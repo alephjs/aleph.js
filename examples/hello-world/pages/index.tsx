@@ -3,7 +3,7 @@ import Logo from '../components/logo.tsx'
 import '../style/index.less'
 
 export async function getStaticProps() {
-    return { name: 'AlephJS' }
+    return { name: 'Aleph.js' }
 }
 
 export default function Home({ name }: { name: string }) {
@@ -11,14 +11,14 @@ export default function Home({ name }: { name: string }) {
 
     return (
         <div className="wrapper">
-            <p><Logo /></p>
+            <p className="logo"><Logo /></p>
             <p>Welcome to use <strong>{name}</strong>!</p>
             <p className="links">
-                <span>[</span>
+                <a href="https://alephjs.org/guides" target="_blank">Get Started</a>
+                <span>&middot;</span>
                 <a href="https://alephjs.org/docs" target="_blank">Docs</a>
-                <span>|</span>
+                <span>&middot;</span>
                 <a href="https://github.com/postui/alephjs" target="_blank">Github</a>
-                <span>]</span>
             </p>
             <p className="counter">
                 <span>Counter:</span>

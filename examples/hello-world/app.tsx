@@ -5,7 +5,7 @@ export default function App({ children }: PropsWithChildren<{}>) {
     return (
         <Fragment>
             <Head>
-                <title>Welcome - AlephJS</title>
+                <title>Hello World - AlephJS</title>
             </Head>
             {children}
         </Fragment>

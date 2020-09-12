@@ -1,12 +1,27 @@
-.wrapper {
-    margin: 90px;
-    text-align: center;
+main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
 
+.wrapper {
     p {
         margin: 0;
+        line-height: 1.5;
         font-size: 15px;
-        line-height: 1.8;
-        font-family: Verdana, Geneva, Tahoma, sans-serif;
+        font-family: Helvetica, Arial, sans-serif;
+        text-align: center;
+        color: #333;
+
+        strong {
+            color: #000;
+            font-weight: 600;
+        }
+    }
+
+    .logo + p {
+        margin-top: 15px;
     }
 
     .links {
@@ -15,30 +30,32 @@
             vertical-align: middle;
         }
         span {
-            color: #aaa;
+            color: #999;
         }
         a {
             margin: 0 9px;
             color: #0090f0;
             text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
+
+            &:hover {
+                text-decoration: underline;
+            }
         }
     }
 
     .counter {
         margin-top: 30px;
 
-        strong {
-            display: inline-block;
-            width: 45px;
-            text-align: center;
-        }
+        strong,
         button {
             display: inline-block;
-            width: 24px;
             text-align: center;
+        }
+        strong {
+            width: 45px;
+        }
+        button {
+            width: 24px;
         }
         button + button {
             margin-left: 6px;
