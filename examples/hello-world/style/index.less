@@ -45,6 +45,14 @@ main {
 
     .counter {
         margin-top: 30px;
+        padding: 9px 60px;
+        border: 1px dashed #eee;
+        border-radius: 6px;
+        transition: border-color 0.15s ease-in;
+
+        &:hover {
+            border-color: #ddd;
+        }
 
         strong,
         button {
@@ -56,6 +64,7 @@ main {
         }
         button {
             width: 24px;
+            cursor: pointer;
         }
         button + button {
             margin-left: 6px;
