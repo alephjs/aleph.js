@@ -17,7 +17,7 @@ export default function Home({ name }: { name: string }) {
                 <span>[</span>
                 <a href="https://alephjs.org/docs" target="_blank">Docs</a>
                 <span>|</span>
-                <a href="https://github.com/postui/postjs" target="_blank">Github</a>
+                <a href="https://github.com/postui/alephjs" target="_blank">Github</a>
                 <span>]</span>
             </p>
             <p className="counter">
