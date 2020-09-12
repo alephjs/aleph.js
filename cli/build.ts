@@ -13,7 +13,8 @@ Options:
     -h, --help  Prints help message
 `
 
-export default function (appDir: string, options: Record<string, string | boolean>) {
+export default async function (appDir: string, options: Record<string, string | boolean>) {
     const project = new Project(appDir, 'production')
-    project.build()
+    await project.build()
+    Deno.exit(0)
 }

@@ -18,7 +18,8 @@ export default async function (appDir: string, options: Record<string, string | 
     const gzData = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))
-    const template = 'hello-world'
+    // todo: add template select ui
+    let template = 'hello-world'
     for await (const entry of entryList) {
         if (entry.fileName.startsWith(`postjs-templates-master/${template}/`)) {
             const fp = path.join(appDir, util.trimPrefix(entry.fileName, `postjs-templates-master/${template}/`))

@@ -211,7 +211,6 @@ export default class Project {
 
     async build() {
         await this.ready
-        Deno.exit(0)
     }
 
     async importModuleAsComponent(moduleId: string, ...args: any[]) {
