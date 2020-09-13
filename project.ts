@@ -226,9 +226,9 @@ export default class Project {
     }
 
     private async _loadConfig() {
-        const { POSTJS_IMPORT_MAP } = globalThis as any
-        if (POSTJS_IMPORT_MAP) {
-            const { imports } = POSTJS_IMPORT_MAP
+        const { ALEPH_IMPORT_MAP } = globalThis as any
+        if (ALEPH_IMPORT_MAP) {
+            const { imports } = ALEPH_IMPORT_MAP
             Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
         }
 
@@ -340,7 +340,7 @@ export default class Project {
             for (const p of event.paths) {
                 const { rootDir, outputDir } = this.config
                 const rp = util.trimPrefix(util.trimPrefix(p, rootDir), '/')
-                if ((reModuleExt.test(rp) || reStyleModuleExt.test(rp)) && !rp.startsWith('.postjs/') && !rp.startsWith(outputDir.slice(1))) {
+                if ((reModuleExt.test(rp) || reStyleModuleExt.test(rp)) && !rp.startsWith('.aleph/') && !rp.startsWith(outputDir.slice(1))) {
                     const moduleId = './' + rp.replace(reModuleExt, '.js')
                     if (this.#fsWatchQueue.has(moduleId)) {
                         clearTimeout(this.#fsWatchQueue.get(moduleId)!)
@@ -421,7 +421,7 @@ export default class Project {
         }
 
         const name = path.basename(sourceFile.split('?')[0]).replace(reModuleExt, '')
-        const saveDir = path.join(rootDir, '.postjs', this.mode, path.dirname(isRemote ? this._renameRemotePath(sourceFile) : sourceFile))
+        const saveDir = path.join(rootDir, '.aleph', this.mode, path.dirname(isRemote ? this._renameRemotePath(sourceFile) : sourceFile))
         const metaFile = path.join(saveDir, `${name}.meta.json`)
         const mod: Module = {
             id,

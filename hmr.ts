@@ -1,5 +1,5 @@
 /**
- * postjs hmr
+ * aleph.js hmr
  * prior works: react-refresh & esm-hmr
  * @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
  * @link https://github.com/pikapkg/esm-hmr
@@ -64,7 +64,7 @@ class Module {
 const { location, WebSocket } = window as any
 const { protocol, host } = location
 const messageQueue: any[] = []
-const socket: IWebSocket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr', /*  'postjs-hmr' */)
+const socket: IWebSocket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr', /*  'aleph-hmr' */)
 const modules: Map<string, Module> = new Map()
 
 socket.addEventListener('open', () => {

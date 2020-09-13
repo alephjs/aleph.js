@@ -1,6 +1,6 @@
-# Contributing to postjs
+# Contributing to aleph.js
 
-Welcome, and thank you for taking time in contributing to postjs!
+Welcome, and thank you for taking time in contributing to aleph.js!
 
 ## Development Setup
 
@@ -8,8 +8,8 @@ You will need [deno](https://deno.land/) 1.3+ and [vscode](https://code.visualst
 
 ```bash
 # clone the code
-$ git clone https://github.com/postui/postjs
-$ cd postjs
+$ git clone https://github.com/postui/aleph.js
+$ cd aleph.js
 
 # run examples
 $ deno run -A --unstable --importmap=import_map.json cli.ts ./examples/hello-world --log=debug

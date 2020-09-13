@@ -1,15 +1,15 @@
 import { start } from '../server/server.ts'
 
-export const helpMessage = `Starts the postjs app in production mode.
+export const helpMessage = `Starts the aleph app in production mode.
 
 Usage:
     deno -A run https://alephjs.org/cli.ts start <dir> [...options]
 
-<dir> represents the directory of the postjs app,
+<dir> represents the directory of the aleph app,
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -p, --port  A port number to start the postjs app, default is 8080
+    -p, --port  A port number to start the aleph app, default is 8080
     -h, --help  Prints help message
     -l, --log   Sets log level
 `

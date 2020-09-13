@@ -1,12 +1,12 @@
 
 import Project from '../project.ts'
 
-export const helpMessage = `Builds the postjs app in production mode.
+export const helpMessage = `Builds the aleph app in production mode.
 
 Usage:
     deno -A run https://alephjs.org/cli.ts build <dir> [...options]
 
-<dir> represents the directory of the postjs app,
+<dir> represents the directory of the aleph app,
 if the <dir> is empty, the current directory will be used.
 
 Options:

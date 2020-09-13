@@ -6,11 +6,11 @@ import util from './util.ts'
 import { version } from './version.ts'
 
 const commands = ['init', 'fetch', 'dev', 'start', 'build']
-const helpMessage = `postjs v${version}
+const helpMessage = `aleph.js v${version}
 The radical new Front-End Framework with deno.
 
 Docs: https://alephjs.org/docs
-Bugs: https://github.com/postui/postjs/issues
+Bugs: https://github.com/postui/aleph.js/issues
 
 Usage:
     deno -A run https://alephjs.org/cli.ts <command> [...options]
@@ -48,16 +48,16 @@ function main() {
         }
     }
 
-    // prints postjs version
+    // prints aleph.js version
     if (argOptions.v) {
-        console.log(`postjs v${version}`)
+        console.log(`aleph.js v${version}`)
         Deno.exit(0)
     }
 
-    // prints postjs and deno version
+    // prints aleph.js and deno version
     if (argOptions.version) {
         const { deno, v8, typescript } = Deno.version
-        console.log(`postjs v${version}\ndeno v${deno}\nv8 v${v8}\ntypescript v${typescript}`)
+        console.log(`aleph.js v${version}\ndeno v${deno}\nv8 v${v8}\ntypescript v${typescript}`)
         Deno.exit(0)
     }
 
@@ -66,7 +66,7 @@ function main() {
     if (argOptions.h || argOptions.help) {
         if (hasCommand) {
             import(`./cli/${args.shift()}.ts`).then(({ helpMessage }) => {
-                console.log(`postjs v${version}`)
+                console.log(`aleph.js v${version}`)
                 if (util.isNEString(helpMessage)) {
                     console.log(helpMessage)
                 }
@@ -86,7 +86,7 @@ function main() {
     // proxy alephjs.org
     if (existsSync('./import_map.json')) {
         const { imports } = JSON.parse(Deno.readTextFileSync('./import_map.json'))
-        Object.assign(globalThis, { POSTJS_IMPORT_MAP: { imports } })
+        Object.assign(globalThis, { ALEPH_IMPORT_MAP: { imports } })
         if (imports['https://alephjs.org/']) {
             const match = String(imports['https://alephjs.org/']).match(/^http:\/\/(localhost|127.0.0.1):(\d+)\/$/)
             if (match) {
@@ -132,8 +132,8 @@ function main() {
                                     'Content-Length': info.size.toString()
                                 }),
                                 body: createHtml({
-                                    head: [`<title>postjs/</title>`],
-                                    body: `<h1>&nbsp;postjs/</h1><ul>${Array.from(items).join('')}</ul>`
+                                    head: [`<title>aleph.js/</title>`],
+                                    body: `<h1>&nbsp;aleph.js/</h1><ul>${Array.from(items).join('')}</ul>`
                                 })
                             })
                             return
