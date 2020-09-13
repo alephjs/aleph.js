@@ -6,11 +6,10 @@ import transformReactRefresh from './transform-react-refresh.ts'
 import { CreatePlainTransformer, CreateTransformer } from './transformer.ts'
 
 export interface CompileOptions {
-    target?: 'ES2015' | 'ES2016' | 'ES2017' | 'ES2018' | 'ES2019' | 'ES2020' | 'ESNext'
+    target?: string
     mode?: 'development' | 'production'
     rewriteImportPath?: (importPath: string) => string
     reactRefresh?: boolean
-    transformers?: (ts.TransformerFactory<ts.SourceFile> | ts.CustomTransformerFactory)[]
 }
 
 export function createSourceFile(fileName: string, source: string) {
@@ -21,8 +20,18 @@ export function createSourceFile(fileName: string, source: string) {
     )
 }
 
+const allowTargets = [
+    'esnext',
+    'es2015',
+    'es2016',
+    'es2017',
+    'es2018',
+    'es2019',
+    'es2020',
+]
+
 export function compile(fileName: string, source: string, { target: targetName = 'ES2015', mode, rewriteImportPath, reactRefresh }: CompileOptions) {
-    const target = ['esnext', 'es2015', 'es2016', 'es2017', 'es2018', 'es2019', 'es2020'].indexOf(targetName.toLowerCase())
+    const target = allowTargets.indexOf(targetName.toLowerCase())
     const transformers: ts.CustomTransformers = {
         before: [],
         after: []

@@ -79,6 +79,10 @@ function main() {
         }
     }
 
+    if (argOptions.l || argOptions.log) {
+        log.setLevel(String(argOptions.l || argOptions.log))
+    }
+
     // proxy alephjs.org
     if (existsSync('./import_map.json')) {
         const { imports } = JSON.parse(Deno.readTextFileSync('./import_map.json'))

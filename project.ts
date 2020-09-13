@@ -571,6 +571,7 @@ export default class Project {
                 mod.hash = this._hash(mod.jsContent)
             } else {
                 const compileOptions = {
+                    target: this.config.target,
                     mode: this.mode,
                     reactRefresh: this.isDev && !mod.isRemote,
                     rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path)

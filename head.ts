@@ -2,7 +2,7 @@ import React, { Children, createElement, isValidElement, PropsWithChildren, Reac
 import util from './util.ts'
 
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
-const serverStyles: Array<{ id: string, css: string }> = []
+const serverStyles: Map<string, string> = new Map()
 
 export function renderHead(styleModules?: string[]) {
     const tags: string[] = []
@@ -27,25 +27,18 @@ export function renderHead(styleModules?: string[]) {
             }
         }
     })
-    if (styleModules) {
-        serverStyles.forEach(({ id, css }) => {
-            if (styleModules.includes(id)) {
-                tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>\n${css}</style>`)
-            }
-        })
-    }
+    styleModules?.forEach(id => {
+        if (serverStyles.has(id)) {
+            tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>\n${serverStyles.get(id)}</style>`)
+        }
+    })
     serverHeadElements.splice(0, serverHeadElements.length)
     return tags
 }
 
 export function applyCSS(id: string, css: string) {
     if (window.Deno) {
-        const prev = serverStyles.find(({ id: _id }) => _id === id)
-        if (prev) {
-            prev.css = css
-        } else {
-            serverStyles.push({ id, css })
-        }
+        serverStyles.set(id, css)
     } else {
         const { document } = (window as any)
         const textEl = document.createTextNode(css)

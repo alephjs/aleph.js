@@ -11,6 +11,7 @@ if the <dir> is empty, the current directory will be used.
 
 Options:
     -h, --help  Prints help message
+    -l, --log   Sets log level
 `
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {

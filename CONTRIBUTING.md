@@ -12,5 +12,5 @@ $ git clone https://github.com/postui/postjs
 $ cd postjs
 
 # run examples
-$ deno run -A --unstable --importmap=import_map.json cli.ts ./examples/hello-world
+$ deno run -A --unstable --importmap=import_map.json cli.ts ./examples/hello-world --log=debug
 ```
