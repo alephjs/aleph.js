@@ -11,13 +11,12 @@ A radical new Front-End Framework in [deno](https://deno.land), inspired by [nex
 
 ## Features
 - Zero Config
-- Typescript with Deno
+- Typescript in Deno
 - ES Module Ready
 - HMR with Fast Refresh
-- SSR and SSG
-- File-system Routing
-- API Routes
-- Built-in CSS Support
+- File-system Page/API Routing
+- Built-in Less(CSS) Support
+- SSR/SSG
 
 ## Usage
 ```bash
