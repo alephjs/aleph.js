@@ -4,11 +4,10 @@
     "files.exclude": {
         "**/.git": true,
         "**/.DS_Store": true,
-        "**/Thumbs.db": true,
-        "/out/": true,
+        "**/Thumbs.db": true
     },
     "[javascript]": {
-        "editor.defaultFormatter": "vscode.typescript-language-features",
+        "editor.defaultFormatter": "vscode.typescript-language-features"
     },
     "[typescript]": {
         "editor.defaultFormatter": "vscode.typescript-language-features",
@@ -16,7 +15,7 @@
         "editor.formatOnPaste": true,
         "editor.codeActionsOnSave": {
             "source.organizeImports": true,
-        },
+        }
     },
     "deno.enable": true,
     "deno.unstable": true,

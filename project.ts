@@ -1,5 +1,5 @@
 import type { APIHandle, Location, RouterURL } from './api.ts'
-import { colors, exists, existsSync, Md5, path, Sha1, walk } from './deps.ts'
+import { colors, ensureDir, exists, existsSync, Md5, path, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
@@ -7,12 +7,17 @@ import route from './route.ts'
 import { compile } from './tsc/compile.ts'
 import util from './util.ts'
 import AnsiUp from './vendor/ansi-up/ansi-up.ts'
-import less from './vendor/less/dist/less.js'
+import './vendor/clean-css-builds/v4.2.2.js'
+import less from './vendor/less/less.js'
+import { minify } from './vendor/terser/terser.js'
 
 const reHttp = /^https?:\/\//i
 const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i
 const reStyleModuleExt = /\.(css|less|sass|scss)$/i
 const reHashJs = /\.[0-9a-fx]{9}\.js$/i
+
+const { CleanCSS } = window as any
+const cleanCSS = new CleanCSS({ compatibility: '*' }) // Internet Explorer 10+
 
 interface Config {
     readonly rootDir: string
@@ -202,13 +207,51 @@ export default class Project {
                 { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
                 { src: path.join(baseUrl, `/_dist/main.${mainMod.hash.slice(0, 9)}.js`), type: 'module' },
             ],
-            body
+            body,
+            minify: !this.isDev
         })
         return [code, html]
     }
 
     async build() {
+        const start = performance.now()
+        const outputDir = path.join(this.srcDir, this.config.outputDir)
+        const publicDir = path.join(this.srcDir, 'public')
+        const distDir = path.join(outputDir, '_dist')
         await this.ready
+        if (await this._existsDir(outputDir)) {
+            await Deno.remove(outputDir, { recursive: true })
+        }
+        await Promise.all([outputDir, distDir].map(dir => ensureDir(dir)))
+        await Promise.all(Array.from(this.#modules.values())
+            .filter(({ id }) => {
+                switch (id) {
+                    case './renderer.js':
+                    case 'deno.land/x/aleph/renderer.js':
+                    case 'deno.land/x/aleph/vendor/react-dom-server/server.js':
+                        return false
+                    default:
+                        return !id.startsWith('./api/')
+                }
+            })
+            .map(({ sourceFile, isRemote, jsContent, hash }) => {
+                const saveDir = path.join(distDir, path.dirname(isRemote ? this._renameRemotePath(sourceFile) : sourceFile))
+                const name = path.basename(sourceFile.split('?')[0]).replace(reModuleExt, '')
+                const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, 9))) + '.js'
+                return this._writeTextFile(jsFile, jsContent)
+            }))
+        for (const pathname of this.#pageModules.keys()) {
+            const [_, html] = await this.getPageHtml({ pathname })
+            const htmlFile = path.join(outputDir, pathname, 'index.html')
+            await this._writeTextFile(htmlFile, html)
+        }
+        if (this._existsDir(publicDir)) {
+            for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
+                const rp = path.resolve(util.trimPrefix(p, publicDir))
+                await Deno.copyFile(p, path.join(outputDir, rp))
+            }
+        }
+        log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
     async importModuleAsComponent(moduleId: string, ...args: any[]) {
@@ -273,7 +316,7 @@ export default class Project {
         const pagesDir = path.join(this.srcDir, 'pages')
 
         if (!(await this._existsDir(pagesDir))) {
-            log.error("please create some pages.")
+            log.error('please create some pages.')
             Deno.exit(0)
         }
 
@@ -285,22 +328,22 @@ export default class Project {
         }
 
         for await (const { path: p } of walk(pagesDir, walkOptions)) {
-            const name = path.basename(p)
-            const pagePath = '/' + name.replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/?index$/i, '')
+            const rp = path.resolve(util.trimPrefix(p, pagesDir)) || '/'
+            const pagePath = rp.replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/?index$/i, '/')
             this.#pageModules.set(pagePath, {
-                moduleId: './pages/' + name.replace(reModuleExt, '') + '.js',
+                moduleId: './pages' + rp.replace(reModuleExt, '') + '.js',
                 rendered: {
                     head: [],
                     html: ''
                 }
             })
-            await this._compile('./pages/' + name)
+            await this._compile('./pages' + rp)
         }
 
         if (await this._existsDir(apiDir)) {
             for await (const { path: p } of walk(apiDir, walkOptions)) {
-                const name = path.basename(p)
-                await this._compile('./api/' + name)
+                const rp = path.resolve(util.trimPrefix(p, apiDir))
+                await this._compile('./api/' + rp)
             }
         }
 
@@ -537,10 +580,13 @@ export default class Project {
             const t = performance.now()
             mod.deps = []
             if (mod.sourceType === 'css' || mod.sourceType === 'less') {
-                let css = sourceContent
-                if (mod.sourceType === 'less') {
-                    const output = await less.render(sourceContent || '/* empty content */')
-                    css = output.css
+                // todo: sourceMap
+                let { css } = await less.render(sourceContent || '/* empty content */')
+                if (this.isDev) {
+                    css = '\n' + String(css).trim() + '\n'
+                } else {
+                    const output = cleanCSS.minify(css)
+                    css = output.styles
                 }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(this._relativePath(
@@ -562,11 +608,24 @@ export default class Project {
                 if (diagnostics && diagnostics.length > 0) {
                     throw new Error(`compile ${sourceFile}: ${diagnostics.map(d => d.messageText).join(' ')}`)
                 }
-                mod.jsContent = outputText.replace(/ from ("|')tslib("|');?/g, ' from ' + JSON.stringify(this._relativePath(
+                const jsContent = outputText.replace(/import([^'"]*)("|')tslib("|')(\)|;)?/g, 'import$1' + JSON.stringify(this._relativePath(
                     path.dirname(path.resolve('/', mod.isRemote ? this._renameRemotePath(mod.sourceFile) : mod.sourceFile)),
                     '/-/deno.land/x/aleph/vendor/tslib/tslib.js'
-                )) + ';')
-                mod.jsSourceMap = sourceMapText!
+                )) + '$4')
+                if (this.isDev) {
+                    mod.jsContent = jsContent
+                    mod.jsSourceMap = sourceMapText!
+                } else {
+                    const { code, map } = await minify(jsContent, {
+                        compress: false,
+                        mangle: true,
+                        sourceMap: {
+                            content: sourceMapText!,
+                        }
+                    })
+                    mod.jsContent = code
+                    mod.jsSourceMap = map
+                }
                 mod.hash = this._hash(mod.jsContent)
             }
 
@@ -587,7 +646,7 @@ export default class Project {
                         path.dirname(path.resolve('/', sourceFile)),
                         path.resolve('/', dep.path.replace(reModuleExt, ''))
                     )
-                    mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]+)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
+                    mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
                             importPath.slice(0, importPath.length - 13) === depImportPath
@@ -632,7 +691,7 @@ export default class Project {
                         path.resolve('/', dep.path.replace(reModuleExt, ''))
                     )
                     dep.hash = depHash
-                    mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]+)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
+                    mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
                             importPath.slice(0, importPath.length - 13) === depImportPath
@@ -801,9 +860,7 @@ export default class Project {
 
     private async _writeTextFile(filepath: string, content: string) {
         const dir = path.dirname(filepath)
-        if (!existsSync(dir)) {
-            await Deno.mkdir(dir, { recursive: true })
-        }
+        await ensureDir(dir)
         await Deno.writeTextFile(filepath, content)
     }
 

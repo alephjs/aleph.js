@@ -29,7 +29,7 @@ export function renderHead(styleModules?: string[]) {
     })
     styleModules?.forEach(id => {
         if (serverStyles.has(id)) {
-            tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>\n${serverStyles.get(id)}</style>`)
+            tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>${serverStyles.get(id)}</style>`)
         }
     })
     serverHeadElements.splice(0, serverHeadElements.length)
