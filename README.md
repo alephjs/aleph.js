@@ -1,5 +1,8 @@
-<div style="text-align:center;margin-bottom: 60px">
-    <img src="./logo.png" height=60>
+<div align="center">
+    <img src="./examples/hello-world/public/logo.png" height=75 />
+    <br/>
+    <br/>
+    <br/>
 </div>
 
 # AlephJS
@@ -22,14 +25,14 @@ A radical new Front-End Framework in [deno](https://deno.land), inspired by [nex
 # install aleph.js command
 $ deno install --allow-read --allow-write --allow-net -n aleph https://deno.land/x/aleph/cli.ts
 
-# initiate a app
+# initiate a new app
 $ aleph init hello
 $ cd hello
 
 # start app in development mode
 $ aleph
 
-# build the app
+# build app
 $ aleph build
 ```
 
