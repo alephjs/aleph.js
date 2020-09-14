@@ -6,8 +6,8 @@ import util from './util.ts'
 import { version } from './version.ts'
 
 const commands = ['init', 'fetch', 'dev', 'start', 'build']
-const helpMessage = `aleph.js v${version}
-The radical new Front-End Framework with deno.
+const helpMessage = `Aleph.js v${version}
+The radical new Front-End Framework in deno.
 
 Docs: https://alephjs.org/docs
 Bugs: https://github.com/postui/aleph.js/issues
@@ -66,7 +66,7 @@ function main() {
     if (argOptions.h || argOptions.help) {
         if (hasCommand) {
             import(`./cli/${args.shift()}.ts`).then(({ helpMessage }) => {
-                console.log(`aleph.js v${version}`)
+                console.log(`Aleph.js v${version}`)
                 if (util.isNEString(helpMessage)) {
                     console.log(helpMessage)
                 }
