@@ -15,15 +15,17 @@ Options:
 `
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const resp = await fetch('https://codeload.github.com/postui/aleph-templates/tar.gz/master')
+    const rev = 'master'
+    const resp = await fetch('https://codeload.github.com/postui/alephjs-templates/tar.gz/' + rev)
     const gzData = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))
+
     // todo: add template select ui
     let template = 'hello-world'
     for await (const entry of entryList) {
-        if (entry.fileName.startsWith(`aleph-templates-master/${template}/`)) {
-            const fp = path.join(appDir, util.trimPrefix(entry.fileName, `aleph-templates-master/${template}/`))
+        if (entry.fileName.startsWith(`alephjs-templates-${rev}/${template}/`)) {
+            const fp = path.join(appDir, util.trimPrefix(entry.fileName, `alephjs-templates-${rev}/${template}/`))
             if (entry.type === 'directory') {
                 await ensureDir(fp)
                 continue
