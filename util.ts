@@ -146,3 +146,5 @@ export default {
         }
     }
 }
+
+export const hashShort = 7

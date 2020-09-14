@@ -3,7 +3,7 @@ import { createHtml } from '../html.ts'
 import log from '../log.ts'
 import Project from '../project.ts'
 import route from '../route.ts'
-import util from '../util.ts'
+import util, { hashShort } from '../util.ts'
 import { PostAPIRequest, PostAPIResponse } from './api.ts'
 import { getContentType } from './mime.ts'
 
@@ -36,7 +36,10 @@ export async function start(appDir: string, port: number, isDev = false) {
                                                         socket.send(JSON.stringify({
                                                             type: 'update',
                                                             id: mod.id,
-                                                            updateUrl: path.resolve(path.join(project.config.baseUrl, '/_dist/'), mod.id.replace(/\.js$/, '') + `.${hash!.slice(0, 9)}.js`)
+                                                            updateUrl: path.resolve(
+                                                                path.join(project.config.baseUrl, '/_dist/'),
+                                                                mod.id.replace(/\.js$/, '') + `.${hash!.slice(0, hashShort)}.js`
+                                                            )
                                                         }))
                                                     }
                                                 })

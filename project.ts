@@ -5,12 +5,12 @@ import { createHtml } from './html.ts'
 import log from './log.ts'
 import route from './route.ts'
 import { compile } from './tsc/compile.ts'
-import util from './util.ts'
+import util, { hashShort } from './util.ts'
 
 const reHttp = /^https?:\/\//i
 const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i
 const reStyleModuleExt = /\.(css|less|sass|scss)$/i
-const reHashJs = /\.[0-9a-fx]{9}\.js$/i
+const reHashJs = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
 
 const { CleanCSS } = window as any
 const cleanCSS = new CleanCSS({ compatibility: '*' }) // Internet Explorer 10+
@@ -145,8 +145,8 @@ export default class Project {
             modId = util.trimPrefix(modId, '/-/')
         } else {
             modId = '.' + modId
-            if (/\.[0-9a-f]{9}\.js$/.test(modId)) {
-                const id = modId.slice(0, modId.length - 13)
+            if (reHashJs.test(modId)) {
+                const id = modId.slice(0, modId.length - (hashShort + 4))
                 if (reStyleModuleExt.test(id)) {
                     modId = id
                 } else {
@@ -201,7 +201,7 @@ export default class Project {
             head: head,
             scripts: [
                 { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
-                { src: path.join(baseUrl, `/_dist/main.${mainMod.hash.slice(0, 9)}.js`), type: 'module' },
+                { src: path.join(baseUrl, `/_dist/main.${mainMod.hash.slice(0, hashShort)}.js`), type: 'module' },
             ],
             body,
             minify: !this.isDev
@@ -233,7 +233,7 @@ export default class Project {
             .map(({ sourceFile, isRemote, jsContent, hash }) => {
                 const saveDir = path.join(distDir, path.dirname(isRemote ? this._renameRemotePath(sourceFile) : sourceFile))
                 const name = path.basename(sourceFile.split('?')[0]).replace(reModuleExt, '')
-                const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, 9))) + '.js'
+                const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
                 return this._writeTextFile(jsFile, jsContent)
             }))
         for (const pathname of this.#pageModules.keys()) {
@@ -475,7 +475,7 @@ export default class Project {
 
         if (existsSync(metaFile)) {
             const { sourceHash, hash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
-            const jsFile = path.join(saveDir, name + (mod.isRemote ? '' : '.' + hash.slice(0, 9))) + '.js'
+            const jsFile = path.join(saveDir, name + (mod.isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
             if (util.isNEString(sourceHash) && util.isNEString(hash) && util.isArray(deps) && existsSync(jsFile)) {
                 try {
                     mod.jsContent = await Deno.readTextFile(jsFile)
@@ -645,9 +645,9 @@ export default class Project {
                     mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
-                            importPath.slice(0, importPath.length - 13) === depImportPath
+                            importPath.slice(0, importPath.length - (hashShort + 4)) === depImportPath
                         ) {
-                            return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, 9)}.js${qr}${end}`
+                            return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}${end}`
                         }
                         return s
                     })
@@ -660,7 +660,7 @@ export default class Project {
         }
 
         if (fsync) {
-            mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, 9)}`)) + '.js'
+            mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + '.js'
             await Promise.all([
                 this._writeTextFile(metaFile, JSON.stringify({
                     sourceFile,
@@ -690,14 +690,14 @@ export default class Project {
                     mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
-                            importPath.slice(0, importPath.length - 13) === depImportPath
+                            importPath.slice(0, importPath.length - (hashShort + 4)) === depImportPath
                         ) {
-                            return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, 9)}.js${qr}${end}`
+                            return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}${end}`
                         }
                         return s
                     })
                     mod.hash = this._hash(mod.jsContent)
-                    mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, 9)}.js`
+                    mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
                     this._writeTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
                         sourceFile: mod.sourceFile,
                         sourceHash: mod.sourceHash,
@@ -750,7 +750,7 @@ export default class Project {
                     '/' + path.join('-', sourceUrl.host, pathname)
                 )
             } else {
-                rewrittenPath = importPath.replace(reModuleExt, '') + '.' + 'x'.repeat(9)
+                rewrittenPath = importPath.replace(reModuleExt, '') + '.' + 'x'.repeat(hashShort)
             }
         }
         if (reHttp.test(importPath)) {

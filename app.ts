@@ -4,7 +4,7 @@ import type { AppManifest, RouterURL } from './api.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
-import util from './util.ts'
+import util, { hashShort } from './util.ts'
 
 export const AppManifestContext = createContext<AppManifest>({
     baseUrl: '/',
@@ -49,7 +49,7 @@ function Main({
         )
         if (url.pagePath in pageModules) {
             const { moduleId, hash } = pageModules[url.pagePath]!
-            const importPath = util.cleanPath(baseUrl + '_dist/' + moduleId.replace(/\.js$/, `.${hash.slice(0, 9)}.js`))
+            const importPath = util.cleanPath(baseUrl + '_dist/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
             const { default: Component, __staticProps: staticProps } = await import(importPath)
             setPage({ url, Component, staticProps })
         } else {
@@ -150,8 +150,8 @@ export async function bootstrap(manifest: AppManifest) {
                 { default: AppComponent, __staticProps: appStaticProps },
                 { default: PageComponent, __staticProps: staticProps }
             ] = await Promise.all([
-                appModule ? import(baseUrl + `_dist/app.${appModule.hash.slice(0, 9)}.js`) : async () => ({}),
-                import(baseUrl + '_dist/' + pageModule.moduleId.replace(/\.js$/, `.${pageModule.hash.slice(0, 9)}.js`)),
+                appModule ? import(baseUrl + `_dist/app.${appModule.hash.slice(0, hashShort)}.js`) : async () => ({}),
+                import(baseUrl + '_dist/' + pageModule.moduleId.replace(/\.js$/, `.${pageModule.hash.slice(0, hashShort)}.js`)),
             ])
             const el = React.createElement(
                 Main,
