@@ -19,13 +19,11 @@ A radical new Front-End Framework in [deno](https://deno.land), inspired by [nex
 - API Routes
 - Built-in CSS Support
 
-## Installation
-```bash
-$ deno install --allow-read --allow-write --allow-net -n aleph https://deno.land/x/aleph/cli.ts
-```
-
 ## Usage
 ```bash
+# install aleph.js command
+deno install --allow-read --allow-write --allow-net -n aleph https://deno.land/x/aleph/cli.ts
+
 # initiate a new app
 $ aleph init hello
 $ cd hello
@@ -35,6 +33,9 @@ $ aleph
 
 # build app
 $ aleph build
+
+# help message
+$ aleph -h
 ```
 
 ## Documentation
