@@ -1,12 +1,13 @@
 <div align="center">
-    <img src="./examples/hello-world/public/logo.png" height=75 />
-    <br/>
+    <img src="./examples/hello-world/public/logo.png" height=60 />
     <br/>
     <br/>
 </div>
 
 # AlephJS
 A radical new Front-End Framework in [deno](https://deno.land), inspired by [next.js](https://nextjs.org) and [snowpack](https://www.snowpack.dev).
+
+🚧 This project is work in progress.
 
 ## Features
 - Zero Config
@@ -18,13 +19,13 @@ A radical new Front-End Framework in [deno](https://deno.land), inspired by [nex
 - API Routes
 - Built-in CSS Support
 
-🚧 This project is work in progress.
+## Installation
+```bash
+$ deno install --allow-read --allow-write --allow-net -n aleph https://deno.land/x/aleph/cli.ts
+```
 
 ## Usage
 ```bash
-# install aleph.js command
-$ deno install --allow-read --allow-write --allow-net -n aleph https://deno.land/x/aleph/cli.ts
-
 # initiate a new app
 $ aleph init hello
 $ cd hello
