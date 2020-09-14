@@ -4,9 +4,7 @@ import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import route from './route.ts'
-import { compile, createSourceFile } from './tsc/compile.ts'
-import transformImportPathRewrite from './tsc/transform-import-path-rewrite.ts'
-import { traverse } from './tsc/traverse.ts'
+import { compile } from './tsc/compile.ts'
 import util from './util.ts'
 import AnsiUp from './vendor/ansi-up/ansi-up.ts'
 import less from './vendor/less/dist/less.js'
@@ -497,7 +495,7 @@ export default class Project {
                 } catch (err) {
                     throw new Error(`Download ${sourceFile}: ${err.message}`)
                 }
-            } else if (/^http:\/\/(localhost|127.0.0.1)(:\d+)?\//.test(url)) {
+            } else if (/^https?:\/\/(localhost|127.0.0.1)(:\d+)?\//.test(url)) {
                 try {
                     const text = await fetch(url).then(resp => {
                         if (resp.status == 200) {
@@ -553,22 +551,6 @@ export default class Project {
                 ].join('\n')
                 mod.jsSourceMap = ''
                 mod.hash = this._hash(mod.jsContent)
-            } else if (mod.sourceType === 'js' && mod.isRemote) {
-                const sf = createSourceFile(mod.sourceFile, sourceContent)
-                const rewrittenPaths: Record<string, string> = {}
-                traverse(sf, node => transformImportPathRewrite(sf, node, path => {
-                    const rewrittenPath = this._rewriteImportPath(mod, path)
-                    rewrittenPaths[path] = rewrittenPath
-                    return rewrittenPath
-                }))
-                mod.jsContent = sourceContent.replace(/(import|export)([^'"]+)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
-                    if (importPath in rewrittenPaths) {
-                        return `${key}${from}${ql}${rewrittenPaths[importPath]}${qr}${end}`
-                    }
-                    return s
-                })
-                mod.jsSourceMap = ''
-                mod.hash = this._hash(mod.jsContent)
             } else {
                 const compileOptions = {
                     target: this.config.target,
@@ -600,7 +582,7 @@ export default class Project {
             const depMod = await this._compile(dep.path)
             if (dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
-                if (!dep.path.startsWith('http')) {
+                if (!reHttp.test(dep.path)) {
                     const depImportPath = this._relativePath(
                         path.dirname(path.resolve('/', sourceFile)),
                         path.resolve('/', dep.path.replace(reModuleExt, ''))
