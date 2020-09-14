@@ -1,15 +1,11 @@
 import type { APIHandle, Location, RouterURL } from './api.ts'
-import { colors, ensureDir, exists, existsSync, Md5, path, Sha1, walk } from './deps.ts'
+import { AnsiUp, colors, ensureDir, exists, existsSync, less, Md5, minify, path, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import route from './route.ts'
 import { compile } from './tsc/compile.ts'
 import util from './util.ts'
-import AnsiUp from './vendor/ansi-up/ansi-up.ts'
-import './vendor/clean-css-builds/v4.2.2.js'
-import less from './vendor/less/less.js'
-import { minify } from './vendor/terser/terser.js'
 
 const reHttp = /^https?:\/\//i
 const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i

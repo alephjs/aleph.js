@@ -1,5 +1,4 @@
-// @deno-types="../vendor/typescript/lib/typescript.d.ts"
-import ts from '../vendor/typescript/lib/typescript.js'
+import { ts } from '../deps.ts'
 
 /**
  * TS AST transformer to rewrite import path.

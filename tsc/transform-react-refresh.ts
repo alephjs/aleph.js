@@ -4,8 +4,7 @@
  * @link https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js
  */
 
-// @deno-types="../vendor/typescript/lib/typescript.d.ts"
-import ts from '../vendor/typescript/lib/typescript.js'
+import { ts } from '../deps.ts'
 
 type TSFunctionLike = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction
 

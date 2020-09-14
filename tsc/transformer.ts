@@ -1,5 +1,4 @@
-// @deno-types="../vendor/typescript/lib/typescript.d.ts"
-import ts from '../vendor/typescript/lib/typescript.js'
+import { ts } from '../deps.ts'
 
 export function CreatePlainTransformer(transform: (sf: ts.SourceFile, node: ts.Node, ...args: any[]) => ts.VisitResult<ts.Node>, ...args: any[]): ts.TransformerFactory<ts.SourceFile> {
     function nodeVisitor(ctx: ts.TransformationContext, sf: ts.SourceFile) {

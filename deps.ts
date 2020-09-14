@@ -11,4 +11,9 @@ export { fromStreamReader } from 'https://deno.land/std@0.68.0/io/mod.ts'
 export * as path from 'https://deno.land/std@0.68.0/path/mod.ts'
 export * as ws from 'https://deno.land/std@0.68.0/ws/mod.ts'
 export { gzipDecode, gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
-
+export { default as AnsiUp } from './vendor/ansi-up/ansi-up.ts'
+export { default as less } from './vendor/less/less.js'
+export { minify } from './vendor/terser/terser.js'
+// @deno-types="./vendor/typescript/lib/typescript.d.ts"
+export { default as ts } from './vendor/typescript/lib/typescript.js'
+import './vendor/clean-css-builds/v4.2.2.js'

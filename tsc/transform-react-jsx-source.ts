@@ -1,5 +1,4 @@
-// @deno-types="../vendor/typescript/lib/typescript.d.ts"
-import ts from '../vendor/typescript/lib/typescript.js'
+import { ts } from '../deps.ts'
 
 /**
  * TypeScript AST Transformer that adds source file and line number to JSX elements.
