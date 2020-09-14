@@ -1,6 +1,6 @@
 import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { hydrate } from 'https://esm.sh/react-dom'
-import { AppManifest, RouterURL } from './api.ts'
+import type { AppManifest, RouterURL } from './api.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'

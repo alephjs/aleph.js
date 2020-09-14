@@ -1,4 +1,4 @@
-import { APIHandle, Location, RouterURL } from './api.ts'
+import type { APIHandle, Location, RouterURL } from './api.ts'
 import { colors, exists, existsSync, Md5, path, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'

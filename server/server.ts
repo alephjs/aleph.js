@@ -182,13 +182,14 @@ function injectHmr(id: string, jsContent: string) {
     ]
     const reactRefresh = id.endsWith('.js')
     if (reactRefresh) {
+        text.push('')
         text.push(
             `const prevRefreshReg = window.$RefreshReg$`,
             `const prevRefreshSig = window.$RefreshSig$`,
-            `window.$RefreshReg$ = (type, id) => {`,
-            `    RefreshRuntime.register(type, ${JSON.stringify(id)} + " " + id)`,
-            `}`,
-            `window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform`
+            `Object.assign(window, {`,
+            `    $RefreshReg$: (type, id) => RefreshRuntime.register(type, ${JSON.stringify(id)} + " " + id),`,
+            `    $RefreshSig$: RefreshRuntime.createSignatureFunctionForTransform`,
+            `})`,
         )
     }
     text.push('')

@@ -43,7 +43,7 @@ export function createHtml({
         '<!DOCTYPE html>',
         `<html lang="${lang}">`,
         '<head>',
-        `${indent}<meta charSet="utf-8" />`,
+        indent + '<meta charSet="utf-8" />',
         ...headTags.map(tag => indent + tag),
         '</head>',
         '<body>',

@@ -1,4 +1,4 @@
-import { Location, RouterURL } from './api.ts'
+import type { Location, RouterURL } from './api.ts'
 import util from './util.ts'
 
 export default function route(base: string, pagePaths: string[], options?: { location?: { pathname: string, search?: string }, fallback?: string, defaultLocale?: string, locales?: string[] }): RouterURL {

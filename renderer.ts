@@ -1,5 +1,5 @@
 import React, { ComponentType } from 'https://esm.sh/react'
-import { RouterURL } from './api.ts'
+import type { RouterURL } from './api.ts'
 import { RouterContext } from './router.ts'
 import ReactDomServer from './vendor/react-dom-server/server.js'
 export { renderHead } from './head.ts'
