@@ -186,19 +186,19 @@ function injectHmr(id: string, jsContent: string) {
     }
 
     const text = [
-        `import { createHotContext, RefreshRuntime, performReactRefresh } from ${JSON.stringify(hmrImportPath)}`,
-        `import.meta.hot = createHotContext(${JSON.stringify(id)})`
+        `import { createHotContext, RefreshRuntime, performReactRefresh } from ${JSON.stringify(hmrImportPath)};`,
+        `import.meta.hot = createHotContext(${JSON.stringify(id)});`
     ]
     const reactRefresh = id.endsWith('.js')
     if (reactRefresh) {
         text.push('')
         text.push(
-            `const prevRefreshReg = window.$RefreshReg$`,
-            `const prevRefreshSig = window.$RefreshSig$`,
+            `const prevRefreshReg = window.$RefreshReg$;`,
+            `const prevRefreshSig = window.$RefreshSig$;`,
             `Object.assign(window, {`,
             `    $RefreshReg$: (type, id) => RefreshRuntime.register(type, ${JSON.stringify(id)} + " " + id),`,
             `    $RefreshSig$: RefreshRuntime.createSignatureFunctionForTransform`,
-            `})`,
+            `});`,
         )
     }
     text.push('')
@@ -206,12 +206,12 @@ function injectHmr(id: string, jsContent: string) {
     text.push('')
     if (reactRefresh) {
         text.push(
-            'window.$RefreshReg$ = prevRefreshReg',
-            'window.$RefreshSig$ = prevRefreshSig',
-            'import.meta.hot.accept(performReactRefresh)'
+            'window.$RefreshReg$ = prevRefreshReg;',
+            'window.$RefreshSig$ = prevRefreshSig;',
+            'import.meta.hot.accept(performReactRefresh);'
         )
     } else {
-        text.push('import.meta.hot.accept()')
+        text.push('import.meta.hot.accept();')
     }
     return text.join('\n')
 }

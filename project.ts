@@ -579,7 +579,7 @@ export default class Project {
                 // todo: sourceMap
                 let { css } = await less.render(sourceContent || '/* empty content */')
                 if (this.isDev) {
-                    css = '\n' + String(css).trim() + '\n'
+                    css = `\n${String(css).trim()}\n`
                 } else {
                     const output = cleanCSS.minify(css)
                     css = output.styles
@@ -588,9 +588,9 @@ export default class Project {
                     `import { applyCSS } from ${JSON.stringify(this._relativePath(
                         path.dirname(path.resolve('/', mod.sourceFile)),
                         '/-/deno.land/x/aleph/head.js'
-                    ))}`,
-                    `applyCSS(${JSON.stringify(sourceFile)}, ${JSON.stringify(css)})`,
-                ].join('\n')
+                    ))};`,
+                    `applyCSS(${JSON.stringify(sourceFile)}, ${JSON.stringify(css)});`,
+                ].join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
                 mod.hash = this._hash(mod.jsContent)
             } else {
