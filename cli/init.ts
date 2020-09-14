@@ -4,7 +4,7 @@ import util from '../util.ts'
 export const helpMessage = `Initiate a new aleph app.
 
 Usage:
-    deno -A run https://alephjs.org/cli.ts init <dir> [...options]
+    aleph init <dir> [...options]
 
 <dir> represents the directory of the aleph app,
 if the <dir> is empty, the current directory will be used.

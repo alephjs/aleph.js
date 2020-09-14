@@ -13,7 +13,7 @@ Docs: https://alephjs.org/docs
 Bugs: https://github.com/postui/aleph.js/issues
 
 Usage:
-    deno -A run https://alephjs.org/cli.ts <command> [...options]
+    aleph <command> [...options]
 
 Commands:
     ${commands.join(', ')}
@@ -83,12 +83,12 @@ function main() {
         log.setLevel(String(argOptions.l || argOptions.log))
     }
 
-    // proxy alephjs.org
+    // proxy https://deno.land/x/aleph
     if (existsSync('./import_map.json')) {
         const { imports } = JSON.parse(Deno.readTextFileSync('./import_map.json'))
         Object.assign(globalThis, { ALEPH_IMPORT_MAP: { imports } })
-        if (imports['https://alephjs.org/']) {
-            const match = String(imports['https://alephjs.org/']).match(/^http:\/\/(localhost|127.0.0.1):(\d+)\/$/)
+        if (imports['https://deno.land/x/aleph/']) {
+            const match = String(imports['https://deno.land/x/aleph/']).match(/^http:\/\/(localhost|127.0.0.1):(\d+)\/$/)
             if (match) {
                 const port = parseInt(match[2])
                 listenAndServe({ port }, async (req: ServerRequest) => {
@@ -158,7 +158,7 @@ function main() {
                         })
                     }
                 })
-                log.info(`Start alephjs.org proxy server on http://localhost:${port}`)
+                log.info(`Proxy https://deno.land/x/aleph on http://localhost:${port}`)
             }
         }
     }

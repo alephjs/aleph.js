@@ -2,7 +2,7 @@
 export const helpMessage = `Fetches the aleph app remote modules.
 
 Usage:
-    deno -A run https://alephjs.org/cli.ts fetch <dir> [...options]
+    aleph fetch <dir> [...options]
 
 <dir> represents the directory of the aleph app,
 if the <dir> is empty, the current directory will be used.

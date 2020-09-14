@@ -308,12 +308,12 @@ export default class Project {
 
         const innerModules: Record<string, string> = {
             './main.js': [
-                `import 'https://alephjs.org/vendor/tslib/tslib.js'`,
-                this.isDev && `import 'https://alephjs.org/hmr.ts'`,
-                `import { bootstrap } from 'https://alephjs.org/app.ts'`,
+                `import 'https://deno.land/x/aleph/vendor/tslib/tslib.js'`,
+                this.isDev && `import 'https://deno.land/x/aleph/hmr.ts'`,
+                `import { bootstrap } from 'https://deno.land/x/aleph/app.ts'`,
                 `bootstrap(${JSON.stringify(this.manifest)})`
             ].filter(Boolean).join('\n'),
-            './renderer.js': `export * from 'https://alephjs.org/renderer.ts'`
+            './renderer.js': `export * from 'https://deno.land/x/aleph/renderer.ts'`
         }
         for (const path in innerModules) {
             await this._compile(path, { sourceCode: innerModules[path] })
@@ -547,7 +547,7 @@ export default class Project {
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(this._relativePath(
                         path.dirname(path.resolve('/', mod.sourceFile)),
-                        '/-/alephjs.org/head.js'
+                        '/-/deno.land/x/aleph/head.js'
                     ))}`,
                     `applyCSS(${JSON.stringify(sourceFile)}, ${JSON.stringify(css)})`,
                 ].join('\n')
@@ -582,7 +582,7 @@ export default class Project {
                 }
                 mod.jsContent = outputText.replace(/ from ("|')tslib("|');?/g, ' from ' + JSON.stringify(this._relativePath(
                     path.dirname(path.resolve('/', mod.isRemote ? this._renameRemotePath(mod.sourceFile) : mod.sourceFile)),
-                    '/-/alephjs.org/vendor/tslib/tslib.js'
+                    '/-/deno.land/x/aleph/vendor/tslib/tslib.js'
                 )) + ';')
                 mod.jsSourceMap = sourceMapText!
                 mod.hash = this._hash(mod.jsContent)

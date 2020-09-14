@@ -3,7 +3,7 @@ import { start } from '../server/server.ts'
 export const helpMessage = `Starts the aleph app in development mode.
 
 Usage:
-    deno -A run https://alephjs.org/cli.ts dev <dir> [...options]
+    aleph dev <dir> [...options]
 
 <dir> represents the directory of the aleph app,
 if the <dir> is empty, the current directory will be used.

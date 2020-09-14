@@ -170,7 +170,7 @@ export async function start(appDir: string, port: number, isDev = false) {
 function injectHmr(id: string, jsContent: string) {
     let hmrImportPath = path.relative(
         path.dirname(path.resolve('/', id)),
-        '/-/alephjs.org/hmr.js'
+        '/-/deno.land/x/aleph/hmr.js'
     )
     if (!hmrImportPath.startsWith('.') && !hmrImportPath.startsWith('/')) {
         hmrImportPath = './' + hmrImportPath
