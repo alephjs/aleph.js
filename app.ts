@@ -1,6 +1,7 @@
 import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { hydrate } from 'https://esm.sh/react-dom'
 import type { AppManifest, RouterURL } from './api.ts'
+import { ErrorPage } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
@@ -23,18 +24,18 @@ function Main({
 }: {
     manifest: AppManifest
     url: RouterURL
-    app?: { Component: ComponentType<any>, staticProps: any }
-    page: { Component: ComponentType<any>, staticProps: any }
+    app?: { Component: ComponentType<any>, props: any }
+    page: { Component: ComponentType<any>, props: any }
 }) {
     const [manifest, setManifest] = useState(() => initialManifest)
     const [app, setApp] = useState(() => ({
         Component: initialApp?.Component,
-        staticProps: initialApp?.staticProps
+        props: initialApp?.props
     }))
     const [page, setPage] = useState(() => ({
         url: initialUrl,
         Component: initialPage.Component,
-        staticProps: initialPage.staticProps
+        props: initialPage.props
     }))
     const onpopstate = useCallback(async () => {
         const { baseUrl, pageModules, defaultLocale, locales } = manifest
@@ -49,11 +50,18 @@ function Main({
         )
         if (url.pagePath in pageModules) {
             const { moduleId, hash } = pageModules[url.pagePath]!
-            const importPath = util.cleanPath(baseUrl + '_dist/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
-            const { default: Component, __staticProps: staticProps } = await import(importPath)
-            setPage({ url, Component, staticProps })
+            const importPath = util.cleanPath(baseUrl + '/_dist/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
+            const { default: Component, getStaticProps } = await import(importPath)
+            if (util.isFunction(getStaticProps)) {
+                const dataUrl = util.cleanPath(baseUrl + '/_data/' + url.asPath + '/index.json')
+                const resp = await fetch(dataUrl)
+                const data = await resp.json()
+                setPage({ url, Component, props: data })
+            } else {
+                setPage({ url, Component, props: null })
+            }
         } else {
-            setPage({ url, Component: Default404Page, staticProps: null })
+            setPage({ url, Component: ErrorPage, props: { status: 404 } })
         }
     }, [manifest])
 
@@ -67,14 +75,14 @@ function Main({
         }
     }, [onpopstate])
 
-    const pageEl = React.createElement(page.Component, page.staticProps)
+    const pageEl = React.createElement(page.Component, page.props)
     return React.createElement(
         AppManifestContext.Provider,
         { value: manifest },
         React.createElement(
             RouterContext.Provider,
             { value: page.url },
-            app.Component ? React.createElement(app.Component, app.staticProps, pageEl) : pageEl
+            app.Component ? React.createElement(app.Component, app.props, pageEl) : pageEl
         )
     )
 }
@@ -111,46 +119,20 @@ export async function redirect(url: string, replace: boolean) {
     events.emit('popstate', { type: 'popstate' })
 }
 
-function Default404Page() {
-    return React.createElement(
-        'p',
-        null,
-        React.createElement(
-            'strong',
-            null,
-            React.createElement(
-                'code',
-                null,
-                '404'
-            )
-        ),
-        React.createElement(
-            'small',
-            null,
-            ' - '
-        ),
-        React.createElement(
-            'span',
-            null,
-            'page not found'
-        )
-    )
-}
-
 export async function bootstrap(manifest: AppManifest) {
     const { document } = window as any
     const { baseUrl, appModule, pageModules } = manifest
     const el = document.getElementById('ssr-data')
 
     if (el) {
-        const { url } = JSON.parse(el.innerHTML)
+        const { url, appStaticProps, staticProps } = JSON.parse(el.innerHTML)
         if (url && util.isNEString(url.pagePath) && url.pagePath in pageModules) {
             const pageModule = pageModules[url.pagePath]!
             const [
-                { default: AppComponent, __staticProps: appStaticProps },
-                { default: PageComponent, __staticProps: staticProps }
+                { default: AppComponent },
+                { default: PageComponent }
             ] = await Promise.all([
-                appModule ? import(baseUrl + `_dist/app.${appModule.hash.slice(0, hashShort)}.js`) : async () => ({}),
+                appModule ? import(baseUrl + `_dist/app.${appModule.hash.slice(0, hashShort)}.js`) : Promise.resolve({}),
                 import(baseUrl + '_dist/' + pageModule.moduleId.replace(/\.js$/, `.${pageModule.hash.slice(0, hashShort)}.js`)),
             ])
             const el = React.createElement(
@@ -158,8 +140,8 @@ export async function bootstrap(manifest: AppManifest) {
                 {
                     url,
                     manifest,
-                    app: { Component: AppComponent, staticProps: appStaticProps },
-                    page: { Component: PageComponent, staticProps },
+                    app: { Component: AppComponent, props: appStaticProps },
+                    page: { Component: PageComponent, props: staticProps },
                 }
             )
             const ssrHeadEls = document.head.querySelectorAll('[ssr]')
