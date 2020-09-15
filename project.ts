@@ -1,5 +1,5 @@
 import type { APIHandle, Location, RouterURL } from './api.ts'
-import { AnsiUp, colors, ensureDir, exists, existsSync, less, Md5, minify, path, Sha1, walk } from './deps.ts'
+import { AnsiUp, colors, ensureDir, exists, existsSync, less, minify, path, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
@@ -30,9 +30,10 @@ interface Config {
 
 interface Module {
     id: string
+    url: string
     isRemote: boolean
     deps: { path: string, hash: string }[]
-    sourceFile: string
+    sourceFilePath: string
     sourceType: string
     sourceHash: string
     jsFile: string
@@ -49,13 +50,21 @@ interface BuildManifest {
     pageModules: Record<string, { moduleId: string, hash: string }>
 }
 
+interface RenderResult {
+    code: number
+    head: string[]
+    body: string
+    appStaticProps?: Record<string, any> | null
+    staticProps?: Record<string, any> | null
+}
+
 export default class Project {
     readonly mode: 'development' | 'production'
     readonly config: Config
     readonly ready: Promise<void>
 
     #modules: Map<string, Module> = new Map()
-    #pageModules: Map<string, { moduleId: string, rendered: { head: string[], html: string } }> = new Map()
+    #pageModules: Map<string, { moduleId: string, rendered: Map<string, RenderResult> }> = new Map()
     #fsWatchQueue: Map<string, number> = new Map()
     #fsWatchListeners: Array<EventEmitter> = []
 
@@ -122,6 +131,9 @@ export default class Project {
     }
 
     isHMRable(moduleId: string) {
+        if (reHttp.test(moduleId)) {
+            return false
+        }
         return moduleId === './app.js' || moduleId.startsWith('./pages/') || moduleId.startsWith('./components/') || reStyleModuleExt.test(moduleId)
     }
 
@@ -142,7 +154,10 @@ export default class Project {
             modId = util.trimPrefix(modId, '/_dist')
         }
         if (modId.startsWith('/-/')) {
-            modId = util.trimPrefix(modId, '/-/')
+            modId = util.trimSuffix(util.trimPrefix(modId, '/-/'), '.js')
+            if (!reStyleModuleExt.test(modId)) {
+                modId = modId + '.js'
+            }
         } else {
             modId = '.' + modId
             if (reHashJs.test(modId)) {
@@ -153,6 +168,9 @@ export default class Project {
                     modId = id + '.js'
                 }
             }
+        }
+        if (!this.#modules.has(modId)) {
+            console.warn(`can't get the module by path '${pathname}(${modId})'`)
         }
         return this.getModule(modId)
     }
@@ -195,12 +213,12 @@ export default class Project {
             }
         )
         const mainMod = this.#modules.get('./main.js')!
-        const { code, head, body } = await this._renderPage(url)
+        const { code, head, body, appStaticProps, staticProps } = await this._renderPage(url)
         const html = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
-                { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
+                { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url, appStaticProps, staticProps }) },
                 { src: path.join(baseUrl, `/_dist/main.${mainMod.hash.slice(0, hashShort)}.js`), type: 'module' },
             ],
             body,
@@ -230,9 +248,9 @@ export default class Project {
                         return !id.startsWith('./api/')
                 }
             })
-            .map(({ sourceFile, isRemote, jsContent, hash }) => {
-                const saveDir = path.join(distDir, path.dirname(isRemote ? this._renameRemotePath(sourceFile) : sourceFile))
-                const name = path.basename(sourceFile.split('?')[0]).replace(reModuleExt, '')
+            .map(({ sourceFilePath, isRemote, jsContent, hash }) => {
+                const saveDir = path.join(distDir, sourceFilePath)
+                const name = path.basename(sourceFilePath).replace(reModuleExt, '')
                 const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
                 return this._writeTextFile(jsFile, jsContent)
             }))
@@ -304,6 +322,14 @@ export default class Project {
                 Object.assign(this.config, { cacheDeps })
             }
         }
+
+        Object.assign(globalThis, {
+            ALEPH_ENV: {
+                appDir: this.config.rootDir
+            },
+            $RefreshReg$: () => { },
+            $RefreshSig$: () => (type: any) => type,
+        })
     }
 
     private async _init() {
@@ -328,10 +354,7 @@ export default class Project {
             const pagePath = rp.replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/?index$/i, '/')
             this.#pageModules.set(pagePath, {
                 moduleId: './pages' + rp.replace(reModuleExt, '') + '.js',
-                rendered: {
-                    head: [],
-                    html: ''
-                }
+                rendered: new Map()
             })
             await this._compile('./pages' + rp)
         }
@@ -439,32 +462,31 @@ export default class Project {
     private _resetPageModule(moduleId: string) {
         for (const [p, pm] of this.#pageModules.entries()) {
             if (pm.moduleId === moduleId) {
-                pm.rendered = {
-                    head: [],
-                    html: ''
-                }
+                pm.rendered.clear()
                 break
             }
         }
     }
 
-    private async _compile(sourceFile: string, options?: { sourceCode?: string, forceCompile?: boolean }) {
+    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean }) {
         const { rootDir, importMap } = this.config
-        const isRemote = reHttp.test(sourceFile) || (sourceFile in importMap.imports && reHttp.test(importMap.imports[sourceFile]))
-        const id = (isRemote ? util.trimPrefix(this._renameRemotePath(sourceFile), '/-/') : sourceFile).replace(reModuleExt, '.js')
+        const isRemote = reHttp.test(url) || (url in importMap.imports && reHttp.test(importMap.imports[url]))
+        const sourceFilePath = this._renameImportUrl(url)
+        const id = (isRemote ? util.trimPrefix(sourceFilePath, '/-/') : '.' + sourceFilePath).replace(reModuleExt, '.js')
 
         if (this.#modules.has(id) && !options?.forceCompile) {
             return this.#modules.get(id)!
         }
 
-        const name = path.basename(sourceFile.split('?')[0]).replace(reModuleExt, '')
-        const saveDir = path.join(rootDir, '.aleph', this.mode, path.dirname(isRemote ? this._renameRemotePath(sourceFile) : sourceFile))
+        const name = path.basename(sourceFilePath).replace(reModuleExt, '')
+        const saveDir = path.join(rootDir, '.aleph', this.mode, path.dirname(sourceFilePath))
         const metaFile = path.join(saveDir, `${name}.meta.json`)
         const mod: Module = {
             id,
+            url,
             isRemote,
-            sourceFile,
-            sourceType: path.extname(sourceFile.split('?')[0]).slice(1).replace('mjs', 'js') || 'js',
+            sourceFilePath,
+            sourceType: path.extname(sourceFilePath).slice(1).replace('mjs', 'js') || 'js',
             sourceHash: '',
             deps: [],
             jsFile: '',
@@ -499,67 +521,69 @@ export default class Project {
                 mod.sourceHash = sourceHash
             }
         } else if (mod.isRemote) {
-            let url = sourceFile
+            let dlUrl = url
             for (const importPath in importMap.imports) {
                 const alias = importMap.imports[importPath]
-                if (importPath === url) {
-                    url = alias
+                if (importPath === dlUrl) {
+                    dlUrl = alias
                     break
-                } else if (importPath.endsWith('/') && url.startsWith(importPath)) {
-                    url = util.trimSuffix(alias, '/') + '/' + util.trimPrefix(url, importPath)
+                } else if (importPath.endsWith('/') && dlUrl.startsWith(importPath)) {
+                    dlUrl = util.trimSuffix(alias, '/') + '/' + util.trimPrefix(dlUrl, importPath)
                     break
                 }
             }
-            if (this.isDev && (sourceFile === 'https://esm.sh/react' || sourceFile === 'https://esm.sh/react-dom')) {
-                url += '?env=development'
+            if (this.isDev && (dlUrl === 'https://esm.sh/react' || dlUrl === 'https://esm.sh/react-dom')) {
+                dlUrl += '?env=development'
             }
             if (mod.sourceHash === '') {
-                log.info('Download', sourceFile, url != sourceFile ? colors.dim(`• ${url}`) : '')
+                log.info('Download', url, dlUrl != url ? colors.dim(`• ${dlUrl}`) : '')
                 try {
-                    sourceContent = await fetch(url).then(resp => {
-                        if (resp.status == 200) {
-                            if (mod.sourceType === 'js') {
-                                const t = resp.headers.get('Content-Type')
-                                if (t?.startsWith('text/typescript')) {
-                                    mod.sourceType = 'ts'
-                                } else if (t?.startsWith('text/jsx')) {
-                                    mod.sourceType = 'jsx'
-                                }
-                            }
-                            return resp.text()
-                        }
-                        return Promise.reject(new Error(`${resp.status} - ${resp.statusText}`))
-                    })
+                    const resp = await fetch(dlUrl)
+                    if (resp.status != 200) {
+                        throw new Error(`${resp.status} - ${resp.statusText}`)
+                    }
+                    sourceContent = await resp.text()
                     mod.sourceHash = (new Sha1()).update(sourceContent).hex()
-                } catch (err) {
-                    throw new Error(`Download ${sourceFile}: ${err.message}`)
-                }
-            } else if (/^https?:\/\/(localhost|127.0.0.1)(:\d+)?\//.test(url)) {
-                try {
-                    const text = await fetch(url).then(resp => {
-                        if (resp.status == 200) {
-                            return resp.text()
+                    if (mod.sourceType === 'js') {
+                        const t = resp.headers.get('Content-Type')
+                        if (t?.startsWith('text/typescript')) {
+                            mod.sourceType = 'ts'
+                        } else if (t?.startsWith('text/jsx')) {
+                            mod.sourceType = 'jsx'
                         }
-                        return Promise.reject(new Error(`${resp.status} - ${resp.statusText}`))
-                    })
+                    }
+                } catch (err) {
+                    throw new Error(`Download ${url}: ${err.message}`)
+                }
+            } else if (/^https?:\/\/(localhost|127.0.0.1)(:\d+)?\//.test(dlUrl)) {
+                try {
+                    const resp = await fetch(dlUrl)
+                    if (resp.status != 200) {
+                        throw new Error(`${resp.status} - ${resp.statusText}`)
+                    }
+                    const text = await resp.text()
                     const sourceHash = (new Sha1()).update(text).hex()
                     if (mod.sourceHash !== sourceHash) {
                         sourceContent = text
                         mod.sourceHash = sourceHash
                     }
                 } catch (err) {
-                    throw new Error(`Download ${sourceFile}: ${err.message}`)
+                    throw new Error(`Download ${url}: ${err.message}`)
                 }
             }
         } else {
-            const filepath = path.join(this.srcDir, sourceFile)
-            const fileinfo = await Deno.stat(filepath)
-
-            // 10mb limit
-            if (fileinfo.size > 10 * (1 << 20)) {
-                throw new Error(`ignored module '${sourceFile}': too large(${(fileinfo.size / (1 << 20)).toFixed(2)}mb)`)
+            const filepath = path.join(this.srcDir, url)
+            try {
+                const fileinfo = await Deno.stat(filepath)
+                // 10mb limit
+                if (fileinfo.size > 10 * (1 << 20)) {
+                    throw new Error(`ignored module '${url}': too large(${(fileinfo.size / (1 << 20)).toFixed(2)}mb)`)
+                }
+            } catch (err) {
+                if (err instanceof Deno.errors.NotFound) {
+                    throw new Error(`module '${url}' not found`)
+                }
             }
-
             const text = await Deno.readTextFile(filepath)
             const sourceHash = (new Sha1()).update(text).hex()
             if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
@@ -576,36 +600,62 @@ export default class Project {
             const t = performance.now()
             mod.deps = []
             if (mod.sourceType === 'css' || mod.sourceType === 'less') {
-                // todo: sourceMap
-                let { css } = await less.render(sourceContent || '/* empty content */')
+                let css: string = sourceContent
+                if (mod.sourceType === 'less') {
+                    try {
+                        // todo: sourceMap
+                        const output = await less.render(sourceContent || '/* empty content */')
+                        css = output.css
+                    } catch (error) {
+                        throw new Error(`less: ${error}`);
+                    }
+                }
                 if (this.isDev) {
-                    css = `\n${String(css).trim()}\n`
+                    css = String(css).trim()
                 } else {
                     const output = cleanCSS.minify(css)
                     css = output.styles
                 }
+                const hash = (new Sha1).update(css).hex()
+                const savePath = path.join(path.dirname(sourceFilePath), util.trimSuffix(path.basename(sourceFilePath), '.css') + '.' + hash.slice(0, hashShort) + '.css')
+                if (css.length > 1024) {
+                    await this._writeTextFile(path.join(rootDir, '.aleph', this.mode, savePath), css)
+                }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(this._relativePath(
-                        path.dirname(path.resolve('/', mod.sourceFile)),
+                        path.dirname(path.resolve('/', mod.url)),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
-                    `applyCSS(${JSON.stringify(sourceFile)}, ${JSON.stringify(css)});`,
+                    `applyCSS(${JSON.stringify(url)}, ${css.length > 1024 ? JSON.stringify(path.join(this.config.baseUrl, '_dist', savePath)) + ', true' : JSON.stringify(css)});`,
                 ].join(this.isDev ? '\n' : '')
+                mod.hash = hash
                 mod.jsSourceMap = ''
-                mod.hash = this._hash(mod.jsContent)
             } else {
                 const compileOptions = {
                     target: this.config.target,
                     mode: this.mode,
+                    rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path),
                     reactRefresh: this.isDev && !mod.isRemote,
-                    rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path)
+                    // hmr: this.isHMRable(mod.id) ? {
+                    //     id: mod.id,
+                    //     importPath: (() => {
+                    //         const importPath = path.relative(
+                    //             path.dirname(mod.sourceFilePath),
+                    //             '/-/deno.land/x/aleph/hmr.js'
+                    //         )
+                    //         if (!importPath.startsWith('.') && !importPath.startsWith('/')) {
+                    //             return './' + importPath
+                    //         }
+                    //         return importPath
+                    //     })()
+                    // } : undefined
                 }
-                const { diagnostics, outputText, sourceMapText } = compile(mod.sourceFile, sourceContent, compileOptions)
+                const { diagnostics, outputText, sourceMapText } = compile(mod.url, sourceContent, compileOptions)
                 if (diagnostics && diagnostics.length > 0) {
-                    throw new Error(`compile ${sourceFile}: ${diagnostics.map(d => d.messageText).join(' ')}`)
+                    throw new Error(`compile ${url}: ${diagnostics.map(d => d.messageText).join(' ')}`)
                 }
                 const jsContent = outputText.replace(/import([^'"]*)("|')tslib("|')(\)|;)?/g, 'import$1' + JSON.stringify(this._relativePath(
-                    path.dirname(path.resolve('/', mod.isRemote ? this._renameRemotePath(mod.sourceFile) : mod.sourceFile)),
+                    path.dirname(mod.sourceFilePath),
                     '/-/deno.land/x/aleph/vendor/tslib/tslib.js'
                 )) + '$4')
                 if (this.isDev) {
@@ -622,15 +672,17 @@ export default class Project {
                     mod.jsContent = code
                     mod.jsSourceMap = map
                 }
-                mod.hash = this._hash(mod.jsContent)
+                mod.hash = (new Sha1).update(mod.jsContent).hex()
             }
 
-            log.debug(`${sourceFile} compiled in ${(performance.now() - t).toFixed(3)}ms`)
+            log.debug(`${url} compiled in ${(performance.now() - t).toFixed(3)}ms`)
 
             if (!fsync) {
                 fsync = true
             }
         }
+
+        this.#modules.set(mod.id, mod)
 
         // compile deps
         for (const dep of mod.deps) {
@@ -639,7 +691,7 @@ export default class Project {
                 dep.hash = depMod.hash
                 if (!reHttp.test(dep.path)) {
                     const depImportPath = this._relativePath(
-                        path.dirname(path.resolve('/', sourceFile)),
+                        path.dirname(path.resolve('/', url)),
                         path.resolve('/', dep.path.replace(reModuleExt, ''))
                     )
                     mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
@@ -651,7 +703,7 @@ export default class Project {
                         }
                         return s
                     })
-                    mod.hash = this._hash(mod.jsContent)
+                    mod.hash = (new Sha1).update(mod.jsContent).hex()
                 }
                 if (!fsync) {
                     fsync = true
@@ -663,7 +715,7 @@ export default class Project {
             mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + '.js'
             await Promise.all([
                 this._writeTextFile(metaFile, JSON.stringify({
-                    sourceFile,
+                    url,
                     sourceHash: mod.sourceHash,
                     hash: mod.hash,
                     deps: mod.deps,
@@ -673,8 +725,6 @@ export default class Project {
             ])
         }
 
-        this.#modules.set(mod.id, mod)
-
         return mod
     }
 
@@ -683,7 +733,7 @@ export default class Project {
             mod.deps.forEach(dep => {
                 if (dep.path === depPath && dep.hash !== depHash) {
                     const depImportPath = this._relativePath(
-                        path.dirname(path.resolve('/', mod.sourceFile)),
+                        path.dirname(path.resolve('/', mod.url)),
                         path.resolve('/', dep.path.replace(reModuleExt, ''))
                     )
                     dep.hash = depHash
@@ -696,10 +746,10 @@ export default class Project {
                         }
                         return s
                     })
-                    mod.hash = this._hash(mod.jsContent)
+                    mod.hash = (new Sha1).update(mod.jsContent).hex()
                     mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
                     this._writeTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
-                        sourceFile: mod.sourceFile,
+                        sourceFile: mod.url,
                         sourceHash: mod.sourceHash,
                         hash: mod.hash,
                         deps: mod.deps,
@@ -709,8 +759,8 @@ export default class Project {
                         this._writeTextFile(mod.jsFile + '.map', mod.jsSourceMap)
                     }
                     callback(mod)
-                    this._updateDependency(mod.sourceFile, mod.hash, callback)
-                    log.debug('update dependency:', depPath, '->', mod.sourceFile)
+                    this._updateDependency(mod.url, mod.hash, callback)
+                    log.debug('update dependency:', depPath, '->', mod.url)
                 }
             })
         })
@@ -726,13 +776,13 @@ export default class Project {
             if (cacheDeps || /\.(jsx|tsx?)$/i.test(importPath)) {
                 if (mod.isRemote) {
                     rewrittenPath = this._relativePath(
-                        path.dirname(path.resolve('/', mod.sourceFile.replace(reHttp, '-/').replace(/:(\d+)/, `/$1`))),
-                        this._renameRemotePath(importPath)
+                        path.dirname(path.resolve('/', mod.url.replace(reHttp, '-/').replace(/:(\d+)/, `/$1`))),
+                        this._renameImportUrl(importPath)
                     )
                 } else {
                     rewrittenPath = this._relativePath(
-                        path.dirname(path.resolve('/', mod.sourceFile)),
-                        this._renameRemotePath(importPath)
+                        path.dirname(path.resolve('/', mod.url)),
+                        this._renameImportUrl(importPath)
                     )
                 }
             } else {
@@ -740,14 +790,15 @@ export default class Project {
             }
         } else {
             if (mod.isRemote) {
-                const sourceUrl = new URL(mod.sourceFile)
+                const modUrl = new URL(mod.url)
                 let pathname = importPath
                 if (!pathname.startsWith('/')) {
-                    pathname = path.join(path.dirname(sourceUrl.pathname), importPath)
+                    pathname = path.join(path.dirname(modUrl.pathname), importPath)
                 }
+                const importUrl = new URL(modUrl.protocol + '//' + modUrl.host + pathname)
                 rewrittenPath = this._relativePath(
-                    path.dirname(this._renameRemotePath(mod.sourceFile)),
-                    '/' + path.join('-', sourceUrl.host, pathname)
+                    path.dirname(mod.sourceFilePath),
+                    this._renameImportUrl(importUrl.toString())
                 )
             } else {
                 rewrittenPath = importPath.replace(reModuleExt, '') + '.' + 'x'.repeat(hashShort)
@@ -757,14 +808,14 @@ export default class Project {
             mod.deps.push({ path: importPath, hash: '' })
         } else {
             if (mod.isRemote) {
-                const sourceUrl = new URL(mod.sourceFile)
+                const sourceUrl = new URL(mod.url)
                 let pathname = importPath
                 if (!pathname.startsWith('/')) {
                     pathname = path.join(path.dirname(sourceUrl.pathname), importPath)
                 }
                 mod.deps.push({ path: sourceUrl.protocol + '//' + sourceUrl.host + pathname, hash: '' })
             } else {
-                mod.deps.push({ path: '.' + path.resolve('/', path.dirname(mod.sourceFile), importPath), hash: '' })
+                mod.deps.push({ path: '.' + path.resolve('/', path.dirname(mod.url), importPath), hash: '' })
             }
         }
 
@@ -778,18 +829,22 @@ export default class Project {
         return rewrittenPath.replace(reModuleExt, '') + '.js'
     }
 
-    private _renameRemotePath(remotePath: string): string {
-        const url = new URL(remotePath)
+    private _renameImportUrl(importUrl: string): string {
+        const isRemote = reHttp.test(importUrl)
+        const url = new URL(isRemote ? importUrl : 'file://' + path.resolve('/', importUrl))
         const ext = path.extname(path.basename(url.pathname)) || '.js'
-        let pathname = ext ? util.trimSuffix(url.pathname, ext) : url.pathname
+        let pathname = util.trimSuffix(url.pathname, ext)
         if (url.search) {
-            pathname += '_' + btoa(url.search)
+            pathname += '/' + btoa(url.search).replace(/[\.\/=]/g, '')
         }
-        return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
+        if (isRemote) {
+            return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
+        }
+        return pathname + ext
     }
 
     private async _renderPage(url: RouterURL) {
-        const ret = {
+        const ret: RenderResult = {
             code: 404,
             head: ['<title>404 - page not found</title>'],
             body: '<p><strong><code>404</code></strong><small> - </small><span>page not found</span></p>',
@@ -797,17 +852,12 @@ export default class Project {
         if (this.#pageModules.has(url.pagePath)) {
             const pm = this.#pageModules.get(url.pagePath)!
             const mod = this.#modules.get(pm.moduleId)!
-            if (pm.rendered.html) {
-                ret.code = 200
-                ret.head = pm.rendered.head
-                ret.body = `<main>${pm.rendered.html}</main>`
-                return ret
+            const appMod = this.#modules.get('./app.js')
+            if (pm.rendered.has(url.asPath)) {
+                const cache = pm.rendered.get(url.asPath)!
+                return { ...cache }
             }
             try {
-                Object.assign(globalThis, {
-                    $RefreshReg$: () => { },
-                    $RefreshSig$: () => (type: any) => type,
-                })
                 const [
                     { renderPage, renderHead },
                     App,
@@ -819,11 +869,16 @@ export default class Project {
                 ])
                 if (Page.Component) {
                     const html = renderPage(url, App.Component ? App : undefined, Page)
-                    const head = renderHead(mod.deps.filter(({ path }) => reStyleModuleExt.test(path)).map(({ path }) => path))
+                    const head = renderHead([
+                        mod.deps.filter(({ path }) => reStyleModuleExt.test(path)).map(({ path }) => path),
+                        appMod?.deps.filter(({ path }) => reStyleModuleExt.test(path)).map(({ path }) => path)
+                    ].filter(Boolean).flat())
                     ret.code = 200
                     ret.head = head
                     ret.body = `<main>${html}</main>`
-                    pm.rendered = { head, html }
+                    ret.appStaticProps = App.staticProps
+                    ret.staticProps = Page.staticProps
+                    pm.rendered.set(url.asPath, { ...ret })
                 } else {
                     ret.code = 500
                     ret.head = ['<title>500 - render error</title>']
@@ -832,18 +887,11 @@ export default class Project {
             } catch (err) {
                 ret.code = 500
                 ret.head = ['<title>500 - render error</title>']
-                ret.body = `<pre>${AnsiUp.ansi_to_html(err.message)}</pre>`
-                log.error(err.message)
+                ret.body = `<pre>${AnsiUp.ansi_to_html(err.stack)}</pre>`
+                log.error(err.stack)
             }
         }
         return ret
-    }
-
-    private _hash(content: string): string {
-        const md5 = new Md5()
-        md5.update(content)
-        md5.update(Date.now().toString())
-        return md5.toString('hex')
     }
 
     private _relativePath(from: string, to: string): string {
@@ -852,12 +900,6 @@ export default class Project {
             r = './' + r
         }
         return r
-    }
-
-    private async _writeTextFile(filepath: string, content: string) {
-        const dir = path.dirname(filepath)
-        await ensureDir(dir)
-        await Deno.writeTextFile(filepath, content)
     }
 
     private async _existsDir(path: string) {
@@ -873,5 +915,11 @@ export default class Project {
             }
             throw err
         }
+    }
+
+    private async _writeTextFile(filepath: string, content: string) {
+        const dir = path.dirname(filepath)
+        await ensureDir(dir)
+        await Deno.writeTextFile(filepath, content)
     }
 }
