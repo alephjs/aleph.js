@@ -78,63 +78,83 @@ export async function start(appDir: string, port: number, isDev = false) {
 
                     // serve js files
                     if (pathname.startsWith('/_dist/')) {
-                        const reqSourceMap = pathname.endsWith('.js.map')
-                        const mod = project.getModuleByPath(reqSourceMap ? pathname.slice(0, -4) : pathname)
-                        if (mod) {
-                            const etag = req.headers.get('If-None-Match')
-                            if (etag && etag === mod.hash) {
-                                req.respond({ status: 304 })
-                                continue
+                        if (pathname.endsWith('.css')) {
+                            try {
+                                const filePath = path.join(project.rootDir, '.aleph', project.mode, util.trimPrefix(pathname, '/_dist/'))
+                                const info = await Deno.lstat(filePath)
+                                if (!info.isDirectory) {
+                                    const body = await Deno.readFile(filePath)
+                                    req.respond({
+                                        status: 200,
+                                        headers: new Headers({ 'Content-Type': 'text/css; charset=utf-8' }),
+                                        body
+                                    })
+                                    continue
+                                }
+                            } catch (err) {
+                                if (!(err instanceof Deno.errors.NotFound)) {
+                                    throw err
+                                }
                             }
+                        } else {
+                            const reqMap = pathname.endsWith('.js.map')
+                            const mod = project.getModuleByPath(reqMap ? pathname.slice(0, -4) : pathname)
+                            if (mod) {
+                                const etag = req.headers.get('If-None-Match')
+                                if (etag && etag === mod.hash) {
+                                    req.respond({ status: 304 })
+                                    continue
+                                }
 
-                            let body = ''
-                            if (reqSourceMap) {
-                                body = mod.jsSourceMap
-                            } else {
-                                body = mod.jsContent
-                                if (mod.id === './app.js' || mod.id.startsWith('./pages/')) {
-                                    const { staticProps } = await project.importModuleAsComponent(mod.id)
-                                    if (staticProps) {
-                                        body = 'export const __staticProps = ' + JSON.stringify(staticProps) + ';\n' + body
+                                let body = ''
+                                if (reqMap) {
+                                    body = mod.jsSourceMap
+                                } else {
+                                    body = mod.jsContent
+                                    if (project.isHMRable(mod.id)) {
+                                        body = injectHmr({ id: mod.id, sourceFilePath: mod.sourceFilePath, jsContent: body })
                                     }
                                 }
-                                if (project.isHMRable(mod.id)) {
-                                    body = injectHmr(mod.id, body)
-                                }
-                            }
-                            req.respond({
-                                status: 200,
-                                headers: new Headers({
-                                    'Content-Type': `application/${reqSourceMap ? 'json' : 'javascript'}; charset=utf-8`,
-                                    'ETag': mod.hash
-                                }),
-                                body
-                            })
-                        } else {
-                            req.respond({
-                                status: 404,
-                                headers: new Headers({ 'Content-Type': 'text/html' }),
-                                body: createHtml({
-                                    lang: 'en',
-                                    head: ['<title>404 - not found</title>'],
-                                    body: '<p><strong><code>404</code></strong><small> - </small><span>not found</span></p>'
+                                req.respond({
+                                    status: 200,
+                                    headers: new Headers({
+                                        'Content-Type': `application/${reqMap ? 'json' : 'javascript'}; charset=utf-8`,
+                                        'ETag': mod.hash
+                                    }),
+                                    body
                                 })
-                            })
+                                continue
+                            }
                         }
+                        req.respond({
+                            status: 404,
+                            headers: new Headers({ 'Content-Type': 'text/html' }),
+                            body: createHtml({
+                                lang: 'en',
+                                head: ['<title>404 - not found</title>'],
+                                body: '<p><strong><code>404</code></strong><small> - </small><span>not found</span></p>'
+                            })
+                        })
                         continue
                     }
 
                     // serve public files
-                    const publicPath = path.join(project.rootDir, 'public', pathname)
-                    const info = await Deno.lstat(publicPath)
-                    if (!info.isDirectory) {
-                        const body = await Deno.readFile(publicPath)
-                        req.respond({
-                            status: 200,
-                            headers: new Headers({ 'Content-Type': getContentType(publicPath) }),
-                            body
-                        })
-                        continue
+                    try {
+                        const filePath = path.join(project.rootDir, 'public', pathname)
+                        const info = await Deno.lstat(filePath)
+                        if (!info.isDirectory) {
+                            const body = await Deno.readFile(filePath)
+                            req.respond({
+                                status: 200,
+                                headers: new Headers({ 'Content-Type': getContentType(filePath) }),
+                                body
+                            })
+                            continue
+                        }
+                    } catch (err) {
+                        if (!(err instanceof Deno.errors.NotFound)) {
+                            throw err
+                        }
                     }
 
                     const [status, html] = await project.getPageHtml({ pathname, search: url.search })
@@ -144,27 +164,15 @@ export async function start(appDir: string, port: number, isDev = false) {
                         body: html
                     })
                 } catch (err) {
-                    if (err instanceof Deno.errors.NotFound) {
-                        req.respond({
-                            status: 404,
-                            headers: new Headers({ 'Content-Type': 'text/html' }),
-                            body: createHtml({
-                                lang: 'en',
-                                head: ['<title>404 - not found</title>'],
-                                body: `<p><strong><code>404</code></strong><small> - </small><span>not found</span></p>`
-                            })
+                    req.respond({
+                        status: 500,
+                        headers: new Headers({ 'Content-Type': 'text/html' }),
+                        body: createHtml({
+                            lang: 'en',
+                            head: ['<title>500 - internal server error</title>'],
+                            body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`
                         })
-                    } else {
-                        req.respond({
-                            status: 500,
-                            headers: new Headers({ 'Content-Type': 'text/html' }),
-                            body: createHtml({
-                                lang: 'en',
-                                head: ['<title>500 - internal server error</title>'],
-                                body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`
-                            })
-                        })
-                    }
+                    })
                 }
             }
         } catch (err) {
@@ -179,9 +187,9 @@ export async function start(appDir: string, port: number, isDev = false) {
     }
 }
 
-function injectHmr(id: string, jsContent: string) {
+function injectHmr({ id, sourceFilePath, jsContent }: { id: string, sourceFilePath: string, jsContent: string }) {
     let hmrImportPath = path.relative(
-        path.dirname(path.resolve('/', id)),
+        path.dirname(sourceFilePath),
         '/-/deno.land/x/aleph/hmr.js'
     )
     if (!hmrImportPath.startsWith('.') && !hmrImportPath.startsWith('/')) {
