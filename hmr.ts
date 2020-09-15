@@ -49,7 +49,7 @@ class Module {
 
     async applyUpdate(updateUrl: string) {
         try {
-            const module = await import(updateUrl)
+            const module = await import(updateUrl + '?t=' + Date.now())
             this.#acceptCallbacks.forEach(cb => cb(module))
         } catch (e) {
             location.reload()
