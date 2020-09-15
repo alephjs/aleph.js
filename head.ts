@@ -2,7 +2,7 @@ import React, { Children, createElement, isValidElement, PropsWithChildren, Reac
 import util from './util.ts'
 
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
-const serverStyles: Map<string, string> = new Map()
+const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
 export function renderHead(styleModules?: string[]) {
     const tags: string[] = []
@@ -27,29 +27,44 @@ export function renderHead(styleModules?: string[]) {
             }
         }
     })
-    styleModules?.forEach(id => {
-        if (serverStyles.has(id)) {
-            tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>${serverStyles.get(id)}</style>`)
+    styleModules?.filter(id => serverStyles.has(id)).forEach(id => {
+        const { css, asLink } = serverStyles.get(id)!
+        if (asLink) {
+            tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(id)}/>`)
+        } else {
+            tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>\n${css}\n</style>`)
         }
     })
     serverHeadElements.splice(0, serverHeadElements.length)
     return tags
 }
 
-export function applyCSS(id: string, css: string) {
+export function applyCSS(id: string, css: string, asLink: boolean = false) {
     if (window.Deno) {
-        serverStyles.set(id, css)
+        serverStyles.set(id, { css, asLink })
     } else {
         const { document } = (window as any)
-        const textEl = document.createTextNode(css)
-        const styleEl = document.createElement('style')
-        const prevStyleEl = document.querySelector(`style[data-module-id=${JSON.stringify(id)}]`)
-        styleEl.type = 'text/css'
+        const styleEl = document.createElement(asLink ? 'link' : 'style')
+        const prevStyleEls = Array.from(document.head.children).filter((el: any) => el.getAttribute('data-module-id') === id)
+        if (asLink) {
+            styleEl.rel = 'stylesheet'
+            styleEl.href = css
+        } else {
+            styleEl.type = 'text/css'
+            styleEl.appendChild(document.createTextNode(css))
+        }
         styleEl.setAttribute('data-module-id', id)
-        styleEl.appendChild(textEl)
         document.head.appendChild(styleEl)
-        if (prevStyleEl) {
-            document.head.removeChild(prevStyleEl)
+        if (prevStyleEls.length > 0) {
+            if (asLink) {
+                styleEl.addEventListener('load', () => {
+                    prevStyleEls.forEach(el => document.head.removeChild(el))
+                })
+            } else {
+                setTimeout(() => {
+                    prevStyleEls.forEach(el => document.head.removeChild(el))
+                }, 0)
+            }
         }
     }
 }
