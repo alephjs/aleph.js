@@ -6,16 +6,20 @@
 
 import { ts } from '../deps.ts'
 
+const f = ts.factory
+
 type TSFunctionLike = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction
 
 export class RefreshTransformer {
-    private _sf: ts.SourceFile
+    #sf: ts.SourceFile
+    #options: Record<string, any>
 
     static refreshSig = '$RefreshSig$'
     static refreshReg = '$RefreshReg$'
 
-    constructor(sf: ts.SourceFile) {
-        this._sf = sf
+    constructor(sf: ts.SourceFile, options?: Record<string, any>) {
+        this.#sf = sf
+        this.#options = options || {}
     }
 
     transform() {
@@ -24,22 +28,23 @@ export class RefreshTransformer {
         const signatures: ts.Identifier[] = []
         const hookCalls: WeakMap<TSFunctionLike, { id: ts.Identifier, key: string, customHooks: string[] }> = new WeakMap()
         const seenHooks: Set<string> = new Set()
-        this._sf.statements.forEach(node => {
+
+        this.#sf.statements.forEach(node => {
             if (ts.isFunctionDeclaration(node)) {
-                const hookCallsSignature = this._getHookCallsSignature(node)
                 if (node.name && isComponentishName(node.name.text)) {
                     components.push(node.name)
                 }
                 if (node.name && isHookName(node.name.text)) {
                     seenHooks.add(node.name.text)
                 }
+                const hookCallsSignature = this._getHookCallsSignature(node)
                 if (hookCallsSignature) {
-                    const id = ts.createUniqueName('_s', ts.GeneratedIdentifierFlags.Optimistic)
+                    const id = f.createUniqueName('_s', ts.GeneratedIdentifierFlags.Optimistic)
                     signatures.push(id)
                     hookCalls.set(node, { id, ...hookCallsSignature })
                 }
             } else if (ts.isVariableStatement(node)) {
-                node.declarationList.declarations.forEach(({ name, initializer }) => {
+                node.declarationList.declarations.forEach(({ name, initializer, modifiers }) => {
                     if (
                         initializer &&
                         ts.isIdentifier(name) &&
@@ -53,7 +58,7 @@ export class RefreshTransformer {
                             seenHooks.add(name.text)
                         }
                         if (hookCallsSignature) {
-                            const id = ts.createUniqueName('_s', ts.GeneratedIdentifierFlags.Optimistic)
+                            const id = f.createUniqueName('_s', ts.GeneratedIdentifierFlags.Optimistic)
                             signatures.push(id)
                             hookCalls.set(initializer, { id, ...hookCallsSignature })
                         }
@@ -77,48 +82,230 @@ export class RefreshTransformer {
         })
 
         components.forEach(name => {
-            statements.push(ts.createExpressionStatement(
+            statements.push(f.createExpressionStatement(
                 ts.createCall(
-                    ts.createIdentifier(RefreshTransformer.refreshReg),
+                    f.createIdentifier(RefreshTransformer.refreshReg),
                     undefined,
                     [
                         name,
-                        ts.createStringLiteralFromNode(name)
+                        f.createStringLiteralFromNode(name)
                     ]
                 )
             ))
         })
 
         if (signatures.length > 0) {
-            statements.unshift(ts.createVariableStatement(
+            statements.unshift(f.createVariableStatement(
                 undefined,
-                ts.createVariableDeclarationList(signatures.map(id => {
-                    return ts.createVariableDeclaration(
+                f.createVariableDeclarationList(signatures.map(id => {
+                    return f.createVariableDeclaration(
                         id,
                         undefined,
-                        ts.createCall(ts.createIdentifier(RefreshTransformer.refreshSig), undefined, undefined)
+                        undefined,
+                        ts.createCall(f.createIdentifier(RefreshTransformer.refreshSig), undefined, undefined)
                     )
                 }), ts.NodeFlags.Const)
             ))
         }
 
+        // if (this.#options.hmr && components.length > 0) {
+        //     const { id: hmrId, importPath: hmrImportPath } = this.#options.hmr
+        //     const windowID = f.createIdentifier('window')
+        //     const createHotContextID = f.createIdentifier('createHotContext')
+        //     const RefreshRuntimeID = f.createIdentifier('RefreshRuntime')
+        //     const performReactRefreshID = f.createIdentifier('performReactRefresh')
+        //     const prevRefreshRegID = f.createIdentifier('prevRefreshReg')
+        //     const prevRefreshSigID = f.createIdentifier('prevRefreshSig')
+        //     const RefreshRegID = f.createIdentifier('$RefreshReg$')
+        //     const RefreshSigID = f.createIdentifier('$RefreshSig$')
+        //     const typeID = f.createIdentifier('type')
+        //     const idID = f.createIdentifier('id')
+
+        //     statements.unshift(
+        //         // import { createHotContext, RefreshRuntime, performReactRefresh } from "https://deno.land/x/aleph/hmr.js";
+        //         f.createImportDeclaration(
+        //             undefined,
+        //             undefined,
+        //             f.createImportClause(
+        //                 false,
+        //                 undefined,
+        //                 f.createNamedImports([
+        //                     f.createImportSpecifier(undefined, createHotContextID),
+        //                     f.createImportSpecifier(undefined, RefreshRuntimeID),
+        //                     f.createImportSpecifier(undefined, performReactRefreshID)
+        //                 ])
+        //             ),
+        //             f.createStringLiteral(hmrImportPath)
+        //         ),
+        //         // import.meta.hot = createHotContext("./pages/index.js");
+        //         f.createExpressionStatement(
+        //             f.createBinaryExpression(
+        //                 f.createPropertyAccessExpression(
+        //                     f.createMetaProperty(
+        //                         ts.SyntaxKind.ImportKeyword,
+        //                         f.createIdentifier('meta')
+        //                     ),
+        //                     f.createIdentifier('hot')
+        //                 ),
+        //                 ts.SyntaxKind.EqualsToken,
+        //                 f.createCallExpression(
+        //                     createHotContextID,
+        //                     undefined,
+        //                     [f.createStringLiteral(hmrId)]
+        //                 )
+        //             ),
+        //         ),
+        //         // const prevRefreshReg = window.$RefreshReg$, prevRefreshSig = window.$RefreshSig$;
+        //         f.createVariableStatement(
+        //             undefined,
+        //             f.createVariableDeclarationList([
+        //                 f.createVariableDeclaration(
+        //                     prevRefreshRegID,
+        //                     undefined,
+        //                     undefined,
+        //                     f.createPropertyAccessExpression(windowID, RefreshRegID)
+        //                 ),
+        //                 f.createVariableDeclaration(
+        //                     prevRefreshSigID,
+        //                     undefined,
+        //                     undefined,
+        //                     f.createPropertyAccessExpression(windowID, RefreshSigID)
+        //                 )
+        //             ], ts.NodeFlags.Const)
+        //         ),
+        //         // window.$RefreshReg$ = (type, id) => RefreshRuntime.regirster(type, "./pages/index.js" + " " + id);
+        //         f.createExpressionStatement(
+        //             f.createBinaryExpression(
+        //                 f.createPropertyAccessExpression(
+        //                     windowID,
+        //                     RefreshRegID
+        //                 ),
+        //                 ts.SyntaxKind.EqualsToken,
+        //                 f.createArrowFunction(
+        //                     undefined,
+        //                     undefined,
+        //                     [
+        //                         f.createParameterDeclaration(
+        //                             undefined,
+        //                             undefined,
+        //                             undefined,
+        //                             typeID,
+        //                             undefined,
+        //                             undefined
+        //                         ),
+        //                         f.createParameterDeclaration(
+        //                             undefined,
+        //                             undefined,
+        //                             undefined,
+        //                             idID,
+        //                             undefined,
+        //                             undefined
+        //                         )
+        //                     ],
+        //                     undefined,
+        //                     undefined,
+        //                     f.createCallExpression(
+        //                         f.createPropertyAccessExpression(
+        //                             RefreshRuntimeID,
+        //                             f.createIdentifier('register')
+        //                         ),
+        //                         undefined,
+        //                         [
+        //                             typeID,
+        //                             f.createBinaryExpression(
+        //                                 f.createStringLiteral(hmrId),
+        //                                 ts.SyntaxKind.PlusToken,
+        //                                 f.createBinaryExpression(
+        //                                     f.createStringLiteral(' '),
+        //                                     ts.SyntaxKind.PlusToken,
+        //                                     idID
+        //                                 )
+        //                             )
+        //                         ]
+        //                     )
+        //                 )
+        //             ),
+        //         ),
+        //         // window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+        //         f.createExpressionStatement(
+        //             f.createBinaryExpression(
+        //                 f.createPropertyAccessExpression(
+        //                     windowID,
+        //                     RefreshSigID
+        //                 ),
+        //                 ts.SyntaxKind.EqualsToken,
+        //                 f.createPropertyAccessExpression(
+        //                     RefreshRuntimeID,
+        //                     f.createIdentifier('createSignatureFunctionForTransform')
+        //                 ),
+        //             )
+        //         )
+        //     )
+        //     statements.push(
+        //         // window.$RefreshReg$ = prevRefreshReg;
+        //         f.createExpressionStatement(
+        //             f.createBinaryExpression(
+        //                 f.createPropertyAccessExpression(
+        //                     windowID,
+        //                     RefreshRegID
+        //                 ),
+        //                 ts.SyntaxKind.EqualsToken,
+        //                 prevRefreshRegID,
+        //             )
+        //         ),
+        //         // window.$RefreshSig$ = prevRefreshSig;
+        //         f.createExpressionStatement(
+        //             f.createBinaryExpression(
+        //                 f.createPropertyAccessExpression(
+        //                     windowID,
+        //                     RefreshSigID
+        //                 ),
+        //                 ts.SyntaxKind.EqualsToken,
+        //                 prevRefreshSigID,
+        //             )
+        //         ),
+        //         // import.meta.hot.accept(performReactRefresh);
+        //         f.createExpressionStatement(
+        //             f.createCallExpression(
+        //                 f.createPropertyAccessExpression(
+        //                     f.createPropertyAccessExpression(
+        //                         f.createPropertyAccessExpression(
+        //                             f.createMetaProperty(
+        //                                 ts.SyntaxKind.ImportKeyword,
+        //                                 f.createIdentifier('meta')
+        //                             ),
+        //                             f.createIdentifier('hot')
+        //                         ),
+        //                         f.createIdentifier('accept')
+        //                     ),
+        //                     f.createIdentifier('accept')
+        //                 ),
+        //                 undefined,
+        //                 [
+        //                     performReactRefreshID
+        //                 ]
+        //             )
+        //         )
+        //     )
+        // }
+
         return ts.updateSourceFileNode(
-            this._sf,
+            this.#sf,
             ts.setTextRange(
-                ts.createNodeArray(
+                f.createNodeArray(
                     statements.map(node => {
                         if (ts.isFunctionDeclaration(node) && hookCalls.has(node)) {
                             const { id, key, customHooks } = hookCalls.get(node)!
                             const _customHooks = customHooks.filter(name => seenHooks.has(name))
-                            const forceResetComment = !!ts.getLeadingCommentRanges(this._sf.text, node.pos)?.filter(({ pos, end }) => this._sf.text.substring(pos, end).includes('@refresh reset')).length;
+                            const forceResetComment = !!ts.getLeadingCommentRanges(this.#sf.text, node.pos)?.filter(({ pos, end }) => this.#sf.text.substring(pos, end).includes('@refresh reset')).length;
                             return this._sign(node, node.name!.text, id, key, forceResetComment || _customHooks.length !== _customHooks.length, _customHooks)! as ts.Statement[]
                         }
                         if (ts.isVariableStatement(node)) {
-                            const forceResetComment = !!ts.getLeadingCommentRanges(this._sf.text, node.pos)?.filter(({ pos, end }) => this._sf.text.substring(pos, end).includes('@refresh reset')).length;
+                            const forceResetComment = !!ts.getLeadingCommentRanges(this.#sf.text, node.pos)?.filter(({ pos, end }) => this.#sf.text.substring(pos, end).includes('@refresh reset')).length;
                             const _ss: ts.Statement[] = []
-                            const vs = ts.createVariableStatement(
+                            const vs = f.createVariableStatement(
                                 node.modifiers,
-                                ts.createVariableDeclarationList(
+                                f.createVariableDeclarationList(
                                     node.declarationList.declarations.map(decl => {
                                         const { name, initializer } = decl
                                         if (
@@ -131,7 +318,12 @@ export class RefreshTransformer {
                                             const _customHooks = customHooks.filter(name => seenHooks.has(name))
                                             const [_initializer, _s] = this._sign(initializer, name.text, id, key, forceResetComment || _customHooks.length !== _customHooks.length, _customHooks)!
                                             _ss.push(_s as ts.Statement)
-                                            return ts.createVariableDeclaration(name, decl.type, _initializer as ts.ArrowFunction)
+                                            return f.createVariableDeclaration(
+                                                name,
+                                                decl.exclamationToken,
+                                                decl.type,
+                                                _initializer as ts.ArrowFunction
+                                            )
                                         }
                                         return decl
                                     }),
@@ -143,7 +335,7 @@ export class RefreshTransformer {
                         return node
                     }).flat()
                 ),
-                this._sf.statements
+                this.#sf.statements
             )
         )
     }
@@ -223,26 +415,26 @@ export class RefreshTransformer {
 
     private _sign(fnNode: TSFunctionLike, fnName: string, sigId: ts.Identifier, key: string, forceReset: boolean, customHooks: string[]) {
         if (fnNode.body && ts.isBlock(fnNode.body)) {
-            const _s = ts.createExpressionStatement(ts.createCall(
+            const _s = f.createExpressionStatement(ts.createCall(
                 sigId,
                 undefined,
                 [
-                    ts.createIdentifier(fnName),
-                    ts.createStringLiteral(key),
+                    f.createIdentifier(fnName),
+                    f.createStringLiteral(key),
                     ...(forceReset || customHooks.length > 0 ? [
-                        forceReset ? ts.createTrue() : ts.createFalse(),
+                        forceReset ? f.createTrue() : f.createFalse(),
                         ...(customHooks.length > 0 ? [
-                            ts.createFunctionExpression(
+                            f.createFunctionExpression(
                                 undefined,
                                 undefined,
                                 undefined,
                                 undefined,
                                 undefined,
                                 undefined,
-                                ts.createBlock([
+                                f.createBlock([
                                     ts.createReturn(
                                         ts.createArrayLiteral(
-                                            customHooks.map(name => ts.createIdentifier(name)),
+                                            customHooks.map(name => f.createIdentifier(name)),
                                             false
                                         )
                                     )
@@ -254,7 +446,7 @@ export class RefreshTransformer {
             ))
             if (ts.isFunctionDeclaration(fnNode)) {
                 return [
-                    ts.createFunctionDeclaration(
+                    f.createFunctionDeclaration(
                         fnNode.decorators,
                         fnNode.modifiers,
                         fnNode.asteriskToken,
@@ -262,8 +454,8 @@ export class RefreshTransformer {
                         fnNode.typeParameters,
                         fnNode.parameters,
                         fnNode.type,
-                        ts.createBlock([
-                            ts.createExpressionStatement(ts.createCall(sigId, undefined, undefined)),
+                        f.createBlock([
+                            f.createExpressionStatement(ts.createCall(sigId, undefined, undefined)),
                             ...fnNode.body.statements
                         ], true)
                     ),
@@ -271,15 +463,15 @@ export class RefreshTransformer {
                 ]
             } else if (ts.isFunctionExpression(fnNode)) {
                 return [
-                    ts.createFunctionExpression(
+                    f.createFunctionExpression(
                         fnNode.modifiers,
                         fnNode.asteriskToken,
                         fnNode.name,
                         fnNode.typeParameters,
                         fnNode.parameters,
                         fnNode.type,
-                        ts.createBlock([
-                            ts.createExpressionStatement(ts.createCall(sigId, undefined, undefined)),
+                        f.createBlock([
+                            f.createExpressionStatement(ts.createCall(sigId, undefined, undefined)),
                             ...fnNode.body.statements
                         ], true)
                     ),
@@ -292,8 +484,8 @@ export class RefreshTransformer {
                         fnNode.typeParameters,
                         fnNode.parameters,
                         fnNode.type,
-                        ts.createBlock([
-                            ts.createExpressionStatement(ts.createCall(sigId, undefined, undefined)),
+                        f.createBlock([
+                            f.createExpressionStatement(ts.createCall(sigId, undefined, undefined)),
                             ...fnNode.body.statements
                         ], true)
                     ),
@@ -342,7 +534,7 @@ function isBuiltinHook(hookName: string) {
     }
 }
 
-export default function transformReactRefresh(ctx: ts.TransformationContext, sf: ts.SourceFile): ts.SourceFile {
-    const t = new RefreshTransformer(sf)
+export default function transformReactRefresh(ctx: ts.TransformationContext, sf: ts.SourceFile, options?: Record<string, any>): ts.SourceFile {
+    const t = new RefreshTransformer(sf, options)
     return t.transform()
 }
