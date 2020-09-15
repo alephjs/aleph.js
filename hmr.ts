@@ -1,10 +1,3 @@
-/**
- * aleph.js hmr
- * prior works: react-refresh & esm-hmr
- * @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
- * @link https://github.com/pikapkg/esm-hmr
- */
-
 import events from './events.ts'
 import util from './util.ts'
 import runtime from './vendor/react-refresh/runtime.js'
@@ -13,12 +6,15 @@ interface Callback {
     (...args: any[]): void
 }
 
-interface IWebSocket {
-    readonly OPEN: number
-    readyState: number
-    send(message: string): void
-    addEventListener(event: string, callback: Callback): void
-}
+// react-refresh
+// @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
+runtime.injectIntoGlobalHook(window)
+Object.assign(window, {
+    $RefreshReg$: () => { },
+    $RefreshSig$: () => (type: any) => type
+})
+export const performReactRefresh = util.debounce(runtime.performReactRefresh, 30)
+export const RefreshRuntime = runtime
 
 class Module {
     #id: string
@@ -61,11 +57,11 @@ class Module {
     }
 }
 
-const { location, WebSocket } = window as any
+const { location } = window as any
 const { protocol, host } = location
-const messageQueue: any[] = []
-const socket: IWebSocket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr', /*  'aleph-hmr' */)
 const modules: Map<string, Module> = new Map()
+const messageQueue: any[] = []
+const socket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr', /*  'aleph-hmr' */)
 
 socket.addEventListener('open', () => {
     messageQueue.forEach(msg => socket.send(JSON.stringify(msg)))
@@ -110,14 +106,5 @@ export function createHotContext(id: string) {
     modules.set(id, mod)
     return mod
 }
-
-export const performReactRefresh = util.debounce(runtime.performReactRefresh, 30)
-export const RefreshRuntime = runtime
-
-runtime.injectIntoGlobalHook(window)
-Object.assign(window, {
-    $RefreshReg$: () => { },
-    $RefreshSig$: () => (type: any) => type
-})
 
 console.log('[HMR] listening for file changes...')

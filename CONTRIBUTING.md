@@ -4,7 +4,7 @@ Welcome, and thank you for taking time in contributing to aleph.js!
 
 ## Development Setup
 
-You will need [deno](https://deno.land/) 1.3+ and [vscode](https://code.visualstudio.com/) to format the code.
+You will need [deno](https://deno.land/) 1.4+ and [vscode](https://code.visualstudio.com/) to format the code.
 
 ```bash
 # clone the code
