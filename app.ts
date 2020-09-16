@@ -24,18 +24,16 @@ function Main({
 }: {
     manifest: AppManifest
     url: RouterURL
-    app?: { Component: ComponentType<any>, props: any }
-    page: { Component: ComponentType<any>, props: any }
+    app: { Component?: ComponentType<any> }
+    page: { Component?: ComponentType<any> }
 }) {
     const [manifest, setManifest] = useState(() => initialManifest)
     const [app, setApp] = useState(() => ({
-        Component: initialApp?.Component,
-        props: initialApp?.props
+        Component: initialApp.Component
     }))
     const [page, setPage] = useState(() => ({
         url: initialUrl,
-        Component: initialPage.Component,
-        props: initialPage.props
+        Component: initialPage.Component
     }))
     const onpopstate = useCallback(async () => {
         const { baseUrl, pageModules, defaultLocale, locales } = manifest
@@ -51,17 +49,10 @@ function Main({
         if (url.pagePath in pageModules) {
             const { moduleId, hash } = pageModules[url.pagePath]!
             const importPath = util.cleanPath(baseUrl + '/_dist/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
-            const { default: Component, getStaticProps } = await import(importPath)
-            if (util.isFunction(getStaticProps)) {
-                const dataUrl = util.cleanPath(baseUrl + '/_data/' + url.asPath + '/index.json')
-                const resp = await fetch(dataUrl)
-                const data = await resp.json()
-                setPage({ url, Component, props: data })
-            } else {
-                setPage({ url, Component, props: null })
-            }
+            const { default: Component } = await import(importPath)
+            setPage({ url, Component })
         } else {
-            setPage({ url, Component: ErrorPage, props: { status: 404 } })
+            setPage({ url })
         }
     }, [manifest])
 
@@ -75,14 +66,14 @@ function Main({
         }
     }, [onpopstate])
 
-    const pageEl = React.createElement(page.Component, page.props)
+    const pageEl = page.Component ? React.createElement(page.Component, page.props) : React.createElement(ErrorPage, { status: 404 })
     return React.createElement(
         AppManifestContext.Provider,
         { value: manifest },
         React.createElement(
             RouterContext.Provider,
             { value: page.url },
-            app.Component ? React.createElement(app.Component, app.props, pageEl) : pageEl
+            app.Component ? React.createElement(app.Component, null, pageEl) : pageEl
         )
     )
 }
@@ -125,7 +116,7 @@ export async function bootstrap(manifest: AppManifest) {
     const el = document.getElementById('ssr-data')
 
     if (el) {
-        const { url, appStaticProps, staticProps } = JSON.parse(el.innerHTML)
+        const { url } = JSON.parse(el.innerHTML)
         if (url && util.isNEString(url.pagePath) && url.pagePath in pageModules) {
             const pageModule = pageModules[url.pagePath]!
             const [
@@ -140,14 +131,15 @@ export async function bootstrap(manifest: AppManifest) {
                 {
                     url,
                     manifest,
-                    app: { Component: AppComponent, props: appStaticProps },
-                    page: { Component: PageComponent, props: staticProps },
+                    app: { Component: AppComponent },
+                    page: { Component: PageComponent },
                 }
             )
-            const ssrHeadEls = document.head.querySelectorAll('[ssr]')
-            if (ssrHeadEls.length > 0) {
-                ssrHeadEls.forEach((el: any) => document.head.removeChild(el))
-            }
+            Array.from(document.head.children).forEach((el: any) => {
+                if (el.hasAttribute('ssr')) {
+                    document.head.removeChild(el)
+                }
+            })
             hydrate(el, document.querySelector('main'))
         }
     }

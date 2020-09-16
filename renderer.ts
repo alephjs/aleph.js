@@ -6,17 +6,14 @@ export { renderHead } from './head.ts'
 
 export function renderPage(
     url: RouterURL,
-    App: { Component: ComponentType, staticProps: any } | undefined,
-    Page: { Component: ComponentType, staticProps: any },
+    App: { Component: ComponentType<any> } | undefined,
+    Page: { Component: ComponentType<any> },
 ) {
     const El = React.createElement(
         RouterContext.Provider,
         { value: url },
-        React.createElement(
-            Page.Component,
-            Page.staticProps
-        )
+        React.createElement(Page.Component)
     )
-    const html = ReactDomServer.renderToString(App ? React.createElement(App.Component, App.staticProps, El) : El)
+    const html = ReactDomServer.renderToString(App ? React.createElement(App.Component, null, El) : El)
     return html
 }

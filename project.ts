@@ -54,8 +54,6 @@ interface RenderResult {
     code: number
     head: string[]
     body: string
-    appStaticProps?: Record<string, any> | null
-    staticProps?: Record<string, any> | null
 }
 
 export default class Project {
@@ -213,12 +211,12 @@ export default class Project {
             }
         )
         const mainMod = this.#modules.get('./main.js')!
-        const { code, head, body, appStaticProps, staticProps } = await this._renderPage(url)
+        const { code, head, body } = await this._renderPage(url)
         const html = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
-                { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url, appStaticProps, staticProps }) },
+                { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
                 { src: path.join(baseUrl, `/_dist/main.${mainMod.hash.slice(0, hashShort)}.js`), type: 'module' },
             ],
             body,
@@ -268,13 +266,11 @@ export default class Project {
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
-    async importModuleAsComponent(moduleId: string, ...args: any[]) {
+    async importModuleAsComponent(moduleId: string) {
         if (this.#modules.has(moduleId)) {
-            const { default: Component, getStaticProps } = await import(this.#modules.get(moduleId)!.jsFile)
+            const { default: Component } = await import(this.#modules.get(moduleId)!.jsFile)
             if (util.isLikelyReactComponent(Component)) {
-                const fn = [Component.getStaticProps, getStaticProps].filter(util.isFunction)[0]
-                const data = fn ? await fn(...args) : null
-                return { Component, staticProps: util.isPlainObject(data) ? data : null }
+                return { Component }
             }
         }
         return {}
@@ -524,15 +520,15 @@ export default class Project {
             let dlUrl = url
             for (const importPath in importMap.imports) {
                 const alias = importMap.imports[importPath]
-                if (importPath === dlUrl) {
+                if (importPath === url) {
                     dlUrl = alias
                     break
-                } else if (importPath.endsWith('/') && dlUrl.startsWith(importPath)) {
-                    dlUrl = util.trimSuffix(alias, '/') + '/' + util.trimPrefix(dlUrl, importPath)
+                } else if (importPath.endsWith('/') && url.startsWith(importPath)) {
+                    dlUrl = util.trimSuffix(alias, '/') + '/' + util.trimPrefix(url, importPath)
                     break
                 }
             }
-            if (this.isDev && (dlUrl === 'https://esm.sh/react' || dlUrl === 'https://esm.sh/react-dom')) {
+            if (this.isDev && url.startsWith('https://esm.sh/')) {
                 dlUrl += '?env=development'
             }
             if (mod.sourceHash === '') {
@@ -865,7 +861,7 @@ export default class Project {
                 ] = await Promise.all([
                     import(this.#modules.get('./renderer.js')!.jsFile),
                     this.importModuleAsComponent('./app.js'),
-                    this.importModuleAsComponent(pm.moduleId, url)
+                    this.importModuleAsComponent(pm.moduleId)
                 ])
                 if (Page.Component) {
                     const html = renderPage(url, App.Component ? App : undefined, Page)
@@ -876,8 +872,6 @@ export default class Project {
                     ret.code = 200
                     ret.head = head
                     ret.body = `<main>${html}</main>`
-                    ret.appStaticProps = App.staticProps
-                    ret.staticProps = Page.staticProps
                     pm.rendered.set(url.asPath, { ...ret })
                 } else {
                     ret.code = 500

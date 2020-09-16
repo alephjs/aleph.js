@@ -1,9 +1,9 @@
 export interface AppManifest {
-    baseUrl: string
-    defaultLocale: string
-    locales: Record<string, Record<string, string>>
-    appModule: { hash: string } | null
-    pageModules: Record<string, { moduleId: string, hash: string }>
+    readonly baseUrl: string
+    readonly defaultLocale: string
+    readonly locales: Record<string, Record<string, string>>
+    readonly appModule: { hash: string } | null
+    readonly pageModules: Record<string, { moduleId: string, hash: string }>
 }
 
 export interface RouterURL {
