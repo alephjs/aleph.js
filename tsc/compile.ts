@@ -9,7 +9,6 @@ export interface CompileOptions {
     mode?: 'development' | 'production'
     rewriteImportPath?: (importPath: string) => string
     reactRefresh?: boolean
-    hmr?: { id: string }
 }
 
 export function createSourceFile(fileName: string, source: string) {
@@ -31,14 +30,14 @@ const allowTargets = [
     'es2020',
 ]
 
-export function compile(fileName: string, source: string, { target: targetName = 'ES2015', mode, rewriteImportPath, reactRefresh, hmr }: CompileOptions) {
+export function compile(fileName: string, source: string, { target: targetName = 'ES2015', mode, rewriteImportPath, reactRefresh }: CompileOptions) {
     const target = allowTargets.indexOf(targetName.toLowerCase())
     const transformers: ts.CustomTransformers = { before: [], after: [] }
     if (mode === 'development') {
         transformers.before!.push(CreatePlainTransformer(transformReactJsxSource))
     }
     if (reactRefresh) {
-        transformers.before!.push(CreateTransformer(transformReactRefresh, { hmr }))
+        transformers.before!.push(CreateTransformer(transformReactRefresh))
     }
     if (rewriteImportPath) {
         transformers.after!.push(CreatePlainTransformer(transformImportPathRewrite, rewriteImportPath))

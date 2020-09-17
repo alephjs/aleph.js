@@ -632,19 +632,6 @@ export default class Project {
                     mode: this.mode,
                     rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path),
                     reactRefresh: this.isDev && !mod.isRemote,
-                    // hmr: this.isHMRable(mod.id) ? {
-                    //     id: mod.id,
-                    //     importPath: (() => {
-                    //         const importPath = path.relative(
-                    //             path.dirname(mod.sourceFilePath),
-                    //             '/-/deno.land/x/aleph/hmr.js'
-                    //         )
-                    //         if (!importPath.startsWith('.') && !importPath.startsWith('/')) {
-                    //             return './' + importPath
-                    //         }
-                    //         return importPath
-                    //     })()
-                    // } : undefined
                 }
                 const { diagnostics, outputText, sourceMapText } = compile(mod.url, sourceContent, compileOptions)
                 if (diagnostics && diagnostics.length > 0) {
