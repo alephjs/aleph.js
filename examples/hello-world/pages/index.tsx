@@ -2,7 +2,7 @@ import React, { useState } from 'https://esm.sh/react'
 import Logo from '../components/logo.tsx'
 import '../style/index.less'
 
-export default function Home( ) {
+export default function Home() {
     const [count, setCount] = useState(0)
 
     return (
@@ -19,8 +19,8 @@ export default function Home( ) {
             <p className="counter">
                 <span>Counter:</span>
                 <strong>{count}</strong>
-                <button onClick={() => setCount(n => n-1)}>-</button>
-                <button onClick={() => setCount(n => n+1)}>+</button>
+                <button onClick={() => setCount(n => n - 1)}>-</button>
+                <button onClick={() => setCount(n => n + 1)}>+</button>
             </p>
         </div>
     )
