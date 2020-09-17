@@ -1,6 +1,7 @@
-import React, { ComponentType, createContext, useCallback, useContext, useEffect, useState } from 'https://esm.sh/react'
+import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { hydrate } from 'https://esm.sh/react-dom'
 import type { AppManifest, RouterURL } from './api.ts'
+import { DataContext } from './data.ts'
 import { ErrorPage } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
@@ -11,31 +12,19 @@ export const AppManifestContext = createContext<AppManifest>({
     baseUrl: '/',
     defaultLocale: 'en',
     locales: {},
-    appModule: null,
-    pageModules: {},
 })
 AppManifestContext.displayName = 'AppManifestContext'
 
-export const DataContext = createContext<{ data: Record<string, any> }>({
-    data: {},
-})
-DataContext.displayName = 'DataContext'
-
-export function useData(key: string) {
-    const { data } = useContext(DataContext)
-    return data[key]
-}
-
-interface MainConfig {
-    manifest: AppManifest
-    data: Record<string, any>
-    app: { Component?: ComponentType<any> }
-    page: { Component?: ComponentType<any> }
-    pageModules: Record<string, { moduleId: string, hash: string }>
-    url: RouterURL
-}
-
-function Main({ config }: { config: Readonly<MainConfig> }) {
+function ALEPH({ config }: {
+    config: {
+        manifest: AppManifest
+        data: Record<string, any>
+        app: { Component?: ComponentType<any> }
+        page: { Component?: ComponentType<any> }
+        pageModules: Record<string, { moduleId: string, hash: string }>
+        url: RouterURL
+    }
+}) {
     const [manifest, setManifest] = useState(() => config.manifest)
     const [data, setData] = useState(() => ({ data: config.data }))
     const [app, setApp] = useState(() => ({
@@ -129,15 +118,19 @@ interface Module {
     hash: string,
 }
 
-interface BootstrapConfig extends AppManifest {
+export async function bootstrap({
+    baseUrl,
+    defaultLocale,
+    locales,
+    dataModule,
+    appModule,
+    pageModules
+}: AppManifest & {
     dataModule: Module | null
     appModule: Module | null
     pageModules: Record<string, Module>
-}
-
-export async function bootstrap(manifest: BootstrapConfig) {
+}) {
     const { document } = window as any
-    const { baseUrl, defaultLocale, locales, dataModule, appModule, pageModules } = manifest
     const el = document.getElementById('ssr-data')
 
     if (el) {
@@ -154,7 +147,7 @@ export async function bootstrap(manifest: BootstrapConfig) {
                 import(getModuleImportUrl(baseUrl, pageModule)),
             ])
             const el = React.createElement(
-                Main,
+                ALEPH,
                 {
                     config: {
                         manifest: { baseUrl, defaultLocale, locales },
@@ -162,7 +155,7 @@ export async function bootstrap(manifest: BootstrapConfig) {
                         app: { Component: AppComponent },
                         page: { Component: PageComponent },
                         pageModules,
-                        url
+                        url,
                     }
                 }
             )
