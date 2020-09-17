@@ -2,13 +2,11 @@ export interface AppManifest {
     readonly baseUrl: string
     readonly defaultLocale: string
     readonly locales: Record<string, Record<string, string>>
-    readonly appModule: { hash: string } | null
-    readonly pageModules: Record<string, { moduleId: string, hash: string }>
 }
 
 export interface RouterURL {
     locale: string
-    asPath: string
+    pathname: string
     pagePath: string
     params: Record<string, string>
     query: Record<string, string | string[]>

@@ -1,4 +1,4 @@
-import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
+import React, { ComponentType, createContext, useCallback, useContext, useEffect, useState } from 'https://esm.sh/react'
 import { hydrate } from 'https://esm.sh/react-dom'
 import type { AppManifest, RouterURL } from './api.ts'
 import { ErrorPage } from './error.ts'
@@ -16,27 +16,38 @@ export const AppManifestContext = createContext<AppManifest>({
 })
 AppManifestContext.displayName = 'AppManifestContext'
 
-function Main({
-    manifest: initialManifest,
-    url: initialUrl,
-    app: initialApp,
-    page: initialPage
-}: {
+export const DataContext = createContext<{ data: Record<string, any> }>({
+    data: {},
+})
+DataContext.displayName = 'DataContext'
+
+export function useData(key: string) {
+    const { data } = useContext(DataContext)
+    return data[key]
+}
+
+interface MainConfig {
     manifest: AppManifest
-    url: RouterURL
+    data: Record<string, any>
     app: { Component?: ComponentType<any> }
     page: { Component?: ComponentType<any> }
-}) {
-    const [manifest, setManifest] = useState(() => initialManifest)
+    pageModules: Record<string, { moduleId: string, hash: string }>
+    url: RouterURL
+}
+
+function Main({ config }: { config: Readonly<MainConfig> }) {
+    const [manifest, setManifest] = useState(() => config.manifest)
+    const [data, setData] = useState(() => ({ data: config.data }))
     const [app, setApp] = useState(() => ({
-        Component: initialApp.Component
+        Component: config.app.Component
     }))
     const [page, setPage] = useState(() => ({
-        url: initialUrl,
-        Component: initialPage.Component
+        url: config.url,
+        Component: config.page.Component
     }))
     const onpopstate = useCallback(async () => {
-        const { baseUrl, pageModules, defaultLocale, locales } = manifest
+        const { pageModules } = config
+        const { baseUrl, defaultLocale, locales } = manifest
         const url = route(
             baseUrl,
             Object.keys(pageModules),
@@ -47,9 +58,8 @@ function Main({
             }
         )
         if (url.pagePath in pageModules) {
-            const { moduleId, hash } = pageModules[url.pagePath]!
-            const importPath = util.cleanPath(baseUrl + '/_dist/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
-            const { default: Component } = await import(importPath)
+            const mod = pageModules[url.pagePath]!
+            const { default: Component } = await import(getModuleImportUrl(baseUrl, mod))
             setPage({ url, Component })
         } else {
             setPage({ url })
@@ -71,9 +81,13 @@ function Main({
         AppManifestContext.Provider,
         { value: manifest },
         React.createElement(
-            RouterContext.Provider,
-            { value: page.url },
-            app.Component ? React.createElement(app.Component, null, pageEl) : pageEl
+            DataContext.Provider,
+            { value: data },
+            React.createElement(
+                RouterContext.Provider,
+                { value: page.url },
+                app.Component ? React.createElement(app.Component, null, pageEl) : pageEl
+            )
         )
     )
 }
@@ -110,9 +124,20 @@ export async function redirect(url: string, replace: boolean) {
     events.emit('popstate', { type: 'popstate' })
 }
 
-export async function bootstrap(manifest: AppManifest) {
+interface Module {
+    moduleId: string,
+    hash: string,
+}
+
+interface BootstrapConfig extends AppManifest {
+    dataModule: Module | null
+    appModule: Module | null
+    pageModules: Record<string, Module>
+}
+
+export async function bootstrap(manifest: BootstrapConfig) {
     const { document } = window as any
-    const { baseUrl, appModule, pageModules } = manifest
+    const { baseUrl, defaultLocale, locales, dataModule, appModule, pageModules } = manifest
     const el = document.getElementById('ssr-data')
 
     if (el) {
@@ -120,19 +145,25 @@ export async function bootstrap(manifest: AppManifest) {
         if (url && util.isNEString(url.pagePath) && url.pagePath in pageModules) {
             const pageModule = pageModules[url.pagePath]!
             const [
+                data,
                 { default: AppComponent },
                 { default: PageComponent }
             ] = await Promise.all([
-                appModule ? import(baseUrl + `_dist/app.${appModule.hash.slice(0, hashShort)}.js`) : Promise.resolve({}),
-                import(baseUrl + '_dist/' + pageModule.moduleId.replace(/\.js$/, `.${pageModule.hash.slice(0, hashShort)}.js`)),
+                dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({}),
+                appModule ? import(getModuleImportUrl(baseUrl, appModule)) : Promise.resolve({}),
+                import(getModuleImportUrl(baseUrl, pageModule)),
             ])
             const el = React.createElement(
                 Main,
                 {
-                    url,
-                    manifest,
-                    app: { Component: AppComponent },
-                    page: { Component: PageComponent },
+                    config: {
+                        manifest: { baseUrl, defaultLocale, locales },
+                        data,
+                        app: { Component: AppComponent },
+                        page: { Component: PageComponent },
+                        pageModules,
+                        url
+                    }
                 }
             )
             Array.from(document.head.children).forEach((el: any) => {
@@ -143,4 +174,8 @@ export async function bootstrap(manifest: AppManifest) {
             hydrate(el, document.querySelector('main'))
         }
     }
+}
+
+function getModuleImportUrl(baseUrl: string, { moduleId, hash }: Module) {
+    return util.cleanPath(baseUrl + '/_dist/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
 }

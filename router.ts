@@ -3,7 +3,7 @@ import type { RouterURL } from './api.ts'
 
 export const RouterContext = createContext<RouterURL>({
     pagePath: '/',
-    asPath: '/',
+    pathname: '/',
     params: {},
     query: {},
     locale: 'en'

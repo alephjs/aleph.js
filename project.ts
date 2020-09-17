@@ -42,14 +42,6 @@ interface Module {
     hash: string
 }
 
-interface BuildManifest {
-    baseUrl: string
-    defaultLocale: string
-    locales: Record<string, Record<string, string>>
-    appModule: { hash: string } | null
-    pageModules: Record<string, { moduleId: string, hash: string }>
-}
-
 interface RenderResult {
     code: number
     head: string[]
@@ -101,27 +93,6 @@ export default class Project {
         return Array.from(this.#modules.keys())
             .filter(p => p.startsWith('./api/'))
             .map(p => p.slice(1).replace(reModuleExt, ''))
-    }
-
-    get manifest() {
-        const { baseUrl, defaultLocale } = this.config
-        const manifest: BuildManifest = {
-            baseUrl,
-            defaultLocale,
-            locales: {},
-            appModule: null,
-            pageModules: {}
-        }
-        if (this.#modules.has('./app.js')) {
-            manifest.appModule = {
-                hash: this.#modules.get('./app.js')!.hash
-            }
-        }
-        this.#pageModules.forEach(({ moduleId }, pagePath) => {
-            const { hash } = this.#modules.get(moduleId)!
-            manifest.pageModules[pagePath] = { moduleId, hash }
-        })
-        return manifest
     }
 
     get isDev() {
@@ -329,6 +300,7 @@ export default class Project {
     }
 
     private async _init() {
+        const { baseUrl, defaultLocale } = this.config
         const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.mjs', '.ts', '.tsx'], skip: [/\.d\.ts$/i] }
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
@@ -362,12 +334,40 @@ export default class Project {
             }
         }
 
+        const bootstrapConfig: Record<string, any> = {
+            baseUrl,
+            defaultLocale,
+            locales: {},
+            appModule: null,
+            pageModules: {}
+        }
+        if (this.#modules.has('./app.js')) {
+            bootstrapConfig.appModule = {
+                moduleId: './app.js',
+                hash: this.#modules.get('./app.js')!.hash
+            }
+        }
+        if (this.#modules.has('./data.js')) {
+            bootstrapConfig.dataModule = {
+                moduleId: './data.js',
+                hash: this.#modules.get('./data.js')!.hash
+            }
+        } else if (this.#modules.has('./data/index.js')) {
+            bootstrapConfig.dataModule = {
+                moduleId: './data/index.js',
+                hash: this.#modules.get('./data/index.js')!.hash
+            }
+        }
+        this.#pageModules.forEach(({ moduleId }, pagePath) => {
+            const { hash } = this.#modules.get(moduleId)!
+            bootstrapConfig.pageModules[pagePath] = { moduleId, hash }
+        })
         const innerModules: Record<string, string> = {
             './main.js': [
                 `import 'https://deno.land/x/aleph/vendor/tslib/tslib.js'`,
                 this.isDev && `import 'https://deno.land/x/aleph/hmr.ts'`,
                 `import { bootstrap } from 'https://deno.land/x/aleph/app.ts'`,
-                `bootstrap(${JSON.stringify(this.manifest)})`
+                `bootstrap(${JSON.stringify(bootstrapConfig)})`
             ].filter(Boolean).join('\n'),
             './renderer.js': `export * from 'https://deno.land/x/aleph/renderer.ts'`
         }
@@ -836,8 +836,8 @@ export default class Project {
             const pm = this.#pageModules.get(url.pagePath)!
             const mod = this.#modules.get(pm.moduleId)!
             const appMod = this.#modules.get('./app.js')
-            if (pm.rendered.has(url.asPath)) {
-                const cache = pm.rendered.get(url.asPath)!
+            if (pm.rendered.has(url.pathname)) {
+                const cache = pm.rendered.get(url.pathname)!
                 return { ...cache }
             }
             try {
@@ -859,7 +859,7 @@ export default class Project {
                     ret.code = 200
                     ret.head = head
                     ret.body = `<main>${html}</main>`
-                    pm.rendered.set(url.asPath, { ...ret })
+                    pm.rendered.set(url.pathname, { ...ret })
                 } else {
                     ret.code = 500
                     ret.head = ['<title>500 - render error</title>']

@@ -19,7 +19,7 @@ export default function Link({
     style,
     children
 }: PropsWithChildren<LinkProps>) {
-    const { asPath: currentPath, query: currentQuery } = useRouter()
+    const { pathname: currentPath, query: currentQuery } = useRouter()
     const currentHref = useMemo(() => {
         return [currentPath, Object.entries(currentQuery).map(([key, value]) => {
             if (util.isArray(value)) {

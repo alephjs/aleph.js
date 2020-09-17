@@ -49,7 +49,7 @@ export default function route(base: string, pagePaths: string[], options?: { loc
         pagePath = options?.fallback
     }
 
-    return { locale, asPath, pagePath, params, query }
+    return { locale, pathname: asPath, pagePath, params, query }
 }
 
 function matchPath(routePath: string, locPath: string): [Record<string, string>, boolean] {
