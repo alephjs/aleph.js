@@ -1,7 +1,3 @@
-const symbolFor = typeof Symbol === 'function' && Symbol.for
-const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
-const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
-
 export const hashShort = 7
 
 export default {
@@ -35,39 +31,54 @@ export default {
     isFunction(a: any): a is Function {
         return typeof a === 'function'
     },
-    // copy from https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshRuntime.js#L650 | Copyright (c) Facebook, Inc. and its affiliates.
-    isLikelyReactComponent(a: any): boolean {
-        switch (typeof a) {
-            case 'function': {
-                if (a.prototype != null) {
-                    if (a.prototype.isReactComponent) {
-                        return true
-                    }
-                    const ownNames = Object.getOwnPropertyNames(a.prototype);
-                    if (ownNames.length > 1 || ownNames[0] !== 'constructor') {
-                        return false
-                    }
-                }
-                const name = a.name || a.displayName
-                return typeof name === 'string' && /^[A-Z]/.test(name)
-            }
-            case 'object': {
-                if (a != null) {
-                    switch (a.$$typeof) {
-                        case REACT_FORWARD_REF_TYPE:
-                        case REACT_MEMO_TYPE:
+    isLikelyReactComponent: (() => {
+        /**
+         * Copyright (c) Facebook, Inc. and its affiliates.
+         *
+         * This source code is licensed under the MIT license found in the
+         * LICENSE file in the root directory of this source tree.
+         *
+         */
+
+        const symbolFor = typeof Symbol === 'function' && Symbol.for
+        const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
+        const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
+
+        function isLikelyComponentType(type: any): boolean {
+            switch (typeof type) {
+                case 'function': {
+                    if (type.prototype != null) {
+                        if (type.prototype.isReactComponent) {
                             return true
-                        default:
+                        }
+                        const ownNames = Object.getOwnPropertyNames(type.prototype);
+                        if (ownNames.length > 1 || ownNames[0] !== 'constructor') {
                             return false
+                        }
                     }
+                    const name = type.name || type.displayName
+                    return typeof name === 'string' && /^[A-Z]/.test(name)
                 }
-                return false
-            }
-            default: {
-                return false
+                case 'object': {
+                    if (type != null) {
+                        switch (type.$$typeof) {
+                            case REACT_FORWARD_REF_TYPE:
+                            case REACT_MEMO_TYPE:
+                                return true
+                            default:
+                                return false
+                        }
+                    }
+                    return false
+                }
+                default: {
+                    return false
+                }
             }
         }
-    },
+
+        return isLikelyComponentType
+    })(),
     isHttpUrl(url: string) {
         return url.startsWith('https://') || url.startsWith('http://')
     },
