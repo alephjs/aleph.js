@@ -701,7 +701,7 @@ export default class Project {
 
         let fsync = false
 
-        // compile source
+        // compile source code
         if (sourceContent != '' || emptyContent) {
             const t = performance.now()
             mod.deps = options?.implicitDeps || []

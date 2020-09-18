@@ -31,9 +31,9 @@ export function createHtml({
             return `<script>${v}</script>`
         } else if (util.isNEString(v.innerText)) {
             const { innerText, ...rest } = v
-            return `<script${toAttrs(rest)}>${innerText}</script>`
+            return `<script${attrString(rest)}>${innerText}</script>`
         } else if (util.isNEString(v.src) && !v.preload) {
-            return `<script${toAttrs(v)}></script>`
+            return `<script${attrString(v)}></script>`
         } else {
             return ''
         }
@@ -54,6 +54,6 @@ export function createHtml({
     ].join(eol)
 }
 
-function toAttrs(v: any): string {
+function attrString(v: any): string {
     return Object.keys(v).map(k => ` ${k}=${JSON.stringify(String(v[k]))}`).join('')
 }

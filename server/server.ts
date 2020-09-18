@@ -20,6 +20,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                 const pathname = util.cleanPath(url.pathname)
 
                 try {
+                    // hmr
                     if (pathname === '/_hmr') {
                         const { conn, r: bufReader, w: bufWriter, headers } = req
                         ws.acceptWebSocket({ conn, bufReader, bufWriter, headers }).then(async socket => {
@@ -87,7 +88,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                         continue
                     }
 
-                    // serve js files
+                    // serve dist files
                     if (pathname.startsWith('/_dist/')) {
                         if (pathname.endsWith('.css')) {
                             try {
@@ -185,6 +186,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                         }
                     }
 
+                    // ssr
                     const [status, html] = await project.getPageHtml({ pathname, search: url.search })
                     req.respond({
                         status,

@@ -4,7 +4,7 @@ const mimeTypes: Record<string, string[]> = {
     'application/json': ['json', 'map'],
     'application/json5': ['json5'],
     'application/pdf': ['pdf'],
-    'application/xml': ['xml', 'xsl', 'xsd', 'rng'],
+    'application/xml': ['xml', 'xsl'],
 
     'text/html': ['html', 'htm'],
     'text/markdown': ['markdown', 'md'],

@@ -25,6 +25,9 @@ export class Logger {
             case 'error':
                 this.#level = Level.Error
                 break
+            case 'fatal':
+                this.#level = Level.Fatal
+                break
         }
     }
 

@@ -146,7 +146,7 @@ export default {
             callback()
         }, delay))
     },
-    // @require Deno env
+    // @require Deno
     existsDir(path: string) {
         if (typeof Deno === 'undefined') {
             throw new Error('require Deno')
@@ -164,7 +164,7 @@ export default {
             throw err
         }
     },
-    // @require Deno env
+    // @require Deno
     existsFile(path: string) {
         if (typeof Deno === 'undefined') {
             throw new Error('require Deno')
