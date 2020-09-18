@@ -79,6 +79,7 @@ function main() {
         }
     }
 
+    // sets log level
     if (argOptions.l || argOptions.log) {
         log.setLevel(String(argOptions.l || argOptions.log))
     }
@@ -168,8 +169,7 @@ function main() {
     import(`./cli/${command}.ts`).then(({ default: cmd }) => {
         const appDir = path.resolve(args[0] || '.')
         if (command !== 'init' && !util.existsDir(appDir)) {
-            log.error('No such app directory:', appDir)
-            return
+            log.fatal('No such app directory:', appDir)
         }
         cmd(appDir, argOptions)
     })

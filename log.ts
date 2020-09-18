@@ -55,7 +55,7 @@ export class Logger {
     fatal(...args: unknown[]) {
         if (this.#level <= Level.Fatal) {
             console.log(colorfulTag('fatal', colors.red), ...args)
-            Deno.exit(0)
+            Deno.exit(1)
         }
     }
 }
