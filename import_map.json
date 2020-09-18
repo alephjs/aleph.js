@@ -1,6 +1,6 @@
 {
     "imports": {
-        "https://esm.sh/": "http://localhost:9000/",
-        "https://deno.land/x/aleph/": "http://localhost:9000/"
+        "https://esm.sh/": "http://localhost:9006/",
+        "https://deno.land/x/aleph/": "http://localhost:9006/"
     }
 }
