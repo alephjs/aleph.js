@@ -80,7 +80,12 @@ export default {
         return isLikelyComponentType
     })(),
     isHttpUrl(url: string) {
-        return url.startsWith('https://') || url.startsWith('http://')
+        try {
+            const { protocol } = new URL(url)
+            return protocol === 'https:' || protocol === 'http:'
+        } catch (error) {
+            return false
+        }
     },
     trimPrefix(s: string, prefix: string): string {
         if (prefix !== '' && s.startsWith(prefix)) {
@@ -128,6 +133,53 @@ export default {
                 timer = null
                 callback()
             }, delay)
+        }
+    },
+    debounceX(id: string, callback: () => void, delay: number) {
+        const self = this as any
+        const timers: Map<string, number> = self.__debounce_timers || (self.__debounce_timers = new Map())
+        if (timers.has(id)) {
+            clearTimeout(timers.get(id)!)
+        }
+        timers.set(id, setTimeout(() => {
+            timers.delete(id)
+            callback()
+        }, delay))
+    },
+    // @require Deno env
+    existsDir(path: string) {
+        if (typeof Deno === 'undefined') {
+            throw new Error('require Deno')
+        }
+        try {
+            const fi = Deno.lstatSync(path)
+            if (fi.isDirectory) {
+                return true
+            }
+            return false
+        } catch (err) {
+            if (err instanceof Deno.errors.NotFound) {
+                return false
+            }
+            throw err
+        }
+    },
+    // @require Deno env
+    existsFile(path: string) {
+        if (typeof Deno === 'undefined') {
+            throw new Error('require Deno')
+        }
+        try {
+            const fi = Deno.lstatSync(path)
+            if (fi.isFile) {
+                return true
+            }
+            return false
+        } catch (err) {
+            if (err instanceof Deno.errors.NotFound) {
+                return false
+            }
+            throw err
         }
     }
 }
