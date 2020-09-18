@@ -26,7 +26,7 @@ function ALEPH({ config }: {
     }
 }) {
     const [manifest, setManifest] = useState(() => config.manifest)
-    const [data, setData] = useState(() => ({ data: config.data }))
+    const [data, setData] = useState(() => config.data)
     const [app, setApp] = useState(() => ({
         Component: config.app.Component
     }))
@@ -64,6 +64,18 @@ function ALEPH({ config }: {
             events.off('popstate', onpopstate)
         }
     }, [onpopstate])
+
+    useEffect(() => {
+        const onupdatedata = (data: any) => {
+            console.log("[DATA]", data)
+            setData(data)
+        }
+        events.on('updateData', onupdatedata)
+
+        return () => {
+            events.off('updateData', onupdatedata)
+        }
+    }, [])
 
     const pageEl = page.Component ? React.createElement(page.Component, page.props) : React.createElement(ErrorPage, { status: 404 })
     return React.createElement(
@@ -138,7 +150,7 @@ export async function bootstrap({
         if (url && util.isNEString(url.pagePath) && url.pagePath in pageModules) {
             const pageModule = pageModules[url.pagePath]!
             const [
-                data,
+                { default: data },
                 { default: AppComponent },
                 { default: PageComponent }
             ] = await Promise.all([

@@ -102,7 +102,7 @@ export default class Project {
         if (reHttp.test(moduleId)) {
             return false
         }
-        return moduleId === './app.js' || moduleId.startsWith('./pages/') || moduleId.startsWith('./components/') || reStyleModuleExt.test(moduleId)
+        return moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js' || moduleId.startsWith('./pages/') || moduleId.startsWith('./components/') || reStyleModuleExt.test(moduleId)
     }
 
     getModule(id: string): Module | null {
@@ -136,6 +136,9 @@ export default class Project {
                     modId = id + '.js'
                 }
             }
+        }
+        if (!this.#modules.has(modId) && modId == './data.js') {
+            modId = './data/index.js'
         }
         if (!this.#modules.has(modId)) {
             console.warn(`can't get the module by path '${pathname}(${modId})'`)
@@ -194,6 +197,33 @@ export default class Project {
         return [code, html]
     }
 
+    async getData() {
+        const mod = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')
+        if (mod) {
+            const { default: Data } = await import(mod.jsFile)
+            let data: any = Data
+            if (util.isFunction(Data)) {
+                data = await Data()
+            }
+            if (util.isPlainObject(data)) {
+                return data
+            } else {
+                log.warn(`module '${mod.url}' should return a plain object`)
+            }
+        }
+        return {}
+    }
+
+    async importModuleAsComponent(moduleId: string) {
+        if (this.#modules.has(moduleId)) {
+            const { default: Component } = await import(this.#modules.get(moduleId)!.jsFile)
+            if (util.isLikelyReactComponent(Component)) {
+                return { Component }
+            }
+        }
+        return {}
+    }
+
     async build() {
         const start = performance.now()
         const outputDir = path.join(this.srcDir, this.config.outputDir)
@@ -232,16 +262,6 @@ export default class Project {
             }
         }
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
-    }
-
-    async importModuleAsComponent(moduleId: string) {
-        if (this.#modules.has(moduleId)) {
-            const { default: Component } = await import(this.#modules.get(moduleId)!.jsFile)
-            if (util.isLikelyReactComponent(Component)) {
-                return { Component }
-            }
-        }
-        return {}
     }
 
     private async _loadConfig() {
@@ -491,7 +511,9 @@ export default class Project {
                                 if (hmrable) {
                                     this.#fsWatchListeners.forEach(e => e.emit(moduleId, type, hash))
                                 }
-                                if (moduleId.startsWith('./pages/')) {
+                                if (moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js') {
+                                    this._clearPageRenderCache()
+                                } else if (moduleId.startsWith('./pages/')) {
                                     this._clearPageRenderCache(moduleId)
                                 }
                                 this._updateDependency('./' + path, hash, mod => {
@@ -505,7 +527,9 @@ export default class Project {
                             })
                         } else if (this.#modules.has(moduleId)) {
                             this.#modules.delete(moduleId)
-                            if (moduleId.startsWith('./pages/')) {
+                            if (moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js') {
+                                this._clearPageRenderCache()
+                            } else if (moduleId.startsWith('./pages/')) {
                                 this._removePageModule(moduleId)
                             }
                             if (this.isHMRable(moduleId)) {
@@ -532,9 +556,9 @@ export default class Project {
         }
     }
 
-    private _clearPageRenderCache(moduleId: string) {
+    private _clearPageRenderCache(moduleId?: string) {
         for (const [_, p] of this.#pageModules.entries()) {
-            if (p.moduleId === moduleId) {
+            if (moduleId === undefined || p.moduleId === moduleId) {
                 p.rendered.clear()
                 break
             }
@@ -921,7 +945,8 @@ export default class Project {
                     this.importModuleAsComponent(pm.moduleId)
                 ])
                 if (Page.Component) {
-                    const html = renderPage(url, App.Component ? App : undefined, Page)
+                    const data = await this.getData()
+                    const html = renderPage(data, url, App.Component ? App : undefined, Page)
                     const head = renderHead([
                         mod.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)),
                         appMod?.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url))

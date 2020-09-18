@@ -107,12 +107,29 @@ export async function start(appDir: string, port: number, isDev = false) {
                                 }
 
                                 let body = ''
-                                if (reqMap) {
+                                if (mod.id === './data.js' || mod.id === './data/index.js') {
+                                    const data = await project.getData()
+                                    if (project.isDev) {
+                                        body = [
+                                            `import { createHotContext } from "./-/deno.land/x/aleph/hmr.js";`,
+                                            `import events from "./-/deno.land/x/aleph/events.js";`,
+                                            `import.meta.hot = createHotContext("./data.js");`,
+                                            `export default ${JSON.stringify(data, undefined, 4)};`,
+                                            `import.meta.hot.accept(({ default: data }) => events.emit("updateData", data));`
+                                        ].join('\n')
+                                    } else {
+                                        body = `export default ${JSON.stringify(data)}`
+                                    }
+                                } else if (reqMap) {
                                     body = mod.jsSourceMap
                                 } else {
                                     body = mod.jsContent
                                     if (project.isHMRable(mod.id)) {
-                                        body = injectHmr({ id: mod.id, sourceFilePath: mod.sourceFilePath, jsContent: body })
+                                        body = injectHmr({
+                                            id: mod.id,
+                                            sourceFilePath: mod.sourceFilePath,
+                                            jsContent: body
+                                        })
                                     }
                                 }
                                 req.respond({
