@@ -2,9 +2,12 @@
 
 Welcome, and thank you for taking time in contributing to aleph.js!
 
+## Code of Conduct
+All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Development Setup
 
-You will need [deno](https://deno.land/) 1.4+ and [vscode](https://code.visualstudio.com/) to format the code.
+You will need [deno](https://deno.land/) 1.4+ and [vscode](https://code.visualstudio.com/).
 
 ```bash
 # clone the code
