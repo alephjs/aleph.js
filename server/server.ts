@@ -92,7 +92,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                     if (pathname.startsWith('/_dist/')) {
                         if (pathname.endsWith('.css')) {
                             try {
-                                const filePath = path.join(project.rootDir, '.aleph', project.mode, util.trimPrefix(pathname, '/_dist/'))
+                                const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_dist/'))
                                 const info = await Deno.lstat(filePath)
                                 if (!info.isDirectory) {
                                     const body = await Deno.readFile(filePath)

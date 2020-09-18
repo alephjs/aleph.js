@@ -21,7 +21,6 @@ export function createSourceFile(fileName: string, source: string) {
 
 const allowTargets = [
     'esnext',
-    'es5',
     'es2015',
     'es2016',
     'es2017',
@@ -47,7 +46,7 @@ export function compile(fileName: string, source: string, { target: targetName =
         fileName,
         reportDiagnostics: true,
         compilerOptions: {
-            target: target < 0 ? ts.ScriptTarget.ES2015 : (target || 99),
+            target: target < 0 ? ts.ScriptTarget.ES2015 : (target > 0 ? target + 1 : 99),
             module: ts.ModuleKind.ES2020,
             isolatedModules: true,
             allowJs: true,

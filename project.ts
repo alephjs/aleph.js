@@ -22,7 +22,7 @@ interface Config {
     readonly baseUrl: string
     readonly defaultLocale: string
     readonly cacheDeps: boolean
-    readonly target: string
+    readonly buildTarget: string
     readonly importMap: {
         imports: Record<string, string>
     }
@@ -66,7 +66,7 @@ export default class Project {
             cacheDeps: true,
             baseUrl: '/',
             defaultLocale: 'en',
-            target: 'ES2015',
+            buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             importMap: {
                 imports: {}
             }
@@ -85,6 +85,10 @@ export default class Project {
 
     get rootDir() {
         return this.config.rootDir
+    }
+
+    get buildDir() {
+        return path.join(this.rootDir, '.aleph', this.mode + '.' + this.config.buildTarget)
     }
 
     get srcDir() {
@@ -299,8 +303,8 @@ export default class Project {
             if (util.isNEString(lang)) {
                 Object.assign(this.config, { defaultLocale: lang })
             }
-            if (/^es(5|20\d{2}|next)$/i.test(target)) {
-                Object.assign(this.config, { target })
+            if (/^es(20\d{2}|next)$/i.test(target)) {
+                Object.assign(this.config, { target: target.toLowerCase() })
             }
             if (typeof cacheDeps === 'boolean') {
                 Object.assign(this.config, { cacheDeps })
@@ -309,7 +313,7 @@ export default class Project {
     }
 
     private async _createMainModule(): Promise<Module> {
-        const { rootDir, baseUrl, defaultLocale } = this.config
+        const { baseUrl, defaultLocale } = this.config
         const config: Record<string, any> = {
             baseUrl,
             defaultLocale,
@@ -349,7 +353,6 @@ export default class Project {
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)})`
         ].filter(Boolean).join('\n')
         const hash = (new Sha1()).update(jsContent).hex()
-        const saveDir = path.join(rootDir, '.aleph', this.mode)
         const id = './main.js'
         const module: Module = {
             id,
@@ -359,14 +362,14 @@ export default class Project {
             sourceType: 'js',
             sourceHash: hash,
             deps,
-            jsFile: path.join(saveDir, `main.${hash.slice(0, hashShort)}.js`),
+            jsFile: path.join(this.buildDir, `main.${hash.slice(0, hashShort)}.js`),
             jsContent,
             jsSourceMap: '',
             hash: hash,
         }
         await Promise.all([
             writeTextFile(module.jsFile, jsContent),
-            writeTextFile(path.join(saveDir, 'main.meta.json'), JSON.stringify({
+            writeTextFile(path.join(this.buildDir, 'main.meta.json'), JSON.stringify({
                 url: './main.js',
                 sourceHash: hash,
                 hash,
@@ -587,7 +590,7 @@ export default class Project {
         }
 
         const name = path.basename(sourceFilePath).replace(reModuleExt, '')
-        const saveDir = path.join(rootDir, '.aleph', this.mode, path.dirname(sourceFilePath))
+        const saveDir = path.join(this.buildDir, path.dirname(sourceFilePath))
         const metaFile = path.join(saveDir, `${name}.meta.json`)
         const mod: Module = {
             id,
@@ -727,7 +730,7 @@ export default class Project {
                 const hash = (new Sha1).update(css).hex()
                 const savePath = path.join(path.dirname(sourceFilePath), util.trimSuffix(path.basename(sourceFilePath), '.css') + '.' + hash.slice(0, hashShort) + '.css')
                 if (css.length > 1024) {
-                    await writeTextFile(path.join(rootDir, '.aleph', this.mode, savePath), css)
+                    await writeTextFile(path.join(this.buildDir, savePath), css)
                 }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(relativePath(
@@ -740,7 +743,7 @@ export default class Project {
                 mod.jsSourceMap = ''
             } else {
                 const compileOptions = {
-                    target: this.config.target,
+                    target: this.config.buildTarget,
                     mode: this.mode,
                     reactRefresh: this.isDev && !mod.isRemote && (mod.id === './app.js' || mod.id.startsWith('./pages/') || mod.id.startsWith('./components/')),
                     rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path),
