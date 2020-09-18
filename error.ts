@@ -1,7 +1,22 @@
 import React from 'https://esm.sh/react'
 
-export const errAppEl = React.createElement(ErrorPage, { status: 500, text: 'app module should export default as a react component', refreshButton: true })
-export const errPageEl = React.createElement(ErrorPage, { status: 500, text: 'page module should export default as a react component', refreshButton: true })
+export const errAppEl = React.createElement(
+    ErrorPage,
+    {
+        status: 501,
+        text: 'app module should export default as a react component',
+        refreshButton: true
+    }
+)
+
+export const errPageEl = React.createElement(
+    ErrorPage,
+    {
+        status: 501,
+        text: 'page module should export default as a react component',
+        refreshButton: true
+    }
+)
 
 export function ErrorPage({ status, text = getStatusText(status), refreshButton }: { status: number, text?: string, refreshButton?: boolean }) {
     return [
