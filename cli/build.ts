@@ -1,4 +1,3 @@
-
 import Project from '../project.ts'
 
 export const helpMessage = `Builds the aleph app in production mode.

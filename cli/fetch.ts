@@ -1,4 +1,3 @@
-
 export const helpMessage = `Fetches the aleph app remote modules.
 
 Usage:
