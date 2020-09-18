@@ -83,17 +83,17 @@ export default class Project {
         return this.mode === 'development'
     }
 
-    get rootDir() {
-        return this.config.rootDir
-    }
-
-    get buildDir() {
-        return path.join(this.rootDir, '.aleph', this.mode + '.' + this.config.buildTarget)
-    }
-
     get srcDir() {
         const { rootDir, srcDir } = this.config
         return path.join(rootDir, srcDir)
+    }
+
+    get publicDir() {
+        return path.join(this.srcDir, 'public')
+    }
+
+    get buildDir() {
+        return path.join(this.config.rootDir, '.aleph', this.mode + '.' + this.config.buildTarget)
     }
 
     get apiPaths() {
@@ -231,7 +231,6 @@ export default class Project {
     async build() {
         const start = performance.now()
         const outputDir = path.join(this.srcDir, this.config.outputDir)
-        const publicDir = path.join(this.srcDir, 'public')
         const distDir = path.join(outputDir, '_dist')
         await this.ready
         if (util.existsDir(outputDir)) {
@@ -259,9 +258,9 @@ export default class Project {
             const htmlFile = path.join(outputDir, pathname, 'index.html')
             await writeTextFile(htmlFile, html)
         }
-        if (util.existsDir(publicDir)) {
-            for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
-                const rp = path.resolve(util.trimPrefix(p, publicDir))
+        if (util.existsDir(this.publicDir)) {
+            for await (const { path: p } of walk(this.publicDir, { includeDirs: false })) {
+                const rp = path.resolve(util.trimPrefix(p, this.publicDir))
                 await Deno.copyFile(p, path.join(outputDir, rp))
             }
         }
@@ -580,7 +579,7 @@ export default class Project {
     }
 
     private async _compile(url: string, options?: { sourceCode?: string, implicitDeps?: { url: string, hash: string }[], forceCompile?: boolean }) {
-        const { rootDir, importMap } = this.config
+        const { importMap } = this.config
         const isRemote = reHttp.test(url) || (url in importMap.imports && reHttp.test(importMap.imports[url]))
         const sourceFilePath = renameImportUrl(url)
         const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : '.' + sourceFilePath).replace(reModuleExt, '.js')

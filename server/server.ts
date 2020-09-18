@@ -169,7 +169,7 @@ export async function start(appDir: string, port: number, isDev = false) {
 
                     // serve public files
                     try {
-                        const filePath = path.join(project.rootDir, 'public', pathname)
+                        const filePath = path.join(project.publicDir, pathname)
                         const info = await Deno.lstat(filePath)
                         if (!info.isDirectory) {
                             const body = await Deno.readFile(filePath)
