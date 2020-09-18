@@ -1,13 +1,14 @@
 import { colors } from './deps.ts'
 
-enum Level {
+export enum Level {
     Debug = 0,
     Info = 1,
     Warn = 2,
     Error = 3,
+    Fatal = 4,
 }
 
-class Logger {
+export class Logger {
     #level: Level = Level.Info
 
     setLevel(level: string) {
@@ -29,32 +30,38 @@ class Logger {
 
     debug(...args: unknown[]) {
         if (this.#level <= Level.Debug) {
-            console.log(this._colorfulTag('debug', colors.blue), ...args)
+            console.log(colorfulTag('debug', colors.blue), ...args)
         }
     }
 
     info(...args: unknown[]) {
         if (this.#level <= Level.Info) {
-            console.log(this._colorfulTag('info', colors.green), ...args)
+            console.log(colorfulTag('info', colors.green), ...args)
         }
     }
 
     warn(...args: unknown[]) {
         if (this.#level <= Level.Warn) {
-            console.log(this._colorfulTag('warn', colors.yellow), ...args)
+            console.log(colorfulTag('warn', colors.yellow), ...args)
         }
     }
 
     error(...args: unknown[]) {
         if (this.#level <= Level.Error) {
-            console.log(this._colorfulTag('error', colors.red), ...args)
+            console.log(colorfulTag('error', colors.red), ...args)
         }
     }
 
-    private _colorfulTag(tag: string, colorful: (text: string) => string) {
-        return [colors.dim('['), colorful(tag), colors.dim(']')].join(' ')
+    fatal(...args: unknown[]) {
+        if (this.#level <= Level.Fatal) {
+            console.log(colorfulTag('fatal', colors.red), ...args)
+            Deno.exit(0)
+        }
     }
 }
 
-export default new Logger()
+function colorfulTag(tag: string, colorful: (text: string) => string) {
+    return [colors.dim('['), colorful(tag), colors.dim(']')].join(' ')
+}
 
+export default new Logger()
