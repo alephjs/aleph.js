@@ -24,6 +24,18 @@ export async function start(appDir: string, port: number, isDev = false) {
                         const { conn, r: bufReader, w: bufWriter, headers } = req
                         ws.acceptWebSocket({ conn, bufReader, bufWriter, headers }).then(async socket => {
                             const watcher = project.createFSWatcher()
+                            watcher.on('add', (moduleId: string, hash: string) => socket.send(JSON.stringify({
+                                type: 'add',
+                                moduleId,
+                                hash
+                            })))
+                            watcher.on('remove', (moduleId: string) => {
+                                watcher.removeAllListeners('modify-' + moduleId)
+                                socket.send(JSON.stringify({
+                                    type: 'remove',
+                                    moduleId
+                                }))
+                            })
                             for await (const e of socket) {
                                 if (util.isNEString(e)) {
                                     try {
@@ -31,21 +43,20 @@ export async function start(appDir: string, port: number, isDev = false) {
                                         if (data.type === 'hotAccept' && util.isNEString(data.id)) {
                                             const mod = project.getModule(data.id)
                                             if (mod) {
-                                                watcher.on(mod.id, (type: string, hash?: string) => {
-                                                    if (type == 'modify') {
-                                                        socket.send(JSON.stringify({
-                                                            type: 'update',
-                                                            id: mod.id,
-                                                            updateUrl: path.resolve(
-                                                                path.join(project.config.baseUrl, '/_dist/'),
-                                                                mod.id.replace(/\.js$/, '') + `.${hash!.slice(0, hashShort)}.js`
-                                                            )
-                                                        }))
-                                                    }
-                                                })
+                                                watcher.on('modify-' + mod.id, (hash: string) => socket.send(JSON.stringify({
+                                                    type: 'update',
+                                                    moduleId: mod.id,
+                                                    hash,
+                                                    updateUrl: path.resolve(
+                                                        path.join(project.config.baseUrl, '/_dist/'),
+                                                        mod.id.replace(/\.js$/, '') + `.${hash!.slice(0, hashShort)}.js`
+                                                    )
+                                                })))
                                             }
                                         }
                                     } catch (e) { }
+                                } else if (ws.isWebSocketCloseEvent(e)) {
+                                    break
                                 }
                             }
                             project.removeFSWatcher(watcher)
@@ -115,7 +126,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                                             `import events from "./-/deno.land/x/aleph/events.js";`,
                                             `import.meta.hot = createHotContext("./data.js");`,
                                             `export default ${JSON.stringify(data, undefined, 4)};`,
-                                            `import.meta.hot.accept(({ default: data }) => events.emit("updateData", data));`
+                                            `import.meta.hot.accept(({ default: data }) => events.emit("update-data", data));`
                                         ].join('\n')
                                     } else {
                                         body = `export default ${JSON.stringify(data)}`

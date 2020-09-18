@@ -1,5 +1,5 @@
 import events from './events.ts'
-import util from './util.ts'
+import util, { hashShort } from './util.ts'
 import runtime from './vendor/react-refresh/runtime.js'
 
 interface Callback {
@@ -69,21 +69,22 @@ socket.addEventListener('open', () => {
 })
 
 socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
-    if (!rawData) {
-        return
-    }
-    const { type, id, updateUrl, hash } = JSON.parse(rawData)
-    if (type === 'add') {
-        events.emit('add-module', id, hash)
-        console.log(`[HMR] add module ${JSON.stringify({ id, hash })}`)
-    } else if (type === 'update' && modules.has(id)) {
-        const mod = modules.get(id)!
-        mod.applyUpdate(updateUrl)
-        console.log(`[HMR] update module '${id}'`)
-    } else if (type === 'remove' && modules.has(id)) {
-        modules.delete(id)
-        events.emit('remove-module', id)
-        console.log(`[HMR] remove module '${id}'`)
+    if (rawData) {
+        try {
+            const { type, moduleId, hash, updateUrl } = JSON.parse(rawData)
+            if (type) {
+                console.log(`[HMR]${hash ? ' [' + hash.slice(0, hashShort) + ']' : ''} ${type} module '${moduleId}'`)
+                if (type === 'add') {
+                    events.emit('add-module', { moduleId, hash })
+                } else if (type === 'update' && modules.has(moduleId)) {
+                    const mod = modules.get(moduleId)!
+                    mod.applyUpdate(updateUrl)
+                } else if (type === 'remove' && modules.has(moduleId)) {
+                    modules.delete(moduleId)
+                    events.emit('remove-module', moduleId)
+                }
+            }
+        } catch (e) { }
     }
 })
 

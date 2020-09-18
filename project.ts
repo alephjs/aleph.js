@@ -102,7 +102,7 @@ export default class Project {
         if (reHttp.test(moduleId)) {
             return false
         }
-        return moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js' || moduleId.startsWith('./pages/') || moduleId.startsWith('./components/') || reStyleModuleExt.test(moduleId)
+        return moduleId === './app.js' || moduleId === './data.js' || (moduleId === './data/index.js' && !this.#modules.has('./data.js')) || moduleId.startsWith('./pages/') || moduleId.startsWith('./components/') || reStyleModuleExt.test(moduleId)
     }
 
     getModule(id: string): Module | null {
@@ -208,7 +208,7 @@ export default class Project {
             if (util.isPlainObject(data)) {
                 return data
             } else {
-                log.warn(`module '${mod.url}' should return a plain object`)
+                log.warn(`module '${mod.url}' should return a plain object as default`)
             }
         }
         return {}
@@ -320,9 +320,9 @@ export default class Project {
         }
         const deps: { url: string, hash: string }[] = []
         if (this.#modules.has('./data.js') || this.#modules.has('./data/index.js')) {
-            const { url, hash } = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')!
+            const { id, url, hash } = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')!
             config.dataModule = {
-                moduleId: './data.js',
+                moduleId: id,
                 hash
             }
             deps.push({ url, hash })
@@ -500,7 +500,20 @@ export default class Project {
                 if (validated) {
                     const moduleId = './' + path.replace(reModuleExt, '.js')
                     util.debounceX(moduleId, () => {
-                        if (util.existsFile(p)) {
+                        const removed = !util.existsFile(p)
+                        const cleanup = () => {
+                            if (moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js') {
+                                this._clearPageRenderCache()
+                            } else if (moduleId.startsWith('./pages/')) {
+                                if (removed) {
+                                    this._removePageModule(moduleId)
+                                } else {
+                                    this._clearPageRenderCache(moduleId)
+                                }
+                            }
+                            this._createMainModule()
+                        }
+                        if (!removed) {
                             let type = 'modify'
                             if (!this.#modules.has(moduleId)) {
                                 type = 'add'
@@ -509,13 +522,13 @@ export default class Project {
                             this._compile('./' + path, { forceCompile: true }).then(({ hash }) => {
                                 const hmrable = this.isHMRable(moduleId)
                                 if (hmrable) {
-                                    this.#fsWatchListeners.forEach(e => e.emit(moduleId, type, hash))
+                                    if (type === 'add') {
+                                        this.#fsWatchListeners.forEach(e => e.emit('add', moduleId, hash))
+                                    } else {
+                                        this.#fsWatchListeners.forEach(e => e.emit('modify-' + moduleId, hash))
+                                    }
                                 }
-                                if (moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js') {
-                                    this._clearPageRenderCache()
-                                } else if (moduleId.startsWith('./pages/')) {
-                                    this._clearPageRenderCache(moduleId)
-                                }
+                                cleanup()
                                 this._updateDependency('./' + path, hash, mod => {
                                     if (!hmrable && this.isHMRable(mod.id)) {
                                         this.#fsWatchListeners.forEach(e => e.emit(mod.id, 'modify', mod.hash))
@@ -527,15 +540,9 @@ export default class Project {
                             })
                         } else if (this.#modules.has(moduleId)) {
                             this.#modules.delete(moduleId)
-                            if (moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js') {
-                                this._clearPageRenderCache()
-                                this._createMainModule()
-                            } else if (moduleId.startsWith('./pages/')) {
-                                this._removePageModule(moduleId)
-                                this._createMainModule()
-                            }
+                            cleanup()
                             if (this.isHMRable(moduleId)) {
-                                this.#fsWatchListeners.forEach(e => e.emit(moduleId, 'remove'))
+                                this.#fsWatchListeners.forEach(e => e.emit('remove', moduleId))
                             }
                             log.info('remove', './' + path)
                         }
@@ -930,39 +937,33 @@ export default class Project {
         }
         if (this.#pageModules.has(url.pagePath)) {
             const pm = this.#pageModules.get(url.pagePath)!
-            const mod = this.#modules.get(pm.moduleId)!
-            const appMod = this.#modules.get('./app.js')
             if (pm.rendered.has(url.pathname)) {
                 const cache = pm.rendered.get(url.pathname)!
                 return { ...cache }
             }
             try {
+                const appModule = this.#modules.get('./app.js')
+                const pageModule = this.#modules.get(pm.moduleId)!
                 const [
                     { renderPage, renderHead },
-                    App,
-                    Page
+                    app,
+                    page
                 ] = await Promise.all([
                     import(this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile),
-                    this.importModuleAsComponent('./app.js'),
+                    appModule ? this.importModuleAsComponent('./app.js') : Promise.resolve({}),
                     this.importModuleAsComponent(pm.moduleId)
                 ])
-                if (Page.Component) {
-                    const data = await this.getData()
-                    const html = renderPage(data, url, App.Component ? App : undefined, Page)
-                    const head = renderHead([
-                        mod.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)),
-                        appMod?.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url))
-                    ].filter(Boolean).flat())
-                    ret.code = 200
-                    ret.head = head
-                    ret.body = `<main>${html}</main>`
-                    pm.rendered.set(url.pathname, { ...ret })
-                    log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
-                } else {
-                    ret.code = 500
-                    ret.head = ['<title>500 - render error</title>']
-                    ret.body = `<p><strong><code>500</code></strong><small> - </small><span>render error: bad page component</span></p>`
-                }
+                const data = await this.getData()
+                const html = renderPage(data, url, appModule ? app : undefined, page)
+                const head = renderHead([
+                    pageModule.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)),
+                    appModule?.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url))
+                ].filter(Boolean).flat())
+                ret.code = 200
+                ret.head = head
+                ret.body = `<main>${html}</main>`
+                pm.rendered.set(url.pathname, { ...ret })
+                log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
             } catch (err) {
                 ret.code = 500
                 ret.head = ['<title>500 - render error</title>']

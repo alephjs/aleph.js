@@ -2,7 +2,7 @@ import React, { ComponentType, createContext, useCallback, useEffect, useState }
 import { hydrate } from 'https://esm.sh/react-dom'
 import type { AppManifest, RouterURL } from './api.ts'
 import { DataContext } from './data.ts'
-import { ErrorPage } from './error.ts'
+import { errAppEl, errPageEl } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
@@ -19,8 +19,8 @@ function ALEPH({ config }: {
     config: {
         manifest: AppManifest
         data: Record<string, any>
-        app: { Component?: ComponentType<any> }
-        page: { Component?: ComponentType<any> }
+        app?: { Component: ComponentType<any> }
+        page: { Component: ComponentType<any> }
         pageModules: Record<string, { moduleId: string, hash: string }>
         url: RouterURL
     }
@@ -28,14 +28,14 @@ function ALEPH({ config }: {
     const [manifest, setManifest] = useState(() => config.manifest)
     const [data, setData] = useState(() => config.data)
     const [app, setApp] = useState(() => ({
-        Component: config.app.Component
+        Component: config.app ? (util.isLikelyReactComponent(config.app.Component) ? config.app.Component : () => errAppEl) : null
     }))
+    const [pageModules, setPageModules] = useState(() => config.pageModules)
     const [page, setPage] = useState(() => ({
         url: config.url,
-        Component: config.page.Component
+        Component: util.isLikelyReactComponent(config.page.Component) ? config.page.Component : () => errPageEl
     }))
     const onpopstate = useCallback(async () => {
-        const { pageModules } = config
         const { baseUrl, defaultLocale, locales } = manifest
         const url = route(
             baseUrl,
@@ -49,11 +49,18 @@ function ALEPH({ config }: {
         if (url.pagePath in pageModules) {
             const mod = pageModules[url.pagePath]!
             const { default: Component } = await import(getModuleImportUrl(baseUrl, mod))
-            setPage({ url, Component })
+            if (util.isLikelyReactComponent(Component)) {
+                setPage({ url, Component })
+            } else {
+                setPage({
+                    url,
+                    Component: () => errPageEl
+                })
+            }
         } else {
             setPage({ url })
         }
-    }, [manifest])
+    }, [manifest, pageModules])
 
     useEffect(() => {
         window.addEventListener('popstate', onpopstate)
@@ -66,18 +73,65 @@ function ALEPH({ config }: {
     }, [onpopstate])
 
     useEffect(() => {
-        const onupdatedata = (data: any) => {
-            console.log("[DATA]", data)
+        const { baseUrl } = manifest
+        const onUpdateData = (data: any) => {
+            console.log('[DATA]', data)
             setData(data)
         }
-        events.on('updateData', onupdatedata)
+        const onAddModule = async ({ moduleId, hash }: Module) => {
+            if (moduleId === './app.js') {
+                const { default: Component } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
+                if (util.isLikelyReactComponent(Component)) {
+                    setApp({ Component })
+                } else {
+                    setPage({
+                        Component: () => errAppEl
+                    })
+                }
+            } else if (moduleId === './data.js' || moduleId === './data/index.js') {
+                const { default: data } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
+                console.log('[DATA]', data)
+                setData(data)
+            } else if (moduleId.startsWith('./pages/')) {
+                const pagePath = util.trimSuffix(moduleId, '.js').replace(/\s+/g, '-').replace(/\/?index$/i, '/')
+                setPageModules(pageModules => ({
+                    ...pageModules,
+                    [pagePath]: { moduleId, hash }
+                }))
+            }
+        }
+        const onRemoveModule = (moduleId: string) => {
+            if (moduleId === './app.js') {
+                setApp({})
+            } else if (moduleId === './data.js' || moduleId === './data/index.js') {
+                console.log('[DATA]', {})
+                setData({})
+            } else if (moduleId.startsWith('./pages/')) {
+                setPageModules(pageModules => {
+                    const newPageModules: Record<string, { moduleId: string, hash: string }> = {}
+                    for (const pagePath in pageModules) {
+                        const mod = pageModules[pagePath]
+                        if (mod.moduleId !== moduleId) {
+                            newPageModules[pagePath] = mod
+                        }
+                    }
+                    return newPageModules
+                })
+            }
+        }
+
+        events.on('update-data', onUpdateData)
+        events.on('add-module', onAddModule)
+        events.on('remove-module', onRemoveModule)
 
         return () => {
-            events.off('updateData', onupdatedata)
+            events.off('update-data', onUpdateData)
+            events.off('add-module', onAddModule)
+            events.off('remove-module', onRemoveModule)
         }
-    }, [])
+    }, [manifest])
 
-    const pageEl = page.Component ? React.createElement(page.Component, page.props) : React.createElement(ErrorPage, { status: 404 })
+    const pageEl = React.createElement(page.Component)
     return React.createElement(
         AppManifestContext.Provider,
         { value: manifest },
@@ -154,7 +208,7 @@ export async function bootstrap({
                 { default: AppComponent },
                 { default: PageComponent }
             ] = await Promise.all([
-                dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({}),
+                dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({ default: {} }),
                 appModule ? import(getModuleImportUrl(baseUrl, appModule)) : Promise.resolve({}),
                 import(getModuleImportUrl(baseUrl, pageModule)),
             ])
@@ -164,7 +218,7 @@ export async function bootstrap({
                     config: {
                         manifest: { baseUrl, defaultLocale, locales },
                         data,
-                        app: { Component: AppComponent },
+                        app: appModule ? { Component: AppComponent } : undefined,
                         page: { Component: PageComponent },
                         pageModules,
                         url,
