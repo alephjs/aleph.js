@@ -343,9 +343,9 @@ export default class Project {
         })
 
         const jsContent = [
-            `import './-/deno.land/x/aleph/vendor/tslib/tslib.js'`,
-            this.isDev && `import './-/deno.land/x/aleph/hmr.js'`,
-            `import { bootstrap } from './-/deno.land/x/aleph/app.js'`,
+            'import "./-/deno.land/x/aleph/vendor/tslib/tslib.js"',
+            this.isDev && 'import "./-/deno.land/x/aleph/hmr.js"',
+            'import { bootstrap } from "./-/deno.land/x/aleph/app.js"',
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)})`
         ].filter(Boolean).join('\n')
         const hash = (new Sha1()).update(jsContent).hex()
@@ -437,10 +437,12 @@ export default class Project {
 
         const preCompileUrls = [
             'https://deno.land/x/aleph/vendor/tslib/tslib.js',
-            this.isDev ? 'https://deno.land/x/aleph/hmr.ts' : '',
             'https://deno.land/x/aleph/app.ts',
             'https://deno.land/x/aleph/renderer.ts',
-        ].filter(Boolean)
+        ]
+        if (this.isDev) {
+            preCompileUrls.push('https://deno.land/x/aleph/hmr.ts')
+        }
         for (const url of preCompileUrls) {
             await this._compile(url)
         }
