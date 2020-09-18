@@ -1,5 +1,5 @@
 import type { APIHandle, Location, RouterURL } from './api.ts'
-import { AnsiUp, colors, ensureDir, exists, existsSync, less, minify, path, Sha1, walk } from './deps.ts'
+import { AnsiUp, colors, ensureDir, less, minify, path, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
@@ -55,7 +55,6 @@ export default class Project {
 
     #modules: Map<string, Module> = new Map()
     #pageModules: Map<string, { moduleId: string, rendered: Map<string, RenderResult> }> = new Map()
-    #fsWatchQueue: Map<string, number> = new Map()
     #fsWatchListeners: Array<EventEmitter> = []
 
     constructor(dir: string, mode: 'development' | 'production') {
@@ -202,7 +201,7 @@ export default class Project {
         const publicDir = path.join(this.srcDir, 'public')
         const distDir = path.join(outputDir, '_dist')
         await this.ready
-        if (await this._existsDir(outputDir)) {
+        if (util.existsDir(outputDir)) {
             await Deno.remove(outputDir, { recursive: true })
         }
         await Promise.all([outputDir, distDir].map(dir => ensureDir(dir)))
@@ -221,14 +220,14 @@ export default class Project {
                 const saveDir = path.join(distDir, sourceFilePath)
                 const name = path.basename(sourceFilePath).replace(reModuleExt, '')
                 const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
-                return this._writeTextFile(jsFile, jsContent)
+                return writeTextFile(jsFile, jsContent)
             }))
         for (const pathname of this.#pageModules.keys()) {
             const [_, html] = await this.getPageHtml({ pathname })
             const htmlFile = path.join(outputDir, pathname, 'index.html')
-            await this._writeTextFile(htmlFile, html)
+            await writeTextFile(htmlFile, html)
         }
-        if (this._existsDir(publicDir)) {
+        if (util.existsDir(publicDir)) {
             for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
                 const rp = path.resolve(util.trimPrefix(p, publicDir))
                 await Deno.copyFile(p, path.join(outputDir, rp))
@@ -255,13 +254,13 @@ export default class Project {
         }
 
         const importMapFile = path.join(this.config.rootDir, 'import_map.json')
-        if (await exists(importMapFile)) {
+        if (util.existsFile(importMapFile)) {
             const { imports } = JSON.parse(await Deno.readTextFile(importMapFile))
             Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
         }
 
         const configFile = path.join(this.config.rootDir, 'post.config.json')
-        if (await exists(configFile)) {
+        if (util.existsFile(configFile)) {
             const {
                 srcDir,
                 ouputDir,
@@ -305,7 +304,7 @@ export default class Project {
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
 
-        if (!(await this._existsDir(pagesDir))) {
+        if (!(util.existsDir(pagesDir))) {
             log.error('please create some pages.')
             Deno.exit(0)
         }
@@ -327,7 +326,7 @@ export default class Project {
             await this._compile('./pages' + rp)
         }
 
-        if (await this._existsDir(apiDir)) {
+        if (util.existsDir(apiDir)) {
             for await (const { path: p } of walk(apiDir, walkOptions)) {
                 const rp = path.resolve(util.trimPrefix(p, apiDir))
                 await this._compile('./api/' + rp)
@@ -347,15 +346,10 @@ export default class Project {
                 hash: this.#modules.get('./app.js')!.hash
             }
         }
-        if (this.#modules.has('./data.js')) {
+        if (this.#modules.has('./data.js') || this.#modules.has('./data/index.js')) {
             bootstrapConfig.dataModule = {
                 moduleId: './data.js',
-                hash: this.#modules.get('./data.js')!.hash
-            }
-        } else if (this.#modules.has('./data/index.js')) {
-            bootstrapConfig.dataModule = {
-                moduleId: './data/index.js',
-                hash: this.#modules.get('./data/index.js')!.hash
+                hash: this.#modules.get('./data.js')?.hash || this.#modules.get('./data/index.js')!.hash
             }
         }
         this.#pageModules.forEach(({ moduleId }, pagePath) => {
@@ -395,34 +389,60 @@ export default class Project {
         for await (const event of w) {
             for (const p of event.paths) {
                 const { rootDir, outputDir } = this.config
-                const rp = util.trimPrefix(util.trimPrefix(p, rootDir), '/')
-                if ((reModuleExt.test(rp) || reStyleModuleExt.test(rp)) && !rp.startsWith('.aleph/') && !rp.startsWith(outputDir.slice(1))) {
-                    const moduleId = './' + rp.replace(reModuleExt, '.js')
-                    if (this.#fsWatchQueue.has(moduleId)) {
-                        clearTimeout(this.#fsWatchQueue.get(moduleId)!)
+                const path = util.trimPrefix(util.trimPrefix(p, rootDir), '/')
+                const validated = (() => {
+                    if (!reModuleExt.test(path) && !reStyleModuleExt.test(path)) {
+                        return false
                     }
-                    this.#fsWatchQueue.set(moduleId, setTimeout(() => {
-                        this.#fsWatchQueue.delete(moduleId)
-                        if (existsSync(p)) {
+                    // ignore '.aleph' and outputDir
+                    if (path.startsWith('.aleph/') || path.startsWith(outputDir.slice(1))) {
+                        return false
+                    }
+                    const moduleId = './' + path.replace(reModuleExt, '.js')
+                    switch (moduleId) {
+                        case './app.js':
+                        case './data.js':
+                        case './data/index.js': {
+                            return true
+                        }
+                        default: {
+                            if ((moduleId.startsWith('./pages/') || moduleId.startsWith('./api/')) && moduleId.endsWith('.js')) {
+                                return true
+                            }
+                            let isDep = false
+                            for (const { deps } of this.#modules.values()) {
+                                if (deps.findIndex(dep => dep.path === '.' + path) > -1) {
+                                    isDep = true
+                                    break
+                                }
+                            }
+                            return isDep
+                        }
+                    }
+                })()
+                if (validated) {
+                    const moduleId = './' + path.replace(reModuleExt, '.js')
+                    util.debounceX(moduleId, () => {
+                        if (util.existsFile(p)) {
                             let type = 'modify'
                             if (!this.#modules.has(moduleId)) {
                                 type = 'add'
                             }
-                            log.info(type, './' + rp)
-                            this._compile('./' + rp, { forceCompile: true }).then(({ hash }) => {
+                            log.info(type, './' + path)
+                            this._compile('./' + path, { forceCompile: true }).then(({ hash }) => {
                                 const hmrable = this.isHMRable(moduleId)
                                 if (hmrable) {
                                     this.#fsWatchListeners.forEach(e => e.emit(moduleId, type, hash))
                                 }
                                 if (moduleId.startsWith('./pages/')) {
-                                    this._resetPageModule(moduleId)
+                                    this._clearPageRenderCache(moduleId)
                                 }
-                                this._updateDependency('./' + rp, hash, mod => {
+                                this._updateDependency('./' + path, hash, mod => {
                                     if (!hmrable && this.isHMRable(mod.id)) {
                                         this.#fsWatchListeners.forEach(e => e.emit(mod.id, 'modify', mod.hash))
                                     }
                                     if (mod.id.startsWith('./pages/')) {
-                                        this._resetPageModule(mod.id)
+                                        this._clearPageRenderCache(mod.id)
                                     }
                                 })
                             })
@@ -434,9 +454,9 @@ export default class Project {
                             if (this.isHMRable(moduleId)) {
                                 this.#fsWatchListeners.forEach(e => e.emit(moduleId, 'remove'))
                             }
-                            log.info('remove', './' + rp)
+                            log.info('remove', './' + path)
                         }
-                    }, 150))
+                    }, 150)
                 }
             }
         }
@@ -455,10 +475,10 @@ export default class Project {
         }
     }
 
-    private _resetPageModule(moduleId: string) {
-        for (const [p, pm] of this.#pageModules.entries()) {
-            if (pm.moduleId === moduleId) {
-                pm.rendered.clear()
+    private _clearPageRenderCache(moduleId: string) {
+        for (const [_, p] of this.#pageModules.entries()) {
+            if (p.moduleId === moduleId) {
+                p.rendered.clear()
                 break
             }
         }
@@ -467,7 +487,7 @@ export default class Project {
     private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean }) {
         const { rootDir, importMap } = this.config
         const isRemote = reHttp.test(url) || (url in importMap.imports && reHttp.test(importMap.imports[url]))
-        const sourceFilePath = this._renameImportUrl(url)
+        const sourceFilePath = renameImportUrl(url)
         const id = (isRemote ? util.trimPrefix(sourceFilePath, '/-/') : '.' + sourceFilePath).replace(reModuleExt, '.js')
 
         if (this.#modules.has(id) && !options?.forceCompile) {
@@ -491,13 +511,13 @@ export default class Project {
             hash: '',
         }
 
-        if (existsSync(metaFile)) {
+        if (util.existsFile(metaFile)) {
             const { sourceHash, hash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
             const jsFile = path.join(saveDir, name + (mod.isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
-            if (util.isNEString(sourceHash) && util.isNEString(hash) && util.isArray(deps) && existsSync(jsFile)) {
+            if (util.isNEString(sourceHash) && util.isNEString(hash) && util.isArray(deps) && util.existsFile(jsFile)) {
                 try {
                     mod.jsContent = await Deno.readTextFile(jsFile)
-                    if (existsSync(jsFile + '.map')) {
+                    if (util.existsFile(jsFile + '.map')) {
                         mod.jsSourceMap = await Deno.readTextFile(jsFile + '.map')
                     }
                     mod.jsFile = jsFile
@@ -615,10 +635,10 @@ export default class Project {
                 const hash = (new Sha1).update(css).hex()
                 const savePath = path.join(path.dirname(sourceFilePath), util.trimSuffix(path.basename(sourceFilePath), '.css') + '.' + hash.slice(0, hashShort) + '.css')
                 if (css.length > 1024) {
-                    await this._writeTextFile(path.join(rootDir, '.aleph', this.mode, savePath), css)
+                    await writeTextFile(path.join(rootDir, '.aleph', this.mode, savePath), css)
                 }
                 mod.jsContent = [
-                    `import { applyCSS } from ${JSON.stringify(this._relativePath(
+                    `import { applyCSS } from ${JSON.stringify(relativePath(
                         path.dirname(path.resolve('/', mod.url)),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
@@ -637,7 +657,7 @@ export default class Project {
                 if (diagnostics && diagnostics.length > 0) {
                     throw new Error(`compile ${url}: ${diagnostics.map(d => d.messageText).join(' ')}`)
                 }
-                const jsContent = outputText.replace(/import([^'"]*)("|')tslib("|')(\)|;)?/g, 'import$1' + JSON.stringify(this._relativePath(
+                const jsContent = outputText.replace(/import([^'"]*)("|')tslib("|')(\)|;)?/g, 'import$1' + JSON.stringify(relativePath(
                     path.dirname(mod.sourceFilePath),
                     '/-/deno.land/x/aleph/vendor/tslib/tslib.js'
                 )) + '$4')
@@ -673,7 +693,7 @@ export default class Project {
             if (dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
                 if (!reHttp.test(dep.path)) {
-                    const depImportPath = this._relativePath(
+                    const depImportPath = relativePath(
                         path.dirname(path.resolve('/', url)),
                         path.resolve('/', dep.path.replace(reModuleExt, ''))
                     )
@@ -697,14 +717,14 @@ export default class Project {
         if (fsync) {
             mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + '.js'
             await Promise.all([
-                this._writeTextFile(metaFile, JSON.stringify({
+                writeTextFile(metaFile, JSON.stringify({
                     url,
                     sourceHash: mod.sourceHash,
                     hash: mod.hash,
                     deps: mod.deps,
                 }, undefined, 4)),
-                this._writeTextFile(mod.jsFile, mod.jsContent),
-                mod.jsSourceMap !== '' ? this._writeTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
+                writeTextFile(mod.jsFile, mod.jsContent),
+                mod.jsSourceMap !== '' ? writeTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
             ])
         }
 
@@ -715,7 +735,7 @@ export default class Project {
         this.#modules.forEach(mod => {
             mod.deps.forEach(dep => {
                 if (dep.path === depPath && dep.hash !== depHash) {
-                    const depImportPath = this._relativePath(
+                    const depImportPath = relativePath(
                         path.dirname(path.resolve('/', mod.url)),
                         path.resolve('/', dep.path.replace(reModuleExt, ''))
                     )
@@ -731,15 +751,15 @@ export default class Project {
                     })
                     mod.hash = (new Sha1).update(mod.jsContent).hex()
                     mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
-                    this._writeTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
+                    writeTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
                         sourceFile: mod.url,
                         sourceHash: mod.sourceHash,
                         hash: mod.hash,
                         deps: mod.deps,
                     }, undefined, 4))
-                    this._writeTextFile(mod.jsFile, mod.jsContent)
+                    writeTextFile(mod.jsFile, mod.jsContent)
                     if (mod.jsSourceMap) {
-                        this._writeTextFile(mod.jsFile + '.map', mod.jsSourceMap)
+                        writeTextFile(mod.jsFile + '.map', mod.jsSourceMap)
                     }
                     callback(mod)
                     this._updateDependency(mod.url, mod.hash, callback)
@@ -758,14 +778,14 @@ export default class Project {
         if (reHttp.test(importPath)) {
             if (cacheDeps || /\.(jsx|tsx?)$/i.test(importPath)) {
                 if (mod.isRemote) {
-                    rewrittenPath = this._relativePath(
+                    rewrittenPath = relativePath(
                         path.dirname(path.resolve('/', mod.url.replace(reHttp, '-/').replace(/:(\d+)/, `/$1`))),
-                        this._renameImportUrl(importPath)
+                        renameImportUrl(importPath)
                     )
                 } else {
-                    rewrittenPath = this._relativePath(
+                    rewrittenPath = relativePath(
                         path.dirname(path.resolve('/', mod.url)),
-                        this._renameImportUrl(importPath)
+                        renameImportUrl(importPath)
                     )
                 }
             } else {
@@ -779,9 +799,9 @@ export default class Project {
                     pathname = path.join(path.dirname(modUrl.pathname), importPath)
                 }
                 const importUrl = new URL(modUrl.protocol + '//' + modUrl.host + pathname)
-                rewrittenPath = this._relativePath(
+                rewrittenPath = relativePath(
                     path.dirname(mod.sourceFilePath),
-                    this._renameImportUrl(importUrl.toString())
+                    renameImportUrl(importUrl.toString())
                 )
             } else {
                 rewrittenPath = importPath.replace(reModuleExt, '') + '.' + 'x'.repeat(hashShort)
@@ -812,21 +832,8 @@ export default class Project {
         return rewrittenPath.replace(reModuleExt, '') + '.js'
     }
 
-    private _renameImportUrl(importUrl: string): string {
-        const isRemote = reHttp.test(importUrl)
-        const url = new URL(isRemote ? importUrl : 'file://' + path.resolve('/', importUrl))
-        const ext = path.extname(path.basename(url.pathname)) || '.js'
-        let pathname = util.trimSuffix(url.pathname, ext)
-        if (url.search) {
-            pathname += '/' + btoa(url.search).replace(/[\.\/=]/g, '')
-        }
-        if (isRemote) {
-            return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
-        }
-        return pathname + ext
-    }
-
     private async _renderPage(url: RouterURL) {
+        const start = performance.now()
         const ret: RenderResult = {
             code: 404,
             head: ['<title>404 - page not found</title>'],
@@ -860,6 +867,7 @@ export default class Project {
                     ret.head = head
                     ret.body = `<main>${html}</main>`
                     pm.rendered.set(url.pathname, { ...ret })
+                    log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
                 } else {
                     ret.code = 500
                     ret.head = ['<title>500 - render error</title>']
@@ -874,33 +882,32 @@ export default class Project {
         }
         return ret
     }
+}
 
-    private _relativePath(from: string, to: string): string {
-        let r = path.relative(from, to)
-        if (!r.startsWith('.') && !r.startsWith('/')) {
-            r = './' + r
-        }
-        return r
+function relativePath(from: string, to: string): string {
+    let r = path.relative(from, to)
+    if (!r.startsWith('.') && !r.startsWith('/')) {
+        r = './' + r
     }
+    return r
+}
 
-    private async _existsDir(path: string) {
-        try {
-            const fi = await Deno.lstat(path)
-            if (fi.isDirectory) {
-                return true
-            }
-            return false
-        } catch (err) {
-            if (err instanceof Deno.errors.NotFound) {
-                return false
-            }
-            throw err
-        }
+function renameImportUrl(importUrl: string): string {
+    const isRemote = reHttp.test(importUrl)
+    const url = new URL(isRemote ? importUrl : 'file://' + path.resolve('/', importUrl))
+    const ext = path.extname(path.basename(url.pathname)) || '.js'
+    let pathname = util.trimSuffix(url.pathname, ext)
+    if (url.search) {
+        pathname += '/' + btoa(url.search).replace(/[\.\/=]/g, '')
     }
+    if (isRemote) {
+        return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
+    }
+    return pathname + ext
+}
 
-    private async _writeTextFile(filepath: string, content: string) {
-        const dir = path.dirname(filepath)
-        await ensureDir(dir)
-        await Deno.writeTextFile(filepath, content)
-    }
+async function writeTextFile(filepath: string, content: string) {
+    const dir = path.dirname(filepath)
+    await ensureDir(dir)
+    await Deno.writeTextFile(filepath, content)
 }

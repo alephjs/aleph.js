@@ -1,4 +1,4 @@
-import { existsSync, listenAndServe, path, ServerRequest } from './deps.ts'
+import { listenAndServe, path, ServerRequest } from './deps.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './server/mime.ts'
@@ -84,7 +84,7 @@ function main() {
     }
 
     // proxy https://deno.land/x/aleph
-    if (existsSync('./import_map.json')) {
+    if (util.existsFile('./import_map.json')) {
         const { imports } = JSON.parse(Deno.readTextFileSync('./import_map.json'))
         Object.assign(globalThis, { ALEPH_IMPORT_MAP: { imports } })
         if (imports['https://deno.land/x/aleph/']) {
@@ -167,7 +167,7 @@ function main() {
     const command = hasCommand ? args.shift() : 'dev'
     import(`./cli/${command}.ts`).then(({ default: cmd }) => {
         const appDir = path.resolve(args[0] || '.')
-        if (command !== 'init' && !existsSync(appDir)) {
+        if (command !== 'init' && !util.existsDir(appDir)) {
             log.error('No such app directory:', appDir)
             return
         }
