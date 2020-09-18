@@ -207,11 +207,10 @@ export async function start(appDir: string, port: number, isDev = false) {
             }
         } catch (err) {
             if (err instanceof Deno.errors.AddrInUse) {
-                log.warn(`address :${port} already in use`)
+                log.warn(`port ${port} already in use, try ${port + 1}`)
                 port++
             } else {
-                console.log(err)
-                Deno.exit(1)
+                log.fatal(err.message)
             }
         }
     }
