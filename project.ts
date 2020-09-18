@@ -529,8 +529,10 @@ export default class Project {
                             this.#modules.delete(moduleId)
                             if (moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js') {
                                 this._clearPageRenderCache()
+                                this._createMainModule()
                             } else if (moduleId.startsWith('./pages/')) {
                                 this._removePageModule(moduleId)
+                                this._createMainModule()
                             }
                             if (this.isHMRable(moduleId)) {
                                 this.#fsWatchListeners.forEach(e => e.emit(moduleId, 'remove'))
