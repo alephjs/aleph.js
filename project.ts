@@ -21,7 +21,6 @@ interface Config {
     readonly outputDir: string
     readonly baseUrl: string
     readonly defaultLocale: string
-    readonly cacheDeps: boolean
     readonly buildTarget: string
     readonly sourceMap: boolean
     readonly importMap: {
@@ -64,7 +63,6 @@ export default class Project {
             rootDir: path.resolve(dir),
             srcDir: '/',
             outputDir: '/dist',
-            cacheDeps: true,
             baseUrl: '/',
             defaultLocale: 'en',
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
@@ -317,7 +315,6 @@ export default class Project {
                 srcDir,
                 ouputDir,
                 baseUrl,
-                cacheDeps,
                 target,
                 sourceMap,
                 lang
@@ -333,9 +330,6 @@ export default class Project {
             }
             if (util.isNEString(lang)) {
                 Object.assign(this.config, { defaultLocale: lang })
-            }
-            if (typeof cacheDeps === 'boolean') {
-                Object.assign(this.config, { cacheDeps })
             }
             if (/^es(20\d{2}|next)$/i.test(target)) {
                 Object.assign(this.config, { target: target.toLowerCase() })
@@ -911,26 +905,22 @@ export default class Project {
     }
 
     private _rewriteImportPath(mod: Module, importPath: string): string {
-        const { cacheDeps, importMap } = this.config
+        const { importMap } = this.config
         let rewrittenPath: string
         if (importPath in importMap.imports) {
             importPath = importMap.imports[importPath]
         }
         if (reHttp.test(importPath)) {
-            if (cacheDeps || /\.(jsx|tsx?)$/i.test(importPath)) {
-                if (mod.isRemote) {
-                    rewrittenPath = relativePath(
-                        path.dirname(path.resolve('/', mod.url.replace(reHttp, '-/').replace(/:(\d+)/, `/$1`))),
-                        renameImportUrl(importPath)
-                    )
-                } else {
-                    rewrittenPath = relativePath(
-                        path.dirname(path.resolve('/', mod.url)),
-                        renameImportUrl(importPath)
-                    )
-                }
+            if (mod.isRemote) {
+                rewrittenPath = relativePath(
+                    path.dirname(path.resolve('/', mod.url.replace(reHttp, '-/').replace(/:(\d+)/, '/$1'))),
+                    renameImportUrl(importPath)
+                )
             } else {
-                rewrittenPath = importPath
+                rewrittenPath = relativePath(
+                    path.dirname(path.resolve('/', mod.url)),
+                    renameImportUrl(importPath)
+                )
             }
         } else {
             if (mod.isRemote) {
