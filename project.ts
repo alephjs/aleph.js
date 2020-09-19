@@ -23,6 +23,7 @@ interface Config {
     readonly defaultLocale: string
     readonly cacheDeps: boolean
     readonly buildTarget: string
+    readonly sourceMap: boolean
     readonly importMap: {
         imports: Record<string, string>
     }
@@ -67,6 +68,7 @@ export default class Project {
             baseUrl: '/',
             defaultLocale: 'en',
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
+            sourceMap: false,
             importMap: {
                 imports: {}
             }
@@ -232,38 +234,67 @@ export default class Project {
         const start = performance.now()
         const outputDir = path.join(this.srcDir, this.config.outputDir)
         const distDir = path.join(outputDir, '_aleph')
+        const outputModules = new Set<string>()
+        const lookup = async (moduleId: string) => {
+            if (this.#modules.has(moduleId) && !outputModules.has(moduleId)) {
+                outputModules.add(moduleId)
+                const { deps } = this.#modules.get(moduleId)!
+                deps.forEach(({ url }) => {
+                    const { id } = this._parseUrl(url)
+                    lookup(id)
+                })
+            }
+        }
+
+        // wait project ready
         await this.ready
+
+        // lookup output modules
+        lookup('./main.js')
+
+        // ensure ouput directory ready
         if (util.existsDir(outputDir)) {
             await Deno.remove(outputDir, { recursive: true })
         }
         await Promise.all([outputDir, distDir].map(dir => ensureDir(dir)))
-        await Promise.all(Array.from(this.#modules.values())
-            .filter(({ id }) => {
-                switch (id) {
-                    case 'deno.land/x/aleph/renderer.js':
-                    case 'deno.land/x/aleph/vendor/react-dom-server/server.js':
-                        return false
-                    default:
-                        return !id.startsWith('./api/')
-                }
-            })
-            .map(({ sourceFilePath, isRemote, jsContent, hash }) => {
-                const saveDir = path.join(distDir, sourceFilePath)
-                const name = path.basename(sourceFilePath).replace(reModuleExt, '')
-                const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
-                return writeTextFile(jsFile, jsContent)
-            }))
+
+        // write modules
+        const { sourceMap } = this.config
+        await Promise.all(Array.from(outputModules).map((moduleId) => {
+            const { sourceFilePath, isRemote, jsContent, jsSourceMap, hash } = this.#modules.get(moduleId)!
+            const saveDir = path.join(distDir, path.dirname(sourceFilePath))
+            const name = path.basename(sourceFilePath).replace(reModuleExt, '')
+            const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
+            return Promise.all([
+                writeTextFile(jsFile, jsContent),
+                sourceMap ? writeTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
+            ])
+        }))
+
+        // write static data
+        if (this.#modules.has('./data.js') || this.#modules.has('./data/index.js')) {
+            const { hash } = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')!
+            const data = this.getData()
+            await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), `export default ${JSON.stringify(data)}`)
+        }
+
+        // ssg
         for (const pathname of this.#pageModules.keys()) {
             const [_, html] = await this.getPageHtml({ pathname })
             const htmlFile = path.join(outputDir, pathname, 'index.html')
             await writeTextFile(htmlFile, html)
         }
-        if (util.existsDir(this.publicDir)) {
-            for await (const { path: p } of walk(this.publicDir, { includeDirs: false })) {
-                const rp = path.resolve(util.trimPrefix(p, this.publicDir))
+
+        // copy public files
+        const { publicDir } = this
+        if (util.existsDir(publicDir)) {
+            for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
+                const rp = path.resolve(util.trimPrefix(p, publicDir))
                 await Deno.copyFile(p, path.join(outputDir, rp))
             }
         }
+
+        // done
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
@@ -288,6 +319,7 @@ export default class Project {
                 baseUrl,
                 cacheDeps,
                 target,
+                sourceMap,
                 lang
             } = JSON.parse(await Deno.readTextFile(configFile))
             if (util.isNEString(srcDir)) {
@@ -302,82 +334,16 @@ export default class Project {
             if (util.isNEString(lang)) {
                 Object.assign(this.config, { defaultLocale: lang })
             }
-            if (/^es(20\d{2}|next)$/i.test(target)) {
-                Object.assign(this.config, { target: target.toLowerCase() })
-            }
             if (typeof cacheDeps === 'boolean') {
                 Object.assign(this.config, { cacheDeps })
             }
-        }
-    }
-
-    private async _createMainModule(): Promise<Module> {
-        const { baseUrl, defaultLocale } = this.config
-        const config: Record<string, any> = {
-            baseUrl,
-            defaultLocale,
-            locales: {},
-            dataModule: null,
-            appModule: null,
-            pageModules: {}
-        }
-        const deps: { url: string, hash: string }[] = []
-        if (this.#modules.has('./data.js') || this.#modules.has('./data/index.js')) {
-            const { id, url, hash } = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')!
-            config.dataModule = {
-                moduleId: id,
-                hash
+            if (/^es(20\d{2}|next)$/i.test(target)) {
+                Object.assign(this.config, { target: target.toLowerCase() })
             }
-            deps.push({ url, hash })
-        }
-        if (this.#modules.has('./app.js')) {
-            const { url, hash } = this.#modules.get('./app.js')!
-            config.appModule = {
-                moduleId: './app.js',
-                hash
+            if (typeof sourceMap === 'boolean') {
+                Object.assign(this.config, { sourceMap })
             }
-            deps.push({ url, hash })
         }
-        this.#pageModules.forEach(({ moduleId }, pagePath) => {
-            const { url, hash } = this.#modules.get(moduleId)!
-            const mod = { moduleId, hash }
-            config.pageModules[pagePath] = mod
-            deps.push({ url, hash })
-        })
-
-        const jsContent = [
-            'import "./-/deno.land/x/aleph/vendor/tslib/tslib.js"',
-            this.isDev && 'import "./-/deno.land/x/aleph/hmr.js"',
-            'import { bootstrap } from "./-/deno.land/x/aleph/app.js"',
-            `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)})`
-        ].filter(Boolean).join('\n')
-        const hash = (new Sha1()).update(jsContent).hex()
-        const id = './main.js'
-        const module: Module = {
-            id,
-            url: './main.js',
-            isRemote: false,
-            sourceFilePath: '/main.js',
-            sourceType: 'js',
-            sourceHash: hash,
-            deps,
-            jsFile: path.join(this.buildDir, `main.${hash.slice(0, hashShort)}.js`),
-            jsContent,
-            jsSourceMap: '',
-            hash: hash,
-        }
-        await Promise.all([
-            writeTextFile(module.jsFile, jsContent),
-            writeTextFile(path.join(this.buildDir, 'main.meta.json'), JSON.stringify({
-                url: './main.js',
-                sourceHash: hash,
-                hash,
-                deps,
-            }, undefined, 4))
-        ])
-        this.#modules.set(id, module)
-
-        return module
     }
 
     private async _init() {
@@ -438,9 +404,9 @@ export default class Project {
         }
 
         const preCompileUrls = [
-            'https://deno.land/x/aleph/vendor/tslib/tslib.js',
             'https://deno.land/x/aleph/app.ts',
             'https://deno.land/x/aleph/renderer.ts',
+            'https://deno.land/x/aleph/vendor/tslib/tslib.js',
         ]
         if (this.isDev) {
             preCompileUrls.push('https://deno.land/x/aleph/hmr.ts')
@@ -578,20 +544,79 @@ export default class Project {
         }
     }
 
-    private async _compile(url: string, options?: { sourceCode?: string, implicitDeps?: { url: string, hash: string }[], forceCompile?: boolean }) {
+    private async _createMainModule(): Promise<Module> {
+        const { baseUrl, defaultLocale } = this.config
+        const config: Record<string, any> = {
+            baseUrl,
+            defaultLocale,
+            locales: {},
+            dataModule: null,
+            appModule: null,
+            pageModules: {}
+        }
+        const module = this._parseUrl('./main.js')
+        const deps = [
+            'https://deno.land/x/aleph/vendor/tslib/tslib.js',
+            'https://deno.land/x/aleph/app.ts',
+            this.isDev && 'https://deno.land/x/aleph/hmr.ts'
+        ].filter(Boolean).map(url => ({
+            url: String(url),
+            hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
+        }))
+        if (this.#modules.has('./data.js') || this.#modules.has('./data/index.js')) {
+            const { id, url, hash } = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')!
+            config.dataModule = {
+                moduleId: id,
+                hash
+            }
+            deps.push({ url, hash })
+        }
+        if (this.#modules.has('./app.js')) {
+            const { url, hash } = this.#modules.get('./app.js')!
+            config.appModule = {
+                moduleId: './app.js',
+                hash
+            }
+            deps.push({ url, hash })
+        }
+        this.#pageModules.forEach(({ moduleId }, pagePath) => {
+            const { url, hash } = this.#modules.get(moduleId)!
+            const mod = { moduleId, hash }
+            config.pageModules[pagePath] = mod
+            deps.push({ url, hash })
+        })
+
+        module.jsContent = [
+            this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
+            'import "./-/deno.land/x/aleph/vendor/tslib/tslib.js";',
+            'import { bootstrap } from "./-/deno.land/x/aleph/app.js";',
+            `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
+        ].filter(Boolean).join('\n')
+        module.hash = (new Sha1()).update(module.jsContent).hex()
+        module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
+        module.deps = deps
+
+        await Promise.all([
+            writeTextFile(module.jsFile, module.jsContent),
+            writeTextFile(path.join(this.buildDir, 'main.meta.json'), JSON.stringify({
+                url: './main.js',
+                sourceHash: module.hash,
+                hash: module.hash,
+                deps: module.deps,
+            }, undefined, 4))
+        ])
+        this.#modules.set(module.id, module)
+
+        return module
+    }
+
+    private _parseUrl(url: string): Module {
         const { importMap } = this.config
         const isRemote = reHttp.test(url) || (url in importMap.imports && reHttp.test(importMap.imports[url]))
         const sourceFilePath = renameImportUrl(url)
         const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : '.' + sourceFilePath).replace(reModuleExt, '.js')
 
-        if (this.#modules.has(id) && !options?.forceCompile) {
-            return this.#modules.get(id)!
-        }
-
-        const name = path.basename(sourceFilePath).replace(reModuleExt, '')
-        const saveDir = path.join(this.buildDir, path.dirname(sourceFilePath))
-        const metaFile = path.join(saveDir, `${name}.meta.json`)
-        const mod: Module = {
+        return {
             id,
             url,
             isRemote,
@@ -603,7 +628,19 @@ export default class Project {
             jsContent: '',
             jsSourceMap: '',
             hash: '',
+        } as Module
+    }
+
+    private async _compile(url: string, options?: { sourceCode?: string, implicitDeps?: { url: string, hash: string }[], forceCompile?: boolean }) {
+        const mod = this._parseUrl(url)
+        if (this.#modules.has(mod.id) && !options?.forceCompile) {
+            return this.#modules.get(mod.id)!
         }
+
+        const { importMap } = this.config
+        const name = path.basename(mod.sourceFilePath).replace(reModuleExt, '')
+        const saveDir = path.join(this.buildDir, path.dirname(mod.sourceFilePath))
+        const metaFile = path.join(saveDir, `${name}.meta.json`)
 
         if (util.existsFile(metaFile)) {
             const { sourceHash, hash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
@@ -727,16 +764,20 @@ export default class Project {
                     css = output.styles
                 }
                 const hash = (new Sha1).update(css).hex()
-                const savePath = path.join(path.dirname(sourceFilePath), util.trimSuffix(path.basename(sourceFilePath), '.css') + '.' + hash.slice(0, hashShort) + '.css')
-                if (css.length > 1024) {
-                    await writeTextFile(path.join(this.buildDir, savePath), css)
+                const filepath = path.join(
+                    path.dirname(mod.sourceFilePath),
+                    util.trimSuffix(path.basename(mod.sourceFilePath), '.css') + '.' + hash.slice(0, hashShort) + '.css'
+                )
+                const asLink = css.length > 1024
+                if (asLink) {
+                    await writeTextFile(path.join(this.buildDir, filepath), css)
                 }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(relativePath(
                         path.dirname(path.resolve('/', mod.url)),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
-                    `applyCSS(${JSON.stringify(url)}, ${css.length > 1024 ? JSON.stringify(path.join(this.config.baseUrl, '_aleph', savePath)) + ', true' : JSON.stringify(css)});`,
+                    `applyCSS(${JSON.stringify(url)}, ${asLink ? JSON.stringify(path.join(this.config.baseUrl, '_aleph', filepath)) + ', true' : JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
                 ].join(this.isDev ? '\n' : '')
                 mod.hash = hash
                 mod.jsSourceMap = ''

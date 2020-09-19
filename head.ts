@@ -30,9 +30,9 @@ export function renderHead(styleModules?: string[]) {
     styleModules?.filter(id => serverStyles.has(id)).forEach(id => {
         const { css, asLink } = serverStyles.get(id)!
         if (asLink) {
-            tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(id)}/>`)
+            tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(id)} />`)
         } else {
-            tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>\n${css}\n</style>`)
+            tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>${css}</style>`)
         }
     })
     serverHeadElements.splice(0, serverHeadElements.length)
