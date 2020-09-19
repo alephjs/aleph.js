@@ -49,7 +49,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                                                     moduleId: mod.id,
                                                     hash,
                                                     updateUrl: path.resolve(
-                                                        path.join(project.config.baseUrl, '/_dist/'),
+                                                        path.join(project.config.baseUrl, '/_aleph/'),
                                                         mod.id.replace(/\.js$/, '') + `.${hash!.slice(0, hashShort)}.js`
                                                     )
                                                 })))
@@ -89,10 +89,10 @@ export async function start(appDir: string, port: number, isDev = false) {
                     }
 
                     // serve dist files
-                    if (pathname.startsWith('/_dist/')) {
+                    if (pathname.startsWith('/_aleph/')) {
                         if (pathname.endsWith('.css')) {
                             try {
-                                const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_dist/'))
+                                const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_aleph/'))
                                 const info = await Deno.lstat(filePath)
                                 if (!info.isDirectory) {
                                     const body = await Deno.readFile(filePath)

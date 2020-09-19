@@ -236,5 +236,5 @@ export async function bootstrap({
 }
 
 function getModuleImportUrl(baseUrl: string, { moduleId, hash }: Module) {
-    return util.cleanPath(baseUrl + '/_dist/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
+    return util.cleanPath(baseUrl + '/_aleph/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
 }

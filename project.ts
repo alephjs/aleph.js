@@ -62,7 +62,7 @@ export default class Project {
         this.config = {
             rootDir: path.resolve(dir),
             srcDir: '/',
-            outputDir: '/out',
+            outputDir: '/dist',
             cacheDeps: true,
             baseUrl: '/',
             defaultLocale: 'en',
@@ -122,8 +122,8 @@ export default class Project {
         if (baseUrl !== '/') {
             modId = util.trimPrefix(modId, baseUrl)
         }
-        if (modId.startsWith('/_dist/')) {
-            modId = util.trimPrefix(modId, '/_dist')
+        if (modId.startsWith('/_aleph/')) {
+            modId = util.trimPrefix(modId, '/_aleph')
         }
         if (modId.startsWith('/-/')) {
             modId = '//' + util.trimSuffix(util.trimPrefix(modId, '/-/'), '.js')
@@ -193,7 +193,7 @@ export default class Project {
             head: head,
             scripts: [
                 { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
-                { src: path.join(baseUrl, `/_dist/main.${mainMod.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { src: path.join(baseUrl, `/_aleph/main.${mainMod.hash.slice(0, hashShort)}.js`), type: 'module' },
             ],
             body,
             minify: !this.isDev
@@ -231,7 +231,7 @@ export default class Project {
     async build() {
         const start = performance.now()
         const outputDir = path.join(this.srcDir, this.config.outputDir)
-        const distDir = path.join(outputDir, '_dist')
+        const distDir = path.join(outputDir, '_aleph')
         await this.ready
         if (util.existsDir(outputDir)) {
             await Deno.remove(outputDir, { recursive: true })
@@ -736,7 +736,7 @@ export default class Project {
                         path.dirname(path.resolve('/', mod.url)),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
-                    `applyCSS(${JSON.stringify(url)}, ${css.length > 1024 ? JSON.stringify(path.join(this.config.baseUrl, '_dist', savePath)) + ', true' : JSON.stringify(css)});`,
+                    `applyCSS(${JSON.stringify(url)}, ${css.length > 1024 ? JSON.stringify(path.join(this.config.baseUrl, '_aleph', savePath)) + ', true' : JSON.stringify(css)});`,
                 ].join(this.isDev ? '\n' : '')
                 mod.hash = hash
                 mod.jsSourceMap = ''
