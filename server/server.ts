@@ -186,6 +186,17 @@ export async function start(appDir: string, port: number, isDev = false) {
                         }
                     }
 
+                    // spa
+                    if (project.config.mode === 'spa') {
+                        const html = project.getSPAIndexHtml()
+                        req.respond({
+                            status: 200,
+                            headers: new Headers({ 'Content-Type': 'text/html' }),
+                            body: html
+                        })
+                        continue
+                    }
+
                     // ssr
                     const [status, html] = await project.getPageHtml({ pathname, search: url.search })
                     req.respond({

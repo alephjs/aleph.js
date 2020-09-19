@@ -21,6 +21,7 @@ interface Config {
     readonly outputDir: string
     readonly baseUrl: string
     readonly defaultLocale: string
+    readonly mode: 'spa' | 'ssr'
     readonly buildTarget: string
     readonly sourceMap: boolean
     readonly importMap: {
@@ -65,6 +66,7 @@ export default class Project {
             outputDir: '/dist',
             baseUrl: '/',
             defaultLocale: 'en',
+            mode: 'ssr',
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
             importMap: {
@@ -186,19 +188,33 @@ export default class Project {
                 fallback: '/404'
             }
         )
-        const mainMod = this.#modules.get('./main.js')!
+        const mainModule = this.#modules.get('./main.js')!
         const { code, head, body } = await this._renderPage(url)
         const html = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
                 { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
-                { src: path.join(baseUrl, `/_aleph/main.${mainMod.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
             ],
             body,
             minify: !this.isDev
         })
         return [code, html]
+    }
+
+    getSPAIndexHtml(): string {
+        const { baseUrl, defaultLocale } = this.config
+        const mainModule = this.#modules.get('./main.js')!
+        const html = createHtml({
+            lang: defaultLocale,
+            scripts: [
+                { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
+            ],
+            body: `<main></main>`,
+            minify: !this.isDev
+        })
+        return html
     }
 
     async getData() {
@@ -276,11 +292,15 @@ export default class Project {
             await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), `export default ${JSON.stringify(data)}`)
         }
 
-        // ssg
-        for (const pathname of this.#pageModules.keys()) {
-            const [_, html] = await this.getPageHtml({ pathname })
-            const htmlFile = path.join(outputDir, pathname, 'index.html')
-            await writeTextFile(htmlFile, html)
+        if (this.config.mode === 'spa') {
+            const html = this.getSPAIndexHtml()
+            await writeTextFile(path.join(outputDir, 'index.html'), html)
+        } else {
+            for (const pathname of this.#pageModules.keys()) {
+                const [_, html] = await this.getPageHtml({ pathname })
+                const htmlFile = path.join(outputDir, pathname, 'index.html')
+                await writeTextFile(htmlFile, html)
+            }
         }
 
         // copy public files
@@ -292,7 +312,6 @@ export default class Project {
             }
         }
 
-        // done
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
@@ -309,15 +328,16 @@ export default class Project {
             Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
         }
 
-        const configFile = path.join(this.config.rootDir, 'post.config.json')
+        const configFile = path.join(this.config.rootDir, 'aleph.config.json')
         if (util.existsFile(configFile)) {
             const {
                 srcDir,
                 ouputDir,
                 baseUrl,
-                target,
+                mode,
+                buildTarget,
                 sourceMap,
-                lang
+                defaultLocale
             } = JSON.parse(await Deno.readTextFile(configFile))
             if (util.isNEString(srcDir)) {
                 Object.assign(this.config, { srcDir: util.cleanPath(srcDir) })
@@ -328,11 +348,14 @@ export default class Project {
             if (util.isNEString(baseUrl)) {
                 Object.assign(this.config, { baseUrl: util.cleanPath(encodeURI(baseUrl)) })
             }
-            if (util.isNEString(lang)) {
-                Object.assign(this.config, { defaultLocale: lang })
+            if (util.isNEString(defaultLocale)) {
+                Object.assign(this.config, { defaultLocale })
             }
-            if (/^es(20\d{2}|next)$/i.test(target)) {
-                Object.assign(this.config, { target: target.toLowerCase() })
+            if (mode === 'spa' || mode === 'ssr') {
+                Object.assign(this.config, { mode })
+            }
+            if (/^es(20\d{2}|next)$/i.test(buildTarget)) {
+                Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
             }
             if (typeof sourceMap === 'boolean') {
                 Object.assign(this.config, { sourceMap })
@@ -541,6 +564,7 @@ export default class Project {
     private async _createMainModule(): Promise<Module> {
         const { baseUrl, defaultLocale } = this.config
         const config: Record<string, any> = {
+            mode: this.config.mode,
             baseUrl,
             defaultLocale,
             locales: {},
@@ -967,8 +991,8 @@ export default class Project {
         const start = performance.now()
         const ret: RenderResult = {
             code: 404,
-            head: ['<title>404 - page not found</title>'],
-            body: '<p><strong><code>404</code></strong><small> - </small><span>page not found</span></p>',
+            head: ['<title ssr>404 Error - Aleph.js</title>'],
+            body: '<main><p><strong><code>404</code></strong><small> - </small><span>page not found</span></p></main>',
         }
         if (this.#pageModules.has(url.pagePath)) {
             const pm = this.#pageModules.get(url.pagePath)!
@@ -1001,7 +1025,7 @@ export default class Project {
                 log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
             } catch (err) {
                 ret.code = 500
-                ret.head = ['<title>500 - render error</title>']
+                ret.head = ['<title>500 Error - Aleph.js</title>']
                 ret.body = `<pre>${AnsiUp.ansi_to_html(err.stack)}</pre>`
                 log.error(err.stack)
             }

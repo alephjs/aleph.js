@@ -1,8 +1,8 @@
 import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
-import { hydrate } from 'https://esm.sh/react-dom'
+import { hydrate, render } from 'https://esm.sh/react-dom'
 import type { AppManifest, RouterURL } from './api.ts'
 import { DataContext } from './data.ts'
-import { errAppEl, errPageEl } from './error.ts'
+import { E404Page, errAppEl, errPageEl } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
@@ -185,6 +185,7 @@ interface Module {
 }
 
 export async function bootstrap({
+    mode,
     baseUrl,
     defaultLocale,
     locales,
@@ -192,45 +193,72 @@ export async function bootstrap({
     appModule,
     pageModules
 }: AppManifest & {
+    mode: 'spa' | 'ssr',
     dataModule: Module | null
     appModule: Module | null
     pageModules: Record<string, Module>
 }) {
     const { document } = window as any
-    const el = document.getElementById('ssr-data')
+    const mainEl = document.querySelector('main')
+    const dataEl = document.getElementById('ssr-data')
 
-    if (el) {
-        const { url } = JSON.parse(el.innerHTML)
-        if (url && util.isNEString(url.pagePath) && url.pagePath in pageModules) {
-            const pageModule = pageModules[url.pagePath]!
-            const [
-                { default: data },
-                { default: AppComponent },
-                { default: PageComponent }
-            ] = await Promise.all([
-                dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({ default: {} }),
-                appModule ? import(getModuleImportUrl(baseUrl, appModule)) : Promise.resolve({}),
-                import(getModuleImportUrl(baseUrl, pageModule)),
-            ])
-            const el = React.createElement(
-                ALEPH,
-                {
-                    config: {
-                        manifest: { baseUrl, defaultLocale, locales },
-                        data,
-                        app: appModule ? { Component: AppComponent } : undefined,
-                        page: { Component: PageComponent },
-                        pageModules,
-                        url,
+    let url: RouterURL | null = null
+    if (dataEl) {
+        const data = JSON.parse(dataEl.innerHTML)
+        if (data.url && util.isNEString(data.url.pagePath) && data.url.pagePath in pageModules) {
+            url = data.url
+        }
+    }
+    if (url === null) {
+        url = route(
+            baseUrl,
+            Object.keys(pageModules),
+            {
+                defaultLocale,
+                locales: Object.keys(locales),
+                fallback: '/404'
+            }
+        )
+    }
+
+    if (url) {
+        const pageModule = pageModules[url.pagePath]!
+        const [
+            { default: data },
+            { default: AppComponent },
+            { default: PageComponent }
+        ] = await Promise.all([
+            dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({ default: {} }),
+            appModule ? import(getModuleImportUrl(baseUrl, appModule)) : Promise.resolve({}),
+            pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({ default: E404Page }),
+        ])
+        const el = React.createElement(
+            ALEPH,
+            {
+                config: {
+                    manifest: { baseUrl, defaultLocale, locales },
+                    data,
+                    app: appModule ? { Component: AppComponent } : undefined,
+                    page: {
+                        Component: PageComponent
+                    },
+                    pageModules,
+                    url,
+                }
+            }
+        )
+        if (mode === 'ssr') {
+            hydrate(el, mainEl)
+            // remove ssr head elements, set a timmer to avoid tab title flash
+            setTimeout(() => {
+                Array.from(document.head.children).forEach((el: any) => {
+                    if (el.hasAttribute('ssr')) {
+                        document.head.removeChild(el)
                     }
-                }
-            )
-            Array.from(document.head.children).forEach((el: any) => {
-                if (el.hasAttribute('ssr')) {
-                    document.head.removeChild(el)
-                }
-            })
-            hydrate(el, document.querySelector('main'))
+                })
+            }, 0)
+        } else {
+            render(el, mainEl)
         }
     }
 }

@@ -1,4 +1,5 @@
 import React from 'https://esm.sh/react'
+import Head from './head.ts'
 
 export const errAppEl = React.createElement(
     ErrorPage,
@@ -18,46 +19,63 @@ export const errPageEl = React.createElement(
     }
 )
 
+export function E404Page() {
+    return React.createElement(ErrorPage, { status: 404 })
+}
+
 export function ErrorPage({ status, text = getStatusText(status), refreshButton }: { status: number, text?: string, refreshButton?: boolean }) {
-    return [
+    return (
         React.createElement(
-            'p',
+            React.Fragment,
             null,
             React.createElement(
-                'strong',
+                Head,
                 null,
                 React.createElement(
-                    'code',
+                    'title',
                     null,
-                    status
+                    status + ' Error - Aleph.js'
+                ),
+            ),
+            React.createElement(
+                'p',
+                null,
+                React.createElement(
+                    'strong',
+                    null,
+                    React.createElement(
+                        'code',
+                        null,
+                        status
+                    )
+                ),
+                React.createElement(
+                    'small',
+                    null,
+                    ' - '
+                ),
+                React.createElement(
+                    'span',
+                    null,
+                    text
                 )
             ),
-            React.createElement(
-                'small',
+            refreshButton && React.createElement(
+                'p',
                 null,
-                ' - '
-            ),
-            React.createElement(
-                'span',
-                null,
-                text
-            )
-        ),
-        refreshButton && React.createElement(
-            'p',
-            null,
-            React.createElement(
-                'button',
-                {
-                    onClick() {
-                        const { location } = window as any
-                        location.reload()
-                    }
-                },
-                'Refresh'
+                React.createElement(
+                    'button',
+                    {
+                        onClick() {
+                            const { location } = window as any
+                            location.reload()
+                        }
+                    },
+                    'Refresh'
+                )
             )
         )
-    ]
+    )
 }
 
 function getStatusText(status: number) {
