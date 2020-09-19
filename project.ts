@@ -591,7 +591,7 @@ export default class Project {
             'import "./-/deno.land/x/aleph/vendor/tslib/tslib.js";',
             'import { bootstrap } from "./-/deno.land/x/aleph/app.js";',
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
-        ].filter(Boolean).join('\n')
+        ].filter(Boolean).join(this.isDev ? '\n' : '')
         module.hash = (new Sha1()).update(module.jsContent).hex()
         module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
         module.deps = deps
