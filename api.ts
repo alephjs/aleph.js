@@ -1,3 +1,16 @@
+export interface Config {
+    readonly srcDir: string
+    readonly outputDir: string
+    readonly baseUrl: string
+    readonly defaultLocale: string
+    readonly ssr: boolean | { include?: string[], exclude?: string[] }
+    readonly buildTarget: string
+    readonly sourceMap: boolean
+    readonly importMap: {
+        imports: Record<string, string>
+    }
+}
+
 export interface AppManifest {
     readonly baseUrl: string
     readonly defaultLocale: string

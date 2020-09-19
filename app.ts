@@ -185,7 +185,6 @@ interface Module {
 }
 
 export async function bootstrap({
-    mode,
     baseUrl,
     defaultLocale,
     locales,
@@ -193,7 +192,6 @@ export async function bootstrap({
     appModule,
     pageModules
 }: AppManifest & {
-    mode: 'spa' | 'ssr',
     dataModule: Module | null
     appModule: Module | null
     pageModules: Record<string, Module>
@@ -202,14 +200,15 @@ export async function bootstrap({
     const mainEl = document.querySelector('main')
     const dataEl = document.getElementById('ssr-data')
 
-    let url: RouterURL | null = null
+    let url: RouterURL
     if (dataEl) {
         const data = JSON.parse(dataEl.innerHTML)
         if (data.url && util.isNEString(data.url.pagePath) && data.url.pagePath in pageModules) {
             url = data.url
+        } else {
+            throw new Error("invalid ssr-data")
         }
-    }
-    if (url === null) {
+    } else {
         url = route(
             baseUrl,
             Object.keys(pageModules),
@@ -221,45 +220,43 @@ export async function bootstrap({
         )
     }
 
-    if (url) {
-        const pageModule = pageModules[url.pagePath]!
-        const [
-            { default: data },
-            { default: AppComponent },
-            { default: PageComponent }
-        ] = await Promise.all([
-            dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({ default: {} }),
-            appModule ? import(getModuleImportUrl(baseUrl, appModule)) : Promise.resolve({}),
-            pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({ default: E404Page }),
-        ])
-        const el = React.createElement(
-            ALEPH,
-            {
-                config: {
-                    manifest: { baseUrl, defaultLocale, locales },
-                    data,
-                    app: appModule ? { Component: AppComponent } : undefined,
-                    page: {
-                        Component: PageComponent
-                    },
-                    pageModules,
-                    url,
-                }
+    const pageModule = pageModules[url.pagePath]!
+    const [
+        { default: data },
+        { default: AppComponent },
+        { default: PageComponent }
+    ] = await Promise.all([
+        dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({ default: {} }),
+        appModule ? import(getModuleImportUrl(baseUrl, appModule)) : Promise.resolve({}),
+        pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({ default: E404Page }),
+    ])
+    const el = React.createElement(
+        ALEPH,
+        {
+            config: {
+                manifest: { baseUrl, defaultLocale, locales },
+                data,
+                app: appModule ? { Component: AppComponent } : undefined,
+                page: {
+                    Component: PageComponent
+                },
+                pageModules,
+                url,
             }
-        )
-        if (mode === 'ssr') {
-            hydrate(el, mainEl)
-            // remove ssr head elements, set a timmer to avoid tab title flash
-            setTimeout(() => {
-                Array.from(document.head.children).forEach((el: any) => {
-                    if (el.hasAttribute('ssr')) {
-                        document.head.removeChild(el)
-                    }
-                })
-            }, 0)
-        } else {
-            render(el, mainEl)
         }
+    )
+    if (dataEl) {
+        hydrate(el, mainEl)
+        // remove ssr head elements, set a timmer to avoid tab title flash
+        setTimeout(() => {
+            Array.from(document.head.children).forEach((el: any) => {
+                if (el.hasAttribute('ssr')) {
+                    document.head.removeChild(el)
+                }
+            })
+        }, 0)
+    } else {
+        render(el, mainEl)
     }
 }
 

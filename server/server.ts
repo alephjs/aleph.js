@@ -169,7 +169,7 @@ export async function start(appDir: string, port: number, isDev = false) {
 
                     // serve public files
                     try {
-                        const filePath = path.join(project.publicDir, pathname)
+                        const filePath = path.join(project.rootDir, 'public', pathname)
                         const info = await Deno.lstat(filePath)
                         if (!info.isDirectory) {
                             const body = await Deno.readFile(filePath)
@@ -184,17 +184,6 @@ export async function start(appDir: string, port: number, isDev = false) {
                         if (!(err instanceof Deno.errors.NotFound)) {
                             throw err
                         }
-                    }
-
-                    // spa
-                    if (project.config.mode === 'spa') {
-                        const html = project.getSPAIndexHtml()
-                        req.respond({
-                            status: 200,
-                            headers: new Headers({ 'Content-Type': 'text/html' }),
-                            body: html
-                        })
-                        continue
                     }
 
                     // ssr

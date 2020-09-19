@@ -1,4 +1,4 @@
-import type { APIHandle, Location, RouterURL } from './api.ts'
+import type { APIHandle, Config, Location, RouterURL } from './api.ts'
 import { AnsiUp, colors, ensureDir, less, minify, path, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
@@ -14,20 +14,6 @@ const reHashJs = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
 
 const { CleanCSS } = window as any
 const cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
-
-interface Config {
-    readonly rootDir: string
-    readonly srcDir: string
-    readonly outputDir: string
-    readonly baseUrl: string
-    readonly defaultLocale: string
-    readonly mode: 'spa' | 'ssr'
-    readonly buildTarget: string
-    readonly sourceMap: boolean
-    readonly importMap: {
-        imports: Record<string, string>
-    }
-}
 
 interface Module {
     id: string
@@ -51,6 +37,7 @@ interface RenderResult {
 
 export default class Project {
     readonly mode: 'development' | 'production'
+    readonly rootDir: string
     readonly config: Config
     readonly ready: Promise<void>
 
@@ -60,13 +47,13 @@ export default class Project {
 
     constructor(dir: string, mode: 'development' | 'production') {
         this.mode = mode
+        this.rootDir = path.resolve(dir)
         this.config = {
-            rootDir: path.resolve(dir),
             srcDir: '/',
             outputDir: '/dist',
             baseUrl: '/',
             defaultLocale: 'en',
-            mode: 'ssr',
+            ssr: true,
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
             importMap: {
@@ -86,16 +73,11 @@ export default class Project {
     }
 
     get srcDir() {
-        const { rootDir, srcDir } = this.config
-        return path.join(rootDir, srcDir)
-    }
-
-    get publicDir() {
-        return path.join(this.srcDir, 'public')
+        return path.join(this.rootDir, this.config.srcDir)
     }
 
     get buildDir() {
-        return path.join(this.config.rootDir, '.aleph', this.mode + '.' + this.config.buildTarget)
+        return path.join(this.rootDir, '.aleph', this.mode + '.' + this.config.buildTarget)
     }
 
     get apiPaths() {
@@ -292,19 +274,19 @@ export default class Project {
             await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), `export default ${JSON.stringify(data)}`)
         }
 
-        if (this.config.mode === 'spa') {
-            const html = this.getSPAIndexHtml()
-            await writeTextFile(path.join(outputDir, 'index.html'), html)
-        } else {
+        if (this.config.ssr) {
             for (const pathname of this.#pageModules.keys()) {
                 const [_, html] = await this.getPageHtml({ pathname })
                 const htmlFile = path.join(outputDir, pathname, 'index.html')
                 await writeTextFile(htmlFile, html)
             }
+        } else {
+            const html = this.getSPAIndexHtml()
+            await writeTextFile(path.join(outputDir, 'index.html'), html)
         }
 
         // copy public files
-        const { publicDir } = this
+        const publicDir = path.join(this.rootDir, 'public')
         if (util.existsDir(publicDir)) {
             for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
                 const rp = path.resolve(util.trimPrefix(p, publicDir))
@@ -322,19 +304,19 @@ export default class Project {
             Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
         }
 
-        const importMapFile = path.join(this.config.rootDir, 'import_map.json')
+        const importMapFile = path.join(this.rootDir, 'import_map.json')
         if (util.existsFile(importMapFile)) {
             const { imports } = JSON.parse(await Deno.readTextFile(importMapFile))
             Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
         }
 
-        const configFile = path.join(this.config.rootDir, 'aleph.config.json')
+        const configFile = path.join(this.rootDir, 'aleph.config.json')
         if (util.existsFile(configFile)) {
             const {
                 srcDir,
                 ouputDir,
                 baseUrl,
-                mode,
+                ssr,
                 buildTarget,
                 sourceMap,
                 defaultLocale
@@ -351,8 +333,12 @@ export default class Project {
             if (util.isNEString(defaultLocale)) {
                 Object.assign(this.config, { defaultLocale })
             }
-            if (mode === 'spa' || mode === 'ssr') {
-                Object.assign(this.config, { mode })
+            if (typeof ssr === 'boolean') {
+                Object.assign(this.config, { ssr })
+            } else if (util.isPlainObject(ssr)) {
+                const include = util.isArray(ssr.include) ? ssr.include : []
+                const exclude = util.isArray(ssr.exclude) ? ssr.exclude : []
+                Object.assign(this.config, { ssr: { include, exclude } })
             }
             if (/^es(20\d{2}|next)$/i.test(buildTarget)) {
                 Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
@@ -375,7 +361,7 @@ export default class Project {
 
         Object.assign(globalThis, {
             ALEPH_ENV: {
-                appDir: this.config.rootDir,
+                appDir: this.rootDir,
             },
             $RefreshReg$: () => { },
             $RefreshSig$: () => (type: any) => type,
@@ -452,14 +438,13 @@ export default class Project {
         log.info('Start watching code changes...')
         for await (const event of w) {
             for (const p of event.paths) {
-                const { rootDir, outputDir } = this.config
-                const path = util.trimPrefix(util.trimPrefix(p, rootDir), '/')
+                const path = util.trimPrefix(util.trimPrefix(p, this.rootDir), '/')
                 const validated = (() => {
                     if (!reModuleExt.test(path) && !reStyleModuleExt.test(path)) {
                         return false
                     }
                     // ignore '.aleph' and outputDir directories
-                    if (path.startsWith('.aleph/') || path.startsWith(outputDir.slice(1))) {
+                    if (path.startsWith('.aleph/') || path.startsWith(this.config.outputDir.slice(1))) {
                         return false
                     }
                     const moduleId = './' + path.replace(reModuleExt, '.js')
@@ -564,7 +549,6 @@ export default class Project {
     private async _createMainModule(): Promise<Module> {
         const { baseUrl, defaultLocale } = this.config
         const config: Record<string, any> = {
-            mode: this.config.mode,
             baseUrl,
             defaultLocale,
             locales: {},
@@ -989,11 +973,7 @@ export default class Project {
 
     private async _renderPage(url: RouterURL) {
         const start = performance.now()
-        const ret: RenderResult = {
-            code: 404,
-            head: ['<title ssr>404 Error - Aleph.js</title>'],
-            body: '<main><p><strong><code>404</code></strong><small> - </small><span>page not found</span></p></main>',
-        }
+        const ret: RenderResult = { code: 200, head: [], body: '' }
         if (this.#pageModules.has(url.pagePath)) {
             const pm = this.#pageModules.get(url.pagePath)!
             if (pm.rendered.has(url.pathname)) {
@@ -1029,6 +1009,10 @@ export default class Project {
                 ret.body = `<pre>${AnsiUp.ansi_to_html(err.stack)}</pre>`
                 log.error(err.stack)
             }
+        } else {
+            ret.code = 404
+            ret.head = ['<title ssr>404 Error - Aleph.js</title>']
+            ret.body = '<main><p><strong><code>404</code></strong><small> - </small><span>page not found</span></p></main>'
         }
         return ret
     }
