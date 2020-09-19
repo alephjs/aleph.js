@@ -1,5 +1,5 @@
 import React, { ComponentType, createContext, useContext } from 'https://esm.sh/react'
-import type { RouterURL } from './api.ts'
+import type { RouterURL } from './types.ts'
 
 export const RouterContext = createContext<RouterURL>({
     pagePath: '/',

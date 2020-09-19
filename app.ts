@@ -1,11 +1,11 @@
 import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import type { AppManifest, RouterURL } from './api.ts'
 import { DataContext } from './data.ts'
 import { E404Page, errAppEl, errPageEl } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
+import type { AppManifest, RouterURL } from './types.ts'
 import util, { hashShort } from './util.ts'
 
 export const AppManifestContext = createContext<AppManifest>({

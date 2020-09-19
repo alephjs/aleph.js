@@ -1,4 +1,4 @@
-import type { APIRequest, APIResponse } from '../api.ts'
+import type { APIRequest, APIResponse } from '../types.ts'
 import type { ServerRequest } from '../deps.ts'
 
 export class PostAPIRequest implements APIRequest {

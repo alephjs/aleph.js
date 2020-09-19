@@ -20,7 +20,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                 const pathname = util.cleanPath(url.pathname)
 
                 try {
-                    // hmr
+                    // serve hmr ws
                     if (pathname === '/_hmr') {
                         const { conn, r: bufReader, w: bufWriter, headers } = req
                         ws.acceptWebSocket({ conn, bufReader, bufWriter, headers }).then(async socket => {
@@ -65,7 +65,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                         continue
                     }
 
-                    //serve apis
+                    // serve apis
                     if (pathname.startsWith('/api/')) {
                         const { pagePath, params, query } = route(
                             project.config.baseUrl,

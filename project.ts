@@ -1,10 +1,10 @@
-import type { APIHandle, Config, Location, RouterURL } from './api.ts'
 import { AnsiUp, colors, ensureDir, less, minify, path, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import route from './route.ts'
 import { compile } from './tsc/compile.ts'
+import type { APIHandle, Config, Location, RouterURL } from './types.ts'
 import util, { hashShort } from './util.ts'
 
 const reHttp = /^https?:\/\//i
