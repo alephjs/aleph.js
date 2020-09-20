@@ -1,7 +1,7 @@
 import type { RouterURL } from './types.ts'
 import util from './util.ts'
 
-export default function route(base: string, pagePaths: string[], options?: { location?: { pathname: string, search?: string }, fallback?: string, defaultLocale?: string, locales?: string[] }): RouterURL {
+export default function route(base: string, pagePaths: string[], options?: { location?: { pathname: string, search?: string }, defaultLocale?: string, locales?: string[] }): RouterURL {
     const loc = (options?.location || (window as any).location || { pathname: '/' })
     const pathname = util.cleanPath(util.trimPrefix(loc.pathname, base))
     const query = new URLSearchParams(loc.search)
@@ -28,18 +28,14 @@ export default function route(base: string, pagePaths: string[], options?: { loc
         }
     }
 
-    if (pagePath === '' && options?.fallback) {
-        pagePath = options?.fallback
-    }
-
     return { locale, pathname, pagePath, params, query }
 }
 
-function matchPath(routePath: string, locPath: string): [Record<string, string>, boolean] {
-    const routeSegments = util.splitPath(routePath)
-    const locSegments = util.splitPath(locPath)
-    const depth = Math.max(routeSegments.length, locSegments.length)
+function matchPath(routePath: string, realPath: string): [Record<string, string>, boolean] {
     const params: Record<string, string> = {}
+    const routeSegments = util.splitPath(routePath)
+    const locSegments = util.splitPath(realPath)
+    const depth = Math.max(routeSegments.length, locSegments.length)
 
     for (let i = 0; i < depth; i++) {
         const routeSeg = routeSegments[i]
@@ -49,11 +45,15 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
             return [{}, false]
         }
 
-        if (routeSeg.startsWith('$') && routeSeg.length > 1) {
-            params[routeSeg.slice(1)] = decodeURIComponent(locSeg)
-        } else if (routeSeg.startsWith('~') && routeSeg.length > 1 && i === routeSegments.length - 1) {
-            params[routeSeg.slice(1)] = locSegments.slice(i).map(decodeURIComponent).join('/')
+        if (routeSeg.startsWith('[...') && routeSeg.endsWith(']') && routeSeg.length > 5 && i === routeSegments.length - 1) {
+            params[routeSeg.slice(4, -1)] = locSegments.slice(i).map(decodeURIComponent).join('/')
             break
+        }
+
+        if (routeSeg.startsWith('[') && routeSeg.endsWith(']') && routeSeg.length > 2) {
+            params[routeSeg.slice(1, -1)] = decodeURIComponent(locSeg)
+        } else if (routeSeg.startsWith('$') && routeSeg.length > 1) {
+            params[routeSeg.slice(1)] = decodeURIComponent(locSeg)
         } else if (routeSeg !== locSeg) {
             return [{}, false]
         }

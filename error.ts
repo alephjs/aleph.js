@@ -1,26 +1,34 @@
 import React from 'https://esm.sh/react'
 import Head from './head.ts'
 
-export const errAppEl = React.createElement(
+const e501AppEl = React.createElement(
     ErrorPage,
     {
         status: 501,
-        text: 'app module should export default as a react component',
+        text: 'app module should   default as a react component',
         refreshButton: true
     }
 )
+const e501PageEl = React.createElement(
+    ErrorPage,
+    {
+        status: 501,
+        text: 'page module should   default as a react component',
+        refreshButton: true
+    }
+)
+const e404PageEl = React.createElement(ErrorPage, { status: 404 })
 
-export const errPageEl = React.createElement(
-    ErrorPage,
-    {
-        status: 501,
-        text: 'page module should export default as a react component',
-        refreshButton: true
-    }
-)
+export function E501App() {
+    return e501AppEl
+}
+
+export function E501Page() {
+    return e501PageEl
+}
 
 export function E404Page() {
-    return React.createElement(ErrorPage, { status: 404 })
+    return e404PageEl
 }
 
 export function ErrorPage({ status, text = getStatusText(status), refreshButton }: { status: number, text?: string, refreshButton?: boolean }) {

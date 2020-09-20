@@ -1,6 +1,6 @@
 import React, { ComponentType } from 'https://esm.sh/react'
 import { DataContext } from './data.ts'
-import { errAppEl, errPageEl } from './error.ts'
+import { E501App, E501Page } from './error.ts'
 import { RouterContext } from './router.ts'
 import type { RouterURL } from './types.ts'
 import util from './util.ts'
@@ -13,8 +13,8 @@ export function renderPage(
     App: { Component: ComponentType<any> } | undefined,
     Page: { Component: ComponentType<any> },
 ) {
-    const pageEl = util.isLikelyReactComponent(Page.Component) ? React.createElement(Page.Component) : errPageEl
-    const appEl = App ? (util.isLikelyReactComponent(App.Component) ? React.createElement(App.Component, null, pageEl) : errAppEl) : pageEl
+    const pageEl = React.createElement(util.isLikelyReactComponent(Page.Component) ? Page.Component : E501Page)
+    const appEl = App ? (util.isLikelyReactComponent(App.Component) ? React.createElement(App.Component, null, pageEl) : React.createElement(E501App)) : pageEl
     return ReactDomServer.renderToString(React.createElement(
         DataContext.Provider,
         { value: data },

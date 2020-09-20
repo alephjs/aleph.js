@@ -54,7 +54,7 @@ export default class Project {
             baseUrl: '/',
             defaultLocale: 'en',
             ssr: {
-                fallback: 'fallback.html'
+                fallback: '404.html'
             },
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
@@ -89,10 +89,15 @@ export default class Project {
     }
 
     isHMRable(moduleId: string) {
-        if (reHttp.test(moduleId)) {
-            return false
-        }
-        return moduleId === './app.js' || moduleId === './data.js' || (moduleId === './data/index.js' && !this.#modules.has('./data.js')) || moduleId.startsWith('./pages/') || moduleId.startsWith('./components/') || reStyleModuleExt.test(moduleId)
+        return !reHttp.test(moduleId) && (
+            moduleId === './404.js' ||
+            moduleId === './app.js' ||
+            moduleId === './data.js' ||
+            (moduleId === './data/index.js' && !this.#modules.has('./data.js')) ||
+            moduleId.startsWith('./pages/') ||
+            moduleId.startsWith('./components/') ||
+            reStyleModuleExt.test(moduleId)
+        )
     }
 
     getModule(id: string): Module | null {
@@ -168,10 +173,13 @@ export default class Project {
             Array.from(this.#pageModules.keys()),
             {
                 location,
-                defaultLocale,
-                fallback: '/404'
+                defaultLocale
             }
         )
+        if (url.pagePath === '') {
+            return [200, this.getSPAIndexHtml()]
+        }
+
         const mainModule = this.#modules.get('./main.js')!
         const { code, head, body } = await this._renderPage(url)
         const html = createHtml({
@@ -278,13 +286,13 @@ export default class Project {
 
         const { ssr } = this.config
         if (ssr) {
-            const fallback = ((util.isPlainObject(ssr) && ssr.fallback ? util.trimSuffix(ssr.fallback, '.html') : '') || 'fallback') + '.html'
-            await writeTextFile(path.join(outputDir, fallback), this.getSPAIndexHtml())
             for (const pathname of this.#pageModules.keys()) {
                 const [_, html] = await this.getPageHtml({ pathname })
                 const htmlFile = path.join(outputDir, pathname, 'index.html')
                 await writeTextFile(htmlFile, html)
             }
+            const fallback = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '404.html')
+            await writeTextFile(fallback, this.getSPAIndexHtml())
         } else {
             await writeTextFile(path.join(outputDir, 'index.html'), this.getSPAIndexHtml())
         }
@@ -340,9 +348,10 @@ export default class Project {
             if (typeof ssr === 'boolean') {
                 Object.assign(this.config, { ssr })
             } else if (util.isPlainObject(ssr)) {
+                const fallback = util.isNEString(ssr.fallback) ? ssr.fallback : '404.html'
                 const include = util.isArray(ssr.include) ? ssr.include : []
                 const exclude = util.isArray(ssr.exclude) ? ssr.exclude : []
-                Object.assign(this.config, { ssr: { include, exclude } })
+                Object.assign(this.config, { ssr: { fallback, include, exclude } })
             }
             if (/^es(20\d{2}|next)$/i.test(buildTarget)) {
                 Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
@@ -394,6 +403,7 @@ export default class Project {
                 switch (name.replace(reModuleExt, '')) {
                     case 'app':
                     case 'data':
+                    case '404':
                         await this._compile('./' + name)
                         break
                 }
@@ -453,6 +463,7 @@ export default class Project {
                     }
                     const moduleId = './' + path.replace(reModuleExt, '.js')
                     switch (moduleId) {
+                        case './404.js':
                         case './app.js':
                         case './data.js':
                         case './data/index.js': {
@@ -558,6 +569,7 @@ export default class Project {
             locales: {},
             dataModule: null,
             appModule: null,
+            e404Module: null,
             pageModules: {}
         }
         const module = this._parseUrl('./main.js')
@@ -581,6 +593,14 @@ export default class Project {
             const { url, hash } = this.#modules.get('./app.js')!
             config.appModule = {
                 moduleId: './app.js',
+                hash
+            }
+            deps.push({ url, hash })
+        }
+        if (this.#modules.has('./404.js')) {
+            const { url, hash } = this.#modules.get('./404.js')!
+            config.e404Module = {
+                moduleId: './404.js',
                 hash
             }
             deps.push({ url, hash })
@@ -791,7 +811,7 @@ export default class Project {
                 const compileOptions = {
                     target: this.config.buildTarget,
                     mode: this.mode,
-                    reactRefresh: this.isDev && !mod.isRemote && (mod.id === './app.js' || mod.id.startsWith('./pages/') || mod.id.startsWith('./components/')),
+                    reactRefresh: this.isDev && !mod.isRemote && (mod.id === './404.js' || mod.id === './app.js' || mod.id.startsWith('./pages/') || mod.id.startsWith('./components/')),
                     rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path),
                 }
                 const { diagnostics, outputText, sourceMapText } = compile(mod.url, sourceContent, compileOptions)
@@ -977,46 +997,40 @@ export default class Project {
 
     private async _renderPage(url: RouterURL) {
         const start = performance.now()
-        const ret: RenderResult = { code: 200, head: [], body: '' }
-        if (this.#pageModules.has(url.pagePath)) {
-            const pm = this.#pageModules.get(url.pagePath)!
-            if (pm.rendered.has(url.pathname)) {
-                const cache = pm.rendered.get(url.pathname)!
-                return { ...cache }
-            }
-            try {
-                const appModule = this.#modules.get('./app.js')
-                const pageModule = this.#modules.get(pm.moduleId)!
-                const [
-                    { renderPage, renderHead },
-                    app,
-                    page
-                ] = await Promise.all([
-                    import(this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile),
-                    appModule ? this.importModuleAsComponent('./app.js') : Promise.resolve({}),
-                    this.importModuleAsComponent(pm.moduleId)
-                ])
-                const data = await this.getData()
-                const html = renderPage(data, url, appModule ? app : undefined, page)
-                const head = renderHead([
-                    pageModule.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)),
-                    appModule?.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url))
-                ].filter(Boolean).flat())
-                ret.code = 200
-                ret.head = head
-                ret.body = `<main>${html}</main>`
-                pm.rendered.set(url.pathname, { ...ret })
-                log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
-            } catch (err) {
-                ret.code = 500
-                ret.head = ['<title>500 Error - Aleph.js</title>']
-                ret.body = `<pre>${AnsiUp.ansi_to_html(err.stack)}</pre>`
-                log.error(err.stack)
-            }
-        } else {
-            ret.code = 404
-            ret.head = ['<title ssr>404 Error - Aleph.js</title>']
-            ret.body = '<main><p><strong><code>404</code></strong><small> - </small><span>page not found</span></p></main>'
+        const ret: RenderResult = { code: 200, head: [], body: '<main></main>' }
+        const pm = this.#pageModules.get(url.pagePath)!
+        if (pm.rendered.has(url.pathname)) {
+            const cache = pm.rendered.get(url.pathname)!
+            return { ...cache }
+        }
+        try {
+            const appModule = this.#modules.get('./app.js')
+            const pageModule = this.#modules.get(pm.moduleId)!
+            const [
+                { renderPage, renderHead },
+                app,
+                page
+            ] = await Promise.all([
+                import(this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile),
+                appModule ? this.importModuleAsComponent('./app.js') : Promise.resolve({}),
+                this.importModuleAsComponent(pm.moduleId)
+            ])
+            const data = await this.getData()
+            const html = renderPage(data, url, appModule ? app : undefined, page)
+            const head = renderHead([
+                pageModule.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)),
+                appModule?.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url))
+            ].filter(Boolean).flat())
+            ret.code = 200
+            ret.head = head
+            ret.body = `<main>${html}</main>`
+            pm.rendered.set(url.pathname, { ...ret })
+            log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
+        } catch (err) {
+            ret.code = 500
+            ret.head = ['<title>500 Error - Aleph.js</title>']
+            ret.body = `<main><pre>${AnsiUp.ansi_to_html(err.stack)}</pre></main>`
+            log.error(err.stack)
         }
         return ret
     }

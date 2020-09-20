@@ -1,7 +1,7 @@
 import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { DataContext } from './data.ts'
-import { E404Page, errAppEl, errPageEl } from './error.ts'
+import { E404Page, E501App, E501Page } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
@@ -19,21 +19,22 @@ function ALEPH({ config }: {
     config: {
         manifest: AppManifest
         data: Record<string, any>
-        app?: { Component: ComponentType<any> }
-        page: { Component: ComponentType<any> }
         pageModules: Record<string, { moduleId: string, hash: string }>
         url: RouterURL
+        AppComponent?: ComponentType<any>
+        E404Component?: ComponentType<any>
+        PageComponent?: ComponentType<any>
     }
 }) {
     const [manifest, setManifest] = useState(() => config.manifest)
     const [data, setData] = useState(() => config.data)
     const [app, setApp] = useState(() => ({
-        Component: config.app ? (util.isLikelyReactComponent(config.app.Component) ? config.app.Component : () => errAppEl) : null
+        Component: config.AppComponent ? (util.isLikelyReactComponent(config.AppComponent) ? config.AppComponent : E501App) : null
     }))
     const [pageModules, setPageModules] = useState(() => config.pageModules)
     const [page, setPage] = useState(() => ({
         url: config.url,
-        Component: util.isLikelyReactComponent(config.page.Component) ? config.page.Component : () => errPageEl
+        Component: config.PageComponent ? (util.isLikelyReactComponent(config.PageComponent) ? config.PageComponent : E501Page) : (config.E404Component || E404Page)
     }))
     const onpopstate = useCallback(async () => {
         const { baseUrl, defaultLocale, locales } = manifest
@@ -42,11 +43,10 @@ function ALEPH({ config }: {
             Object.keys(pageModules),
             {
                 defaultLocale,
-                locales: Object.keys(locales),
-                fallback: '/404'
+                locales: Object.keys(locales)
             }
         )
-        if (url.pagePath in pageModules) {
+        if (url.pagePath && url.pagePath in pageModules) {
             const mod = pageModules[url.pagePath]!
             const { default: Component } = await import(getModuleImportUrl(baseUrl, mod))
             if (util.isLikelyReactComponent(Component)) {
@@ -54,11 +54,14 @@ function ALEPH({ config }: {
             } else {
                 setPage({
                     url,
-                    Component: () => errPageEl
+                    Component: E501Page
                 })
             }
         } else {
-            setPage({ url })
+            setPage({
+                url,
+                Component: config.E404Component || E404Page
+            })
         }
     }, [manifest, pageModules])
 
@@ -85,7 +88,7 @@ function ALEPH({ config }: {
                     setApp({ Component })
                 } else {
                     setPage({
-                        Component: () => errAppEl
+                        Component: E501App
                     })
                 }
             } else if (moduleId === './data.js' || moduleId === './data/index.js') {
@@ -190,10 +193,12 @@ export async function bootstrap({
     locales,
     dataModule,
     appModule,
+    e404Module,
     pageModules
 }: AppManifest & {
     dataModule: Module | null
     appModule: Module | null
+    e404Module: Module | null
     pageModules: Record<string, Module>
 }) {
     const { document } = window as any
@@ -203,7 +208,7 @@ export async function bootstrap({
     let url: RouterURL
     if (dataEl) {
         const data = JSON.parse(dataEl.innerHTML)
-        if (data.url && util.isNEString(data.url.pagePath) && data.url.pagePath in pageModules) {
+        if (util.isPlainObject(data.url)) {
             url = data.url
         } else {
             throw new Error("invalid ssr-data")
@@ -214,8 +219,7 @@ export async function bootstrap({
             Object.keys(pageModules),
             {
                 defaultLocale,
-                locales: Object.keys(locales),
-                fallback: '/404'
+                locales: Object.keys(locales)
             }
         )
     }
@@ -224,11 +228,13 @@ export async function bootstrap({
     const [
         { default: data },
         { default: AppComponent },
+        { default: E404Component },
         { default: PageComponent }
     ] = await Promise.all([
         dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({ default: {} }),
         appModule ? import(getModuleImportUrl(baseUrl, appModule)) : Promise.resolve({}),
-        pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({ default: E404Page }),
+        e404Module ? import(getModuleImportUrl(baseUrl, e404Module)) : Promise.resolve({}),
+        pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({}),
     ])
     const el = React.createElement(
         ALEPH,
@@ -236,12 +242,11 @@ export async function bootstrap({
             config: {
                 manifest: { baseUrl, defaultLocale, locales },
                 data,
-                app: appModule ? { Component: AppComponent } : undefined,
-                page: {
-                    Component: PageComponent
-                },
                 pageModules,
                 url,
+                AppComponent,
+                E404Component,
+                PageComponent,
             }
         }
     )
