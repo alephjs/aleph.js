@@ -5,7 +5,7 @@ const e501AppEl = React.createElement(
     ErrorPage,
     {
         status: 501,
-        text: 'app module should   default as a react component',
+        text: 'app module should export default as a react component',
         refreshButton: true
     }
 )
@@ -13,7 +13,7 @@ const e501PageEl = React.createElement(
     ErrorPage,
     {
         status: 501,
-        text: 'page module should   default as a react component',
+        text: 'page module should export default as a react component',
         refreshButton: true
     }
 )

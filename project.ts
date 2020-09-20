@@ -567,9 +567,7 @@ export default class Project {
             baseUrl,
             defaultLocale,
             locales: {},
-            dataModule: null,
-            appModule: null,
-            e404Module: null,
+            keyModules: {},
             pageModules: {}
         }
         const module = this._parseUrl('./main.js')
@@ -583,7 +581,7 @@ export default class Project {
         }))
         if (this.#modules.has('./data.js') || this.#modules.has('./data/index.js')) {
             const { id, url, hash } = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')!
-            config.dataModule = {
+            config.keyModules.data = {
                 moduleId: id,
                 hash
             }
@@ -591,7 +589,7 @@ export default class Project {
         }
         if (this.#modules.has('./app.js')) {
             const { url, hash } = this.#modules.get('./app.js')!
-            config.appModule = {
+            config.keyModules.app = {
                 moduleId: './app.js',
                 hash
             }
@@ -599,7 +597,7 @@ export default class Project {
         }
         if (this.#modules.has('./404.js')) {
             const { url, hash } = this.#modules.get('./404.js')!
-            config.e404Module = {
+            config.keyModules['404'] = {
                 moduleId: './404.js',
                 hash
             }

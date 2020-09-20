@@ -191,14 +191,10 @@ export async function bootstrap({
     baseUrl,
     defaultLocale,
     locales,
-    dataModule,
-    appModule,
-    e404Module,
+    keyModules,
     pageModules
 }: AppManifest & {
-    dataModule: Module | null
-    appModule: Module | null
-    e404Module: Module | null
+    keyModules: Record<string, Module>
     pageModules: Record<string, Module>
 }) {
     const { document } = window as any
@@ -231,9 +227,9 @@ export async function bootstrap({
         { default: E404Component },
         { default: PageComponent }
     ] = await Promise.all([
-        dataModule ? import(getModuleImportUrl(baseUrl, dataModule)) : Promise.resolve({ default: {} }),
-        appModule ? import(getModuleImportUrl(baseUrl, appModule)) : Promise.resolve({}),
-        e404Module ? import(getModuleImportUrl(baseUrl, e404Module)) : Promise.resolve({}),
+        keyModules.data ? import(getModuleImportUrl(baseUrl, keyModules.data)) : Promise.resolve({ default: {} }),
+        keyModules.app ? import(getModuleImportUrl(baseUrl, keyModules.app)) : Promise.resolve({}),
+        keyModules['404'] ? import(getModuleImportUrl(baseUrl, keyModules['404'])) : Promise.resolve({}),
         pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({}),
     ])
     const el = React.createElement(
