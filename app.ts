@@ -28,13 +28,16 @@ function ALEPH({ config }: {
 }) {
     const [manifest, setManifest] = useState(() => config.manifest)
     const [data, setData] = useState(() => config.data)
+    const [e404, setE404] = useState(() => ({
+        Component: config.E404Component && util.isLikelyReactComponent(config.E404Component) ? config.E404Component : E404Page
+    }))
     const [app, setApp] = useState(() => ({
         Component: config.AppComponent ? (util.isLikelyReactComponent(config.AppComponent) ? config.AppComponent : E501App) : null
     }))
     const [pageModules, setPageModules] = useState(() => config.pageModules)
     const [page, setPage] = useState(() => ({
         url: config.url,
-        Component: config.PageComponent ? (util.isLikelyReactComponent(config.PageComponent) ? config.PageComponent : E501Page) : (config.E404Component || E404Page)
+        Component: config.PageComponent ? (util.isLikelyReactComponent(config.PageComponent) ? config.PageComponent : E501Page) : null
     }))
     const onpopstate = useCallback(async () => {
         const { baseUrl, defaultLocale, locales } = manifest
@@ -58,10 +61,7 @@ function ALEPH({ config }: {
                 })
             }
         } else {
-            setPage({
-                url,
-                Component: config.E404Component || E404Page
-            })
+            setPage({ url })
         }
     }, [manifest, pageModules])
 
@@ -82,7 +82,14 @@ function ALEPH({ config }: {
             setData(data)
         }
         const onAddModule = async ({ moduleId, hash }: Module) => {
-            if (moduleId === './app.js') {
+            if (moduleId === './404.js') {
+                const { default: Component } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
+                if (util.isLikelyReactComponent(Component)) {
+                    setE404({ Component })
+                } else {
+                    setE404({ Component: E404Page })
+                }
+            } else if (moduleId === './app.js') {
                 const { default: Component } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
                 if (util.isLikelyReactComponent(Component)) {
                     setApp({ Component })
@@ -104,7 +111,9 @@ function ALEPH({ config }: {
             }
         }
         const onRemoveModule = (moduleId: string) => {
-            if (moduleId === './app.js') {
+            if (moduleId === './404.js') {
+                setE404({ Component: E404Page })
+            } else if (moduleId === './app.js') {
                 setApp({})
             } else if (moduleId === './data.js' || moduleId === './data/index.js') {
                 console.log('[DATA]', {})
@@ -134,7 +143,7 @@ function ALEPH({ config }: {
         }
     }, [manifest])
 
-    const pageEl = React.createElement(page.Component)
+    const pageEl = React.createElement(page.Component || e404.Component)
     return React.createElement(
         AppManifestContext.Provider,
         { value: manifest },
