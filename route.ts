@@ -1,30 +1,13 @@
-import type { Location, RouterURL } from './types.ts'
+import type { RouterURL } from './types.ts'
 import util from './util.ts'
 
 export default function route(base: string, pagePaths: string[], options?: { location?: { pathname: string, search?: string }, fallback?: string, defaultLocale?: string, locales?: string[] }): RouterURL {
-    const { pathname, search }: Location = (options?.location || (window as any).location || { pathname: '/' })
-    const asPath = util.cleanPath(util.trimPrefix(pathname, base))
-    const query: Record<string, string | string[]> = {}
-
-    if (search) {
-        const segs = util.trimPrefix(search, '?').split('&')
-        segs.forEach(seg => {
-            const [key, value] = util.splitBy(seg, '=')
-            if (key in query) {
-                const prevValue = query[key]
-                if (util.isArray(prevValue)) {
-                    prevValue.push(value)
-                } else {
-                    query[key] = [prevValue, value]
-                }
-            } else {
-                query[key] = value
-            }
-        })
-    }
+    const loc = (options?.location || (window as any).location || { pathname: '/' })
+    const pathname = util.cleanPath(util.trimPrefix(loc.pathname, base))
+    const query = new URLSearchParams(loc.search)
 
     let locale = options?.defaultLocale || 'en'
-    let asPagePath = asPath
+    let asPagePath = pathname
     let pagePath = ''
     let params: Record<string, string> = {}
 
@@ -49,7 +32,7 @@ export default function route(base: string, pagePaths: string[], options?: { loc
         pagePath = options?.fallback
     }
 
-    return { locale, pathname: asPath, pagePath, params, query }
+    return { locale, pathname, pagePath, params, query }
 }
 
 function matchPath(routePath: string, locPath: string): [Record<string, string>, boolean] {

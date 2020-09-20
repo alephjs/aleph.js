@@ -22,7 +22,7 @@ export interface RouterURL {
     pathname: string
     pagePath: string
     params: Record<string, string>
-    query: Record<string, string | string[]>
+    query: URLSearchParams
 }
 
 export interface Location {
@@ -39,7 +39,7 @@ export interface APIRequest {
     readonly headers: Headers
     readonly cookies: ReadonlyMap<string, string>
     readonly params: ReadonlyMap<string, string>
-    readonly query: Record<string, string | string[]>
+    readonly query: URLSearchParams
 }
 
 export interface APIResponse {

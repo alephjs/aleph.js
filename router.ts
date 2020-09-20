@@ -2,11 +2,11 @@ import React, { ComponentType, createContext, useContext } from 'https://esm.sh/
 import type { RouterURL } from './types.ts'
 
 export const RouterContext = createContext<RouterURL>({
+    locale: 'en',
     pagePath: '/',
     pathname: '/',
     params: {},
-    query: {},
-    locale: 'en'
+    query: new URLSearchParams(),
 })
 RouterContext.displayName = 'RouterContext'
 

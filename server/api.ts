@@ -1,14 +1,14 @@
-import type { APIRequest, APIResponse } from '../types.ts'
 import type { ServerRequest } from '../deps.ts'
+import type { APIRequest, APIResponse } from '../types.ts'
 
 export class PostAPIRequest implements APIRequest {
     #req: ServerRequest
 
     cookies: ReadonlyMap<string, string>
     params: ReadonlyMap<string, string>
-    query: Record<string, string | string[]>
+    query: URLSearchParams
 
-    constructor(req: ServerRequest, params: Record<string, string>, query: Record<string, string | string[]>) {
+    constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams) {
         this.#req = req
 
         const paramsMap = new Map<string, string>()
