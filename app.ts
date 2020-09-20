@@ -28,13 +28,13 @@ function ALEPH({ config }: {
 }) {
     const [manifest, setManifest] = useState(() => config.manifest)
     const [data, setData] = useState(() => config.data)
+    const [pageModules, setPageModules] = useState(() => config.pageModules)
     const [e404, setE404] = useState(() => ({
         Component: config.E404Component && util.isLikelyReactComponent(config.E404Component) ? config.E404Component : E404Page
     }))
     const [app, setApp] = useState(() => ({
         Component: config.AppComponent ? (util.isLikelyReactComponent(config.AppComponent) ? config.AppComponent : E501App) : null
     }))
-    const [pageModules, setPageModules] = useState(() => config.pageModules)
     const [page, setPage] = useState(() => ({
         url: config.url,
         Component: config.PageComponent ? (util.isLikelyReactComponent(config.PageComponent) ? config.PageComponent : E501Page) : null

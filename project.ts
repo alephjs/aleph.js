@@ -177,7 +177,7 @@ export default class Project {
             }
         )
         if (url.pagePath === '') {
-            return [200, this.getSPAIndexHtml()]
+            return [200, this.getDefaultIndexHtml()]
         }
 
         const mainModule = this.#modules.get('./main.js')!
@@ -195,7 +195,7 @@ export default class Project {
         return [code, html]
     }
 
-    getSPAIndexHtml(): string {
+    getDefaultIndexHtml(): string {
         const { baseUrl, defaultLocale } = this.config
         const mainModule = this.#modules.get('./main.js')!
         const html = createHtml({
@@ -226,16 +226,6 @@ export default class Project {
         return {}
     }
 
-    async importModuleAsComponent(moduleId: string) {
-        if (this.#modules.has(moduleId)) {
-            const { default: Component } = await import(this.#modules.get(moduleId)!.jsFile)
-            if (util.isLikelyReactComponent(Component)) {
-                return { Component }
-            }
-        }
-        return {}
-    }
-
     async build() {
         const start = performance.now()
         const outputDir = path.join(this.srcDir, this.config.outputDir)
@@ -246,7 +236,7 @@ export default class Project {
                 outputModules.add(moduleId)
                 const { deps } = this.#modules.get(moduleId)!
                 deps.forEach(({ url }) => {
-                    const { id } = this._parseUrl(url)
+                    const { id } = this._newModule(url)
                     lookup(id)
                 })
             }
@@ -292,9 +282,9 @@ export default class Project {
                 await writeTextFile(htmlFile, html)
             }
             const fallback = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '404.html')
-            await writeTextFile(fallback, this.getSPAIndexHtml())
+            await writeTextFile(fallback, this.getDefaultIndexHtml())
         } else {
-            await writeTextFile(path.join(outputDir, 'index.html'), this.getSPAIndexHtml())
+            await writeTextFile(path.join(outputDir, 'index.html'), this.getDefaultIndexHtml())
         }
 
         // copy public files
@@ -561,6 +551,27 @@ export default class Project {
         }
     }
 
+    private _newModule(url: string): Module {
+        const { importMap } = this.config
+        const isRemote = reHttp.test(url) || (url in importMap.imports && reHttp.test(importMap.imports[url]))
+        const sourceFilePath = renameImportUrl(url)
+        const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : '.' + sourceFilePath).replace(reModuleExt, '.js')
+
+        return {
+            id,
+            url,
+            isRemote,
+            sourceFilePath,
+            sourceType: path.extname(sourceFilePath).slice(1).replace('mjs', 'js') || 'js',
+            sourceHash: '',
+            deps: [],
+            jsFile: '',
+            jsContent: '',
+            jsSourceMap: '',
+            hash: '',
+        } as Module
+    }
+
     private async _createMainModule(): Promise<Module> {
         const { baseUrl, defaultLocale } = this.config
         const config: Record<string, any> = {
@@ -570,7 +581,7 @@ export default class Project {
             keyModules: {},
             pageModules: {}
         }
-        const module = this._parseUrl('./main.js')
+        const module = this._newModule('./main.js')
         const deps = [
             'https://deno.land/x/aleph/vendor/tslib/tslib.js',
             'https://deno.land/x/aleph/app.ts',
@@ -634,29 +645,8 @@ export default class Project {
         return module
     }
 
-    private _parseUrl(url: string): Module {
-        const { importMap } = this.config
-        const isRemote = reHttp.test(url) || (url in importMap.imports && reHttp.test(importMap.imports[url]))
-        const sourceFilePath = renameImportUrl(url)
-        const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : '.' + sourceFilePath).replace(reModuleExt, '.js')
-
-        return {
-            id,
-            url,
-            isRemote,
-            sourceFilePath,
-            sourceType: path.extname(sourceFilePath).slice(1).replace('mjs', 'js') || 'js',
-            sourceHash: '',
-            deps: [],
-            jsFile: '',
-            jsContent: '',
-            jsSourceMap: '',
-            hash: '',
-        } as Module
-    }
-
     private async _compile(url: string, options?: { sourceCode?: string, implicitDeps?: { url: string, hash: string }[], forceCompile?: boolean }) {
-        const mod = this._parseUrl(url)
+        const mod = this._newModule(url)
         if (this.#modules.has(mod.id) && !options?.forceCompile) {
             return this.#modules.get(mod.id)!
         }
@@ -996,25 +986,25 @@ export default class Project {
     private async _renderPage(url: RouterURL) {
         const start = performance.now()
         const ret: RenderResult = { code: 200, head: [], body: '<main></main>' }
-        const pm = this.#pageModules.get(url.pagePath)!
-        if (pm.rendered.has(url.pathname)) {
-            const cache = pm.rendered.get(url.pathname)!
+        const page = this.#pageModules.get(url.pagePath)!
+        if (page.rendered.has(url.pathname)) {
+            const cache = page.rendered.get(url.pathname)!
             return { ...cache }
         }
         try {
             const appModule = this.#modules.get('./app.js')
-            const pageModule = this.#modules.get(pm.moduleId)!
+            const pageModule = this.#modules.get(page.moduleId)!
             const [
                 { renderPage, renderHead },
-                app,
-                page
+                { default: App },
+                { default: Page }
             ] = await Promise.all([
                 import(this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile),
-                appModule ? this.importModuleAsComponent('./app.js') : Promise.resolve({}),
-                this.importModuleAsComponent(pm.moduleId)
+                appModule ? await import(appModule.jsFile) : Promise.resolve({}),
+                await import(pageModule.jsFile)
             ])
             const data = await this.getData()
-            const html = renderPage(data, url, appModule ? app : undefined, page)
+            const html = renderPage(data, url, appModule ? App : undefined, Page)
             const head = renderHead([
                 pageModule.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)),
                 appModule?.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url))
@@ -1022,7 +1012,7 @@ export default class Project {
             ret.code = 200
             ret.head = head
             ret.body = `<main>${html}</main>`
-            pm.rendered.set(url.pathname, { ...ret })
+            page.rendered.set(url.pathname, { ...ret })
             log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
         } catch (err) {
             ret.code = 500

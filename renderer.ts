@@ -10,11 +10,11 @@ export { renderHead } from './head.ts'
 export function renderPage(
     data: Record<string, any>,
     url: RouterURL,
-    App: { Component: ComponentType<any> } | undefined,
-    Page: { Component: ComponentType<any> },
+    App: ComponentType<any> | undefined,
+    Page: ComponentType<any>,
 ) {
-    const pageEl = React.createElement(util.isLikelyReactComponent(Page.Component) ? Page.Component : E501Page)
-    const appEl = App ? (util.isLikelyReactComponent(App.Component) ? React.createElement(App.Component, null, pageEl) : React.createElement(E501App)) : pageEl
+    const pageEl = React.createElement(util.isLikelyReactComponent(Page) ? Page : E501Page)
+    const appEl = App ? (util.isLikelyReactComponent(App) ? React.createElement(App, null, pageEl) : React.createElement(E501App)) : pageEl
     return ReactDomServer.renderToString(React.createElement(
         DataContext.Provider,
         { value: data },
