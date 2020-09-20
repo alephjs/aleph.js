@@ -3,7 +3,11 @@ export interface Config {
     readonly outputDir: string
     readonly baseUrl: string
     readonly defaultLocale: string
-    readonly ssr: boolean | { include?: string[], exclude?: string[] }
+    readonly ssr: boolean | {
+        fallback?: string,
+        include?: string[],
+        exclude?: string[]
+    }
     readonly buildTarget: string
     readonly sourceMap: boolean
     readonly importMap: {

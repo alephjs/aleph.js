@@ -53,7 +53,9 @@ export default class Project {
             outputDir: '/dist',
             baseUrl: '/',
             defaultLocale: 'en',
-            ssr: true,
+            ssr: {
+                fallback: 'fallback.html'
+            },
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
             importMap: {
@@ -274,15 +276,17 @@ export default class Project {
             await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), `export default ${JSON.stringify(data)}`)
         }
 
-        if (this.config.ssr) {
+        const { ssr } = this.config
+        if (ssr) {
+            const fallback = ((util.isPlainObject(ssr) && ssr.fallback ? util.trimSuffix(ssr.fallback, '.html') : '') || 'fallback') + '.html'
+            await writeTextFile(path.join(outputDir, fallback), this.getSPAIndexHtml())
             for (const pathname of this.#pageModules.keys()) {
                 const [_, html] = await this.getPageHtml({ pathname })
                 const htmlFile = path.join(outputDir, pathname, 'index.html')
                 await writeTextFile(htmlFile, html)
             }
         } else {
-            const html = this.getSPAIndexHtml()
-            await writeTextFile(path.join(outputDir, 'index.html'), html)
+            await writeTextFile(path.join(outputDir, 'index.html'), this.getSPAIndexHtml())
         }
 
         // copy public files
