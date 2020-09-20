@@ -254,6 +254,15 @@ export default class Project {
         }
         await Promise.all([outputDir, distDir].map(dir => ensureDir(dir)))
 
+        // copy public files
+        const publicDir = path.join(this.rootDir, 'public')
+        if (util.existsDir(publicDir)) {
+            for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
+                const rp = path.resolve(util.trimPrefix(p, publicDir))
+                await Deno.copyFile(p, path.join(outputDir, rp))
+            }
+        }
+
         // write modules
         const { sourceMap } = this.config
         await Promise.all(Array.from(outputModules).map((moduleId) => {
@@ -287,15 +296,6 @@ export default class Project {
             await writeTextFile(path.join(outputDir, 'index.html'), this.getDefaultIndexHtml())
         }
 
-        // copy public files
-        const publicDir = path.join(this.rootDir, 'public')
-        if (util.existsDir(publicDir)) {
-            for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
-                const rp = path.resolve(util.trimPrefix(p, publicDir))
-                await Deno.copyFile(p, path.join(outputDir, rp))
-            }
-        }
-
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
@@ -312,43 +312,62 @@ export default class Project {
             Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
         }
 
-        const configFile = path.join(this.rootDir, 'aleph.config.json')
-        if (util.existsFile(configFile)) {
-            const {
-                srcDir,
-                ouputDir,
-                baseUrl,
-                ssr,
-                buildTarget,
-                sourceMap,
-                defaultLocale
-            } = JSON.parse(await Deno.readTextFile(configFile))
-            if (util.isNEString(srcDir)) {
-                Object.assign(this.config, { srcDir: util.cleanPath(srcDir) })
+        const config: Record<string, any> = {}
+        for await (const { path: p } of walk(this.srcDir, { includeDirs: false, exts: ['.js', '.mjs', '.ts', '.json'], skip: [/\.d\.ts$/i], maxDepth: 1 })) {
+            const name = path.basename(p)
+            if (name.split('.')[0] === 'config') {
+                if (name.endsWith('.json')) {
+                    try {
+                        const conf = JSON.parse(await Deno.readTextFile(p))
+                        Object.assign(config, conf)
+                        log.debug(name, config)
+                    } catch (e) {
+                        log.fatal('parse config.json:', e.message)
+                    }
+                } else {
+                    const { default: conf } = await import(p)
+                    if (util.isPlainObject(conf)) {
+                        Object.assign(config, conf)
+                        log.debug(name, config)
+                    }
+                }
             }
-            if (util.isNEString(ouputDir)) {
-                Object.assign(this.config, { ouputDir: util.cleanPath(ouputDir) })
-            }
-            if (util.isNEString(baseUrl)) {
-                Object.assign(this.config, { baseUrl: util.cleanPath(encodeURI(baseUrl)) })
-            }
-            if (util.isNEString(defaultLocale)) {
-                Object.assign(this.config, { defaultLocale })
-            }
-            if (typeof ssr === 'boolean') {
-                Object.assign(this.config, { ssr })
-            } else if (util.isPlainObject(ssr)) {
-                const fallback = util.isNEString(ssr.fallback) ? ssr.fallback : '404.html'
-                const include = util.isArray(ssr.include) ? ssr.include : []
-                const exclude = util.isArray(ssr.exclude) ? ssr.exclude : []
-                Object.assign(this.config, { ssr: { fallback, include, exclude } })
-            }
-            if (/^es(20\d{2}|next)$/i.test(buildTarget)) {
-                Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
-            }
-            if (typeof sourceMap === 'boolean') {
-                Object.assign(this.config, { sourceMap })
-            }
+        }
+
+        const {
+            srcDir,
+            ouputDir,
+            baseUrl,
+            ssr,
+            buildTarget,
+            sourceMap,
+            defaultLocale
+        } = config
+        if (util.isNEString(srcDir)) {
+            Object.assign(this.config, { srcDir: util.cleanPath(srcDir) })
+        }
+        if (util.isNEString(ouputDir)) {
+            Object.assign(this.config, { ouputDir: util.cleanPath(ouputDir) })
+        }
+        if (util.isNEString(baseUrl)) {
+            Object.assign(this.config, { baseUrl: util.cleanPath(encodeURI(baseUrl)) })
+        }
+        if (util.isNEString(defaultLocale)) {
+            Object.assign(this.config, { defaultLocale })
+        }
+        if (typeof ssr === 'boolean') {
+            Object.assign(this.config, { ssr })
+        } else if (util.isPlainObject(ssr)) {
+            const fallback = util.isNEString(ssr.fallback) ? ssr.fallback : '404.html'
+            const include = util.isArray(ssr.include) ? ssr.include : []
+            const exclude = util.isArray(ssr.exclude) ? ssr.exclude : []
+            Object.assign(this.config, { ssr: { fallback, include, exclude } })
+        }
+        if (/^es(20\d{2}|next)$/i.test(buildTarget)) {
+            Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
+        }
+        if (typeof sourceMap === 'boolean') {
+            Object.assign(this.config, { sourceMap })
         }
     }
 
