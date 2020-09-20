@@ -19,12 +19,9 @@ const e501PageEl = React.createElement(
 )
 const e404PageEl = React.createElement(ErrorPage, { status: 404 })
 
-export function E501App() {
-    return e501AppEl
-}
-
-export function E501Page() {
-    return e501PageEl
+export const E501 = {
+    App: () => e501AppEl,
+    Page: () => e501PageEl
 }
 
 export function E404Page() {

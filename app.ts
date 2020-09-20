@@ -1,7 +1,7 @@
 import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { DataContext } from './data.ts'
-import { E404Page, E501App, E501Page } from './error.ts'
+import { E404Page, E501 } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
@@ -15,30 +15,38 @@ export const AppManifestContext = createContext<AppManifest>({
 })
 AppManifestContext.displayName = 'AppManifestContext'
 
-function ALEPH({ config }: {
-    config: {
+function ALEPH({ initial }: {
+    initial: {
         manifest: AppManifest
-        data: Record<string, any>
         pageModules: Record<string, { moduleId: string, hash: string }>
         url: RouterURL
-        AppComponent?: ComponentType<any>
-        E404Component?: ComponentType<any>
-        PageComponent?: ComponentType<any>
+        data: Record<string, any>
+        components: Record<string, ComponentType<any>>
     }
 }) {
-    const [manifest, setManifest] = useState(() => config.manifest)
-    const [data, setData] = useState(() => config.data)
-    const [pageModules, setPageModules] = useState(() => config.pageModules)
-    const [e404, setE404] = useState(() => ({
-        Component: config.E404Component && util.isLikelyReactComponent(config.E404Component) ? config.E404Component : E404Page
-    }))
-    const [app, setApp] = useState(() => ({
-        Component: config.AppComponent ? (util.isLikelyReactComponent(config.AppComponent) ? config.AppComponent : E501App) : null
-    }))
-    const [page, setPage] = useState(() => ({
-        url: config.url,
-        Component: config.PageComponent ? (util.isLikelyReactComponent(config.PageComponent) ? config.PageComponent : E501Page) : null
-    }))
+    const [manifest, setManifest] = useState(() => initial.manifest)
+    const [data, setData] = useState(() => initial.data)
+    const [pageModules, setPageModules] = useState(() => initial.pageModules)
+    const [e404, setE404] = useState(() => {
+        const { E404 } = initial.components
+        return {
+            Component: E404 && util.isLikelyReactComponent(E404) ? E404 : E404Page
+        }
+    })
+    const [app, setApp] = useState(() => {
+        const { App } = initial.components
+        return {
+            Component: App ? (util.isLikelyReactComponent(App) ? App : E501.App) : null
+        }
+    })
+    const [page, setPage] = useState(() => {
+        const { components, url } = initial
+        const { Page } = components
+        return {
+            url,
+            Component: Page ? (util.isLikelyReactComponent(Page) ? Page : E501.Page) : null
+        }
+    })
     const onpopstate = useCallback(async () => {
         const { baseUrl, defaultLocale, locales } = manifest
         const url = route(
@@ -57,7 +65,7 @@ function ALEPH({ config }: {
             } else {
                 setPage({
                     url,
-                    Component: E501Page
+                    Component: E501.Page
                 })
             }
         } else {
@@ -95,7 +103,7 @@ function ALEPH({ config }: {
                     setApp({ Component })
                 } else {
                     setPage({
-                        Component: E501App
+                        Component: E501.App
                     })
                 }
             } else if (moduleId === './data.js' || moduleId === './data/index.js') {
@@ -232,9 +240,9 @@ export async function bootstrap({
     const pageModule = pageModules[url.pagePath]!
     const [
         { default: data },
-        { default: AppComponent },
-        { default: E404Component },
-        { default: PageComponent }
+        { default: App },
+        { default: E404 },
+        { default: Page }
     ] = await Promise.all([
         keyModules.data ? import(getModuleImportUrl(baseUrl, keyModules.data)) : Promise.resolve({ default: {} }),
         keyModules.app ? import(getModuleImportUrl(baseUrl, keyModules.app)) : Promise.resolve({}),
@@ -244,14 +252,12 @@ export async function bootstrap({
     const el = React.createElement(
         ALEPH,
         {
-            config: {
+            initial: {
                 manifest: { baseUrl, defaultLocale, locales },
-                data,
                 pageModules,
                 url,
-                AppComponent,
-                E404Component,
-                PageComponent,
+                data,
+                components: { E404, App, Page }
             }
         }
     )
