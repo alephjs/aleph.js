@@ -1,5 +1,6 @@
 <div align="center">
-    <img src="./examples/hello-world/public/logo.png" height=90 />
+    <br/>
+    <img src="./examples/hello-world/public/logo.png" height="90" height="90"/>
     <br/>
     <br/>
 </div>
