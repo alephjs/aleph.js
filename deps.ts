@@ -1,3 +1,6 @@
+
+export { minify } from 'http://localhost/[terser@5.3.2,typescript@4.0.3]/terser'
+export { default as ts } from 'http://localhost/[terser@5.3.2,typescript@4.0.3]/typescript'
 export { Tar, Untar } from 'https://deno.land/std@0.70.0/archive/tar.ts'
 export * as colors from 'https://deno.land/std@0.70.0/fmt/colors.ts'
 export { ensureDir } from 'https://deno.land/std@0.70.0/fs/ensure_dir.ts'
@@ -11,7 +14,4 @@ export * as ws from 'https://deno.land/std@0.70.0/ws/mod.ts'
 export { gzipDecode, gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 export { default as AnsiUp } from './vendor/ansi-up/ansi-up.ts'
 export { default as less } from './vendor/less/less.js'
-export { minify } from './vendor/terser/terser.js'
-// @deno-types="./vendor/typescript/lib/typescript.d.ts"
-export { default as ts } from './vendor/typescript/lib/typescript.js'
 import './vendor/clean-css-builds/v4.2.2.js'

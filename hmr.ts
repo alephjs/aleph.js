@@ -1,6 +1,6 @@
+import runtime from 'https://esm.sh/react-refresh/runtime?dev'
 import events from './events.ts'
 import util, { hashShort } from './util.ts'
-import runtime from './vendor/react-refresh/runtime.js'
 
 interface Callback {
     (...args: any[]): void

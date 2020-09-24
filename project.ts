@@ -712,8 +712,24 @@ export default class Project {
                     break
                 }
             }
+            if (dlUrl.startsWith('https://esm.sh/[')) {
+                dlUrl.replace(/\[([^\]]+)\]/, (_, s: string) => {
+                    const list = s.split(',').map(s => s.trim())
+                    if (list.length > 0) {
+                        const mod = util.trimPrefix(url, 'https://esm.sh/').replace(/\/+$/, '')
+                        if (!list.includes(mod)) {
+                            dlUrl = url
+                        }
+                    }
+                    return _
+                })
+            }
             if (this.isDev && url.startsWith('https://esm.sh/')) {
-                dlUrl += '?env=development'
+                const u = new URL(dlUrl)
+                if (!u.searchParams.has('dev')) {
+                    u.searchParams.set('env', 'development')
+                }
+                dlUrl = u.toString()
             }
             if (mod.sourceHash === '') {
                 log.info('Download', url, dlUrl != url ? colors.dim(`• ${dlUrl}`) : '')
@@ -821,7 +837,7 @@ export default class Project {
                     reactRefresh: this.isDev && !mod.isRemote && (mod.id === './404.js' || mod.id === './app.js' || mod.id.startsWith('./pages/') || mod.id.startsWith('./components/')),
                     rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path),
                 }
-                const { diagnostics, outputText, sourceMapText } = compile(mod.url, sourceContent, compileOptions)
+                const { diagnostics, outputText, sourceMapText } = compile(mod.sourceFilePath, sourceContent, compileOptions)
                 if (diagnostics && diagnostics.length > 0) {
                     throw new Error(`compile ${url}: ${diagnostics.map(d => d.messageText).join(' ')}`)
                 }
@@ -840,8 +856,14 @@ export default class Project {
                             content: sourceMapText!,
                         }
                     })
-                    mod.jsContent = code
-                    mod.jsSourceMap = map
+                    if (code) {
+                        mod.jsContent = code
+                    } else {
+                        mod.jsContent = jsContent
+                    }
+                    if (util.isNEString(map)) {
+                        mod.jsSourceMap = map
+                    }
                 }
                 mod.hash = (new Sha1).update(mod.jsContent).hex()
             }
@@ -1057,7 +1079,7 @@ function renameImportUrl(importUrl: string): string {
     const ext = path.extname(path.basename(url.pathname)) || '.js'
     let pathname = util.trimSuffix(url.pathname, ext)
     if (url.search) {
-        pathname += '/' + btoa(url.search).replace(/[\.\/=]/g, '')
+        pathname += '@' + btoa(url.search).replace(/\//g, '_').replace(/=/g, '')
     }
     if (isRemote) {
         return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
