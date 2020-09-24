@@ -1,12 +1,12 @@
 <div align="center">
     <br/>
-    <img src="./examples/hello-world/public/logo.png" height="90" height="90"/>
+    <img src="./examples/hello-world/public/logo.png" width="90" height="90" />
     <br/>
     <br/>
 </div>
 
 # AlephJS
-A radical new Front-End Framework in [deno](https://deno.land), inspired by [next.js](https://nextjs.org) and [snowpack](https://www.snowpack.dev).
+A radical new Front-End Framework with React in [Deno](https://deno.land), inspired by [next.js](https://nextjs.org) and [snowpack](https://www.snowpack.dev).
 
 🚧 This project is work in progress.
 
