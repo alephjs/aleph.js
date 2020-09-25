@@ -724,12 +724,13 @@ export default class Project {
                     return _
                 })
             }
-            if (this.isDev && url.startsWith('https://esm.sh/')) {
+            if (url.startsWith('https://esm.sh/')) {
                 const u = new URL(dlUrl)
-                if (!u.searchParams.has('dev')) {
-                    u.searchParams.set('env', 'development')
+                u.searchParams.set('target', this.config.buildTarget)
+                if (this.isDev && !u.searchParams.has('dev')) {
+                    u.searchParams.set('dev', '')
                 }
-                dlUrl = u.toString()
+                dlUrl = u.toString().replace(/=(&|$)/, '$1')
             }
             if (mod.sourceHash === '') {
                 log.info('Download', url, dlUrl != url ? colors.dim(`• ${dlUrl}`) : '')
@@ -1078,8 +1079,9 @@ function renameImportUrl(importUrl: string): string {
     const url = new URL(isRemote ? importUrl : 'file://' + path.resolve('/', importUrl))
     const ext = path.extname(path.basename(url.pathname)) || '.js'
     let pathname = util.trimSuffix(url.pathname, ext)
-    if (url.search) {
-        pathname += '@' + btoa(url.search).replace(/\//g, '_').replace(/=/g, '')
+    let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
+    if (search.length > 0) {
+        pathname += '@' + search.join(',')
     }
     if (isRemote) {
         return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
