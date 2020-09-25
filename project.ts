@@ -1,4 +1,4 @@
-import { AnsiUp, colors, ensureDir, less, minify, path, Sha1, walk } from './deps.ts'
+import { colors, ensureDir, less, minify, path, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
@@ -1059,7 +1059,7 @@ export default class Project {
         } catch (err) {
             ret.code = 500
             ret.head = ['<title>500 Error - Aleph.js</title>']
-            ret.body = `<main><pre>${AnsiUp.ansi_to_html(err.stack)}</pre></main>`
+            ret.body = `<main><pre>${err.stack}</pre></main>`
             log.error(err.stack)
         }
         return ret
