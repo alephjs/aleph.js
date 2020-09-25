@@ -212,7 +212,7 @@ export default class Project {
     async getData() {
         const mod = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')
         if (mod) {
-            const { default: Data } = await import("file://" + "file://" + mod.jsFile)
+            const { default: Data } = await import("file://" + mod.jsFile)
             let data: any = Data
             if (util.isFunction(Data)) {
                 data = await Data()
