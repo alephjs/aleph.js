@@ -159,7 +159,7 @@ export default class Project {
         if (path) {
             const importPath = '.' + path + '.js'
             if (this.#modules.has(importPath)) {
-                const { default: handle } = await import(this.#modules.get(importPath)!.jsFile)
+                const { default: handle } = await import("file://" + this.#modules.get(importPath)!.jsFile)
                 return handle
             }
         }
@@ -212,7 +212,7 @@ export default class Project {
     async getData() {
         const mod = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')
         if (mod) {
-            const { default: Data } = await import(mod.jsFile)
+            const { default: Data } = await import("file://" + "file://" + mod.jsFile)
             let data: any = Data
             if (util.isFunction(Data)) {
                 data = await Data()
@@ -325,7 +325,7 @@ export default class Project {
                         log.fatal('parse config.json:', e.message)
                     }
                 } else {
-                    const { default: conf } = await import(p)
+                    const { default: conf } = await import("file://" + p)
                     if (util.isPlainObject(conf)) {
                         Object.assign(config, conf)
                         log.debug(name, config)
@@ -1041,9 +1041,9 @@ export default class Project {
                 { default: App },
                 { default: Page }
             ] = await Promise.all([
-                import(this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile),
-                appModule ? await import(appModule.jsFile) : Promise.resolve({}),
-                await import(pageModule.jsFile)
+                import("file://" + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile),
+                appModule ? await import("file://" + appModule.jsFile) : Promise.resolve({}),
+                await import("file://" + pageModule.jsFile)
             ])
             const data = await this.getData()
             const html = renderPage(data, url, appModule ? App : undefined, Page)
