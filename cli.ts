@@ -80,8 +80,9 @@ async function main() {
     }
 
     // sets log level
-    if (argOptions.l || argOptions.log) {
-        log.setLevel(String(argOptions.l || argOptions.log))
+    const l = argOptions.l || argOptions.log
+    if (util.isNEString(l)) {
+        log.setLevel(l)
     }
 
     // proxy https://deno.land/x/aleph
