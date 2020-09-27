@@ -69,7 +69,7 @@ function ALEPH({ initial }: {
                 })
             }
         } else {
-            setPage({ url })
+            setPage({ url, Component: null })
         }
     }, [manifest, pageModules])
 
@@ -102,9 +102,10 @@ function ALEPH({ initial }: {
                 if (util.isLikelyReactComponent(Component)) {
                     setApp({ Component })
                 } else {
-                    setPage({
+                    setPage(({ url }) => ({
+                        url,
                         Component: E501.App
-                    })
+                    }))
                 }
             } else if (moduleId === './data.js' || moduleId === './data/index.js') {
                 const { default: data } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
@@ -122,7 +123,7 @@ function ALEPH({ initial }: {
             if (moduleId === './404.js') {
                 setE404({ Component: E404Page })
             } else if (moduleId === './app.js') {
-                setApp({})
+                setApp({ Component: null })
             } else if (moduleId === './data.js' || moduleId === './data/index.js') {
                 console.log('[DATA]', {})
                 setData({})
