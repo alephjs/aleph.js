@@ -14,6 +14,6 @@ Options:
     -h, --help  Prints help message
 `
 
-export default function (appDir: string, options: Record<string, string | boolean>) {
-    start(appDir, parseInt(String(options.port || options.p)) || 8080, true)
+export default function (appDir: string, options: { port?: string, p?: string }) {
+    start(appDir, parseInt(options.port || options.p || '8080') || 8080, true)
 }

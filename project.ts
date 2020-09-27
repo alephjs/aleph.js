@@ -381,7 +381,7 @@ export default class Project {
         const pagesDir = path.join(this.srcDir, 'pages')
 
         if (!(util.existsDir(pagesDir))) {
-            log.fatal('please create some pages.')
+            log.fatal(`'pages' directory not found.`)
         }
 
         Object.assign(globalThis, {
