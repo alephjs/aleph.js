@@ -1,4 +1,4 @@
-import { ts } from '../deps.ts'
+import ts from 'https://esm.sh/typescript'
 
 export function CreatePlainTransformer(transform: (sf: ts.SourceFile, node: ts.Node, ...args: any[]) => ts.VisitResult<ts.Node>, ...args: any[]): ts.TransformerFactory<ts.SourceFile> {
     function nodeVisitor(ctx: ts.TransformationContext, sf: ts.SourceFile) {

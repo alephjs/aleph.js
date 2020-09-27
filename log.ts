@@ -1,4 +1,4 @@
-import { colors } from './deps.ts'
+import { colors } from './std.ts'
 
 export enum Level {
     Debug = 0,

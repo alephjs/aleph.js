@@ -1,7 +1,7 @@
-import { listenAndServe, path, ServerRequest } from './deps.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './server/mime.ts'
+import { listenAndServe, path, ServerRequest } from './std.ts'
 import util from './util.ts'
 import { version } from './version.ts'
 

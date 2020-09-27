@@ -1,4 +1,5 @@
-import { ensureDir, ensureFile, fromStreamReader, gzipDecode, path, Untar } from '../deps.ts'
+import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
+import { ensureDir, ensureFile, fromStreamReader, path, Untar } from '../std.ts'
 import util from '../util.ts'
 
 export const helpMessage = `Initiate a new aleph app.

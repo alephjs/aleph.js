@@ -1,11 +1,14 @@
-import { colors, ensureDir, less, minify, path, Sha1, walk } from './deps.ts'
+import { minify } from 'https://esm.sh/terser'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import route from './route.ts'
+import { colors, ensureDir, path, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { APIHandle, Config, Location, RouterURL } from './types.ts'
 import util, { hashShort } from './util.ts'
+import './vendor/clean-css-builds/v4.2.2.js'
+import less from './vendor/less/less.js'
 
 const reHttp = /^https?:\/\//i
 const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i

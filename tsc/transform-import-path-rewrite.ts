@@ -1,4 +1,4 @@
-import { ts } from '../deps.ts'
+import ts from 'https://esm.sh/typescript'
 
 /**
  * TS AST transformer to rewrite import path.

@@ -1,4 +1,4 @@
-import { ts } from '../deps.ts'
+import ts from 'https://esm.sh/typescript'
 import transformImportPathRewrite from './transform-import-path-rewrite.ts'
 import transformReactJsxSource from './transform-react-jsx-source.ts'
 import transformReactRefresh from './transform-react-refresh.ts'
