@@ -41,9 +41,11 @@ export default async function (appDir: string, options: Record<string, string | 
 
     log.info('Done')
     log.info('---')
-    log.info(`start(dev): ` + colors.bold(`aleph`) + ' dev ' + path.basename(appDir))
-    log.info(`start(prod): ` + colors.bold(`aleph`) + ' start ' + path.basename(appDir))
-    log.info(`build(prod): ` + colors.bold(`aleph`) + ' build ' + path.basename(appDir))
+    log.info(colors.dim('App is ready to Go.'))
+    log.info(`${colors.dim('$')} cd ` + path.basename(appDir))
+    log.info(`start(dev) : ${colors.dim('$')} ${colors.bold('aleph')} dev`)
+    log.info(`start(prod): ${colors.dim('$')} ${colors.bold('aleph')} start`)
+    log.info(`build(prod): ${colors.dim('$')} ${colors.bold('aleph')} build`)
     log.info('---')
     Deno.exit(0)
 }
