@@ -57,7 +57,10 @@ async function main() {
     // prints aleph.js and deno version
     if (argOptions.version) {
         const { deno, v8, typescript } = Deno.version
-        console.log(`aleph.js v${version}\ndeno v${deno}\nv8 v${v8}\ntypescript v${typescript}`)
+        console.log(`aleph.js ${version}`)
+        console.log(`deno ${deno}`)
+        console.log(`v8 ${v8}`)
+        console.log(`typescript ${typescript}`)
         Deno.exit(0)
     }
 
