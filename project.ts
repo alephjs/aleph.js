@@ -400,6 +400,7 @@ export default class Project {
             document: new Document(),
             innerWidth: 1920,
             innerHeight: 1080,
+            devicePixelRatio: 1,
             $RefreshReg$: () => { },
             $RefreshSig$: () => (type: any) => type,
         })
@@ -499,7 +500,7 @@ export default class Project {
                             }
                             let isDep = false
                             for (const { deps } of this.#modules.values()) {
-                                if (deps.findIndex(dep => dep.url === '.' + path) > -1) {
+                                if (deps.findIndex(dep => dep.url === './' + path) > -1) {
                                     isDep = true
                                     break
                                 }
