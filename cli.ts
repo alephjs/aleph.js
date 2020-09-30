@@ -1,7 +1,7 @@
-import { listenAndServe, path, ServerRequest } from './deps.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './server/mime.ts'
+import { listenAndServe, path, ServerRequest, walk } from './std.ts'
 import util from './util.ts'
 import { version } from './version.ts'
 
@@ -23,7 +23,7 @@ Options:
     -v, --version  Prints version number
 `
 
-function main() {
+async function main() {
     // parse deno args
     const args: Array<string> = []
     const argOptions: Record<string, string | boolean> = {}
@@ -80,8 +80,9 @@ function main() {
     }
 
     // sets log level
-    if (argOptions.l || argOptions.log) {
-        log.setLevel(String(argOptions.l || argOptions.log))
+    const l = argOptions.l || argOptions.log
+    if (util.isNEString(l)) {
+        log.setLevel(l)
     }
 
     // proxy https://deno.land/x/aleph
@@ -139,6 +140,23 @@ function main() {
                 })
                 log.info(`Proxy https://deno.land/x/aleph on http://localhost:${port}`)
             }
+        }
+    }
+
+    if (!hasCommand) {
+        const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.mjs', '.ts', '.tsx'], skip: [/\.d\.ts$/i], dep: 1 }
+        const pagesDir = path.join(path.resolve(args[0] || '.'), 'pages')
+        let hasIndexPage = false
+        if (util.existsDir(pagesDir)) {
+            for await (const { path: p } of walk(pagesDir, walkOptions)) {
+                if (path.basename(p).split('.')[0] === 'index') {
+                    hasIndexPage = true
+                }
+            }
+        }
+        if (!hasIndexPage) {
+            console.log(helpMessage)
+            Deno.exit(0)
         }
     }
 

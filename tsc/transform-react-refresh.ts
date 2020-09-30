@@ -4,7 +4,7 @@
  * @link https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js
  */
 
-import { ts } from '../deps.ts'
+import ts from 'https://esm.sh/typescript'
 
 const f = ts.factory
 

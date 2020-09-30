@@ -68,6 +68,10 @@ socket.addEventListener('open', () => {
     messageQueue.splice(0, messageQueue.length)
 })
 
+socket.addEventListener('close', () => {
+    location.reload()
+})
+
 socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
     if (rawData) {
         try {

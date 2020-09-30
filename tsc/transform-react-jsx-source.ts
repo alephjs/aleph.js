@@ -1,4 +1,4 @@
-import { ts } from '../deps.ts'
+import ts from 'https://esm.sh/typescript'
 
 /**
  * TypeScript AST Transformer that adds source file and line number to JSX elements.

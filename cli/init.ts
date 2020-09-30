@@ -1,5 +1,6 @@
-import { colors, ensureDir, ensureFile, fromStreamReader, gzipDecode, path, Untar } from '../deps.ts'
+import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from '../log.ts'
+import { colors, ensureDir, ensureFile, fromStreamReader, path, Untar } from '../std.ts'
 import util from '../util.ts'
 
 export const helpMessage = `Initiate a new aleph app.
@@ -38,11 +39,11 @@ export default async function (appDir: string, options: Record<string, string | 
         }
     }
 
+    log.info('Done')
     log.info('---')
     log.info(`start(dev): ` + colors.bold(`aleph`) + ' dev ' + path.basename(appDir))
     log.info(`start(prod): ` + colors.bold(`aleph`) + ' start ' + path.basename(appDir))
     log.info(`build(prod): ` + colors.bold(`aleph`) + ' build ' + path.basename(appDir))
     log.info('---')
-    log.info('Done')
     Deno.exit(0)
 }
