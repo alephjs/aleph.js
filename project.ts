@@ -8,6 +8,7 @@ import { compile } from './tsc/compile.ts'
 import type { APIHandle, Config, Location, RouterURL } from './types.ts'
 import util, { hashShort } from './util.ts'
 import './vendor/clean-css-builds/v4.2.2.js'
+import { Document } from './vendor/deno-dom/document.ts'
 import less from './vendor/less/less.js'
 
 const reHttp = /^https?:\/\//i
@@ -162,8 +163,12 @@ export default class Project {
         if (path) {
             const importPath = '.' + path + '.js'
             if (this.#modules.has(importPath)) {
-                const { default: handle } = await import("file://" + this.#modules.get(importPath)!.jsFile)
-                return handle
+                try {
+                    const { default: handle } = await import("file://" + this.#modules.get(importPath)!.jsFile)
+                    return handle
+                } catch (error) {
+                    log.error(error)
+                }
             }
         }
         return null
@@ -215,15 +220,19 @@ export default class Project {
     async getData() {
         const mod = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')
         if (mod) {
-            const { default: Data } = await import("file://" + mod.jsFile)
-            let data: any = Data
-            if (util.isFunction(Data)) {
-                data = await Data()
-            }
-            if (util.isPlainObject(data)) {
-                return data
-            } else {
-                log.warn(`module '${mod.url}' should return a plain object as default`)
+            try {
+                const { default: Data } = await import("file://" + mod.jsFile)
+                let data: any = Data
+                if (util.isFunction(Data)) {
+                    data = await Data()
+                }
+                if (util.isPlainObject(data)) {
+                    return data
+                } else {
+                    log.warn(`module '${mod.url}' should return a plain object as default`)
+                }
+            } catch (error) {
+                log.error(error)
             }
         }
         return {}
@@ -388,6 +397,9 @@ export default class Project {
             ALEPH_ENV: {
                 appDir: this.rootDir,
             },
+            document: new Document(),
+            innerWidth: 1920,
+            innerHeight: 1080,
             $RefreshReg$: () => { },
             $RefreshSig$: () => (type: any) => type,
         })
@@ -433,7 +445,7 @@ export default class Project {
         }
 
         const preCompileUrls = [
-            'https://deno.land/x/aleph/app.ts',
+            'https://deno.land/x/aleph/bootstrap.ts',
             'https://deno.land/x/aleph/renderer.ts',
             'https://deno.land/x/aleph/vendor/tslib/tslib.js',
         ]
@@ -646,7 +658,7 @@ export default class Project {
         module.jsContent = [
             this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
             'import "./-/deno.land/x/aleph/vendor/tslib/tslib.js";',
-            'import { bootstrap } from "./-/deno.land/x/aleph/app.js";',
+            'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js";',
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
         ].filter(Boolean).join(this.isDev ? '\n' : '')
         module.hash = (new Sha1()).update(module.jsContent).hex()
@@ -1036,18 +1048,28 @@ export default class Project {
             const cache = page.rendered.get(url.pathname)!
             return { ...cache }
         }
+        Object.assign(window, {
+            location: {
+                protocol: 'http:',
+                host: 'localhost',
+                hostname: 'localhost',
+                port: '',
+                href: 'http://localhost' + url.pathname,
+                origin: 'http://localhost',
+                pathname: url.pathname,
+                search: '',
+                hash: '',
+                reload() { },
+                replace() { },
+                toString() { return this.href },
+            }
+        })
         try {
             const appModule = this.#modules.get('./app.js')
             const pageModule = this.#modules.get(page.moduleId)!
-            const [
-                { renderPage, renderHead },
-                { default: App },
-                { default: Page }
-            ] = await Promise.all([
-                import("file://" + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile),
-                appModule ? await import("file://" + appModule.jsFile) : Promise.resolve({}),
-                await import("file://" + pageModule.jsFile)
-            ])
+            const { renderPage, renderHead } = await import("file://" + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
+            const { default: App } = appModule ? await import("file://" + appModule.jsFile) : {} as any
+            const { default: Page } = await import("file://" + pageModule.jsFile)
             const data = await this.getData()
             const html = renderPage(data, url, appModule ? App : undefined, Page)
             const head = renderHead([
