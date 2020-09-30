@@ -20,7 +20,7 @@ The radical new Front-End Framework with React in [Deno](https://deno.land), ins
 ## Usage
 ```bash
 # install aleph.js command
-deno install --allow-read --allow-write --allow-net -n aleph https://deno.land/x/aleph/cli.ts
+deno install --allow-read --allow-write --allow-net -f -n aleph https://deno.land/x/aleph/cli.ts
 
 # initiate a new app
 $ aleph init hello
