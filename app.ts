@@ -1,11 +1,10 @@
 import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
-import { hydrate, render } from 'https://esm.sh/react-dom'
 import { DataContext } from './data.ts'
 import { E404Page, E501 } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
-import type { AppManifest, RouterURL } from './types.ts'
+import type { AppManifest, Module, RouterURL } from './types.ts'
 import util, { hashShort } from './util.ts'
 
 export const AppManifestContext = createContext<AppManifest>({
@@ -15,7 +14,7 @@ export const AppManifestContext = createContext<AppManifest>({
 })
 AppManifestContext.displayName = 'AppManifestContext'
 
-function ALEPH({ initial }: {
+export function ALEPH({ initial }: {
     initial: {
         manifest: AppManifest
         pageModules: Record<string, { moduleId: string, hash: string }>
@@ -168,115 +167,6 @@ function ALEPH({ initial }: {
     )
 }
 
-export async function redirect(url: string, replace: boolean) {
-    const { location, document, history } = window as any
-
-    if (util.isHttpUrl(url)) {
-        location.href = url
-        return
-    }
-
-    url = util.cleanPath(url)
-    if (location.protocol === 'file:') {
-        const dataEl = document.getElementById('ssr-data')
-        if (dataEl) {
-            const ssrData = JSON.parse(dataEl.innerHTML)
-            if (ssrData && 'url' in ssrData) {
-                const { url: { pagePath: initialPagePath } } = ssrData
-                location.href = location.href.replace(
-                    `/${util.trimPrefix(initialPagePath, '/') || 'index'}.html`,
-                    `/${util.trimPrefix(url, '/') || 'index'}.html`
-                )
-            }
-        }
-        return
-    }
-
-    if (replace) {
-        history.replaceState(null, '', url)
-    } else {
-        history.pushState(null, '', url)
-    }
-    events.emit('popstate', { type: 'popstate' })
-}
-
-interface Module {
-    moduleId: string,
-    hash: string,
-}
-
-export async function bootstrap({
-    baseUrl,
-    defaultLocale,
-    locales,
-    keyModules,
-    pageModules
-}: AppManifest & {
-    keyModules: Record<string, Module>
-    pageModules: Record<string, Module>
-}) {
-    const { document } = window as any
-    const mainEl = document.querySelector('main')
-    const dataEl = document.getElementById('ssr-data')
-
-    let url: RouterURL
-    if (dataEl) {
-        const data = JSON.parse(dataEl.innerHTML)
-        if (util.isPlainObject(data.url)) {
-            url = data.url
-        } else {
-            throw new Error("invalid ssr-data")
-        }
-    } else {
-        url = route(
-            baseUrl,
-            Object.keys(pageModules),
-            {
-                defaultLocale,
-                locales: Object.keys(locales)
-            }
-        )
-    }
-
-    const pageModule = pageModules[url.pagePath]!
-    const [
-        { default: data },
-        { default: App },
-        { default: E404 },
-        { default: Page }
-    ] = await Promise.all([
-        keyModules.data ? import(getModuleImportUrl(baseUrl, keyModules.data)) : Promise.resolve({ default: {} }),
-        keyModules.app ? import(getModuleImportUrl(baseUrl, keyModules.app)) : Promise.resolve({}),
-        keyModules['404'] ? import(getModuleImportUrl(baseUrl, keyModules['404'])) : Promise.resolve({}),
-        pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({}),
-    ])
-    const el = React.createElement(
-        ALEPH,
-        {
-            initial: {
-                manifest: { baseUrl, defaultLocale, locales },
-                pageModules,
-                url,
-                data,
-                components: { E404, App, Page }
-            }
-        }
-    )
-    if (dataEl) {
-        hydrate(el, mainEl)
-        // remove ssr head elements, set a timmer to avoid tab title flash
-        setTimeout(() => {
-            Array.from(document.head.children).forEach((el: any) => {
-                if (el.hasAttribute('ssr')) {
-                    document.head.removeChild(el)
-                }
-            })
-        }, 0)
-    } else {
-        render(el, mainEl)
-    }
-}
-
-function getModuleImportUrl(baseUrl: string, { moduleId, hash }: Module) {
+export function getModuleImportUrl(baseUrl: string, { moduleId, hash }: Module) {
     return util.cleanPath(baseUrl + '/_aleph/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
 }

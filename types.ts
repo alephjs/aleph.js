@@ -58,3 +58,8 @@ export interface APIResponse {
 export interface APIHandle {
     (req: APIRequest, res: APIResponse): void
 }
+
+export interface Module {
+    moduleId: string,
+    hash: string,
+}
