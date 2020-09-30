@@ -6,17 +6,15 @@
 </div>
 
 # AlephJS
-A radical new Front-End Framework with React in [Deno](https://deno.land), inspired by [next.js](https://nextjs.org) and [snowpack](https://www.snowpack.dev).
-
-🚧 This project is work in progress.
+The radical new Front-End Framework with React in [Deno](https://deno.land), inspired by [next.js](https://nextjs.org) and [snowpack](https://www.snowpack.dev).
 
 ## Features
 - Zero Config
 - Typescript in Deno
 - ES Module Ready
 - HMR with Fast Refresh
-- File-system Page/API Routing
-- Built-in Less(CSS) Support
+- File-system Routing
+- Built-in CSS(Less) Support
 - SSR/SSG
 
 ## Usage
