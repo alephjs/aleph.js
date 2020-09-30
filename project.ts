@@ -1074,9 +1074,9 @@ export default class Project {
             const data = await this.getData()
             const html = renderPage(data, url, appModule ? App : undefined, Page)
             const head = renderHead([
-                pageModule.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)),
-                appModule?.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url))
-            ].filter(Boolean).flat())
+                this._lookupStyles(pageModule),
+                appModule ? this._lookupStyles(appModule) : []
+            ].flat())
             ret.code = 200
             ret.head = head
             ret.body = `<main>${html}</main>`
@@ -1090,7 +1090,27 @@ export default class Project {
         }
         return ret
     }
+
+    private _lookupStyles(mod: Module, a: string[] = [], s: Set<string> = new Set()): string[] {
+        if (s.has(mod.id)) {
+            return a
+        }
+        s.add(mod.id)
+        a.push(...mod.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)))
+        mod.deps.forEach(({ url }) => {
+            if (reModuleExt.test(url) && !reHttp.test(url)) {
+                const id = url.replace(reModuleExt, '.js')
+                const smod = this.getModule(id)
+                if (smod) {
+                    this._lookupStyles(smod, a, s)
+                }
+            }
+        })
+        return a
+    }
+
 }
+
 
 function relativePath(from: string, to: string): string {
     let r = path.relative(from, to)
