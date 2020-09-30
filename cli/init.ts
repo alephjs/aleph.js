@@ -1,4 +1,5 @@
-import { ensureDir, ensureFile, fromStreamReader, gzipDecode, path, Untar } from '../deps.ts'
+import { colors, ensureDir, ensureFile, fromStreamReader, gzipDecode, path, Untar } from '../deps.ts'
+import log from '../log.ts'
 import util from '../util.ts'
 
 export const helpMessage = `Initiate a new aleph app.
@@ -15,7 +16,9 @@ Options:
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
     const rev = 'master'
+    log.info('Downloading template...')
     const resp = await fetch('https://codeload.github.com/postui/alephjs-templates/tar.gz/' + rev)
+    log.info('Saving template...')
     const gzData = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))
@@ -34,5 +37,12 @@ export default async function (appDir: string, options: Record<string, string | 
             await Deno.copy(entry, file)
         }
     }
+
+    log.info('---')
+    log.info(`start(dev): ` + colors.bold(`aleph`) + ' dev ' + path.basename(appDir))
+    log.info(`start(prod): ` + colors.bold(`aleph`) + ' start ' + path.basename(appDir))
+    log.info(`build(prod): ` + colors.bold(`aleph`) + ' build ' + path.basename(appDir))
+    log.info('---')
+    log.info('Done')
     Deno.exit(0)
 }
