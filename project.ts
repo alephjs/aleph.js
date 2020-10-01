@@ -437,7 +437,7 @@ export default class Project {
 
         for await (const { path: p } of walk(pagesDir, walkOptions)) {
             const rp = path.resolve(util.trimPrefix(p, pagesDir)) || '/'
-            const pagePath = rp.replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/?index$/i, '/')
+            const pagePath = rp.replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
             this.#pageModules.set(pagePath, {
                 moduleId: './pages' + rp.replace(reModuleExt, '') + '.js',
                 rendered: new Map()
@@ -518,9 +518,15 @@ export default class Project {
                                 this._clearPageRenderCache()
                             } else if (moduleId.startsWith('./pages/')) {
                                 if (removed) {
-                                    this._removePageModule(moduleId)
+                                    this._removePageModuleById(moduleId)
                                 } else {
-                                    this._clearPageRenderCache(moduleId)
+                                    if (this.#pageModules.has(moduleId)) {
+                                        this._clearPageRenderCache(moduleId)
+                                    } else {
+                                        const pagePath = util.trimPrefix(moduleId, './pages').replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
+                                        console.log(">", pagePath)
+                                        this.#pageModules.set(pagePath, { moduleId, rendered: new Map() })
+                                    }
                                 }
                             }
                             this._createMainModule()
@@ -564,7 +570,7 @@ export default class Project {
         }
     }
 
-    private _removePageModule(moduleId: string) {
+    private _removePageModuleById(moduleId: string) {
         let pagePath = ''
         for (const [p, pm] of this.#pageModules.entries()) {
             if (pm.moduleId === moduleId) {
@@ -579,7 +585,9 @@ export default class Project {
 
     private _clearPageRenderCache(moduleId?: string) {
         for (const [_, p] of this.#pageModules.entries()) {
-            if (moduleId === undefined || p.moduleId === moduleId) {
+            if (!moduleId) {
+                p.rendered.clear()
+            } else if (p.moduleId == moduleId) {
                 p.rendered.clear()
                 break
             }
