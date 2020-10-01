@@ -23,7 +23,7 @@ export function renderHead(styleModules?: string[]) {
             } else if (util.isNEArray(props.children)) {
                 tags.push(`<${type}${attrs} ssr>${props.children.join('')}</${type}>`)
             } else {
-                tags.push(`<${type}${attrs} ssr/>`)
+                tags.push(`<${type}${attrs} ssr />`)
             }
         }
     })
