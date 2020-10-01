@@ -19,13 +19,40 @@ const e501PageEl = React.createElement(
 )
 const e404PageEl = React.createElement(ErrorPage, { status: 404 })
 
-export const E501 = {
-    App: () => e501AppEl,
-    Page: () => e501PageEl
-}
+export const E501App = () => e501AppEl
+export const E501Page = () => e501PageEl
+export const E404Page = () => e404PageEl
 
-export function E404Page() {
-    return e404PageEl
+export class ErrorBoundary extends React.Component {
+    state: { stack: string | null }
+
+    constructor(props: any) {
+        super(props)
+        this.state = { stack: null }
+    }
+
+    static getDerivedStateFromError(error: Error) {
+        // Update state so the next render will show the fallback UI.
+        return { stack: error.stack }
+    }
+
+    componentDidCatch(error: any, errorInfo: any) {
+        this.state = { stack: error.stack }
+    }
+
+    render() {
+        if (this.state.stack) {
+            return (
+                React.createElement(
+                    'pre',
+                    null,
+                    this.state.stack
+                )
+            )
+        }
+
+        return this.props.children
+    }
 }
 
 export function ErrorPage({ status, text = getStatusText(status), refreshButton }: { status: number, text?: string, refreshButton?: boolean }) {

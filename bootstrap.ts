@@ -1,6 +1,7 @@
 import React from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './app.ts'
+import { ErrorBoundary } from './error.ts'
 import route from './route.ts'
 import type { AppManifest, Module, RouterURL } from './types.ts'
 import util from './util.ts'
@@ -51,17 +52,22 @@ export default async function bootstrap({
         pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({}),
     ])
     const el = React.createElement(
-        ALEPH,
-        {
-            initial: {
-                manifest: { baseUrl, defaultLocale, locales },
-                pageModules,
-                url,
-                data,
-                components: { E404, App, Page }
+        ErrorBoundary,
+        null,
+        React.createElement(
+            ALEPH,
+            {
+                initial: {
+                    manifest: { baseUrl, defaultLocale, locales },
+                    pageModules,
+                    url,
+                    data,
+                    components: { E404, App, Page }
+                }
             }
-        }
+        )
     )
+
     if (dataEl) {
         hydrate(el, mainEl)
         // remove ssr head elements, set a timmer to avoid tab title flash

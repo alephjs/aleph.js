@@ -1,6 +1,6 @@
 import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { DataContext } from './data.ts'
-import { E404Page, E501 } from './error.ts'
+import { E404Page, E501App, E501Page } from './error.ts'
 import events from './events.ts'
 import route from './route.ts'
 import { RouterContext } from './router.ts'
@@ -35,7 +35,7 @@ export function ALEPH({ initial }: {
     const [app, setApp] = useState(() => {
         const { App } = initial.components
         return {
-            Component: App ? (util.isLikelyReactComponent(App) ? App : E501.App) : null
+            Component: App ? (util.isLikelyReactComponent(App) ? App : E501App) : null
         }
     })
     const [page, setPage] = useState(() => {
@@ -43,7 +43,7 @@ export function ALEPH({ initial }: {
         const { Page } = components
         return {
             url,
-            Component: Page ? (util.isLikelyReactComponent(Page) ? Page : E501.Page) : null
+            Component: Page ? (util.isLikelyReactComponent(Page) ? Page : E501Page) : null
         }
     })
     const onpopstate = useCallback(async () => {
@@ -64,7 +64,7 @@ export function ALEPH({ initial }: {
             } else {
                 setPage({
                     url,
-                    Component: E501.Page
+                    Component: E501Page
                 })
             }
         } else {
@@ -103,7 +103,7 @@ export function ALEPH({ initial }: {
                 } else {
                     setPage(({ url }) => ({
                         url,
-                        Component: E501.App
+                        Component: E501App
                     }))
                 }
             } else if (moduleId === './data.js' || moduleId === './data/index.js') {
