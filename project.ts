@@ -555,6 +555,8 @@ export default class Project {
                                         this._clearPageRenderCache(mod.id)
                                     }
                                 })
+                            }).catch(err => {
+                                log.error("compile", './' + path, err.message)
                             })
                         } else if (this.#modules.has(moduleId)) {
                             this.#modules.delete(moduleId)
