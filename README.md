@@ -1,12 +1,14 @@
 <div align="center">
     <br/>
-    <img src="./examples/hello-world/public/logo.png" width="90" height="90" />
+    <br/>
+    <img src="./examples/hello-world/public/logo.png" width="120" height="120" />
+    <br/>
     <br/>
     <br/>
 </div>
 
-# AlephJS
-The radical new Front-End Framework with React in [Deno](https://deno.land), inspired by [next.js](https://nextjs.org) and [snowpack](https://www.snowpack.dev).
+# Aleph.js
+The React Framework in [Deno](https://deno.land), inspired by [next.js](https://nextjs.org) and [snowpack](https://www.snowpack.dev).
 
 ## Features
 - Zero Config
@@ -28,6 +30,9 @@ $ cd hello
 
 # start app in development mode
 $ aleph
+
+# start app in production mode
+$ aleph start
 
 # build app
 $ aleph build
