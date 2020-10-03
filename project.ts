@@ -10,6 +10,7 @@ import util, { hashShort, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from
 import './vendor/clean-css-builds/v4.2.2.js'
 import { Document } from './vendor/deno-dom/document.ts'
 import less from './vendor/less/less.js'
+import { version } from './version.ts'
 
 const { CleanCSS } = window as any
 const cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
@@ -40,6 +41,7 @@ export default class Project {
     readonly config: Config
     readonly ready: Promise<void>
 
+    #buildId: string = ''
     #modules: Map<string, Module> = new Map()
     #pageModules: Map<string, { moduleId: string, rendered: Map<string, RenderResult> }> = new Map()
     #fsWatchListeners: Array<EventEmitter> = []
@@ -77,8 +79,12 @@ export default class Project {
         return path.join(this.rootDir, this.config.srcDir)
     }
 
+    get buildId() {
+        return this.#buildId
+    }
+
     get buildDir() {
-        return path.join(this.rootDir, '.aleph', this.mode + '.' + this.config.buildTarget)
+        return path.join(this.rootDir, '.aleph', 'build-' + this.buildId)
     }
 
     get apiPaths() {
@@ -375,6 +381,9 @@ export default class Project {
         if (typeof sourceMap === 'boolean') {
             Object.assign(this.config, { sourceMap })
         }
+
+        // Gen build ID after config loaded
+        this.#buildId = (new Sha1()).update(this.mode + '.' + this.config.buildTarget + '.' + version).hex().slice(0, 18)
     }
 
     private async _init() {
@@ -390,6 +399,7 @@ export default class Project {
         Object.assign(globalThis, {
             ALEPH_ENV: {
                 appDir: this.rootDir,
+                buildId: this.buildId,
                 config: this.config,
                 mode: this.mode,
             },
@@ -845,7 +855,7 @@ export default class Project {
                 }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(relativePath(
-                        path.dirname(path.resolve('/', mod.url)),
+                        path.dirname(mod.url),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
                     `applyCSS(${JSON.stringify(url)}, ${asLink ? JSON.stringify(path.join(this.config.baseUrl, '_aleph', filepath)) + ', true' : JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
@@ -1079,8 +1089,8 @@ export default class Project {
             const data = await this.getData()
             const html = renderPage(data, url, appModule ? App : undefined, Page)
             const head = await renderHead([
+                appModule ? this._lookupStyles(appModule) : [],
                 this._lookupStyles(pageModule),
-                appModule ? this._lookupStyles(appModule) : []
             ].flat())
             ret.code = 200
             ret.head = head

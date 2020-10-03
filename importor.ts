@@ -1,5 +1,4 @@
 import React, { useEffect } from 'https://esm.sh/react'
-import type { Config } from './types.ts'
 import util, { reStyleModuleExt } from './util.ts'
 
 const serverImports: Set<string> = new Set()
@@ -33,8 +32,7 @@ interface LoaderProps {
 
 export function StyleLoader({ path, rawPath, resolveDir }: LoaderProps) {
     if (typeof Deno !== 'undefined') {
-        const { appDir, mode, config } = (window as any).ALEPH_ENV as { appDir: string, mode: string, config: Config }
-        serverImports.add(util.cleanPath(`${appDir}/.aleph/${mode}.${config.buildTarget}/${resolveDir}/${path}`))
+        serverImports.add(util.cleanPath(`${resolveDir}/${path}`))
     }
 
     useEffect(() => {

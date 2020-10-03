@@ -28,7 +28,10 @@ export async function renderHead(styleModules?: string[]) {
             }
         }
     })
-    await Promise.all(resetImports().map(path => import(path)))
+    await Promise.all(resetImports().map(p => {
+        const { appDir, buildId } = (window as any).ALEPH_ENV as { appDir: string, buildId: string }
+        return util.cleanPath(`${appDir}/.aleph/build-${buildId}/${p}`)
+    }).map(p => import('file://' + p)))
     styleModules?.filter(id => serverStyles.has(id)).forEach(id => {
         const { css, asLink } = serverStyles.get(id)!
         if (asLink) {
