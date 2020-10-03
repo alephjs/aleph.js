@@ -143,7 +143,7 @@ export function ALEPH({ initial }: {
         }
     }, [manifest])
 
-    const pageEl = React.createElement(page.Component || e404.Component)
+    const Page = page.Component || e404.Component
     return React.createElement(
         AppManifestContext.Provider,
         { value: manifest },
@@ -153,7 +153,7 @@ export function ALEPH({ initial }: {
             React.createElement(
                 RouterContext.Provider,
                 { value: page.url },
-                app.Component ? React.createElement(app.Component, null, pageEl) : pageEl
+                app.Component ? React.createElement(app.Component, { Page }) : React.createElement(Page)
             )
         )
     )

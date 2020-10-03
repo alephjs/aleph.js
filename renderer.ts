@@ -4,6 +4,7 @@ import { DataContext, RouterContext } from './context.ts'
 import { E501App, E501Page, ErrorBoundary } from './error.ts'
 import type { RouterURL } from './types.ts'
 import util from './util.ts'
+
 export { renderHead } from './head.ts'
 
 export function renderPage(
@@ -12,8 +13,10 @@ export function renderPage(
     App: ComponentType<any> | undefined,
     Page: ComponentType<any>,
 ) {
-    const pageEl = React.createElement(util.isLikelyReactComponent(Page) ? Page : E501Page)
-    const appEl = App ? (util.isLikelyReactComponent(App) ? React.createElement(App, null, pageEl) : React.createElement(E501App)) : pageEl
+    if (!util.isLikelyReactComponent(Page)) {
+        Page = E501Page
+    }
+    const appEl = App ? (util.isLikelyReactComponent(App) ? React.createElement(App, { Page }) : React.createElement(E501App)) : React.createElement(Page)
     return renderToString(
         React.createElement(
             ErrorBoundary,
