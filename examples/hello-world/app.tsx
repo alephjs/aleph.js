@@ -5,7 +5,7 @@ export default function App({ Page }: { Page: ComponentType<any> }) {
     return (
         <>
             <Head>
-                <title>Hello World - AlephJS</title>
+                <title>Hello World - Aleph.js</title>
             </Head>
             <Page />
         </>
