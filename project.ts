@@ -83,18 +83,18 @@ export default class Project {
 
     get apiPaths() {
         return Array.from(this.#modules.keys())
-            .filter(p => p.startsWith('./api/'))
+            .filter(p => p.startsWith('/api/'))
             .map(p => p.slice(1).replace(reModuleExt, ''))
     }
 
     isHMRable(moduleId: string) {
         return !reHttp.test(moduleId) && (
-            moduleId === './404.js' ||
-            moduleId === './app.js' ||
-            moduleId === './data.js' ||
-            (moduleId === './data/index.js' && !this.#modules.has('./data.js')) ||
-            moduleId.startsWith('./pages/') ||
-            moduleId.startsWith('./components/') ||
+            moduleId === '/404.js' ||
+            moduleId === '/app.js' ||
+            moduleId === '/data.js' ||
+            (moduleId === '/data/index.js' && !this.#modules.has('/data.js')) ||
+            moduleId.startsWith('/pages/') ||
+            moduleId.startsWith('/components/') ||
             reStyleModuleExt.test(moduleId)
         )
     }
@@ -121,7 +121,6 @@ export default class Project {
                 modId = modId + '.js'
             }
         } else {
-            modId = '.' + modId
             if (reHashJs.test(modId)) {
                 const id = modId.slice(0, modId.length - (hashShort + 4))
                 if (reStyleModuleExt.test(id)) {
@@ -131,8 +130,8 @@ export default class Project {
                 }
             }
         }
-        if (!this.#modules.has(modId) && modId == './data.js') {
-            modId = './data/index.js'
+        if (!this.#modules.has(modId) && modId == '/data.js') {
+            modId = '/data/index.js'
         }
         if (!this.#modules.has(modId)) {
             log.warn(`can't get the module by path '${pathname}(${modId})'`)
@@ -183,7 +182,7 @@ export default class Project {
             return [200, this.getDefaultIndexHtml()]
         }
 
-        const mainModule = this.#modules.get('./main.js')!
+        const mainModule = this.#modules.get('/main.js')!
         const { code, head, body } = await this._renderPage(url)
         const html = createHtml({
             lang: url.locale,
@@ -200,7 +199,7 @@ export default class Project {
 
     getDefaultIndexHtml(): string {
         const { baseUrl, defaultLocale } = this.config
-        const mainModule = this.#modules.get('./main.js')!
+        const mainModule = this.#modules.get('/main.js')!
         const html = createHtml({
             lang: defaultLocale,
             scripts: [
@@ -213,7 +212,7 @@ export default class Project {
     }
 
     async getData() {
-        const mod = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')
+        const mod = this.#modules.get('/data.js') || this.#modules.get('/data/index.js')
         if (mod) {
             try {
                 const { default: Data } = await import("file://" + mod.jsFile)
@@ -253,7 +252,7 @@ export default class Project {
         await this.ready
 
         // lookup output modules
-        lookup('./main.js')
+        lookup('/main.js')
 
         // ensure ouput directory ready
         if (util.existsDir(outputDir)) {
@@ -284,8 +283,8 @@ export default class Project {
         }))
 
         // write static data
-        if (this.#modules.has('./data.js') || this.#modules.has('./data/index.js')) {
-            const { hash } = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')!
+        if (this.#modules.has('/data.js') || this.#modules.has('/data/index.js')) {
+            const { hash } = this.#modules.get('/data.js') || this.#modules.get('/data/index.js')!
             const data = this.getData()
             await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), `export default ${JSON.stringify(data)}`)
         }
@@ -409,14 +408,14 @@ export default class Project {
                     case 'api':
                         for await (const { path: p } of walk(apiDir, walkOptions)) {
                             const rp = path.resolve(util.trimPrefix(p, apiDir))
-                            await this._compile('./api/' + rp)
+                            await this._compile('/api/' + rp)
                         }
                         break
                     case 'data':
                         for await (const { path: p } of walk(dataDir, { ...walkOptions, maxDepth: 1 })) {
                             const name = path.basename(p)
                             if (name.replace(reModuleExt, '') === 'index') {
-                                await this._compile('./data/' + name)
+                                await this._compile('/data/' + name)
                             }
                         }
                         break
@@ -426,7 +425,7 @@ export default class Project {
                     case 'app':
                     case 'data':
                     case '404':
-                        await this._compile('./' + name)
+                        await this._compile('/' + name)
                         break
                 }
             }
@@ -436,10 +435,10 @@ export default class Project {
             const rp = path.resolve(util.trimPrefix(p, pagesDir)) || '/'
             const pagePath = rp.replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
             this.#pageModules.set(pagePath, {
-                moduleId: './pages' + rp.replace(reModuleExt, '') + '.js',
+                moduleId: '/pages' + rp.replace(reModuleExt, '') + '.js',
                 rendered: new Map()
             })
-            await this._compile('./pages' + rp)
+            await this._compile('/pages' + rp)
         }
 
         const preCompileUrls = [
@@ -483,21 +482,21 @@ export default class Project {
                     if (path.startsWith('.aleph/') || path.startsWith(this.config.outputDir.slice(1))) {
                         return false
                     }
-                    const moduleId = './' + path.replace(reModuleExt, '.js')
+                    const moduleId = '/' + path.replace(reModuleExt, '.js')
                     switch (moduleId) {
-                        case './404.js':
-                        case './app.js':
-                        case './data.js':
-                        case './data/index.js': {
+                        case '/404.js':
+                        case '/app.js':
+                        case '/data.js':
+                        case '/data/index.js': {
                             return true
                         }
                         default: {
-                            if ((moduleId.startsWith('./pages/') || moduleId.startsWith('./api/')) && moduleId.endsWith('.js')) {
+                            if ((moduleId.startsWith('/pages/') || moduleId.startsWith('/api/')) && moduleId.endsWith('.js')) {
                                 return true
                             }
                             let isDep = false
                             for (const { deps } of this.#modules.values()) {
-                                if (deps.findIndex(dep => dep.url === './' + path) > -1) {
+                                if (deps.findIndex(dep => dep.url === '/' + path) > -1) {
                                     isDep = true
                                     break
                                 }
@@ -507,20 +506,20 @@ export default class Project {
                     }
                 })()
                 if (validated) {
-                    const moduleId = './' + path.replace(reModuleExt, '.js')
+                    const moduleId = '/' + path.replace(reModuleExt, '.js')
                     util.debounceX(moduleId, () => {
                         const removed = !util.existsFile(p)
                         const cleanup = () => {
-                            if (moduleId === './app.js' || moduleId === './data.js' || moduleId === './data/index.js') {
+                            if (moduleId === '/app.js' || moduleId === '/data.js' || moduleId === '/data/index.js') {
                                 this._clearPageRenderCache()
-                            } else if (moduleId.startsWith('./pages/')) {
+                            } else if (moduleId.startsWith('/pages/')) {
                                 if (removed) {
                                     this._removePageModuleById(moduleId)
                                 } else {
                                     if (this.#pageModules.has(moduleId)) {
                                         this._clearPageRenderCache(moduleId)
                                     } else {
-                                        const pagePath = util.trimPrefix(moduleId, './pages').replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
+                                        const pagePath = util.trimPrefix(moduleId, '/pages').replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
                                         this.#pageModules.set(pagePath, { moduleId, rendered: new Map() })
                                     }
                                 }
@@ -532,8 +531,8 @@ export default class Project {
                             if (!this.#modules.has(moduleId)) {
                                 type = 'add'
                             }
-                            log.info(type, './' + path)
-                            this._compile('./' + path, { forceCompile: true }).then(({ hash }) => {
+                            log.info(type, '/' + path)
+                            this._compile('/' + path, { forceCompile: true }).then(({ hash }) => {
                                 const hmrable = this.isHMRable(moduleId)
                                 if (hmrable) {
                                     if (type === 'add') {
@@ -543,16 +542,16 @@ export default class Project {
                                     }
                                 }
                                 cleanup()
-                                this._updateDependency('./' + path, hash, mod => {
+                                this._updateDependency('/' + path, hash, mod => {
                                     if (!hmrable && this.isHMRable(mod.id)) {
                                         this.#fsWatchListeners.forEach(e => e.emit(mod.id, 'modify', mod.hash))
                                     }
-                                    if (mod.id.startsWith('./pages/')) {
+                                    if (mod.id.startsWith('/pages/')) {
                                         this._clearPageRenderCache(mod.id)
                                     }
                                 })
                             }).catch(err => {
-                                log.error(`compile(./${path}):`, err.message)
+                                log.error(`compile(/${path}):`, err.message)
                             })
                         } else if (this.#modules.has(moduleId)) {
                             this.#modules.delete(moduleId)
@@ -560,7 +559,7 @@ export default class Project {
                             if (this.isHMRable(moduleId)) {
                                 this.#fsWatchListeners.forEach(e => e.emit('remove', moduleId))
                             }
-                            log.info('remove', './' + path)
+                            log.info('remove', '/' + path)
                         }
                     }, 150)
                 }
@@ -596,7 +595,7 @@ export default class Project {
         const { importMap } = this.config
         const isRemote = reHttp.test(url) || (url in importMap.imports && reHttp.test(importMap.imports[url]))
         const sourceFilePath = renameImportUrl(url)
-        const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : '.' + sourceFilePath).replace(reModuleExt, '.js')
+        const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : sourceFilePath).replace(reModuleExt, '.js')
 
         return {
             id,
@@ -622,7 +621,7 @@ export default class Project {
             keyModules: {},
             pageModules: {}
         }
-        const module = this._newModule('./main.js')
+        const module = this._newModule('/main.js')
         const deps = [
             'https://deno.land/x/aleph/vendor/tslib/tslib.js',
             'https://deno.land/x/aleph/app.ts',
@@ -631,26 +630,26 @@ export default class Project {
             url: String(url),
             hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
         }))
-        if (this.#modules.has('./data.js') || this.#modules.has('./data/index.js')) {
-            const { id, url, hash } = this.#modules.get('./data.js') || this.#modules.get('./data/index.js')!
+        if (this.#modules.has('/data.js') || this.#modules.has('/data/index.js')) {
+            const { id, url, hash } = this.#modules.get('/data.js') || this.#modules.get('/data/index.js')!
             config.keyModules.data = {
                 moduleId: id,
                 hash
             }
             deps.push({ url, hash })
         }
-        if (this.#modules.has('./app.js')) {
-            const { url, hash } = this.#modules.get('./app.js')!
+        if (this.#modules.has('/app.js')) {
+            const { url, hash } = this.#modules.get('/app.js')!
             config.keyModules.app = {
-                moduleId: './app.js',
+                moduleId: '/app.js',
                 hash
             }
             deps.push({ url, hash })
         }
-        if (this.#modules.has('./404.js')) {
-            const { url, hash } = this.#modules.get('./404.js')!
+        if (this.#modules.has('/404.js')) {
+            const { url, hash } = this.#modules.get('/404.js')!
             config.keyModules['404'] = {
-                moduleId: './404.js',
+                moduleId: '/404.js',
                 hash
             }
             deps.push({ url, hash })
@@ -675,7 +674,7 @@ export default class Project {
         await Promise.all([
             writeTextFile(module.jsFile, module.jsContent),
             writeTextFile(path.join(this.buildDir, 'main.meta.json'), JSON.stringify({
-                url: './main.js',
+                url: '/main.js',
                 sourceHash: module.hash,
                 hash: module.hash,
                 deps: module.deps,
@@ -857,7 +856,7 @@ export default class Project {
                 const compileOptions = {
                     target: this.config.buildTarget,
                     mode: this.mode,
-                    reactRefresh: this.isDev && !mod.isRemote && (mod.id === './404.js' || mod.id === './app.js' || mod.id.startsWith('./pages/') || mod.id.startsWith('./components/')),
+                    reactRefresh: this.isDev && !mod.isRemote && (mod.id === '/404.js' || mod.id === '/app.js' || mod.id.startsWith('/pages/') || mod.id.startsWith('/components/')),
                     rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path),
                 }
                 const { diagnostics, outputText, sourceMapText } = compile(mod.sourceFilePath, sourceContent, compileOptions)
@@ -907,10 +906,10 @@ export default class Project {
                 dep.hash = depMod.hash
                 if (!reHttp.test(dep.url)) {
                     const depImportPath = relativePath(
-                        path.dirname(path.resolve('/', url)),
+                        path.dirname(url),
                         path.resolve('/', dep.url.replace(reModuleExt, ''))
                     )
-                    mod.jsContent = mod.jsContent.replace(/(i|Import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
+                    mod.jsContent = mod.jsContent.replace(/(import|Import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
                             importPath.slice(0, importPath.length - (hashShort + 4)) === depImportPath
@@ -954,7 +953,7 @@ export default class Project {
                         path.resolve('/', dep.url.replace(reModuleExt, ''))
                     )
                     dep.hash = depHash
-                    if (mod.id === './main.js') {
+                    if (mod.id === '/main.js') {
                         this._createMainModule()
                     } else {
                         mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
@@ -1033,7 +1032,7 @@ export default class Project {
                 }
                 mod.deps.push({ url: sourceUrl.protocol + '//' + sourceUrl.host + pathname, hash: '' })
             } else {
-                mod.deps.push({ url: '.' + path.resolve('/', path.dirname(mod.url), importPath), hash: '' })
+                mod.deps.push({ url: path.resolve('/', path.dirname(mod.url), importPath), hash: '' })
             }
         }
 
@@ -1042,7 +1041,7 @@ export default class Project {
         }
 
         if (!rewrittenPath.startsWith('.') && !rewrittenPath.startsWith('/')) {
-            rewrittenPath = './' + rewrittenPath
+            rewrittenPath = '/' + rewrittenPath
         }
         return rewrittenPath.replace(reModuleExt, '') + '.js'
     }
@@ -1072,7 +1071,7 @@ export default class Project {
             }
         })
         try {
-            const appModule = this.#modules.get('./app.js')
+            const appModule = this.#modules.get('/app.js')
             const pageModule = this.#modules.get(page.moduleId)!
             const { renderPage, renderHead } = await import("file://" + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
             const { default: App } = appModule ? await import("file://" + appModule.jsFile) : {} as any
@@ -1116,7 +1115,6 @@ export default class Project {
     }
 
 }
-
 
 function relativePath(from: string, to: string): string {
     let r = path.relative(from, to)

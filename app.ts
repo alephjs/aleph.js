@@ -81,14 +81,14 @@ export function ALEPH({ initial }: {
             setData(data)
         }
         const onAddModule = async ({ moduleId, hash }: Module) => {
-            if (moduleId === './404.js') {
+            if (moduleId === '/404.js') {
                 const { default: Component } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
                 if (util.isLikelyReactComponent(Component)) {
                     setE404({ Component })
                 } else {
                     setE404({ Component: E404Page })
                 }
-            } else if (moduleId === './app.js') {
+            } else if (moduleId === '/app.js') {
                 const { default: Component } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
                 if (util.isLikelyReactComponent(Component)) {
                     setApp({ Component })
@@ -98,11 +98,11 @@ export function ALEPH({ initial }: {
                         Component: E501App
                     }))
                 }
-            } else if (moduleId === './data.js' || moduleId === './data/index.js') {
+            } else if (moduleId === '/data.js' || moduleId === '/data/index.js') {
                 const { default: data } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
                 console.log('[DATA]', data)
                 setData(data)
-            } else if (moduleId.startsWith('./pages/')) {
+            } else if (moduleId.startsWith('/pages/')) {
                 const pagePath = util.trimSuffix(moduleId, '.js').replace(/\s+/g, '-').replace(/\/?index$/i, '/')
                 setPageModules(pageModules => ({
                     ...pageModules,
@@ -111,14 +111,14 @@ export function ALEPH({ initial }: {
             }
         }
         const onRemoveModule = (moduleId: string) => {
-            if (moduleId === './404.js') {
+            if (moduleId === '/404.js') {
                 setE404({ Component: E404Page })
-            } else if (moduleId === './app.js') {
+            } else if (moduleId === '/app.js') {
                 setApp({ Component: null })
-            } else if (moduleId === './data.js' || moduleId === './data/index.js') {
+            } else if (moduleId === '/data.js' || moduleId === '/data/index.js') {
                 console.log('[DATA]', {})
                 setData({})
-            } else if (moduleId.startsWith('./pages/')) {
+            } else if (moduleId.startsWith('/pages/')) {
                 setPageModules(pageModules => {
                     const newPageModules: Record<string, { moduleId: string, hash: string }> = {}
                     for (const pagePath in pageModules) {

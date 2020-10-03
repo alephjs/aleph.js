@@ -48,10 +48,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                                                     type: 'update',
                                                     moduleId: mod.id,
                                                     hash,
-                                                    updateUrl: path.resolve(
-                                                        path.join(project.config.baseUrl, '/_aleph/'),
-                                                        mod.id.replace(/\.js$/, '') + `.${hash!.slice(0, hashShort)}.js`
-                                                    )
+                                                    updateUrl: path.join('/', project.config.baseUrl, '/_aleph/', mod.id.replace(/\.js$/, '') + `.${hash!.slice(0, hashShort)}.js`)
                                                 })))
                                             }
                                         }
@@ -119,13 +116,13 @@ export async function start(appDir: string, port: number, isDev = false) {
                                 }
 
                                 let body = ''
-                                if (mod.id === './data.js' || mod.id === './data/index.js') {
+                                if (mod.id === '/data.js' || mod.id === '/data/index.js') {
                                     const data = await project.getData()
                                     if (project.isDev) {
                                         body = [
                                             `import { createHotContext } from "./-/deno.land/x/aleph/hmr.js";`,
                                             `import events from "./-/deno.land/x/aleph/events.js";`,
-                                            `import.meta.hot = createHotContext("./data.js");`,
+                                            `import.meta.hot = createHotContext("/data.js");`,
                                             `export default ${JSON.stringify(data, undefined, 4)};`,
                                             `import.meta.hot.accept(({ default: data }) => events.emit("update-data", data));`
                                         ].join('\n')
