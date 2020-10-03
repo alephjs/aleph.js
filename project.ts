@@ -451,15 +451,15 @@ export default class Project {
             await this._compile('/pages' + rp)
         }
 
-        const preCompileUrls = [
+        const precompileUrls = [
             'https://deno.land/x/aleph/bootstrap.ts',
             'https://deno.land/x/aleph/renderer.ts',
             'https://deno.land/x/aleph/vendor/tslib/tslib.js',
         ]
         if (this.isDev) {
-            preCompileUrls.push('https://deno.land/x/aleph/hmr.ts')
+            precompileUrls.push('https://deno.land/x/aleph/hmr.ts')
         }
-        for (const url of preCompileUrls) {
+        for (const url of precompileUrls) {
             await this._compile(url)
         }
         await this._createMainModule()
@@ -762,6 +762,8 @@ export default class Project {
                     u.searchParams.set('dev', '')
                 }
                 dlUrl = u.toString().replace(/=(&|$)/, '$1')
+            } else if (dlUrl.startsWith('https://deno.land/x/aleph/')) {
+                dlUrl = `https://deno.land/x/aleph@v${version}/` + util.trimPrefix(dlUrl, 'https://deno.land/x/aleph/')
             }
             if (mod.sourceHash === '') {
                 log.info('Download', url, dlUrl != url ? colors.dim(`• ${dlUrl}`) : '')
