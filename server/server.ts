@@ -1,6 +1,6 @@
 import { createHtml } from '../html.ts'
 import log from '../log.ts'
-import Project from '../project.ts'
+import Project, { injectHmr } from '../project.ts'
 import { createRouter } from '../router.ts'
 import { path, serve, ws } from '../std.ts'
 import util, { hashShort } from '../util.ts'
@@ -134,11 +134,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                                 } else {
                                     body = mod.jsContent
                                     if (project.isHMRable(mod.id)) {
-                                        body = injectHmr({
-                                            id: mod.id,
-                                            sourceFilePath: mod.sourceFilePath,
-                                            jsContent: body
-                                        })
+                                        body = injectHmr({ ...mod, jsContent: body })
                                     }
                                 }
                                 req.respond({
@@ -213,42 +209,4 @@ export async function start(appDir: string, port: number, isDev = false) {
     }
 }
 
-function injectHmr({ id, sourceFilePath, jsContent }: { id: string, sourceFilePath: string, jsContent: string }) {
-    let hmrImportPath = path.relative(
-        path.dirname(sourceFilePath),
-        '/-/deno.land/x/aleph/hmr.js'
-    )
-    if (!hmrImportPath.startsWith('.') && !hmrImportPath.startsWith('/')) {
-        hmrImportPath = './' + hmrImportPath
-    }
 
-    const text = [
-        `import { createHotContext, RefreshRuntime, performReactRefresh } from ${JSON.stringify(hmrImportPath)};`,
-        `import.meta.hot = createHotContext(${JSON.stringify(id)});`
-    ]
-    const reactRefresh = id.endsWith('.js')
-    if (reactRefresh) {
-        text.push('')
-        text.push(
-            `const prevRefreshReg = window.$RefreshReg$;`,
-            `const prevRefreshSig = window.$RefreshSig$;`,
-            `Object.assign(window, {`,
-            `    $RefreshReg$: (type, id) => RefreshRuntime.register(type, ${JSON.stringify(id)} + " " + id),`,
-            `    $RefreshSig$: RefreshRuntime.createSignatureFunctionForTransform`,
-            `});`,
-        )
-    }
-    text.push('')
-    text.push(jsContent)
-    text.push('')
-    if (reactRefresh) {
-        text.push(
-            'window.$RefreshReg$ = prevRefreshReg;',
-            'window.$RefreshSig$ = prevRefreshSig;',
-            'import.meta.hot.accept(performReactRefresh);'
-        )
-    } else {
-        text.push('import.meta.hot.accept();')
-    }
-    return text.join('\n')
-}

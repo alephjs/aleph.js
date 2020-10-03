@@ -39,15 +39,7 @@ export function StyleLoader({ path, rawPath, resolveDir }: LoaderProps) {
 
     useEffect(() => {
         import(util.cleanPath(`/_aleph/${resolveDir}/${path}`))
-        return () => {
-            const moduleId = util.cleanPath(`/${resolveDir}/${rawPath}`)
-            const { document } = (window as any)
-            Array.from(document.head.children).forEach((el: any) => {
-                if (el.getAttribute('data-module-id') === moduleId) {
-                    document.head.removeChild(el)
-                }
-            })
-        }
+        return () => { }
     }, [])
 
     return null

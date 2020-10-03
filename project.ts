@@ -1116,6 +1116,46 @@ export default class Project {
 
 }
 
+export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
+    let hmrImportPath = path.relative(
+        path.dirname(sourceFilePath),
+        '/-/deno.land/x/aleph/hmr.js'
+    )
+    if (!hmrImportPath.startsWith('.') && !hmrImportPath.startsWith('/')) {
+        hmrImportPath = './' + hmrImportPath
+    }
+
+    const text = [
+        `import { createHotContext, RefreshRuntime, performReactRefresh } from ${JSON.stringify(hmrImportPath)};`,
+        `import.meta.hot = createHotContext(${JSON.stringify(id)});`
+    ]
+    const reactRefresh = id.endsWith('.js')
+    if (reactRefresh) {
+        text.push('')
+        text.push(
+            `const prevRefreshReg = window.$RefreshReg$;`,
+            `const prevRefreshSig = window.$RefreshSig$;`,
+            `Object.assign(window, {`,
+            `    $RefreshReg$: (type, id) => RefreshRuntime.register(type, ${JSON.stringify(id)} + " " + id),`,
+            `    $RefreshSig$: RefreshRuntime.createSignatureFunctionForTransform`,
+            `});`,
+        )
+    }
+    text.push('')
+    text.push(jsContent)
+    text.push('')
+    if (reactRefresh) {
+        text.push(
+            'window.$RefreshReg$ = prevRefreshReg;',
+            'window.$RefreshSig$ = prevRefreshSig;',
+            'import.meta.hot.accept(performReactRefresh);'
+        )
+    } else {
+        text.push('import.meta.hot.accept();')
+    }
+    return text.join('\n')
+}
+
 function relativePath(from: string, to: string): string {
     let r = path.relative(from, to)
     if (!r.startsWith('.') && !r.startsWith('/')) {

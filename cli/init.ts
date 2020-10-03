@@ -41,7 +41,7 @@ export default async function (appDir: string, options: Record<string, string | 
 
     log.info('Done')
     log.info('---')
-    log.info(colors.dim('App is ready to Go.'))
+    log.info(colors.dim('Aleph is ready to Go.'))
     log.info(`${colors.dim('$')} cd ` + path.basename(appDir))
     log.info(`start(dev) : ${colors.dim('$')} ${colors.bold('aleph')} dev`)
     log.info(`start(prod): ${colors.dim('$')} ${colors.bold('aleph')} start`)
