@@ -1,57 +1,63 @@
-import React, { ComponentType, createContext, useContext } from 'https://esm.sh/react'
-import events from './events.ts'
 import type { RouterURL } from './types.ts'
 import util from './util.ts'
 
-export const RouterContext = createContext<RouterURL>({
-    locale: 'en',
-    pagePath: '/',
-    pathname: '/',
-    params: {},
-    query: new URLSearchParams(),
-})
-RouterContext.displayName = 'RouterContext'
+export function createRouter(base: string, pagePaths: string[], options?: { location?: { pathname: string, search?: string }, defaultLocale?: string, locales?: string[] }): RouterURL {
+    const loc = (options?.location || (window as any).location || { pathname: '/' })
+    const pathname = util.cleanPath(util.trimPrefix(loc.pathname, base))
+    const query = new URLSearchParams(loc.search)
 
-export function withRouter(Component: ComponentType<{ url: RouterURL }>) {
-    function WithRouter(props: any) {
-        const url = useRouter()
-        return React.createElement(Component, Object.assign({}, props, { url }))
-    }
-    return WithRouter
-}
+    let locale = options?.defaultLocale || 'en'
+    let asPagePath = pathname
+    let pagePath = ''
+    let params: Record<string, string> = {}
 
-export function useRouter() {
-    return useContext(RouterContext)
-}
-
-export async function redirect(url: string, replace: boolean) {
-    const { location, document, history } = window as any
-
-    if (util.isHttpUrl(url)) {
-        location.href = url
-        return
-    }
-
-    url = util.cleanPath(url)
-    if (location.protocol === 'file:') {
-        const dataEl = document.getElementById('ssr-data')
-        if (dataEl) {
-            const ssrData = JSON.parse(dataEl.innerHTML)
-            if (ssrData && 'url' in ssrData) {
-                const { url: { pagePath: initialPagePath } } = ssrData
-                location.href = location.href.replace(
-                    `/${util.trimPrefix(initialPagePath, '/') || 'index'}.html`,
-                    `/${util.trimPrefix(url, '/') || 'index'}.html`
-                )
-            }
+    if (asPagePath !== '/') {
+        const a = asPagePath.split('/')
+        if (options?.locales?.includes(a[0])) {
+            locale = a[0]
+            asPagePath = '/' + a.slice(1).join('/')
         }
-        return
     }
 
-    if (replace) {
-        history.replaceState(null, '', url)
-    } else {
-        history.pushState(null, '', url)
+    for (const routePath of pagePaths) {
+        const [p, ok] = matchPath(routePath, asPagePath)
+        if (ok) {
+            pagePath = routePath
+            params = p
+            break
+        }
     }
-    events.emit('popstate', { type: 'popstate' })
+
+    return { locale, pathname, pagePath, params, query }
+}
+
+function matchPath(routePath: string, realPath: string): [Record<string, string>, boolean] {
+    const params: Record<string, string> = {}
+    const routeSegments = util.splitPath(routePath)
+    const locSegments = util.splitPath(realPath)
+    const depth = Math.max(routeSegments.length, locSegments.length)
+
+    for (let i = 0; i < depth; i++) {
+        const routeSeg = routeSegments[i]
+        const locSeg = locSegments[i]
+
+        if (locSeg === undefined || routeSeg === undefined) {
+            return [{}, false]
+        }
+
+        if (routeSeg.startsWith('[...') && routeSeg.endsWith(']') && routeSeg.length > 5 && i === routeSegments.length - 1) {
+            params[routeSeg.slice(4, -1)] = locSegments.slice(i).map(decodeURIComponent).join('/')
+            break
+        }
+
+        if (routeSeg.startsWith('[') && routeSeg.endsWith(']') && routeSeg.length > 2) {
+            params[routeSeg.slice(1, -1)] = decodeURIComponent(locSeg)
+        } else if (routeSeg.startsWith('$') && routeSeg.length > 1) {
+            params[routeSeg.slice(1)] = decodeURIComponent(locSeg)
+        } else if (routeSeg !== locSeg) {
+            return [{}, false]
+        }
+    }
+
+    return [params, true]
 }

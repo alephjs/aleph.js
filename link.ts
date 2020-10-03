@@ -1,5 +1,6 @@
 import React, { Children, cloneElement, CSSProperties, isValidElement, MouseEvent, PropsWithChildren, useCallback, useEffect, useMemo, useRef } from 'https://esm.sh/react'
-import { redirect, useRouter } from './router.ts'
+import { redirect } from './app.ts'
+import { useRouter } from './hooks.ts'
 import util from './util.ts'
 
 interface LinkProps {

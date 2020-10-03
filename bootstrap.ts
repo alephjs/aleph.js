@@ -2,7 +2,7 @@ import React from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './app.ts'
 import { ErrorBoundary } from './error.ts'
-import route from './route.ts'
+import { createRouter } from './router.ts'
 import type { AppManifest, Module, RouterURL } from './types.ts'
 import util from './util.ts'
 
@@ -29,7 +29,7 @@ export default async function bootstrap({
             throw new Error("invalid ssr-data")
         }
     } else {
-        url = route(
+        url = createRouter(
             baseUrl,
             Object.keys(pageModules),
             {

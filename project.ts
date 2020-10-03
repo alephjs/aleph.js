@@ -2,7 +2,7 @@ import { minify } from 'https://esm.sh/terser'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
-import route from './route.ts'
+import { createRouter } from './router.ts'
 import { colors, ensureDir, path, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { APIHandle, Config, Location, RouterURL } from './types.ts'
@@ -140,7 +140,7 @@ export default class Project {
             modId = './data/index.js'
         }
         if (!this.#modules.has(modId)) {
-            console.warn(`can't get the module by path '${pathname}(${modId})'`)
+            log.warn(`can't get the module by path '${pathname}(${modId})'`)
         }
         return this.getModule(modId)
     }
@@ -176,7 +176,7 @@ export default class Project {
 
     async getPageHtml(location: Location): Promise<[number, string]> {
         const { baseUrl, defaultLocale } = this.config
-        const url = route(
+        const url = createRouter(
             baseUrl,
             Array.from(this.#pageModules.keys()),
             {
@@ -524,7 +524,6 @@ export default class Project {
                                         this._clearPageRenderCache(moduleId)
                                     } else {
                                         const pagePath = util.trimPrefix(moduleId, './pages').replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
-                                        console.log(">", pagePath)
                                         this.#pageModules.set(pagePath, { moduleId, rendered: new Map() })
                                     }
                                 }
@@ -556,7 +555,7 @@ export default class Project {
                                     }
                                 })
                             }).catch(err => {
-                                log.error("compile", './' + path, err.message)
+                                log.error(`compile(./${path}):`, err.message)
                             })
                         } else if (this.#modules.has(moduleId)) {
                             this.#modules.delete(moduleId)

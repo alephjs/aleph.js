@@ -1,7 +1,7 @@
 import { createHtml } from '../html.ts'
 import log from '../log.ts'
 import Project from '../project.ts'
-import route from '../route.ts'
+import { createRouter } from '../router.ts'
 import { path, serve, ws } from '../std.ts'
 import util, { hashShort } from '../util.ts'
 import { PostAPIRequest, PostAPIResponse } from './api.ts'
@@ -67,7 +67,7 @@ export async function start(appDir: string, port: number, isDev = false) {
 
                     // serve apis
                     if (pathname.startsWith('/api/')) {
-                        const { pagePath, params, query } = route(
+                        const { pagePath, params, query } = createRouter(
                             project.config.baseUrl,
                             project.apiPaths,
                             { location: { pathname, search: url.search } }

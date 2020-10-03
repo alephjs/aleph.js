@@ -1,18 +1,10 @@
-import React, { ComponentType, createContext, useCallback, useEffect, useState } from 'https://esm.sh/react'
-import { DataContext } from './data.ts'
+import React, { ComponentType, useCallback, useEffect, useState } from 'https://esm.sh/react'
+import { AppManifestContext, DataContext, RouterContext } from './context.ts'
 import { E404Page, E501App, E501Page } from './error.ts'
 import events from './events.ts'
-import route from './route.ts'
-import { RouterContext } from './router.ts'
+import { createRouter } from './router.ts'
 import type { AppManifest, Module, RouterURL } from './types.ts'
 import util, { hashShort } from './util.ts'
-
-export const AppManifestContext = createContext<AppManifest>({
-    baseUrl: '/',
-    defaultLocale: 'en',
-    locales: {},
-})
-AppManifestContext.displayName = 'AppManifestContext'
 
 export function ALEPH({ initial }: {
     initial: {
@@ -48,7 +40,7 @@ export function ALEPH({ initial }: {
     })
     const onpopstate = useCallback(async () => {
         const { baseUrl, defaultLocale, locales } = manifest
-        const url = route(
+        const url = createRouter(
             baseUrl,
             Object.keys(pageModules),
             {
@@ -165,6 +157,38 @@ export function ALEPH({ initial }: {
             )
         )
     )
+}
+
+export async function redirect(url: string, replace: boolean) {
+    const { location, document, history } = window as any
+
+    if (util.isHttpUrl(url)) {
+        location.href = url
+        return
+    }
+
+    url = util.cleanPath(url)
+    if (location.protocol === 'file:') {
+        const dataEl = document.getElementById('ssr-data')
+        if (dataEl) {
+            const ssrData = JSON.parse(dataEl.innerHTML)
+            if (ssrData && 'url' in ssrData) {
+                const { url: { pagePath: initialPagePath } } = ssrData
+                location.href = location.href.replace(
+                    `/${util.trimPrefix(initialPagePath, '/') || 'index'}.html`,
+                    `/${util.trimPrefix(url, '/') || 'index'}.html`
+                )
+            }
+        }
+        return
+    }
+
+    if (replace) {
+        history.replaceState(null, '', url)
+    } else {
+        history.pushState(null, '', url)
+    }
+    events.emit('popstate', { type: 'popstate' })
 }
 
 export function getModuleImportUrl(baseUrl: string, { moduleId, hash }: Module) {
