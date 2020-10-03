@@ -1,14 +1,14 @@
 import ts from 'https://esm.sh/typescript'
 import transformImportPathRewrite from './transform-import-path-rewrite.ts'
-import transformReactJsxSource from './transform-react-jsx-source.ts'
+import transformReactJsx from './transform-react-jsx.ts'
 import transformReactRefresh from './transform-react-refresh.ts'
 import { CreatePlainTransformer, CreateTransformer } from './transformer.ts'
 
 export interface CompileOptions {
-    target?: string
-    mode?: 'development' | 'production'
-    rewriteImportPath?: (importPath: string) => string
-    reactRefresh?: boolean
+    target: string
+    mode: 'development' | 'production'
+    reactRefresh: boolean
+    rewriteImportPath: (importPath: string) => string
 }
 
 export function createSourceFile(fileName: string, source: string) {
@@ -29,18 +29,14 @@ const allowTargets = [
     'es2020',
 ]
 
-export function compile(fileName: string, source: string, { target: targetName = 'ES2015', mode, rewriteImportPath, reactRefresh }: CompileOptions) {
+export function compile(fileName: string, source: string, { target: targetName, mode, rewriteImportPath, reactRefresh }: CompileOptions) {
     const target = allowTargets.indexOf(targetName.toLowerCase())
     const transformers: ts.CustomTransformers = { before: [], after: [] }
-    if (mode === 'development') {
-        transformers.before!.push(CreatePlainTransformer(transformReactJsxSource))
-    }
+    transformers.before!.push(CreatePlainTransformer(transformReactJsx, { mode, rewriteImportPath }))
     if (reactRefresh) {
         transformers.before!.push(CreateTransformer(transformReactRefresh))
     }
-    if (rewriteImportPath) {
-        transformers.after!.push(CreatePlainTransformer(transformImportPathRewrite, rewriteImportPath))
-    }
+    transformers.after!.push(CreatePlainTransformer(transformImportPathRewrite, rewriteImportPath))
 
     return ts.transpileModule(source, {
         fileName,

@@ -1,4 +1,10 @@
 export const hashShort = 7
+export const reHttp = /^https?:\/\//i
+export const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i
+export const reStyleModuleExt = /\.(css|less|sass|scss)$/i
+export const reSVGExt = /\.(svg|svgz)$/i
+export const reMDExt = /\.(md|mdx)$/i
+export const reHashJs = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
 
 export default {
     isNumber(a: any): a is number {

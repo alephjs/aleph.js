@@ -1,10 +1,11 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useEffect } from 'https://esm.sh/react'
+import { resetImports } from './importor.ts'
 import util from './util.ts'
 
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
 const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
-export function renderHead(styleModules?: string[]) {
+export async function renderHead(styleModules?: string[]) {
     const tags: string[] = []
     serverHeadElements.forEach(({ type, props }) => {
         if (type === 'title') {
@@ -27,6 +28,7 @@ export function renderHead(styleModules?: string[]) {
             }
         }
     })
+    await Promise.all(resetImports().map(path => import(path)))
     styleModules?.filter(id => serverStyles.has(id)).forEach(id => {
         const { css, asLink } = serverStyles.get(id)!
         if (asLink) {

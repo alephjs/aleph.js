@@ -6,15 +6,10 @@ import { createRouter } from './router.ts'
 import { colors, ensureDir, path, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { APIHandle, Config, Location, RouterURL } from './types.ts'
-import util, { hashShort } from './util.ts'
+import util, { hashShort, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from './util.ts'
 import './vendor/clean-css-builds/v4.2.2.js'
 import { Document } from './vendor/deno-dom/document.ts'
 import less from './vendor/less/less.js'
-
-const reHttp = /^https?:\/\//i
-const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i
-const reStyleModuleExt = /\.(css|less|sass|scss)$/i
-const reHashJs = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
 
 const { CleanCSS } = window as any
 const cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
@@ -396,6 +391,8 @@ export default class Project {
         Object.assign(globalThis, {
             ALEPH_ENV: {
                 appDir: this.rootDir,
+                config: this.config,
+                mode: this.mode,
             },
             document: new Document(),
             innerWidth: 1920,
@@ -913,12 +910,12 @@ export default class Project {
                         path.dirname(path.resolve('/', url)),
                         path.resolve('/', dep.url.replace(reModuleExt, ''))
                     )
-                    mod.jsContent = mod.jsContent.replace(/(import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
+                    mod.jsContent = mod.jsContent.replace(/(i|Import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
                             importPath.slice(0, importPath.length - (hashShort + 4)) === depImportPath
                         ) {
-                            return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}${end}`
+                            return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}${end || ''}`
                         }
                         return s
                     })
@@ -965,7 +962,7 @@ export default class Project {
                                 reHashJs.test(importPath) &&
                                 importPath.slice(0, importPath.length - (hashShort + 4)) === depImportPath
                             ) {
-                                return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}${end}`
+                                return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}${end || ''}`
                             }
                             return s
                         })
@@ -1082,7 +1079,7 @@ export default class Project {
             const { default: Page } = await import("file://" + pageModule.jsFile)
             const data = await this.getData()
             const html = renderPage(data, url, appModule ? App : undefined, Page)
-            const head = renderHead([
+            const head = await renderHead([
                 this._lookupStyles(pageModule),
                 appModule ? this._lookupStyles(appModule) : []
             ].flat())
