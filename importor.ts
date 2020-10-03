@@ -12,13 +12,12 @@ export function resetImports() {
 
 interface ImportProps {
     from: string
-    rawPath: string
-    resolveDir: string
 }
 
-export function Import({ from, rawPath, resolveDir }: ImportProps) {
+export function Import(props: ImportProps) {
+    const { from: path, rawPath, resolveDir } = props as any
     if (reStyleModuleExt.test(rawPath)) {
-        return React.createElement(StyleLoader, { path: from, rawPath, resolveDir })
+        return React.createElement(StyleLoader, { path: util.cleanPath(`${resolveDir}/${path}`), rawPath })
     }
     // todo: more loaders
     return null
@@ -27,16 +26,15 @@ export function Import({ from, rawPath, resolveDir }: ImportProps) {
 interface LoaderProps {
     path: string
     rawPath: string
-    resolveDir: string
 }
 
-export function StyleLoader({ path, rawPath, resolveDir }: LoaderProps) {
+export function StyleLoader({ path }: LoaderProps) {
     if (typeof Deno !== 'undefined') {
-        serverImports.add(util.cleanPath(`${resolveDir}/${path}`))
+        serverImports.add(path)
     }
 
     useEffect(() => {
-        import(util.cleanPath(`/_aleph/${resolveDir}/${path}`))
+        import(`/_aleph${path}`)
         return () => { }
     }, [])
 
