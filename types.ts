@@ -3,16 +3,18 @@ export interface Config {
     readonly outputDir: string
     readonly baseUrl: string
     readonly defaultLocale: string
-    readonly ssr: boolean | {
-        fallback?: string,
-        include?: string[],
-        exclude?: string[]
-    }
+    readonly ssr: boolean | SSROptions
     readonly buildTarget: string
     readonly sourceMap: boolean
     readonly importMap: {
         imports: Record<string, string>
     }
+}
+
+export interface SSROptions {
+    readonly fallback: string, // default is 404.html
+    readonly include?: string[],
+    readonly exclude?: string[]
 }
 
 export interface AppManifest {
@@ -22,11 +24,11 @@ export interface AppManifest {
 }
 
 export interface RouterURL {
-    locale: string
-    pathname: string
-    pagePath: string
-    params: Record<string, string>
-    query: URLSearchParams
+    readonly locale: string
+    readonly pathname: string
+    readonly pagePath: string
+    readonly params: Record<string, string>
+    readonly query: URLSearchParams
 }
 
 export interface Location {
@@ -60,6 +62,6 @@ export interface APIHandle {
 }
 
 export interface Module {
-    moduleId: string,
-    hash: string,
+    readonly id: string,
+    readonly hash: string,
 }

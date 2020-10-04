@@ -3,11 +3,12 @@ import util, { reStyleModuleExt } from './util.ts'
 
 const serverImports: Set<string> = new Set()
 
-// reset imports and returns them
-export function resetImports() {
-    const a = Array.from(serverImports)
+export async function importAll() {
+    const { appDir, buildID } = (window as any).ALEPH_ENV as { appDir: string, buildID: string }
+    for (const p of serverImports.values()) {
+        await import('file://' + util.cleanPath(`${appDir}/.aleph/build-${buildID}/${p}`))
+    }
     serverImports.clear()
-    return a
 }
 
 interface ImportProps {

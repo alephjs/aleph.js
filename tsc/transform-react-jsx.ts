@@ -6,19 +6,24 @@ export default function transformReactJsx(sf: ts.SourceFile, node: ts.Node, opti
         let props = Array.from(node.attributes.properties)
 
         if (node.tagName.getText() === 'Import') {
+            props = []
             let rawPath = ''
-            for (let i = 0; i < props.length; i++) {
-                const prop = props[i]
+            for (let i = 0; i < node.attributes.properties.length; i++) {
+                const prop = node.attributes.properties[i]
                 if (ts.isJsxAttribute(prop) && prop.name.text === 'from' && prop.initializer && ts.isStringLiteral(prop.initializer)) {
                     rawPath = prop.initializer.text
-                    props[i] = ts.createJsxAttribute(
-                        ts.createIdentifier('from'),
-                        ts.createJsxExpression(undefined, ts.createStringLiteral(options.rewriteImportPath(rawPath)))
-                    )
-                    break
+                } else {
+                    props.push(prop)
                 }
             }
             if (rawPath) {
+                // ensure 'from' prop is the first one of all props
+                props.unshift(
+                    ts.createJsxAttribute(
+                        ts.createIdentifier('from'),
+                        ts.createJsxExpression(undefined, ts.createStringLiteral(options.rewriteImportPath(rawPath)))
+                    )
+                )
                 props.push(
                     ts.createJsxAttribute(
                         ts.createIdentifier('rawPath'),

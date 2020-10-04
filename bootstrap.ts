@@ -10,10 +10,10 @@ export default async function bootstrap({
     baseUrl,
     defaultLocale,
     locales,
-    keyModules,
+    coreModules,
     pageModules
 }: AppManifest & {
-    keyModules: Record<string, Module>
+    coreModules: Record<string, Module>
     pageModules: Record<string, Module>
 }) {
     const { document } = window as any
@@ -46,9 +46,9 @@ export default async function bootstrap({
         { default: E404 },
         { default: Page }
     ] = await Promise.all([
-        keyModules.data ? import(getModuleImportUrl(baseUrl, keyModules.data)) : Promise.resolve({ default: {} }),
-        keyModules.app ? import(getModuleImportUrl(baseUrl, keyModules.app)) : Promise.resolve({}),
-        keyModules['404'] ? import(getModuleImportUrl(baseUrl, keyModules['404'])) : Promise.resolve({}),
+        coreModules.data ? import(getModuleImportUrl(baseUrl, coreModules.data)) : Promise.resolve({ default: {} }),
+        coreModules.app ? import(getModuleImportUrl(baseUrl, coreModules.app)) : Promise.resolve({}),
+        coreModules['404'] ? import(getModuleImportUrl(baseUrl, coreModules['404'])) : Promise.resolve({}),
         pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({}),
     ])
     const el = React.createElement(

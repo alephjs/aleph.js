@@ -9,7 +9,7 @@ import util, { hashShort } from './util.ts'
 export function ALEPH({ initial }: {
     initial: {
         manifest: AppManifest
-        pageModules: Record<string, { moduleId: string, hash: string }>
+        pageModules: Record<string, Module>
         url: RouterURL
         data: Record<string, any>
         components: Record<string, ComponentType<any>>
@@ -80,16 +80,16 @@ export function ALEPH({ initial }: {
             console.log('[DATA]', data)
             setData(data)
         }
-        const onAddModule = async ({ moduleId, hash }: Module) => {
-            if (moduleId === '/404.js') {
-                const { default: Component } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
+        const onAddModule = async (mod: Module) => {
+            if (mod.id === '/404.js') {
+                const { default: Component } = await import(getModuleImportUrl(baseUrl, mod) + '?t=' + Date.now())
                 if (util.isLikelyReactComponent(Component)) {
                     setE404({ Component })
                 } else {
                     setE404({ Component: E404Page })
                 }
-            } else if (moduleId === '/app.js') {
-                const { default: Component } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
+            } else if (mod.id === '/app.js') {
+                const { default: Component } = await import(getModuleImportUrl(baseUrl, mod) + '?t=' + Date.now())
                 if (util.isLikelyReactComponent(Component)) {
                     setApp({ Component })
                 } else {
@@ -98,15 +98,15 @@ export function ALEPH({ initial }: {
                         Component: E501App
                     }))
                 }
-            } else if (moduleId === '/data.js' || moduleId === '/data/index.js') {
-                const { default: data } = await import(getModuleImportUrl(baseUrl, { moduleId, hash }) + '?t=' + Date.now())
+            } else if (mod.id === '/data.js' || mod.id === '/data/index.js') {
+                const { default: data } = await import(getModuleImportUrl(baseUrl, mod) + '?t=' + Date.now())
                 console.log('[DATA]', data)
                 setData(data)
-            } else if (moduleId.startsWith('/pages/')) {
-                const pagePath = util.trimSuffix(moduleId, '.js').replace(/\s+/g, '-').replace(/\/?index$/i, '/')
+            } else if (mod.id.startsWith('/pages/')) {
+                const pagePath = util.trimSuffix(mod.id, '.js').replace(/\s+/g, '-').replace(/\/?index$/i, '/')
                 setPageModules(pageModules => ({
                     ...pageModules,
-                    [pagePath]: { moduleId, hash }
+                    [pagePath]: mod
                 }))
             }
         }
@@ -120,10 +120,10 @@ export function ALEPH({ initial }: {
                 setData({})
             } else if (moduleId.startsWith('/pages/')) {
                 setPageModules(pageModules => {
-                    const newPageModules: Record<string, { moduleId: string, hash: string }> = {}
+                    const newPageModules: Record<string, Module> = {}
                     for (const pagePath in pageModules) {
                         const mod = pageModules[pagePath]
-                        if (mod.moduleId !== moduleId) {
+                        if (mod.id !== moduleId) {
                             newPageModules[pagePath] = mod
                         }
                     }
@@ -192,6 +192,6 @@ export async function redirect(url: string, replace: boolean) {
     events.emit('popstate', { type: 'popstate' })
 }
 
-export function getModuleImportUrl(baseUrl: string, { moduleId, hash }: Module) {
-    return util.cleanPath(baseUrl + '/_aleph/' + moduleId.replace(/\.js$/, `.${hash.slice(0, hashShort)}.js`))
+export function getModuleImportUrl(baseUrl: string, mod: Module) {
+    return util.cleanPath(baseUrl + '/_aleph/' + mod.id.replace(/\.js$/, `.${mod.hash.slice(0, hashShort)}.js`))
 }

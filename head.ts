@@ -1,5 +1,5 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useEffect } from 'https://esm.sh/react'
-import { resetImports } from './importor.ts'
+import { importAll } from './importor.ts'
 import util from './util.ts'
 
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
@@ -28,10 +28,7 @@ export async function renderHead(styleModules?: string[]) {
             }
         }
     })
-    await Promise.all(resetImports().map(p => {
-        const { appDir, buildId } = (window as any).ALEPH_ENV as { appDir: string, buildId: string }
-        return util.cleanPath(`${appDir}/.aleph/build-${buildId}/${p}`)
-    }).map(p => import('file://' + p)))
+    await importAll()
     styleModules?.filter(id => serverStyles.has(id)).forEach(id => {
         const { css, asLink } = serverStyles.get(id)!
         if (asLink) {

@@ -2,7 +2,7 @@ import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './server/mime.ts'
 import { listenAndServe, path, ServerRequest, walk } from './std.ts'
-import util from './util.ts'
+import util, { existsDirSync, existsFileSync } from './util.ts'
 import { version } from './version.ts'
 
 const commands = ['init', 'fetch', 'dev', 'start', 'build']
@@ -89,7 +89,7 @@ async function main() {
     }
 
     // proxy https://deno.land/x/aleph
-    if (util.existsFile('./import_map.json')) {
+    if (existsFileSync('./import_map.json')) {
         const { imports } = JSON.parse(Deno.readTextFileSync('./import_map.json'))
         Object.assign(globalThis, { ALEPH_IMPORT_MAP: { imports } })
         if (imports['https://deno.land/x/aleph/']) {
@@ -150,7 +150,7 @@ async function main() {
         const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.mjs', '.ts', '.tsx'], skip: [/\.d\.ts$/i], dep: 1 }
         const pagesDir = path.join(path.resolve(args[0] || '.'), 'pages')
         let hasIndexPage = false
-        if (util.existsDir(pagesDir)) {
+        if (existsDirSync(pagesDir)) {
             for await (const { path: p } of walk(pagesDir, walkOptions)) {
                 if (path.basename(p).split('.')[0] === 'index') {
                     hasIndexPage = true
@@ -167,8 +167,8 @@ async function main() {
     const command = hasCommand ? args.shift() : 'dev'
     import(`./cli/${command}.ts`).then(({ default: cmd }) => {
         const appDir = path.resolve(args[0] || '.')
-        if (command !== 'init' && !util.existsDir(appDir)) {
-            log.fatal('No such app directory:', appDir)
+        if (command !== 'init' && !existsDirSync(appDir)) {
+            log.fatal('No such directory:', appDir)
         }
         cmd(appDir, argOptions)
     })

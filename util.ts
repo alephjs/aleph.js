@@ -104,6 +104,12 @@ export default {
         }
         return s
     },
+    ensureExt(s: string, ext: string): string {
+        if (s.endsWith(ext)) {
+            return s
+        }
+        return s + ext
+    },
     splitBy(s: string, splitter: string): [string, string] {
         const i = s.indexOf(splitter)
         if (i >= 0) {
@@ -150,41 +156,43 @@ export default {
             timers.delete(id)
             callback()
         }, delay))
-    },
-    // @require Deno
-    existsDir(path: string) {
-        if (typeof Deno === 'undefined') {
-            throw new Error('require Deno')
+    }
+}
+
+// @require Deno
+export function existsDirSync(path: string) {
+    if (typeof Deno === 'undefined') {
+        throw new Error('require Deno')
+    }
+    try {
+        const fi = Deno.lstatSync(path)
+        if (fi.isDirectory) {
+            return true
         }
-        try {
-            const fi = Deno.lstatSync(path)
-            if (fi.isDirectory) {
-                return true
-            }
+        return false
+    } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
             return false
-        } catch (err) {
-            if (err instanceof Deno.errors.NotFound) {
-                return false
-            }
-            throw err
         }
-    },
-    // @require Deno
-    existsFile(path: string) {
-        if (typeof Deno === 'undefined') {
-            throw new Error('require Deno')
+        throw err
+    }
+}
+
+// @require Deno
+export function existsFileSync(path: string) {
+    if (typeof Deno === 'undefined') {
+        throw new Error('require Deno')
+    }
+    try {
+        const fi = Deno.lstatSync(path)
+        if (fi.isFile) {
+            return true
         }
-        try {
-            const fi = Deno.lstatSync(path)
-            if (fi.isFile) {
-                return true
-            }
+        return false
+    } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
             return false
-        } catch (err) {
-            if (err instanceof Deno.errors.NotFound) {
-                return false
-            }
-            throw err
         }
+        throw err
     }
 }
