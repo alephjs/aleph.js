@@ -7,13 +7,8 @@ import { colors, ensureDir, path, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { APIHandle, Config, Location, RouterURL } from './types.ts'
 import util, { hashShort, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from './util.ts'
-import './vendor/clean-css-builds/v4.2.2.js'
-import { Document } from './vendor/deno-dom/document.ts'
-import less from './vendor/less/less.js'
+import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
-
-const { CleanCSS } = window as any
-const cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
 
 interface Module {
     id: string
@@ -454,7 +449,7 @@ export default class Project {
         const precompileUrls = [
             'https://deno.land/x/aleph/bootstrap.ts',
             'https://deno.land/x/aleph/renderer.ts',
-            'https://deno.land/x/aleph/vendor/tslib/tslib.js',
+            'https://deno.land/x/aleph/tsc/tslib.js',
         ]
         if (this.isDev) {
             precompileUrls.push('https://deno.land/x/aleph/hmr.ts')
@@ -633,7 +628,7 @@ export default class Project {
         }
         const module = this._newModule('/main.js')
         const deps = [
-            'https://deno.land/x/aleph/vendor/tslib/tslib.js',
+            'https://deno.land/x/aleph/tsc/tslib.js',
             'https://deno.land/x/aleph/app.ts',
             this.isDev && 'https://deno.land/x/aleph/hmr.ts'
         ].filter(Boolean).map(url => ({
@@ -673,7 +668,7 @@ export default class Project {
 
         module.jsContent = [
             this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
-            'import "./-/deno.land/x/aleph/vendor/tslib/tslib.js";',
+            'import "./-/deno.land/x/aleph/tsc/tslib.js";',
             'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js";',
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
         ].filter(Boolean).join(this.isDev ? '\n' : '')
@@ -877,7 +872,7 @@ export default class Project {
                 }
                 const jsContent = outputText.replace(/import([^'"]*)("|')tslib("|')(\)|;)?/g, 'import$1' + JSON.stringify(relativePath(
                     path.dirname(mod.sourceFilePath),
-                    '/-/deno.land/x/aleph/vendor/tslib/tslib.js'
+                    '/-/deno.land/x/aleph/tsc/tslib.js'
                 )) + '$4')
                 if (this.isDev) {
                     mod.jsContent = jsContent
