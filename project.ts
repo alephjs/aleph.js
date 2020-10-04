@@ -10,11 +10,17 @@ import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reMod
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
 
+interface Dep {
+    url: string
+    hash: string
+    async?: boolean
+}
+
 interface Module {
     id: string
     url: string
     isRemote: boolean
-    deps: { url: string, hash: string }[]
+    deps: Dep[]
     sourceFilePath: string
     sourceType: string
     sourceHash: string
@@ -647,10 +653,7 @@ export default class Project {
         }
         if (this.#modules.has('/404.js')) {
             const { url, hash } = this.#modules.get('/404.js')!
-            config.coreModules['404'] = {
-                id: '/404.js',
-                hash
-            }
+            config.coreModules['404'] = { id: '/404.js', hash }
             deps.push({ url, hash })
         }
         this.#pageModules.forEach(({ moduleID }, pagePath) => {
@@ -658,6 +661,16 @@ export default class Project {
             config.pageModules[pagePath] = { id: moduleID, hash }
             deps.push({ url, hash })
         })
+
+        for (const key in config.coreModules) {
+            const m = config.coreModules[key]
+            m.asyncDeps = this._lookupStyleDeps(m.id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+        }
+
+        for (const key in config.pageModules) {
+            const m = config.pageModules[key]
+            m.asyncDeps = this._lookupStyleDeps(m.id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+        }
 
         module.jsContent = [
             this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
@@ -864,7 +877,7 @@ export default class Project {
                     target: this.config.buildTarget,
                     mode: this.mode,
                     reactRefresh: this.isDev && !mod.isRemote && (mod.id === '/404.js' || mod.id === '/app.js' || mod.id.startsWith('/pages/') || mod.id.startsWith('/components/')),
-                    rewriteImportPath: (path: string) => this._rewriteImportPath(mod, path),
+                    rewriteImportPath: (path: string, async?: boolean) => this._rewriteImportPath(mod, path, async),
                 }
                 const { diagnostics, outputText, sourceMapText } = compile(mod.sourceFilePath, sourceContent, compileOptions)
                 if (diagnostics && diagnostics.length > 0) {
@@ -994,7 +1007,7 @@ export default class Project {
         })
     }
 
-    private _rewriteImportPath(mod: Module, importPath: string): string {
+    private _rewriteImportPath(mod: Module, importPath: string, async?: boolean): string {
         const { importMap } = this.config
         let rewrittenPath: string
         if (importPath in importMap.imports) {
@@ -1029,7 +1042,7 @@ export default class Project {
             }
         }
         if (reHttp.test(importPath)) {
-            mod.deps.push({ url: importPath, hash: '' })
+            mod.deps.push({ url: importPath, hash: '', async })
         } else {
             if (mod.isRemote) {
                 const sourceUrl = new URL(mod.url)
@@ -1037,9 +1050,9 @@ export default class Project {
                 if (!pathname.startsWith('/')) {
                     pathname = path.join(path.dirname(sourceUrl.pathname), importPath)
                 }
-                mod.deps.push({ url: sourceUrl.protocol + '//' + sourceUrl.host + pathname, hash: '' })
+                mod.deps.push({ url: sourceUrl.protocol + '//' + sourceUrl.host + pathname, hash: '', async })
             } else {
-                mod.deps.push({ url: path.resolve('/', path.dirname(mod.url), importPath), hash: '' })
+                mod.deps.push({ url: path.resolve('/', path.dirname(mod.url), importPath), hash: '', async })
             }
         }
 
@@ -1086,8 +1099,8 @@ export default class Project {
             const data = await this.getData()
             const html = renderPage(data, url, appModule ? App : undefined, Page)
             const head = await renderHead([
-                appModule ? this._lookupStyles(appModule) : [],
-                this._lookupStyles(pageModule),
+                appModule ? this._lookupStyleDeps(appModule.id) : [],
+                this._lookupStyleDeps(pageModule.id),
             ].flat())
             ret.code = 200
             ret.head = head
@@ -1103,19 +1116,19 @@ export default class Project {
         return ret
     }
 
-    private _lookupStyles(mod: Module, a: string[] = [], s: Set<string> = new Set()): string[] {
-        if (s.has(mod.id)) {
+    private _lookupStyleDeps(moduleID: string, a: Dep[] = [], s: Set<string> = new Set()) {
+        const mod = this.getModule(moduleID)
+        if (!mod) {
             return a
         }
-        s.add(mod.id)
-        a.push(...mod.deps.map(({ url }) => url).filter(url => reStyleModuleExt.test(url)))
+        if (s.has(moduleID)) {
+            return a
+        }
+        s.add(moduleID)
+        a.push(...mod.deps.filter(({ url }) => reStyleModuleExt.test(url)))
         mod.deps.forEach(({ url }) => {
             if (reModuleExt.test(url) && !reHttp.test(url)) {
-                const id = url.replace(reModuleExt, '.js')
-                const smod = this.getModule(id)
-                if (smod) {
-                    this._lookupStyles(smod, a, s)
-                }
+                this._lookupStyleDeps(url.replace(reModuleExt, '.js'), a, s)
             }
         })
         return a

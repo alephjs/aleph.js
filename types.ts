@@ -62,6 +62,7 @@ export interface APIHandle {
 }
 
 export interface Module {
-    readonly id: string,
-    readonly hash: string,
+    readonly id: string
+    readonly hash: string
+    readonly asyncDeps?: { url: string, hash: string }[]
 }

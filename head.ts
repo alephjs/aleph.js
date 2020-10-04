@@ -1,11 +1,11 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useEffect } from 'https://esm.sh/react'
-import { importAll } from './importor.ts'
-import util from './util.ts'
+import util, { hashShort } from './util.ts'
 
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
 const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
-export async function renderHead(styleModules?: string[]) {
+export async function renderHead(styleModules?: { url: string, hash: string, async?: boolean }[]) {
+    const { appDir, buildID } = (window as any).ALEPH_ENV as { appDir: string, buildID: string }
     const tags: string[] = []
     serverHeadElements.forEach(({ type, props }) => {
         if (type === 'title') {
@@ -28,13 +28,17 @@ export async function renderHead(styleModules?: string[]) {
             }
         }
     })
-    await importAll()
-    styleModules?.filter(id => serverStyles.has(id)).forEach(id => {
-        const { css, asLink } = serverStyles.get(id)!
-        if (asLink) {
-            tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(id)} />`)
-        } else {
-            tags.push(`<style type="text/css" data-module-id=${JSON.stringify(id)}>${css}</style>`)
+    await Promise.all(styleModules?.filter(({ async }) => !!async).map(({ url, hash }) => {
+        return import('file://' + util.cleanPath(`${appDir}/.aleph/build-${buildID}/${url}.${hash.slice(0, hashShort)}.js`))
+    }) || [])
+    styleModules?.forEach(({ url }) => {
+        if (serverStyles.has(url)) {
+            const { css, asLink } = serverStyles.get(url)!
+            if (asLink) {
+                tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(url)} />`)
+            } else {
+                tags.push(`<style type="text/css" data-module-id=${JSON.stringify(url)}>${css}</style>`)
+            }
         }
     })
     serverHeadElements.splice(0, serverHeadElements.length)

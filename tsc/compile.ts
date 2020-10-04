@@ -8,7 +8,7 @@ export interface CompileOptions {
     target: string
     mode: 'development' | 'production'
     reactRefresh: boolean
-    rewriteImportPath: (importPath: string) => string
+    rewriteImportPath: (importPath: string, async?: boolean) => string
 }
 
 export function createSourceFile(fileName: string, source: string) {

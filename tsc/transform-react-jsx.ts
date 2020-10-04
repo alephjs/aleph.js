@@ -1,39 +1,15 @@
 import ts from 'https://esm.sh/typescript'
-import { path } from '../std.ts'
 
-export default function transformReactJsx(sf: ts.SourceFile, node: ts.Node, options: { mode: 'development' | 'production', rewriteImportPath: (importPath: string) => string }): ts.VisitResult<ts.Node> {
+export default function transformReactJsx(sf: ts.SourceFile, node: ts.Node, options: { mode: 'development' | 'production', rewriteImportPath: (importPath: string, async: boolean) => string }): ts.VisitResult<ts.Node> {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
         let props = Array.from(node.attributes.properties)
 
         if (node.tagName.getText() === 'Import') {
-            props = []
-            let rawPath = ''
             for (let i = 0; i < node.attributes.properties.length; i++) {
                 const prop = node.attributes.properties[i]
                 if (ts.isJsxAttribute(prop) && prop.name.text === 'from' && prop.initializer && ts.isStringLiteral(prop.initializer)) {
-                    rawPath = prop.initializer.text
-                } else {
-                    props.push(prop)
+                    options.rewriteImportPath(prop.initializer.text, true)
                 }
-            }
-            if (rawPath) {
-                // ensure 'from' prop is the first one of all props
-                props.unshift(
-                    ts.createJsxAttribute(
-                        ts.createIdentifier('from'),
-                        ts.createJsxExpression(undefined, ts.createStringLiteral(options.rewriteImportPath(rawPath)))
-                    )
-                )
-                props.push(
-                    ts.createJsxAttribute(
-                        ts.createIdentifier('rawPath'),
-                        ts.createJsxExpression(undefined, ts.createStringLiteral(rawPath))
-                    ),
-                    ts.createJsxAttribute(
-                        ts.createIdentifier('resolveDir'),
-                        ts.createJsxExpression(undefined, ts.createStringLiteral(path.dirname(sf.fileName)))
-                    )
-                )
             }
         }
 

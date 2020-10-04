@@ -4,7 +4,7 @@ import { ALEPH, getModuleImportUrl } from './app.ts'
 import { ErrorBoundary } from './error.ts'
 import { createRouter } from './router.ts'
 import type { AppManifest, Module, RouterURL } from './types.ts'
-import util from './util.ts'
+import util, { hashShort, reModuleExt } from './util.ts'
 
 export default async function bootstrap({
     baseUrl,
@@ -39,7 +39,11 @@ export default async function bootstrap({
         )
     }
 
-    const pageModule = pageModules[url.pagePath]!
+    const pageModule = pageModules[url.pagePath]
+    if (!pageModule) {
+        throw new Error('page module not found')
+    }
+
     const [
         { default: data },
         { default: App },
@@ -67,6 +71,17 @@ export default async function bootstrap({
             }
         )
     )
+
+    // import async sytle dependencies
+    const asyncDeps: { url: string, hash: string }[] = []
+    for (const key in coreModules) {
+        const mod = coreModules[key]
+        mod.asyncDeps?.forEach(deps => asyncDeps.push(deps))
+    }
+    pageModule.asyncDeps?.forEach(deps => asyncDeps.push(deps))
+    await Promise.all(asyncDeps.map(dep => {
+        return import(util.cleanPath(`${baseUrl}/_aleph/${dep.url.replace(reModuleExt, '')}.${dep.hash.slice(0, hashShort)}.js`))
+    }))
 
     if (dataEl) {
         hydrate(el, mainEl)

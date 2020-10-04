@@ -4,7 +4,7 @@ import { E404Page, E501App, E501Page } from './error.ts'
 import events from './events.ts'
 import { createRouter } from './router.ts'
 import type { AppManifest, Module, RouterURL } from './types.ts'
-import util, { hashShort } from './util.ts'
+import util, { hashShort, reModuleExt } from './util.ts'
 
 export function ALEPH({ initial }: {
     initial: {
@@ -51,6 +51,9 @@ export function ALEPH({ initial }: {
         if (url.pagePath && url.pagePath in pageModules) {
             const mod = pageModules[url.pagePath]!
             const { default: Component } = await import(getModuleImportUrl(baseUrl, mod))
+            await Promise.all(mod.asyncDeps?.map(dep => {
+                return import(util.cleanPath(`${baseUrl}/_aleph/${dep.url.replace(reModuleExt, '')}.${dep.hash.slice(0, hashShort)}.js`))
+            }) || [])
             if (util.isLikelyReactComponent(Component)) {
                 setPage({ url, Component })
             } else {
@@ -193,5 +196,5 @@ export async function redirect(url: string, replace: boolean) {
 }
 
 export function getModuleImportUrl(baseUrl: string, mod: Module) {
-    return util.cleanPath(baseUrl + '/_aleph/' + mod.id.replace(/\.js$/, `.${mod.hash.slice(0, hashShort)}.js`))
+    return util.cleanPath(baseUrl + '/_aleph/' + util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js`)
 }
