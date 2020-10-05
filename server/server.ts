@@ -179,6 +179,15 @@ export async function start(appDir: string, port: number, isDev = false) {
                         }
                     }
 
+                    if (pathname === '/favicon.ico') {
+                        req.respond({
+                            status: 404,
+                            headers: new Headers({ 'Content-Type': 'text/plain' }),
+                            body: 'icon not found'
+                        })
+                        continue
+                    }
+
                     // ssr
                     const [status, html] = await project.getPageHtml({ pathname, search: url.search })
                     req.respond({
