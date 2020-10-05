@@ -1,5 +1,5 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useEffect } from 'https://esm.sh/react'
-import type { AlephEnv } from './types.ts'
+import type { AlephEnv } from './project.ts'
 import util, { hashShort } from './util.ts'
 
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []

@@ -17,13 +17,6 @@ export interface SSROptions {
     readonly exclude?: string[]
 }
 
-export interface AlephEnv {
-    appRoot: string
-    buildID: string
-    config: Config
-    mode: 'development' | 'production'
-}
-
 export interface AppManifest {
     readonly baseUrl: string
     readonly defaultLocale: string

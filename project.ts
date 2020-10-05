@@ -5,22 +5,16 @@ import log from './log.ts'
 import { createRouter } from './router.ts'
 import { colors, ensureDir, path, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
-import type { AlephEnv, APIHandle, Config, Location, RouterURL } from './types.ts'
+import type { APIHandle, Config, Location, RouterURL } from './types.ts'
 import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
-
-interface Dep {
-    url: string
-    hash: string
-    async?: boolean
-}
 
 interface Module {
     id: string
     url: string
     isRemote: boolean
-    deps: Dep[]
+    deps: { url: string, hash: string, async?: boolean }[]
     sourceFilePath: string
     sourceType: string
     sourceHash: string
@@ -34,6 +28,13 @@ interface RenderResult {
     code: number
     head: string[]
     body: string
+}
+
+export interface AlephEnv {
+    appRoot: string
+    buildID: string
+    config: Config
+    mode: 'development' | 'production'
 }
 
 export default class Project {
@@ -99,7 +100,6 @@ export default class Project {
             moduleID === '/404.js' ||
             moduleID === '/app.js' ||
             moduleID === '/data.js' ||
-            (moduleID === '/data/index.js' && !this.#modules.has('/data.js')) ||
             moduleID.startsWith('/pages/') ||
             moduleID.startsWith('/components/') ||
             reStyleModuleExt.test(moduleID)
@@ -136,9 +136,6 @@ export default class Project {
                     modId = id + '.js'
                 }
             }
-        }
-        if (!this.#modules.has(modId) && modId == '/data.js') {
-            modId = '/data/index.js'
         }
         if (!this.#modules.has(modId)) {
             log.warn(`can't get the module by path '${pathname}(${modId})'`)
@@ -220,7 +217,7 @@ export default class Project {
     }
 
     async getData() {
-        const mod = this.#modules.get('/data.js') || this.#modules.get('/data/index.js')
+        const mod = this.#modules.get('/data.js')
         if (mod) {
             try {
                 const { default: Data } = await import("file://" + mod.jsFile)
@@ -290,8 +287,8 @@ export default class Project {
         }))
 
         // write static data
-        if (this.#modules.has('/data.js') || this.#modules.has('/data/index.js')) {
-            const { hash } = this.#modules.get('/data.js') || this.#modules.get('/data/index.js')!
+        if (this.#modules.has('/data.js')) {
+            const { hash } = this.#modules.get('/data.js')!
             const data = this.getData()
             await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), `export default ${JSON.stringify(data)}`)
         }
@@ -388,8 +385,7 @@ export default class Project {
     }
 
     private async _init() {
-        const walkOptions = { includeDirs: false, exts: ['.js', '.ts', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)s$/i] }
-        const dataDir = path.join(this.srcDir, 'data')
+        const walkOptions = { includeDirs: false, exts: ['.js', '.ts', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
 
@@ -412,32 +408,21 @@ export default class Project {
             $RefreshSig$: () => (type: any) => type,
         })
 
-        for await (const { path: p, isDirectory, isFile } of walk(this.srcDir, { maxDepth: 1 })) {
+        for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.jsx', '.tsx'] })) {
             const name = path.basename(p)
-            if (isDirectory && p !== this.srcDir) {
-                switch (name) {
-                    case 'api':
-                        for await (const { path: p } of walk(apiDir, walkOptions)) {
-                            await this._compile('/api' + util.trimPrefix(p, apiDir))
-                        }
-                        break
-                    case 'data':
-                        for await (const { path: p } of walk(dataDir, { ...walkOptions, maxDepth: 1 })) {
-                            const name = path.basename(p)
-                            if (name.replace(reModuleExt, '') === 'index') {
-                                await this._compile('/data/' + name)
-                            }
-                        }
-                        break
-                }
-            } else if (isFile && reModuleExt.test(name)) {
-                switch (name.replace(reModuleExt, '')) {
-                    case 'app':
-                    case 'data':
-                    case '404':
-                        await this._compile('/' + name)
-                        break
-                }
+            console.log(name)
+            switch (name.replace(reModuleExt, '')) {
+                case 'app':
+                case 'data':
+                case '404':
+                    await this._compile('/' + name)
+                    break
+            }
+        }
+
+        if (existsDirSync(apiDir)) {
+            for await (const { path: p } of walk(apiDir, walkOptions)) {
+                await this._compile('/api' + util.trimPrefix(p, apiDir))
             }
         }
 
@@ -496,8 +481,7 @@ export default class Project {
                     switch (moduleID) {
                         case '/404.js':
                         case '/app.js':
-                        case '/data.js':
-                        case '/data/index.js': {
+                        case '/data.js': {
                             return true
                         }
                         default: {
@@ -520,7 +504,7 @@ export default class Project {
                     util.debounceX(moduleID, () => {
                         const removed = !existsFileSync(p)
                         const cleanup = () => {
-                            if (moduleID === '/app.js' || moduleID === '/data.js' || moduleID === '/data/index.js') {
+                            if (moduleID === '/app.js' || moduleID === '/data.js') {
                                 this._clearPageRenderCache()
                             } else if (moduleID.startsWith('/pages/')) {
                                 if (removed) {
@@ -638,8 +622,8 @@ export default class Project {
             url: String(url),
             hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
         }))
-        if (this.#modules.has('/data.js') || this.#modules.has('/data/index.js')) {
-            const { id, url, hash } = this.#modules.get('/data.js') || this.#modules.get('/data/index.js')!
+        if (this.#modules.has('/data.js')) {
+            const { id, url, hash } = this.#modules.get('/data.js')!
             config.coreModules.data = { id, hash }
             deps.push({ url, hash })
         }
@@ -864,6 +848,8 @@ export default class Project {
                 ].join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
                 mod.hash = hash
+            } else if (mod.sourceType === 'sass' || mod.sourceType === 'scss') {
+                // todo: support sass
             } else if (mod.sourceType === 'md' || mod.sourceType === 'mdx') {
                 mod.jsContent = `export default function MD() { return React.createElement('pre', null, ${JSON.stringify(sourceContent)})}`
                 mod.jsSourceMap = ''
@@ -1112,7 +1098,7 @@ export default class Project {
         return ret
     }
 
-    private _lookupStyleDeps(moduleID: string, a: Dep[] = [], s: Set<string> = new Set()) {
+    private _lookupStyleDeps(moduleID: string, a: { url: string, hash: string, async?: boolean }[] = [], s: Set<string> = new Set()) {
         const mod = this.getModule(moduleID)
         if (!mod) {
             return a
