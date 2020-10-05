@@ -1,3 +1,4 @@
+// mime types for web
 const mimeTypes: Record<string, string[]> = {
     'application/javascript': ['js', 'mjs'],
     'application/wasm': ['wasm'],
@@ -5,7 +6,7 @@ const mimeTypes: Record<string, string[]> = {
     'application/json5': ['json5'],
     'application/pdf': ['pdf'],
     'application/xml': ['xml', 'xsl'],
-
+    // text
     'text/html': ['html', 'htm'],
     'text/markdown': ['markdown', 'md'],
     'text/typescript': ['ts', 'tsx'],
@@ -17,13 +18,13 @@ const mimeTypes: Record<string, string[]> = {
     'text/stylus': ['stylus', 'styl'],
     'text/csv': ['csv'],
     'text/plain': ['txt', 'text', 'conf', 'ini', 'log'],
-
+    // font
     'font/ttf': ['ttf'],
     'font/otf': ['otf'],
     'font/woff': ['woff'],
     'font/woff2': ['woff2'],
     'font/collection': ['ttc'],
-
+    // image
     'image/jpeg': ['jpeg', 'jpg', 'jpe'],
     'image/png': ['png'],
     'image/apng': ['apng'],
@@ -31,13 +32,13 @@ const mimeTypes: Record<string, string[]> = {
     'image/webp': ['webp'],
     'image/svg+xml': ['svg', 'svgz'],
     'image/x-icon': ['ico'],
-
+    // audio
     'audio/mp4': ['m4a', 'mp4a'],
     'audio/mpeg': ['mp3', 'm3a'],
     'audio/ogg': ['oga', 'ogg', 'spx'],
     'audio/wav': ['wav'],
     'audio/webm': ['weba'],
-
+    // video
     'video/mp4': ['mp4', 'm4v', 'mp4v', 'mpg4'],
     'video/ogg': ['ogv'],
     'video/webm': ['webm'],

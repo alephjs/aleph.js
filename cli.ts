@@ -5,9 +5,9 @@ import { listenAndServe, path, ServerRequest, walk } from './std.ts'
 import util, { existsDirSync, existsFileSync } from './util.ts'
 import { version } from './version.ts'
 
-const commands = ['init', 'fetch', 'dev', 'start', 'build']
+const commands = ['init', 'fetch', 'dev', 'start', 'build', 'upgrade']
 const helpMessage = `Aleph.js v${version}
-The radical new Front-End Framework in deno.
+The React Framework in deno.
 
 Docs: https://alephjs.org/docs
 Bugs: https://github.com/postui/aleph.js/issues
@@ -88,8 +88,28 @@ async function main() {
         log.setLevel(l)
     }
 
+    if (!hasCommand) {
+        const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.mjs', '.ts', '.tsx'], skip: [/\.d\.ts$/i], dep: 1 }
+        const pagesDir = path.join(path.resolve(args[0] || '.'), 'pages')
+        let hasIndexPage = false
+        if (existsDirSync(pagesDir)) {
+            for await (const { path: p } of walk(pagesDir, walkOptions)) {
+                if (path.basename(p).split('.')[0] === 'index') {
+                    hasIndexPage = true
+                }
+            }
+        }
+        if (!hasIndexPage) {
+            console.log(helpMessage)
+            Deno.exit(0)
+        }
+    }
+
+    // get command, default is 'dev'
+    const command = hasCommand ? String(args.shift()) : 'dev'
+
     // proxy https://deno.land/x/aleph
-    if (existsFileSync('./import_map.json')) {
+    if (['dev', 'start', 'build'].includes(command) && existsFileSync('./import_map.json')) {
         const { imports } = JSON.parse(Deno.readTextFileSync('./import_map.json'))
         Object.assign(globalThis, { ALEPH_IMPORT_MAP: { imports } })
         if (imports['https://deno.land/x/aleph/']) {
@@ -112,7 +132,7 @@ async function main() {
                             req.respond({
                                 status: 200,
                                 headers: new Headers({
-                                    'Content-Type': getContentType('.html'),
+                                    'Content-Type': 'text/html',
                                     'Content-Length': info.size.toString()
                                 }),
                                 body: createHtml({
@@ -146,25 +166,6 @@ async function main() {
         }
     }
 
-    if (!hasCommand) {
-        const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.mjs', '.ts', '.tsx'], skip: [/\.d\.ts$/i], dep: 1 }
-        const pagesDir = path.join(path.resolve(args[0] || '.'), 'pages')
-        let hasIndexPage = false
-        if (existsDirSync(pagesDir)) {
-            for await (const { path: p } of walk(pagesDir, walkOptions)) {
-                if (path.basename(p).split('.')[0] === 'index') {
-                    hasIndexPage = true
-                }
-            }
-        }
-        if (!hasIndexPage) {
-            console.log(helpMessage)
-            Deno.exit(0)
-        }
-    }
-
-    // execute command
-    const command = hasCommand ? args.shift() : 'dev'
     import(`./cli/${command}.ts`).then(({ default: cmd }) => {
         const appDir = path.resolve(args[0] || '.')
         if (command !== 'init' && !existsDirSync(appDir)) {
