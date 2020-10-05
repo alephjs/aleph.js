@@ -5,7 +5,7 @@ import util, { hashShort } from './util.ts'
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
 const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
-export async function renderHead(styleModules?: { url: string, hash: string, async?: boolean }[]) {
+export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
     const { build: { appRoot, buildID } } = (window as any).ALEPH_ENV as AlephEnv
     const tags: string[] = []
     serverHeadElements.forEach(({ type, props }) => {
@@ -29,10 +29,10 @@ export async function renderHead(styleModules?: { url: string, hash: string, asy
             }
         }
     })
-    await Promise.all(styleModules?.filter(({ async }) => !!async).map(({ url, hash }) => {
+    await Promise.all(styles?.filter(({ async }) => !!async).map(({ url, hash }) => {
         return import('file://' + util.cleanPath(`${appRoot}/.aleph/build-${buildID}/${url}.${hash.slice(0, hashShort)}.js`))
     }) || [])
-    styleModules?.forEach(({ url }) => {
+    styles?.forEach(({ url }) => {
         if (serverStyles.has(url)) {
             const { css, asLink } = serverStyles.get(url)!
             if (asLink) {

@@ -116,7 +116,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                                 }
 
                                 let body = ''
-                                if (mod.id === '/data.js' || mod.id === '/data/index.js') {
+                                if (mod.id === '/data.js') {
                                     const data = await project.getData()
                                     if (project.isDev) {
                                         body = [

@@ -10,11 +10,15 @@ export default async function bootstrap({
     baseUrl,
     defaultLocale,
     locales,
-    coreModules,
-    pageModules
+    staticDataModule,
+    customAppModule,
+    custom404Module,
+    routing
 }: AppManifest & {
-    coreModules: Record<string, Module>
-    pageModules: Record<string, Module>
+    staticDataModule?: Module
+    customAppModule?: Module
+    custom404Module?: Module
+    routing: Record<string, Module>
 }) {
     const { document } = window as any
     const mainEl = document.querySelector('main')
@@ -31,7 +35,7 @@ export default async function bootstrap({
     } else {
         url = createRouter(
             baseUrl,
-            Object.keys(pageModules),
+            Object.keys(routing),
             {
                 defaultLocale,
                 locales: Object.keys(locales)
@@ -39,20 +43,20 @@ export default async function bootstrap({
         )
     }
 
-    const pageModule = pageModules[url.pagePath]
+    const pageModule = routing[url.pagePath]
     if (!pageModule) {
         throw new Error('page module not found')
     }
 
     const [
-        { default: data },
+        { default: staticData },
         { default: App },
         { default: E404 },
         { default: Page }
     ] = await Promise.all([
-        coreModules.data ? import(getModuleImportUrl(baseUrl, coreModules.data)) : Promise.resolve({ default: {} }),
-        coreModules.app ? import(getModuleImportUrl(baseUrl, coreModules.app)) : Promise.resolve({}),
-        coreModules['404'] ? import(getModuleImportUrl(baseUrl, coreModules['404'])) : Promise.resolve({}),
+        staticDataModule ? import(getModuleImportUrl(baseUrl, staticDataModule)) : Promise.resolve({ default: {} }),
+        customAppModule ? import(getModuleImportUrl(baseUrl, customAppModule)) : Promise.resolve({}),
+        custom404Module ? import(getModuleImportUrl(baseUrl, custom404Module)) : Promise.resolve({}),
         pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({}),
     ])
     const el = React.createElement(
@@ -63,9 +67,9 @@ export default async function bootstrap({
             {
                 initial: {
                     manifest: { baseUrl, defaultLocale, locales },
-                    pageModules,
+                    routing,
                     url,
-                    data,
+                    staticData,
                     components: { E404, App, Page }
                 }
             }
@@ -74,10 +78,8 @@ export default async function bootstrap({
 
     // import async sytle dependencies
     const asyncDeps: { url: string, hash: string }[] = []
-    for (const key in coreModules) {
-        const mod = coreModules[key]
-        mod.asyncDeps?.forEach(deps => asyncDeps.push(deps))
-    }
+    customAppModule?.asyncDeps?.forEach(deps => asyncDeps.push(deps))
+    custom404Module?.asyncDeps?.forEach(deps => asyncDeps.push(deps))
     pageModule.asyncDeps?.forEach(deps => asyncDeps.push(deps))
     await Promise.all(asyncDeps.map(dep => {
         return import(util.cleanPath(`${baseUrl}/_aleph/${dep.url.replace(reModuleExt, '')}.${dep.hash.slice(0, hashShort)}.js`))

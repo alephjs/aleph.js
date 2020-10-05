@@ -1,4 +1,6 @@
+import marked from 'https://esm.sh/marked'
 import { minify } from 'https://esm.sh/terser'
+import { loadFront } from 'https://esm.sh/yaml-front-matter'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
@@ -130,14 +132,15 @@ export default class Project {
             if (!reStyleModuleExt.test(modId)) {
                 modId = modId + '.js'
             }
-        } else {
+        } else if (modId.endsWith('.js')) {
+            let id = modId.slice(0, modId.length - 3)
             if (reHashJs.test(modId)) {
-                const id = modId.slice(0, modId.length - (hashShort + 4))
-                if (reStyleModuleExt.test(id)) {
-                    modId = id
-                } else {
-                    modId = id + '.js'
-                }
+                id = modId.slice(0, modId.length - (1 + hashShort + 3))
+            }
+            if (reMDExt.test(id) || reStyleModuleExt.test(id)) {
+                modId = id
+            } else {
+                modId = id + '.js'
             }
         }
         if (!this.#modules.has(modId)) {
@@ -434,7 +437,7 @@ export default class Project {
 
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md', '.mdx'] })) {
             const rp = util.trimPrefix(p, pagesDir)
-            const pagePath = rp.replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
+            const pagePath = rp.replace(reModuleExt, '').replace(reMDExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '/')
             const mod = await this._compile('/pages' + rp)
             this.#pageModules.set(pagePath, {
                 moduleID: mod.id,
@@ -520,7 +523,7 @@ export default class Project {
                                     if (this.#pageModules.has(moduleID)) {
                                         this._clearPageRenderCache(moduleID)
                                     } else {
-                                        const pagePath = util.trimPrefix(moduleID, '/pages').replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
+                                        const pagePath = util.trimPrefix(moduleID, '/pages').replace(reModuleExt, '').replace(reMDExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '/')
                                         this.#pageModules.set(pagePath, { moduleID, rendered: new Map() })
                                     }
                                 }
@@ -618,8 +621,7 @@ export default class Project {
             baseUrl,
             defaultLocale,
             locales: {},
-            coreModules: {},
-            pageModules: {}
+            routing: {}
         }
         const module = this._moduleFromURL('/main.js')
         const deps = [
@@ -631,34 +633,28 @@ export default class Project {
         }))
         if (this.#modules.has('/data.js')) {
             const { id, url, hash } = this.#modules.get('/data.js')!
-            config.coreModules.data = { id, hash }
+            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+            config.staticDataModule = { id, hash, asyncDeps }
             deps.push({ url, hash })
         }
         if (this.#modules.has('/app.js')) {
-            const { url, hash } = this.#modules.get('/app.js')!
-            config.coreModules.app = { id: '/app.js', hash }
+            const { id, url, hash } = this.#modules.get('/app.js')!
+            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+            config.customAppModule = { id, hash, asyncDeps }
             deps.push({ url, hash })
         }
         if (this.#modules.has('/404.js')) {
-            const { url, hash } = this.#modules.get('/404.js')!
-            config.coreModules['404'] = { id: '/404.js', hash }
+            const { id, url, hash } = this.#modules.get('/404.js')!
+            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+            config.custom404Module = { id: '/404.js', hash, asyncDeps }
             deps.push({ url, hash })
         }
         this.#pageModules.forEach(({ moduleID }, pagePath) => {
-            const { url, hash } = this.#modules.get(moduleID)!
-            config.pageModules[pagePath] = { id: moduleID, hash }
+            const { id, url, hash } = this.#modules.get(moduleID)!
+            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+            config.routing[pagePath] = { id, hash, asyncDeps }
             deps.push({ url, hash })
         })
-
-        for (const key in config.coreModules) {
-            const m = config.coreModules[key]
-            m.asyncDeps = this._lookupStyleDeps(m.id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
-        }
-
-        for (const key in config.pageModules) {
-            const m = config.pageModules[key]
-            m.asyncDeps = this._lookupStyleDeps(m.id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
-        }
 
         module.jsContent = [
             this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
@@ -857,11 +853,18 @@ export default class Project {
                 mod.hash = hash
             } else if (mod.sourceType === 'sass' || mod.sourceType === 'scss') {
                 // todo: support sass
-            } else if (mod.sourceType === 'md' || mod.sourceType === 'mdx') {
-                mod.jsContent = `export default function MD() { return React.createElement('pre', null, ${JSON.stringify(sourceContent)})}`
-                mod.jsSourceMap = ''
-                mod.hash = mod.sourceHash
             } else {
+                if (mod.sourceType === 'md' || mod.sourceType === 'mdx') {
+                    const { __content, ...props } = loadFront(sourceContent)
+                    const html = marked.parse(__content)
+                    sourceContent = [
+                        `import React from 'https://esm.sh/react';`,
+                        `export const pageProps = ${JSON.stringify(props, undefined, 4)};`,
+                        `export default function Marked() {`,
+                        `  return React.createElement('div', ${JSON.stringify({ className: 'marked', dangerouslySetInnerHTML: { __html: html } }, undefined, 4)});`,
+                        `}`
+                    ].join('\n')
+                }
                 const compileOptions = {
                     target: this.config.buildTarget,
                     mode: this.mode,
@@ -870,12 +873,12 @@ export default class Project {
                 }
                 const { diagnostics, outputText, sourceMapText } = compile(mod.sourceFilePath, sourceContent, compileOptions)
                 if (diagnostics && diagnostics.length > 0) {
-                    throw new Error(`compile ${url}: ${diagnostics.map(d => d.messageText).join(' ')}`)
+                    throw new Error(`compile ${url}: ${diagnostics.map(d => d.messageText).join('\n')}`)
                 }
-                const jsContent = outputText.replace(/import([^'"]*)("|')tslib("|')(\)|;)?/g, 'import$1' + JSON.stringify(relativePath(
+                const jsContent = outputText.replace(/import\s*{([^}]+)}\s*from\s*("|')tslib("|');?/g, 'import {$1} from ' + JSON.stringify(relativePath(
                     path.dirname(mod.sourceFilePath),
                     '/-/deno.land/x/aleph/tsc/tslib.js'
-                )) + '$4')
+                )) + ';')
                 if (this.isDev) {
                     mod.jsContent = jsContent
                     mod.jsSourceMap = sourceMapText!
@@ -1114,7 +1117,7 @@ export default class Project {
             return a
         }
         s.add(moduleID)
-        a.push(...mod.deps.filter(({ url }) => reStyleModuleExt.test(url)))
+        a.push(...mod.deps.filter(({ url }) => reStyleModuleExt.test(url) && a.findIndex(i => i.url === url) === -1))
         mod.deps.forEach(({ url }) => {
             if (reModuleExt.test(url) && !reHttp.test(url)) {
                 this._lookupStyleDeps(url.replace(reModuleExt, '.js'), a, s)
@@ -1138,7 +1141,7 @@ export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
         `import { createHotContext, RefreshRuntime, performReactRefresh } from ${JSON.stringify(hmrImportPath)};`,
         `import.meta.hot = createHotContext(${JSON.stringify(id)});`
     ]
-    const reactRefresh = id.endsWith('.js')
+    const reactRefresh = id.endsWith('.js') || id.endsWith('.md') || id.endsWith('.mdx')
     if (reactRefresh) {
         text.push('')
         text.push(

@@ -9,15 +9,15 @@ import util, { hashShort, reModuleExt } from './util.ts'
 export function ALEPH({ initial }: {
     initial: {
         manifest: AppManifest
-        pageModules: Record<string, Module>
+        routing: Record<string, Module>
         url: RouterURL
-        data: Record<string, any>
+        staticData: Record<string, any>
         components: Record<string, ComponentType<any>>
     }
 }) {
     const [manifest, setManifest] = useState(() => initial.manifest)
-    const [data, setData] = useState(() => initial.data)
-    const [pageModules, setPageModules] = useState(() => initial.pageModules)
+    const [staticData, setStaticData] = useState(() => initial.staticData)
+    const [routing, setRouting] = useState(() => initial.routing)
     const [e404, setE404] = useState(() => {
         const { E404 } = initial.components
         return {
@@ -42,14 +42,14 @@ export function ALEPH({ initial }: {
         const { baseUrl, defaultLocale, locales } = manifest
         const url = createRouter(
             baseUrl,
-            Object.keys(pageModules),
+            Object.keys(routing),
             {
                 defaultLocale,
                 locales: Object.keys(locales)
             }
         )
-        if (url.pagePath && url.pagePath in pageModules) {
-            const mod = pageModules[url.pagePath]!
+        if (url.pagePath && url.pagePath in routing) {
+            const mod = routing[url.pagePath]!
             const { default: Component } = await import(getModuleImportUrl(baseUrl, mod))
             await Promise.all(mod.asyncDeps?.map(dep => {
                 return import(util.cleanPath(`${baseUrl}/_aleph/${dep.url.replace(reModuleExt, '')}.${dep.hash.slice(0, hashShort)}.js`))
@@ -65,7 +65,7 @@ export function ALEPH({ initial }: {
         } else {
             setPage({ url, Component: null })
         }
-    }, [manifest, pageModules])
+    }, [manifest, routing])
 
     useEffect(() => {
         window.addEventListener('popstate', onpopstate)
@@ -81,7 +81,7 @@ export function ALEPH({ initial }: {
         const { baseUrl } = manifest
         const onUpdateData = (data: any) => {
             console.log('[DATA]', data)
-            setData(data)
+            setStaticData(data)
         }
         const onAddModule = async (mod: Module) => {
             if (mod.id === '/404.js') {
@@ -104,10 +104,10 @@ export function ALEPH({ initial }: {
             } else if (mod.id === '/data.js' || mod.id === '/data/index.js') {
                 const { default: data } = await import(getModuleImportUrl(baseUrl, mod) + '?t=' + Date.now())
                 console.log('[DATA]', data)
-                setData(data)
+                setStaticData(data)
             } else if (mod.id.startsWith('/pages/')) {
                 const pagePath = util.trimSuffix(mod.id, '.js').replace(/\s+/g, '-').replace(/\/?index$/i, '/')
-                setPageModules(pageModules => ({
+                setRouting(pageModules => ({
                     ...pageModules,
                     [pagePath]: mod
                 }))
@@ -120,9 +120,9 @@ export function ALEPH({ initial }: {
                 setApp({ Component: null })
             } else if (moduleId === '/data.js' || moduleId === '/data/index.js') {
                 console.log('[DATA]', {})
-                setData({})
+                setStaticData({})
             } else if (moduleId.startsWith('/pages/')) {
-                setPageModules(pageModules => {
+                setRouting(pageModules => {
                     const newPageModules: Record<string, Module> = {}
                     for (const pagePath in pageModules) {
                         const mod = pageModules[pagePath]
@@ -151,7 +151,7 @@ export function ALEPH({ initial }: {
         { value: manifest },
         React.createElement(
             DataContext.Provider,
-            { value: data },
+            { value: staticData },
             React.createElement(
                 RouterContext.Provider,
                 { value: page.url },
