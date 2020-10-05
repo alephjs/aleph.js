@@ -6,7 +6,7 @@ const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = 
 const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
 export async function renderHead(styleModules?: { url: string, hash: string, async?: boolean }[]) {
-    const { appRoot, buildID } = (window as any).ALEPH_ENV as AlephEnv
+    const { build: { appRoot, buildID } } = (window as any).ALEPH_ENV as AlephEnv
     const tags: string[] = []
     serverHeadElements.forEach(({ type, props }) => {
         if (type === 'title') {

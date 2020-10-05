@@ -6,7 +6,7 @@ import { createRouter } from './router.ts'
 import { colors, ensureDir, path, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { APIHandle, Config, Location, RouterURL } from './types.ts'
-import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from './util.ts'
+import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
 
@@ -31,10 +31,13 @@ interface RenderResult {
 }
 
 export interface AlephEnv {
-    appRoot: string
-    buildID: string
-    config: Config
-    mode: 'development' | 'production'
+    version: string
+    build: {
+        mode: 'development' | 'production'
+        buildID: string
+        appRoot: string
+        config: Config
+    }
 }
 
 export default class Project {
@@ -395,10 +398,13 @@ export default class Project {
 
         Object.assign(globalThis, {
             ALEPH_ENV: {
-                appRoot: this.appRoot,
-                buildID: this.buildID,
-                config: this.config,
-                mode: this.mode,
+                version,
+                build: {
+                    appRoot: this.appRoot,
+                    buildID: this.buildID,
+                    config: this.config,
+                    mode: this.mode,
+                }
             } as AlephEnv,
             document: new Document(),
             innerWidth: 1920,
@@ -468,39 +474,40 @@ export default class Project {
         log.info('Start watching code changes...')
         for await (const event of w) {
             for (const p of event.paths) {
-                const path = util.trimPrefix(util.trimPrefix(p, this.appRoot), '/')
+                const path = '/' + util.trimPrefix(util.trimPrefix(p, this.appRoot), '/')
                 const validated = (() => {
-                    if (!reModuleExt.test(path) && !reStyleModuleExt.test(path)) {
+                    if (!reModuleExt.test(path) && !reStyleModuleExt.test(path) && !reMDExt.test(path)) {
                         return false
                     }
                     // ignore '.aleph' and output directories
-                    if (path.startsWith('.aleph/') || path.startsWith(this.config.outputDir.slice(1))) {
+                    if (path.startsWith('/.aleph/') || path.startsWith(this.config.outputDir)) {
                         return false
                     }
-                    const moduleID = '/' + path.replace(reModuleExt, '.js')
-                    switch (moduleID) {
-                        case '/404.js':
-                        case '/app.js':
-                        case '/data.js': {
-                            return true
-                        }
-                        default: {
-                            if ((moduleID.startsWith('/pages/') || moduleID.startsWith('/api/')) && moduleID.endsWith('.js')) {
+                    if (reModuleExt.test(path)) {
+                        switch (path.replace(reModuleExt, '')) {
+                            case '/404':
+                            case '/app':
+                            case '/data': {
                                 return true
                             }
-                            let isDep = false
-                            for (const { deps } of this.#modules.values()) {
-                                if (deps.findIndex(dep => dep.url === '/' + path) > -1) {
-                                    isDep = true
-                                    break
+                            default: {
+                                if (path.startsWith('/pages/') || path.startsWith('/api/')) {
+                                    return true
                                 }
                             }
-                            return isDep
                         }
                     }
+                    let isDep = false
+                    for (const { deps } of this.#modules.values()) {
+                        if (deps.findIndex(dep => dep.url === path) > -1) {
+                            isDep = true
+                            break
+                        }
+                    }
+                    return isDep
                 })()
                 if (validated) {
-                    const moduleID = '/' + path.replace(reModuleExt, '.js')
+                    const moduleID = path.replace(reModuleExt, '.js')
                     util.debounceX(moduleID, () => {
                         const removed = !existsFileSync(p)
                         const cleanup = () => {
@@ -525,8 +532,8 @@ export default class Project {
                             if (!this.#modules.has(moduleID)) {
                                 type = 'add'
                             }
-                            log.info(type, '/' + path)
-                            this._compile('/' + path, { forceCompile: true }).then(({ hash }) => {
+                            log.info(type, path)
+                            this._compile(path, { forceCompile: true }).then(({ hash }) => {
                                 const hmrable = this.isHMRable(moduleID)
                                 if (hmrable) {
                                     if (type === 'add') {
@@ -536,7 +543,7 @@ export default class Project {
                                     }
                                 }
                                 cleanup()
-                                this._updateDependency('/' + path, hash, mod => {
+                                this._updateDependency(path, hash, mod => {
                                     if (!hmrable && this.isHMRable(mod.id)) {
                                         this.#fsWatchListeners.forEach(e => e.emit(mod.id, 'modify', mod.hash))
                                     }
@@ -545,7 +552,7 @@ export default class Project {
                                     }
                                 })
                             }).catch(err => {
-                                log.error(`compile(/${path}):`, err.message)
+                                log.error(`compile(${path}):`, err.message)
                             })
                         } else if (this.#modules.has(moduleID)) {
                             this.#modules.delete(moduleID)
@@ -553,7 +560,7 @@ export default class Project {
                             if (this.isHMRable(moduleID)) {
                                 this.#fsWatchListeners.forEach(e => e.emit('remove', moduleID))
                             }
-                            log.info('remove', '/' + path)
+                            log.info('remove', path)
                         }
                     }, 150)
                 }
