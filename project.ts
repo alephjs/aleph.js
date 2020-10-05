@@ -5,7 +5,7 @@ import log from './log.ts'
 import { createRouter } from './router.ts'
 import { colors, ensureDir, path, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
-import type { APIHandle, Config, Location, RouterURL } from './types.ts'
+import type { AlephEnv, APIHandle, Config, Location, RouterURL } from './types.ts'
 import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
@@ -38,7 +38,7 @@ interface RenderResult {
 
 export default class Project {
     readonly mode: 'development' | 'production'
-    readonly appDir: string
+    readonly appRoot: string
     readonly config: Config
     readonly ready: Promise<void>
 
@@ -49,7 +49,7 @@ export default class Project {
 
     constructor(dir: string, mode: 'development' | 'production') {
         this.mode = mode
-        this.appDir = path.resolve(dir)
+        this.appRoot = dir
         this.config = {
             srcDir: '/',
             outputDir: '/dist',
@@ -77,7 +77,7 @@ export default class Project {
     }
 
     get srcDir() {
-        return path.join(this.appDir, this.config.srcDir)
+        return path.join(this.appRoot, this.config.srcDir)
     }
 
     get buildID() {
@@ -85,7 +85,7 @@ export default class Project {
     }
 
     get buildDir() {
-        return path.join(this.appDir, '.aleph', 'build-' + this.buildID)
+        return path.join(this.appRoot, '.aleph', 'build-' + this.buildID)
     }
 
     get apiPaths() {
@@ -269,11 +269,10 @@ export default class Project {
         await Promise.all([outputDir, distDir].map(dir => ensureDir(dir)))
 
         // copy public files
-        const publicDir = path.join(this.appDir, 'public')
+        const publicDir = path.join(this.appRoot, 'public')
         if (existsDirSync(publicDir)) {
             for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
-                const rp = path.resolve(util.trimPrefix(p, publicDir))
-                await Deno.copyFile(p, path.join(outputDir, rp))
+                await Deno.copyFile(p, path.join(outputDir, util.trimPrefix(p, publicDir)))
             }
         }
 
@@ -320,7 +319,7 @@ export default class Project {
             Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
         }
 
-        const importMapFile = path.join(this.appDir, 'import_map.json')
+        const importMapFile = path.join(this.appRoot, 'import_map.json')
         if (existsFileSync(importMapFile)) {
             const { imports } = JSON.parse(await Deno.readTextFile(importMapFile))
             Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
@@ -389,7 +388,7 @@ export default class Project {
     }
 
     private async _init() {
-        const walkOptions = { includeDirs: false, exts: ['.js', '.ts', '.mjs'], skip: [/\.d\.ts$/i] }
+        const walkOptions = { includeDirs: false, exts: ['.js', '.ts', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)s$/i] }
         const dataDir = path.join(this.srcDir, 'data')
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
@@ -400,11 +399,11 @@ export default class Project {
 
         Object.assign(globalThis, {
             ALEPH_ENV: {
-                appDir: this.appDir,
+                appRoot: this.appRoot,
                 buildID: this.buildID,
                 config: this.config,
                 mode: this.mode,
-            },
+            } as AlephEnv,
             document: new Document(),
             innerWidth: 1920,
             innerHeight: 1080,
@@ -419,8 +418,7 @@ export default class Project {
                 switch (name) {
                     case 'api':
                         for await (const { path: p } of walk(apiDir, walkOptions)) {
-                            const rp = path.resolve(util.trimPrefix(p, apiDir))
-                            await this._compile('/api/' + rp)
+                            await this._compile('/api' + util.trimPrefix(p, apiDir))
                         }
                         break
                     case 'data':
@@ -444,7 +442,7 @@ export default class Project {
         }
 
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md', '.mdx'] })) {
-            const rp = path.resolve(util.trimPrefix(p, pagesDir)) || '/'
+            const rp = util.trimPrefix(p, pagesDir)
             const pagePath = rp.replace(reModuleExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '') || '/'
             const mod = await this._compile('/pages' + rp)
             this.#pageModules.set(pagePath, {
@@ -485,7 +483,7 @@ export default class Project {
         log.info('Start watching code changes...')
         for await (const event of w) {
             for (const p of event.paths) {
-                const path = util.trimPrefix(util.trimPrefix(p, this.appDir), '/')
+                const path = util.trimPrefix(util.trimPrefix(p, this.appRoot), '/')
                 const validated = (() => {
                     if (!reModuleExt.test(path) && !reStyleModuleExt.test(path)) {
                         return false
@@ -634,9 +632,8 @@ export default class Project {
         }
         const module = this._moduleFromURL('/main.js')
         const deps = [
-            'https://deno.land/x/aleph/tsc/tslib.js',
-            'https://deno.land/x/aleph/app.ts',
-            this.isDev && 'https://deno.land/x/aleph/hmr.ts'
+            this.isDev && 'https://deno.land/x/aleph/hmr.ts',
+            'https://deno.land/x/aleph/bootstrap.ts'
         ].filter(Boolean).map(url => ({
             url: String(url),
             hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
@@ -674,7 +671,6 @@ export default class Project {
 
         module.jsContent = [
             this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
-            'import "./-/deno.land/x/aleph/tsc/tslib.js";',
             'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js";',
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
         ].filter(Boolean).join(this.isDev ? '\n' : '')
@@ -927,7 +923,7 @@ export default class Project {
                 if (!reHttp.test(dep.url)) {
                     const depImportPath = relativePath(
                         path.dirname(url),
-                        path.resolve('/', dep.url.replace(reModuleExt, ''))
+                        dep.url.replace(reModuleExt, '')
                     )
                     mod.jsContent = mod.jsContent.replace(/(import|Import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
                         if (
@@ -969,8 +965,8 @@ export default class Project {
             mod.deps.forEach(dep => {
                 if (dep.url === depPath && dep.hash !== depHash && !trace?.has(mod.id)) {
                     const depImportPath = relativePath(
-                        path.dirname(path.resolve('/', mod.url)),
-                        path.resolve('/', dep.url.replace(reModuleExt, ''))
+                        path.dirname(mod.url),
+                        dep.url.replace(reModuleExt, '')
                     )
                     dep.hash = depHash
                     if (mod.id === '/main.js') {
@@ -1016,12 +1012,12 @@ export default class Project {
         if (reHttp.test(importPath)) {
             if (mod.isRemote) {
                 rewrittenPath = relativePath(
-                    path.dirname(path.resolve('/', mod.url.replace(reHttp, '-/').replace(/:(\d+)/, '/$1'))),
+                    path.dirname(mod.url.replace(reHttp, '/-/').replace(/:(\d+)/, '/$1')),
                     renameImportUrl(importPath)
                 )
             } else {
                 rewrittenPath = relativePath(
-                    path.dirname(path.resolve('/', mod.url)),
+                    path.dirname(mod.url),
                     renameImportUrl(importPath)
                 )
             }
@@ -1052,7 +1048,7 @@ export default class Project {
                 }
                 mod.deps.push({ url: sourceUrl.protocol + '//' + sourceUrl.host + pathname, hash: '', async })
             } else {
-                mod.deps.push({ url: path.resolve('/', path.dirname(mod.url), importPath), hash: '', async })
+                mod.deps.push({ url: path.join(path.dirname(mod.url), importPath), hash: '', async })
             }
         }
 
@@ -1186,7 +1182,7 @@ function relativePath(from: string, to: string): string {
 
 function renameImportUrl(importUrl: string): string {
     const isRemote = reHttp.test(importUrl)
-    const url = new URL(isRemote ? importUrl : 'file://' + path.resolve('/', importUrl))
+    const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
     const ext = path.extname(path.basename(url.pathname)) || '.js'
     let pathname = util.trimSuffix(url.pathname, ext)
     let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)

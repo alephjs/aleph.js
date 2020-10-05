@@ -1,11 +1,12 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useEffect } from 'https://esm.sh/react'
+import type { AlephEnv } from './types.ts'
 import util, { hashShort } from './util.ts'
 
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
 const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
 export async function renderHead(styleModules?: { url: string, hash: string, async?: boolean }[]) {
-    const { appDir, buildID } = (window as any).ALEPH_ENV as { appDir: string, buildID: string }
+    const { appRoot, buildID } = (window as any).ALEPH_ENV as AlephEnv
     const tags: string[] = []
     serverHeadElements.forEach(({ type, props }) => {
         if (type === 'title') {
@@ -29,7 +30,7 @@ export async function renderHead(styleModules?: { url: string, hash: string, asy
         }
     })
     await Promise.all(styleModules?.filter(({ async }) => !!async).map(({ url, hash }) => {
-        return import('file://' + util.cleanPath(`${appDir}/.aleph/build-${buildID}/${url}.${hash.slice(0, hashShort)}.js`))
+        return import('file://' + util.cleanPath(`${appRoot}/.aleph/build-${buildID}/${url}.${hash.slice(0, hashShort)}.js`))
     }) || [])
     styleModules?.forEach(({ url }) => {
         if (serverStyles.has(url)) {
