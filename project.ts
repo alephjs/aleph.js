@@ -33,8 +33,8 @@ interface RenderResult {
     body: string
 }
 
-export interface AlephEnv {
-    [key: string]: string
+export interface AlephRuntime {
+    env: Record<string, string>
     __version: string
     __appRoot: string
     __buildID: string
@@ -402,12 +402,12 @@ export default class Project {
         }
 
         Object.assign(globalThis, {
-            ALEPH_ENV: {
-                ...this.config.env,
+            ALEPH: {
+                env: this.config.env,
                 __version: version,
                 __appRoot: this.appRoot,
                 __buildID: this.buildID,
-            } as AlephEnv,
+            } as AlephRuntime,
             document: new Document(),
             innerWidth: 1920,
             innerHeight: 1080,
@@ -632,25 +632,25 @@ export default class Project {
         }))
         if (this.#modules.has('/data.js')) {
             const { id, url, hash } = this.#modules.get('/data.js')!
-            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
             config.staticDataModule = { id, hash, asyncDeps }
             deps.push({ url, hash })
         }
         if (this.#modules.has('/app.js')) {
             const { id, url, hash } = this.#modules.get('/app.js')!
-            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
             config.customAppModule = { id, hash, asyncDeps }
             deps.push({ url, hash })
         }
         if (this.#modules.has('/404.js')) {
             const { id, url, hash } = this.#modules.get('/404.js')!
-            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
             config.custom404Module = { id: '/404.js', hash, asyncDeps }
             deps.push({ url, hash })
         }
         this.#pageModules.forEach(({ moduleID }, pagePath) => {
             const { id, url, hash } = this.#modules.get(moduleID)!
-            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ url, hash }) => ({ url, hash }))
+            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
             config.routing[pagePath] = { id, hash, asyncDeps }
             deps.push({ url, hash })
         })
@@ -663,6 +663,13 @@ export default class Project {
         module.hash = (new Sha1()).update(module.jsContent).hex()
         module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
         module.deps = deps
+
+        if (this.#modules.has(module.id)) {
+            const prevHash = this.#modules.get(module.id)!.hash
+            try {
+                await Deno.remove(path.join(this.buildDir, `main.${prevHash.slice(0, hashShort)}.js`))
+            } catch (e) { }
+        }
 
         await Promise.all([
             writeTextFile(module.jsFile, module.jsContent),
@@ -940,6 +947,12 @@ export default class Project {
         }
 
         if (fsync) {
+            if (mod.jsFile != "") {
+                try {
+                    await Deno.remove(mod.jsFile)
+                    await Deno.remove(mod.jsFile + '.map')
+                } catch (e) { }
+            }
             mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + '.js'
             await Promise.all([
                 writeTextFile(metaFile, JSON.stringify({

@@ -1,12 +1,12 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useEffect } from 'https://esm.sh/react'
-import type { AlephEnv } from './project.ts'
+import type { AlephRuntime } from './project.ts'
 import util, { hashShort } from './util.ts'
 
 const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
 const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
 export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
-    const { __appRoot, __buildID } = (window as any).ALEPH_ENV as AlephEnv
+    const { __appRoot, __buildID } = (window as any).ALEPH as AlephRuntime
     const tags: string[] = []
     serverHeadElements.forEach(({ type, props }) => {
         if (type === 'title') {
