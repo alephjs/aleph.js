@@ -9,18 +9,13 @@ export interface Config {
     readonly importMap: {
         imports: Record<string, string>
     }
+    readonly env: Record<string, string>
 }
 
 export interface SSROptions {
     readonly fallback: string, // default is 404.html
     readonly include?: string[],
     readonly exclude?: string[]
-}
-
-export interface AppManifest {
-    readonly baseUrl: string
-    readonly defaultLocale: string
-    readonly locales: Record<string, Record<string, string>>
 }
 
 export interface RouterURL {

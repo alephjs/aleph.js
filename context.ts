@@ -1,14 +1,5 @@
 import { createContext } from 'https://esm.sh/react'
-import type { AppManifest, RouterURL } from './types.ts'
-
-export const AppManifestContext = createNamedContext<AppManifest>(
-    'AppManifestContext',
-    {
-        baseUrl: '/',
-        defaultLocale: 'en',
-        locales: {},
-    }
-)
+import type { RouterURL } from './types.ts'
 
 export const DataContext = createNamedContext<Record<string, any>>(
     'DataContext',

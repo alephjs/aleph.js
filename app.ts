@@ -1,23 +1,25 @@
 import React, { ComponentType, useCallback, useEffect, useState } from 'https://esm.sh/react'
-import { AppManifestContext, DataContext, RouterContext } from './context.ts'
-import { E404Page, E501App, E501Page } from './error.ts'
+import { DataContext, RouterContext } from './context.ts'
+import { E404Page, E501App, E501Page, ErrorBoundary } from './error.ts'
 import events from './events.ts'
 import { createRouter } from './router.ts'
-import type { AppManifest, Module, RouterURL } from './types.ts'
+import type { Module, RouterURL } from './types.ts'
 import util, { hashShort, reModuleExt } from './util.ts'
 
 export function ALEPH({ initial }: {
     initial: {
-        manifest: AppManifest
+        baseUrl: string
+        defaultLocale: string
+        locales: string[]
         routing: Record<string, Module>
         url: RouterURL
         staticData: Record<string, any>
         components: Record<string, ComponentType<any>>
     }
 }) {
-    const [manifest, setManifest] = useState(() => initial.manifest)
     const [staticData, setStaticData] = useState(() => initial.staticData)
     const [routing, setRouting] = useState(() => initial.routing)
+    const [locales, setLocales] = useState(() => initial.locales)
     const [e404, setE404] = useState(() => {
         const { E404 } = initial.components
         return {
@@ -39,13 +41,13 @@ export function ALEPH({ initial }: {
         }
     })
     const onpopstate = useCallback(async () => {
-        const { baseUrl, defaultLocale, locales } = manifest
+        const { baseUrl, defaultLocale } = initial
         const url = createRouter(
             baseUrl,
             Object.keys(routing),
             {
                 defaultLocale,
-                locales: Object.keys(locales)
+                locales
             }
         )
         if (url.pagePath && url.pagePath in routing) {
@@ -65,7 +67,7 @@ export function ALEPH({ initial }: {
         } else {
             setPage({ url, Component: null })
         }
-    }, [manifest, routing])
+    }, [routing, locales])
 
     useEffect(() => {
         window.addEventListener('popstate', onpopstate)
@@ -78,7 +80,7 @@ export function ALEPH({ initial }: {
     }, [onpopstate])
 
     useEffect(() => {
-        const { baseUrl } = manifest
+        const { baseUrl } = initial
         const onUpdateData = (data: any) => {
             console.log('[DATA]', data)
             setStaticData(data)
@@ -101,7 +103,7 @@ export function ALEPH({ initial }: {
                         Component: E501App
                     }))
                 }
-            } else if (mod.id === '/data.js' || mod.id === '/data/index.js') {
+            } else if (mod.id === '/data.js') {
                 const { default: data } = await import(getModuleImportUrl(baseUrl, mod) + '?t=' + Date.now())
                 console.log('[DATA]', data)
                 setStaticData(data)
@@ -118,7 +120,7 @@ export function ALEPH({ initial }: {
                 setE404({ Component: E404Page })
             } else if (moduleId === '/app.js') {
                 setApp({ Component: null })
-            } else if (moduleId === '/data.js' || moduleId === '/data/index.js') {
+            } else if (moduleId === '/data.js') {
                 console.log('[DATA]', {})
                 setStaticData({})
             } else if (moduleId.startsWith('/pages/')) {
@@ -144,20 +146,24 @@ export function ALEPH({ initial }: {
             events.off('add-module', onAddModule)
             events.off('remove-module', onRemoveModule)
         }
-    }, [manifest])
+    }, [])
 
-    return React.createElement(
-        AppManifestContext.Provider,
-        { value: manifest },
+    return (
         React.createElement(
-            DataContext.Provider,
-            { value: staticData },
+            ErrorBoundary,
+            null,
             React.createElement(
-                RouterContext.Provider,
-                { value: page.url },
-                (page.Component && app.Component) && React.createElement(app.Component, { Page: page.Component }),
-                (page.Component && !app.Component) && React.createElement(page.Component),
-                !page.Component && React.createElement(e404.Component),
+                DataContext.Provider,
+                { value: staticData },
+                React.createElement(
+                    RouterContext.Provider,
+                    { value: page.url },
+                    ...[
+                        (page.Component && app.Component) && React.createElement(app.Component, { Page: page.Component }),
+                        (page.Component && !app.Component) && React.createElement(page.Component),
+                        !page.Component && React.createElement(e404.Component)
+                    ].filter(Boolean),
+                )
             )
         )
     )

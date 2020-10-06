@@ -1,9 +1,8 @@
 import React from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './app.ts'
-import { ErrorBoundary } from './error.ts'
 import { createRouter } from './router.ts'
-import type { AppManifest, Module, RouterURL } from './types.ts'
+import type { Module, RouterURL } from './types.ts'
 import util, { hashShort, reModuleExt } from './util.ts'
 
 export default async function bootstrap({
@@ -14,7 +13,10 @@ export default async function bootstrap({
     customAppModule,
     custom404Module,
     routing
-}: AppManifest & {
+}: {
+    baseUrl: string
+    defaultLocale: string
+    locales: string[]
     staticDataModule?: Module
     customAppModule?: Module
     custom404Module?: Module
@@ -57,26 +59,24 @@ export default async function bootstrap({
         staticDataModule ? import(getModuleImportUrl(baseUrl, staticDataModule)) : Promise.resolve({ default: {} }),
         customAppModule ? import(getModuleImportUrl(baseUrl, customAppModule)) : Promise.resolve({}),
         custom404Module ? import(getModuleImportUrl(baseUrl, custom404Module)) : Promise.resolve({}),
-        pageModule ? import(getModuleImportUrl(baseUrl, pageModule)) : Promise.resolve({}),
+        import(getModuleImportUrl(baseUrl, pageModule))
     ])
     const el = React.createElement(
-        ErrorBoundary,
-        null,
-        React.createElement(
-            ALEPH,
-            {
-                initial: {
-                    manifest: { baseUrl, defaultLocale, locales },
-                    routing,
-                    url,
-                    staticData,
-                    components: { E404, App, Page }
-                }
+        ALEPH,
+        {
+            initial: {
+                baseUrl,
+                defaultLocale,
+                locales,
+                routing,
+                url,
+                staticData,
+                components: { E404, App, Page }
             }
-        )
+        }
     )
 
-    // import async sytle dependencies
+    // import async style dependencies
     const asyncDeps: { url: string, hash: string }[] = []
     customAppModule?.asyncDeps?.forEach(deps => asyncDeps.push(deps))
     custom404Module?.asyncDeps?.forEach(deps => asyncDeps.push(deps))
