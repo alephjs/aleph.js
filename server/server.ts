@@ -106,8 +106,8 @@ export async function start(appDir: string, port: number, isDev = false) {
                                 }
                             }
                         } else {
-                            const reqMap = pathname.endsWith('.js.map')
-                            const mod = project.getModuleByPath(reqMap ? pathname.slice(0, -4) : pathname)
+                            const reqSourceMap = pathname.endsWith('.js.map')
+                            const mod = project.getModuleByPath(reqSourceMap ? pathname.slice(0, -4) : pathname)
                             if (mod) {
                                 const etag = req.headers.get('If-None-Match')
                                 if (etag && etag === mod.hash) {
@@ -117,7 +117,7 @@ export async function start(appDir: string, port: number, isDev = false) {
 
                                 let body = ''
                                 if (mod.id === '/data.js') {
-                                    const data = await project.getData()
+                                    const data = await project.getStaticData()
                                     if (project.isDev) {
                                         body = [
                                             `import { createHotContext } from "./-/deno.land/x/aleph/hmr.js";`,
@@ -129,7 +129,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                                     } else {
                                         body = `export default ${JSON.stringify(data)}`
                                     }
-                                } else if (reqMap) {
+                                } else if (reqSourceMap) {
                                     body = mod.jsSourceMap
                                 } else {
                                     body = mod.jsContent
@@ -140,7 +140,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                                 req.respond({
                                     status: 200,
                                     headers: new Headers({
-                                        'Content-Type': `application/${reqMap ? 'json' : 'javascript'}; charset=utf-8`,
+                                        'Content-Type': `application/${reqSourceMap ? 'json' : 'javascript'}; charset=utf-8`,
                                         'ETag': mod.hash
                                     }),
                                     body

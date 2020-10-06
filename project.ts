@@ -16,10 +16,11 @@ interface Module {
     id: string
     url: string
     isRemote: boolean
-    deps: { url: string, hash: string, async?: boolean }[]
+    asPage?: { meta: Record<string, any> }
     sourceFilePath: string
     sourceType: string
     sourceHash: string
+    deps: { url: string, hash: string, async?: boolean }[]
     jsFile: string
     jsContent: string
     jsSourceMap: string
@@ -33,13 +34,10 @@ interface RenderResult {
 }
 
 export interface AlephEnv {
-    version: string
-    build: {
-        mode: 'development' | 'production'
-        buildID: string
-        appRoot: string
-        config: Config
-    }
+    [key: string]: string
+    __version: string
+    __appRoot: string
+    __buildID: string
 }
 
 export default class Project {
@@ -68,7 +66,8 @@ export default class Project {
             sourceMap: false,
             importMap: {
                 imports: {}
-            }
+            },
+            env: {}
         }
         this.ready = (async () => {
             const t = performance.now()
@@ -222,7 +221,7 @@ export default class Project {
         return html
     }
 
-    async getData() {
+    async getStaticData() {
         const mod = this.#modules.get('/data.js')
         if (mod) {
             try {
@@ -233,11 +232,10 @@ export default class Project {
                 }
                 if (util.isPlainObject(data)) {
                     return data
-                } else {
-                    log.warn(`module '${mod.url}' should return a plain object as default`)
                 }
+                log.warn(`module '${mod.url}' should return a plain object as default`)
             } catch (error) {
-                log.error(error)
+                log.error('getStaticData:', error)
             }
         }
         return {}
@@ -295,7 +293,7 @@ export default class Project {
         // write static data
         if (this.#modules.has('/data.js')) {
             const { hash } = this.#modules.get('/data.js')!
-            const data = this.getData()
+            const data = this.getStaticData()
             await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), `export default ${JSON.stringify(data)}`)
         }
 
@@ -354,10 +352,11 @@ export default class Project {
             srcDir,
             ouputDir,
             baseUrl,
-            ssr,
             buildTarget,
             sourceMap,
-            defaultLocale
+            defaultLocale,
+            ssr,
+            env
         } = config
         if (util.isNEString(srcDir)) {
             Object.assign(this.config, { srcDir: util.cleanPath(srcDir) })
@@ -367,6 +366,12 @@ export default class Project {
         }
         if (util.isNEString(baseUrl)) {
             Object.assign(this.config, { baseUrl: util.cleanPath(encodeURI(baseUrl)) })
+        }
+        if (/^es(20\d{2}|next)$/i.test(buildTarget)) {
+            Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
+        }
+        if (typeof sourceMap === 'boolean') {
+            Object.assign(this.config, { sourceMap })
         }
         if (util.isNEString(defaultLocale)) {
             Object.assign(this.config, { defaultLocale })
@@ -379,11 +384,8 @@ export default class Project {
             const exclude = util.isArray(ssr.exclude) ? ssr.exclude : []
             Object.assign(this.config, { ssr: { fallback, include, exclude } })
         }
-        if (/^es(20\d{2}|next)$/i.test(buildTarget)) {
-            Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
-        }
-        if (typeof sourceMap === 'boolean') {
-            Object.assign(this.config, { sourceMap })
+        if (util.isPlainObject(env)) {
+            Object.assign(this.config, { env })
         }
 
         // Gen build ID after config loaded
@@ -401,13 +403,10 @@ export default class Project {
 
         Object.assign(globalThis, {
             ALEPH_ENV: {
-                version,
-                build: {
-                    appRoot: this.appRoot,
-                    buildID: this.buildID,
-                    config: this.config,
-                    mode: this.mode,
-                }
+                ...this.config.env,
+                __version: version,
+                __appRoot: this.appRoot,
+                __buildID: this.buildID,
             } as AlephEnv,
             document: new Document(),
             innerWidth: 1920,
@@ -620,7 +619,7 @@ export default class Project {
         const config: Record<string, any> = {
             baseUrl,
             defaultLocale,
-            locales: {},
+            locales: [],
             routing: {}
         }
         const module = this._moduleFromURL('/main.js')
@@ -853,18 +852,20 @@ export default class Project {
                 mod.hash = hash
             } else if (mod.sourceType === 'sass' || mod.sourceType === 'scss') {
                 // todo: support sass
+            } else if (mod.sourceType === 'md' || mod.sourceType === 'mdx') {
+                const { __content, ...props } = loadFront(sourceContent)
+                const html = marked.parse(__content)
+                mod.jsContent = [
+                    `import React from ${JSON.stringify(relativePath(path.dirname(mod.sourceFilePath), '/-/esm.sh/react.js'))};`,
+                    `export default function Markdown() {`,
+                    `  return React.createElement("div", ${JSON.stringify({ className: 'markdown', dangerouslySetInnerHTML: { __html: html } })});`,
+                    `}`,
+                    `Markdown.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
+                    this.isDev && `$RefreshReg$(Markdown, "Markdown");`,
+                ].filter(Boolean).join(this.isDev ? '\n' : '')
+                mod.jsSourceMap = ''
+                mod.hash = (new Sha1).update(mod.jsContent).hex()
             } else {
-                if (mod.sourceType === 'md' || mod.sourceType === 'mdx') {
-                    const { __content, ...props } = loadFront(sourceContent)
-                    const html = marked.parse(__content)
-                    sourceContent = [
-                        `import React from 'https://esm.sh/react';`,
-                        `export const pageProps = ${JSON.stringify(props, undefined, 4)};`,
-                        `export default function Marked() {`,
-                        `  return React.createElement('div', ${JSON.stringify({ className: 'marked', dangerouslySetInnerHTML: { __html: html } }, undefined, 4)});`,
-                        `}`
-                    ].join('\n')
-                }
                 const compileOptions = {
                     target: this.config.buildTarget,
                     mode: this.mode,
@@ -1088,8 +1089,8 @@ export default class Project {
             const { renderPage, renderHead } = await import("file://" + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
             const { default: App } = appModule ? await import("file://" + appModule.jsFile) : {} as any
             const { default: Page } = await import("file://" + pageModule.jsFile)
-            const data = await this.getData()
-            const html = renderPage(data, url, appModule ? App : undefined, Page)
+            const data = await this.getStaticData()
+            const html = renderPage(url, data, appModule ? App : undefined, Page)
             const head = await renderHead([
                 appModule ? this._lookupStyleDeps(appModule.id) : [],
                 this._lookupStyleDeps(pageModule.id),

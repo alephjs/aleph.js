@@ -8,8 +8,8 @@ import util from './util.ts'
 export { renderHead } from './head.ts'
 
 export function renderPage(
-    data: Record<string, any>,
     url: RouterURL,
+    data: Record<string, any>,
     App: ComponentType<any> | undefined,
     Page: ComponentType<any>,
 ) {
