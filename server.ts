@@ -1,11 +1,9 @@
-import { createHtml } from '../html.ts'
-import log from '../log.ts'
-import Project, { injectHmr } from '../project.ts'
-import { createRouter } from '../router.ts'
-import { path, serve, ws } from '../std.ts'
-import util, { hashShort } from '../util.ts'
-import { PostAPIRequest, PostAPIResponse } from './api.ts'
+import { createHtml } from './html.ts'
+import log from './log.ts'
 import { getContentType } from './mime.ts'
+import Project, { injectHmr } from './project.ts'
+import { path, serve, ws } from './std.ts'
+import util, { hashShort } from './util.ts'
 
 export async function start(appDir: string, port: number, isDev = false) {
     const project = new Project(appDir, isDev ? 'development' : 'production')
@@ -64,24 +62,7 @@ export async function start(appDir: string, port: number, isDev = false) {
 
                     // serve apis
                     if (pathname.startsWith('/api/')) {
-                        const { pagePath, params, query } = createRouter(
-                            project.config.baseUrl,
-                            project.apiPaths,
-                            { location: { pathname, search: url.search } }
-                        )
-                        const handle = await project.getAPIHandle(pagePath)
-                        if (handle) {
-                            handle(
-                                new PostAPIRequest(req, params, query),
-                                new PostAPIResponse(req)
-                            )
-                        } else {
-                            req.respond({
-                                status: 404,
-                                headers: new Headers({ 'Content-Type': 'application/javascript; charset=utf-8' }),
-                                body: JSON.stringify({ error: { status: 404, message: 'page not found' } })
-                            })
-                        }
+                        project.callAPI(req, { pathname, search: url.search })
                         continue
                     }
 

@@ -1,7 +1,7 @@
-import type { ServerRequest } from '../std.ts'
-import type { APIRequest, APIResponse } from '../types.ts'
+import type { ServerRequest } from './std.ts'
+import type { APIRequest, APIResponse } from './types.ts'
 
-export class PostAPIRequest implements APIRequest {
+export class AlephAPIRequest implements APIRequest {
     #req: ServerRequest
 
     cookies: ReadonlyMap<string, string>
@@ -48,7 +48,7 @@ export class PostAPIRequest implements APIRequest {
     }
 }
 
-export class PostAPIResponse implements APIResponse {
+export class AlephAPIResponse implements APIResponse {
     #req: ServerRequest
     #headers: Headers
     #status: number

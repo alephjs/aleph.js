@@ -1,4 +1,4 @@
-import { start } from '../server/server.ts'
+import { start } from '../server.ts'
 
 export const helpMessage = `Starts the aleph app in development mode.
 

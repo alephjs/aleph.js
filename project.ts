@@ -1,13 +1,14 @@
 import marked from 'https://esm.sh/marked'
 import { minify } from 'https://esm.sh/terser'
-import { loadFront } from 'https://esm.sh/yaml-front-matter'
+import { safeLoadFront } from 'https://esm.sh/yaml-front-matter'
+import { AlephAPIRequest, AlephAPIResponse } from './api.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
-import { createRouter } from './router.ts'
-import { colors, ensureDir, path, Sha1, walk } from './std.ts'
+import { Routing } from './router.ts'
+import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
-import type { APIHandle, Config, Location, RouterURL } from './types.ts'
+import type { AlephRuntime, APIHandle, Config, RouteModule, RouterURL } from './types.ts'
 import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
@@ -16,7 +17,6 @@ interface Module {
     id: string
     url: string
     isRemote: boolean
-    asPage?: { meta: Record<string, any> }
     sourceFilePath: string
     sourceType: string
     sourceHash: string
@@ -28,16 +28,9 @@ interface Module {
 }
 
 interface RenderResult {
-    code: number
+    status: number
     head: string[]
     body: string
-}
-
-export interface AlephRuntime {
-    env: Record<string, string>
-    __version: string
-    __appRoot: string
-    __buildID: string
 }
 
 export default class Project {
@@ -48,7 +41,8 @@ export default class Project {
 
     #buildID: string = ''
     #modules: Map<string, Module> = new Map()
-    #pageModules: Map<string, { moduleID: string, rendered: Map<string, RenderResult> }> = new Map()
+    #routing: Routing = new Routing()
+    #apiRouting: Routing = new Routing()
     #fsWatchListeners: Array<EventEmitter> = []
 
     constructor(dir: string, mode: 'development' | 'production') {
@@ -91,12 +85,6 @@ export default class Project {
 
     get buildDir() {
         return path.join(this.appRoot, '.aleph', 'build-' + this.buildID)
-    }
-
-    get apiPaths() {
-        return Array.from(this.#modules.keys())
-            .filter(p => p.startsWith('/api/'))
-            .map(p => p.slice(1).replace(reModuleExt, ''))
     }
 
     isHMRable(moduleID: string) {
@@ -162,49 +150,56 @@ export default class Project {
         }
     }
 
-    async getAPIHandle(path: string): Promise<APIHandle | null> {
-        if (path) {
-            const importPath = '.' + path + '.js'
-            if (this.#modules.has(importPath)) {
+    async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandle | null> {
+        const [{ pagePath, params, query }] = this.#apiRouting.createRouter(loc)
+        if (pagePath != '') {
+            const moduleID = pagePath + '.js'
+            if (this.#modules.has(moduleID)) {
                 try {
-                    const { default: handle } = await import("file://" + this.#modules.get(importPath)!.jsFile)
-                    return handle
-                } catch (error) {
-                    log.error(error)
+                    const { default: handle } = await import('file://' + this.#modules.get(moduleID)!.jsFile)
+                    handle(
+                        new AlephAPIRequest(req, params, query),
+                        new AlephAPIResponse(req)
+                    )
+                } catch (err) {
+                    req.respond({
+                        status: 500,
+                        headers: new Headers({ 'Content-Type': 'text/plain; charset=utf-8' }),
+                        body: JSON.stringify({ error: { status: 500, message: err.message } })
+                    })
                 }
             }
+        } else {
+            req.respond({
+                status: 404,
+                headers: new Headers({ 'Content-Type': 'application/javascript; charset=utf-8' }),
+                body: JSON.stringify({ error: { status: 404, message: 'page not found' } })
+            })
         }
         return null
     }
 
-    async getPageHtml(location: Location): Promise<[number, string]> {
-        const { baseUrl, defaultLocale } = this.config
-        const url = createRouter(
-            baseUrl,
-            Array.from(this.#pageModules.keys()),
-            {
-                location,
-                defaultLocale
-            }
-        )
+    async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string]> {
+        const { baseUrl } = this.config
+        const [url, pageModuleTree] = this.#routing.createRouter(loc)
 
         if (url.pagePath === '') {
             return [200, this.getDefaultIndexHtml()]
         }
 
         const mainModule = this.#modules.get('/main.js')!
-        const { code, head, body } = await this._renderPage(url)
+        const { status, head, body } = await this._renderPage(url, pageModuleTree)
         const html = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
-                { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
+                // { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
             ],
             body,
             minify: !this.isDev
         })
-        return [code, html]
+        return [status, html]
     }
 
     getDefaultIndexHtml(): string {
@@ -299,7 +294,7 @@ export default class Project {
 
         const { ssr } = this.config
         if (ssr) {
-            for (const pathname of this.#pageModules.keys()) {
+            for (const pathname of this.#routing.paths) {
                 const [_, html] = await this.getPageHtml({ pathname })
                 const htmlFile = path.join(outputDir, pathname, 'index.html')
                 await writeTextFile(htmlFile, html)
@@ -387,9 +382,10 @@ export default class Project {
         if (util.isPlainObject(env)) {
             Object.assign(this.config, { env })
         }
-
-        // Gen build ID after config loaded
+        // Gen build ID after config loaded.
         this.#buildID = (new Sha1()).update(this.mode + '.' + this.config.buildTarget + '.' + version).hex().slice(0, 18)
+        // Update routing options.
+        this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, [])
     }
 
     private async _init() {
@@ -430,18 +426,15 @@ export default class Project {
 
         if (existsDirSync(apiDir)) {
             for await (const { path: p } of walk(apiDir, walkOptions)) {
-                await this._compile('/api' + util.trimPrefix(p, apiDir))
+                const mod = await this._compile('/api' + util.trimPrefix(p, apiDir))
+                this.#apiRouting.update(this._getRouteModule(mod))
             }
         }
 
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md', '.mdx'] })) {
             const rp = util.trimPrefix(p, pagesDir)
-            const pagePath = rp.replace(reModuleExt, '').replace(reMDExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '/')
             const mod = await this._compile('/pages' + rp)
-            this.#pageModules.set(pagePath, {
-                moduleID: mod.id,
-                rendered: new Map()
-            })
+            this.#routing.update(this._getRouteModule(mod))
         }
 
         const precompileUrls = [
@@ -458,11 +451,11 @@ export default class Project {
         await this._createMainModule()
 
         log.info(colors.bold('Pages'))
-        for (const path of this.#pageModules.keys()) {
+        for (const path of this.#routing.paths) {
             const isIndex = path == '/'
             log.info('○', path, isIndex ? colors.dim('(index)') : '')
         }
-        for (const path of this.apiPaths) {
+        for (const path of this.#apiRouting.paths) {
             log.info('λ', path)
         }
 
@@ -493,11 +486,14 @@ export default class Project {
                                 return true
                             }
                             default: {
-                                if (path.startsWith('/pages/') || path.startsWith('/api/')) {
+                                if (path.startsWith('/api/')) {
                                     return true
                                 }
                             }
                         }
+                    }
+                    if ((reModuleExt.test(path) || reMDExt.test(path)) && path.startsWith('/pages/')) {
+                        return true
                     }
                     let isDep = false
                     for (const { deps } of this.#modules.values()) {
@@ -511,54 +507,41 @@ export default class Project {
                 if (validated) {
                     const moduleID = path.replace(reModuleExt, '.js')
                     util.debounceX(moduleID, () => {
-                        const removed = !existsFileSync(p)
-                        const cleanup = () => {
-                            if (moduleID === '/app.js' || moduleID === '/data.js') {
-                                this._clearPageRenderCache()
-                            } else if (moduleID.startsWith('/pages/')) {
-                                if (removed) {
-                                    this._removePageModuleById(moduleID)
-                                } else {
-                                    if (this.#pageModules.has(moduleID)) {
-                                        this._clearPageRenderCache(moduleID)
-                                    } else {
-                                        const pagePath = util.trimPrefix(moduleID, '/pages').replace(reModuleExt, '').replace(reMDExt, '').replace(/\s+/g, '-').replace(/\/index$/i, '/')
-                                        this.#pageModules.set(pagePath, { moduleID, rendered: new Map() })
-                                    }
-                                }
-                            }
-                            this._createMainModule()
-                        }
-                        if (!removed) {
+                        if (existsFileSync(p)) {
                             let type = 'modify'
                             if (!this.#modules.has(moduleID)) {
                                 type = 'add'
                             }
                             log.info(type, path)
-                            this._compile(path, { forceCompile: true }).then(({ hash }) => {
-                                const hmrable = this.isHMRable(moduleID)
+                            this._compile(path, { forceCompile: true }).then(mod => {
+                                const hmrable = this.isHMRable(mod.id)
                                 if (hmrable) {
                                     if (type === 'add') {
-                                        this.#fsWatchListeners.forEach(e => e.emit('add', moduleID, hash))
+                                        this.#fsWatchListeners.forEach(e => e.emit('add', mod.id, mod.hash))
                                     } else {
-                                        this.#fsWatchListeners.forEach(e => e.emit('modify-' + moduleID, hash))
+                                        this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.id, mod.hash))
                                     }
                                 }
-                                cleanup()
-                                this._updateDependency(path, hash, mod => {
-                                    if (!hmrable && this.isHMRable(mod.id)) {
-                                        this.#fsWatchListeners.forEach(e => e.emit(mod.id, 'modify', mod.hash))
-                                    }
-                                    if (mod.id.startsWith('/pages/')) {
-                                        this._clearPageRenderCache(mod.id)
+                                if (moduleID.startsWith('/pages/')) {
+                                    this.#routing.update(this._getRouteModule(mod))
+                                } else if (moduleID.startsWith('/api/')) {
+                                    this.#apiRouting.update(this._getRouteModule(mod))
+                                }
+                                this._updateDependency(path, mod.hash, ({ id: moduleID }) => {
+                                    if (!hmrable && this.isHMRable(moduleID)) {
+                                        this.#fsWatchListeners.forEach(e => e.emit(moduleID, 'modify', mod.hash))
                                     }
                                 })
                             }).catch(err => {
                                 log.error(`compile(${path}):`, err.message)
                             })
                         } else if (this.#modules.has(moduleID)) {
+                            if (moduleID.startsWith('/pages/')) {
+                                this.#routing.removeRoute(moduleID)
+                            } else if (moduleID.startsWith('/api/')) {
+                                this.#apiRouting.removeRoute(moduleID)
+                            }
                             this.#modules.delete(moduleID)
-                            cleanup()
                             if (this.isHMRable(moduleID)) {
                                 this.#fsWatchListeners.forEach(e => e.emit('remove', moduleID))
                             }
@@ -570,28 +553,9 @@ export default class Project {
         }
     }
 
-    private _removePageModuleById(moduleID: string) {
-        let pagePath = ''
-        for (const [p, pm] of this.#pageModules.entries()) {
-            if (pm.moduleID === moduleID) {
-                pagePath = p
-                break
-            }
-        }
-        if (pagePath !== '') {
-            this.#pageModules.delete(pagePath)
-        }
-    }
-
-    private _clearPageRenderCache(moduleID?: string) {
-        for (const [_, p] of this.#pageModules.entries()) {
-            if (!moduleID) {
-                p.rendered.clear()
-            } else if (p.moduleID == moduleID) {
-                p.rendered.clear()
-                break
-            }
-        }
+    private _getRouteModule({ id, hash }: Module): RouteModule {
+        const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
+        return { id, hash, asyncDeps }
     }
 
     private _moduleFromURL(url: string): Module {
@@ -620,7 +584,7 @@ export default class Project {
             baseUrl,
             defaultLocale,
             locales: [],
-            routing: {}
+            routes: this.#routing.routes
         }
         const module = this._moduleFromURL('/main.js')
         const deps = [
@@ -630,29 +594,9 @@ export default class Project {
             url: String(url),
             hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
         }))
-        if (this.#modules.has('/data.js')) {
-            const { id, url, hash } = this.#modules.get('/data.js')!
-            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
-            config.staticDataModule = { id, hash, asyncDeps }
-            deps.push({ url, hash })
-        }
-        if (this.#modules.has('/app.js')) {
-            const { id, url, hash } = this.#modules.get('/app.js')!
-            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
-            config.customAppModule = { id, hash, asyncDeps }
-            deps.push({ url, hash })
-        }
-        if (this.#modules.has('/404.js')) {
-            const { id, url, hash } = this.#modules.get('/404.js')!
-            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
-            config.custom404Module = { id: '/404.js', hash, asyncDeps }
-            deps.push({ url, hash })
-        }
-        this.#pageModules.forEach(({ moduleID }, pagePath) => {
-            const { id, url, hash } = this.#modules.get(moduleID)!
-            const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
-            config.routing[pagePath] = { id, hash, asyncDeps }
-            deps.push({ url, hash })
+
+        config.preloadModules = ['/data.js', '/app.js', '/404.js'].filter(id => this.#modules.has(id)).map(id => {
+            return this._getRouteModule(this.#modules.get(id)!)
         })
 
         module.jsContent = [
@@ -860,7 +804,7 @@ export default class Project {
             } else if (mod.sourceType === 'sass' || mod.sourceType === 'scss') {
                 // todo: support sass
             } else if (mod.sourceType === 'md' || mod.sourceType === 'mdx') {
-                const { __content, ...props } = loadFront(sourceContent)
+                const { __content, ...props } = safeLoadFront(sourceContent)
                 const html = marked.parse(__content)
                 mod.jsContent = [
                     `import React from ${JSON.stringify(relativePath(path.dirname(mod.sourceFilePath), '/-/esm.sh/react.js'))};`,
@@ -947,7 +891,7 @@ export default class Project {
         }
 
         if (fsync) {
-            if (mod.jsFile != "") {
+            if (mod.jsFile != '') {
                 try {
                     await Deno.remove(mod.jsFile)
                     await Deno.remove(mod.jsFile + '.map')
@@ -969,11 +913,10 @@ export default class Project {
         return mod
     }
 
-    private _updateDependency(depPath: string, depHash: string, callback: (mod: Module) => void, trace?: Set<string>) {
-        trace = trace || new Set()
+    private _updateDependency(depPath: string, depHash: string, callback: (mod: Module) => void, tracing = new Set<string>()) {
         this.#modules.forEach(mod => {
             mod.deps.forEach(dep => {
-                if (dep.url === depPath && dep.hash !== depHash && !trace?.has(mod.id)) {
+                if (dep.url === depPath && dep.hash !== depHash && !tracing?.has(mod.id)) {
                     const depImportPath = relativePath(
                         path.dirname(mod.url),
                         dep.url.replace(reModuleExt, '')
@@ -1005,8 +948,8 @@ export default class Project {
                         ])
                     }
                     callback(mod)
-                    trace?.add(mod.id)
-                    this._updateDependency(mod.url, mod.hash, callback, trace)
+                    tracing.add(mod.id)
+                    this._updateDependency(mod.url, mod.hash, callback, tracing)
                     log.debug('update dependency:', depPath, '->', mod.url)
                 }
             })
@@ -1072,14 +1015,9 @@ export default class Project {
         return rewrittenPath.replace(reModuleExt, '') + '.js'
     }
 
-    private async _renderPage(url: RouterURL) {
+    private async _renderPage(url: RouterURL, pageModuleTree: { id: string, hash: string }[]) {
         const start = performance.now()
-        const ret: RenderResult = { code: 200, head: [], body: '<main></main>' }
-        const page = this.#pageModules.get(url.pagePath)!
-        if (page.rendered.has(url.pathname)) {
-            const cache = page.rendered.get(url.pathname)!
-            return { ...cache }
-        }
+        const ret: RenderResult = { status: 200, head: [], body: '<main></main>' }
         Object.assign(window, {
             location: {
                 protocol: 'http:',
@@ -1098,23 +1036,30 @@ export default class Project {
         })
         try {
             const appModule = this.#modules.get('/app.js')
-            const pageModule = this.#modules.get(page.moduleID)!
-            const { renderPage, renderHead } = await import("file://" + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
-            const { default: App } = appModule ? await import("file://" + appModule.jsFile) : {} as any
-            const { default: Page } = await import("file://" + pageModule.jsFile)
-            const data = await this.getStaticData()
-            const html = renderPage(url, data, appModule ? App : undefined, Page)
+            const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
+            const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
+            const staticData = await this.getStaticData()
+            const pageComponentTree: { id: string, Component?: any }[] = pageModuleTree.map(({ id }) => ({ id }))
+            const imports = pageModuleTree.map(async ({ id }) => {
+                const mod = this.#modules.get(id)!
+                const { default: C } = await import('file://' + mod.jsFile)
+                const pc = pageComponentTree.find(pc => pc.id === mod.id)
+                if (pc) {
+                    pc.Component = C
+                }
+            })
+            await Promise.all(imports)
+            const html = renderPage(url, staticData, App, pageComponentTree)
             const head = await renderHead([
                 appModule ? this._lookupStyleDeps(appModule.id) : [],
-                this._lookupStyleDeps(pageModule.id),
+                ...pageModuleTree.map(({ id }) => this._lookupStyleDeps(id))
             ].flat())
-            ret.code = 200
+            ret.status = 200
             ret.head = head
             ret.body = `<main>${html}</main>`
-            page.rendered.set(url.pathname, { ...ret })
             log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
         } catch (err) {
-            ret.code = 500
+            ret.status = 500
             ret.head = ['<title>500 Error - Aleph.js</title>']
             ret.body = `<main><pre>${err.stack}</pre></main>`
             log.error(err.stack)

@@ -1,8 +1,12 @@
+const symbolFor = typeof Symbol === 'function' && Symbol.for
+const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
+const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
+
 export const hashShort = 7
 export const reHttp = /^https?:\/\//i
 export const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i
 export const reStyleModuleExt = /\.(css|less|sass|scss)$/i
-export const reMDExt = /\.(md|mdx)$/i
+export const reMDExt = /\.(md|markdown)$/i
 export const reHashJs = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
 
 export default {
@@ -24,10 +28,10 @@ export default {
     isNEString(a: any): a is string {
         return typeof a === 'string' && a.length > 0
     },
-    isArray<T = any>(a: any): a is Array<T> {
+    isArray(a: any): a is Array<any> {
         return Array.isArray(a)
     },
-    isNEArray<T = any>(a: any): a is Array<T> {
+    isNEArray(a: any): a is Array<any> {
         return Array.isArray(a) && a.length > 0
     },
     isPlainObject(a: any): a is Record<string, any> {
@@ -36,54 +40,35 @@ export default {
     isFunction(a: any): a is Function {
         return typeof a === 'function'
     },
-    isLikelyReactComponent: (() => {
-        /**
-         * Copyright (c) Facebook, Inc. and its affiliates.
-         *
-         * This source code is licensed under the MIT license found in the
-         * LICENSE file in the root directory of this source tree.
-         *
-         */
-
-        const symbolFor = typeof Symbol === 'function' && Symbol.for
-        const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
-        const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
-
-        function isLikelyComponentType(type: any): boolean {
-            switch (typeof type) {
-                case 'function': {
-                    if (type.prototype != null) {
-                        if (type.prototype.isReactComponent) {
+    isLikelyReactComponent(type: any): Boolean {
+        switch (typeof type) {
+            case 'function':
+                if (type.prototype != null) {
+                    if (type.prototype.isReactComponent) {
+                        return true
+                    }
+                    const ownNames = Object.getOwnPropertyNames(type.prototype);
+                    if (ownNames.length > 1 || ownNames[0] !== 'constructor') {
+                        return false
+                    }
+                }
+                const name = type.name || type.displayName
+                return typeof name === 'string' && /^[A-Z]/.test(name)
+            case 'object':
+                if (type != null) {
+                    switch (type.$$typeof) {
+                        case REACT_FORWARD_REF_TYPE:
+                        case REACT_MEMO_TYPE:
                             return true
-                        }
-                        const ownNames = Object.getOwnPropertyNames(type.prototype);
-                        if (ownNames.length > 1 || ownNames[0] !== 'constructor') {
+                        default:
                             return false
-                        }
                     }
-                    const name = type.name || type.displayName
-                    return typeof name === 'string' && /^[A-Z]/.test(name)
                 }
-                case 'object': {
-                    if (type != null) {
-                        switch (type.$$typeof) {
-                            case REACT_FORWARD_REF_TYPE:
-                            case REACT_MEMO_TYPE:
-                                return true
-                            default:
-                                return false
-                        }
-                    }
-                    return false
-                }
-                default: {
-                    return false
-                }
-            }
+                return false
+            default:
+                return false
         }
-
-        return isLikelyComponentType
-    })(),
+    },
     isHttpUrl(url: string) {
         try {
             const { protocol } = new URL(url)
@@ -110,8 +95,8 @@ export default {
         }
         return s + ext
     },
-    splitBy(s: string, splitter: string): [string, string] {
-        const i = s.indexOf(splitter)
+    splitBy(s: string, searchString: string): [string, string] {
+        const i = s.indexOf(searchString)
         if (i >= 0) {
             return [s.slice(0, i), s.slice(i + 1)]
         }

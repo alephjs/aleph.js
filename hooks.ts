@@ -7,11 +7,6 @@ export function useData(key: string) {
     return data[key]
 }
 
-export function usePageMeta<T = any>(): T {
-    const { pagePath } = useContext(RouterContext)
-    return {} as T
-}
-
 export function useRouter() {
     return useContext(RouterContext)
 }

@@ -1,101 +1,105 @@
-import React from 'https://esm.sh/react'
+import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import { ALEPH, getModuleImportUrl } from './app.ts'
-import { createRouter } from './router.ts'
-import type { Module, RouterURL } from './types.ts'
-import util, { hashShort, reModuleExt } from './util.ts'
+import { ALEPH, getModuleImportUrl } from './aleph.ts'
+import { E501Page } from './error.ts'
+import { Routing } from './router.ts'
+import type { PageProps, Route, RouteModule } from './types.ts'
+import util, { reModuleExt } from './util.ts'
 
 export default async function bootstrap({
+    routes,
     baseUrl,
     defaultLocale,
     locales,
-    staticDataModule,
-    customAppModule,
-    custom404Module,
-    routing
+    preloadModules
 }: {
+    routes: Route[]
     baseUrl: string
     defaultLocale: string
     locales: string[]
-    staticDataModule?: Module
-    customAppModule?: Module
-    custom404Module?: Module
-    routing: Record<string, Module>
+    preloadModules: RouteModule[]
 }) {
     const { document } = window as any
     const mainEl = document.querySelector('main')
-    const dataEl = document.getElementById('ssr-data')
+    const routing = new Routing(routes, baseUrl, defaultLocale, locales)
+    const [url, pageModuleTree] = routing.createRouter()
 
-    let url: RouterURL
-    if (dataEl) {
-        const data = JSON.parse(dataEl.innerHTML)
-        if (util.isPlainObject(data.url)) {
-            url = data.url
-        } else {
-            throw new Error("invalid ssr-data")
-        }
-    } else {
-        url = createRouter(
-            baseUrl,
-            Object.keys(routing),
-            {
-                defaultLocale,
-                locales: Object.keys(locales)
+    if (url.pagePath === '') {
+        throw new Error('invalid router')
+    }
+
+    const staticData: Record<string, any> = {}
+    const components: Record<string, ComponentType> = {}
+    const ctree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
+    const imports = [...preloadModules, ...pageModuleTree].map(async mod => {
+        const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
+        if (mod.asyncDeps) {
+            // import async dependencies
+            for (const dep of mod.asyncDeps) {
+                await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
             }
-        )
-    }
+        }
+        switch (mod.id) {
+            case '/data.js':
+                Object.assign(staticData, C)
+                break
+            case '/app.js':
+                components['App'] = C
+                break
+            case '/404.js':
+                components['E404'] = C
+                break
+            default:
+                const pc = ctree.find(pc => pc.id === mod.id)
+                if (pc) {
+                    if (util.isLikelyReactComponent(C)) {
+                        pc.Component = C
+                    } else {
+                        pc.Component = E501Page
+                    }
+                }
+                break
+        }
+    })
+    await Promise.all(imports)
 
-    const pageModule = routing[url.pagePath]
-    if (!pageModule) {
-        throw new Error('page module not found')
+    const pageProps: PageProps = {
+        Page: ctree[0].Component || (() => null),
+        pageProps: {}
     }
-
-    const [
-        { default: staticData },
-        { default: App },
-        { default: E404 },
-        { default: Page }
-    ] = await Promise.all([
-        staticDataModule ? import(getModuleImportUrl(baseUrl, staticDataModule)) : Promise.resolve({ default: {} }),
-        customAppModule ? import(getModuleImportUrl(baseUrl, customAppModule)) : Promise.resolve({}),
-        custom404Module ? import(getModuleImportUrl(baseUrl, custom404Module)) : Promise.resolve({}),
-        import(getModuleImportUrl(baseUrl, pageModule))
-    ])
+    ctree.slice(1).reduce((p, m) => {
+        const c = {
+            Page: m.Component || (() => null),
+            pageProps: {}
+        }
+        p.pageProps = c
+        return c
+    }, pageProps)
     const el = React.createElement(
         ALEPH,
         {
             initial: {
-                baseUrl,
-                defaultLocale,
-                locales,
                 routing,
                 url,
                 staticData,
-                components: { E404, App, Page }
+                components,
+                pageProps
             }
         }
     )
 
-    // import async style dependencies
-    const asyncDeps: { url: string, hash: string }[] = []
-    customAppModule?.asyncDeps?.forEach(deps => asyncDeps.push(deps))
-    custom404Module?.asyncDeps?.forEach(deps => asyncDeps.push(deps))
-    pageModule.asyncDeps?.forEach(deps => asyncDeps.push(deps))
-    await Promise.all(asyncDeps.map(dep => {
-        return import(util.cleanPath(`${baseUrl}/_aleph/${dep.url.replace(reModuleExt, '')}.${dep.hash.slice(0, hashShort)}.js`))
-    }))
-
-    if (dataEl) {
+    if (mainEl.childElementCount > 0) {
         hydrate(el, mainEl)
-        // remove ssr head elements, set a timmer to avoid tab title flash
-        setTimeout(() => {
-            Array.from(document.head.children).forEach((el: any) => {
-                if (el.hasAttribute('ssr')) {
-                    document.head.removeChild(el)
-                }
-            })
-        }, 0)
     } else {
         render(el, mainEl)
     }
+
+    // remove ssr head elements, set a timmer to avoid the tab title flash
+    setTimeout(() => {
+        Array.from(document.head.children).forEach((el: any) => {
+            if (el.hasAttribute('ssr')) {
+                document.head.removeChild(el)
+            }
+        })
+    }, 0)
 }
