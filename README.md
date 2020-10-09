@@ -16,6 +16,7 @@ The React Framework in [Deno](https://deno.land), inspired by [next.js](https://
 - ES Module Ready
 - HMR with Fast Refresh
 - File-system Routing
+- Markdown Page
 - Built-in CSS(Less) Support
 - SSR/SSG
 
