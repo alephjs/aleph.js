@@ -1,5 +1,5 @@
 import React from 'https://esm.sh/react'
-import Head from './head.ts'
+import { Head } from './head.ts'
 
 const e501AppEl = React.createElement(
     ErrorPage,

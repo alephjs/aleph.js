@@ -76,7 +76,7 @@ export function applyCSS(id: string, css: string, asLink: boolean = false) {
     }
 }
 
-export default function Head({ children }: PropsWithChildren<{}>) {
+export function Head({ children }: PropsWithChildren<{}>) {
     if (window.Deno) {
         parse(children).forEach(({ type, props }) => serverHeadElements.push({ type, props }))
     }
