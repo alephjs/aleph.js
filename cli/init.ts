@@ -1,4 +1,4 @@
-import { gzipDecode } from 'https://esm.sh/deno.land/x/wasm_gzip@v1.0.0/mod.ts'
+import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from '../log.ts'
 import { colors, ensureDir, ensureFile, fromStreamReader, path, Untar } from '../std.ts'
 import util from '../util.ts'
