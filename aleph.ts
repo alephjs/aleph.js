@@ -89,7 +89,8 @@ export function ALEPH({ initial }: {
     }, [onpopstate])
 
     useEffect(() => {
-        const { routing: { baseUrl } } = ref.current
+        const { routing } = ref.current
+        const { baseUrl } = routing
         const onUpdateData = (data: any) => {
             console.log('[DATA]', data)
             setStaticData(data)
@@ -149,15 +150,32 @@ export function ALEPH({ initial }: {
                     break
             }
         }
+        const onFetchPageModule = async ({ url: pathname }: { url: string }) => {
+            const [url, pageModuleTree] = routing.createRouter({ pathname })
+            if (url.pagePath !== '') {
+                const imports = pageModuleTree.map(async mod => {
+                    await import(getModuleImportUrl(baseUrl, mod))
+                    if (mod.asyncDeps) {
+                        // import async dependencies
+                        for (const dep of mod.asyncDeps) {
+                            await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
+                        }
+                    }
+                })
+                await Promise.all(imports)
+            }
+        }
 
         events.on('update-data', onUpdateData)
         events.on('add-module', onAddModule)
         events.on('remove-module', onRemoveModule)
+        events.on('fetch-page-module', onFetchPageModule)
 
         return () => {
             events.off('update-data', onUpdateData)
             events.off('add-module', onAddModule)
             events.off('remove-module', onRemoveModule)
+            events.off('fetch-page-module', onFetchPageModule)
         }
     }, [ref])
 

@@ -1,5 +1,6 @@
-import React, { Children, cloneElement, CSSProperties, isValidElement, MouseEvent, PropsWithChildren, useCallback, useEffect, useMemo, useRef } from 'https://esm.sh/react'
+import React, { Children, cloneElement, CSSProperties, isValidElement, MouseEvent, PropsWithChildren, useCallback, useEffect, useMemo } from 'https://esm.sh/react'
 import { redirect } from './aleph.ts'
+import events from './events.ts'
 import { useRouter } from './hooks.ts'
 import util from './util.ts'
 
@@ -11,6 +12,8 @@ interface LinkProps {
     style?: CSSProperties
 }
 
+const fetchedPageModules = new Set<string>()
+
 export default function Link({
     to,
     replace = false,
@@ -19,15 +22,10 @@ export default function Link({
     style,
     children
 }: PropsWithChildren<LinkProps>) {
-    const { pathname: currentPath, query: currentQuery } = useRouter()
+    const { pathname: currentPathname, query: currentQuery } = useRouter()
     const currentHref = useMemo(() => {
-        return [currentPath, Object.entries(currentQuery).map(([key, value]) => {
-            if (util.isArray(value)) {
-                return value.map(v => `${key}=${v}`).join('&')
-            }
-            return `${key}=${value}`
-        }).join('&')].filter(Boolean).join('?')
-    }, [currentPath, currentQuery])
+        return [currentPathname, currentQuery.toString()].filter(Boolean).join('?')
+    }, [currentPathname, currentQuery])
     const href = useMemo(() => {
         if (util.isHttpUrl(to)) {
             return to
@@ -36,15 +34,14 @@ export default function Link({
         if (pathname.startsWith('/')) {
             pathname = util.cleanPath(pathname)
         } else {
-            pathname = util.cleanPath(currentPath + '/' + pathname)
+            pathname = util.cleanPath(currentPathname + '/' + pathname)
         }
         return [pathname, search].filter(Boolean).join('?')
-    }, [currentPath, to])
-    const prefetchStatus = useRef('')
+    }, [currentPathname, to])
     const prefetch = useCallback(() => {
-        if (prefetchStatus.current != href && !util.isHttpUrl(href) && href !== currentHref) {
-            prefetchStatus.current = href
-            // prefetchPage(href)
+        if (!util.isHttpUrl(href) && href !== currentHref && !fetchedPageModules.has(href)) {
+            events.emit('fetch-page-module', { url: href })
+            fetchedPageModules.add(href)
         }
     }, [href, currentHref])
     const onClick = useCallback((e: MouseEvent) => {
