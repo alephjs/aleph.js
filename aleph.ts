@@ -1,4 +1,3 @@
-/// <reference lib="dom" />
 import React, { ComponentType, useCallback, useEffect, useRef, useState } from 'https://esm.sh/react'
 import { DataContext, RouterContext } from './context.ts'
 import { E404Page, E501App, E501Page, ErrorBoundary } from './error.ts'
@@ -72,7 +71,7 @@ export function ALEPH({ initial }: {
             }, pageProps)
             setPage({ url, pageProps })
             if (util.isInt(e.scrollTo)) {
-                window.scrollTo(e.scrollTo, 0)
+                (window as any).scrollTo(e.scrollTo, 0)
             }
         } else {
             setPage({ url, pageProps: null })

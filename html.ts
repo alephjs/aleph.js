@@ -9,7 +9,7 @@ export function createHtml({
 }: {
     lang?: string,
     head?: string[],
-    scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, async?: boolean, preload?: boolean })[],
+    scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean, preload?: boolean })[],
     body: string,
     minify?: boolean
 }) {

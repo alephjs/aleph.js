@@ -5,6 +5,7 @@ import { AlephAPIRequest, AlephAPIResponse } from './api.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
+import { nomoduleJS } from './polyfill.ts'
 import { Routing } from './router.ts'
 import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
@@ -193,8 +194,8 @@ export class Project {
             lang: url.locale,
             head: head,
             scripts: [
-                // { type: 'application/json', id: 'ssr-data', innerText: JSON.stringify({ url }) },
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { innerText: nomoduleJS(this.isDev), nomodule: true },
             ],
             body,
             minify: !this.isDev
@@ -209,6 +210,7 @@ export class Project {
             lang: defaultLocale,
             scripts: [
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { innerText: nomoduleJS(this.isDev), nomodule: true },
             ],
             body: `<main></main>`,
             minify: !this.isDev
@@ -220,7 +222,7 @@ export class Project {
         const mod = this.#modules.get('/data.js')
         if (mod) {
             try {
-                const { default: Data } = await import("file://" + mod.jsFile)
+                const { default: Data } = await import('file://' + mod.jsFile)
                 let data: any = Data
                 if (util.isFunction(Data)) {
                     data = await Data()
@@ -334,7 +336,7 @@ export class Project {
                         log.fatal('parse config.json:', e.message)
                     }
                 } else {
-                    const { default: conf } = await import("file://" + p)
+                    const { default: conf } = await import('file://' + p)
                     if (util.isPlainObject(conf)) {
                         Object.assign(config, conf)
                         log.debug(name, config)
