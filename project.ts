@@ -712,7 +712,7 @@ export class Project {
                 try {
                     const resp = await fetch(dlUrl)
                     if (resp.status != 200) {
-                        throw new Error(`${resp.status} - ${resp.statusText}`)
+                        throw new Error(`Download ${url}: ${resp.status} - ${resp.statusText}`)
                     }
                     if (mod.sourceType === 'js') {
                         const t = resp.headers.get('Content-Type')
