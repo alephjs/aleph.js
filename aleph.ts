@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import React, { ComponentType, useCallback, useEffect, useRef, useState } from 'https://esm.sh/react'
 import { DataContext, RouterContext } from './context.ts'
 import { E404Page, E501App, E501Page, ErrorBoundary } from './error.ts'
@@ -33,7 +34,7 @@ export function ALEPH({ initial }: {
         const { url, pageProps } = initial
         return { pageProps, url }
     })
-    const onpopstate = useCallback(async () => {
+    const onpopstate = useCallback(async (e: any) => {
         const { routing } = ref.current
         const { baseUrl } = routing
         const [url, pageModuleTree] = routing.createRouter()
@@ -70,6 +71,9 @@ export function ALEPH({ initial }: {
                 return c
             }, pageProps)
             setPage({ url, pageProps })
+            if (util.isInt(e.scrollTo)) {
+                window.scrollTo(e.scrollTo, 0)
+            }
         } else {
             setPage({ url, pageProps: null })
         }
@@ -193,7 +197,7 @@ export async function redirect(url: string, replace?: boolean) {
     } else {
         history.pushState(null, '', url)
     }
-    events.emit('popstate', { type: 'popstate' })
+    events.emit('popstate', { type: 'popstate', scrollTo: 0 })
 }
 
 export function getModuleImportUrl(baseUrl: string, mod: Module, forceFetch = false) {
