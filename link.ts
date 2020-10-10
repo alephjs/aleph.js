@@ -14,7 +14,7 @@ interface LinkProps {
 
 const fetchedPageModules = new Set<string>()
 
-export default function Link({
+export function Link({
     to,
     replace = false,
     prefetch: prefetchImmediately = false,
@@ -99,4 +99,44 @@ export default function Link({
         },
         children
     )
+}
+
+interface NavLinkProps extends LinkProps {
+    activeClassName?: string
+    activeStyle?: CSSProperties
+}
+
+export function NavLink({
+    activeClassName = 'active',
+    activeStyle,
+    to,
+    ...rest
+}: PropsWithChildren<NavLinkProps>) {
+    const { pathname: currentPathname } = useRouter()
+    const pathname = useMemo(() => {
+        if (util.isHttpUrl(to)) {
+            return to
+        }
+        let [pathname] = util.splitBy(to, '?')
+        if (pathname.startsWith('/')) {
+            pathname = util.cleanPath(pathname)
+        } else {
+            pathname = util.cleanPath(currentPathname + '/' + pathname)
+        }
+        return pathname
+    }, [currentPathname, to])
+
+    if (currentPathname === pathname) {
+        return React.createElement(
+            Link,
+            {
+                ...rest,
+                to,
+                className: [rest.className?.trim(), activeClassName.trim()].filter(Boolean).join(' '),
+                style: Object.assign({}, rest.style, activeStyle)
+            }
+        )
+    }
+
+    return React.createElement(Link, { ...rest, to })
 }
