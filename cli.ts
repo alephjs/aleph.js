@@ -5,7 +5,13 @@ import { listenAndServe, path, ServerRequest, walk } from './std.ts'
 import util, { existsDirSync, existsFileSync } from './util.ts'
 import { version } from './version.ts'
 
-const commands = ['init', 'dev', 'start', 'build', 'upgrade']
+const commands = {
+    'init': 'Initiate a new aleph app.',
+    'dev': 'Starts the aleph app in development mode.',
+    'start': 'Starts the aleph app in production mode.',
+    'build': 'Builds the aleph app in production mode.',
+    'upgrade': 'Upgrade the aleph command.'
+}
 const helpMessage = `Aleph.js v${version}
 The React Framework in deno.
 
@@ -16,7 +22,7 @@ Usage:
     aleph <command> [...options]
 
 Commands:
-    ${commands.join(', ')}
+    ${Object.entries(commands).map(([name, desc]) => `${name.padEnd(15)}${desc}`).join('\n    ')}
 
 Options:
     -h, --help     Prints help message
@@ -48,6 +54,10 @@ async function main() {
         }
     }
 
+    // get command, default is 'dev'
+    const hasCommand = args.length > 0 && args[0] in commands
+    const command = (hasCommand ? String(args.shift()) : 'dev') as keyof typeof commands
+
     // prints aleph.js version
     if (argOptions.v) {
         console.log(`aleph.js v${version}`)
@@ -65,11 +75,10 @@ async function main() {
     }
 
     // prints help message
-    const hasCommand = args.length > 0 && commands.includes(args[0])
     if (argOptions.h || argOptions.help) {
         if (hasCommand) {
-            import(`./cli/${args.shift()}.ts`).then(({ helpMessage }) => {
-                console.log(`Aleph.js v${version}`)
+            import(`./cli/${command}.ts`).then(({ helpMessage }) => {
+                console.log(commands[command])
                 if (util.isNEString(helpMessage)) {
                     console.log(helpMessage)
                 }
@@ -104,9 +113,6 @@ async function main() {
             Deno.exit(0)
         }
     }
-
-    // get command, default is 'dev'
-    const command = hasCommand ? String(args.shift()) : 'dev'
 
     // proxy https://deno.land/x/aleph
     if (['dev', 'start', 'build'].includes(command) && existsFileSync('./import_map.json')) {

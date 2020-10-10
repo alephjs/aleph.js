@@ -1,7 +1,6 @@
 import { start } from '../server.ts'
 
-export const helpMessage = `Starts the aleph app in production mode.
-
+export const helpMessage = `
 Usage:
     aleph start <dir> [...options]
 

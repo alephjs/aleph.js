@@ -3,8 +3,7 @@ import log from '../log.ts'
 import { colors, ensureDir, ensureFile, fromStreamReader, path, Untar } from '../std.ts'
 import util from '../util.ts'
 
-export const helpMessage = `Initiate a new aleph app.
-
+export const helpMessage = `
 Usage:
     aleph init <dir> [...options]
 

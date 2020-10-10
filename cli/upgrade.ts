@@ -1,5 +1,4 @@
-export const helpMessage = `Upgrade the aleph command.
-
+export const helpMessage = `
 Usage:
     aleph upgrade
 
