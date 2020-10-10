@@ -55,5 +55,11 @@ export function createHtml({
 }
 
 function attrString(v: any): string {
-    return Object.keys(v).map(k => ` ${k}=${JSON.stringify(String(v[k]))}`).join('')
+    return Object.keys(v).map(k => {
+        if (v[k] === true) {
+            return ` ${k}`
+        } else {
+            return ` ${k}=${JSON.stringify(String(v[k]))}`
+        }
+    }).join('')
 }

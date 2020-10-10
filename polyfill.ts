@@ -21,9 +21,9 @@ export const nomoduleJS = (isDev: boolean) => {
         `${indent}color: "#666",`,
         `${indent}textAlign: "center"`,
         '};',
-        `el.innerHTML = '<p><strong style="font-size:24px;font-weight:700;color:#000;">${title}</strong><br>${desc}</p>';`,
         `for (var key in style) {`,
         `${indent}el.style[key] = style[key];`,
         `}`,
+        `el.innerHTML = '<p><strong style="font-size:24px;font-weight:700;color:#000;">${title}</strong><br>${desc}</p>';`,
     ].join(eol + indent.repeat(2)) + eol + indent
 }
