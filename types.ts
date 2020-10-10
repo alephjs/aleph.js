@@ -50,8 +50,6 @@ export interface APIHandle {
     (req: APIRequest, res: APIResponse): void
 }
 
-
-
 export interface Route {
     path: string
     module: RouteModule

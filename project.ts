@@ -584,9 +584,13 @@ export default class Project {
             baseUrl,
             defaultLocale,
             locales: [],
-            routes: this.#routing.routes
+            routes: this.#routing.routes,
+            preloadModules: ['/404.js', '/app.js', '/data.js'].filter(id => this.#modules.has(id)).map(id => {
+                return this._getRouteModule(this.#modules.get(id)!)
+            })
         }
         const module = this._moduleFromURL('/main.js')
+        const metaFile = path.join(this.buildDir, 'main.meta.json')
         const deps = [
             this.isDev && 'https://deno.land/x/aleph/hmr.ts',
             'https://deno.land/x/aleph/bootstrap.ts'
@@ -594,10 +598,6 @@ export default class Project {
             url: String(url),
             hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
         }))
-
-        config.preloadModules = ['/data.js', '/app.js', '/404.js'].filter(id => this.#modules.has(id)).map(id => {
-            return this._getRouteModule(this.#modules.get(id)!)
-        })
 
         module.jsContent = [
             this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
@@ -608,16 +608,24 @@ export default class Project {
         module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
         module.deps = deps
 
-        if (this.#modules.has(module.id)) {
-            const prevHash = this.#modules.get(module.id)!.hash
-            try {
+        try {
+            let prevHash = ''
+            if (this.#modules.has(module.id)) {
+                prevHash = this.#modules.get(module.id)!.hash
+            } else if (existsFileSync(metaFile)) {
+                const { hash } = JSON.parse(await Deno.readTextFile(metaFile))
+                if (util.isNEString(hash)) {
+                    prevHash = hash
+                }
+            }
+            if (prevHash !== '') {
                 await Deno.remove(path.join(this.buildDir, `main.${prevHash.slice(0, hashShort)}.js`))
-            } catch (e) { }
-        }
+            }
+        } catch (e) { }
 
         await Promise.all([
             writeTextFile(module.jsFile, module.jsContent),
-            writeTextFile(path.join(this.buildDir, 'main.meta.json'), JSON.stringify({
+            writeTextFile(metaFile, JSON.stringify({
                 url: '/main.js',
                 sourceHash: module.hash,
                 hash: module.hash,
@@ -1036,6 +1044,7 @@ export default class Project {
         })
         try {
             const appModule = this.#modules.get('/app.js')
+            const { E501Page } = await import('file://' + this.#modules.get('//deno.land/x/aleph/error.js')!.jsFile)
             const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
             const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
             const staticData = await this.getStaticData()
@@ -1045,7 +1054,11 @@ export default class Project {
                 const { default: C } = await import('file://' + mod.jsFile)
                 const pc = pageComponentTree.find(pc => pc.id === mod.id)
                 if (pc) {
-                    pc.Component = C
+                    if (util.isLikelyReactComponent(C)) {
+                        pc.Component = C
+                    } else {
+                        pc.Component = E501Page
+                    }
                 }
             })
             await Promise.all(imports)
@@ -1084,7 +1097,6 @@ export default class Project {
         })
         return a
     }
-
 }
 
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
