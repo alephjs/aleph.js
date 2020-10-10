@@ -7,9 +7,9 @@ import { version } from './version.ts'
 
 const commands = {
     'init': 'Initiate a new aleph app.',
-    'dev': 'Starts the aleph app in development mode.',
-    'start': 'Starts the aleph app in production mode.',
-    'build': 'Builds the aleph app in production mode.',
+    'dev': 'Start the aleph app in development mode.',
+    'start': 'Start the aleph app in production mode.',
+    'build': 'Build the aleph app in production mode.',
     'upgrade': 'Upgrade the aleph command.'
 }
 const helpMessage = `Aleph.js v${version}

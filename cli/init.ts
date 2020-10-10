@@ -40,11 +40,11 @@ export default async function (appDir: string, options: Record<string, string | 
 
     log.info('Done')
     log.info('---')
-    log.info(colors.dim('Aleph is ready to Go.'))
+    log.info(colors.dim('Aleph App is ready to Go.'))
     log.info(`${colors.dim('$')} cd ` + path.basename(appDir))
-    log.info(`start(dev) : ${colors.dim('$')} ${colors.bold('aleph')} dev`)
-    log.info(`start(prod): ${colors.dim('$')} ${colors.bold('aleph')} start`)
-    log.info(`build(prod): ${colors.dim('$')} ${colors.bold('aleph')} build`)
+    log.info(`${colors.dim('$')} aleph ${colors.bold('dev')}    ${colors.dim('# start the app in development mode')}`)
+    log.info(`${colors.dim('$')} aleph ${colors.bold('start')}  ${colors.dim('# start the app in production mode')}`)
+    log.info(`${colors.dim('$')} aleph ${colors.bold('build')}  ${colors.dim('# build the app in production mode')}`)
     log.info('---')
     Deno.exit(0)
 }

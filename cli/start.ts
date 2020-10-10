@@ -1,5 +1,3 @@
-import { start } from '../server.ts'
-
 export const helpMessage = `
 Usage:
     aleph start <dir> [...options]
@@ -13,6 +11,7 @@ Options:
     -h, --help    Prints help message
 `
 
-export default function (appDir: string, options: Record<string, string | boolean>) {
+export default async function (appDir: string, options: Record<string, string | boolean>) {
+    const { start } = await import('../server.ts')
     start(appDir, parseInt(String(options.port || options.p)) || 8080)
 }

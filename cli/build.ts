@@ -1,5 +1,3 @@
-import Project from '../project.ts'
-
 export const helpMessage = `
 Usage:
     aleph build <dir> [...options]
@@ -13,6 +11,7 @@ Options:
 `
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
+    const { Project } = await import('../project.ts')
     const project = new Project(appDir, 'production')
     await project.build()
     Deno.exit(0)
