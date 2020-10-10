@@ -5,7 +5,7 @@ import { listenAndServe, path, ServerRequest, walk } from './std.ts'
 import util, { existsDirSync, existsFileSync } from './util.ts'
 import { version } from './version.ts'
 
-const commands = ['init', 'fetch', 'dev', 'start', 'build', 'upgrade']
+const commands = ['init', 'dev', 'start', 'build', 'upgrade']
 const helpMessage = `Aleph.js v${version}
 The React Framework in deno.
 
@@ -167,11 +167,15 @@ async function main() {
     }
 
     import(`./cli/${command}.ts`).then(({ default: cmd }) => {
-        const appDir = path.resolve(args[0] || '.')
-        if (command !== 'init' && !existsDirSync(appDir)) {
-            log.fatal('No such directory:', appDir)
+        if (command === 'upgrade') {
+            cmd()
+        } else {
+            const appDir = path.resolve(args[0] || '.')
+            if (command !== 'init' && !existsDirSync(appDir)) {
+                log.fatal('No such directory:', appDir)
+            }
+            cmd(appDir, argOptions)
         }
-        cmd(appDir, argOptions)
     })
 }
 

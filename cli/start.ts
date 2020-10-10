@@ -9,8 +9,9 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -p, --port  A port number to start the aleph app, default is 8080
-    -h, --help  Prints help message
+    -p, --port    A port number to start the aleph app, default is 8080
+    -r, --reload  Reload remote deps
+    -h, --help    Prints help message
 `
 
 export default function (appDir: string, options: Record<string, string | boolean>) {

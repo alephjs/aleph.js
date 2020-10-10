@@ -9,7 +9,8 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -h, --help  Prints help message
+    -r, --reload  Reload remote deps
+    -h, --help    Prints help message
 `
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
