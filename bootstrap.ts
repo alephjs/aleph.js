@@ -3,7 +3,7 @@ import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './aleph.ts'
 import { E501Page } from './error.ts'
 import { Routing } from './router.ts'
-import type { PageProps, Route, RouteModule } from './types.ts'
+import type { Module, PageProps, Route } from './types.ts'
 import util, { reModuleExt } from './util.ts'
 
 export default async function bootstrap({
@@ -17,7 +17,7 @@ export default async function bootstrap({
     baseUrl: string
     defaultLocale: string
     locales: string[]
-    preloadModules: RouteModule[]
+    preloadModules: Module[]
 }) {
     const { document } = window as any
     const mainEl = document.querySelector('main')

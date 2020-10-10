@@ -1,4 +1,4 @@
-import type { Route, RouteModule, RouterURL } from './types.ts'
+import type { Module, Route, RouterURL } from './types.ts'
 import util, { reMDExt } from './util.ts'
 
 const ghostRoute: Route = { path: '', module: { id: '', hash: '' } }
@@ -36,7 +36,7 @@ export class Routing {
         return JSON.parse(JSON.stringify(this._routes))
     }
 
-    update(module: RouteModule) {
+    update(module: Module) {
         const newRoute: Route = { path: getPagePath(module.id), module }
         const dirtyRoutes: Set<Route[]> = new Set()
         let exists = false
@@ -91,7 +91,7 @@ export class Routing {
         }, true)
     }
 
-    createRouter(location?: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
+    createRouter(location?: { pathname: string, search?: string }): [RouterURL, Module[]] {
         const loc = location || (window as any).location || { pathname: '/' }
         const query = new URLSearchParams(loc.search)
 
@@ -99,7 +99,7 @@ export class Routing {
         let pathname = util.cleanPath(util.trimPrefix(loc.pathname, this._baseUrl))
         let pagePath = ''
         let params: Record<string, string> = {}
-        let tree: RouteModule[] = []
+        let tree: Module[] = []
 
         if (pathname !== '/' && this._locales.length > 0) {
             const a = pathname.split('/')

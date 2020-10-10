@@ -1,7 +1,7 @@
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './mime.ts'
-import Project, { injectHmr } from './project.ts'
+import { injectHmr, Project } from './project.ts'
 import { path, serve, ws } from './std.ts'
 import util, { hashShort } from './util.ts'
 

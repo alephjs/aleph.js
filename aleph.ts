@@ -3,7 +3,7 @@ import { DataContext, RouterContext } from './context.ts'
 import { E404Page, E501App, E501Page, ErrorBoundary } from './error.ts'
 import events from './events.ts'
 import type { Routing } from './router.ts'
-import type { PageProps, RouteModule, RouterURL } from './types.ts'
+import type { Module, PageProps, RouterURL } from './types.ts'
 import util, { hashShort, reModuleExt } from './util.ts'
 
 export function ALEPH({ initial }: {
@@ -91,7 +91,7 @@ export function ALEPH({ initial }: {
             console.log('[DATA]', data)
             setStaticData(data)
         }
-        const onAddModule = async (mod: RouteModule) => {
+        const onAddModule = async (mod: Module) => {
             switch (mod.id) {
                 case '/404.js': {
                     const { default: Component } = await import(getModuleImportUrl(baseUrl, mod, true))
@@ -196,6 +196,6 @@ export async function redirect(url: string, replace?: boolean) {
     events.emit('popstate', { type: 'popstate' })
 }
 
-export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceFetch = false) {
+export function getModuleImportUrl(baseUrl: string, mod: Module, forceFetch = false) {
     return util.cleanPath(baseUrl + '/_aleph/' + util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js` + (forceFetch ? `?t=${Date.now()}` : ''))
 }

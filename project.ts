@@ -8,7 +8,7 @@ import log from './log.ts'
 import { Routing } from './router.ts'
 import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
-import type { AlephRuntime, APIHandle, Config, RouteModule, RouterURL } from './types.ts'
+import type { AlephRuntime, APIHandle, Config, RouterURL } from './types.ts'
 import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
@@ -33,7 +33,7 @@ interface RenderResult {
     body: string
 }
 
-export default class Project {
+export class Project {
     readonly mode: 'development' | 'production'
     readonly appRoot: string
     readonly config: Config
@@ -414,7 +414,6 @@ export default class Project {
 
         for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.jsx', '.tsx'] })) {
             const name = path.basename(p)
-            console.log(name)
             switch (name.replace(reModuleExt, '')) {
                 case 'app':
                 case 'data':
@@ -427,14 +426,14 @@ export default class Project {
         if (existsDirSync(apiDir)) {
             for await (const { path: p } of walk(apiDir, walkOptions)) {
                 const mod = await this._compile('/api' + util.trimPrefix(p, apiDir))
-                this.#apiRouting.update(this._getRouteModule(mod))
+                this.#apiRouting.update(this._getPageModule(mod))
             }
         }
 
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md', '.mdx'] })) {
             const rp = util.trimPrefix(p, pagesDir)
             const mod = await this._compile('/pages' + rp)
-            this.#routing.update(this._getRouteModule(mod))
+            this.#routing.update(this._getPageModule(mod))
         }
 
         const precompileUrls = [
@@ -523,9 +522,9 @@ export default class Project {
                                     }
                                 }
                                 if (moduleID.startsWith('/pages/')) {
-                                    this.#routing.update(this._getRouteModule(mod))
+                                    this.#routing.update(this._getPageModule(mod))
                                 } else if (moduleID.startsWith('/api/')) {
-                                    this.#apiRouting.update(this._getRouteModule(mod))
+                                    this.#apiRouting.update(this._getPageModule(mod))
                                 }
                                 this._updateDependency(path, mod.hash, ({ id: moduleID }) => {
                                     if (!hmrable && this.isHMRable(moduleID)) {
@@ -553,7 +552,7 @@ export default class Project {
         }
     }
 
-    private _getRouteModule({ id, hash }: Module): RouteModule {
+    private _getPageModule({ id, hash }: Module) {
         const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
         return { id, hash, asyncDeps }
     }
@@ -586,7 +585,7 @@ export default class Project {
             locales: [],
             routes: this.#routing.routes,
             preloadModules: ['/404.js', '/app.js', '/data.js'].filter(id => this.#modules.has(id)).map(id => {
-                return this._getRouteModule(this.#modules.get(id)!)
+                return this._getPageModule(this.#modules.get(id)!)
             })
         }
         const module = this._moduleFromURL('/main.js')

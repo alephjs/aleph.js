@@ -50,16 +50,16 @@ export interface APIHandle {
     (req: APIRequest, res: APIResponse): void
 }
 
-export interface Route {
-    path: string
-    module: RouteModule
-    children?: Route[]
-}
-
-export interface RouteModule {
+export interface Module {
     readonly id: string
     readonly hash: string
     readonly asyncDeps?: { url: string, hash: string }[]
+}
+
+export interface Route {
+    path: string
+    module: Module
+    children?: Route[]
 }
 
 export interface RouterURL {
