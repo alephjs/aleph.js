@@ -12,7 +12,7 @@ export function ALEPH({ initial }: {
         url: RouterURL
         staticData: Record<string, any>
         components: Record<string, ComponentType<any>>
-        pageProps: PageProps
+        pageProps: PageProps | null
     }
 }) {
     const ref = useRef({ routing: initial.routing })
@@ -29,7 +29,7 @@ export function ALEPH({ initial }: {
             Component: App ? (util.isLikelyReactComponent(App) ? App : E501App) : null
         }
     })
-    const [page, setPage] = useState<{ url: RouterURL, pageProps: PageProps | null }>(() => {
+    const [page, setPage] = useState(() => {
         const { url, pageProps } = initial
         return { pageProps, url }
     })
@@ -40,11 +40,11 @@ export function ALEPH({ initial }: {
         if (url.pagePath !== '') {
             const ctree: { id: string, Component?: ComponentType<any> }[] = pageModuleTree.map(({ id }) => ({ id }))
             const imports = pageModuleTree.map(async mod => {
-                const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
+                const { default: C } = await import(getModuleImportUrl(baseUrl, mod, e.forceFetch))
                 if (mod.asyncDeps) {
                     // import async dependencies
                     for (const dep of mod.asyncDeps) {
-                        await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
+                        await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }, e.forceFetch))
                     }
                 }
                 const pc = ctree.find(pc => pc.id === mod.id)
@@ -61,14 +61,16 @@ export function ALEPH({ initial }: {
                 Page: ctree[0].Component || (() => null),
                 pageProps: {}
             }
-            ctree.slice(1).reduce((p, m) => {
-                const c: PageProps = {
-                    Page: m.Component || (() => null),
-                    pageProps: {}
-                }
-                p.pageProps = c
-                return c
-            }, pageProps)
+            if (ctree.length > 1) {
+                ctree.slice(1).reduce((p, m) => {
+                    const c = {
+                        Page: m.Component || (() => null),
+                        pageProps: {}
+                    }
+                    p.pageProps = c
+                    return c
+                }, pageProps)
+            }
             setPage({ url, pageProps })
             if (util.isInt(e.scrollTo)) {
                 (window as any).scrollTo(e.scrollTo, 0)
@@ -125,6 +127,7 @@ export function ALEPH({ initial }: {
                     if (mod.id.startsWith('/pages/')) {
                         const { routing } = ref.current
                         routing.update(mod)
+                        events.emit('popstate', { type: 'popstate', forceFetch: true })
                     }
                     break
                 }
@@ -146,6 +149,7 @@ export function ALEPH({ initial }: {
                     if (moduleId.startsWith('/pages/')) {
                         const { routing } = ref.current
                         routing.removeRoute(moduleId)
+                        events.emit('popstate', { type: 'popstate' })
                     }
                     break
             }

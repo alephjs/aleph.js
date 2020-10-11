@@ -79,7 +79,7 @@ socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
             const { type, moduleId, hash, updateUrl } = JSON.parse(rawData)
             switch (type) {
                 case 'add':
-                    events.emit('add-module', { moduleId, hash })
+                    events.emit('add-module', { id: moduleId, hash })
                     break
                 case 'update':
                     const mod = modules.get(moduleId)

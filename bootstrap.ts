@@ -21,15 +21,10 @@ export default async function bootstrap({
 }) {
     const { document } = window as any
     const mainEl = document.querySelector('main')
-    const routing = new Routing(routes, baseUrl, defaultLocale, locales)
-    const [url, pageModuleTree] = routing.createRouter()
-
-    if (url.pagePath === '') {
-        throw new Error('invalid router')
-    }
-
     const staticData: Record<string, any> = {}
     const components: Record<string, ComponentType> = {}
+    const routing = new Routing(routes, baseUrl, defaultLocale, locales)
+    const [url, pageModuleTree] = routing.createRouter()
     const ctree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
     const imports = [...preloadModules, ...pageModuleTree].map(async mod => {
         const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
@@ -63,18 +58,20 @@ export default async function bootstrap({
     })
     await Promise.all(imports)
 
-    const pageProps: PageProps = {
+    const pageProps: PageProps | null = url.pagePath != '' ? {
         Page: ctree[0].Component || (() => null),
         pageProps: {}
+    } : null
+    if (pageProps && ctree.length > 1) {
+        ctree.slice(1).reduce((p, m) => {
+            const c = {
+                Page: m.Component || (() => null),
+                pageProps: {}
+            }
+            p.pageProps = c
+            return c
+        }, pageProps)
     }
-    ctree.slice(1).reduce((p, m) => {
-        const c = {
-            Page: m.Component || (() => null),
-            pageProps: {}
-        }
-        p.pageProps = c
-        return c
-    }, pageProps)
     const el = React.createElement(
         ALEPH,
         {

@@ -28,6 +28,7 @@ interface Module {
 }
 
 interface RenderResult {
+    url: RouterURL
     status: number
     head: string[]
     body: string
@@ -181,14 +182,8 @@ export class Project {
 
     async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string]> {
         const { baseUrl } = this.config
-        const [url, pageModuleTree] = this.#routing.createRouter(loc)
-
-        if (url.pagePath === '') {
-            return [200, this.getDefaultIndexHtml()]
-        }
-
         const mainModule = this.#modules.get('/main.js')!
-        const { status, head, body } = await this._renderPage(url, pageModuleTree)
+        const { url, status, head, body } = await this._renderPage(loc)
         const html = createHtml({
             lang: url.locale,
             head: head,
@@ -525,12 +520,13 @@ export class Project {
                                 }
                                 if (moduleID.startsWith('/pages/')) {
                                     this.#routing.update(this._getPageModule(mod))
+                                    this._createMainModule()
                                 } else if (moduleID.startsWith('/api/')) {
                                     this.#apiRouting.update(this._getPageModule(mod))
                                 }
                                 this._updateDependency(path, mod.hash, ({ id: moduleID }) => {
                                     if (!hmrable && this.isHMRable(moduleID)) {
-                                        this.#fsWatchListeners.forEach(e => e.emit(moduleID, 'modify', mod.hash))
+                                        this.#fsWatchListeners.forEach(e => e.emit('modify-' + moduleID, mod.hash))
                                     }
                                 })
                             }).catch(err => {
@@ -539,6 +535,7 @@ export class Project {
                         } else if (this.#modules.has(moduleID)) {
                             if (moduleID.startsWith('/pages/')) {
                                 this.#routing.removeRoute(moduleID)
+                                this._createMainModule()
                             } else if (moduleID.startsWith('/api/')) {
                                 this.#apiRouting.removeRoute(moduleID)
                             }
@@ -1038,9 +1035,10 @@ export class Project {
         return rewrittenPath.replace(reModuleExt, '') + '.js'
     }
 
-    private async _renderPage(url: RouterURL, pageModuleTree: { id: string, hash: string }[]) {
+    private async _renderPage(loc: { pathname: string, search?: string }) {
         const start = performance.now()
-        const ret: RenderResult = { status: 200, head: [], body: '<main></main>' }
+        const [url, pageModuleTree] = this.#routing.createRouter(loc)
+        const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], body: '<main></main>' }
         Object.assign(window, {
             location: {
                 protocol: 'http:',
@@ -1061,7 +1059,7 @@ export class Project {
             const appModule = this.#modules.get('/app.js')
             const { E501Page } = await import('file://' + this.#modules.get('//deno.land/x/aleph/error.js')!.jsFile)
             const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
-            const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
+            const { default: App } = appModule && url.pagePath != '' ? await import('file://' + appModule.jsFile) : {} as any
             const staticData = await this.getStaticData()
             const pageComponentTree: { id: string, Component?: any }[] = pageModuleTree.map(({ id }) => ({ id }))
             const imports = pageModuleTree.map(async ({ id }) => {
@@ -1082,10 +1080,13 @@ export class Project {
                 appModule ? this._lookupStyleDeps(appModule.id) : [],
                 ...pageModuleTree.map(({ id }) => this._lookupStyleDeps(id))
             ].flat())
-            ret.status = 200
             ret.head = head
             ret.body = `<main>${html}</main>`
-            log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
+            if (url.pagePath !== '') {
+                log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
+            } else {
+                log.warn(`page '${url.pathname}' not found`)
+            }
         } catch (err) {
             ret.status = 500
             ret.head = ['<title>500 Error - Aleph.js</title>']
