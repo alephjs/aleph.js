@@ -792,36 +792,50 @@ export class Project {
                     const output = cleanCSS.minify(css)
                     css = output.styles
                 }
-                const hash = (new Sha1).update(css).hex()
-                const filepath = path.join(
-                    path.dirname(mod.sourceFilePath),
-                    util.trimSuffix(path.basename(mod.sourceFilePath), '.css') + '.' + hash.slice(0, hashShort) + '.css'
-                )
-                const asLink = css.length > 1024
-                if (asLink) {
-                    await writeTextFile(path.join(this.buildDir, filepath), css)
-                }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(relativePath(
                         path.dirname(mod.url),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
-                    `applyCSS(${JSON.stringify(url)}, ${asLink ? JSON.stringify(path.join(this.config.baseUrl, '_aleph', filepath)) + ', true' : JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
+                    `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
                 ].join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
-                mod.hash = hash
+                mod.hash = (new Sha1).update(css).hex()
             } else if (mod.sourceType === 'sass' || mod.sourceType === 'scss') {
                 // todo: support sass
-            } else if (mod.sourceType === 'md' || mod.sourceType === 'mdx') {
+            } else if (mod.sourceType === 'mdx') {
+                // todo: support mdx
+            } else if (mod.sourceType === 'md' || mod.sourceType === 'markdown') {
                 const { __content, ...props } = safeLoadFront(sourceContent)
                 const html = marked.parse(__content)
                 mod.jsContent = [
-                    `import React from ${JSON.stringify(relativePath(path.dirname(mod.sourceFilePath), '/-/esm.sh/react.js'))};`,
-                    `export default function Markdown() {`,
-                    `  return React.createElement("div", ${JSON.stringify({ className: 'markdown', dangerouslySetInnerHTML: { __html: html } })});`,
+                    this.isDev && `const _s = $RefreshSig$();`,
+                    `import React, { useEffect, useRef } from ${JSON.stringify(relativePath(path.dirname(mod.sourceFilePath), '/-/esm.sh/react.js'))};`,
+                    `import { redirect } from ${JSON.stringify(relativePath(path.dirname(mod.sourceFilePath), '/-/deno.land/x/aleph/aleph.js'))};`,
+                    `export default function MarkdownPage() {`,
+                    this.isDev && `  _s();`,
+                    `  const ref = useRef(null);`,
+                    `  useEffect(() => {`,
+                    `    const appLinks = [];`,
+                    `    const onClick = e => {`,
+                    `      e.preventDefault();`,
+                    `      redirect(e.target.getAttribute("href"));`,
+                    `    };`,
+                    `    if (ref.current) {`,
+                    `      ref.current.querySelectorAll("a").forEach(a => {`,
+                    `        if (!/^(https?|mailto|file):/i.test(a.getAttribute("href"))) {`,
+                    `          a.addEventListener("click", onClick);`,
+                    `          appLinks.push(a);`,
+                    `        }`,
+                    `      });`,
+                    `    }`,
+                    `    return () => appLinks.forEach(a => a.removeEventListener("click", onClick));`,
+                    `  }, [])`,
+                    `  return React.createElement("div", {className: "markdown-page", ref, dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}});`,
                     `}`,
-                    `Markdown.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
-                    this.isDev && `$RefreshReg$(Markdown, "Markdown");`,
+                    `MarkdownPage.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
+                    this.isDev && `_s(MarkdownPage, "useRef{ref}\\nuseEffect{}");`,
+                    this.isDev && `$RefreshReg$(MarkdownPage, "MarkdownPage");`,
                 ].filter(Boolean).join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
                 mod.hash = (new Sha1).update(mod.jsContent).hex()
