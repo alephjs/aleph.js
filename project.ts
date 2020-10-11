@@ -189,7 +189,7 @@ export class Project {
             head: head,
             scripts: [
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`) },
+                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
             body,
             minify: !this.isDev
