@@ -31,7 +31,6 @@ for (var key in style) {
 for (var key in hStyle) {
     (hEl.style as any)[key] = hStyle[key]
 }
-hEl.innerText = 'Your browser is out of date.'
 var isDev = false
 var scripts = document.getElementsByTagName('script')
 for (var i = 0; i < scripts.length; i++) {
@@ -41,6 +40,9 @@ for (var i = 0; i < scripts.length; i++) {
         break
     }
 }
+// todo: i18n
+// todo: add browser info
+hEl.innerText = 'Your browser is out of date.'
 if (isDev) {
     pEl.innerHTML = 'Aleph.js requires <a href="https://caniuse.com/es6-module" style="font-weight:500;color:#000;">ES module</a> support during development.'
 } else {
