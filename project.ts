@@ -189,7 +189,7 @@ export class Project {
             head: head,
             scripts: [
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`) },
             ],
             body,
             minify: !this.isDev
@@ -435,7 +435,7 @@ export class Project {
         const precompileUrls = [
             'https://deno.land/x/aleph/bootstrap.ts',
             'https://deno.land/x/aleph/renderer.ts',
-            'https://deno.land/x/aleph/nomodule.js',
+            'https://deno.land/x/aleph/nomodule.ts',
             'https://deno.land/x/aleph/tsc/tslib.js',
         ]
         if (this.isDev) {
