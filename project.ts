@@ -5,7 +5,6 @@ import { AlephAPIRequest, AlephAPIResponse } from './api.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
-import { nomoduleJS } from './polyfill.ts'
 import { Routing } from './router.ts'
 import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
@@ -195,7 +194,7 @@ export class Project {
             head: head,
             scripts: [
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { innerText: nomoduleJS(this.isDev), nomodule: true },
+                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
             body,
             minify: !this.isDev
@@ -210,7 +209,7 @@ export class Project {
             lang: defaultLocale,
             scripts: [
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { innerText: nomoduleJS(this.isDev), nomodule: true },
+                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
             body: `<main></main>`,
             minify: !this.isDev
@@ -441,6 +440,7 @@ export class Project {
         const precompileUrls = [
             'https://deno.land/x/aleph/bootstrap.ts',
             'https://deno.land/x/aleph/renderer.ts',
+            'https://deno.land/x/aleph/nomodule.js',
             'https://deno.land/x/aleph/tsc/tslib.js',
         ]
         if (this.isDev) {
