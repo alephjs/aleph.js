@@ -15,7 +15,7 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 
 ![Aleph.js in Deno](https://github.com/postui/aleph.js/workflows/Aleph.js%20in%20Deno/badge.svg)
 
-## Features
+### Features
 - Zero Config
 - Typescript in Deno
 - ES Module Ready
@@ -25,12 +25,12 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 - Built-in CSS(Less) Support
 - SSR/SSG
 
-## Installation
+### Installation
 ```bash
 deno install -A -f -n aleph https://deno.land/x/aleph/cli.ts
 ```
 
-## Usage
+### Usage
 ```bash
 # create a new app
 $ aleph init hello
@@ -49,8 +49,8 @@ $ aleph build
 $ aleph -h
 ```
 
-## Documentation
+### Documentation
 Please visit https://alephjs.org/docs to view the documentation.
 
-## Contributing
+### Contributing
 Please read the [contributing.md](CONTRIBUTING.md).
