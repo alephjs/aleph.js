@@ -11,7 +11,7 @@
 
 The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://nextjs.org).
 
-[Website](https://alephjs.org) | [Docs](https://alephjs.org/docs) | [ESM](https://esm.sh) | [The Aleph  (by Jorge Luis Borges)](http://www.phinnweb.org/links/literature/borges/aleph.html)
+[Website](https://alephjs.org) | [Get Started](https://alephjs.org/docs/get-started)  | [Docs](https://alephjs.org/docs) | [ESM](https://esm.sh) | [The Aleph  (by Jorge Luis Borges)](http://www.phinnweb.org/links/literature/borges/aleph.html)
 
 ![Aleph.js in Deno](https://github.com/postui/aleph.js/workflows/Aleph.js%20in%20Deno/badge.svg)
 
