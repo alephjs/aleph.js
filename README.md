@@ -33,20 +33,20 @@ deno install -A -f -n aleph https://deno.land/x/aleph/cli.ts
 ### Usage
 ```bash
 # create a new app
-$ aleph init hello
-$ cd hello
+aleph init hello
+cd hello
 
 # start the app in `development` mode
-$ aleph
+aleph
 
 # start the app in `production` mode
-$ aleph start
+aleph start
 
 # build the app
-$ aleph build
+aleph build
 
 # more usages
-$ aleph -h
+aleph -h
 ```
 
 ### Documentation
