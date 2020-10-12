@@ -25,25 +25,27 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 - Built-in CSS(Less) Support
 - SSR/SSG
 
+## Installation
+```bash
+deno install -A -f -n aleph https://deno.land/x/aleph/cli.ts
+```
+
 ## Usage
 ```bash
-# install aleph.js command
-deno install --allow-read --allow-write --allow-net -f -n aleph https://deno.land/x/aleph/cli.ts
-
-# initiate a new app
+# create a new app
 $ aleph init hello
 $ cd hello
 
-# start the app in development mode
+# start the app in `development` mode
 $ aleph
 
-# start the app in production mode
+# start the app in `production` mode
 $ aleph start
 
 # build the app
 $ aleph build
 
-# help message
+# more usages
 $ aleph -h
 ```
 
