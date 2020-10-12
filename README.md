@@ -8,7 +8,9 @@
 </div>
 
 # Aleph.js
-The React Framework in [Deno](https://deno.land), inspired by [next.js](https://nextjs.org) and [snowpack](https://www.snowpack.dev).
+The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://nextjs.org).
+
+[Website](https://alephjs.org) ｜ [Docs](https://alephjs.org/docs) ｜ [ESM](https://esm.sh) ｜ [The Aleph (by Jorge Luis Borges)](http://www.phinnweb.org/links/literature/borges/aleph.html)
 
 ## Features
 - Zero Config
@@ -29,13 +31,13 @@ deno install --allow-read --allow-write --allow-net -f -n aleph https://deno.lan
 $ aleph init hello
 $ cd hello
 
-# start app in development mode
+# start the app in development mode
 $ aleph
 
-# start app in production mode
+# start the app in production mode
 $ aleph start
 
-# build app
+# build the app
 $ aleph build
 
 # help message
