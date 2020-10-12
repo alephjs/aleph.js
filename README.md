@@ -10,7 +10,7 @@
 # Aleph.js
 The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://nextjs.org).
 
-[Website](https://alephjs.org) ｜ [Docs](https://alephjs.org/docs) ｜ [ESM](https://esm.sh) ｜ [The Aleph (by Jorge Luis Borges)](http://www.phinnweb.org/links/literature/borges/aleph.html)
+[Website](https://alephjs.org) | [Docs](https://alephjs.org/docs) | [ESM](https://esm.sh) | [The Aleph](http://www.phinnweb.org/links/literature/borges/aleph.html) (by Jorge Luis Borges)
 
 ## Features
 - Zero Config
