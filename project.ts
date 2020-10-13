@@ -446,13 +446,27 @@ export class Project {
         }
         await this._createMainModule()
 
-        log.info(colors.bold('Pages'))
+        log.info(colors.bold('Aleph.js'))
+        log.info(colors.bold('  Pages'))
         for (const path of this.#routing.paths) {
             const isIndex = path == '/'
-            log.info('○', path, isIndex ? colors.dim('(index)') : '')
+            log.info('    ○', path, isIndex ? colors.dim('(index)') : '')
+        }
+        if (this.#apiRouting.paths.length > 0) {
+            log.info(colors.bold('  APIs'))
         }
         for (const path of this.#apiRouting.paths) {
-            log.info('λ', path)
+            log.info('    λ', path)
+        }
+        log.info(colors.bold('  Config'))
+        if (this.#modules.has('/data.js')) {
+            log.info('    ✓', 'Global Static Data')
+        }
+        if (this.#modules.has('/app.js')) {
+            log.info('    ✓', 'Custom App')
+        }
+        if (this.#modules.has('/404.js')) {
+            log.info('    ✓', 'Custom 404 Page')
         }
 
         if (this.isDev) {
