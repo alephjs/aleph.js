@@ -6,14 +6,19 @@ Welcome, and thank you for taking time in contributing to aleph.js!
 All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Development Setup
+You will need [deno](https://deno.land/) 1.4+ and [vscode](https://code.visualstudio.com/) with deno [extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno).
 
-You will need [deno](https://deno.land/) 1.4+ and [vscode](https://code.visualstudio.com/).
+1. Fork this repository to your own GitHub account.
+2. Clone the repository to your local device.
+3. Create a new branch `git checkout -b BRANCH_NAME`.
+4. Change code then run examples.
 
 ```bash
-# clone the code
-$ git clone https://github.com/postui/aleph.js
-$ cd aleph.js
+deno run -A --unstable --importmap=import_map.json cli.ts ./examples/hello-world --log=debug
+```
 
-# run examples
-$ deno run -A --unstable --importmap=import_map.json cli.ts ./examples/hello-world --log=debug
+## Testing
+Running all tests:
+```bash
+deno test -A --unstable
 ```
