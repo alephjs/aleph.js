@@ -2,7 +2,7 @@ import React, { Children, createElement, isValidElement, PropsWithChildren, Reac
 import type { AlephRuntime } from './types.ts'
 import util, { hashShort } from './util.ts'
 
-const serverHeadElements: Array<{ type: string, props: Record<string, any> }> = []
+const serverHeadElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
 const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
 export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
@@ -42,7 +42,7 @@ export async function renderHead(styles?: { url: string, hash: string, async?: b
             }
         }
     })
-    serverHeadElements.splice(0, serverHeadElements.length)
+    serverHeadElements.clear()
     return tags
 }
 
@@ -78,7 +78,7 @@ export function applyCSS(id: string, css: string, asLink: boolean = false) {
 
 export function Head({ children }: PropsWithChildren<{}>) {
     if (window.Deno) {
-        parse(children).forEach(({ type, props }) => serverHeadElements.push({ type, props }))
+        parse(children).forEach(({ type, props }, key) => serverHeadElements.set(key, { type, props }))
     }
 
     useEffect(() => {
@@ -182,11 +182,7 @@ export function Viewport(props: ViewportProps) {
     )
 }
 
-function parse(node: ReactNode, els?: Map<string, { type: string, props: Record<string, any> }>) {
-    if (els === undefined) {
-        els = new Map()
-    }
-
+function parse(node: ReactNode, els: Map<string, { type: string, props: Record<string, any> }> = new Map()) {
     Children.forEach(node, child => {
         if (!isValidElement(child)) {
             return
@@ -225,20 +221,20 @@ function parse(node: ReactNode, els?: Map<string, { type: string, props: Record<
                             key += Object.keys(props).filter(k => !(/^content|children$/i.test(k))).map(k => `[${k.toLowerCase()}=${JSON.stringify(props[k])}]`).join('')
                         }
                     } else if (type !== 'title') {
-                        key += '-' + (els!.size + 1)
+                        key += '-' + (els.size + 1)
                     }
                     // remove the children prop of base/meta/link
-                    if (/^base|meta|link$/.test(type) && 'children' in props) {
+                    if (['base', 'meta', 'link'].includes(type) && 'children' in props) {
                         const { children, ...rest } = props
-                        els!.set(key, { type, props: rest })
+                        els.set(key, { type, props: rest })
                     } else {
-                        els!.set(key, { type, props })
+                        els.set(key, { type, props })
                     }
                 }
                 break
         }
     })
 
-    return els!
+    return els
 }
 
