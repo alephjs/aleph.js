@@ -37,7 +37,7 @@ aleph init hello
 cd hello
 
 # start the app in `development` mode
-aleph
+aleph dev
 
 # start the app in `production` mode
 aleph start
