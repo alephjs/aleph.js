@@ -72,6 +72,7 @@ export default async function (appDir: string, options: Record<string, string | 
     await Deno.writeTextFile(path.join(appDir, '.vscode', 'extensions.json'), JSON.stringify(vscExtensions, undefined, 4))
     await Deno.writeTextFile(path.join(appDir, '.vscode', 'settings.json'), JSON.stringify(vscSettings, undefined, 4))
     await Deno.writeTextFile(path.join(appDir, '.gitignore'), gitignore.join('\n'))
+    await Deno.writeTextFile(path.join(appDir, 'import_map.json'), JSON.stringify({ imports: {} }, undefined, 4))
 
     log.info('Done')
     log.info('---')
