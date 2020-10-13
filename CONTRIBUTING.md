@@ -1,6 +1,6 @@
-# Contributing to aleph.js
+# Contributing to Aleph.js
 
-Welcome, and thank you for taking time in contributing to aleph.js!
+Welcome, and thank you for taking time in contributing to Aleph.js!
 
 ## Code of Conduct
 All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
