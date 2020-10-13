@@ -525,7 +525,7 @@ export class Project {
                                     return true
                                 }
                                 default: {
-                                    if (path.startsWith('/page/')) {
+                                    if (moduleID.startsWith('/pages/')) {
                                         return true
                                     }
                                     return false
