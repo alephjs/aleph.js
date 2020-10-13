@@ -66,7 +66,7 @@ export function ErrorPage({ status, text = getStatusText(status), refreshButton 
                 React.createElement(
                     'title',
                     null,
-                    status + ' - ' + text
+                    `${status} - ${text} | Aleph.js`
                 ),
             ),
             React.createElement(

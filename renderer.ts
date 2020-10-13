@@ -11,10 +11,11 @@ export function renderPage(
     url: RouterURL,
     staticData: Record<string, any>,
     App: ComponentType<PageProps> | undefined,
+    E404: ComponentType | undefined,
     pageComponentTree: { id: string, Component?: any }[]
 ) {
     const pageProps: PageProps = {
-        Page: pageComponentTree.length > 0 ? pageComponentTree[0].Component || (() => null) : E404Page,
+        Page: pageComponentTree.length > 0 ? pageComponentTree[0].Component || (() => null) : E404 || E404Page,
         pageProps: {}
     }
     if (pageComponentTree.length > 1) {

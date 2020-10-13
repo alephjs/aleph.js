@@ -503,6 +503,21 @@ export class Project {
                 if (validated) {
                     const moduleID = path.replace(reModuleExt, '.js')
                     util.debounceX(moduleID, () => {
+                        const shouldUpdateMainModule = (() => {
+                            switch (moduleID) {
+                                case '/404.js':
+                                case '/app.js':
+                                case '/data.js': {
+                                    return true
+                                }
+                                default: {
+                                    if (path.startsWith('/page/')) {
+                                        return true
+                                    }
+                                    return false
+                                }
+                            }
+                        })()
                         if (existsFileSync(p)) {
                             let type = 'modify'
                             if (!this.#modules.has(moduleID)) {
@@ -520,9 +535,11 @@ export class Project {
                                 }
                                 if (moduleID.startsWith('/pages/')) {
                                     this.#routing.update(this._getPageModule(mod))
-                                    this._createMainModule()
                                 } else if (moduleID.startsWith('/api/')) {
                                     this.#apiRouting.update(this._getPageModule(mod))
+                                }
+                                if (shouldUpdateMainModule) {
+                                    this._createMainModule()
                                 }
                                 this._updateDependency(path, mod.hash, ({ id: moduleID }) => {
                                     if (!hmrable && this.isHMRable(moduleID)) {
@@ -535,9 +552,11 @@ export class Project {
                         } else if (this.#modules.has(moduleID)) {
                             if (moduleID.startsWith('/pages/')) {
                                 this.#routing.removeRoute(moduleID)
-                                this._createMainModule()
                             } else if (moduleID.startsWith('/api/')) {
                                 this.#apiRouting.removeRoute(moduleID)
+                            }
+                            if (shouldUpdateMainModule) {
+                                this._createMainModule()
                             }
                             this.#modules.delete(moduleID)
                             if (this.isHMRable(moduleID)) {
@@ -1057,9 +1076,11 @@ export class Project {
         })
         try {
             const appModule = this.#modules.get('/app.js')
+            const e404Module = this.#modules.get('/404.js')
             const { E501Page } = await import('file://' + this.#modules.get('//deno.land/x/aleph/error.js')!.jsFile)
             const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
             const { default: App } = appModule && url.pagePath != '' ? await import('file://' + appModule.jsFile) : {} as any
+            const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
             const staticData = await this.getStaticData()
             const pageComponentTree: { id: string, Component?: any }[] = pageModuleTree.map(({ id }) => ({ id }))
             const imports = pageModuleTree.map(async ({ id }) => {
@@ -1075,7 +1096,7 @@ export class Project {
                 }
             })
             await Promise.all(imports)
-            const html = renderPage(url, staticData, App, pageComponentTree)
+            const html = renderPage(url, staticData, App, E404, pageComponentTree)
             const head = await renderHead([
                 appModule ? this._lookupStyleDeps(appModule.id) : [],
                 ...pageModuleTree.map(({ id }) => this._lookupStyleDeps(id))
