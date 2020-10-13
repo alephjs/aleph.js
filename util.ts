@@ -119,17 +119,17 @@ export default {
     cleanPath(path: string): string {
         return '/' + this.splitPath(path).join('/')
     },
-    debounce(callback: () => void, delay: number) {
+    debounce<T extends Function>(callback: T, delay: number): T {
         let timer: number | null = null
-        return () => {
+        return ((...args: any[]) => {
             if (timer != null) {
                 clearTimeout(timer)
             }
             timer = setTimeout(() => {
                 timer = null
-                callback()
+                callback(...args)
             }, delay)
-        }
+        }) as any
     },
     debounceX(id: string, callback: () => void, delay: number) {
         const self = this as any
