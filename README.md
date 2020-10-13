@@ -19,6 +19,7 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 - Zero Config
 - Typescript in Deno
 - ES Module Ready
+- Import Maps
 - HMR with Fast Refresh
 - File-system Routing
 - Markdown Page
