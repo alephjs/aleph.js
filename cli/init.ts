@@ -3,6 +3,36 @@ import log from '../log.ts'
 import { colors, ensureDir, ensureFile, fromStreamReader, path, Untar } from '../std.ts'
 import util from '../util.ts'
 
+const gitignore = [
+    '.DS_Store',
+    'Thumbs.db',
+    '.aleph/',
+    'dist/',
+]
+const vscExtensions = {
+    'recommendations': [
+        'denoland.vscode-deno'
+    ]
+}
+const vscSettings = {
+    'files.eol': '\n',
+    'files.trimTrailingWhitespace': true,
+    'files.exclude': {
+        '**/.git': true,
+        '**/.DS_Store': true,
+        '**/Thumbs.db': true,
+        '**/.aleph': true
+    },
+    'deno.enable': true,
+    'deno.unstable': true,
+    'deno.import_map': './import_map.json',
+    'deno.import_intellisense_autodiscovery': true,
+    'deno.import_intellisense_origins': {
+        'https://deno.land': true,
+        'https://esm.sh': true
+    }
+}
+
 export const helpMessage = `
 Usage:
     aleph init <dir> [...options]
@@ -37,6 +67,11 @@ export default async function (appDir: string, options: Record<string, string | 
             await Deno.copy(entry, file)
         }
     }
+
+    await ensureDir(path.join(appDir, '.vscode'))
+    await Deno.writeTextFile(path.join(appDir, '.vscode', 'extensions.json'), JSON.stringify(vscExtensions, undefined, 4))
+    await Deno.writeTextFile(path.join(appDir, '.vscode', 'settings.json'), JSON.stringify(vscSettings, undefined, 4))
+    await Deno.writeTextFile(path.join(appDir, '.gitignore'), gitignore.join('\n'))
 
     log.info('Done')
     log.info('---')
