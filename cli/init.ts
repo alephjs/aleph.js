@@ -9,11 +9,13 @@ const gitignore = [
     '.aleph/',
     'dist/',
 ]
+
 const vscExtensions = {
     'recommendations': [
         'denoland.vscode-deno'
     ]
 }
+
 const vscSettings = {
     'files.eol': '\n',
     'files.trimTrailingWhitespace': true,
