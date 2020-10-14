@@ -292,7 +292,7 @@ export class Project {
         lookup('/main.js')
         lookup('/404.js')
         lookup('/app.js')
-        lookup('//deno.land/x/aleph/nomodule.ts')
+        lookup('//deno.land/x/aleph/nomodule.js')
         lookup('//deno.land/x/aleph/tsc/tslib.js')
 
         // ensure ouput directory ready
