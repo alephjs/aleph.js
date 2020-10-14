@@ -1,3 +1,7 @@
+body {
+    font-family: "Helvetica Neue", Helvetica, Arial sans-serif;
+}
+
 main {
     display: flex;
     align-items: center;
@@ -5,24 +9,31 @@ main {
     min-height: 100vh;
 }
 
-.wrapper {
+.page {
     display: flex;
     align-items: center;
     justify-content: left;
     flex-direction: column;
 
+    h1 {
+        margin: 0;
+        line-height: 1.5;
+        font-size: 16px;
+        font-weight: 400;
+        text-align: center;
+        color: #000;
+
+        strong {
+            font-weight: 700;
+        }
+    }
+
     p {
         margin: 0;
         line-height: 1.5;
         font-size: 15px;
-        font-family: Helvetica, Arial, sans-serif;
         text-align: center;
         color: #333;
-
-        strong {
-            color: #000;
-            font-weight: 600;
-        }
     }
 
     .logo + p {
