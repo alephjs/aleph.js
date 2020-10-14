@@ -153,14 +153,14 @@ export class Project {
     }
 
     async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandle | null> {
-        const [{ pagePath, params, query }] = this.#apiRouting.createRouter(loc)
-        if (pagePath != '') {
-            const moduleID = pagePath + '.js'
+        const [url] = this.#apiRouting.createRouter(loc)
+        if (url.pagePath != '') {
+            const moduleID = url.pagePath + '.js'
             if (this.#modules.has(moduleID)) {
                 try {
                     const { default: handle } = await import('file://' + this.#modules.get(moduleID)!.jsFile)
-                    handle(
-                        new AlephAPIRequest(req, params, query),
+                    await handle(
+                        new AlephAPIRequest(req, url),
                         new AlephAPIResponse(req)
                     )
                 } catch (err) {
@@ -168,7 +168,8 @@ export class Project {
                         status: 500,
                         headers: new Headers({ 'Content-Type': 'text/plain; charset=utf-8' }),
                         body: JSON.stringify({ error: { status: 500, message: err.message } })
-                    })
+                    }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                    log.error('callAPI:', err)
                 }
             }
         } else {
@@ -176,7 +177,7 @@ export class Project {
                 status: 404,
                 headers: new Headers({ 'Content-Type': 'application/javascript; charset=utf-8' }),
                 body: JSON.stringify({ error: { status: 404, message: 'page not found' } })
-            })
+            }).catch(err => log.warn('ServerRequest.respond:', err.message))
         }
         return null
     }
@@ -859,7 +860,7 @@ export class Project {
                     `    };`,
                     `    if (ref.current) {`,
                     `      ref.current.querySelectorAll("a").forEach(a => {`,
-                    `        const href = a.getAttribute("href")`,
+                    `        const href = a.getAttribute("href");`,
                     `        if (href && !/^(https?|mailto|file):/i.test(href)) {`,
                     `          a.addEventListener("click", onClick, false);`,
                     `          appLinks.push(a);`,
@@ -867,13 +868,13 @@ export class Project {
                     `      });`,
                     `    }`,
                     `    return () => appLinks.forEach(a => a.removeEventListener("click", onClick));`,
-                    `  }, [])`,
+                    `  }, []);`,
                     `  return React.createElement("div", {className: "markdown-page", ref, dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}});`,
                     `}`,
                     `MarkdownPage.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
                     this.isDev && `_s(MarkdownPage, "useRef{ref}\\nuseEffect{}");`,
                     this.isDev && `$RefreshReg$(MarkdownPage, "MarkdownPage");`,
-                ].filter(Boolean).join(this.isDev ? '\n' : '')
+                ].filter(Boolean).map(l => this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
                 mod.hash = (new Sha1).update(mod.jsContent).hex()
             } else {

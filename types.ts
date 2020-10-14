@@ -26,16 +26,20 @@ export interface Config {
     }
 }
 
+export interface APIRequestURL {
+    readonly pathname: string
+    readonly params: ReadonlyMap<string, string>
+    readonly query: URLSearchParams
+}
+
 export interface APIRequest {
-    readonly url: string
+    readonly url: APIRequestURL
     readonly method: string
     readonly proto: string
     readonly protoMinor: number
     readonly protoMajor: number
     readonly headers: Headers
     readonly cookies: ReadonlyMap<string, string>
-    readonly params: ReadonlyMap<string, string>
-    readonly query: URLSearchParams
 }
 
 export interface APIResponse {

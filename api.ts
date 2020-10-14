@@ -1,30 +1,30 @@
+import log from './log.ts'
 import type { ServerRequest } from './std.ts'
-import type { APIRequest, APIResponse } from './types.ts'
+import type { APIRequest, APIRequestURL, APIResponse, RouterURL } from './types.ts'
 
 export class AlephAPIRequest implements APIRequest {
     #req: ServerRequest
-
+    #url: APIRequestURL
     cookies: ReadonlyMap<string, string>
-    params: ReadonlyMap<string, string>
-    query: URLSearchParams
 
-    constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams) {
+    constructor(req: ServerRequest, url: RouterURL) {
         this.#req = req
 
         const paramsMap = new Map<string, string>()
-        for (const key in params) {
-            paramsMap.set(key, params[key])
+        for (const key in url.params) {
+            paramsMap.set(key, url.params[key])
         }
-        this.params = paramsMap
-
+        this.#url = {
+            pathname: url.pathname,
+            params: paramsMap,
+            query: url.query,
+        }
         this.cookies = new Map()
         // todo: parse cookies
-
-        this.query = query
     }
 
-    get url(): string {
-        return this.#req.url
+    get url(): APIRequestURL {
+        return this.#url
     }
 
     get method(): string {
@@ -90,7 +90,7 @@ export class AlephAPIResponse implements APIResponse {
             status: this.#status,
             headers: this.#headers,
             body
-        })
+        }).catch(err => log.warn('ServerRequest.respond:', err.message))
     }
 
     json(data: any) {
@@ -99,6 +99,6 @@ export class AlephAPIResponse implements APIResponse {
             status: this.#status,
             headers: this.#headers,
             body: JSON.stringify(data)
-        })
+        }).catch(err => log.warn('ServerRequest.respond:', err.message))
     }
 }
