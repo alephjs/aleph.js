@@ -27,7 +27,7 @@ export class Routing {
 
     get paths() {
         const paths: string[] = []
-        this._lookup(path => { paths.push(path.map(r => r.path).join('')) })
+        this._lookup(path => { paths.push(path.map(r => r.path).join('')) }, true)
         return paths
     }
 
@@ -62,7 +62,7 @@ export class Routing {
                 newRoute.path = util.trimPrefix(newRoute.path, path)
                 targetRoutes = route.children || (route.children = [])
             }
-        }, true)
+        })
         if (exists) {
             return
         }
@@ -88,7 +88,7 @@ export class Routing {
                 }
                 return false
             }
-        }, true)
+        })
     }
 
     createRouter(location?: { pathname: string, search?: string }): [RouterURL, Module[]] {
@@ -123,19 +123,23 @@ export class Routing {
                 params = p
                 return false
             }
-        })
+        }, true)
 
         return [{ locale, pathname, pagePath, params, query }, tree]
     }
 
+    lookup(callback: (path: Route[]) => Boolean | void) {
+        this._lookup(callback)
+    }
+
     private _lookup(
         callback: (path: Route[]) => Boolean | void,
-        containsNestIndex = false,
+        skipNestIndex = false,
         __tracing: Route[] = [],
         __routes = this._routes
     ) {
         for (const route of __routes) {
-            if (!containsNestIndex && __tracing.length > 0 && route.path === '/') {
+            if (skipNestIndex && __tracing.length > 0 && route.path === '/') {
                 continue
             }
             if (callback([...__tracing, route]) === false) {
@@ -144,7 +148,7 @@ export class Routing {
         }
         for (const route of __routes) {
             if (route.path !== '/' && route.children?.length) {
-                if (this._lookup(callback, containsNestIndex, [...__tracing, route], route.children) === false) {
+                if (this._lookup(callback, skipNestIndex, [...__tracing, route], route.children) === false) {
                     return false
                 }
             }

@@ -1,5 +1,5 @@
 import marked from 'https://esm.sh/marked'
-import { minify } from 'https://esm.sh/terser'
+import { minify } from 'https://esm.sh/terser@5.3.2'
 import { safeLoadFront } from 'https://esm.sh/yaml-front-matter'
 import { AlephAPIRequest, AlephAPIResponse } from './api.ts'
 import { EventEmitter } from './events.ts'
@@ -9,7 +9,7 @@ import { Routing } from './router.ts'
 import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { AlephRuntime, APIHandle, Config, RouterURL } from './types.ts'
-import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
+import util, { existsDirSync, existsFileSync, hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
 
@@ -100,6 +100,27 @@ export class Project {
         )
     }
 
+    isSSRable(pathname: string): boolean {
+        const { ssr } = this.config
+        if (util.isPlainObject(ssr)) {
+            if (ssr.include) {
+                for (let r of ssr.include) {
+                    if (!r.test(pathname)) {
+                        return false
+                    }
+                }
+            }
+            if (ssr.exclude) {
+                for (let r of ssr.exclude) {
+                    if (r.test(pathname)) {
+                        return false
+                    }
+                }
+            }
+        }
+        return true
+    }
+
     getModule(id: string): Module | null {
         if (this.#modules.has(id)) {
             return this.#modules.get(id)!
@@ -159,14 +180,22 @@ export class Project {
             if (this.#modules.has(moduleID)) {
                 try {
                     const { default: handle } = await import('file://' + this.#modules.get(moduleID)!.jsFile)
-                    await handle(
-                        new AlephAPIRequest(req, url),
-                        new AlephAPIResponse(req)
-                    )
+                    if (util.isFunction(handle)) {
+                        await handle(
+                            new AlephAPIRequest(req, url),
+                            new AlephAPIResponse(req)
+                        )
+                    } else {
+                        req.respond({
+                            status: 500,
+                            headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
+                            body: JSON.stringify({ error: { status: 404, message: "handle not found" } })
+                        }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                    }
                 } catch (err) {
                     req.respond({
                         status: 500,
-                        headers: new Headers({ 'Content-Type': 'text/plain; charset=utf-8' }),
+                        headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
                         body: JSON.stringify({ error: { status: 500, message: err.message } })
                     }).catch(err => log.warn('ServerRequest.respond:', err.message))
                     log.error('callAPI:', err)
@@ -183,6 +212,11 @@ export class Project {
     }
 
     async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string]> {
+        if (!this.isSSRable(loc.pathname)) {
+            const [url] = this.#routing.createRouter(loc)
+            return [url.pagePath === '' ? 404 : 200, this.getDefaultIndexHtml()]
+        }
+
         const { baseUrl } = this.config
         const mainModule = this.#modules.get('/main.js')!
         const { url, status, head, body } = await this._renderPage(loc)
@@ -254,54 +288,103 @@ export class Project {
         await this.ready
 
         // lookup output modules
+        this.#routing.lookup(path => path.forEach(r => lookup(r.module.id)))
         lookup('/main.js')
+        lookup('/404.js')
+        lookup('/app.js')
+        lookup('//deno.land/x/aleph/nomodule.ts')
+        lookup('//deno.land/x/aleph/tsc/tslib.js')
 
         // ensure ouput directory ready
         if (existsDirSync(outputDir)) {
             await Deno.remove(outputDir, { recursive: true })
         }
-        await Promise.all([outputDir, distDir].map(dir => ensureDir(dir)))
-
-        // copy public files
-        const publicDir = path.join(this.appRoot, 'public')
-        if (existsDirSync(publicDir)) {
-            for await (const { path: p } of walk(publicDir, { includeDirs: false })) {
-                await Deno.copyFile(p, path.join(outputDir, util.trimPrefix(p, publicDir)))
-            }
-        }
-
-        // write modules
-        const { sourceMap } = this.config
-        await Promise.all(Array.from(outputModules).map((moduleID) => {
-            const { sourceFilePath, isRemote, jsContent, jsSourceMap, hash } = this.#modules.get(moduleID)!
-            const saveDir = path.join(distDir, path.dirname(sourceFilePath))
-            const name = path.basename(sourceFilePath).replace(reModuleExt, '')
-            const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
-            return Promise.all([
-                writeTextFile(jsFile, jsContent),
-                sourceMap ? writeTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
-            ])
-        }))
-
-        // write static data
-        if (this.#modules.has('/data.js')) {
-            const { hash } = this.#modules.get('/data.js')!
-            const data = this.getStaticData()
-            await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), `export default ${JSON.stringify(data)}`)
-        }
+        await ensureDir(outputDir)
+        await ensureDir(distDir)
 
         const { ssr } = this.config
         if (ssr) {
+            log.info(colors.bold('  Pages (SSG)'))
             for (const pathname of this.#routing.paths) {
-                const [_, html] = await this.getPageHtml({ pathname })
-                const htmlFile = path.join(outputDir, pathname, 'index.html')
-                await writeTextFile(htmlFile, html)
+                if (this.isSSRable(pathname)) {
+                    const [_, html] = await this.getPageHtml({ pathname })
+                    const htmlFile = path.join(outputDir, pathname, 'index.html')
+                    await writeTextFile(htmlFile, html)
+                    log.info('    ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
+                }
             }
             const fbHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '404.html')
             await writeTextFile(fbHtmlFile, this.getDefaultIndexHtml())
         } else {
             await writeTextFile(path.join(outputDir, 'index.html'), this.getDefaultIndexHtml())
         }
+
+        // copy public assets
+        const publicDir = path.join(this.appRoot, 'public')
+        if (existsDirSync(publicDir)) {
+            log.info(colors.bold('  Public Assets'))
+            for await (const { path: p } of walk(publicDir, { includeDirs: false, skip: [/\/\.[^\/]+($|\/)/] })) {
+                const rp = util.trimPrefix(p, publicDir)
+                const fp = path.join(outputDir, rp)
+                const fi = await Deno.lstat(p)
+                await ensureDir(path.dirname(fp))
+                await Deno.copyFile(p, fp)
+                let sizeColorful = colors.dim
+                if (fi.size > 10 * MB) {
+                    sizeColorful = colors.red
+                } else if (fi.size > MB) {
+                    sizeColorful = colors.yellow
+                }
+                log.info('    ✹', rp, colors.dim('•'), getColorfulBytesString(fi.size))
+            }
+        }
+
+        let deps = 0
+        let depsBytes = 0
+        let modules = 0
+        let modulesBytes = 0
+        let styles = 0
+        let stylesBytes = 0
+
+        // write modules
+        const { sourceMap } = this.config
+        await Promise.all(Array.from(outputModules).map((moduleID) => {
+            const { sourceFilePath, sourceType, isRemote, jsContent, jsSourceMap, hash } = this.#modules.get(moduleID)!
+            const saveDir = path.join(distDir, path.dirname(sourceFilePath))
+            const name = path.basename(sourceFilePath).replace(reModuleExt, '')
+            const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
+            if (isRemote) {
+                deps++
+                depsBytes += jsContent.length
+            } else {
+                if (sourceType === 'css' || sourceType === 'less') {
+                    styles++
+                    stylesBytes += jsContent.length
+                } else {
+                    modules++
+                    modulesBytes += jsContent.length
+                }
+            }
+            return Promise.all([
+                writeTextFile(jsFile, jsContent),
+                sourceMap && jsSourceMap ? writeTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
+            ])
+        }))
+
+        // write static data
+        if (this.#modules.has('/data.js')) {
+            const { hash } = this.#modules.get('/data.js')!
+            const data = await this.getStaticData()
+            const jsContent = `export default ${JSON.stringify(data)}`
+            modules++
+            modulesBytes += jsContent.length
+            await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), jsContent)
+        }
+
+        log.info(colors.bold('  Modules'))
+        log.info('    ▲', colors.bold(deps.toString()), 'deps', colors.dim(`• ${util.bytesString(depsBytes)} (mini, uncompress)`))
+        log.info('    ▲', colors.bold(modules.toString()), 'modules', colors.dim(`• ${util.bytesString(modulesBytes)} (mini, uncompress)`))
+        log.info('    ▲', colors.bold(styles.toString()), 'styles', colors.dim(`• ${util.bytesString(stylesBytes)} (mini, uncompress)`))
 
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
@@ -378,8 +461,8 @@ export class Project {
             Object.assign(this.config, { ssr })
         } else if (util.isPlainObject(ssr)) {
             const fallback = util.isNEString(ssr.fallback) ? util.ensureExt(ssr.fallback, '.html') : '404.html'
-            const include = util.isArray(ssr.include) ? ssr.include : []
-            const exclude = util.isArray(ssr.exclude) ? ssr.exclude : []
+            const include = util.isArray(ssr.include) ? ssr.include.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
+            const exclude = util.isArray(ssr.exclude) ? ssr.exclude.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
             Object.assign(this.config, { ssr: { fallback, include, exclude } })
         }
         if (util.isPlainObject(env)) {
@@ -454,26 +537,29 @@ export class Project {
         await this._createMainModule()
 
         log.info(colors.bold('Aleph.js'))
-        log.info(colors.bold('  Pages'))
-        for (const path of this.#routing.paths) {
-            const isIndex = path == '/'
-            log.info('    ○', path, isIndex ? colors.dim('(index)') : '')
-        }
-        if (this.#apiRouting.paths.length > 0) {
-            log.info(colors.bold('  APIs'))
-        }
-        for (const path of this.#apiRouting.paths) {
-            log.info('    λ', path)
-        }
         log.info(colors.bold('  Config'))
         if (this.#modules.has('/data.js')) {
-            log.info('    ✓', 'Global Static Data')
+            log.info('    ✓', 'App Static Data')
         }
         if (this.#modules.has('/app.js')) {
             log.info('    ✓', 'Custom App')
         }
         if (this.#modules.has('/404.js')) {
             log.info('    ✓', 'Custom 404 Page')
+        }
+
+        if (this.isDev) {
+            if (this.#apiRouting.paths.length > 0) {
+                log.info(colors.bold('  APIs'))
+            }
+            for (const path of this.#apiRouting.paths) {
+                log.info('    λ', path)
+            }
+            log.info(colors.bold('  Pages'))
+            for (const path of this.#routing.paths) {
+                const isIndex = path == '/'
+                log.info('    ○', path, isIndex ? colors.dim('(index)') : '')
+            }
         }
 
         if (this.isDev) {
@@ -487,11 +573,12 @@ export class Project {
         for await (const event of w) {
             for (const p of event.paths) {
                 const path = '/' + util.trimPrefix(util.trimPrefix(p, this.appRoot), '/')
+                // handle `api` dir remove directly
                 const validated = (() => {
                     if (!reModuleExt.test(path) && !reStyleModuleExt.test(path) && !reMDExt.test(path)) {
                         return false
                     }
-                    // ignore '.aleph' and output directories
+                    // ignore `.aleph` and output directories
                     if (path.startsWith('/.aleph/') || path.startsWith(this.config.outputDir)) {
                         return false
                     }
@@ -874,7 +961,7 @@ export class Project {
                     `MarkdownPage.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
                     this.isDev && `_s(MarkdownPage, "useRef{ref}\\nuseEffect{}");`,
                     this.isDev && `$RefreshReg$(MarkdownPage, "MarkdownPage");`,
-                ].filter(Boolean).map(l => this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
+                ].filter(Boolean).map(l => !this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
                 mod.hash = (new Sha1).update(mod.jsContent).hex()
             } else {
@@ -1125,10 +1212,10 @@ export class Project {
             ].flat())
             ret.head = head
             ret.body = `<main>${html}</main>`
-            if (url.pagePath !== '') {
-                log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
-            } else {
+            if (url.pagePath === '') {
                 log.warn(`page '${url.pathname}' not found`)
+            } else if (this.isDev) {
+                log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
             }
         } catch (err) {
             ret.status = 500
@@ -1225,4 +1312,14 @@ async function writeTextFile(filepath: string, content: string) {
     const dir = path.dirname(filepath)
     await ensureDir(dir)
     await Deno.writeTextFile(filepath, content)
+}
+
+function getColorfulBytesString(bytes: number) {
+    let cf = colors.dim
+    if (bytes > 10 * MB) {
+        cf = colors.red
+    } else if (bytes > MB) {
+        cf = colors.yellow
+    }
+    return cf(util.bytesString(bytes))
 }
