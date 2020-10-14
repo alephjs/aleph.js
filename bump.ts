@@ -36,6 +36,7 @@ async function main() {
             await run('git', 'add', '.', '--all')
             await run('git', 'commit', '-m', `v${up}`)
             await run('git', 'tag', `v${up}`)
+            await run('git', 'push', 'origin', 'master', '--tag', `v${up}`)
         }
     }
 }
