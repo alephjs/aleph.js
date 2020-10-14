@@ -16,6 +16,7 @@ export interface Config {
     readonly outputDir: string
     readonly baseUrl: string
     readonly defaultLocale: string
+    readonly locales: string[]
     readonly ssr: boolean | SSROptions
     readonly buildTarget: string
     readonly sourceMap: boolean

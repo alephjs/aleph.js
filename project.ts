@@ -9,7 +9,7 @@ import { Routing } from './router.ts'
 import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { AlephRuntime, APIHandle, Config, RouterURL } from './types.ts'
-import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
+import util, { existsDirSync, existsFileSync, hashShort, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
 
@@ -54,6 +54,7 @@ export class Project {
             outputDir: '/dist',
             baseUrl: '/',
             defaultLocale: 'en',
+            locales: [],
             ssr: {
                 fallback: '404.html'
             },
@@ -206,7 +207,7 @@ export class Project {
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
-            body: `<main></main>`,
+            body: `<main><p><em>Loading...</em></p></main>`, // todo: custom `loading` page
             minify: !this.isDev
         })
         return html
@@ -346,6 +347,7 @@ export class Project {
             buildTarget,
             sourceMap,
             defaultLocale,
+            locales,
             ssr,
             env
         } = config
@@ -367,6 +369,10 @@ export class Project {
         if (util.isNEString(defaultLocale)) {
             Object.assign(this.config, { defaultLocale })
         }
+        if (util.isArray(locales)) {
+            Object.assign(this.config, { locales: Array.from(new Set(locales.filter(l => reLocaleID.test(l)))) })
+            locales.filter(l => !reLocaleID.test(l)).forEach(l => log.warn(`invalid locale ID '${l}'`))
+        }
         if (typeof ssr === 'boolean') {
             Object.assign(this.config, { ssr })
         } else if (util.isPlainObject(ssr)) {
@@ -381,7 +387,7 @@ export class Project {
         // Gen build ID after config loaded.
         this.#buildID = (new Sha1()).update(this.mode + '.' + this.config.buildTarget + '.' + version).hex().slice(0, 18)
         // Update routing options.
-        this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, [])
+        this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
     }
 
     private async _init() {
