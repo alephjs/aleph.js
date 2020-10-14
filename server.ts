@@ -3,7 +3,7 @@ import log from './log.ts'
 import { getContentType } from './mime.ts'
 import { injectHmr, Project } from './project.ts'
 import { path, serve, ws } from './std.ts'
-import util, { hashShort } from './util.ts'
+import util, { existsFileSync, hashShort } from './util.ts'
 
 export async function start(appDir: string, port: number, isDev = false) {
     const project = new Project(appDir, isDev ? 'development' : 'production')
@@ -69,22 +69,15 @@ export async function start(appDir: string, port: number, isDev = false) {
                     // serve dist files
                     if (pathname.startsWith('/_aleph/')) {
                         if (pathname.endsWith('.css')) {
-                            try {
-                                const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_aleph/'))
-                                const info = await Deno.lstat(filePath)
-                                if (!info.isDirectory) {
-                                    const body = await Deno.readFile(filePath)
-                                    req.respond({
-                                        status: 200,
-                                        headers: new Headers({ 'Content-Type': 'text/css; charset=utf-8' }),
-                                        body
-                                    })
-                                    continue
-                                }
-                            } catch (err) {
-                                if (!(err instanceof Deno.errors.NotFound)) {
-                                    throw err
-                                }
+                            const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_aleph/'))
+                            if (existsFileSync(filePath)) {
+                                const body = await Deno.readFile(filePath)
+                                req.respond({
+                                    status: 200,
+                                    headers: new Headers({ 'Content-Type': 'text/css; charset=utf-8' }),
+                                    body
+                                }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                                continue
                             }
                         } else {
                             const reqSourceMap = pathname.endsWith('.js.map')
@@ -125,47 +118,21 @@ export async function start(appDir: string, port: number, isDev = false) {
                                         'ETag': mod.hash
                                     }),
                                     body
-                                })
+                                }).catch(err => log.warn('ServerRequest.respond:', err.message))
                                 continue
                             }
                         }
-                        req.respond({
-                            status: 404,
-                            headers: new Headers({ 'Content-Type': 'text/html' }),
-                            body: createHtml({
-                                lang: 'en',
-                                head: ['<title>404 - not found</title>'],
-                                body: '<p><strong><code>404</code></strong><small> - </small><span>not found</span></p>'
-                            })
-                        })
-                        continue
                     }
 
                     // serve public files
-                    try {
-                        const filePath = path.join(project.appRoot, 'public', pathname)
-                        const info = await Deno.lstat(filePath)
-                        if (!info.isDirectory) {
-                            const body = await Deno.readFile(filePath)
-                            req.respond({
-                                status: 200,
-                                headers: new Headers({ 'Content-Type': getContentType(filePath) }),
-                                body
-                            })
-                            continue
-                        }
-                    } catch (err) {
-                        if (!(err instanceof Deno.errors.NotFound)) {
-                            throw err
-                        }
-                    }
-
-                    if (pathname === '/favicon.ico') {
+                    const filePath = path.join(project.appRoot, 'public', pathname)
+                    if (existsFileSync(filePath)) {
+                        const body = await Deno.readFile(filePath)
                         req.respond({
-                            status: 404,
-                            headers: new Headers({ 'Content-Type': 'text/plain' }),
-                            body: 'icon not found'
-                        })
+                            status: 200,
+                            headers: new Headers({ 'Content-Type': getContentType(filePath) }),
+                            body
+                        }).catch(err => log.warn('ServerRequest.respond:', err.message))
                         continue
                     }
 
@@ -175,7 +142,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                         status,
                         headers: new Headers({ 'Content-Type': 'text/html' }),
                         body: html
-                    })
+                    }).catch(err => log.warn('ServerRequest.respond:', err.message))
                 } catch (err) {
                     req.respond({
                         status: 500,
@@ -185,7 +152,7 @@ export async function start(appDir: string, port: number, isDev = false) {
                             head: ['<title>500 - internal server error</title>'],
                             body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`
                         })
-                    })
+                    }).catch(err => log.warn('ServerRequest.respond:', err.message))
                 }
             }
         } catch (err) {
