@@ -207,6 +207,10 @@ export function ALEPH({ initial }: {
 export async function redirect(url: string, replace?: boolean) {
     const { location, history } = window as any
 
+    if (!util.isNEString(url)) {
+        return
+    }
+
     if (util.isHttpUrl(url)) {
         location.href = url
         return
