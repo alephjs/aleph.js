@@ -762,6 +762,7 @@ export class Project {
         return module
     }
 
+    // todo: force recompile remote modules which URL don't specify version
     private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean }) {
         const mod = this._moduleFromURL(url)
         if (this.#modules.has(mod.id) && !options?.forceCompile) {
