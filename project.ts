@@ -284,7 +284,7 @@ export class Project {
             }
         }
 
-        // wait project ready
+        // wait for project ready
         await this.ready
 
         // lookup output modules
@@ -295,13 +295,13 @@ export class Project {
         lookup('//deno.land/x/aleph/nomodule.js')
         lookup('//deno.land/x/aleph/tsc/tslib.js')
 
-        // ensure ouput directory ready
         if (existsDirSync(outputDir)) {
             await Deno.remove(outputDir, { recursive: true })
         }
         await ensureDir(outputDir)
         await ensureDir(distDir)
 
+        // ssg
         const { ssr } = this.config
         if (ssr) {
             log.info(colors.bold('  Pages (SSG)'))
@@ -329,22 +329,19 @@ export class Project {
                 const fi = await Deno.lstat(p)
                 await ensureDir(path.dirname(fp))
                 await Deno.copyFile(p, fp)
-                let sizeColorful = colors.dim
-                if (fi.size > 10 * MB) {
-                    sizeColorful = colors.red
-                } else if (fi.size > MB) {
-                    sizeColorful = colors.yellow
-                }
                 log.info('    ✹', rp, colors.dim('•'), getColorfulBytesString(fi.size))
             }
         }
 
-        let deps = 0
-        let depsBytes = 0
-        let modules = 0
-        let modulesBytes = 0
-        let styles = 0
-        let stylesBytes = 0
+        const moduleState = {
+            deps: { bytes: 0, count: 0 },
+            modules: { bytes: 0, count: 0 },
+            styles: { bytes: 0, count: 0 }
+        }
+        const logModule = (key: 'deps' | 'modules' | 'styles', size: number) => {
+            moduleState[key].bytes += size
+            moduleState[key].count++
+        }
 
         // write modules
         const { sourceMap } = this.config
@@ -354,15 +351,12 @@ export class Project {
             const name = path.basename(sourceFilePath).replace(reModuleExt, '')
             const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
             if (isRemote) {
-                deps++
-                depsBytes += jsContent.length
+                logModule('deps', jsContent.length)
             } else {
                 if (sourceType === 'css' || sourceType === 'less') {
-                    styles++
-                    stylesBytes += jsContent.length
+                    logModule('styles', jsContent.length)
                 } else {
-                    modules++
-                    modulesBytes += jsContent.length
+                    logModule('modules', jsContent.length)
                 }
             }
             return Promise.all([
@@ -376,15 +370,15 @@ export class Project {
             const { hash } = this.#modules.get('/data.js')!
             const data = await this.getStaticData()
             const jsContent = `export default ${JSON.stringify(data)}`
-            modules++
-            modulesBytes += jsContent.length
             await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), jsContent)
+            logModule('modules', jsContent.length)
         }
 
+        const { deps, modules, styles } = moduleState
         log.info(colors.bold('  Modules'))
-        log.info('    ▲', colors.bold(deps.toString()), 'deps', colors.dim(`• ${util.bytesString(depsBytes)} (mini, uncompress)`))
-        log.info('    ▲', colors.bold(modules.toString()), 'modules', colors.dim(`• ${util.bytesString(modulesBytes)} (mini, uncompress)`))
-        log.info('    ▲', colors.bold(styles.toString()), 'styles', colors.dim(`• ${util.bytesString(stylesBytes)} (mini, uncompress)`))
+        log.info('    ▲', colors.bold(deps.count.toString()), 'deps', colors.dim(`• ${util.bytesString(deps.bytes)} (mini, uncompress)`))
+        log.info('    ▲', colors.bold(modules.count.toString()), 'modules', colors.dim(`• ${util.bytesString(modules.bytes)} (mini, uncompress)`))
+        log.info('    ▲', colors.bold(styles.count.toString()), 'styles', colors.dim(`• ${util.bytesString(styles.bytes)} (mini, uncompress)`))
 
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }

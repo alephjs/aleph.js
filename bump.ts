@@ -27,7 +27,7 @@ async function run(...cmd: string[]) {
 }
 
 async function main() {
-    const answer = await ask([...versions.map((v, i) => `${i + 1}. v${v}`), 'upgrade to:'].join('\n'))
+    const answer = await ask([...versions.map((v, i) => `${i + 1} → v${v}`), 'upgrade to:'].join('\n'))
     const n = parseInt(answer)
     if (!isNaN(n) && n > 0 && n <= versions.length) {
         const up = versions[n - 1]

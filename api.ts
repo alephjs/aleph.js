@@ -5,7 +5,7 @@ import type { APIRequest, APIRequestURL, APIResponse, RouterURL } from './types.
 export class AlephAPIRequest implements APIRequest {
     #req: ServerRequest
     #url: APIRequestURL
-    cookies: ReadonlyMap<string, string>
+    #cookies: ReadonlyMap<string, string>
 
     constructor(req: ServerRequest, url: RouterURL) {
         this.#req = req
@@ -19,12 +19,15 @@ export class AlephAPIRequest implements APIRequest {
             params: paramsMap,
             query: url.query,
         }
-        this.cookies = new Map()
-        // todo: parse cookies
+        this.#cookies = new Map() // todo: parse cookies
     }
 
     get url(): APIRequestURL {
         return this.#url
+    }
+
+    get cookies(): ReadonlyMap<string, string> {
+        return this.#cookies
     }
 
     get method(): string {
@@ -79,7 +82,7 @@ export class AlephAPIResponse implements APIResponse {
         return this
     }
 
-    send(data: string | Uint8Array | ArrayBuffer) {
+    async send(data: string | Uint8Array | ArrayBuffer) {
         let body: string | Uint8Array
         if (data instanceof ArrayBuffer) {
             body = new Uint8Array(data)
@@ -93,7 +96,7 @@ export class AlephAPIResponse implements APIResponse {
         }).catch(err => log.warn('ServerRequest.respond:', err.message))
     }
 
-    json(data: any) {
+    async json(data: any) {
         this.#headers.set('Content-Type', 'application/json')
         return this.#req.respond({
             status: this.#status,
