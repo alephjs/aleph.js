@@ -89,13 +89,6 @@ export class AlephAPIResponse implements APIResponse {
         return this
     }
 
-    async end(status: number) {
-        return this.#req.respond({
-            status,
-            headers: this.#headers,
-        }).catch(err => log.warn('ServerRequest.respond:', err.message))
-    }
-
     async json(data: any, replacer?: (this: any, key: string, value: any) => any, space?: string | number) {
         return this.send(JSON.stringify(data, replacer, space), 'application/json', true)
     }
@@ -105,7 +98,6 @@ export class AlephAPIResponse implements APIResponse {
             log.warn('ServerRequest.respond: repeat send calls')
             return
         }
-
         let body: Uint8Array
         if (typeof data === 'string') {
             body = new TextEncoder().encode(data)
@@ -130,6 +122,19 @@ export class AlephAPIResponse implements APIResponse {
             status: this.#status,
             headers: this.#headers,
             body
+        }).catch(err => log.warn('ServerRequest.respond:', err.message))
+    }
+
+    async end(status: number) {
+        if (this.#sent) {
+            log.warn('ServerRequest.respond: repeat send calls')
+            return
+        }
+        this.#headers.set('Date', (new Date).toUTCString())
+        this.#sent = true
+        return this.#req.respond({
+            status,
+            headers: this.#headers,
         }).catch(err => log.warn('ServerRequest.respond:', err.message))
     }
 }
