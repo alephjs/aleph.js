@@ -5,8 +5,8 @@ import { injectHmr, Project } from './project.ts'
 import { path, serve, ws } from './std.ts'
 import util, { existsFileSync, hashShort } from './util.ts'
 
-export async function start(appDir: string, port: number, isDev = false) {
-    const project = new Project(appDir, isDev ? 'development' : 'production')
+export async function start(appDir: string, port: number, isDev = false, reload = false) {
+    const project = new Project(appDir, isDev ? 'development' : 'production', reload)
     await project.ready
 
     while (true) {

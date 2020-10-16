@@ -27,12 +27,7 @@ const vscSettings = {
     },
     'deno.enable': true,
     'deno.unstable': true,
-    'deno.import_map': './import_map.json',
-    'deno.import_intellisense_autodiscovery': true,
-    'deno.import_intellisense_origins': {
-        'https://deno.land': true,
-        'https://esm.sh': true
-    }
+    'deno.import_map': './import_map.json'
 }
 
 export const helpMessage = `

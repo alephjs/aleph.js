@@ -6,13 +6,13 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -r, --reload  Reload remote deps
+    -r, --reload  Reload source code cache
     -h, --help    Prints help message
 `
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
     const { Project } = await import('../project.ts')
-    const project = new Project(appDir, 'production')
+    const project = new Project(appDir, 'production', Boolean(options.r || options.reload))
     await project.build()
     Deno.exit(0)
 }

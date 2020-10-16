@@ -52,7 +52,7 @@ export class Project {
     #fsWatchListeners: Array<EventEmitter> = []
     #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0 }
 
-    constructor(dir: string, mode: 'development' | 'production') {
+    constructor(dir: string, mode: 'development' | 'production', reload = false) {
         this.mode = mode
         this.appRoot = dir
         this.config = {
@@ -75,7 +75,7 @@ export class Project {
         this.ready = (async () => {
             const t = performance.now()
             await this._loadConfig()
-            await this._init()
+            await this._init(reload)
             log.debug('initialize project token ' + Math.round(performance.now() - t) + 'ms')
         })()
     }
@@ -471,13 +471,20 @@ export class Project {
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
     }
 
-    private async _init() {
+    private async _init(reload: boolean) {
         const walkOptions = { includeDirs: false, exts: ['.js', '.ts', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
 
         if (!(existsDirSync(pagesDir))) {
             log.fatal(`'pages' directory not found.`)
+        }
+
+        if (reload) {
+            if (existsDirSync(this.buildDir)) {
+                await Deno.remove(this.buildDir, { recursive: true })
+            }
+            await ensureDir(this.buildDir)
         }
 
         Object.assign(globalThis, {
