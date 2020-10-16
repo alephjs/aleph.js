@@ -1,4 +1,6 @@
-import { version } from './version.ts';
+/* Aleph.js publish script, do NOT run this unless you ensure what are you doing! */
+
+import { version } from './version.ts'
 
 const [major, minor, patch] = version.split('.').map(s => parseInt(s))
 const versions = [
