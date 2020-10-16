@@ -1,5 +1,6 @@
+import { E400MissingDefaultExportAsComponent } from './error.ts'
 import type { Module, Route, RouterURL } from './types.ts'
-import util, { reMDExt } from './util.ts'
+import util, { reMDExt, reModuleExt } from './util.ts'
 
 const ghostRoute: Route = { path: '', module: { id: '', hash: '' } }
 
@@ -189,4 +190,43 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
     }
 
     return [params, true]
+}
+
+export interface PageProps {
+    Page: any
+    pageProps: Partial<PageProps> & { name?: string }
+}
+
+export function createPageProps(componentTree: { id: string, Component?: any }[]): PageProps {
+    const pageProps: PageProps = {
+        Page: null,
+        pageProps: {}
+    }
+    if (componentTree.length > 0) {
+        Object.assign(pageProps, _createPagePropsSegment(componentTree[0]))
+    }
+    if (componentTree.length > 1) {
+        componentTree.slice(1).reduce((p, seg) => {
+            const c = _createPagePropsSegment(seg)
+            p.pageProps = c
+            return c
+        }, pageProps)
+    }
+    return pageProps
+}
+
+function _createPagePropsSegment(seg: { id: string, Component?: any }): PageProps {
+    const pageProps: PageProps = {
+        Page: null,
+        pageProps: {}
+    }
+    if (seg.Component) {
+        if (util.isLikelyReactComponent(seg.Component)) {
+            pageProps.Page = seg.Component
+        } else {
+            pageProps.Page = E400MissingDefaultExportAsComponent
+            pageProps.pageProps = { name: 'Page:' + seg.id.replace(reModuleExt, '') }
+        }
+    }
+    return pageProps
 }

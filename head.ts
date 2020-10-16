@@ -30,7 +30,7 @@ export async function renderHead(styles?: { url: string, hash: string, async?: b
         }
     })
     await Promise.all(styles?.filter(({ async }) => !!async).map(({ url, hash }) => {
-        return import('file://' + util.cleanPath(`${__appRoot}/.aleph/build-${__buildID}/${url}.${hash.slice(0, hashShort)}.js`))
+        return import('file://' + util.cleanPath(`${__appRoot}/.aleph/${__buildID}/${url}.${hash.slice(0, hashShort)}.js`))
     }) || [])
     styles?.forEach(({ url }) => {
         if (serverStyles.has(url)) {

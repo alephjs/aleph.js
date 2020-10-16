@@ -74,8 +74,3 @@ export interface RouterURL {
     readonly params: Record<string, string>
     readonly query: URLSearchParams
 }
-
-export interface PageProps {
-    Page: any
-    pageProps: Partial<PageProps>
-}

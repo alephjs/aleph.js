@@ -1,6 +1,6 @@
-import marked from 'https://esm.sh/marked'
-import { minify } from 'https://esm.sh/terser@5.3.2'
-import { safeLoadFront } from 'https://esm.sh/yaml-front-matter'
+import marked from 'https://esm.sh/marked@1.2'
+import { minify } from 'https://esm.sh/terser@5.3'
+import { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1'
 import { AlephAPIRequest, AlephAPIResponse } from './api.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
@@ -30,7 +30,6 @@ interface Module {
 interface Renderer {
     renderPage: Function
     renderHead: Function
-    E501Page: Function
 }
 
 interface RenderResult {
@@ -45,13 +44,13 @@ export class Project {
     readonly appRoot: string
     readonly config: Config
     readonly ready: Promise<void>
+    readonly buildID: string
 
-    #buildID: string = ''
     #modules: Map<string, Module> = new Map()
     #routing: Routing = new Routing()
     #apiRouting: Routing = new Routing()
     #fsWatchListeners: Array<EventEmitter> = []
-    #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0, E501Page: () => null }
+    #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0 }
 
     constructor(dir: string, mode: 'development' | 'production') {
         this.mode = mode
@@ -72,6 +71,7 @@ export class Project {
             },
             env: {}
         }
+        this.buildID = this.mode + '.' + this.config.buildTarget
         this.ready = (async () => {
             const t = performance.now()
             await this._loadConfig()
@@ -88,12 +88,8 @@ export class Project {
         return path.join(this.appRoot, this.config.srcDir)
     }
 
-    get buildID() {
-        return this.#buildID
-    }
-
     get buildDir() {
-        return path.join(this.appRoot, '.aleph', 'build-' + this.buildID)
+        return path.join(this.appRoot, '.aleph', this.buildID)
     }
 
     isHMRable(moduleID: string) {
@@ -336,7 +332,7 @@ export class Project {
                 const fi = await Deno.lstat(p)
                 await ensureDir(path.dirname(fp))
                 await Deno.copyFile(p, fp)
-                log.info('    ✹', rp, colors.dim('•'), getColorfulBytesString(fi.size))
+                log.info('    ✹', rp, colors.dim('•'), colorfulBytesString(fi.size))
             }
         }
 
@@ -469,8 +465,8 @@ export class Project {
         if (util.isPlainObject(env)) {
             Object.assign(this.config, { env })
         }
-        // Gen build ID after config loaded.
-        this.#buildID = (new Sha1()).update(this.mode + '.' + this.config.buildTarget + '.' + version).hex().slice(0, 18)
+        // Update buildID
+        Object.assign(this, { buildID: this.mode + '.' + this.config.buildTarget })
         // Update routing options.
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
     }
@@ -539,8 +535,7 @@ export class Project {
 
         // ensure react in deno is same with browser one
         const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
-        const { E501Page } = await import('file://' + this.#modules.get('//deno.land/x/aleph/error.js')!.jsFile)
-        this.#renderer = { renderPage, renderHead, E501Page }
+        this.#renderer = { renderPage, renderHead }
 
         log.info(colors.bold('Aleph.js'))
         log.info(colors.bold('  Config'))
@@ -686,7 +681,7 @@ export class Project {
 
     private _getPageModule({ id, hash }: Module) {
         const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
-        return { id, hash, asyncDeps }
+        return { id, hash, asyncDeps: asyncDeps.length > 0 ? asyncDeps : undefined }
     }
 
     private _moduleFromURL(url: string): Module {
@@ -735,7 +730,7 @@ export class Project {
             'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js";',
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
         ].filter(Boolean).join(this.isDev ? '\n' : '')
-        module.hash = (new Sha1()).update(module.jsContent).hex()
+        module.hash = getHash(module.jsContent)
         module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
         module.deps = deps
 
@@ -800,7 +795,7 @@ export class Project {
         let sourceContent = ''
         let shouldCompile = false
         if (options?.sourceCode) {
-            const sourceHash = (new Sha1()).update(options.sourceCode).hex()
+            const sourceHash = getHash(options.sourceCode, true)
             if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                 mod.sourceHash = sourceHash
                 sourceContent = options.sourceCode
@@ -855,7 +850,7 @@ export class Project {
                             mod.sourceType = 'jsx'
                         }
                     }
-                    mod.sourceHash = (new Sha1()).update(sourceContent).hex()
+                    mod.sourceHash = getHash(sourceContent, true)
                     sourceContent = await resp.text()
                     shouldCompile = true
                 } catch (err) {
@@ -868,7 +863,7 @@ export class Project {
                         throw new Error(`${resp.status} - ${resp.statusText}`)
                     }
                     const text = await resp.text()
-                    const sourceHash = (new Sha1()).update(text).hex()
+                    const sourceHash = getHash(text, true)
                     if (mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
                         sourceContent = text
@@ -892,7 +887,7 @@ export class Project {
                 }
             }
             const text = await Deno.readTextFile(filepath)
-            const sourceHash = (new Sha1()).update(text).hex()
+            const sourceHash = getHash(text, true)
             if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                 mod.sourceHash = sourceHash
                 sourceContent = text
@@ -931,7 +926,7 @@ export class Project {
                     `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
                 ].join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
-                mod.hash = (new Sha1).update(css).hex()
+                mod.hash = getHash(css)
             } else if (mod.sourceType === 'sass' || mod.sourceType === 'scss') {
                 // todo: support sass
             } else if (mod.sourceType === 'mdx') {
@@ -970,7 +965,7 @@ export class Project {
                     this.isDev && `$RefreshReg$(MarkdownPage, "MarkdownPage");`,
                 ].filter(Boolean).map(l => !this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
-                mod.hash = (new Sha1).update(mod.jsContent).hex()
+                mod.hash = getHash(mod.jsContent)
             } else {
                 const compileOptions = {
                     target: this.config.buildTarget,
@@ -1006,7 +1001,7 @@ export class Project {
                         mod.jsSourceMap = map
                     }
                 }
-                mod.hash = (new Sha1).update(mod.jsContent).hex()
+                mod.hash = getHash(mod.jsContent)
             }
 
             log.debug(`${url} compiled in ${(performance.now() - t).toFixed(3)}ms`)
@@ -1028,7 +1023,7 @@ export class Project {
                         path.dirname(url),
                         dep.url.replace(reModuleExt, '')
                     )
-                    mod.jsContent = mod.jsContent.replace(/(import|Import|export)([\s\S]*?)(from\s*=?\s*|\()("|')([^'"]+)("|')(\)|;)?/g, (s, key, fields, from, ql, importPath, qr, end) => {
+                    mod.jsContent = mod.jsContent.replace(/(import|Import|export)([\s\S]*?)(from\s*:?\s*|\()("|')([^'"]+)("|')(\)|;)?/g, (s, key, fields, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
                             importPath.slice(0, importPath.length - (hashShort + 4)) === depImportPath
@@ -1037,7 +1032,7 @@ export class Project {
                         }
                         return s
                     })
-                    mod.hash = (new Sha1).update(mod.jsContent).hex()
+                    mod.hash = getHash(mod.jsContent)
                 }
                 if (!fsync) {
                     fsync = true
@@ -1089,7 +1084,7 @@ export class Project {
                             }
                             return s
                         })
-                        mod.hash = (new Sha1).update(mod.jsContent).hex()
+                        mod.hash = getHash(mod.jsContent)
                         mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
                         Promise.all([
                             writeTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
@@ -1208,17 +1203,14 @@ export class Project {
                 const { default: C } = await import('file://' + mod.jsFile)
                 const pc = pageComponentTree.find(pc => pc.id === mod.id)
                 if (pc) {
-                    if (util.isLikelyReactComponent(C)) {
-                        pc.Component = C
-                    } else {
-                        pc.Component = this.#renderer.E501Page
-                    }
+                    pc.Component = C
                 }
             })
             await Promise.all(imports)
             const html = this.#renderer.renderPage(url, staticData, App, E404, pageComponentTree)
             const head = await this.#renderer.renderHead([
-                appModule ? this._lookupStyleDeps(appModule.id) : [],
+                appModule && url.pagePath != '' ? this._lookupStyleDeps(appModule.id) : [],
+                e404Module && url.pagePath == '' ? this._lookupStyleDeps(e404Module.id) : [],
                 ...pageModuleTree.map(({ id }) => this._lookupStyleDeps(id))
             ].flat())
             ret.head = head
@@ -1319,13 +1311,16 @@ function renameImportUrl(importUrl: string): string {
     return pathname + ext
 }
 
-async function writeTextFile(filepath: string, content: string) {
-    const dir = path.dirname(filepath)
-    await ensureDir(dir)
-    await Deno.writeTextFile(filepath, content)
+function getHash(content: string, checkVersion = false) {
+    const sha1 = new Sha1()
+    sha1.update(content)
+    if (checkVersion) {
+        sha1.update(version)
+    }
+    return sha1.hex()
 }
 
-function getColorfulBytesString(bytes: number) {
+function colorfulBytesString(bytes: number) {
     let cf = colors.dim
     if (bytes > 10 * MB) {
         cf = colors.red
@@ -1333,4 +1328,10 @@ function getColorfulBytesString(bytes: number) {
         cf = colors.yellow
     }
     return cf(util.bytesString(bytes))
+}
+
+async function writeTextFile(filepath: string, content: string) {
+    const dir = path.dirname(filepath)
+    await ensureDir(dir)
+    await Deno.writeTextFile(filepath, content)
 }

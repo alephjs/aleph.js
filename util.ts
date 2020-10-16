@@ -11,8 +11,10 @@ export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reHashJs = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
 
 export const KB = 1024
-export const MB = KB * KB
-export const GB = KB * MB
+export const MB = KB ** 2
+export const GB = KB ** 3
+export const TB = KB ** 4
+export const PB = KB ** 5
 
 export default {
     isNumber(a: any): a is number {
@@ -114,8 +116,12 @@ export default {
             return Math.ceil(bytes / KB) + 'KB'
         } else if (bytes < GB) {
             return (bytes / MB).toFixed(1).replace(/\.0$/, '') + 'MB'
-        } else {
+        } else if (bytes < TB) {
             return (bytes / GB).toFixed(1).replace(/\.0$/, '') + 'GB'
+        } else if (bytes < PB) {
+            return (bytes / TB).toFixed(1).replace(/\.0$/, '') + 'TB'
+        } else {
+            return (bytes / PB).toFixed(1).replace(/\.0$/, '') + 'PB'
         }
     },
     splitPath(path: string): string[] {

@@ -1,10 +1,9 @@
 import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './aleph.ts'
-import { E501Page } from './error.ts'
 import { Routing } from './router.ts'
-import type { Module, PageProps, Route } from './types.ts'
-import util, { reModuleExt } from './util.ts'
+import type { Module, Route } from './types.ts'
+import { reModuleExt } from './util.ts'
 
 export default async function bootstrap({
     routes,
@@ -25,7 +24,7 @@ export default async function bootstrap({
     const components: Record<string, ComponentType> = {}
     const routing = new Routing(routes, baseUrl, defaultLocale, locales)
     const [url, pageModuleTree] = routing.createRouter()
-    const ctree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
+    const pageComponentTree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
     const imports = [...preloadModules, ...pageModuleTree].map(async mod => {
         const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
         if (mod.asyncDeps) {
@@ -45,33 +44,15 @@ export default async function bootstrap({
                 components['E404'] = C
                 break
             default:
-                const pc = ctree.find(pc => pc.id === mod.id)
+                const pc = pageComponentTree.find(pc => pc.id === mod.id)
                 if (pc) {
-                    if (util.isLikelyReactComponent(C)) {
-                        pc.Component = C
-                    } else {
-                        pc.Component = E501Page
-                    }
+                    pc.Component = C
                 }
                 break
         }
     })
     await Promise.all(imports)
 
-    const pageProps: PageProps | null = url.pagePath != '' ? {
-        Page: ctree[0].Component || (() => null),
-        pageProps: {}
-    } : null
-    if (pageProps && ctree.length > 1) {
-        ctree.slice(1).reduce((p, m) => {
-            const c = {
-                Page: m.Component || (() => null),
-                pageProps: {}
-            }
-            p.pageProps = c
-            return c
-        }, pageProps)
-    }
     const el = React.createElement(
         ALEPH,
         {
@@ -80,7 +61,7 @@ export default async function bootstrap({
                 url,
                 staticData,
                 components,
-                pageProps
+                pageComponentTree,
             }
         }
     )

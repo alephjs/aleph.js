@@ -1,8 +1,8 @@
-import React, { Children, cloneElement, CSSProperties, isValidElement, MouseEvent, PropsWithChildren, useCallback, useEffect, useMemo } from 'https://esm.sh/react'
+import React, { Children, cloneElement, ComponentType, CSSProperties, isValidElement, MouseEvent, PropsWithChildren, ReactElement, useCallback, useEffect, useMemo, useState } from 'https://esm.sh/react'
 import { redirect } from './aleph.ts'
 import events from './events.ts'
 import { useRouter } from './hooks.ts'
-import util, { reModuleExt, reStyleModuleExt } from './util.ts'
+import util, { reModuleExt } from './util.ts'
 
 interface LinkProps {
     to: string
@@ -141,12 +141,49 @@ export function NavLink({
     return React.createElement(Link, { ...rest, to })
 }
 
-export function Import(props: { from: string, props?: Record<string, any> }) {
-    if (reStyleModuleExt.test(props.from)) {
-        return null
+interface ImportProps {
+    from: string
+    props?: Record<string, any>
+    placeholder?: ReactElement
+    fallback?: ReactElement
+}
+
+export function Import(props: ImportProps) {
+    const { __importer, __sourceFile } = (props as any)
+    const [error, setError] = useState<string | null>(null)
+    const [mod, setMod] = useState<{ Component: ComponentType | null }>({ Component: null })
+
+    useEffect(() => {
+        if (reModuleExt.test(__sourceFile)) {
+            const p = util.splitPath(__importer)
+            p.pop()
+            import(util.cleanPath("/_aleph/" + p.join('/') + '/' + props.from))
+                .then(({ default: Component }) => {
+                    setMod({ Component })
+                })
+                .catch((err: Error) => {
+                    setError(err.message)
+                })
+        }
+    }, [__importer, __sourceFile])
+
+    if (error) {
+        if (props.fallback) {
+            return props.fallback
+        }
+        return React.createElement('div', { style: { color: 'red' } }, error)
     }
-    if (reModuleExt.test(props.from)) {
-        // todo: import component form props.__url
-        return null
+
+    if (mod.Component) {
+        return React.createElement(mod.Component, props.props)
     }
+
+    if (reModuleExt.test(__sourceFile)) {
+        if (props.placeholder) {
+            return props.placeholder
+        }
+        return React.createElement('div', { style: { color: 'gray' } }, 'Loading...')
+    }
+
+    return null
 }

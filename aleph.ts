@@ -1,9 +1,9 @@
 import React, { ComponentType, useCallback, useEffect, useRef, useState } from 'https://esm.sh/react'
 import { DataContext, RouterContext } from './context.ts'
-import { E404Page, E501App, E501Page, ErrorBoundary } from './error.ts'
+import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
 import events from './events.ts'
-import type { Routing } from './router.ts'
-import type { Module, PageProps, RouterURL } from './types.ts'
+import { createPageProps, Routing } from './router.ts'
+import type { Module, RouterURL } from './types.ts'
 import util, { hashShort, reModuleExt } from './util.ts'
 
 export function ALEPH({ initial }: {
@@ -12,26 +12,34 @@ export function ALEPH({ initial }: {
         url: RouterURL
         staticData: Record<string, any>
         components: Record<string, ComponentType<any>>
-        pageProps: PageProps | null
+        pageComponentTree: { id: string, Component?: any }[]
     }
 }) {
     const ref = useRef({ routing: initial.routing })
     const [staticData, setStaticData] = useState(() => initial.staticData)
-    const [e404, setE404] = useState(() => {
+    const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
         const { E404 } = initial.components
-        return {
-            Component: E404 && util.isLikelyReactComponent(E404) ? E404 : E404Page
+        if (E404) {
+            if (util.isLikelyReactComponent(E404)) {
+                return { Component: E404 }
+            }
+            return { Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom 404 Page' } }
         }
+        return { Component: E404Page }
     })
-    const [app, setApp] = useState(() => {
+    const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
         const { App } = initial.components
-        return {
-            Component: App ? (util.isLikelyReactComponent(App) ? App : E501App) : null
+        if (App) {
+            if (util.isLikelyReactComponent(App)) {
+                return { Component: App }
+            }
+            return { Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom App' } }
         }
+        return { Component: null }
     })
-    const [page, setPage] = useState(() => {
-        const { url, pageProps } = initial
-        return { pageProps, url }
+    const [route, setRoute] = useState(() => {
+        const { url, pageComponentTree } = initial
+        return { ...createPageProps(pageComponentTree), url }
     })
     const onpopstate = useCallback(async (e: any) => {
         const { routing } = ref.current
@@ -49,34 +57,16 @@ export function ALEPH({ initial }: {
                 }
                 const pc = ctree.find(pc => pc.id === mod.id)
                 if (pc) {
-                    if (util.isLikelyReactComponent(C)) {
-                        pc.Component = C
-                    } else {
-                        pc.Component = E501Page
-                    }
+                    pc.Component = C
                 }
             })
             await Promise.all(imports)
-            const pageProps: PageProps = {
-                Page: ctree[0].Component || (() => null),
-                pageProps: {}
-            }
-            if (ctree.length > 1) {
-                ctree.slice(1).reduce((p, m) => {
-                    const c = {
-                        Page: m.Component || (() => null),
-                        pageProps: {}
-                    }
-                    p.pageProps = c
-                    return c
-                }, pageProps)
-            }
-            setPage({ url, pageProps })
+            setRoute({ ...createPageProps(ctree), url })
             if (util.isInt(e.scrollTo)) {
                 (window as any).scrollTo(e.scrollTo, 0)
             }
         } else {
-            setPage({ url, pageProps: null })
+            setRoute({ Page: null, pageProps: {}, url })
         }
     }, [ref])
 
@@ -113,7 +103,7 @@ export function ALEPH({ initial }: {
                     if (util.isLikelyReactComponent(Component)) {
                         setApp({ Component })
                     } else {
-                        setApp({ Component: E501App })
+                        setApp({ Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom App' } })
                     }
                     break
                 }
@@ -192,11 +182,11 @@ export function ALEPH({ initial }: {
                 { value: staticData },
                 React.createElement(
                     RouterContext.Provider,
-                    { value: page.url },
+                    { value: route.url },
                     ...[
-                        (page.pageProps && app.Component) && React.createElement(app.Component, page.pageProps),
-                        (page.pageProps && !app.Component) && React.createElement(page.pageProps.Page, page.pageProps.pageProps),
-                        !page.pageProps && React.createElement(e404.Component)
+                        (route.Page && app.Component) && React.createElement(app.Component, Object.assign({}, app.props, { Page: route.Page, pageProps: route.pageProps })),
+                        (route.Page && !app.Component) && React.createElement(route.Page, route.pageProps),
+                        !route.Page && React.createElement(e404.Component, e404.props)
                     ].filter(Boolean),
                 )
             )
