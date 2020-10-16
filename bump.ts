@@ -31,7 +31,7 @@ async function main() {
     const n = parseInt(answer)
     if (!isNaN(n) && n > 0 && n <= versions.length) {
         const up = versions[n - 1]
-        if (await ask('are you sure? (y/n)') === 'y') {
+        if (/y(es)?/i.test(await ask('are you sure? (y/n)'))) {
             await Deno.writeTextFile('./version.ts', `export const version = '${up}'\n`)
             await run('git', 'add', '.', '--all')
             await run('git', 'commit', '-m', `v${up}`)
