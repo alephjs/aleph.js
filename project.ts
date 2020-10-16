@@ -27,6 +27,12 @@ interface Module {
     hash: string
 }
 
+interface Renderer {
+    renderPage: Function
+    renderHead: Function
+    E501Page: Function
+}
+
 interface RenderResult {
     url: RouterURL
     status: number
@@ -45,6 +51,7 @@ export class Project {
     #routing: Routing = new Routing()
     #apiRouting: Routing = new Routing()
     #fsWatchListeners: Array<EventEmitter> = []
+    #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0, E501Page: () => null }
 
     constructor(dir: string, mode: 'development' | 'production') {
         this.mode = mode
@@ -376,9 +383,9 @@ export class Project {
 
         const { deps, modules, styles } = moduleState
         log.info(colors.bold('  Modules'))
-        log.info('    ▲', colors.bold(deps.count.toString()), 'deps', colors.dim(`• ${util.bytesString(deps.bytes)} (mini, uncompress)`))
-        log.info('    ▲', colors.bold(modules.count.toString()), 'modules', colors.dim(`• ${util.bytesString(modules.bytes)} (mini, uncompress)`))
-        log.info('    ▲', colors.bold(styles.count.toString()), 'styles', colors.dim(`• ${util.bytesString(styles.bytes)} (mini, uncompress)`))
+        log.info('    {}', colors.bold(deps.count.toString()), 'deps', colors.dim(`• ${util.bytesString(deps.bytes)} (mini, uncompress)`))
+        log.info('    {}', colors.bold(modules.count.toString()), 'modules', colors.dim(`• ${util.bytesString(modules.bytes)} (mini, uncompress)`))
+        log.info('    {}', colors.bold(styles.count.toString()), 'styles', colors.dim(`• ${util.bytesString(styles.bytes)} (mini, uncompress)`))
 
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
@@ -529,6 +536,11 @@ export class Project {
             await this._compile(url)
         }
         await this._createMainModule()
+
+        // ensure react in deno is same with browser one
+        const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
+        const { E501Page } = await import('file://' + this.#modules.get('//deno.land/x/aleph/error.js')!.jsFile)
+        this.#renderer = { renderPage, renderHead, E501Page }
 
         log.info(colors.bold('Aleph.js'))
         log.info(colors.bold('  Config'))
@@ -1181,11 +1193,15 @@ export class Project {
         try {
             const appModule = this.#modules.get('/app.js')
             const e404Module = this.#modules.get('/404.js')
-            const { E501Page } = await import('file://' + this.#modules.get('//deno.land/x/aleph/error.js')!.jsFile)
-            const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
-            const { default: App } = appModule && url.pagePath != '' ? await import('file://' + appModule.jsFile) : {} as any
-            const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
-            const staticData = await this.getStaticData()
+            const [
+                { default: App }, // todo: cache, re-import when hash changed
+                { default: E404 }, // todo: cache, re-import when hash changed
+                staticData // todo: real static
+            ] = await Promise.all([
+                appModule && url.pagePath != '' ? await import('file://' + appModule.jsFile) : Promise.resolve({}),
+                e404Module ? await import('file://' + e404Module.jsFile) : Promise.resolve({}),
+                await this.getStaticData()
+            ])
             const pageComponentTree: { id: string, Component?: any }[] = pageModuleTree.map(({ id }) => ({ id }))
             const imports = pageModuleTree.map(async ({ id }) => {
                 const mod = this.#modules.get(id)!
@@ -1195,13 +1211,13 @@ export class Project {
                     if (util.isLikelyReactComponent(C)) {
                         pc.Component = C
                     } else {
-                        pc.Component = E501Page
+                        pc.Component = this.#renderer.E501Page
                     }
                 }
             })
             await Promise.all(imports)
-            const html = renderPage(url, staticData, App, E404, pageComponentTree)
-            const head = await renderHead([
+            const html = this.#renderer.renderPage(url, staticData, App, E404, pageComponentTree)
+            const head = await this.#renderer.renderHead([
                 appModule ? this._lookupStyleDeps(appModule.id) : [],
                 ...pageModuleTree.map(({ id }) => this._lookupStyleDeps(id))
             ].flat())
