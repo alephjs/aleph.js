@@ -128,7 +128,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                         const body = await Deno.readFile(filePath)
                         const ct = getContentType(filePath)
                         resp.setHeader('Last-Modified', info.mtime!.toUTCString())
-                        resp.send(body, ct, ct.startsWith('text/') || /\.(m?js|json|xml)$/i.test(filePath))
+                        resp.send(body, ct, ct.startsWith('text/') || /\.(m?js|json|xml|svg)$/i.test(filePath))
                         continue
                     }
 

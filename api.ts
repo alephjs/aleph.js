@@ -54,17 +54,18 @@ export class AlephAPIRequest implements APIRequest {
 
 export class AlephAPIResponse implements APIResponse {
     #req: ServerRequest
-    #headers: Headers
     #status: number
+    #headers: Headers
+    #sent: boolean
 
     constructor(req: ServerRequest) {
         this.#req = req
+        this.#status = 200
         this.#headers = new Headers({
             'Status': '200',
             'Server': 'Aleph.js',
-            'Date': (new Date).toUTCString(),
         })
-        this.#status = 200
+        this.#sent = false
     }
 
     status(code: number): this {
@@ -95,7 +96,16 @@ export class AlephAPIResponse implements APIResponse {
         }).catch(err => log.warn('ServerRequest.respond:', err.message))
     }
 
+    async json(data: any, replacer?: (this: any, key: string, value: any) => any, space?: string | number) {
+        return this.send(JSON.stringify(data, replacer, space), 'application/json', true)
+    }
+
     async send(data: string | Uint8Array | ArrayBuffer, contentType?: string, gzip = false) {
+        if (this.#sent) {
+            log.warn('ServerRequest.respond: repeat send calls')
+            return
+        }
+
         let body: Uint8Array
         if (typeof data === 'string') {
             body = new TextEncoder().encode(data)
@@ -114,19 +124,12 @@ export class AlephAPIResponse implements APIResponse {
             this.#headers.set('Content-Encoding', 'gzip')
             body = gzipEncode(body)
         }
+        this.#headers.set('Date', (new Date).toUTCString())
+        this.#sent = true
         return this.#req.respond({
             status: this.#status,
             headers: this.#headers,
             body
-        }).catch(err => log.warn('ServerRequest.respond:', err.message))
-    }
-
-    async json(data: any) {
-        this.#headers.set('Content-Type', 'application/json')
-        return this.#req.respond({
-            status: this.#status,
-            headers: this.#headers,
-            body: JSON.stringify(data)
         }).catch(err => log.warn('ServerRequest.respond:', err.message))
     }
 }
