@@ -1028,12 +1028,12 @@ export class Project {
                         path.dirname(url),
                         dep.url.replace(reModuleExt, '')
                     )
-                    mod.jsContent = mod.jsContent.replace(/(import|Import|export)([^'"]*)("|')([^'"]+)("|')(\)|;)?/g, (s, key, from, ql, importPath, qr, end) => {
+                    mod.jsContent = mod.jsContent.replace(/(import|Import|export)([\s\S]*?)(from\s*=?\s*|\()("|')([^'"]+)("|')(\)|;)?/g, (s, key, fields, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
                             importPath.slice(0, importPath.length - (hashShort + 4)) === depImportPath
                         ) {
-                            return `${key}${from}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}${end || ''}`
+                            return `${key}${fields}${from}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}${end || ''}`
                         }
                         return s
                     })

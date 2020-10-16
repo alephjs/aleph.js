@@ -2,7 +2,7 @@ import React, { Children, cloneElement, CSSProperties, isValidElement, MouseEven
 import { redirect } from './aleph.ts'
 import events from './events.ts'
 import { useRouter } from './hooks.ts'
-import util from './util.ts'
+import util, { reModuleExt, reStyleModuleExt } from './util.ts'
 
 interface LinkProps {
     to: string
@@ -139,4 +139,14 @@ export function NavLink({
     }
 
     return React.createElement(Link, { ...rest, to })
+}
+
+export function Import(props: { from: string, props?: Record<string, any> }) {
+    if (reStyleModuleExt.test(props.from)) {
+        return null
+    }
+    if (reModuleExt.test(props.from)) {
+        // todo: import component form props.__url
+        return null
+    }
 }
