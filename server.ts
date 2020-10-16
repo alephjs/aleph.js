@@ -1,3 +1,4 @@
+import { AlephAPIResponse } from './api.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './mime.ts'
@@ -16,6 +17,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
             for await (const req of s) {
                 const url = new URL('http://localhost/' + req.url)
                 const pathname = util.cleanPath(url.pathname)
+                const resp = new AlephAPIResponse(req)
 
                 try {
                     // serve hmr ws
@@ -72,11 +74,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                             const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_aleph/'))
                             if (existsFileSync(filePath)) {
                                 const body = await Deno.readFile(filePath)
-                                req.respond({
-                                    status: 200,
-                                    headers: new Headers({ 'Content-Type': 'text/css; charset=utf-8' }),
-                                    body
-                                }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                                resp.send(body, 'text/css; charset=utf-8', true)
                                 continue
                             }
                         } else {
@@ -85,7 +83,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                             if (mod) {
                                 const etag = req.headers.get('If-None-Match')
                                 if (etag && etag === mod.hash) {
-                                    req.respond({ status: 304 })
+                                    resp.end(304)
                                     continue
                                 }
 
@@ -111,14 +109,8 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                                         body = injectHmr({ ...mod, jsContent: body })
                                     }
                                 }
-                                req.respond({
-                                    status: 200,
-                                    headers: new Headers({
-                                        'Content-Type': `application/${reqSourceMap ? 'json' : 'javascript'}; charset=utf-8`,
-                                        'ETag': mod.hash
-                                    }),
-                                    body
-                                }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                                resp.setHeader('ETag', mod.hash)
+                                resp.send(body, `application/${reqSourceMap ? 'json' : 'javascript'}; charset=utf-8`, true)
                                 continue
                             }
                         }
@@ -127,32 +119,28 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                     // serve public files
                     const filePath = path.join(project.appRoot, 'public', pathname)
                     if (existsFileSync(filePath)) {
+                        const info = await Deno.lstat(filePath)
+                        if (info.mtime?.toUTCString() === req.headers.get('If-Modified-Since')) {
+                            resp.end(304)
+                            continue
+                        }
+
                         const body = await Deno.readFile(filePath)
-                        req.respond({
-                            status: 200,
-                            headers: new Headers({ 'Content-Type': getContentType(filePath) }),
-                            body
-                        }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                        const ct = getContentType(filePath)
+                        resp.setHeader('Last-Modified', info.mtime!.toUTCString())
+                        resp.send(body, ct, ct.startsWith('text/') || /\.(m?js|json|xml)$/i.test(filePath))
                         continue
                     }
 
                     // ssr
                     const [status, html] = await project.getPageHtml({ pathname, search: url.search })
-                    req.respond({
-                        status,
-                        headers: new Headers({ 'Content-Type': 'text/html' }),
-                        body: html
-                    }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                    resp.status(status).send(html, 'text/html', true)
                 } catch (err) {
-                    req.respond({
-                        status: 500,
-                        headers: new Headers({ 'Content-Type': 'text/html' }),
-                        body: createHtml({
-                            lang: 'en',
-                            head: ['<title>500 - internal server error</title>'],
-                            body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`
-                        })
-                    }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                    resp.status(500).send(createHtml({
+                        lang: 'en',
+                        head: ['<title>500 - internal server error</title>'],
+                        body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`
+                    }), 'text/html', true)
                 }
             }
         } catch (err) {

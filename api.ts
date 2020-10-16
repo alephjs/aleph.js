@@ -1,3 +1,4 @@
+import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from './log.ts'
 import type { ServerRequest } from './std.ts'
 import type { APIRequest, APIRequestURL, APIResponse, RouterURL } from './types.ts'
@@ -58,11 +59,16 @@ export class AlephAPIResponse implements APIResponse {
 
     constructor(req: ServerRequest) {
         this.#req = req
-        this.#headers = new Headers()
+        this.#headers = new Headers({
+            'Status': '200',
+            'Server': 'Aleph.js',
+            'Date': (new Date).toUTCString(),
+        })
         this.#status = 200
     }
 
     status(code: number): this {
+        this.#headers.set('status', code.toString())
         this.#status = code
         return this
     }
@@ -82,12 +88,31 @@ export class AlephAPIResponse implements APIResponse {
         return this
     }
 
-    async send(data: string | Uint8Array | ArrayBuffer) {
-        let body: string | Uint8Array
-        if (data instanceof ArrayBuffer) {
+    async end(status: number) {
+        return this.#req.respond({
+            status,
+            headers: this.#headers,
+        }).catch(err => log.warn('ServerRequest.respond:', err.message))
+    }
+
+    async send(data: string | Uint8Array | ArrayBuffer, contentType?: string, gzip = false) {
+        let body: Uint8Array
+        if (typeof data === 'string') {
+            body = new TextEncoder().encode(data)
+        } else if (data instanceof ArrayBuffer) {
             body = new Uint8Array(data)
-        } else {
+        } else if (data instanceof Uint8Array) {
             body = data
+        } else {
+            return
+        }
+        if (contentType) {
+            this.#headers.set('Content-Type', contentType)
+        }
+        if (gzip && this.#req.headers.get('accept-encoding')?.includes('gzip') && body.length > 1024) {
+            this.#headers.set('Vary', 'Origin')
+            this.#headers.set('Content-Encoding', 'gzip')
+            body = gzipEncode(body)
         }
         return this.#req.respond({
             status: this.#status,
