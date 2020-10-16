@@ -29,10 +29,14 @@ export function renderPage(
     } else {
         if (pageProps.Page == null) {
             if (E404) {
-                el = React.createElement(
-                    E400MissingDefaultExportAsComponent,
-                    { name: 'Custom 404' }
-                )
+                if (util.isLikelyReactComponent(E404)) {
+                    el = React.createElement(E404)
+                } else {
+                    el = React.createElement(
+                        E400MissingDefaultExportAsComponent,
+                        { name: 'Custom 404' }
+                    )
+                }
             } else {
                 el = React.createElement(E404Page)
             }
