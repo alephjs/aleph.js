@@ -1,7 +1,7 @@
 import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './aleph.ts'
-import { Module, Route, Routing } from './routing.ts'
+import { Route, RouteModule, Routing } from './routing.ts'
 import { reModuleExt } from './util.ts'
 
 export default async function bootstrap({
@@ -15,7 +15,7 @@ export default async function bootstrap({
     baseUrl: string
     defaultLocale: string
     locales: string[]
-    preloadModules: Module[]
+    preloadModules: RouteModule[]
 }) {
     const { document } = window as any
     const mainEl = document.querySelector('main')

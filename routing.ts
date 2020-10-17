@@ -2,16 +2,16 @@ import { E400MissingDefaultExportAsComponent } from './error.ts'
 import type { RouterURL } from './types.ts'
 import util, { reMDExt, reModuleExt } from './util.ts'
 
-export interface Module {
+export interface Route {
+    path: string
+    module: RouteModule
+    children?: Route[]
+}
+
+export interface RouteModule {
     readonly id: string
     readonly hash: string
     readonly asyncDeps?: { url: string, hash: string }[]
-}
-
-export interface Route {
-    path: string
-    module: Module
-    children?: Route[]
 }
 
 export interface PageProps {
@@ -54,7 +54,7 @@ export class Routing {
         return JSON.parse(JSON.stringify(this._routes))
     }
 
-    update(module: Module) {
+    update(module: RouteModule) {
         const newRoute: Route = { path: getPagePath(module.id), module }
         const dirtyRoutes: Set<Route[]> = new Set()
         let exists = false
@@ -109,7 +109,7 @@ export class Routing {
         })
     }
 
-    createRouter(location?: { pathname: string, search?: string }): [RouterURL, Module[]] {
+    createRouter(location?: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
         const loc = location || (window as any).location || { pathname: '/' }
         const query = new URLSearchParams(loc.search)
 
@@ -117,7 +117,7 @@ export class Routing {
         let pathname = util.cleanPath(util.trimPrefix(loc.pathname, this._baseUrl))
         let pagePath = ''
         let params: Record<string, string> = {}
-        let tree: Module[] = []
+        let tree: RouteModule[] = []
 
         if (pathname !== '/' && this._locales.length > 0) {
             const a = pathname.split('/')

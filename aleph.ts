@@ -2,7 +2,7 @@ import React, { ComponentType, useCallback, useEffect, useRef, useState } from '
 import { DataContext, RouterContext } from './context.ts'
 import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
 import events from './events.ts'
-import { createPageProps, Module, Routing } from './routing.ts'
+import { createPageProps, RouteModule, Routing } from './routing.ts'
 import type { RouterURL } from './types.ts'
 import util, { hashShort, reModuleExt } from './util.ts'
 
@@ -87,7 +87,7 @@ export function ALEPH({ initial }: {
             console.log('[DATA]', data)
             setStaticData(data)
         }
-        const onAddModule = async (mod: Module) => {
+        const onAddModule = async (mod: RouteModule) => {
             switch (mod.id) {
                 case '/404.js': {
                     const { default: Component } = await import(getModuleImportUrl(baseUrl, mod, true))
@@ -215,6 +215,6 @@ export async function redirect(url: string, replace?: boolean) {
     events.emit('popstate', { type: 'popstate', scrollTo: 0 })
 }
 
-export function getModuleImportUrl(baseUrl: string, mod: Module, forceFetch = false) {
+export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceFetch = false) {
     return util.cleanPath(baseUrl + '/_aleph/' + util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js` + (forceFetch ? `?t=${Date.now()}` : ''))
 }
