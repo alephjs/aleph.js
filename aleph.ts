@@ -2,7 +2,7 @@ import React, { ComponentType, useCallback, useEffect, useRef, useState } from '
 import { DataContext, RouterContext } from './context.ts'
 import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
 import events from './events.ts'
-import { createPageProps, Module, Routing } from './router.ts'
+import { createPageProps, Module, Routing } from './routing.ts'
 import type { RouterURL } from './types.ts'
 import util, { hashShort, reModuleExt } from './util.ts'
 

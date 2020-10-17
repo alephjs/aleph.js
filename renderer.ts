@@ -2,7 +2,7 @@ import React, { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import { DataContext, RouterContext } from './context.ts'
 import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
-import { createPageProps } from './router.ts'
+import { createPageProps } from './routing.ts'
 import type { RouterURL } from './types.ts'
 import util from './util.ts'
 
