@@ -1,8 +1,7 @@
 import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './aleph.ts'
-import { Routing } from './router.ts'
-import type { Module, Route } from './types.ts'
+import { Module, Route, Routing } from './router.ts'
 import { reModuleExt } from './util.ts'
 
 export default async function bootstrap({

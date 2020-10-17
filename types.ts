@@ -2,7 +2,8 @@ export interface AlephRuntime {
     env: Record<string, string>
     __version: string
     __appRoot: string
-    __buildID: string
+    __buildMode: string
+    __buildTarget: string
 }
 
 export interface SSROptions {
@@ -27,17 +28,17 @@ export interface Config {
 }
 
 export interface APIRequestURL {
+    readonly proto: string
+    readonly protoMinor: number
+    readonly protoMajor: number
     readonly pathname: string
     readonly params: ReadonlyMap<string, string>
     readonly query: URLSearchParams
 }
 
 export interface APIRequest {
-    readonly url: APIRequestURL
     readonly method: string
-    readonly proto: string
-    readonly protoMinor: number
-    readonly protoMajor: number
+    readonly url: APIRequestURL
     readonly headers: Headers
     readonly cookies: ReadonlyMap<string, string>
 }
@@ -53,18 +54,6 @@ export interface APIResponse {
 
 export interface APIHandle {
     (req: APIRequest, res: APIResponse): void
-}
-
-export interface Module {
-    readonly id: string
-    readonly hash: string
-    readonly asyncDeps?: { url: string, hash: string }[]
-}
-
-export interface Route {
-    path: string
-    module: Module
-    children?: Route[]
 }
 
 export interface RouterURL {

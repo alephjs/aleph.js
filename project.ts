@@ -44,7 +44,6 @@ export class Project {
     readonly appRoot: string
     readonly config: Config
     readonly ready: Promise<void>
-    readonly buildID: string
 
     #modules: Map<string, Module> = new Map()
     #routing: Routing = new Routing()
@@ -71,12 +70,11 @@ export class Project {
             },
             env: {}
         }
-        this.buildID = this.mode + '.' + this.config.buildTarget
         this.ready = (async () => {
             const t = performance.now()
             await this._loadConfig()
             await this._init(reload)
-            log.debug('initialize project token ' + Math.round(performance.now() - t) + 'ms')
+            log.debug('init project in ' + Math.round(performance.now() - t) + 'ms')
         })()
     }
 
@@ -89,7 +87,7 @@ export class Project {
     }
 
     get buildDir() {
-        return path.join(this.appRoot, '.aleph', this.buildID)
+        return path.join(this.appRoot, '.aleph', this.mode + '.' + this.config.buildTarget)
     }
 
     isHMRable(moduleID: string) {
@@ -407,7 +405,6 @@ export class Project {
                     try {
                         const conf = JSON.parse(await Deno.readTextFile(p))
                         Object.assign(config, conf)
-                        log.debug(name, config)
                     } catch (e) {
                         log.fatal('parse config.json:', e.message)
                     }
@@ -415,7 +412,6 @@ export class Project {
                     const { default: conf } = await import('file://' + p)
                     if (util.isPlainObject(conf)) {
                         Object.assign(config, conf)
-                        log.debug(name, config)
                     }
                 }
             }
@@ -489,10 +485,11 @@ export class Project {
 
         Object.assign(globalThis, {
             ALEPH: {
-                env: this.config.env,
+                env: { ...this.config.env },
                 __version: version,
                 __appRoot: this.appRoot,
-                __buildID: this.buildID,
+                __buildMode: this.mode,
+                __buildTarget: this.config.buildTarget,
             } as AlephRuntime,
             document: new Document(),
             innerWidth: 1920,
@@ -857,7 +854,7 @@ export class Project {
                             mod.sourceType = 'jsx'
                         }
                     }
-                    mod.sourceHash = getHash(sourceContent, true)
+                    mod.sourceHash = getHash(sourceContent)
                     sourceContent = await resp.text()
                     shouldCompile = true
                 } catch (err) {
@@ -1011,7 +1008,7 @@ export class Project {
                 mod.hash = getHash(mod.jsContent)
             }
 
-            log.debug(`${url} compiled in ${(performance.now() - t).toFixed(3)}ms`)
+            log.debug(`compile ${url} in ${Math.round(performance.now() - t)}ms`)
 
             if (!fsync) {
                 fsync = true
@@ -1225,7 +1222,7 @@ export class Project {
             if (url.pagePath === '') {
                 log.warn(`page '${url.pathname}' not found`)
             } else if (this.isDev) {
-                log.debug(`render page '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
+                log.debug(`render '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
             }
         } catch (err) {
             ret.status = 500

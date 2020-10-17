@@ -1,6 +1,23 @@
 import { E400MissingDefaultExportAsComponent } from './error.ts'
-import type { Module, Route, RouterURL } from './types.ts'
+import type { RouterURL } from './types.ts'
 import util, { reMDExt, reModuleExt } from './util.ts'
+
+export interface Module {
+    readonly id: string
+    readonly hash: string
+    readonly asyncDeps?: { url: string, hash: string }[]
+}
+
+export interface Route {
+    path: string
+    module: Module
+    children?: Route[]
+}
+
+export interface PageProps {
+    Page: any
+    pageProps: Partial<PageProps> & { name?: string }
+}
 
 const ghostRoute: Route = { path: '', module: { id: '', hash: '' } }
 
@@ -190,11 +207,6 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
     }
 
     return [params, true]
-}
-
-export interface PageProps {
-    Page: any
-    pageProps: Partial<PageProps> & { name?: string }
 }
 
 export function createPageProps(componentTree: { id: string, Component?: any }[]): PageProps {

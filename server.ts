@@ -62,7 +62,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                         continue
                     }
 
-                    // serve apis
+                    // serve APIs
                     if (pathname.startsWith('/api/')) {
                         project.callAPI(req, { pathname, search: url.search })
                         continue
@@ -74,7 +74,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                             const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_aleph/'))
                             if (existsFileSync(filePath)) {
                                 const body = await Deno.readFile(filePath)
-                                resp.send(body, 'text/css; charset=utf-8', true)
+                                resp.send(body, 'text/css; charset=utf-8')
                                 continue
                             }
                         } else {
@@ -110,7 +110,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                                     }
                                 }
                                 resp.setHeader('ETag', mod.hash)
-                                resp.send(body, `application/${reqSourceMap ? 'json' : 'javascript'}; charset=utf-8`, true)
+                                resp.send(body, `application/${reqSourceMap ? 'json' : 'javascript'}; charset=utf-8`)
                                 continue
                             }
                         }
@@ -126,21 +126,20 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                         }
 
                         const body = await Deno.readFile(filePath)
-                        const ct = getContentType(filePath)
                         resp.setHeader('Last-Modified', info.mtime!.toUTCString())
-                        resp.send(body, ct, ct.startsWith('text/') || /\.(m?js|json|xml|svg)$/i.test(filePath))
+                        resp.send(body, getContentType(filePath))
                         continue
                     }
 
                     // ssr
                     const [status, html] = await project.getPageHtml({ pathname, search: url.search })
-                    resp.status(status).send(html, 'text/html', true)
+                    resp.status(status).send(html, 'text/html; charset=utf-8')
                 } catch (err) {
                     resp.status(500).send(createHtml({
                         lang: 'en',
                         head: ['<title>500 - internal server error</title>'],
                         body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`
-                    }), 'text/html', true)
+                    }), 'text/html; charset=utf-8')
                 }
             }
         } catch (err) {

@@ -6,7 +6,7 @@ const serverHeadElements: Map<string, { type: string, props: Record<string, any>
 const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
 export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
-    const { __appRoot, __buildID } = (window as any).ALEPH as AlephRuntime
+    const { __appRoot, __buildMode, __buildTarget } = (window as any).ALEPH as AlephRuntime
     const tags: string[] = []
     serverHeadElements.forEach(({ type, props }) => {
         if (type === 'title') {
@@ -30,7 +30,7 @@ export async function renderHead(styles?: { url: string, hash: string, async?: b
         }
     })
     await Promise.all(styles?.filter(({ async }) => !!async).map(({ url, hash }) => {
-        return import('file://' + util.cleanPath(`${__appRoot}/.aleph/${__buildID}/${url}.${hash.slice(0, hashShort)}.js`))
+        return import('file://' + util.cleanPath(`${__appRoot}/.aleph/${__buildMode}.${__buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
     }) || [])
     styles?.forEach(({ url }) => {
         if (serverStyles.has(url)) {

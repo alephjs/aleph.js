@@ -9,13 +9,15 @@ export class AlephAPIRequest implements APIRequest {
     #cookies: ReadonlyMap<string, string>
 
     constructor(req: ServerRequest, url: RouterURL) {
-        this.#req = req
-
         const paramsMap = new Map<string, string>()
         for (const key in url.params) {
             paramsMap.set(key, url.params[key])
         }
+        this.#req = req
         this.#url = {
+            proto: this.#req.proto,
+            protoMinor: this.#req.protoMinor,
+            protoMajor: this.#req.protoMajor,
             pathname: url.pathname,
             params: paramsMap,
             query: url.query,
@@ -23,32 +25,20 @@ export class AlephAPIRequest implements APIRequest {
         this.#cookies = new Map() // todo: parse cookies
     }
 
-    get url(): APIRequestURL {
-        return this.#url
-    }
-
-    get cookies(): ReadonlyMap<string, string> {
-        return this.#cookies
-    }
-
     get method(): string {
         return this.#req.method
     }
 
-    get proto(): string {
-        return this.#req.proto
-    }
-
-    get protoMinor(): number {
-        return this.#req.protoMinor
-    }
-
-    get protoMajor(): number {
-        return this.#req.protoMajor
+    get url(): APIRequestURL {
+        return this.#url
     }
 
     get headers(): Headers {
         return this.#req.headers
+    }
+
+    get cookies(): ReadonlyMap<string, string> {
+        return this.#cookies
     }
 }
 
@@ -90,12 +80,12 @@ export class AlephAPIResponse implements APIResponse {
     }
 
     async json(data: any, replacer?: (this: any, key: string, value: any) => any, space?: string | number) {
-        return this.send(JSON.stringify(data, replacer, space), 'application/json', true)
+        return this.send(JSON.stringify(data, replacer, space), 'application/json')
     }
 
-    async send(data: string | Uint8Array | ArrayBuffer, contentType?: string, gzip = false) {
+    async send(data: string | Uint8Array | ArrayBuffer, contentType?: string) {
         if (this.#sent) {
-            log.warn('ServerRequest.respond: repeat send calls')
+            log.warn('ServerRequest: repeat respond calls')
             return
         }
         let body: Uint8Array
@@ -110,8 +100,20 @@ export class AlephAPIResponse implements APIResponse {
         }
         if (contentType) {
             this.#headers.set('Content-Type', contentType)
+        } else if (this.#headers.has('Content-Type')) {
+            contentType = this.#headers.get('Content-Type')!
         }
-        if (gzip && this.#req.headers.get('accept-encoding')?.includes('gzip') && body.length > 1024) {
+        let isText = false
+        if (contentType) {
+            if (contentType.startsWith('text/')) {
+                isText = true
+            } else if (/^application\/(javascript|typecript|json|xml)/.test(contentType)) {
+                isText = true
+            } else if (/^image\/svg+xml/.test(contentType)) {
+                isText = true
+            }
+        }
+        if (isText && body.length > 1024 && this.#req.headers.get('accept-encoding')?.includes('gzip')) {
             this.#headers.set('Vary', 'Origin')
             this.#headers.set('Content-Encoding', 'gzip')
             body = gzipEncode(body)
@@ -127,7 +129,7 @@ export class AlephAPIResponse implements APIResponse {
 
     async end(status: number) {
         if (this.#sent) {
-            log.warn('ServerRequest.respond: repeat send calls')
+            log.warn('ServerRequest: repeat respond calls')
             return
         }
         this.#headers.set('Date', (new Date).toUTCString())
