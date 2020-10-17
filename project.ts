@@ -45,6 +45,8 @@ export class Project {
     readonly config: Config
     readonly ready: Promise<void>
 
+    #appData: Record<string, any> = {}
+    #appDataRefreshTimer: number | null = null
     #modules: Map<string, Module> = new Map()
     #routing: Routing = new Routing()
     #apiRouting: Routing = new Routing()
@@ -249,24 +251,8 @@ export class Project {
         return html
     }
 
-    async getStaticData() {
-        const mod = this.#modules.get('/data.js')
-        if (mod) {
-            try {
-                const { default: Data } = await import('file://' + mod.jsFile)
-                let data: any = Data
-                if (util.isFunction(Data)) {
-                    data = await Data()
-                }
-                if (util.isPlainObject(data)) {
-                    return data
-                }
-                log.warn(`module '${mod.url}' should return a plain object as default`)
-            } catch (error) {
-                log.error('getStaticData:', error)
-            }
-        }
-        return {}
+    get appData() {
+        return { ...this.#appData }
     }
 
     async build() {
@@ -366,10 +352,10 @@ export class Project {
             ])
         }))
 
-        // write static data
+        // write app data
         if (this.#modules.has('/data.js')) {
             const { hash } = this.#modules.get('/data.js')!
-            const data = await this.getStaticData()
+            const data = await this.appData
             const jsContent = `export default ${JSON.stringify(data)}`
             await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), jsContent)
             logModule('modules', jsContent.length)
@@ -542,7 +528,7 @@ export class Project {
         this.#renderer = { renderPage, renderHead }
 
         log.info(colors.bold('Aleph.js'))
-        log.info(colors.bold('  Config'))
+        log.info(colors.bold('  Global'))
         if (this.#modules.has('/data.js')) {
             log.info('    ✓', 'App Static Data')
         }
@@ -964,7 +950,7 @@ export class Project {
                     `  }, []);`,
                     `  return React.createElement("div", {className: "markdown-page", ref, dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}});`,
                     `}`,
-                    `MarkdownPage.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
+                    `export const __getPageProps = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
                     this.isDev && `_s(MarkdownPage, "useRef{ref}\\nuseEffect{}");`,
                     this.isDev && `$RefreshReg$(MarkdownPage, "MarkdownPage");`,
                 ].filter(Boolean).map(l => !this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
@@ -1064,7 +1050,49 @@ export class Project {
             ])
         }
 
+        if (mod.id === '/data.js') {
+            this._updateAppData()
+        }
+
         return mod
+    }
+
+    private async _updateAppData() {
+        if (this.#appDataRefreshTimer != null) {
+            clearTimeout(this.#appDataRefreshTimer)
+            this.#appDataRefreshTimer = null
+        }
+        if (this.#modules.has('/data.js')) {
+            const mod = this.getModule('/data.js')!
+            try {
+                const start = performance.now()
+                const { default: Data, refreshInterval } = await import('file://' + mod.jsFile)
+                let data: any = Data
+                if (util.isFunction(Data)) {
+                    data = await Data()
+                }
+                if (util.isPlainObject(data)) {
+                    this.#appData = data
+                    log.debug(`app data updated in ${Math.round(performance.now() - start)}ms`)
+                    if (util.isUNumber(refreshInterval) && this.isDev) {
+                        this.#appDataRefreshTimer = setTimeout(async () => {
+                            this.#appDataRefreshTimer = null
+                            await this._updateAppData()
+                            if (JSON.stringify(data) !== JSON.stringify(this.appData)) {
+                                this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.id, mod.hash))
+                            }
+                        }, refreshInterval * 1000)
+                    }
+                } else {
+                    log.warn(`the Custom App should return a plain object as default`)
+                }
+            } catch (error) {
+                log.error(`${mod.url}:`, error)
+            }
+        } else {
+            this.#appData = {}
+            log.debug('app data reseted')
+        }
     }
 
     private _updateDependency(depPath: string, depHash: string, callback: (mod: Module) => void, tracing = new Set<string>()) {
@@ -1195,11 +1223,9 @@ export class Project {
             const [
                 { default: App }, // todo: cache, re-import when hash changed
                 { default: E404 }, // todo: cache, re-import when hash changed
-                staticData // todo: real static
             ] = await Promise.all([
                 appModule && url.pagePath != '' ? await import('file://' + appModule.jsFile) : Promise.resolve({}),
-                e404Module ? await import('file://' + e404Module.jsFile) : Promise.resolve({}),
-                await this.getStaticData()
+                e404Module ? await import('file://' + e404Module.jsFile) : Promise.resolve({})
             ])
             const pageComponentTree: { id: string, Component?: any }[] = pageModuleTree.map(({ id }) => ({ id }))
             const imports = pageModuleTree.map(async ({ id }) => {
@@ -1211,7 +1237,7 @@ export class Project {
                 }
             })
             await Promise.all(imports)
-            const html = this.#renderer.renderPage(url, staticData, App, E404, pageComponentTree)
+            const html = this.#renderer.renderPage(url, this.appData, App, E404, pageComponentTree)
             const head = await this.#renderer.renderHead([
                 appModule && url.pagePath != '' ? this._lookupStyleDeps(appModule.id) : [],
                 e404Module && url.pagePath == '' ? this._lookupStyleDeps(e404Module.id) : [],
