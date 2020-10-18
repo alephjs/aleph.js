@@ -117,7 +117,7 @@ export class Routing {
         let locale = this._defaultLocale
         let pathname = util.cleanPath(util.trimPrefix(loc.pathname, this._baseUrl))
         let pagePath = ''
-        let params: Record<string, string> = {}
+        let params: Map<string, string> = new Map
         let tree: RouteModule[] = []
 
         if (pathname !== '/' && this._locales.length > 0) {
@@ -139,7 +139,9 @@ export class Routing {
                     tree.push(c.module)
                 }
                 pagePath = path
-                params = p
+                for (const key in p) {
+                    params.set(key, p[key])
+                }
                 return false
             }
         }, true)

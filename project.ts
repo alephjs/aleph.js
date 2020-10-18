@@ -1,14 +1,14 @@
 import marked from 'https://esm.sh/marked@1.2.0'
 import { minify } from 'https://esm.sh/terser@5.3.2'
 import { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.0'
-import { AlephAPIRequest, AlephAPIResponse } from './api.ts'
+import { Request } from './api.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getPagePath, RouteModule, Routing } from './routing.ts'
 import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
-import type { AlephRuntime, APIHandle, Config, RouterURL } from './types.ts'
+import type { AlephRuntime, APIHandler, Config, RouterURL } from './types.ts'
 import util, { existsDirSync, existsFileSync, hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
@@ -175,7 +175,7 @@ export class Project {
         }
     }
 
-    async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandle | null> {
+    async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandler | null> {
         const [url] = this.#apiRouting.createRouter(loc)
         if (url.pagePath != '') {
             const moduleID = url.pagePath + '.js'
@@ -183,10 +183,7 @@ export class Project {
                 try {
                     const { default: handle } = await import('file://' + this.#modules.get(moduleID)!.jsFile)
                     if (util.isFunction(handle)) {
-                        await handle(
-                            new AlephAPIRequest(req, url),
-                            new AlephAPIResponse(req)
-                        )
+                        await handle(new Request(req, url))
                     } else {
                         req.respond({
                             status: 500,
@@ -1275,7 +1272,7 @@ export class Project {
         return ret
     }
 
-    private async _render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
+    private async _render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: new Map(), query: new URLSearchParams() }) {
         const ret: RenderResult = { url, status: 404, head: [], body: '<main></main>', data: null }
         try {
             const e404Module = this.#modules.get('/404.js')

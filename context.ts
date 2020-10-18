@@ -5,7 +5,7 @@ export const RouterContext = createContext<RouterURL>({
     locale: 'en',
     pagePath: '/',
     pathname: '/',
-    params: {},
+    params: new Map(),
     query: new URLSearchParams(),
 })
 RouterContext.displayName = 'RouterContext'
