@@ -1,24 +1,31 @@
+* {
+    margin: 0;
+    padding: 0;
+    border: none;
+    outline: none;
+    font: inherit;
+    font-size: 100%;
+    vertical-align: baseline;
+    background: transparent;
+}
+
 body {
     font-family: "Helvetica Neue", Helvetica, Arial sans-serif;
+    font-size: 16px;
 }
 
 main {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
+    height: 100vh;
 }
 
 .page {
-    display: flex;
-    align-items: center;
-    justify-content: left;
-    flex-direction: column;
-
     h1 {
         margin: 0;
         line-height: 1.5;
-        font-size: 16px;
+        font-size: 18px;
         font-weight: 400;
         text-align: center;
         color: #000;
@@ -31,7 +38,6 @@ main {
     p {
         margin: 0;
         line-height: 1.5;
-        font-size: 15px;
         text-align: center;
         color: #333;
     }
@@ -60,31 +66,55 @@ main {
     }
 
     .counter {
+        display: flex;
+        justify-content: center;
+        align-items: center;
         width: 260px;
-        margin-top: 24px;
-        padding: 12px 0;
-        border: 1px dashed #eee;
+        height: 48px;
+        margin: 24px auto 0;
+        border: 1px dashed #ddd;
         border-radius: 6px;
         transition: border-color 0.15s ease-in;
 
         &:hover {
-            border-color: #ddd;
+            border-color: #ccc;
         }
 
-        strong,
-        button {
+        strong {
             display: inline-block;
+            width: 48px;
+            font-weight: 600;
             text-align: center;
         }
-        strong {
-            width: 45px;
-        }
+
         button {
-            width: 24px;
+            display: line-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 5px;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+            line-height: 1;
+            font-size: 12px;
+            font-family: Courier, monospace;
+            font-weight: 600;
+            color: #666;
             cursor: pointer;
+
+            &:hover {
+                color: #111;
+                box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+            }
         }
         button + button {
-            margin-left: 6px;
+            margin-left: 9px;
         }
+    }
+
+    .copyinfo {
+        margin-top: 24px;
+        font-size: 14px;
+        color: #999;
     }
 }
