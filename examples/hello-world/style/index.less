@@ -56,11 +56,12 @@ main {
         }
         a {
             margin: 0 9px;
-            color: #0090f0;
+            color: #766;
             text-decoration: none;
+            border-bottom: 1px dashed #cbb;
 
             &:hover {
-                text-decoration: underline;
+                border-bottom-color: transparent;
             }
         }
     }
@@ -69,14 +70,15 @@ main {
         display: flex;
         justify-content: center;
         align-items: center;
-        width: 260px;
-        height: 48px;
-        margin: 24px auto 0;
-        border: 1px dashed #ddd;
+        width: 270px;
+        height: 50px;
+        margin: 30px auto 0;
+        border: 1px solid #eee;
         border-radius: 6px;
-        transition: border-color 0.15s ease-in;
+        transition: all 0.15s ease-in;
 
         &:hover {
+            background-color: #faf9f9;
             border-color: #ccc;
         }
 
@@ -91,20 +93,21 @@ main {
             display: line-flex;
             align-items: center;
             justify-content: center;
-            width: 22px;
-            height: 22px;
-            border-radius: 5px;
-            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            box-shadow: 0 0 1px rgba(0, 0, 0, 0.5);
             line-height: 1;
             font-size: 12px;
             font-family: Courier, monospace;
             font-weight: 600;
             color: #666;
+            transition: all 0.15s ease-in;
             cursor: pointer;
 
             &:hover {
                 color: #111;
-                box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+                box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
             }
         }
         button + button {
@@ -113,7 +116,7 @@ main {
     }
 
     .copyinfo {
-        margin-top: 24px;
+        margin-top: 30px;
         font-size: 14px;
         color: #999;
     }
