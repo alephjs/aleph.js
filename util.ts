@@ -2,7 +2,7 @@ const symbolFor = typeof Symbol === 'function' && Symbol.for
 const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
 const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
 
-export const hashShort = 7
+export const hashShort = 9
 export const reHttp = /^https?:\/\//i
 export const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i
 export const reStyleModuleExt = /\.(css|less|sass|scss)$/i
@@ -168,7 +168,7 @@ export default {
 
 // @require Deno
 export function existsDirSync(path: string) {
-    if (typeof Deno === 'undefined') {
+    if (typeof Deno === 'undefined' && Deno.version.deno) {
         throw new Error('require Deno')
     }
     try {
@@ -187,7 +187,7 @@ export function existsDirSync(path: string) {
 
 // @require Deno
 export function existsFileSync(path: string) {
-    if (typeof Deno === 'undefined') {
+    if (typeof Deno === 'undefined' && Deno.version.deno) {
         throw new Error('require Deno')
     }
     try {

@@ -1,21 +1,22 @@
 import React, { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
-import { DataContext, RouterContext } from './context.ts'
-import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
+import { RouterContext } from './context.ts'
+import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
+import events from './events.ts'
 import { createPageProps } from './routing.ts'
 import type { RouterURL } from './types.ts'
 import util from './util.ts'
 
 export { renderHead } from './head.ts'
 
-export function renderPage(
+export async function renderPage(
     url: RouterURL,
-    staticData: Record<string, any>,
     App: ComponentType<any> | undefined,
     E404: ComponentType | undefined,
     pageComponentTree: { id: string, Component?: any }[]
 ) {
     let el: ReactElement
+    let html: string
     const pageProps = createPageProps(pageComponentTree)
     if (App) {
         if (util.isLikelyReactComponent(App)) {
@@ -44,19 +45,52 @@ export function renderPage(
             el = React.createElement(pageProps.Page, pageProps.pageProps)
         }
     }
-    return renderToString(
-        React.createElement(
-            ErrorBoundary,
-            null,
-            React.createElement(
-                DataContext.Provider,
-                { value: staticData },
+    const data: Record<string, any> = {}
+    const useDenEvent = `useDeno://${url.pathname + '?' + url.query.toString()}`
+    const useDenoAsyncCalls: Array<Promise<any>> = []
+    const orginFetch = window.fetch
+    events.on(useDenEvent, (id: string, ret: any, async: boolean) => {
+        if (async) {
+            useDenoAsyncCalls.push(ret)
+        } else {
+            data[id] = ret
+        }
+    })
+    Object.assign(window, {
+        _useDenoAsyncData: {},
+        fetch: (input: Request | URL | string, init?: RequestInit) => {
+            console.log(`[ renderer ] fetch '${input}' ...`)
+            return orginFetch(input, init)
+        }
+    })
+    while (true) {
+        try {
+            if (useDenoAsyncCalls.length > 0) {
+                const iter = [...useDenoAsyncCalls]
+                useDenoAsyncCalls.splice(0, useDenoAsyncCalls.length)
+                await Promise.all(iter)
+            }
+            html = renderToString(
                 React.createElement(
-                    RouterContext.Provider,
-                    { value: url },
-                    el
+                    ErrorBoundary,
+                    null,
+                    React.createElement(
+                        RouterContext.Provider,
+                        { value: url },
+                        el
+                    )
                 )
             )
-        )
-    )
+            break
+        } catch (error) {
+            if (error instanceof AsyncUseDenoError) {
+                continue
+            }
+            Object.assign(window, { _useDenoAsyncData: null, fetch: orginFetch })
+            throw error
+        }
+    }
+    Object.assign(window, { _useDenoAsyncData: null, fetch: orginFetch })
+    events.removeAllListeners(useDenEvent)
+    return [html, data]
 }

@@ -1,3 +1,4 @@
+import type { ComponentType } from 'https://esm.sh/react'
 import { E400MissingDefaultExportAsComponent } from './error.ts'
 import type { RouterURL } from './types.ts'
 import util, { reMDExt, reModuleExt } from './util.ts'
@@ -15,7 +16,7 @@ export interface RouteModule {
 }
 
 export interface PageProps {
-    Page: any
+    Page: ComponentType<any> | null
     pageProps: Partial<PageProps> & { name?: string }
 }
 
@@ -174,7 +175,7 @@ export class Routing {
     }
 }
 
-function getPagePath(moduleId: string): string {
+export function getPagePath(moduleId: string): string {
     return util.trimSuffix(moduleId, '.js').replace(reMDExt, '').toLowerCase().replace(/\s+/g, '-').replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
 }
 
@@ -209,7 +210,7 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
     return [params, true]
 }
 
-export function createPageProps(componentTree: { id: string, Component?: any }[]): PageProps {
+export function createPageProps(componentTree: { id: string, Component?: ComponentType<any> }[]): PageProps {
     const pageProps: PageProps = {
         Page: null,
         pageProps: {}
@@ -227,7 +228,7 @@ export function createPageProps(componentTree: { id: string, Component?: any }[]
     return pageProps
 }
 
-function _createPagePropsSegment(seg: { id: string, Component?: any }): PageProps {
+function _createPagePropsSegment(seg: { id: string, Component?: ComponentType<any> }): PageProps {
     const pageProps: PageProps = {
         Page: null,
         pageProps: {}

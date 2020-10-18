@@ -5,6 +5,7 @@
  */
 
 import ts from 'https://esm.sh/typescript'
+import { Sha1 } from '../std.ts'
 
 const f = ts.factory
 
@@ -12,14 +13,14 @@ type TSFunctionLike = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowF
 
 export class RefreshTransformer {
     #sf: ts.SourceFile
-    #options: Record<string, any>
+    #useDenoIndex: number
 
     static refreshSig = '$RefreshSig$'
     static refreshReg = '$RefreshReg$'
 
-    constructor(sf: ts.SourceFile, options?: Record<string, any>) {
+    constructor(sf: ts.SourceFile) {
         this.#sf = sf
-        this.#options = options || {}
+        this.#useDenoIndex = 0
     }
 
     transform() {
@@ -117,7 +118,7 @@ export class RefreshTransformer {
                             const { id, key, customHooks } = hookCalls.get(node)!
                             const _customHooks = customHooks.filter(name => seenHooks.has(name))
                             const forceResetComment = !!ts.getLeadingCommentRanges(this.#sf.text, node.pos)?.filter(({ pos, end }) => this.#sf.text.substring(pos, end).includes('@refresh reset')).length;
-                            return this._sign(node, node.name!.text, id, key, forceResetComment || _customHooks.length !== _customHooks.length, _customHooks)! as ts.Statement[]
+                            return this._sign(node, node.name!.text, id, key, forceResetComment || _customHooks.length !== customHooks.length, _customHooks)! as ts.Statement[]
                         }
                         if (ts.isVariableStatement(node)) {
                             const forceResetComment = !!ts.getLeadingCommentRanges(this.#sf.text, node.pos)?.filter(({ pos, end }) => this.#sf.text.substring(pos, end).includes('@refresh reset')).length;
@@ -135,7 +136,7 @@ export class RefreshTransformer {
                                         ) {
                                             const { id, key, customHooks } = hookCalls.get(initializer)!
                                             const _customHooks = customHooks.filter(name => seenHooks.has(name))
-                                            const [_initializer, _s] = this._sign(initializer, name.text, id, key, forceResetComment || _customHooks.length !== _customHooks.length, _customHooks)!
+                                            const [_initializer, _s] = this._sign(initializer, name.text, id, key, forceResetComment || _customHooks.length !== customHooks.length, _customHooks)!
                                             _ss.push(_s as ts.Statement)
                                             return f.createVariableDeclaration(
                                                 name,
@@ -164,7 +165,7 @@ export class RefreshTransformer {
         if (fnNode.body && ts.isBlock(fnNode.body)) {
             fnNode.body.statements.forEach(s => {
                 if (ts.isVariableStatement(s)) {
-                    s.declarationList.declarations.forEach(({ name, initializer }) => {
+                    s.declarationList.declarations.forEach(({ initializer }) => {
                         if (
                             initializer &&
                             ts.isCallExpression(initializer)
@@ -172,6 +173,9 @@ export class RefreshTransformer {
                             const sig = this._getHookCallSignature(initializer)
                             if (sig) {
                                 hookCalls.push(sig)
+                                if (sig.name === 'useDeno') {
+                                    this._signUseDeno(initializer)
+                                }
                             }
                         }
                     })
@@ -182,6 +186,9 @@ export class RefreshTransformer {
                     const sig = this._getHookCallSignature(s.expression)
                     if (sig) {
                         hookCalls.push(sig)
+                        if (sig.name === 'useDeno') {
+                            this._signUseDeno(s.expression)
+                        }
                     }
                 }
             })
@@ -229,6 +236,25 @@ export class RefreshTransformer {
         return {
             name,
             key,
+        }
+    }
+
+    private _signUseDeno(call: ts.CallExpression) {
+        const args = call.arguments as unknown as Array<any>
+        if (args.length > 0) {
+            const id = new Sha1().update(this.#sf.fileName + ':useDeno#' + (this.#useDenoIndex++)).hex().slice(0, 9)
+            const arg3 = f.createStringLiteral(`useDeno.${id}`)
+            if (args.length === 1) {
+                args.push(f.createFalse())
+            }
+            if (args.length === 2) {
+                args.push(f.createVoidZero())
+            }
+            if (args.length === 3) {
+                args.push(arg3)
+            } else {
+                args[3] = arg3
+            }
         }
     }
 
@@ -298,11 +324,12 @@ export class RefreshTransformer {
                 ]
             } else if (ts.isArrowFunction(fnNode)) {
                 return [
-                    ts.createArrowFunction(
+                    f.createArrowFunction(
                         fnNode.modifiers,
                         fnNode.typeParameters,
                         fnNode.parameters,
                         fnNode.type,
+                        fnNode.equalsGreaterThanToken,
                         f.createBlock([
                             f.createExpressionStatement(ts.createCall(sigId, undefined, undefined)),
                             ...fnNode.body.statements
@@ -353,7 +380,7 @@ function isBuiltinHook(hookName: string) {
     }
 }
 
-export default function transformReactRefresh(ctx: ts.TransformationContext, sf: ts.SourceFile, options?: Record<string, any>): ts.SourceFile {
-    const t = new RefreshTransformer(sf, options)
+export default function transformReactRefresh(ctx: ts.TransformationContext, sf: ts.SourceFile): ts.SourceFile {
+    const t = new RefreshTransformer(sf)
     return t.transform()
 }

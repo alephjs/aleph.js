@@ -88,19 +88,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                                 }
 
                                 let body = ''
-                                if (mod.id === '/data.js') {
-                                    if (project.isDev) {
-                                        body = [
-                                            `import { createHotContext } from "./-/deno.land/x/aleph/hmr.js"`,
-                                            `import events from "./-/deno.land/x/aleph/events.js"`,
-                                            `import.meta.hot = createHotContext("/data.js")`,
-                                            `export default ${JSON.stringify(project.appData, undefined, 4)}`,
-                                            `import.meta.hot.accept(({ default: data }) => events.emit("update-data", data))`
-                                        ].join(';\n')
-                                    } else {
-                                        body = `export default ${JSON.stringify(project.appData)}`
-                                    }
-                                } else if (reqSourceMap) {
+                                if (reqSourceMap) {
                                     body = mod.jsSourceMap
                                 } else {
                                     body = mod.jsContent

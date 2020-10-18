@@ -5,7 +5,7 @@ import { AlephAPIRequest, AlephAPIResponse } from './api.ts'
 import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
-import { RouteModule, Routing } from './routing.ts'
+import { getPagePath, RouteModule, Routing } from './routing.ts'
 import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { AlephRuntime, APIHandle, Config, RouterURL } from './types.ts'
@@ -37,6 +37,7 @@ interface RenderResult {
     status: number
     head: string[]
     body: string
+    data: Record<string, string>
 }
 
 export class Project {
@@ -45,13 +46,12 @@ export class Project {
     readonly config: Config
     readonly ready: Promise<void>
 
-    #appData: Record<string, any> = {}
-    #appDataRefreshTimer: number | null = null
     #modules: Map<string, Module> = new Map()
     #routing: Routing = new Routing()
     #apiRouting: Routing = new Routing()
     #fsWatchListeners: Array<EventEmitter> = []
     #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0 }
+    #rendered: Map<string, Map<string, RenderResult>> = new Map()
 
     constructor(dir: string, mode: 'development' | 'production', reload = false) {
         this.mode = mode
@@ -96,7 +96,6 @@ export class Project {
         return !reHttp.test(moduleID) && (
             moduleID === '/404.js' ||
             moduleID === '/app.js' ||
-            moduleID === '/data.js' ||
             moduleID.startsWith('/pages/') ||
             moduleID.startsWith('/components/') ||
             reStyleModuleExt.test(moduleID)
@@ -222,11 +221,12 @@ export class Project {
 
         const { baseUrl } = this.config
         const mainModule = this.#modules.get('/main.js')!
-        const { url, status, head, body } = await this._renderPage(loc)
+        const { url, status, head, body, data } = await this._renderPage(loc)
         const html = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
+                { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' },
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
@@ -249,10 +249,6 @@ export class Project {
             minify: !this.isDev
         })
         return html
-    }
-
-    get appData() {
-        return { ...this.#appData }
     }
 
     async build() {
@@ -351,15 +347,6 @@ export class Project {
                 sourceMap && jsSourceMap ? writeTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
             ])
         }))
-
-        // write app data
-        if (this.#modules.has('/data.js')) {
-            const { hash } = this.#modules.get('/data.js')!
-            const data = await this.appData
-            const jsContent = `export default ${JSON.stringify(data)}`
-            await writeTextFile(path.join(distDir, `data.${hash.slice(0, hashShort)}.js`), jsContent)
-            logModule('modules', jsContent.length)
-        }
 
         const { deps, modules, styles } = moduleState
         log.info(colors.bold('  Modules'))
@@ -489,7 +476,6 @@ export class Project {
             const name = path.basename(p)
             switch (name.replace(reModuleExt, '')) {
                 case 'app':
-                case 'data':
                 case '404':
                     await this._compile('/' + name)
                     break
@@ -529,14 +515,14 @@ export class Project {
 
         log.info(colors.bold('Aleph.js'))
         log.info(colors.bold('  Global'))
-        if (this.#modules.has('/data.js')) {
-            log.info('    ✓', 'App Static Data')
-        }
         if (this.#modules.has('/app.js')) {
             log.info('    ✓', 'Custom App')
         }
         if (this.#modules.has('/404.js')) {
             log.info('    ✓', 'Custom 404 Page')
+        }
+        if (this.#modules.has('/loading.js')) {
+            log.info('    ✓', 'Custom Loading Page')
         }
 
         if (this.isDev) {
@@ -577,14 +563,11 @@ export class Project {
                         switch (path.replace(reModuleExt, '')) {
                             case '/404':
                             case '/app':
-                            case '/data': {
                                 return true
-                            }
-                            default: {
+                            default:
                                 if (path.startsWith('/api/')) {
                                     return true
                                 }
-                            }
                         }
                     }
                     if ((reModuleExt.test(path) || reMDExt.test(path)) && path.startsWith('/pages/')) {
@@ -606,15 +589,12 @@ export class Project {
                             switch (moduleID) {
                                 case '/404.js':
                                 case '/app.js':
-                                case '/data.js': {
                                     return true
-                                }
-                                default: {
+                                default:
                                     if (moduleID.startsWith('/pages/')) {
                                         return true
                                     }
                                     return false
-                                }
                             }
                         })()
                         if (existsFileSync(p)) {
@@ -632,7 +612,10 @@ export class Project {
                                         this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.id, mod.hash))
                                     }
                                 }
-                                if (moduleID.startsWith('/pages/')) {
+                                if (moduleID === '/app.js') {
+                                    this.#rendered.clear()
+                                } else if (moduleID.startsWith('/pages/')) {
+                                    this.#rendered.delete(getPagePath(moduleID))
                                     this.#routing.update(this._getRouteModule(mod))
                                 } else if (moduleID.startsWith('/api/')) {
                                     this.#apiRouting.update(this._getRouteModule(mod))
@@ -640,16 +623,22 @@ export class Project {
                                 if (shouldUpdateMainModule) {
                                     this._createMainModule()
                                 }
-                                this._updateDependency(path, mod.hash, ({ id: moduleID }) => {
-                                    if (!hmrable && this.isHMRable(moduleID)) {
-                                        this.#fsWatchListeners.forEach(e => e.emit('modify-' + moduleID, mod.hash))
+                                this._updateDependency(path, mod.hash, ({ id, hash }) => {
+                                    if (id.startsWith('/pages/')) {
+                                        this.#rendered.delete(getPagePath(id))
+                                    }
+                                    if (!hmrable && this.isHMRable(id)) {
+                                        this.#fsWatchListeners.forEach(e => e.emit('modify-' + id, hash))
                                     }
                                 })
                             }).catch(err => {
                                 log.error(`compile(${path}):`, err.message)
                             })
                         } else if (this.#modules.has(moduleID)) {
-                            if (moduleID.startsWith('/pages/')) {
+                            if (moduleID === '/app.js') {
+                                this.#rendered.clear()
+                            } else if (moduleID.startsWith('/pages/')) {
+                                this.#rendered.delete(getPagePath(moduleID))
                                 this.#routing.removeRoute(moduleID)
                             } else if (moduleID.startsWith('/api/')) {
                                 this.#apiRouting.removeRoute(moduleID)
@@ -701,7 +690,7 @@ export class Project {
             defaultLocale,
             locales: [],
             routes: this.#routing.routes,
-            preloadModules: ['/404.js', '/app.js', '/data.js'].filter(id => this.#modules.has(id)).map(id => {
+            preloadModules: ['/404.js', '/app.js'].filter(id => this.#modules.has(id)).map(id => {
                 return this._getRouteModule(this.#modules.get(id)!)
             })
         }
@@ -950,7 +939,7 @@ export class Project {
                     `  }, []);`,
                     `  return React.createElement("div", {className: "markdown-page", ref, dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}});`,
                     `}`,
-                    `export const __getPageProps = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
+                    `MarkdownPage.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
                     this.isDev && `_s(MarkdownPage, "useRef{ref}\\nuseEffect{}");`,
                     this.isDev && `$RefreshReg$(MarkdownPage, "MarkdownPage");`,
                 ].filter(Boolean).map(l => !this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
@@ -1050,49 +1039,7 @@ export class Project {
             ])
         }
 
-        if (mod.id === '/data.js') {
-            this._updateAppData()
-        }
-
         return mod
-    }
-
-    private async _updateAppData() {
-        if (this.#appDataRefreshTimer != null) {
-            clearTimeout(this.#appDataRefreshTimer)
-            this.#appDataRefreshTimer = null
-        }
-        if (this.#modules.has('/data.js')) {
-            const mod = this.getModule('/data.js')!
-            try {
-                const start = performance.now()
-                const { default: Data, refreshInterval } = await import('file://' + mod.jsFile)
-                let data: any = Data
-                if (util.isFunction(Data)) {
-                    data = await Data()
-                }
-                if (util.isPlainObject(data)) {
-                    this.#appData = data
-                    log.debug(`app data updated in ${Math.round(performance.now() - start)}ms`)
-                    if (util.isUNumber(refreshInterval) && this.isDev) {
-                        this.#appDataRefreshTimer = setTimeout(async () => {
-                            this.#appDataRefreshTimer = null
-                            await this._updateAppData()
-                            if (JSON.stringify(data) !== JSON.stringify(this.appData)) {
-                                this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.id, mod.hash))
-                            }
-                        }, refreshInterval * 1000)
-                    }
-                } else {
-                    log.warn(`the Custom App should return a plain object as default`)
-                }
-            } catch (error) {
-                log.error(`${mod.url}:`, error)
-            }
-        } else {
-            this.#appData = {}
-            log.debug('app data reseted')
-        }
     }
 
     private _updateDependency(depPath: string, depHash: string, callback: (mod: Module) => void, tracing = new Set<string>()) {
@@ -1131,8 +1078,8 @@ export class Project {
                     }
                     callback(mod)
                     tracing.add(mod.id)
-                    this._updateDependency(mod.url, mod.hash, callback, tracing)
                     log.debug('update dependency:', depPath, '->', mod.url)
+                    this._updateDependency(mod.url, mod.hash, callback, tracing)
                 }
             })
         })
@@ -1200,17 +1147,28 @@ export class Project {
     private async _renderPage(loc: { pathname: string, search?: string }) {
         const start = performance.now()
         const [url, pageModuleTree] = this.#routing.createRouter(loc)
-        const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], body: '<main></main>' }
+        const key = url.pathname + '?' + url.query.toString()
+        if (url.pagePath !== '') {
+            if (this.#rendered.has(url.pagePath)) {
+                const cache = this.#rendered.get(url.pagePath)!
+                if (cache.has(key)) {
+                    return cache.get(key)!
+                }
+            } else {
+                this.#rendered.set(url.pagePath, new Map())
+            }
+        }
+        const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], body: '<main></main>', data: {} }
         Object.assign(window, {
             location: {
                 protocol: 'http:',
                 host: 'localhost',
                 hostname: 'localhost',
                 port: '',
-                href: 'http://localhost' + url.pathname,
+                href: 'http://localhost' + url.pathname + url.query.toString(),
                 origin: 'http://localhost',
                 pathname: url.pathname,
-                search: '',
+                search: url.query.toString(),
                 hash: '',
                 reload() { },
                 replace() { },
@@ -1220,41 +1178,48 @@ export class Project {
         try {
             const appModule = this.#modules.get('/app.js')
             const e404Module = this.#modules.get('/404.js')
+            // todo: cache custom page module import
             const [
-                { default: App }, // todo: cache, re-import when hash changed
-                { default: E404 }, // todo: cache, re-import when hash changed
+                { default: App },
+                { default: E404 },
             ] = await Promise.all([
-                appModule && url.pagePath != '' ? await import('file://' + appModule.jsFile) : Promise.resolve({}),
-                e404Module ? await import('file://' + e404Module.jsFile) : Promise.resolve({})
+                appModule && ret.status === 200 ? import('file://' + appModule.jsFile) : Promise.resolve({}),
+                e404Module ? import('file://' + e404Module.jsFile) : Promise.resolve({})
             ])
             const pageComponentTree: { id: string, Component?: any }[] = pageModuleTree.map(({ id }) => ({ id }))
-            const imports = pageModuleTree.map(async ({ id }) => {
-                const mod = this.#modules.get(id)!
-                const { default: C } = await import('file://' + mod.jsFile)
-                const pc = pageComponentTree.find(pc => pc.id === mod.id)
-                if (pc) {
-                    pc.Component = C
-                }
-            })
-            await Promise.all(imports)
-            const html = this.#renderer.renderPage(url, this.appData, App, E404, pageComponentTree)
+            if (ret.status === 200) {
+                const imports = pageModuleTree.map(async ({ id }) => {
+                    const mod = this.#modules.get(id)!
+                    const { default: C } = await import('file://' + mod.jsFile)
+                    const pc = pageComponentTree.find(pc => pc.id === mod.id)
+                    if (pc) {
+                        pc.Component = C
+                    }
+                })
+                await Promise.all(imports)
+            }
+            const [html, data] = await this.#renderer.renderPage(url, App, E404, pageComponentTree)
             const head = await this.#renderer.renderHead([
-                appModule && url.pagePath != '' ? this._lookupStyleDeps(appModule.id) : [],
-                e404Module && url.pagePath == '' ? this._lookupStyleDeps(e404Module.id) : [],
+                appModule && ret.status === 200 ? this._lookupStyleDeps(appModule.id) : [],
+                e404Module && ret.status === 404 ? this._lookupStyleDeps(e404Module.id) : [],
                 ...pageModuleTree.map(({ id }) => this._lookupStyleDeps(id))
             ].flat())
             ret.head = head
             ret.body = `<main>${html}</main>`
-            if (url.pagePath === '') {
+            ret.data = data
+            if (ret.status === 200) {
+                this.#rendered.get(url.pagePath)!.set(key, ret)
+                if (this.isDev) {
+                    log.debug(`render '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
+                }
+            } else if (ret.status === 404) {
                 log.warn(`page '${url.pathname}' not found`)
-            } else if (this.isDev) {
-                log.debug(`render '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
             }
         } catch (err) {
             ret.status = 500
-            ret.head = ['<title>500 Error - Aleph.js</title>']
+            ret.head = ['<title>Error 500 - Aleph.js</title>']
             ret.body = `<main><pre>${err.stack}</pre></main>`
-            log.error(err.stack)
+            log.error(err)
         }
         return ret
     }

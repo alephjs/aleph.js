@@ -19,13 +19,13 @@ export default async function bootstrap({
 }) {
     const { document } = window as any
     const mainEl = document.querySelector('main')
-    const staticData: Record<string, any> = {}
+    const ssrDataEl = document.querySelector('#ssr-data')
     const components: Record<string, ComponentType> = {}
     const routing = new Routing(routes, baseUrl, defaultLocale, locales)
     const [url, pageModuleTree] = routing.createRouter()
     const pageComponentTree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
     const imports = [...preloadModules, ...pageModuleTree].map(async mod => {
-        const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
+        const { default: C, __pageProps } = await import(getModuleImportUrl(baseUrl, mod))
         if (mod.asyncDeps) {
             // import async dependencies
             for (const dep of mod.asyncDeps) {
@@ -33,9 +33,6 @@ export default async function bootstrap({
             }
         }
         switch (mod.id) {
-            case '/data.js':
-                Object.assign(staticData, C)
-                break
             case '/app.js':
                 components['App'] = C
                 break
@@ -52,19 +49,22 @@ export default async function bootstrap({
     })
     await Promise.all(imports)
 
+    const ssrData = JSON.parse(ssrDataEl.innerText)
+    for (const key in ssrData) {
+        Object.assign(window, { [`useDeno://${url.pathname}?${url.query.toString()}#${key}`]: ssrData[key] })
+    }
+
     const el = React.createElement(
         ALEPH,
         {
             initial: {
                 routing,
                 url,
-                staticData,
                 components,
                 pageComponentTree,
             }
         }
     )
-
     if (mainEl.childElementCount > 0) {
         hydrate(el, mainEl)
     } else {

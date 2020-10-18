@@ -11,11 +11,11 @@ export class ErrorBoundary extends React.Component {
 
     static getDerivedStateFromError(error: Error) {
         // Update state so the next render will show the fallback UI.
-        return { stack: error.stack }
+        return { stack: error?.stack || null }
     }
 
     componentDidCatch(error: any, errorInfo: any) {
-        this.state = { stack: error.stack }
+        this.state = { stack: error?.stack || null }
     }
 
     render() {
@@ -36,26 +36,26 @@ export class ErrorBoundary extends React.Component {
 
 export function E404Page() {
     return React.createElement(
-        Error,
+        StatusError,
         {
             status: 404,
-            message: 'page not found'
+            message: 'Page not found'
         }
     )
 }
 
 export function E400MissingDefaultExportAsComponent({ name }: { name: string }) {
     return React.createElement(
-        Error,
+        StatusError,
         {
             status: 400,
-            message: `"${name}" should export a React Component as default`,
-            refreshButton: true
+            message: `Module "${name}" should export a React Component as default`,
+            showRefreshButton: true
         }
     )
 }
 
-export function Error({ status, message, refreshButton }: { status: number, message: string, refreshButton?: boolean }) {
+export function StatusError({ status, message, showRefreshButton }: { status: number, message: string, showRefreshButton?: boolean }) {
     return (
         React.createElement(
             React.Fragment,
@@ -93,7 +93,7 @@ export function Error({ status, message, refreshButton }: { status: number, mess
                     message
                 )
             ),
-            refreshButton && React.createElement(
+            showRefreshButton && React.createElement(
                 'p',
                 null,
                 React.createElement(
@@ -110,3 +110,5 @@ export function Error({ status, message, refreshButton }: { status: number, mess
         )
     )
 }
+
+export class AsyncUseDenoError extends Error { }

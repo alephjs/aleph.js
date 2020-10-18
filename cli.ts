@@ -97,9 +97,9 @@ async function main() {
         log.setLevel(l)
     }
 
-    if (!hasCommand) {
+    if (!hasCommand && !args[0]) {
         const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.mjs', '.ts', '.tsx'], skip: [/\.d\.ts$/i], dep: 1 }
-        const pagesDir = path.join(path.resolve(args[0] || '.'), 'pages')
+        const pagesDir = path.join(path.resolve('.'), 'pages')
         let hasIndexPage = false
         if (existsDirSync(pagesDir)) {
             for await (const { path: p } of walk(pagesDir, walkOptions)) {
