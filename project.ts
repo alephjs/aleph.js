@@ -72,7 +72,6 @@ export class Project {
             },
             env: {}
         }
-        log.info(colors.bold('Aleph.js'))
         this.ready = (async () => {
             const t = performance.now()
             await this._loadConfig()
@@ -417,19 +416,21 @@ export class Project {
         for await (const { path: p } of walk(this.srcDir, { includeDirs: false, exts: ['.js', '.mjs', '.ts', '.json'], skip: [/\.d\.ts$/i], maxDepth: 1 })) {
             const name = path.basename(p)
             if (name.split('.')[0] === 'config') {
-                log.info(colors.bold('  Config'))
-                log.info('    ⚙️', name)
-                if (name.endsWith('.json')) {
-                    try {
-                        const conf = JSON.parse(await Deno.readTextFile(p))
-                        Object.assign(config, conf)
-                    } catch (e) {
-                        log.fatal('parse config.json:', e.message)
-                    }
-                } else {
+                if (reModuleExt.test(name)) {
                     const { default: conf } = await import('file://' + p)
                     if (util.isPlainObject(conf)) {
                         Object.assign(config, conf)
+                        Object.assign(this.config, { __file: name })
+                    }
+                } else if (name.endsWith('.json')) {
+                    try {
+                        const conf = JSON.parse(await Deno.readTextFile(p))
+                        if (util.isPlainObject(conf)) {
+                            Object.assign(config, conf)
+                            Object.assign(this.config, { __file: name })
+                        }
+                    } catch (e) {
+                        log.fatal('parse config.json:', e.message)
                     }
                 }
             }
@@ -559,6 +560,11 @@ export class Project {
         const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
         this.#renderer = { renderPage, renderHead }
 
+        log.info(colors.bold('Aleph.js'))
+        if ('__file' in this.config) {
+            log.info(colors.bold('  Config'))
+            log.info('    ⚙️', this.config['__file'])
+        }
         log.info(colors.bold('  Global'))
         if (this.#modules.has('/app.js')) {
             log.info('    ✓', 'Custom App')
