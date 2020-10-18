@@ -10,6 +10,7 @@ export default function Blog() {
             <h1>My Blog.</h1>
             <ul>
                 <li><Link to="/post/hello-world">Hello World</Link></li>
+                <li><Link to="/post/bla-bla-bla">Bla Bla Bla</Link></li>
             </ul>
             <p><Link to="/">Home</Link></p>
         </>
