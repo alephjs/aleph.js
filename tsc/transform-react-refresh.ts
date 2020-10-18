@@ -5,7 +5,6 @@
  */
 
 import ts from 'https://esm.sh/typescript'
-import { Sha1 } from '../std.ts'
 
 const f = ts.factory
 
@@ -13,14 +12,12 @@ type TSFunctionLike = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowF
 
 export class RefreshTransformer {
     #sf: ts.SourceFile
-    #useDenoIndex: number
 
     static refreshSig = '$RefreshSig$'
     static refreshReg = '$RefreshReg$'
 
     constructor(sf: ts.SourceFile) {
         this.#sf = sf
-        this.#useDenoIndex = 0
     }
 
     transform() {
@@ -173,9 +170,6 @@ export class RefreshTransformer {
                             const sig = this._getHookCallSignature(initializer)
                             if (sig) {
                                 hookCalls.push(sig)
-                                if (sig.name === 'useDeno') {
-                                    this._signUseDeno(initializer)
-                                }
                             }
                         }
                     })
@@ -186,9 +180,6 @@ export class RefreshTransformer {
                     const sig = this._getHookCallSignature(s.expression)
                     if (sig) {
                         hookCalls.push(sig)
-                        if (sig.name === 'useDeno') {
-                            this._signUseDeno(s.expression)
-                        }
                     }
                 }
             })
@@ -236,25 +227,6 @@ export class RefreshTransformer {
         return {
             name,
             key,
-        }
-    }
-
-    private _signUseDeno(call: ts.CallExpression) {
-        const args = call.arguments as unknown as Array<any>
-        if (args.length > 0) {
-            const id = new Sha1().update(this.#sf.fileName + ':useDeno#' + (this.#useDenoIndex++)).hex().slice(0, 9)
-            const arg3 = f.createStringLiteral(`useDeno.${id}`)
-            if (args.length === 1) {
-                args.push(f.createFalse())
-            }
-            if (args.length === 2) {
-                args.push(f.createVoidZero())
-            }
-            if (args.length === 3) {
-                args.push(arg3)
-            } else {
-                args[3] = arg3
-            }
         }
     }
 
@@ -347,7 +319,7 @@ function isComponentishName(name: string) {
     return c >= 'A' && c <= 'Z'
 }
 
-function isHookName(name: string) {
+export function isHookName(name: string) {
     let c: string
     return name.startsWith('use') && (c = name.charAt(3)) && c >= 'A' && c <= 'Z'
 }

@@ -2,11 +2,12 @@ import ts from 'https://esm.sh/typescript'
 import transformImportPathRewrite from './transform-import-path-rewrite.ts'
 import transformReactJsx from './transform-react-jsx.ts'
 import transformReactRefresh from './transform-react-refresh.ts'
+import transformReactUseDenoHook from './transform-react-use-deno-hook.ts'
 import { CreatePlainTransformer, CreateTransformer } from './transformer.ts'
 
 export interface CompileOptions {
-    target: string
     mode: 'development' | 'production'
+    target: string
     reactRefresh: boolean
     rewriteImportPath: (importPath: string, async?: boolean) => string
 }
@@ -29,10 +30,11 @@ const allowTargets = [
     'es2020',
 ]
 
-export function compile(fileName: string, source: string, { target: targetName, mode, rewriteImportPath, reactRefresh }: CompileOptions) {
+export function compile(fileName: string, source: string, { mode, target: targetName, rewriteImportPath, reactRefresh }: CompileOptions) {
     const target = allowTargets.indexOf(targetName.toLowerCase())
     const transformers: ts.CustomTransformers = { before: [], after: [] }
     transformers.before!.push(CreatePlainTransformer(transformReactJsx, { mode, rewriteImportPath }))
+    transformers.before!.push(CreateTransformer(transformReactUseDenoHook))
     if (reactRefresh) {
         transformers.before!.push(CreateTransformer(transformReactRefresh))
     }
