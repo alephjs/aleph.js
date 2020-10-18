@@ -17,7 +17,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
             for await (const req of s) {
                 const url = new URL('http://localhost/' + req.url)
                 const pathname = util.cleanPath(url.pathname)
-                const resp = new Request(req, { pathname, params: new Map(), query: new URLSearchParams() })
+                const resp = new Request(req, { pathname, params: {}, query: new URLSearchParams() })
 
                 try {
                     // serve hmr ws

@@ -1272,7 +1272,7 @@ export class Project {
         return ret
     }
 
-    private async _render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: new Map(), query: new URLSearchParams() }) {
+    private async _render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
         const ret: RenderResult = { url, status: 404, head: [], body: '<main></main>', data: null }
         try {
             const e404Module = this.#modules.get('/404.js')

@@ -30,7 +30,7 @@ export interface Config {
 
 export interface APIRequestURL {
     readonly pathname: string
-    readonly params: ReadonlyMap<string, string>
+    readonly params: Record<string, string>
     readonly query: URLSearchParams
 }
 
@@ -75,6 +75,6 @@ export interface RouterURL {
     readonly locale: string
     readonly pathname: string
     readonly pagePath: string
-    readonly params: ReadonlyMap<string, string>
+    readonly params: Record<string, string>
     readonly query: URLSearchParams
 }
