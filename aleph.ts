@@ -4,7 +4,7 @@ import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './
 import events from './events.ts'
 import { createPageProps, RouteModule, Routing } from './routing.ts'
 import type { RouterURL } from './types.ts'
-import util, { hashShort, reModuleExt } from './util.ts'
+import util, { hashShort, reModuleExt, reStyleModuleExt } from './util.ts'
 
 export function ALEPH({ initial }: {
     initial: {
@@ -46,11 +46,21 @@ export function ALEPH({ initial }: {
         if (url.pagePath !== '') {
             const ctree: { id: string, Component?: ComponentType<any> }[] = pageModuleTree.map(({ id }) => ({ id }))
             const imports = pageModuleTree.map(async mod => {
-                const { default: C } = await import(getModuleImportUrl(baseUrl, mod, e.forceFetch))
+                const { default: C } = await import(getModuleImportUrl(baseUrl, mod, e.forceRefetch))
                 if (mod.asyncDeps) {
                     // import async dependencies
-                    for (const dep of mod.asyncDeps) {
-                        await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }, e.forceFetch))
+                    for (const dep of mod.asyncDeps.filter(({ url }) => reStyleModuleExt.test(url))) {
+                        await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }, e.forceRefetch))
+                    }
+                    if (mod.asyncDeps.filter(({ url }) => url.startsWith('#useDeno.')).length > 0) {
+                        import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : '')).then(({ default: data }) => {
+                            if (util.isPlainObject(data)) {
+                                for (const key in data) {
+                                    const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
+                                    Object.assign(window, { [useDenoUrl]: data[key] })
+                                }
+                            }
+                        })
                     }
                 }
                 const pc = ctree.find(pc => pc.id === mod.id)
@@ -105,7 +115,7 @@ export function ALEPH({ initial }: {
                     if (mod.id.startsWith('/pages/')) {
                         const { routing } = ref.current
                         routing.update(mod)
-                        events.emit('popstate', { type: 'popstate', forceFetch: true })
+                        events.emit('popstate', { type: 'popstate', forceRefetch: true })
                     }
                     break
                 }
@@ -128,15 +138,26 @@ export function ALEPH({ initial }: {
                     break
             }
         }
-        const onFetchPageModule = async ({ url: pathname }: { url: string }) => {
-            const [url, pageModuleTree] = routing.createRouter({ pathname })
+        const onFetchPageModule = async ({ href }: { href: string }) => {
+            const [pathname, search] = href.split('?')
+            const [url, pageModuleTree] = routing.createRouter({ pathname, search })
             if (url.pagePath !== '') {
                 const imports = pageModuleTree.map(async mod => {
                     await import(getModuleImportUrl(baseUrl, mod))
                     if (mod.asyncDeps) {
                         // import async dependencies
-                        for (const dep of mod.asyncDeps) {
+                        for (const dep of mod.asyncDeps.filter(({ url }) => reStyleModuleExt.test(url))) {
                             await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
+                        }
+                        if (mod.asyncDeps.filter(({ url }) => url.startsWith('#useDeno.')).length > 0) {
+                            import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`).then(({ default: data }) => {
+                                if (util.isPlainObject(data)) {
+                                    for (const key in data) {
+                                        const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
+                                        Object.assign(window, { [useDenoUrl]: data[key] })
+                                    }
+                                }
+                            })
                         }
                     }
                 })
@@ -193,6 +214,6 @@ export async function redirect(url: string, replace?: boolean) {
     events.emit('popstate', { type: 'popstate', scrollTo: 0 })
 }
 
-export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceFetch = false) {
-    return util.cleanPath(baseUrl + '/_aleph/' + util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js` + (forceFetch ? `?t=${Date.now()}` : ''))
+export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceRefetch = false) {
+    return util.cleanPath(baseUrl + '/_aleph/' + util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js` + (forceRefetch ? `?t=${Date.now()}` : ''))
 }

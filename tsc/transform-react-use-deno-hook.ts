@@ -5,7 +5,6 @@
  */
 
 import ts from 'https://esm.sh/typescript'
-import { Sha1 } from '../std.ts'
 import { isHookName } from './transform-react-refresh.ts'
 
 const f = ts.factory
@@ -13,10 +12,12 @@ const f = ts.factory
 export class RefreshTransformer {
     #sf: ts.SourceFile
     #useDenoIndex: number
+    #signUseDeno: (id: string) => string
 
-    constructor(sf: ts.SourceFile) {
+    constructor(sf: ts.SourceFile, signUseDeno: (id: string) => string) {
         this.#sf = sf
         this.#useDenoIndex = 0
+        this.#signUseDeno = signUseDeno
     }
 
     transform() {
@@ -95,8 +96,8 @@ export class RefreshTransformer {
     private _signUseDeno(call: ts.CallExpression) {
         const args = call.arguments as unknown as Array<any>
         if (args.length > 0) {
-            const id = new Sha1().update(this.#sf.fileName + ':useDeno#' + (this.#useDenoIndex++)).hex().slice(0, 9)
-            const arg3 = f.createStringLiteral(`useDeno.${id}`)
+            const id = this.#signUseDeno(this.#sf.fileName + ':useDeno#' + (this.#useDenoIndex++))
+            const arg3 = f.createStringLiteral(id)
             if (args.length === 1) {
                 args.push(f.createFalse())
             }
@@ -114,7 +115,7 @@ export class RefreshTransformer {
 
 
 
-export default function transformReactUseDenoHook(ctx: ts.TransformationContext, sf: ts.SourceFile): ts.SourceFile {
-    const t = new RefreshTransformer(sf)
+export default function transformReactUseDenoHook(ctx: ts.TransformationContext, sf: ts.SourceFile, signUseDeno: (id: string) => string): ts.SourceFile {
+    const t = new RefreshTransformer(sf, signUseDeno)
     return t.transform()
 }

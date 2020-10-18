@@ -40,7 +40,7 @@ export function Link({
     }, [currentPathname, to])
     const prefetch = useCallback(() => {
         if (!util.isHttpUrl(href) && href !== currentHref && !fetchedPageModules.has(href)) {
-            events.emit('fetch-page-module', { url: href })
+            events.emit('fetch-page-module', { href })
             fetchedPageModules.add(href)
         }
     }, [href, currentHref])

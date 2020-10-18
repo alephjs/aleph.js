@@ -7,9 +7,10 @@ export interface AlephRuntime {
 }
 
 export interface SSROptions {
-    readonly fallback?: string // default is 404.html
+    readonly fallback?: string // default is '_fallback.html'
     readonly include?: RegExp[]
     readonly exclude?: RegExp[]
+    readonly staticPaths?: string[]
 }
 
 export interface Config {

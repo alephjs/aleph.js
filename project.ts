@@ -37,7 +37,7 @@ interface RenderResult {
     status: number
     head: string[]
     body: string
-    data: Record<string, string>
+    data: Record<string, string> | null
 }
 
 export class Project {
@@ -63,7 +63,7 @@ export class Project {
             defaultLocale: 'en',
             locales: [],
             ssr: {
-                fallback: '404.html'
+                fallback: '_fallback.html'
             },
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
@@ -72,6 +72,7 @@ export class Project {
             },
             env: {}
         }
+        log.info(colors.bold('Aleph.js'))
         this.ready = (async () => {
             const t = performance.now()
             await this._loadConfig()
@@ -213,10 +214,19 @@ export class Project {
         return null
     }
 
+    async getPageData(loc: { pathname: string, search?: string }): Promise<[number, any]> {
+        if (!this.isSSRable(loc.pathname)) {
+            return [404, null]
+        }
+
+        const { status, data } = await this._renderPage(loc)
+        return [status, data]
+    }
+
     async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string]> {
         if (!this.isSSRable(loc.pathname)) {
             const [url] = this.#routing.createRouter(loc)
-            return [url.pagePath === '' ? 404 : 200, this.getDefaultIndexHtml()]
+            return [url.pagePath === '' ? 404 : 200, this.getSPAIndexHtml()]
         }
 
         const { baseUrl } = this.config
@@ -226,7 +236,7 @@ export class Project {
             lang: url.locale,
             head: head,
             scripts: [
-                { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' },
+                data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
@@ -236,7 +246,7 @@ export class Project {
         return [status, html]
     }
 
-    getDefaultIndexHtml(): string {
+    getSPAIndexHtml(): string {
         const { baseUrl, defaultLocale } = this.config
         const mainModule = this.#modules.get('/main.js')!
         const html = createHtml({
@@ -286,21 +296,54 @@ export class Project {
 
         // ssg
         const { ssr } = this.config
+        const SPAIndexHtml = this.getSPAIndexHtml()
         if (ssr) {
             log.info(colors.bold('  Pages (SSG)'))
-            for (const pathname of this.#routing.paths) {
-                if (this.isSSRable(pathname)) {
-                    const [_, html] = await this.getPageHtml({ pathname })
-                    const htmlFile = path.join(outputDir, pathname, 'index.html')
-                    await writeTextFile(htmlFile, html)
-                    log.info('    ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
-                }
+            const paths = new Set(this.#routing.paths)
+            if (typeof ssr === 'object' && ssr.staticPaths) {
+                ssr.staticPaths.forEach(path => paths.add(path))
             }
-            const fbHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '404.html')
-            await writeTextFile(fbHtmlFile, this.getDefaultIndexHtml())
+            await Promise.all(Array.from(paths).map(async pathname => {
+                if (this.isSSRable(pathname)) {
+                    const [status, html] = await this.getPageHtml({ pathname })
+                    if (status == 200) {
+                        const [_, data] = await this.getPageData({ pathname })
+                        const htmlFile = path.join(outputDir, pathname, 'index.html')
+                        const dataFile = path.join(outputDir, '_aleph/data', pathname, 'data.js')
+                        await writeTextFile(htmlFile, html)
+                        if (data) {
+                            await writeTextFile(dataFile, `export default ` + JSON.stringify(data))
+                        }
+                        log.info('    ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
+                    } else if (status == 404) {
+                        log.info('    ○', colors.dim(pathname), colors.red(`Page not found`))
+                    } else if (status == 500) {
+                        log.info('    ○', colors.dim(pathname), colors.red(`Error 505`))
+                    }
+                }
+            }))
+            const fbHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback.html')
+            await writeTextFile(fbHtmlFile, SPAIndexHtml)
         } else {
-            await writeTextFile(path.join(outputDir, 'index.html'), this.getDefaultIndexHtml())
+            await writeTextFile(path.join(outputDir, 'index.html'), SPAIndexHtml)
         }
+
+        // write 404 page
+        const { baseUrl } = this.config
+        const { url, head, body, data } = await this._render404Page()
+        const mainModule = this.#modules.get('/main.js')!
+        const e404PageHtml = createHtml({
+            lang: url.locale,
+            head: head,
+            scripts: [
+                data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
+                { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+            ],
+            body,
+            minify: !this.isDev
+        })
+        await writeTextFile(path.join(outputDir, '404.html'), e404PageHtml)
 
         // copy public assets
         const publicDir = path.join(this.appRoot, 'public')
@@ -374,6 +417,8 @@ export class Project {
         for await (const { path: p } of walk(this.srcDir, { includeDirs: false, exts: ['.js', '.mjs', '.ts', '.json'], skip: [/\.d\.ts$/i], maxDepth: 1 })) {
             const name = path.basename(p)
             if (name.split('.')[0] === 'config') {
+                log.info(colors.bold('  Config'))
+                log.info('    ⚙️', name)
                 if (name.endsWith('.json')) {
                     try {
                         const conf = JSON.parse(await Deno.readTextFile(p))
@@ -429,7 +474,8 @@ export class Project {
             const fallback = util.isNEString(ssr.fallback) ? util.ensureExt(ssr.fallback, '.html') : '404.html'
             const include = util.isArray(ssr.include) ? ssr.include.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
             const exclude = util.isArray(ssr.exclude) ? ssr.exclude.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
-            Object.assign(this.config, { ssr: { fallback, include, exclude } })
+            const staticPaths = util.isArray(ssr.staticPaths) ? ssr.staticPaths.map(v => util.cleanPath(v)) : []
+            Object.assign(this.config, { ssr: { fallback, include, exclude, staticPaths } })
         }
         if (util.isPlainObject(env)) {
             Object.assign(this.config, { env })
@@ -513,7 +559,6 @@ export class Project {
         const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
         this.#renderer = { renderPage, renderHead }
 
-        log.info(colors.bold('Aleph.js'))
         log.info(colors.bold('  Global'))
         if (this.#modules.has('/app.js')) {
             log.info('    ✓', 'Custom App')
@@ -659,7 +704,7 @@ export class Project {
     }
 
     private _getRouteModule({ id, hash }: Module): RouteModule {
-        const asyncDeps = this._lookupStyleDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
+        const asyncDeps = this._lookupAsyncDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
         return { id, hash, asyncDeps: asyncDeps.length > 0 ? asyncDeps : undefined }
     }
 
@@ -946,11 +991,17 @@ export class Project {
                 mod.jsSourceMap = ''
                 mod.hash = getHash(mod.jsContent)
             } else {
+                const useDenos: string[] = []
                 const compileOptions = {
-                    target: this.config.buildTarget,
                     mode: this.mode,
-                    reactRefresh: this.isDev && !mod.isRemote && (mod.id === '/404.js' || mod.id === '/app.js' || mod.id.startsWith('/pages/') || mod.id.startsWith('/components/')),
+                    target: this.config.buildTarget,
+                    reactRefresh: this.isDev && !mod.isRemote,
                     rewriteImportPath: (path: string, async?: boolean) => this._rewriteImportPath(mod, path, async),
+                    signUseDeno: (id: string) => {
+                        const sig = 'useDeno.' + (new Sha1()).update(id).update(version).update(Date.now().toString()).hex().slice(0, hashShort)
+                        useDenos.push(sig)
+                        return sig
+                    }
                 }
                 const { diagnostics, outputText, sourceMapText } = compile(mod.sourceFilePath, sourceContent, compileOptions)
                 if (diagnostics && diagnostics.length > 0) {
@@ -981,6 +1032,9 @@ export class Project {
                     }
                 }
                 mod.hash = getHash(mod.jsContent)
+                useDenos.forEach(sig => {
+                    mod.deps.push({ url: '#' + sig, hash: '', async: true })
+                })
             }
 
             log.debug(`compile '${url}' in ${Math.round(performance.now() - t)}ms`)
@@ -993,7 +1047,7 @@ export class Project {
         this.#modules.set(mod.id, mod)
 
         // compile deps
-        for (const dep of mod.deps) {
+        for (const dep of mod.deps.filter(({ url }) => !url.startsWith('#useDeno.'))) {
             const depMod = await this._compile(dep.url)
             if (dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
@@ -1147,7 +1201,7 @@ export class Project {
     private async _renderPage(loc: { pathname: string, search?: string }) {
         const start = performance.now()
         const [url, pageModuleTree] = this.#routing.createRouter(loc)
-        const key = url.pathname + '?' + url.query.toString()
+        const key = [url.pathname, url.query.toString()].filter(Boolean).join('?')
         if (url.pagePath !== '') {
             if (this.#rendered.has(url.pagePath)) {
                 const cache = this.#rendered.get(url.pagePath)!
@@ -1158,7 +1212,7 @@ export class Project {
                 this.#rendered.set(url.pagePath, new Map())
             }
         }
-        const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], body: '<main></main>', data: {} }
+        const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], body: '<main></main>', data: null }
         Object.assign(window, {
             location: {
                 protocol: 'http:',
@@ -1175,45 +1229,36 @@ export class Project {
                 toString() { return this.href },
             }
         })
+        if (ret.status === 404) {
+            if (this.isDev) {
+                log.warn(`page '${url.pathname}' not found`)
+            }
+            return this._render404Page(url)
+        }
         try {
             const appModule = this.#modules.get('/app.js')
-            const e404Module = this.#modules.get('/404.js')
-            // todo: cache custom page module import
-            const [
-                { default: App },
-                { default: E404 },
-            ] = await Promise.all([
-                appModule && ret.status === 200 ? import('file://' + appModule.jsFile) : Promise.resolve({}),
-                e404Module ? import('file://' + e404Module.jsFile) : Promise.resolve({})
-            ])
+            const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
             const pageComponentTree: { id: string, Component?: any }[] = pageModuleTree.map(({ id }) => ({ id }))
-            if (ret.status === 200) {
-                const imports = pageModuleTree.map(async ({ id }) => {
-                    const mod = this.#modules.get(id)!
-                    const { default: C } = await import('file://' + mod.jsFile)
-                    const pc = pageComponentTree.find(pc => pc.id === mod.id)
-                    if (pc) {
-                        pc.Component = C
-                    }
-                })
-                await Promise.all(imports)
-            }
-            const [html, data] = await this.#renderer.renderPage(url, App, E404, pageComponentTree)
+            const imports = pageModuleTree.map(async ({ id }) => {
+                const mod = this.#modules.get(id)!
+                const { default: C } = await import('file://' + mod.jsFile)
+                const pc = pageComponentTree.find(pc => pc.id === mod.id)
+                if (pc) {
+                    pc.Component = C
+                }
+            })
+            await Promise.all(imports)
+            const [html, data] = await this.#renderer.renderPage(url, App, undefined, pageComponentTree)
             const head = await this.#renderer.renderHead([
-                appModule && ret.status === 200 ? this._lookupStyleDeps(appModule.id) : [],
-                e404Module && ret.status === 404 ? this._lookupStyleDeps(e404Module.id) : [],
-                ...pageModuleTree.map(({ id }) => this._lookupStyleDeps(id))
+                appModule ? this._lookupAsyncDeps(appModule.id).filter(({ url }) => reStyleModuleExt.test(url)) : [],
+                ...pageModuleTree.map(({ id }) => this._lookupAsyncDeps(id).filter(({ url }) => reStyleModuleExt.test(url)))
             ].flat())
             ret.head = head
             ret.body = `<main>${html}</main>`
             ret.data = data
-            if (ret.status === 200) {
-                this.#rendered.get(url.pagePath)!.set(key, ret)
-                if (this.isDev) {
-                    log.debug(`render '${url.pagePath}' in ${Math.round(performance.now() - start)}ms`)
-                }
-            } else if (ret.status === 404) {
-                log.warn(`page '${url.pathname}' not found`)
+            this.#rendered.get(url.pagePath)!.set(key, ret)
+            if (this.isDev) {
+                log.debug(`render '${url.pathname}' in ${Math.round(performance.now() - start)}ms`)
             }
         } catch (err) {
             ret.status = 500
@@ -1224,22 +1269,43 @@ export class Project {
         return ret
     }
 
-    private _lookupStyleDeps(moduleID: string, a: { url: string, hash: string, async?: boolean }[] = [], s: Set<string> = new Set()) {
+    private async _render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
+        const ret: RenderResult = { url, status: 404, head: [], body: '<main></main>', data: null }
+        try {
+            const e404Module = this.#modules.get('/404.js')
+            const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
+            const [html, data] = await this.#renderer.renderPage(url, undefined, E404, [])
+            const head = await this.#renderer.renderHead([
+                e404Module ? this._lookupAsyncDeps(e404Module.id).filter(({ url }) => reStyleModuleExt.test(url)) : []
+            ].flat())
+            ret.head = head
+            ret.body = `<main>${html}</main>`
+            ret.data = data
+        } catch (err) {
+            ret.status = 500
+            ret.head = ['<title>Error 500 - Aleph.js</title>']
+            ret.body = `<main><pre>${err.stack}</pre></main>`
+            log.error(err)
+        }
+        return ret
+    }
+
+    private _lookupAsyncDeps(moduleID: string, __deps: { url: string, hash: string, async?: boolean }[] = [], __tracing: Set<string> = new Set()) {
         const mod = this.getModule(moduleID)
         if (!mod) {
-            return a
+            return __deps
         }
-        if (s.has(moduleID)) {
-            return a
+        if (__tracing.has(moduleID)) {
+            return __deps
         }
-        s.add(moduleID)
-        a.push(...mod.deps.filter(({ url }) => reStyleModuleExt.test(url) && a.findIndex(i => i.url === url) === -1))
+        __tracing.add(moduleID)
+        __deps.push(...mod.deps.filter(({ url, async }) => !!async && __deps.findIndex(i => i.url === url) === -1))
         mod.deps.forEach(({ url }) => {
             if (reModuleExt.test(url) && !reHttp.test(url)) {
-                this._lookupStyleDeps(url.replace(reModuleExt, '.js'), a, s)
+                this._lookupAsyncDeps(url.replace(reModuleExt, '.js'), __deps, __tracing)
             }
         })
-        return a
+        return __deps
     }
 }
 

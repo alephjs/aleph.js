@@ -2,7 +2,7 @@ import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './aleph.ts'
 import { Route, RouteModule, Routing } from './routing.ts'
-import { reModuleExt } from './util.ts'
+import { reModuleExt, reStyleModuleExt } from './util.ts'
 
 export default async function bootstrap({
     routes,
@@ -25,10 +25,10 @@ export default async function bootstrap({
     const [url, pageModuleTree] = routing.createRouter()
     const pageComponentTree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
     const imports = [...preloadModules, ...pageModuleTree].map(async mod => {
-        const { default: C, __pageProps } = await import(getModuleImportUrl(baseUrl, mod))
+        const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
         if (mod.asyncDeps) {
             // import async dependencies
-            for (const dep of mod.asyncDeps) {
+            for (const dep of mod.asyncDeps.filter(({ url }) => reStyleModuleExt.test(url))) {
                 await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
             }
         }
@@ -49,9 +49,11 @@ export default async function bootstrap({
     })
     await Promise.all(imports)
 
-    const ssrData = JSON.parse(ssrDataEl.innerText)
-    for (const key in ssrData) {
-        Object.assign(window, { [`useDeno://${url.pathname}?${url.query.toString()}#${key}`]: ssrData[key] })
+    if (ssrDataEl) {
+        const ssrData = JSON.parse(ssrDataEl.innerText)
+        for (const key in ssrData) {
+            Object.assign(window, { [`useDeno://${url.pathname}?${url.query.toString()}#${key}`]: ssrData[key] })
+        }
     }
 
     const el = React.createElement(

@@ -15,6 +15,6 @@ export function CreatePlainTransformer(transform: (sf: ts.SourceFile, node: ts.N
     return ctx => sf => ts.visitNode(sf, nodeVisitor(ctx, sf))
 }
 
-export function CreateTransformer(transform: (ctx: ts.TransformationContext, sf: ts.SourceFile, options?: Record<string, any>) => ts.SourceFile, options?: Record<string, any>): ts.TransformerFactory<ts.SourceFile> {
+export function CreateTransformer(transform: (ctx: ts.TransformationContext, sf: ts.SourceFile, options?: any) => ts.SourceFile, options?: Record<string, any>): ts.TransformerFactory<ts.SourceFile> {
     return ctx => sf => transform(ctx, sf, options)
 }

@@ -10,6 +10,7 @@ export interface CompileOptions {
     target: string
     reactRefresh: boolean
     rewriteImportPath: (importPath: string, async?: boolean) => string
+    signUseDeno: (id: string) => string
 }
 
 export function createSourceFile(fileName: string, source: string) {
@@ -30,11 +31,11 @@ const allowTargets = [
     'es2020',
 ]
 
-export function compile(fileName: string, source: string, { mode, target: targetName, rewriteImportPath, reactRefresh }: CompileOptions) {
+export function compile(fileName: string, source: string, { mode, target: targetName, rewriteImportPath, reactRefresh, signUseDeno }: CompileOptions) {
     const target = allowTargets.indexOf(targetName.toLowerCase())
     const transformers: ts.CustomTransformers = { before: [], after: [] }
     transformers.before!.push(CreatePlainTransformer(transformReactJsx, { mode, rewriteImportPath }))
-    transformers.before!.push(CreateTransformer(transformReactUseDenoHook))
+    transformers.before!.push(CreateTransformer(transformReactUseDenoHook, signUseDeno))
     if (reactRefresh) {
         transformers.before!.push(CreateTransformer(transformReactRefresh))
     }

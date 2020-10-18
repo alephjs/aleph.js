@@ -92,5 +92,5 @@ export async function renderPage(
     }
     Object.assign(window, { _useDenoAsyncData: null, fetch: orginFetch })
     events.removeAllListeners(useDenEvent)
-    return [html, data]
+    return [html, Object.keys(data).length > 0 ? data : null]
 }

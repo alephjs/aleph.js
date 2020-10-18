@@ -70,7 +70,16 @@ export async function start(appDir: string, port: number, isDev = false, reload 
 
                     // serve dist files
                     if (pathname.startsWith('/_aleph/')) {
-                        if (pathname.endsWith('.css')) {
+                        if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('/data.js')) {
+                            const [p, s] = util.splitBy(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data'), '/data.js'), '@')
+                            const [status, data] = await project.getPageData({ pathname: p, search: s })
+                            if (status === 200) {
+                                resp.send(`export default ` + JSON.stringify(data), 'application/javascript; charset=utf-8')
+                            } else {
+                                resp.end(status)
+                            }
+                            continue
+                        } else if (pathname.endsWith('.css')) {
                             const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_aleph/'))
                             if (existsFileSync(filePath)) {
                                 const body = await Deno.readFile(filePath)
