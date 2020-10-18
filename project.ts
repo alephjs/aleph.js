@@ -1269,7 +1269,7 @@ export class Project {
         } catch (err) {
             ret.status = 500
             ret.head = ['<title>Error 500 - Aleph.js</title>']
-            ret.body = `<main><pre>${err.stack}</pre></main>`
+            ret.body = `<main><pre>${colors.stripColor(err.stack)}</pre></main>`
             log.error(err)
         }
         return ret
@@ -1290,7 +1290,7 @@ export class Project {
         } catch (err) {
             ret.status = 500
             ret.head = ['<title>Error 500 - Aleph.js</title>']
-            ret.body = `<main><pre>${err.stack}</pre></main>`
+            ret.body = `<main><pre>${colors.stripColor(err.stack)}</pre></main>`
             log.error(err)
         }
         return ret
