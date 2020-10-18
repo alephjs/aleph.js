@@ -1,0 +1,104 @@
+* {
+    margin: 0;
+    padding: 0;
+    border: none;
+    outline: none;
+    font: inherit;
+    font-size: 100%;
+    vertical-align: baseline;
+    background: transparent;
+}
+
+body {
+    font-family: "Helvetica Neue", Helvetica, Arial sans-serif;
+    font-size: 15px;
+}
+
+main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+.page {
+    h1 {
+        margin: 0;
+        line-height: 1.5;
+        font-size: 18px;
+        font-weight: 400;
+        text-align: center;
+        color: #000;
+
+        strong {
+            font-weight: 700;
+        }
+    }
+
+    p {
+        margin: 0;
+        line-height: 1.5;
+        text-align: center;
+        color: #333;
+    }
+
+    .name-input {
+        margin-top: 36px;
+
+        input {
+            width: 300px;
+            text-align: center;
+            padding: 7px 0;
+            outline: 0;
+            line-height: 1.5;
+            font-size: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+    }
+
+    .go-button {
+        margin-top: 15px;
+        text-align: center;
+
+        button {
+            display: inline-block;
+            padding: 3px 12px;
+            background-color: #333;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+        }
+        button[disabled] {
+            background-color: #aaa;
+            cursor: disable;
+        }
+    }
+
+    .links {
+        margin-top: 36px;
+        span, a {
+            display: inline-block;
+            vertical-align: middle;
+        }
+        span {
+            color: #999;
+        }
+        a {
+            margin: 0 9px;
+            color: #766;
+            text-decoration: none;
+            border-bottom: 1px dashed #cbb;
+
+            &:hover {
+                border-bottom-color: transparent;
+            }
+        }
+    }
+
+    .copyinfo {
+        margin-top: 9px;
+        font-size: 14px;
+        color: #999;
+    }
+}
