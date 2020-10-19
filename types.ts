@@ -1,9 +1,9 @@
 export interface AlephRuntime {
-    env: Record<string, string>
-    __version: string
-    __appRoot: string
-    __buildMode: string
-    __buildTarget: string
+    readonly env: Record<string, string>
+    readonly __version: string
+    readonly __appRoot: string
+    readonly __buildMode: string
+    readonly __buildTarget: string
 }
 
 export interface SSROptions {
@@ -14,18 +14,15 @@ export interface SSROptions {
 }
 
 export interface Config {
-    readonly srcDir: string
-    readonly outputDir: string
-    readonly baseUrl: string
-    readonly defaultLocale: string
-    readonly locales: string[]
-    readonly ssr: boolean | SSROptions
-    readonly buildTarget: string
-    readonly sourceMap: boolean
-    readonly env: Record<string, string>
-    readonly importMap: {
-        imports: Record<string, string>
-    }
+    srcDir: string
+    outputDir: string
+    baseUrl: string
+    defaultLocale: string
+    locales: string[]
+    ssr: boolean | SSROptions
+    buildTarget: string
+    sourceMap: boolean
+    env: Record<string, string>
 }
 
 export interface APIRequestURL {

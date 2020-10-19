@@ -43,7 +43,8 @@ interface RenderResult {
 export class Project {
     readonly mode: 'development' | 'production'
     readonly appRoot: string
-    readonly config: Config
+    readonly config: Readonly<Config>
+    readonly importMap: Readonly<{ imports: Record<string, string> }>
     readonly ready: Promise<void>
 
     #modules: Map<string, Module> = new Map()
@@ -67,11 +68,9 @@ export class Project {
             },
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
-            importMap: {
-                imports: {}
-            },
             env: {}
         }
+        this.importMap = { imports: {} }
         this.ready = (async () => {
             const t = performance.now()
             await this._loadConfig()
@@ -400,13 +399,13 @@ export class Project {
         const { ALEPH_IMPORT_MAP } = globalThis as any
         if (ALEPH_IMPORT_MAP) {
             const { imports } = ALEPH_IMPORT_MAP
-            Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
+            Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
         }
 
         const importMapFile = path.join(this.appRoot, 'import_map.json')
         if (existsFileSync(importMapFile)) {
             const { imports } = JSON.parse(await Deno.readTextFile(importMapFile))
-            Object.assign(this.config.importMap, { imports: Object.assign({}, this.config.importMap.imports, imports) })
+            Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
         }
 
         const config: Record<string, any> = {}
@@ -712,8 +711,7 @@ export class Project {
     }
 
     private _moduleFromURL(url: string): Module {
-        const { importMap } = this.config
-        const isRemote = reHttp.test(url) || (url in importMap.imports && reHttp.test(importMap.imports[url]))
+        const isRemote = reHttp.test(url) || (url in this.importMap.imports && reHttp.test(this.importMap.imports[url]))
         const sourceFilePath = renameImportUrl(url)
         const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : sourceFilePath).replace(reModuleExt, '.js')
         return {
@@ -797,7 +795,7 @@ export class Project {
             return this.#modules.get(mod.id)!
         }
 
-        const { importMap } = this.config
+        const { importMap } = this
         const name = path.basename(mod.sourceFilePath).replace(reModuleExt, '')
         const saveDir = path.join(this.buildDir, path.dirname(mod.sourceFilePath))
         const metaFile = path.join(saveDir, `${name}.meta.json`)
@@ -1143,10 +1141,9 @@ export class Project {
     }
 
     private _rewriteImportPath(mod: Module, importPath: string, async?: boolean): string {
-        const { importMap } = this.config
         let rewrittenPath: string
-        if (importPath in importMap.imports) {
-            importPath = importMap.imports[importPath]
+        if (importPath in this.importMap.imports) {
+            importPath = this.importMap.imports[importPath]
         }
         if (reHttp.test(importPath)) {
             if (mod.isRemote) {
