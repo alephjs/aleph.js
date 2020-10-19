@@ -53,7 +53,7 @@ export function ALEPH({ initial }: {
                         await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }, e.forceRefetch))
                     }
                     if (mod.asyncDeps.filter(({ url }) => url.startsWith('#useDeno.')).length > 0) {
-                        import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : '')).then(({ default: data }) => {
+                        await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : '')).then(({ default: data }) => {
                             if (util.isPlainObject(data)) {
                                 for (const key in data) {
                                     const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
@@ -150,7 +150,7 @@ export function ALEPH({ initial }: {
                             await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
                         }
                         if (mod.asyncDeps.filter(({ url }) => url.startsWith('#useDeno.')).length > 0) {
-                            import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`).then(({ default: data }) => {
+                            await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`).then(({ default: data }) => {
                                 if (util.isPlainObject(data)) {
                                     for (const key in data) {
                                         const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
