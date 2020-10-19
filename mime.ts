@@ -1,5 +1,6 @@
 // mime types for web
 const mimeTypes: Record<string, string[]> = {
+    // application
     'application/javascript': ['js', 'mjs'],
     'application/wasm': ['wasm'],
     'application/json': ['json', 'map'],

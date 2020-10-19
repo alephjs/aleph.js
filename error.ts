@@ -1,5 +1,5 @@
 import React from 'https://esm.sh/react'
-import { Head } from './head.ts'
+import Head from './head.ts'
 
 export class ErrorBoundary extends React.Component {
     state: { stack: string | null }
@@ -39,7 +39,7 @@ export function E404Page() {
         StatusError,
         {
             status: 404,
-            message: 'Page not found'
+            message: 'Page Not Found'
         }
     )
 }
@@ -66,7 +66,7 @@ export function StatusError({ status, message, showRefreshButton }: { status: nu
                 React.createElement(
                     'title',
                     null,
-                    `Error ${status} - ${message} | Aleph.js`
+                    `${status} - ${message} | Aleph.js`
                 ),
             ),
             React.createElement(
@@ -75,7 +75,6 @@ export function StatusError({ status, message, showRefreshButton }: { status: nu
                 React.createElement(
                     'strong',
                     null,
-                    'Error ',
                     React.createElement(
                         'code',
                         null,
