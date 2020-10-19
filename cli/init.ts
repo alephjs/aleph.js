@@ -45,8 +45,8 @@ export default async function (appDir: string, options: Record<string, string | 
     const rev = 'master'
     log.info('Downloading template...')
     const resp = await fetch('https://codeload.github.com/postui/alephjs-templates/tar.gz/' + rev)
-    log.info('Saving template...')
     const gzData = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
+    log.info('Saving template...')
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))
 
@@ -73,11 +73,11 @@ export default async function (appDir: string, options: Record<string, string | 
 
     log.info('Done')
     log.info('---')
-    log.info(colors.dim('Aleph App is ready to Go.'))
+    log.info(colors.dim('Aleph.js is ready to Go.'))
     log.info(`${colors.dim('$')} cd ` + path.basename(appDir))
-    log.info(`${colors.dim('$')} aleph ${colors.bold('dev')}    ${colors.dim('# start the app in development mode')}`)
-    log.info(`${colors.dim('$')} aleph ${colors.bold('start')}  ${colors.dim('# start the app in production mode')}`)
-    log.info(`${colors.dim('$')} aleph ${colors.bold('build')}  ${colors.dim('# build the app in production mode')}`)
+    log.info(`${colors.dim('$')} aleph ${colors.bold('dev')}    ${colors.dim('# start the app in `development` mode')}`)
+    log.info(`${colors.dim('$')} aleph ${colors.bold('start')}  ${colors.dim('# start the app in `production` mode')}`)
+    log.info(`${colors.dim('$')} aleph ${colors.bold('build')}  ${colors.dim('# build & export a static site')}`)
     log.info('---')
     Deno.exit(0)
 }

@@ -1,3 +1,4 @@
+import { Request } from './api.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './mime.ts'
@@ -9,8 +10,8 @@ const commands = {
     'init': 'Create a new app',
     'dev': 'Start the app in development mode',
     'start': 'Start the app in production mode',
-    'build': 'Build&Export a static site',
-    'upgrade': 'Upgrade Aleph.js'
+    'build': 'Build & Export a static site',
+    'upgrade': 'Upgrade Aleph.js command'
 }
 const helpMessage = `Aleph.js v${version}
 The React Framework in deno.
@@ -123,9 +124,10 @@ async function main() {
             if (match) {
                 const port = parseInt(match[2])
                 listenAndServe({ port }, async (req: ServerRequest) => {
+                    const url = new URL('http://localhost' + req.url)
+                    const resp = new Request(req, { pathname: util.cleanPath(url.pathname), params: {}, query: url.searchParams })
+                    const filepath = path.join(Deno.cwd(), url.pathname)
                     try {
-                        const url = new URL('http://localhost' + req.url)
-                        let filepath = path.join(Deno.cwd(), url.pathname)
                         const info = await Deno.lstat(filepath)
                         if (info.isDirectory) {
                             const r = Deno.readDir(filepath)
@@ -135,36 +137,19 @@ async function main() {
                                     items.push(`<li><a href='${path.join(url.pathname, encodeURI(item.name))}'>${item.name}${item.isDirectory ? '/' : ''}<a></li>`)
                                 }
                             }
-                            req.respond({
-                                status: 200,
-                                headers: new Headers({
-                                    'Content-Type': 'text/html',
-                                    'Content-Length': info.size.toString()
-                                }),
-                                body: createHtml({
-                                    head: [`<title>aleph.js/</title>`],
-                                    body: `<h1>&nbsp;aleph.js/</h1><ul>${Array.from(items).join('')}</ul>`
-                                })
-                            })
+                            resp.send(createHtml({
+                                head: [`<title>aleph.js/</title>`],
+                                body: `<h1>&nbsp;aleph.js/</h1><ul>${Array.from(items).join('')}</ul>`
+                            }), 'text/html')
                             return
                         }
-                        req.respond({
-                            status: 200,
-                            headers: new Headers({ 'Content-Type': getContentType(filepath) }),
-                            body: await Deno.readFile(filepath)
-                        })
+                        resp.send(await Deno.readFile(filepath), getContentType(filepath))
                     } catch (err) {
                         if (err instanceof Deno.errors.NotFound) {
-                            req.respond({
-                                status: 404,
-                                body: 'not found'
-                            })
+                            resp.status(404).send('file not found', 'text/plain')
                             return
                         }
-                        req.respond({
-                            status: 500,
-                            body: err.message
-                        })
+                        resp.status(500).send(err.message, 'text/plain')
                     }
                 })
                 log.info(`Proxy https://deno.land/x/aleph on http://localhost:${port}`)
