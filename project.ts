@@ -221,7 +221,7 @@ export class Project {
     async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string]> {
         if (!this.isSSRable(loc.pathname)) {
             const [url] = this.#routing.createRouter(loc)
-            return [url.pagePath === '' ? 404 : 200, this.getSPAIndexHtml()]
+            return [url.pagePath === '' ? 404 : 200, await this.getSPAIndexHtml()]
         }
 
         const { baseUrl } = this.config
@@ -241,16 +241,19 @@ export class Project {
         return [status, html]
     }
 
-    getSPAIndexHtml(): string {
+    async getSPAIndexHtml() {
         const { baseUrl, defaultLocale } = this.config
         const mainModule = this.#modules.get('/main.js')!
+        const customLoading = await this._renderLoadingPage()
         const html = createHtml({
             lang: defaultLocale,
             scripts: [
+                customLoading?.data ? { type: 'application/json', innerText: JSON.stringify(customLoading?.data), id: 'ssr-data' } : '',
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
-            body: `<main></main>`, // todo: custom `loading` page
+            head: customLoading?.head || [],
+            body: `<main>${customLoading?.body || ''}</main>`,
             minify: !this.isDev
         })
         return html
@@ -291,7 +294,7 @@ export class Project {
 
         // ssg
         const { ssr } = this.config
-        const SPAIndexHtml = this.getSPAIndexHtml()
+        const SPAIndexHtml = await this.getSPAIndexHtml()
         if (ssr) {
             log.info(colors.bold('  Pages (SSG)'))
             const paths = new Set(this.#routing.paths)
@@ -520,6 +523,7 @@ export class Project {
             switch (name.replace(reModuleExt, '')) {
                 case 'app':
                 case '404':
+                case 'loading':
                     await this._compile('/' + name)
                     break
             }
@@ -1288,6 +1292,24 @@ export class Project {
             log.error(err)
         }
         return ret
+    }
+
+    private async _renderLoadingPage() {
+        if (this.#modules.has('/loading.js')) {
+            const loadingModule = this.#modules.get('/loading.js')!
+            const { default: Loading } = await import('file://' + loadingModule.jsFile)
+            const url = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }
+            const [html, data] = await this.#renderer.renderPage(url, undefined, undefined, [{ id: '/loading.js', Component: Loading }])
+            const head = await this.#renderer.renderHead([
+                this._lookupAsyncDeps(loadingModule.id).filter(({ url }) => reStyleModuleExt.test(url))
+            ].flat())
+            return {
+                head,
+                body: html,
+                data,
+            } as RenderResult
+        }
+        return null
     }
 
     private _lookupAsyncDeps(moduleID: string, __deps: { url: string, hash: string, async?: boolean }[] = [], __tracing: Set<string> = new Set()) {
