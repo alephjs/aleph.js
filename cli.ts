@@ -6,11 +6,11 @@ import util, { existsDirSync, existsFileSync } from './util.ts'
 import { version } from './version.ts'
 
 const commands = {
-    'init': 'Initiate a new aleph app.',
-    'dev': 'Start the aleph app in development mode.',
-    'start': 'Start the aleph app in production mode.',
-    'build': 'Build the aleph app in production mode.',
-    'upgrade': 'Upgrade the aleph command.'
+    'init': 'Create a new app',
+    'dev': 'Start the app in development mode',
+    'start': 'Start the app in production mode',
+    'build': 'Build&Export a static site',
+    'upgrade': 'Upgrade Aleph.js'
 }
 const helpMessage = `Aleph.js v${version}
 The React Framework in deno.
