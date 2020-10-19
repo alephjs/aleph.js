@@ -28,7 +28,7 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 
 ### Installation
 ```bash
-deno install -A -f -n aleph https://deno.land/x/aleph@v0.2.5/cli.ts
+deno install -A -f -n aleph https://deno.land/x/aleph@v0.2.7/cli.ts
 ```
 
 ### Usage
