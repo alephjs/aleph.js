@@ -1,7 +1,7 @@
 import React, { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import { RouterContext } from './context.ts'
-import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
+import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page } from './error.ts'
 import events from './events.ts'
 import { createPageProps } from './routing.ts'
 import type { RouterURL } from './types.ts'
@@ -72,13 +72,9 @@ export async function renderPage(
             }
             html = renderToString(
                 React.createElement(
-                    ErrorBoundary,
-                    null,
-                    React.createElement(
-                        RouterContext.Provider,
-                        { value: url },
-                        el
-                    )
+                    RouterContext.Provider,
+                    { value: url },
+                    el
                 )
             )
             break

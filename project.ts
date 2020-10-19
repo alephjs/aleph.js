@@ -251,7 +251,7 @@ export class Project {
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
-            body: `<main><p><em>Loading...</em></p></main>`, // todo: custom `loading` page
+            body: `<main></main>`, // todo: custom `loading` page
             minify: !this.isDev
         })
         return html

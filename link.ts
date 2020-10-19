@@ -14,7 +14,7 @@ interface LinkProps {
 
 const fetchedPageModules = new Set<string>()
 
-export function Link({
+export default function Link({
     to,
     replace = false,
     prefetch: prefetchImmediately = false,
@@ -143,8 +143,8 @@ export function NavLink({
 
 interface ImportProps {
     from: string
+    name?: string // default is 'default'
     props?: Record<string, any>
-    placeholder?: ReactElement
     fallback?: ReactElement
 }
 
@@ -157,9 +157,14 @@ export function Import(props: ImportProps) {
         if (reModuleExt.test(__sourceFile)) {
             const p = util.splitPath(__importer)
             p.pop()
-            import(util.cleanPath("/_aleph/" + p.join('/') + '/' + props.from))
-                .then(({ default: Component }) => {
-                    setMod({ Component })
+            import(util.cleanPath('/_aleph/' + p.join('/') + '/' + props.from))
+                .then(mod => {
+                    const Component = mod[props.name || 'default']
+                    if (util.isLikelyReactComponent(Component)) {
+                        setMod({ Component })
+                    } else {
+                        setError(`component${props.name ? ` '${props.name}'` : ''} not found`)
+                    }
                 })
                 .catch((err: Error) => {
                     setError(err.message)
@@ -168,9 +173,6 @@ export function Import(props: ImportProps) {
     }, [__importer, __sourceFile])
 
     if (error) {
-        if (props.fallback) {
-            return props.fallback
-        }
         return React.createElement('div', { style: { color: 'red' } }, error)
     }
 
@@ -178,11 +180,8 @@ export function Import(props: ImportProps) {
         return React.createElement(mod.Component, props.props)
     }
 
-    if (reModuleExt.test(__sourceFile)) {
-        if (props.placeholder) {
-            return props.placeholder
-        }
-        return React.createElement('div', { style: { color: 'gray' } }, 'Loading...')
+    if (reModuleExt.test(__sourceFile) && props.fallback) {
+        return props.fallback
     }
 
     return null

@@ -2,81 +2,7 @@ import React, { Children, createElement, isValidElement, PropsWithChildren, Reac
 import type { AlephRuntime } from './types.ts'
 import util, { hashShort } from './util.ts'
 
-const serverHeadElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
-const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
-
-export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
-    const { __appRoot, __buildMode, __buildTarget } = (window as any).ALEPH as AlephRuntime
-    const tags: string[] = []
-    serverHeadElements.forEach(({ type, props }) => {
-        if (type === 'title') {
-            if (util.isNEString(props.children)) {
-                tags.push(`<title ssr>${props.children}</title>`)
-            } else if (util.isNEArray(props.children)) {
-                tags.push(`<title ssr>${props.children.join('')}</title>`)
-            }
-        } else {
-            const attrs = Object.keys(props)
-                .filter(key => key !== 'children')
-                .map(key => ` ${key}=${JSON.stringify(props[key])}`)
-                .join('')
-            if (util.isNEString(props.children)) {
-                tags.push(`<${type}${attrs} ssr>${props.children}</${type}>`)
-            } else if (util.isNEArray(props.children)) {
-                tags.push(`<${type}${attrs} ssr>${props.children.join('')}</${type}>`)
-            } else {
-                tags.push(`<${type}${attrs} ssr />`)
-            }
-        }
-    })
-    await Promise.all(styles?.filter(({ async }) => !!async).map(({ url, hash }) => {
-        return import('file://' + util.cleanPath(`${__appRoot}/.aleph/${__buildMode}.${__buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
-    }) || [])
-    styles?.forEach(({ url }) => {
-        if (serverStyles.has(url)) {
-            const { css, asLink } = serverStyles.get(url)!
-            if (asLink) {
-                tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(url)} />`)
-            } else {
-                tags.push(`<style type="text/css" data-module-id=${JSON.stringify(url)}>${css}</style>`)
-            }
-        }
-    })
-    serverHeadElements.clear()
-    return tags
-}
-
-export function applyCSS(id: string, css: string, asLink: boolean = false) {
-    if (window.Deno) {
-        serverStyles.set(id, { css, asLink })
-    } else {
-        const { document } = (window as any)
-        const styleEl = document.createElement(asLink ? 'link' : 'style')
-        const prevStyleEls = Array.from(document.head.children).filter((el: any) => el.getAttribute('data-module-id') === id)
-        if (asLink) {
-            styleEl.rel = 'stylesheet'
-            styleEl.href = css
-        } else {
-            styleEl.type = 'text/css'
-            styleEl.appendChild(document.createTextNode(css))
-        }
-        styleEl.setAttribute('data-module-id', id)
-        document.head.appendChild(styleEl)
-        if (prevStyleEls.length > 0) {
-            if (asLink) {
-                styleEl.addEventListener('load', () => {
-                    prevStyleEls.forEach(el => document.head.removeChild(el))
-                })
-            } else {
-                setTimeout(() => {
-                    prevStyleEls.forEach(el => document.head.removeChild(el))
-                }, 0)
-            }
-        }
-    }
-}
-
-export function Head({ children }: PropsWithChildren<{}>) {
+export default function Head({ children }: PropsWithChildren<{}>) {
     if (window.Deno) {
         parse(children).forEach(({ type, props }, key) => serverHeadElements.set(key, { type, props }))
     }
@@ -180,6 +106,80 @@ export function Viewport(props: ViewportProps) {
         undefined,
         createElement('meta', { name: 'viewport', content })
     )
+}
+
+const serverHeadElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
+const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
+
+export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
+    const { __appRoot, __buildMode, __buildTarget } = (window as any).ALEPH as AlephRuntime
+    const tags: string[] = []
+    serverHeadElements.forEach(({ type, props }) => {
+        if (type === 'title') {
+            if (util.isNEString(props.children)) {
+                tags.push(`<title ssr>${props.children}</title>`)
+            } else if (util.isNEArray(props.children)) {
+                tags.push(`<title ssr>${props.children.join('')}</title>`)
+            }
+        } else {
+            const attrs = Object.keys(props)
+                .filter(key => key !== 'children')
+                .map(key => ` ${key}=${JSON.stringify(props[key])}`)
+                .join('')
+            if (util.isNEString(props.children)) {
+                tags.push(`<${type}${attrs} ssr>${props.children}</${type}>`)
+            } else if (util.isNEArray(props.children)) {
+                tags.push(`<${type}${attrs} ssr>${props.children.join('')}</${type}>`)
+            } else {
+                tags.push(`<${type}${attrs} ssr />`)
+            }
+        }
+    })
+    await Promise.all(styles?.filter(({ async }) => !!async).map(({ url, hash }) => {
+        return import('file://' + util.cleanPath(`${__appRoot}/.aleph/${__buildMode}.${__buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
+    }) || [])
+    styles?.forEach(({ url }) => {
+        if (serverStyles.has(url)) {
+            const { css, asLink } = serverStyles.get(url)!
+            if (asLink) {
+                tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(url)} />`)
+            } else {
+                tags.push(`<style type="text/css" data-module-id=${JSON.stringify(url)}>${css}</style>`)
+            }
+        }
+    })
+    serverHeadElements.clear()
+    return tags
+}
+
+export function applyCSS(id: string, css: string, asLink: boolean = false) {
+    if (window.Deno) {
+        serverStyles.set(id, { css, asLink })
+    } else {
+        const { document } = (window as any)
+        const styleEl = document.createElement(asLink ? 'link' : 'style')
+        const prevStyleEls = Array.from(document.head.children).filter((el: any) => el.getAttribute('data-module-id') === id)
+        if (asLink) {
+            styleEl.rel = 'stylesheet'
+            styleEl.href = css
+        } else {
+            styleEl.type = 'text/css'
+            styleEl.appendChild(document.createTextNode(css))
+        }
+        styleEl.setAttribute('data-module-id', id)
+        document.head.appendChild(styleEl)
+        if (prevStyleEls.length > 0) {
+            if (asLink) {
+                styleEl.addEventListener('load', () => {
+                    prevStyleEls.forEach(el => document.head.removeChild(el))
+                })
+            } else {
+                setTimeout(() => {
+                    prevStyleEls.forEach(el => document.head.removeChild(el))
+                }, 0)
+            }
+        }
+    }
 }
 
 function parse(node: ReactNode, els: Map<string, { type: string, props: Record<string, any> }> = new Map()) {
