@@ -7,10 +7,10 @@ import util, { existsDirSync, existsFileSync } from './util.ts'
 import { version } from './version.ts'
 
 const commands = {
-    'init': 'Create a new app',
+    'init': 'Create a new appliaction',
     'dev': 'Start the app in development mode',
     'start': 'Start the app in production mode',
-    'build': 'Build & Export a static site',
+    'build': 'Build the app to a static site (SSG)',
     'upgrade': 'Upgrade Aleph.js command'
 }
 

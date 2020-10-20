@@ -77,7 +77,7 @@ export default async function (appDir: string, options: Record<string, string | 
     log.info(`${colors.dim('$')} cd ` + path.basename(appDir))
     log.info(`${colors.dim('$')} aleph ${colors.bold('dev')}    ${colors.dim('# start the app in `development` mode')}`)
     log.info(`${colors.dim('$')} aleph ${colors.bold('start')}  ${colors.dim('# start the app in `production` mode')}`)
-    log.info(`${colors.dim('$')} aleph ${colors.bold('build')}  ${colors.dim('# build & export a static site')}`)
+    log.info(`${colors.dim('$')} aleph ${colors.bold('build')}  ${colors.dim('# build the app to a static site (SSG)')}`)
     log.info('---')
     Deno.exit(0)
 }
