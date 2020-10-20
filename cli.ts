@@ -13,6 +13,7 @@ const commands = {
     'build': 'Build & Export a static site',
     'upgrade': 'Upgrade Aleph.js command'
 }
+
 const helpMessage = `Aleph.js v${version}
 The React Framework in deno.
 
@@ -60,13 +61,13 @@ async function main() {
     const command = (hasCommand ? String(args.shift()) : 'dev') as keyof typeof commands
 
     // prints aleph.js version
-    if (argOptions.v) {
+    if (argOptions.v && command != 'upgrade') {
         console.log(`aleph.js v${version}`)
         Deno.exit(0)
     }
 
     // prints aleph.js and deno version
-    if (argOptions.version) {
+    if (argOptions.version && command != 'upgrade') {
         const { deno, v8, typescript } = Deno.version
         console.log(`aleph.js ${version}`)
         console.log(`deno ${deno}`)
@@ -122,8 +123,8 @@ async function main() {
         if (imports['https://deno.land/x/aleph/']) {
             const match = String(imports['https://deno.land/x/aleph/']).match(/^http:\/\/(localhost|127.0.0.1):(\d+)\/$/)
             if (match) {
-                const port = parseInt(match[2])
                 const cwd = Deno.cwd()
+                const port = parseInt(match[2])
                 listenAndServe({ port }, async (req: ServerRequest) => {
                     const url = new URL('http://localhost' + req.url)
                     const resp = new Request(req, { pathname: util.cleanPath(url.pathname), params: {}, query: url.searchParams })
@@ -160,7 +161,7 @@ async function main() {
 
     import(`./cli/${command}.ts`).then(({ default: cmd }) => {
         if (command === 'upgrade') {
-            cmd()
+            cmd(argOptions.v || argOptions.version || 'latest')
         } else {
             const appDir = path.resolve(args[0] || '.')
             if (command !== 'init' && !existsDirSync(appDir)) {
