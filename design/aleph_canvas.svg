@@ -584,7 +584,7 @@
 	<rect x="323.2" y="187.1" class="st0" width="1" height="1"/>
 	<rect x="187.1" y="187.1" class="st0" width="1" height="1"/>
 	<rect x="119.1" y="187.1" class="st0" width="1" height="1"/>
-	<rect x="391.2" y="187.1" class="st0" width="1" height="1"/>
+	<rect x="391.2" y="187.1" class="st1" width="1" height="1"/>
 	<rect x="255.1" y="187.1" class="st0" width="1" height="1"/>
 	<rect x="68" y="187.1" class="st0" width="1" height="1"/>
 	<rect x="340.2" y="187.1" class="st0" width="1" height="1"/>
@@ -704,7 +704,7 @@
 	<rect x="323.2" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="187.1" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="119.1" y="204.1" class="st0" width="1" height="1"/>
-	<rect x="391.2" y="204.1" class="st0" width="1" height="1"/>
+	<rect x="391.2" y="204.1" class="st1" width="1" height="1"/>
 	<rect x="255.1" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="68" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="340.2" y="204.1" class="st0" width="1" height="1"/>
