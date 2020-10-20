@@ -765,6 +765,13 @@ export class Project {
         ].filter(Boolean).join(this.isDev ? '\n' : '')
         module.hash = getHash(module.jsContent)
         module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
+        module.deps = [
+            this.isDev && 'https://deno.land/x/aleph/hmr.ts',
+            'https://deno.land/x/aleph/bootstrap.ts'
+        ].filter(Boolean).map(url => ({
+            url: String(url),
+            hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
+        }))
 
         try {
             let prevHash = ''
