@@ -43,7 +43,7 @@ interface RenderResult {
 export class Project {
     readonly mode: 'development' | 'production'
     readonly appRoot: string
-    readonly config: Readonly<Config>
+    readonly config: Readonly<Required<Config>>
     readonly importMap: Readonly<{ imports: Record<string, string> }>
     readonly ready: Promise<void>
 
@@ -68,7 +68,9 @@ export class Project {
             },
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
-            env: {}
+            env: {},
+            reactUrl: 'https://esm.sh/react@16.14.0',
+            reactDomUrl: 'https://esm.sh/react-dom@16.14.0'
         }
         this.importMap = { imports: {} }
         this.ready = (async () => {
@@ -843,19 +845,16 @@ export class Project {
                     break
                 }
             }
-            if (dlUrl.startsWith('https://esm.sh/[')) {
-                dlUrl.replace(/\[([^\]]+)\]/, (_, s: string) => {
-                    const list = s.split(',').map(s => s.trim())
-                    if (list.length > 0) {
-                        const mod = util.trimPrefix(url, 'https://esm.sh/').replace(/\/+$/, '')
-                        if (!list.includes(mod)) {
-                            dlUrl = url
-                        }
-                    }
-                    return _
-                })
+            if (/^https?:\/\/[0-9a-z\.\-]+\/react(@[0-9a-z\.\-]+)?\/?$/i.test(url)) {
+                dlUrl = this.config.reactUrl
             }
-            if (url.startsWith('https://esm.sh/')) {
+            if (/^https?:\/\/[0-9a-z\.\-]+\/react\-dom(@[0-9a-z\.\-]+)?(\/server)?\/?$/i.test(url)) {
+                dlUrl = this.config.reactDomUrl
+                if (/\/server\/?$/i.test(url)) {
+                    dlUrl += '/server'
+                }
+            }
+            if (dlUrl.startsWith('https://esm.sh/')) {
                 const u = new URL(dlUrl)
                 u.searchParams.set('target', this.config.buildTarget)
                 if (this.isDev && !u.searchParams.has('dev')) {
@@ -972,7 +971,7 @@ export class Project {
                     this.isDev && `  _s();`,
                     `  const ref = useRef(null);`,
                     `  useEffect(() => {`,
-                    `    const appLinks = [];`,
+                    `    const anchors = [];`,
                     `    const onClick = e => {`,
                     `      e.preventDefault();`,
                     `      redirect(e.currentTarget.getAttribute("href"));`,
@@ -980,13 +979,13 @@ export class Project {
                     `    if (ref.current) {`,
                     `      ref.current.querySelectorAll("a").forEach(a => {`,
                     `        const href = a.getAttribute("href");`,
-                    `        if (href && !/^(https?|mailto|file):/i.test(href)) {`,
+                    `        if (href && !/^[a-z0-9]+:/i.test(href)) {`,
                     `          a.addEventListener("click", onClick, false);`,
-                    `          appLinks.push(a);`,
+                    `          anchors.push(a);`,
                     `        }`,
                     `      });`,
                     `    }`,
-                    `    return () => appLinks.forEach(a => a.removeEventListener("click", onClick));`,
+                    `    return () => anchors.forEach(a => a.removeEventListener("click", onClick));`,
                     `  }, []);`,
                     `  return React.createElement("div", {className: "markdown-page", ref, dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}});`,
                     `}`,

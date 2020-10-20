@@ -6,22 +6,36 @@ export interface AlephEnv {
 }
 
 export interface SSROptions {
-    readonly fallback?: string // default is '_fallback.html'
-    readonly include?: RegExp[]
-    readonly exclude?: RegExp[]
-    readonly staticPaths?: string[]
+    fallback?: string // default is '_fallback.html'
+    include?: RegExp[]
+    exclude?: RegExp[]
+    staticPaths?: string[]
 }
 
+/** Config for Aleph.js */
 export interface Config {
-    srcDir: string
-    outputDir: string
-    baseUrl: string
-    defaultLocale: string
-    locales: string[]
-    ssr: boolean | SSROptions
-    buildTarget: string
-    sourceMap: boolean
-    env: Record<string, string>
+    /** `srcDir` to put all your app `pages`, app.tsx, etc directories (default is '/') */
+    srcDir?: string
+    /** `outputDir` specifies the output directory for `build` command (default is 'dist') */
+    outputDir?: string
+    /** `baseUrl` specifies the path prefix for the application (default is '/') */
+    baseUrl?: string
+    /** `reactUrl` specifies the **react** url (default is 'https://esm.sh/react@16.14.0') */
+    reactUrl?: string
+    /** `reactDomUrl` specifies the **react-dom** url (default is 'https://esm.sh/react-dom@16.14.0') */
+    reactDomUrl?: string
+    /** `defaultLocale` specifies the default locale of the application (default is 'en') */
+    defaultLocale?: string
+    /** A list of locales */
+    locales?: string[]
+    /** Option for **SSR** */
+    ssr?: boolean | SSROptions
+    /** `buildTarget` specifies the build taget for **tsc** (possible values: `ES2015-ES2020, ESNext`, default is ES2015 for production and ES2018 for development) */
+    buildTarget?: string
+    /** Enable sourceMap in **production** mode (default is false) */
+    sourceMap?: boolean
+    /** `env` defines the `Window.ALEPH.ENV` object in the application */
+    env?: Record<string, string>
 }
 
 export interface APIHandler {

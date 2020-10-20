@@ -1,4 +1,4 @@
-import runtime from 'https://esm.sh/react-refresh/runtime?dev'
+import runtime from 'https://esm.sh/react-refresh@0.8.3/runtime'
 import events from './events.ts'
 import util, { hashShort } from './util.ts'
 
