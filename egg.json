@@ -3,15 +3,18 @@
   "version": "0.2.9",
   "description": "The React Framework in Deno, inspired by Next.js.",
   "repository": "https://github.com/postui/aleph.js",
-  "stable": false,
-  "entry": "./mod.ts",
+  "entry": "/mod.ts",
   "files": [
     "./*.ts",
     "./cli/**/*",
     "./tsc/**/*",
     "./vendor/**/*",
     "./README.md",
-    "./LICENSE"
+    "./LICENSE",
+    "./mod.ts"
   ],
-  "checkTests": true
+  "checkFormat": false,
+  "checkTests": true,
+  "checkAll": true,
+  "unlisted": false
 }
