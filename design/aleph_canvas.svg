@@ -426,7 +426,6 @@
 	<rect x="476.2" y="374.2" class="st0" width="1" height="1"/>
 	<rect x="748.3" y="374.2" class="st0" width="1" height="1"/>
 	<polyline class="st0" points="766.3,374.2 765.3,374.2 765.3,375.2 	"/>
-	<rect x="782.4" y="391.2" class="st0" width="1" height="1"/>
 	<rect x="612.3" y="374.2" class="st0" width="1" height="1"/>
 	<rect x="544.2" y="374.2" class="st0" width="1" height="1"/>
 	<rect x="680.3" y="374.2" class="st0" width="1" height="1"/>
@@ -1008,6 +1007,4 @@
 	<polyline class="st2" points="413.2,218.8 386.9,173.2 351.3,235 	"/>
 	<polyline class="st2" points="391.5,181.4 365.2,226.9 436.5,226.9 	"/>
 </g>
-<rect class="st0" width="1" height="1"/>
-<rect x="17" y="17" class="st0" width="1" height="1"/>
 </svg>
