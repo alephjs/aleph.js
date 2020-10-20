@@ -34,7 +34,7 @@ export const helpMessage = `
 Usage:
     aleph init <dir> [...options]
 
-<dir> represents the directory of the aleph app,
+<dir> represents the directory of Aleph.js app,
 if the <dir> is empty, the current directory will be used.
 
 Options:

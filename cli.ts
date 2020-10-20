@@ -93,7 +93,7 @@ async function main() {
     }
 
     // sets log level
-    const l = argOptions.l || argOptions.log
+    const l = argOptions.L || argOptions['log-level']
     if (util.isNEString(l)) {
         log.setLevel(l)
     }
