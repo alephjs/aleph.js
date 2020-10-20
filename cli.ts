@@ -123,10 +123,11 @@ async function main() {
             const match = String(imports['https://deno.land/x/aleph/']).match(/^http:\/\/(localhost|127.0.0.1):(\d+)\/$/)
             if (match) {
                 const port = parseInt(match[2])
+                const cwd = Deno.cwd()
                 listenAndServe({ port }, async (req: ServerRequest) => {
                     const url = new URL('http://localhost' + req.url)
                     const resp = new Request(req, { pathname: util.cleanPath(url.pathname), params: {}, query: url.searchParams })
-                    const filepath = path.join(Deno.cwd(), url.pathname)
+                    const filepath = path.join(cwd, url.pathname)
                     try {
                         const info = await Deno.lstat(filepath)
                         if (info.isDirectory) {

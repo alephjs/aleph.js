@@ -1,7 +1,6 @@
-export interface AlephRuntime {
-    readonly env: Record<string, string>
+export interface AlephEnv {
+    [key: string]: string
     readonly __version: string
-    readonly __appRoot: string
     readonly __buildMode: string
     readonly __buildTarget: string
 }
@@ -25,17 +24,14 @@ export interface Config {
     env: Record<string, string>
 }
 
+export interface APIHandler {
+    (req: APIRequest): void
+}
+
 export interface APIRequestURL {
     readonly pathname: string
     readonly params: Record<string, string>
     readonly query: URLSearchParams
-}
-
-export interface Response {
-    status?: number
-    headers?: Headers
-    trailers?: () => Promise<Headers> | Headers
-    body?: Uint8Array | Deno.Reader | string
 }
 
 export interface APIRequest {
@@ -64,8 +60,11 @@ export interface APIRequest {
     end(code: number): Promise<void>
 }
 
-export interface APIHandler {
-    (req: APIRequest): void
+export interface Response {
+    status?: number
+    headers?: Headers
+    trailers?: () => Promise<Headers> | Headers
+    body?: Uint8Array | Deno.Reader | string
 }
 
 export interface RouterURL {

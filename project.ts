@@ -8,7 +8,7 @@ import log from './log.ts'
 import { getPagePath, RouteModule, Routing } from './routing.ts'
 import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
-import type { AlephRuntime, APIHandler, Config, RouterURL } from './types.ts'
+import type { AlephEnv, APIHandler, Config, RouterURL } from './types.ts'
 import util, { existsDirSync, existsFileSync, hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
@@ -502,14 +502,16 @@ export class Project {
             await ensureDir(this.buildDir)
         }
 
+        Deno.chdir(this.appRoot)
         Object.assign(globalThis, {
             ALEPH: {
-                env: { ...this.config.env },
-                __version: version,
-                __appRoot: this.appRoot,
-                __buildMode: this.mode,
-                __buildTarget: this.config.buildTarget,
-            } as AlephRuntime,
+                ENV: {
+                    ...this.config.env,
+                    __version: version,
+                    __buildMode: this.mode,
+                    __buildTarget: this.config.buildTarget,
+                } as AlephEnv
+            },
             document: new Document(),
             innerWidth: 1920,
             innerHeight: 1080,
@@ -757,6 +759,7 @@ export class Project {
         module.jsContent = [
             this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
             'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js";',
+            `Object.assign(window, ${JSON.stringify({ ALEPH: (globalThis as any)['ALEPH'] }, undefined, this.isDev ? 4 : undefined)});`,
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
         ].filter(Boolean).join(this.isDev ? '\n' : '')
         module.hash = getHash(module.jsContent)
