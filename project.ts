@@ -748,23 +748,21 @@ export class Project {
         }
         const module = this._moduleFromURL('/main.js')
         const metaFile = path.join(this.buildDir, 'main.meta.json')
-        const deps = [
-            this.isDev && 'https://deno.land/x/aleph/hmr.ts',
-            'https://deno.land/x/aleph/bootstrap.ts'
-        ].filter(Boolean).map(url => ({
-            url: String(url),
-            hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
-        }))
 
         module.jsContent = [
             this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
+            'import "./-/deno.land/x/aleph/aleph.js";',
+            'import "./-/deno.land/x/aleph/context.js";',
+            'import "./-/deno.land/x/aleph/error.js";',
+            'import "./-/deno.land/x/aleph/events.js";',
+            'import "./-/deno.land/x/aleph/routing.js";',
+            'import "./-/deno.land/x/aleph/util.js";',
             'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js";',
             `Object.assign(window, ${JSON.stringify({ ALEPH: (globalThis as any)['ALEPH'] }, undefined, this.isDev ? 4 : undefined)});`,
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
         ].filter(Boolean).join(this.isDev ? '\n' : '')
         module.hash = getHash(module.jsContent)
         module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
-        module.deps = deps
 
         try {
             let prevHash = ''
