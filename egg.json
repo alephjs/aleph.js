@@ -9,6 +9,7 @@
     "./cli/**/*",
     "./tsc/**/*",
     "./vendor/**/*",
+    "./design/aleph_canvas.svg",
     "./README.md",
     "./LICENSE",
     "./mod.ts"
