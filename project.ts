@@ -158,6 +158,7 @@ export class Project {
         }
         if (!this.#modules.has(modId)) {
             log.warn(`can't get the module by path '${pathname}(${modId})'`)
+            console.log(Array.from(this.#modules.keys()))
         }
         return this.getModule(modId)
     }
@@ -1368,7 +1369,10 @@ function relativePath(from: string, to: string): string {
 function renameImportUrl(importUrl: string): string {
     const isRemote = reHttp.test(importUrl)
     const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
-    const ext = path.extname(path.basename(url.pathname)) || '.js'
+    let ext = path.extname(path.basename(url.pathname)) || '.js'
+    if (isRemote && !reModuleExt.test(ext) && !reStyleModuleExt.test(ext) && !reMDExt.test(ext)) {
+        ext = '.js'
+    }
     let pathname = util.trimSuffix(url.pathname, ext)
     let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
     if (search.length > 0) {
