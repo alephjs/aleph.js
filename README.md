@@ -1,4 +1,4 @@
-![Aleph Canvas](./design/aleph_canvas.svg)
+![Aleph Poster](./design/poster.svg)
 
 # Aleph.js
 

@@ -3,7 +3,7 @@
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 783.4 392.2" style="enable-background:new 0 0 783.4 392.2;" xml:space="preserve">
 <style type="text/css">
-	.st0{fill:#999999;}
+	.st0{fill:#AAAAAA;}
 	.st1{fill:none;}
 	.st2{fill:none;stroke:#D63369;stroke-width:3;stroke-miterlimit:10;}
 </style>
@@ -703,7 +703,7 @@
 	<rect x="323.2" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="187.1" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="119.1" y="204.1" class="st0" width="1" height="1"/>
-	<rect x="391.2" y="204.1" class="st1" width="1" height="1"/>
+	<rect x="391.2" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="255.1" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="68" y="204.1" class="st0" width="1" height="1"/>
 	<rect x="340.2" y="204.1" class="st0" width="1" height="1"/>
@@ -835,7 +835,7 @@
 	<rect x="289.1" y="221.1" class="st0" width="1" height="1"/>
 	<rect x="153.1" y="221.1" class="st0" width="1" height="1"/>
 	<rect x="85" y="221.1" class="st0" width="1" height="1"/>
-	<rect x="357.2" y="221.1" class="st1" width="1" height="1"/>
+	<rect x="357.2" y="221.1" class="st0" width="1" height="1"/>
 	<rect x="221.1" y="221.1" class="st0" width="1" height="1"/>
 	<rect x="34" y="221.1" class="st0" width="1" height="1"/>
 	<rect x="306.1" y="221.1" class="st0" width="1" height="1"/>
@@ -1001,10 +1001,10 @@
 	<rect x="272.1" y="238.1" class="st0" width="1" height="1"/>
 </g>
 <g id="Aleph">
-	<path class="st2" d="M396.5,157.1c13.4,23.2,26.8,46.4,40.2,69.7c-1.6,2.7-3.3,5.5-4.9,8.2c-26.8,0-53.7,0-80.5,0
-		c-1.5-2.7-3.1-5.4-4.6-8.1c13.4-23.2,26.8-46.5,40.3-69.7C390.1,157.2,393.3,157.2,396.5,157.1z"/>
-	<polyline class="st2" points="369.9,218.9 422.5,218.9 386.8,157.1 	"/>
-	<polyline class="st2" points="413.2,218.8 386.9,173.2 351.3,235 	"/>
-	<polyline class="st2" points="391.5,181.4 365.2,226.9 436.5,226.9 	"/>
+	<path class="st2" d="M396.5,155.6c13.4,23.2,26.8,46.4,40.2,69.7c-1.6,2.7-3.3,5.5-4.9,8.2c-26.8,0-53.7,0-80.5,0
+		c-1.5-2.7-3.1-5.4-4.6-8.1c13.4-23.2,26.8-46.5,40.3-69.7C390.1,155.6,393.3,155.6,396.5,155.6z"/>
+	<polyline class="st2" points="369.9,217.3 422.5,217.3 386.8,155.6 	"/>
+	<polyline class="st2" points="413.2,217.2 386.9,171.7 351.3,233.4 	"/>
+	<polyline class="st2" points="391.5,179.9 365.2,225.4 436.5,225.4 	"/>
 </g>
 </svg>
