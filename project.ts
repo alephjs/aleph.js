@@ -211,7 +211,7 @@ export class Project {
         return null
     }
 
-    async getPageData(loc: { pathname: string, search?: string }): Promise<[number, any]> {
+    async getSSRData(loc: { pathname: string, search?: string }): Promise<[number, any]> {
         if (!this.isSSRable(loc.pathname)) {
             return [404, null]
         }
@@ -220,10 +220,10 @@ export class Project {
         return [status, data]
     }
 
-    async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string]> {
+    async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string, Record<string, string> | null]> {
         if (!this.isSSRable(loc.pathname)) {
             const [url] = this.#routing.createRouter(loc)
-            return [url.pagePath === '' ? 404 : 200, await this.getSPAIndexHtml()]
+            return [url.pagePath === '' ? 404 : 200, await this.getSPAIndexHtml(), null]
         }
 
         const { baseUrl } = this.config
@@ -240,7 +240,7 @@ export class Project {
             body,
             minify: !this.isDev
         })
-        return [status, html]
+        return [status, html, data]
     }
 
     async getSPAIndexHtml() {
@@ -305,13 +305,12 @@ export class Project {
             }
             await Promise.all(Array.from(paths).map(async pathname => {
                 if (this.isSSRable(pathname)) {
-                    const [status, html] = await this.getPageHtml({ pathname })
+                    const [status, html, data] = await this.getPageHtml({ pathname })
                     if (status == 200) {
-                        const [_, data] = await this.getPageData({ pathname })
                         const htmlFile = path.join(outputDir, pathname, 'index.html')
-                        const dataFile = path.join(outputDir, '_aleph/data', pathname, 'data.js')
                         await writeTextFile(htmlFile, html)
                         if (data) {
+                            const dataFile = path.join(outputDir, '_aleph/data', pathname, 'data.js')
                             await writeTextFile(dataFile, `export default ` + JSON.stringify(data))
                         }
                         log.info('    ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
@@ -548,7 +547,6 @@ export class Project {
 
         const precompileUrls = [
             'https://deno.land/x/aleph/bootstrap.ts',
-            'https://deno.land/x/aleph/renderer.ts',
             'https://deno.land/x/aleph/nomodule.ts',
             'https://deno.land/x/aleph/tsc/tslib.js',
         ]
@@ -558,9 +556,9 @@ export class Project {
         for (const url of precompileUrls) {
             await this._compile(url)
         }
+        await this._compile('https://deno.land/x/aleph/renderer.ts', { forceTarget: 'es2020' })
         await this._createMainModule()
 
-        // ensure react in deno is same with browser one
         const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
         this.#renderer = { renderPage, renderHead }
 
@@ -773,21 +771,7 @@ export class Project {
             hash: this.#modules.get(String(url).replace(reHttp, '//').replace(reModuleExt, '.js'))?.hash || ''
         }))
 
-        try {
-            let prevHash = ''
-            if (this.#modules.has(module.id)) {
-                prevHash = this.#modules.get(module.id)!.hash
-            } else if (existsFileSync(metaFile)) {
-                const { hash } = JSON.parse(await Deno.readTextFile(metaFile))
-                if (util.isNEString(hash)) {
-                    prevHash = hash
-                }
-            }
-            if (prevHash !== '') {
-                await Deno.remove(path.join(this.buildDir, `main.${prevHash.slice(0, hashShort)}.js`))
-            }
-        } catch (e) { }
-
+        await cleanupCompilation(module.jsFile)
         await Promise.all([
             writeTextFile(module.jsFile, module.jsContent),
             writeTextFile(metaFile, JSON.stringify({
@@ -803,7 +787,7 @@ export class Project {
     }
 
     // todo: force recompile remote modules which URL don't specify version
-    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean }) {
+    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean, forceTarget?: string }) {
         const mod = this._moduleFromURL(url)
         if (this.#modules.has(mod.id) && !options?.forceCompile) {
             return this.#modules.get(mod.id)!
@@ -1006,7 +990,7 @@ export class Project {
                 const useDenos: string[] = []
                 const compileOptions = {
                     mode: this.mode,
-                    target: this.config.buildTarget,
+                    target: options?.forceTarget || this.config.buildTarget,
                     reactRefresh: this.isDev && !mod.isRemote,
                     rewriteImportPath: (path: string, async?: boolean) => this._rewriteImportPath(mod, path, async),
                     signUseDeno: (id: string) => {
@@ -1086,13 +1070,8 @@ export class Project {
         }
 
         if (fsync) {
-            if (mod.jsFile != '') {
-                try {
-                    await Deno.remove(mod.jsFile)
-                    await Deno.remove(mod.jsFile + '.map')
-                } catch (e) { }
-            }
             mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + '.js'
+            await cleanupCompilation(mod.jsFile)
             await Promise.all([
                 writeTextFile(metaFile, JSON.stringify({
                     url,
@@ -1244,7 +1223,7 @@ export class Project {
             if (this.isDev) {
                 log.warn(`page '${url.pathname}' not found`)
             }
-            return this._render404Page(url)
+            return await this._render404Page(url)
         }
         try {
             const appModule = this.#modules.get('/app.js')
@@ -1424,4 +1403,22 @@ async function writeTextFile(filepath: string, content: string) {
     const dir = path.dirname(filepath)
     await ensureDir(dir)
     await Deno.writeTextFile(filepath, content)
+}
+
+async function cleanupCompilation(jsFile: string) {
+    const dir = path.dirname(jsFile)
+    const jsFileName = path.basename(jsFile)
+    if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {
+        return
+    }
+    const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'
+    for await (const entry of Deno.readDir(dir)) {
+        if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
+            const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
+            if (_jsName === jsName && jsFileName !== entry.name) {
+                log.debug('cleanup', jsFileName, '->', entry.name)
+                await Deno.remove(path.join(dir, entry.name))
+            }
+        }
+    }
 }

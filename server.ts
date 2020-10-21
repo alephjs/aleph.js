@@ -72,7 +72,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                     if (pathname.startsWith('/_aleph/')) {
                         if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('/data.js')) {
                             const [p, s] = util.splitBy(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data'), '/data.js'), '@')
-                            const [status, data] = await project.getPageData({ pathname: p, search: s })
+                            const [status, data] = await project.getSSRData({ pathname: p, search: s })
                             if (status === 200) {
                                 resp.send(`export default ` + JSON.stringify(data), 'application/javascript; charset=utf-8')
                             } else {
