@@ -414,26 +414,26 @@ export class Project {
         }
 
         const config: Record<string, any> = {}
-        for await (const { path: p } of walk(this.srcDir, { includeDirs: false, exts: ['.js', '.mjs', '.ts', '.json'], skip: [/\.d\.ts$/i], maxDepth: 1 })) {
-            const name = path.basename(p)
-            if (name.split('.')[0] === 'config') {
-                if (reModuleExt.test(name)) {
-                    const { default: conf } = await import('file://' + p)
+        for (const name of Array.from(['aleph.config', 'config']).map(name => ['ts', 'js', 'mjs', 'json'].map(ext => `${name}.${ext}`)).flat()) {
+            const p = path.join(this.srcDir, name)
+            if (existsFileSync(p)) {
+                if (name.endsWith('.json')) {
+                    const conf = JSON.parse(await Deno.readTextFile(p))
                     if (util.isPlainObject(conf)) {
                         Object.assign(config, conf)
                         Object.assign(this.config, { __file: name })
                     }
-                } else if (name.endsWith('.json')) {
-                    try {
-                        const conf = JSON.parse(await Deno.readTextFile(p))
-                        if (util.isPlainObject(conf)) {
-                            Object.assign(config, conf)
-                            Object.assign(this.config, { __file: name })
-                        }
-                    } catch (e) {
-                        log.fatal('parse config.json:', e.message)
+                } else {
+                    let { default: conf } = await import('file://' + p)
+                    if (util.isFunction(conf)) {
+                        conf = await conf()
+                    }
+                    if (util.isPlainObject(conf)) {
+                        Object.assign(config, conf)
+                        Object.assign(this.config, { __file: name })
                     }
                 }
+                break
             }
         }
 
@@ -504,7 +504,6 @@ export class Project {
             await ensureDir(this.buildDir)
         }
 
-        Deno.chdir(this.appRoot)
         Object.assign(globalThis, {
             ALEPH: {
                 ENV: {
@@ -521,6 +520,7 @@ export class Project {
             $RefreshReg$: () => { },
             $RefreshSig$: () => (type: any) => type,
         })
+        Deno.chdir(this.appRoot)
 
         for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.jsx', '.tsx'] })) {
             const name = path.basename(p)
@@ -540,7 +540,7 @@ export class Project {
             }
         }
 
-        for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md', '.mdx'] })) {
+        for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md'] })) {
             const rp = util.trimPrefix(p, pagesDir)
             const mod = await this._compile('/pages' + rp)
             this.#routing.update(this._getRouteModule(mod))
