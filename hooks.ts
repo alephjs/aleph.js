@@ -13,8 +13,8 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), browser?: boo
     const { pathname, query } = useRouter()
     const [data, setDate] = useState(() => {
         const global = window as any
-        const { _useDenoAsyncData: asyncData } = global
         const useDenoUrl = `useDeno://${pathname}?${query.toString()}`
+        const { [`__asyncData_${useDenoUrl}`]: asyncData } = global
         const key = `${useDenoUrl}#${id}`
         if (asyncData && key in asyncData) {
             return asyncData[key]

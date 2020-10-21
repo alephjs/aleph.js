@@ -48,7 +48,6 @@ export async function renderPage(
     const data: Record<string, any> = {}
     const useDenEvent = `useDeno://${url.pathname + '?' + url.query.toString()}`
     const useDenoAsyncCalls: Array<Promise<any>> = []
-    const orginFetch = window.fetch
     events.on(useDenEvent, (id: string, ret: any, async: boolean) => {
         if (async) {
             useDenoAsyncCalls.push(ret)
@@ -56,13 +55,7 @@ export async function renderPage(
             data[id] = ret
         }
     })
-    Object.assign(window, {
-        _useDenoAsyncData: {},
-        fetch: (input: Request | URL | string, init?: RequestInit) => {
-            console.log(`[ renderer ] fetch '${input}' ...`)
-            return orginFetch(input, init)
-        }
-    })
+    Object.assign(window, { [`__asyncData_${useDenEvent}`]: {} })
     while (true) {
         try {
             if (useDenoAsyncCalls.length > 0) {
@@ -82,11 +75,12 @@ export async function renderPage(
             if (error instanceof AsyncUseDenoError) {
                 continue
             }
-            Object.assign(window, { _useDenoAsyncData: null, fetch: orginFetch })
+            console.log(error)
+            Object.assign(window, { [`__asyncData_${useDenEvent}`]: null })
             throw error
         }
     }
-    Object.assign(window, { _useDenoAsyncData: null, fetch: orginFetch })
+    Object.assign(window, { [`__asyncData_${useDenEvent}`]: null })
     events.removeAllListeners(useDenEvent)
     return [html, Object.keys(data).length > 0 ? data : null]
 }
