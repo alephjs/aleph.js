@@ -16,7 +16,7 @@ You will need [Deno](https://deno.land/) 1.4+ and [VS Code](https://code.visuals
 4. Change code then run examples.
 
 ```bash
-deno run -A --unstable --importmap=import_map.json cli.ts ./examples/hello-world --log=debug
+deno run -A --unstable --importmap=import_map.json cli.ts ./examples/hello-world -L debug
 ```
 
 ## Testing
