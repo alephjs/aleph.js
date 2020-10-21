@@ -1420,7 +1420,6 @@ async function cleanupCompilation(jsFile: string) {
         if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
             const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
             if (_jsName === jsName && jsFileName !== entry.name) {
-                log.debug('cleanup', jsFileName, '->', entry.name)
                 await Deno.remove(path.join(dir, entry.name))
             }
         }
