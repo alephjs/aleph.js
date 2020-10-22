@@ -1,12 +1,14 @@
+import { compress as brotli } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from './log.ts'
-import type { ServerRequest } from './std.ts'
-import type { APIRequest, APIRequestURL, Response } from './types.ts'
+import { ServerRequest } from './std.ts'
+import type { APIRequest } from './types.ts'
 
-export class Request implements APIRequest {
-    #req: ServerRequest
-    #url: APIRequestURL
-    #cookies: ReadonlyMap<string, string> = new Map()
+export class Request extends ServerRequest implements APIRequest {
+    #pathname: string
+    #params: Record<string, string>
+    #query: URLSearchParams
+    #cookies: ReadonlyMap<string, string>
     #resp = {
         status: 200,
         headers: new Headers({
@@ -16,65 +18,41 @@ export class Request implements APIRequest {
         done: false
     }
 
-    constructor(req: ServerRequest, url: APIRequestURL) {
-        this.#req = req
-        this.#url = url
+    constructor(req: ServerRequest, pathname: string, params: Record<string, string>, query: URLSearchParams) {
+        super()
+        this.conn = req.conn
+        this.r = req.r
+        this.w = req.w
+        this.method = req.method
+        this.url = req.url
+        this.proto = req.proto
+        this.protoMinor = req.protoMinor
+        this.protoMajor = req.protoMajor
+        this.headers = req.headers
+        this.done = req.done
+        this.#pathname = pathname
+        this.#params = params
+        this.#query = query
+        const cookies = new Map()
+        this.headers.get('cookie')?.split(';').forEach(cookie => {
+            const p = cookie.trim().split('=')
+            if (p.length >= 2) {
+                cookies.set(p.shift()!.trim(), decodeURI(p.join('=')))
+            }
+        })
+        this.#cookies = cookies
     }
 
-    get method(): string {
-        return this.#req.method
+    get pathname(): string {
+        return this.#pathname
     }
 
-    get proto() {
-        return this.#req.proto
+    get params(): Record<string, string> {
+        return this.#params
     }
 
-    get protoMinor() {
-        return this.#req.protoMinor
-    }
-
-    get protoMajor() {
-        return this.#req.protoMajor
-    }
-
-    get conn() {
-        return this.#req.conn
-    }
-
-    get r() {
-        return this.#req.r
-    }
-
-    get w() {
-        return this.#req.w
-    }
-
-    get done() {
-        return this.#req.done
-    }
-
-    get contentLength() {
-        return this.#req.contentLength
-    }
-
-    get body() {
-        return this.#req.body
-    }
-
-    async respond(r: Response) {
-        return this.#req.respond(r)
-    }
-
-    async finalize() {
-        return this.#req.finalize()
-    }
-
-    get url(): APIRequestURL {
-        return this.#url
-    }
-
-    get headers(): Headers {
-        return this.#req.headers
+    get query(): URLSearchParams {
+        return this.#query
     }
 
     get cookies(): ReadonlyMap<string, string> {
@@ -102,11 +80,11 @@ export class Request implements APIRequest {
         return this
     }
 
-    json(data: any, replacer?: (this: any, key: string, value: any) => any, space?: string | number) {
-        return this.send(JSON.stringify(data, replacer, space), 'application/json')
+    async json(data: any, replacer?: (this: any, key: string, value: any) => any, space?: string | number): Promise<void> {
+        await this.send(JSON.stringify(data, replacer, space), 'application/json; charset=utf-8')
     }
 
-    async send(data: string | Uint8Array | ArrayBuffer, contentType?: string) {
+    async send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void> {
         if (this.#resp.done) {
             log.warn('ServerRequest: repeat respond calls')
             return
@@ -125,41 +103,36 @@ export class Request implements APIRequest {
             this.#resp.headers.set('Content-Type', contentType)
         } else if (this.#resp.headers.has('Content-Type')) {
             contentType = this.#resp.headers.get('Content-Type')!
+        } else if (typeof data === 'string' && data.length > 0) {
+            contentType = 'text/plain; charset=utf-8'
         }
         let isText = false
         if (contentType) {
             if (contentType.startsWith('text/')) {
                 isText = true
-            } else if (/^application\/(javascript|typecript|json|xml)/.test(contentType)) {
+            } else if (/^application\/(javascript|typecript|json|xml)/i.test(contentType)) {
                 isText = true
-            } else if (/^image\/svg+xml/.test(contentType)) {
+            } else if (/^image\/svg+xml/i.test(contentType)) {
                 isText = true
             }
         }
-        if (isText && body.length > 1024 && this.#req.headers.get('accept-encoding')?.includes('gzip')) {
-            this.#resp.headers.set('Vary', 'Origin')
-            this.#resp.headers.set('Content-Encoding', 'gzip')
-            body = gzipEncode(body)
+        if (isText && body.length > 1024) {
+            if (this.headers.get('accept-encoding')?.includes('br')) {
+                this.#resp.headers.set('Vary', 'Origin')
+                this.#resp.headers.set('Content-Encoding', 'br')
+                body = brotli(body)
+            } else if (this.headers.get('accept-encoding')?.includes('gzip')) {
+                this.#resp.headers.set('Vary', 'Origin')
+                this.#resp.headers.set('Content-Encoding', 'gzip')
+                body = gzipEncode(body)
+            }
         }
         this.#resp.headers.set('Date', (new Date).toUTCString())
         this.#resp.done = true
-        return this.#req.respond({
+        await this.respond({
             status: this.#resp.status,
             headers: this.#resp.headers,
             body
-        }).catch(err => log.warn('ServerRequest.respond:', err.message))
-    }
-
-    async end(status: number) {
-        if (this.#resp.done) {
-            log.warn('ServerRequest: repeat respond calls')
-            return
-        }
-        this.#resp.headers.set('Date', (new Date).toUTCString())
-        this.#resp.done = true
-        return this.#req.respond({
-            status,
-            headers: this.#resp.headers,
         }).catch(err => log.warn('ServerRequest.respond:', err.message))
     }
 }

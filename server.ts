@@ -17,7 +17,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
             for await (const req of s) {
                 const url = new URL('http://localhost/' + req.url)
                 const pathname = util.cleanPath(url.pathname)
-                const resp = new Request(req, { pathname, params: {}, query: url.searchParams })
+                const resp = new Request(req, pathname, {}, url.searchParams)
 
                 try {
                     // serve hmr ws
@@ -76,7 +76,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                             if (status === 200) {
                                 resp.send(`export default ` + JSON.stringify(data), 'application/javascript; charset=utf-8')
                             } else {
-                                resp.end(status)
+                                resp.status(status).send('')
                             }
                             continue
                         } else if (pathname.endsWith('.css')) {
@@ -92,7 +92,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                             if (mod) {
                                 const etag = req.headers.get('If-None-Match')
                                 if (etag && etag === mod.hash) {
-                                    resp.end(304)
+                                    resp.status(304).send('')
                                     continue
                                 }
 
@@ -117,7 +117,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                     if (existsFileSync(filePath)) {
                         const info = await Deno.lstat(filePath)
                         if (info.mtime?.toUTCString() === req.headers.get('If-Modified-Since')) {
-                            resp.end(304)
+                            resp.status(304).send('')
                             continue
                         }
 
@@ -148,5 +148,3 @@ export async function start(appDir: string, port: number, isDev = false, reload 
         }
     }
 }
-
-

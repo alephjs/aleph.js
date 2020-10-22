@@ -127,7 +127,7 @@ async function main() {
                 const port = parseInt(match[2])
                 listenAndServe({ port }, async (req: ServerRequest) => {
                     const url = new URL('http://localhost' + req.url)
-                    const resp = new Request(req, { pathname: util.cleanPath(url.pathname), params: {}, query: url.searchParams })
+                    const resp = new Request(req, util.cleanPath(url.pathname), {}, url.searchParams)
                     const filepath = path.join(cwd, url.pathname)
                     try {
                         const info = await Deno.lstat(filepath)
@@ -148,10 +148,10 @@ async function main() {
                         resp.send(await Deno.readFile(filepath), getContentType(filepath))
                     } catch (err) {
                         if (err instanceof Deno.errors.NotFound) {
-                            resp.status(404).send('file not found', 'text/plain')
+                            resp.status(404).send('file not found')
                             return
                         }
-                        resp.status(500).send(err.message, 'text/plain')
+                        resp.status(500).send(err.message)
                     }
                 })
                 log.info(`Proxy https://deno.land/x/aleph on http://localhost:${port}`)

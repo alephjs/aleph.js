@@ -185,7 +185,7 @@ export class Project {
                 try {
                     const { default: handle } = await import('file://' + this.#modules.get(moduleID)!.jsFile)
                     if (util.isFunction(handle)) {
-                        await handle(new Request(req, url))
+                        await handle(new Request(req, url.pathname, url.params, url.query))
                     } else {
                         req.respond({
                             status: 500,
