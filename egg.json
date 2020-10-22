@@ -1,9 +1,9 @@
 {
   "name": "aleph",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "The React Framework in Deno, inspired by Next.js.",
   "repository": "https://github.com/postui/aleph.js",
-  "entry": "/mod.ts",
+  "entry": "./mod.ts",
   "files": [
     "./*.ts",
     "./cli/**/*",
