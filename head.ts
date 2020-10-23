@@ -1,6 +1,68 @@
+import unescape from 'https://esm.sh/lodash/unescape?no-check'
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useEffect } from 'https://esm.sh/react'
 import type { AlephEnv } from './types.ts'
 import util, { hashShort } from './util.ts'
+
+const serverHeadElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
+const serverScriptsElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
+const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
+
+export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
+    const { __buildMode, __buildTarget } = (window as any).ALEPH.ENV as AlephEnv
+    const tags: string[] = []
+    serverHeadElements.forEach(({ type, props }) => {
+        if (type === 'title') {
+            if (util.isNEString(props.children)) {
+                tags.push(`<title ssr>${props.children}</title>`)
+            } else if (util.isNEArray(props.children)) {
+                tags.push(`<title ssr>${props.children.join('')}</title>`)
+            }
+        } else {
+            const attrs = Object.keys(props)
+                .filter(key => key !== 'children')
+                .map(key => ` ${key}=${JSON.stringify(props[key])}`)
+                .join('')
+            if (util.isNEString(props.children)) {
+                tags.push(`<${type}${attrs} ssr>${props.children}</${type}>`)
+            } else if (util.isNEArray(props.children)) {
+                tags.push(`<${type}${attrs} ssr>${props.children.join('')}</${type}>`)
+            } else {
+                tags.push(`<${type}${attrs} ssr />`)
+            }
+        }
+    })
+    await Promise.all(styles?.filter(({ async }) => !!async).map(({ url, hash }) => {
+        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${__buildMode}.${__buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
+    }) || [])
+    styles?.forEach(({ url }) => {
+        if (serverStyles.has(url)) {
+            const { css, asLink } = serverStyles.get(url)!
+            if (asLink) {
+                tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(url)} />`)
+            } else {
+                tags.push(`<style type="text/css" data-module-id=${JSON.stringify(url)}>${css}</style>`)
+            }
+        }
+    })
+    serverHeadElements.clear()
+    return tags
+}
+
+export async function renderScripts() {
+    const scripts: Record<string, any>[] = []
+    serverScriptsElements.forEach(({ props }) => {
+        const { children, ...attrs } = props
+        if (util.isNEString(children)) {
+            scripts.push({ ...attrs, innerText: unescape(children).trim() })
+        } else if (util.isNEArray(children)) {
+            scripts.push({ ...attrs, innerText: unescape(children.join('')).trim() })
+        } else {
+            scripts.push(props)
+        }
+    })
+    serverScriptsElements.clear()
+    return scripts
+}
 
 export default function Head({ children }: PropsWithChildren<{}>) {
     if (window.Deno) {
@@ -51,6 +113,20 @@ export default function Head({ children }: PropsWithChildren<{}>) {
             insertedEls.forEach(el => doc.head.removeChild(el))
         }
     }, [children])
+
+    return null
+}
+
+export function Scripts({ children }: PropsWithChildren<{}>) {
+    if (window.Deno) {
+        parse(children).forEach(({ type, props }, key) => {
+            if (type === 'script') {
+                serverScriptsElements.set(key, { type, props })
+            }
+        })
+    }
+
+    // todo: insert page scripts in browser
 
     return null
 }
@@ -106,50 +182,6 @@ export function Viewport(props: ViewportProps) {
         undefined,
         createElement('meta', { name: 'viewport', content })
     )
-}
-
-const serverHeadElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
-const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
-
-export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
-    const { __buildMode, __buildTarget } = (window as any).ALEPH.ENV as AlephEnv
-    const tags: string[] = []
-    serverHeadElements.forEach(({ type, props }) => {
-        if (type === 'title') {
-            if (util.isNEString(props.children)) {
-                tags.push(`<title ssr>${props.children}</title>`)
-            } else if (util.isNEArray(props.children)) {
-                tags.push(`<title ssr>${props.children.join('')}</title>`)
-            }
-        } else {
-            const attrs = Object.keys(props)
-                .filter(key => key !== 'children')
-                .map(key => ` ${key}=${JSON.stringify(props[key])}`)
-                .join('')
-            if (util.isNEString(props.children)) {
-                tags.push(`<${type}${attrs} ssr>${props.children}</${type}>`)
-            } else if (util.isNEArray(props.children)) {
-                tags.push(`<${type}${attrs} ssr>${props.children.join('')}</${type}>`)
-            } else {
-                tags.push(`<${type}${attrs} ssr />`)
-            }
-        }
-    })
-    await Promise.all(styles?.filter(({ async }) => !!async).map(({ url, hash }) => {
-        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${__buildMode}.${__buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
-    }) || [])
-    styles?.forEach(({ url }) => {
-        if (serverStyles.has(url)) {
-            const { css, asLink } = serverStyles.get(url)!
-            if (asLink) {
-                tags.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(url)} />`)
-            } else {
-                tags.push(`<style type="text/css" data-module-id=${JSON.stringify(url)}>${css}</style>`)
-            }
-        }
-    })
-    serverHeadElements.clear()
-    return tags
 }
 
 export function applyCSS(id: string, css: string, asLink: boolean = false) {

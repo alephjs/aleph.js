@@ -7,7 +7,7 @@ import { createPageProps } from './routing.ts'
 import type { RouterURL } from './types.ts'
 import util from './util.ts'
 
-export { renderHead } from './head.ts'
+export { renderHead, renderScripts } from './head.ts'
 
 export async function renderPage(
     url: RouterURL,

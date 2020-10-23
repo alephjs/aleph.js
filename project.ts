@@ -31,12 +31,14 @@ interface Module {
 interface Renderer {
     renderPage: Function
     renderHead: Function
+    renderScripts: Function
 }
 
 interface RenderResult {
     url: RouterURL
     status: number
     head: string[]
+    scripts: Record<string, any>[]
     body: string
     data: Record<string, string> | null
 }
@@ -52,7 +54,7 @@ export class Project {
     #routing: Routing = new Routing()
     #apiRouting: Routing = new Routing()
     #fsWatchListeners: Array<EventEmitter> = []
-    #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0 }
+    #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0, renderScripts: () => void 0 }
     #rendered: Map<string, Map<string, RenderResult>> = new Map()
     #postcssPlugins: Record<string, AcceptedPlugin> = {}
 
@@ -76,7 +78,6 @@ export class Project {
             plugins: [],
             postcss: {
                 plugins: [
-                    'postcss-flexbugs-fixes',
                     'autoprefixer'
                 ]
             }
@@ -238,7 +239,7 @@ export class Project {
 
         const { baseUrl } = this.config
         const mainModule = this.#modules.get('/main.js')!
-        const { url, status, head, body, data } = await this._renderPage(loc)
+        const { url, status, head, scripts, body, data } = await this._renderPage(loc)
         const html = createHtml({
             lang: url.locale,
             head: head,
@@ -246,6 +247,7 @@ export class Project {
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                ...scripts
             ],
             body,
             minify: !this.isDev
@@ -339,7 +341,7 @@ export class Project {
 
         // write 404 page
         const { baseUrl } = this.config
-        const { url, head, body, data } = await this._render404Page()
+        const { url, head, scripts, body, data } = await this._render404Page()
         const mainModule = this.#modules.get('/main.js')!
         const e404PageHtml = createHtml({
             lang: url.locale,
@@ -348,6 +350,7 @@ export class Project {
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                ...scripts
             ],
             body,
             minify: !this.isDev
@@ -521,7 +524,7 @@ export class Project {
             } else {
                 name = p.name
             }
-            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.3`)
+            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.3&no-check`)
             this.#postcssPlugins[name] = Plugin
         })
     }
@@ -598,8 +601,8 @@ export class Project {
         await this._compile('https://deno.land/x/aleph/renderer.ts', { forceTarget: 'es2020' })
         await this._createMainModule()
 
-        const { renderPage, renderHead } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
-        this.#renderer = { renderPage, renderHead }
+        const { renderPage, renderHead, renderScripts } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
+        this.#renderer = { renderPage, renderHead, renderScripts }
 
         log.info(colors.bold('Aleph.js'))
         if ('__file' in this.config) {
@@ -885,10 +888,10 @@ export class Project {
                     break
                 }
             }
-            if (/^https?:\/\/[0-9a-z\.\-]+\/react(@[0-9a-z\.\-]+)?\/?$/i.test(url)) {
+            if (/^https?:\/\/[0-9a-z\.\-]+\/react(@[0-9a-z\.\-]+)?\/?$/i.test(dlUrl)) {
                 dlUrl = this.config.reactUrl
             }
-            if (/^https?:\/\/[0-9a-z\.\-]+\/react\-dom(@[0-9a-z\.\-]+)?(\/server)?\/?$/i.test(url)) {
+            if (/^https?:\/\/[0-9a-z\.\-]+\/react\-dom(@[0-9a-z\.\-]+)?(\/server)?\/?$/i.test(dlUrl)) {
                 dlUrl = this.config.reactDomUrl
                 if (/\/server\/?$/i.test(url)) {
                     dlUrl += '/server'
@@ -966,7 +969,6 @@ export class Project {
                 let css: string = sourceContent
                 if (mod.id.endsWith('.less')) {
                     try {
-                        // todo: sourceMap
                         const output = await less.render(sourceContent || '/* empty content */')
                         css = output.css
                     } catch (error) {
@@ -983,7 +985,7 @@ export class Project {
                 })
                 css = (await postcss(plugins).process(css).async()).content
                 if (this.isDev) {
-                    css = String(css).trim()
+                    css = css.trim()
                 } else {
                     const output = cleanCSS.minify(css)
                     css = output.styles
@@ -995,7 +997,7 @@ export class Project {
                     ))};`,
                     `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
                 ].join(this.isDev ? '\n' : '')
-                mod.jsSourceMap = ''
+                mod.jsSourceMap = ''  // todo: sourceMap
                 mod.hash = getHash(css)
             } else if (mod.loader === 'markdown') {
                 const { __content, ...props } = safeLoadFront(sourceContent)
@@ -1250,7 +1252,7 @@ export class Project {
                 this.#rendered.set(url.pagePath, new Map())
             }
         }
-        const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], body: '<main></main>', data: null }
+        const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], scripts: [], body: '<main></main>', data: null }
         Object.assign(window, {
             location: {
                 protocol: 'http:',
@@ -1292,6 +1294,7 @@ export class Project {
                 ...pageModuleTree.map(({ id }) => this._lookupAsyncDeps(id).filter(({ url }) => reStyleModuleExt.test(url)))
             ].flat())
             ret.head = head
+            ret.scripts = await this.#renderer.renderScripts()
             ret.body = `<main>${html}</main>`
             ret.data = data
             this.#rendered.get(url.pagePath)!.set(key, ret)
@@ -1308,7 +1311,7 @@ export class Project {
     }
 
     private async _render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
-        const ret: RenderResult = { url, status: 404, head: [], body: '<main></main>', data: null }
+        const ret: RenderResult = { url, status: 404, head: [], scripts: [], body: '<main></main>', data: null }
         try {
             const e404Module = this.#modules.get('/404.js')
             const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
@@ -1317,6 +1320,7 @@ export class Project {
                 e404Module ? this._lookupAsyncDeps(e404Module.id).filter(({ url }) => reStyleModuleExt.test(url)) : []
             ].flat())
             ret.head = head
+            ret.scripts = await this.#renderer.renderScripts()
             ret.body = `<main>${html}</main>`
             ret.data = data
         } catch (err) {
