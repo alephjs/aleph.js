@@ -78,6 +78,7 @@ export class Project {
             plugins: [],
             postcss: {
                 plugins: [
+                    'postcss-flexbugs-fixes',
                     'autoprefixer'
                 ]
             }
@@ -517,7 +518,7 @@ export class Project {
         // update routing options
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
         // import post plugins
-        this.config.postcss.plugins.map(async p => {
+        await Promise.all(this.config.postcss.plugins.map(async p => {
             let name: string
             if (typeof p === 'string') {
                 name = p
@@ -526,7 +527,7 @@ export class Project {
             }
             const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.3&no-check`)
             this.#postcssPlugins[name] = Plugin
-        })
+        }))
     }
 
     private async _init(reload: boolean) {
