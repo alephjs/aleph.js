@@ -1,4 +1,5 @@
 import marked from 'https://esm.sh/marked@1.2.0'
+import postcss, { AcceptedPlugin } from 'https://esm.sh/postcss@8.1.3'
 import { minify } from 'https://esm.sh/terser@5.3.2'
 import { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.0'
 import { Request } from './api.ts'
@@ -16,9 +17,9 @@ import { version } from './version.ts'
 interface Module {
     id: string
     url: string
+    loader: string
     isRemote: boolean
     sourceFilePath: string
-    sourceType: string
     sourceHash: string
     deps: { url: string, hash: string, async?: boolean }[]
     jsFile: string
@@ -53,6 +54,7 @@ export class Project {
     #fsWatchListeners: Array<EventEmitter> = []
     #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0 }
     #rendered: Map<string, Map<string, RenderResult>> = new Map()
+    #postcssPlugins: Record<string, AcceptedPlugin> = {}
 
     constructor(dir: string, mode: 'development' | 'production', reload = false) {
         this.mode = mode
@@ -62,15 +64,22 @@ export class Project {
             outputDir: '/dist',
             baseUrl: '/',
             defaultLocale: 'en',
+            env: {},
             locales: [],
             ssr: {
                 fallback: '_fallback.html'
             },
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
-            env: {},
             reactUrl: 'https://esm.sh/react@16.14.0',
-            reactDomUrl: 'https://esm.sh/react-dom@16.14.0'
+            reactDomUrl: 'https://esm.sh/react-dom@16.14.0',
+            plugins: [],
+            postcss: {
+                plugins: [
+                    'postcss-flexbugs-fixes',
+                    'autoprefixer'
+                ]
+            }
         }
         this.importMap = { imports: {} }
         this.ready = (async () => {
@@ -372,14 +381,14 @@ export class Project {
         // write modules
         const { sourceMap } = this.config
         await Promise.all(Array.from(outputModules).map((moduleID) => {
-            const { sourceFilePath, sourceType, isRemote, jsContent, jsSourceMap, hash } = this.#modules.get(moduleID)!
+            const { sourceFilePath, loader, isRemote, jsContent, jsSourceMap, hash } = this.#modules.get(moduleID)!
             const saveDir = path.join(distDir, path.dirname(sourceFilePath))
             const name = path.basename(sourceFilePath).replace(reModuleExt, '')
             const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
             if (isRemote) {
                 logModule('deps', jsContent.length)
             } else {
-                if (sourceType === 'css' || sourceType === 'less') {
+                if (loader === 'css') {
                     logModule('styles', jsContent.length)
                 } else {
                     logModule('modules', jsContent.length)
@@ -415,7 +424,7 @@ export class Project {
 
         const config: Record<string, any> = {}
         for (const name of Array.from(['aleph.config', 'config']).map(name => ['ts', 'js', 'mjs', 'json'].map(ext => `${name}.${ext}`)).flat()) {
-            const p = path.join(this.srcDir, name)
+            const p = path.join(this.appRoot, name)
             if (existsFileSync(p)) {
                 if (name.endsWith('.json')) {
                     const conf = JSON.parse(await Deno.readTextFile(p))
@@ -446,7 +455,9 @@ export class Project {
             defaultLocale,
             locales,
             ssr,
-            env
+            env,
+            plugins,
+            postcss,
         } = config
         if (util.isNEString(srcDir)) {
             Object.assign(this.config, { srcDir: util.cleanPath(srcDir) })
@@ -482,10 +493,37 @@ export class Project {
         if (util.isPlainObject(env)) {
             Object.assign(this.config, { env })
         }
-        // Update buildID
+        if (util.isNEArray(plugins)) {
+            Object.assign(this.config, { plugins })
+        }
+        if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
+            Object.assign(this.config, { postcss })
+        } else if (existsFileSync(path.join(this.appRoot, 'postcss.config.json'))) {
+            const text = await Deno.readTextFile(path.join(this.appRoot, 'postcss.config.json'))
+            try {
+                const postcss = JSON.parse(text)
+                if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
+                    Object.assign(this.config, { postcss })
+                }
+            } catch (e) {
+                log.warn('bad postcss.config.json', e.message)
+            }
+        }
+        // update buildID
         Object.assign(this, { buildID: this.mode + '.' + this.config.buildTarget })
-        // Update routing options.
+        // update routing options
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
+        // import post plugins
+        this.config.postcss.plugins.map(async p => {
+            let name: string
+            if (typeof p === 'string') {
+                name = p
+            } else {
+                name = p.name
+            }
+            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.3`)
+            this.#postcssPlugins[name] = Plugin
+        })
     }
 
     private async _init(reload: boolean) {
@@ -721,12 +759,22 @@ export class Project {
         const isRemote = reHttp.test(url) || (url in this.importMap.imports && reHttp.test(this.importMap.imports[url]))
         const sourceFilePath = renameImportUrl(url)
         const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : sourceFilePath).replace(reModuleExt, '.js')
+        let loader = ''
+        if (reStyleModuleExt.test(url)) {
+            loader = 'css'
+        } else if (reMDExt.test(url)) {
+            loader = 'markdown'
+        } else if (reModuleExt.test(url)) {
+            loader = 'js'
+        } else if (isRemote) {
+            loader = 'js'
+        }
         return {
             id,
             url,
+            loader,
             isRemote,
             sourceFilePath,
-            sourceType: path.extname(sourceFilePath).slice(1).replace('mjs', 'js') || 'js',
             sourceHash: '',
             deps: [],
             jsFile: '',
@@ -863,14 +911,6 @@ export class Project {
                     if (resp.status != 200) {
                         throw new Error(`Download ${url}: ${resp.status} - ${resp.statusText}`)
                     }
-                    if (mod.sourceType === 'js') {
-                        const t = resp.headers.get('Content-Type')
-                        if (t?.startsWith('text/typescript')) {
-                            mod.sourceType = 'ts'
-                        } else if (t?.startsWith('text/jsx')) {
-                            mod.sourceType = 'jsx'
-                        }
-                    }
                     mod.sourceHash = getHash(sourceContent)
                     sourceContent = await resp.text()
                     shouldCompile = true
@@ -922,9 +962,9 @@ export class Project {
         if (shouldCompile) {
             const t = performance.now()
             mod.deps = []
-            if (mod.sourceType === 'css' || mod.sourceType === 'less') {
+            if (mod.loader === 'css') {
                 let css: string = sourceContent
-                if (mod.sourceType === 'less') {
+                if (mod.id.endsWith('.less')) {
                     try {
                         // todo: sourceMap
                         const output = await less.render(sourceContent || '/* empty content */')
@@ -933,6 +973,15 @@ export class Project {
                         throw new Error(`less: ${error}`);
                     }
                 }
+                const plugins = this.config.postcss.plugins.map(p => {
+                    if (typeof p === 'string') {
+                        return this.#postcssPlugins[p]
+                    } else {
+                        const Plugin = this.#postcssPlugins[p.name] as Function
+                        return Plugin(p.options)
+                    }
+                })
+                css = (await postcss(plugins).process(css).async()).content
                 if (this.isDev) {
                     css = String(css).trim()
                 } else {
@@ -948,11 +997,7 @@ export class Project {
                 ].join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
                 mod.hash = getHash(css)
-            } else if (mod.sourceType === 'sass' || mod.sourceType === 'scss') {
-                // todo: support sass
-            } else if (mod.sourceType === 'mdx') {
-                // todo: support mdx
-            } else if (mod.sourceType === 'md' || mod.sourceType === 'markdown') {
+            } else if (mod.loader === 'markdown') {
                 const { __content, ...props } = safeLoadFront(sourceContent)
                 const html = marked.parse(__content)
                 mod.jsContent = [
@@ -987,7 +1032,7 @@ export class Project {
                 ].filter(Boolean).map(l => !this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
                 mod.hash = getHash(mod.jsContent)
-            } else {
+            } else if (mod.loader === 'js') {
                 const useDenos: string[] = []
                 const compileOptions = {
                     mode: this.mode,
@@ -1032,6 +1077,8 @@ export class Project {
                 useDenos.forEach(sig => {
                     mod.deps.push({ url: '#' + sig, hash: '', async: true })
                 })
+            } else {
+                throw new Error(`Unknown loader '${mod.loader}'`)
             }
 
             log.debug(`compile '${url}' in ${Math.round(performance.now() - t)}ms`)
@@ -1210,8 +1257,8 @@ export class Project {
                 host: 'localhost',
                 hostname: 'localhost',
                 port: '',
-                href: 'http://localhost' + url.pathname + url.query.toString(),
-                origin: 'http://localhost',
+                href: 'https://esm.sh' + url.pathname + url.query.toString(),
+                origin: 'https://esm.sh',
                 pathname: url.pathname,
                 search: url.query.toString(),
                 hash: '',

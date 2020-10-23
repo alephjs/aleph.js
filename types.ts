@@ -17,7 +17,7 @@ export interface AlephEnv {
  * The options for **SSR**.
  */
 export interface SSROptions {
-    /** The options for **SSR** (default is '**_fallback.html**'). */
+    /** The fallback html **dynamic routes** (default is '**_fallback.html**'). */
     fallback?: string
     /** A list of RegExp for paths to use **SSR**. */
     include?: RegExp[]
@@ -25,6 +25,15 @@ export interface SSROptions {
     exclude?: RegExp[]
     /** A list of paths for **dynamic routes** in **SSR**. */
     staticPaths?: string[]
+}
+
+/**
+ * A plugin for **Aleph.js** application.
+ */
+export interface Plugin {
+    test: RegExp
+    resolve?(path: string): { path: string, external?: boolean }
+    transform?(path: string): { code: string, sourceMap?: string, loader?: 'js' | 'json' | 'css' }
 }
 
 /**
@@ -45,8 +54,12 @@ export interface Config {
     defaultLocale?: string
     /** A list of locales. */
     locales?: string[]
-    /** Options for **SSR**. */
+    /** The options for **SSR**. */
     ssr?: boolean | SSROptions
+    /** A list of plugin. */
+    plugins?: Plugin[]
+    /** A list of plugin of PostCSS. */
+    postcss?: { plugins: (string | { name: string, options: Record<string, any> })[] }
     /** `buildTarget` specifies the build target for **tsc** (possible values: '**ES2015**' - '**ES2020**' | '**ESNext**', default is **ES2015** for `production` and **ES2018** for `development`). */
     buildTarget?: string
     /** Enable sourceMap in **production** mode (default is **false**). */
