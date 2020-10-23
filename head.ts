@@ -48,14 +48,16 @@ export async function renderHead(styles?: { url: string, hash: string, async?: b
     return tags
 }
 
-export async function renderScripts() {
+export function renderScripts() {
     const scripts: Record<string, any>[] = []
     serverScriptsElements.forEach(({ props }) => {
-        const { children, ...attrs } = props
-        if (util.isNEString(children)) {
-            scripts.push({ ...attrs, innerText: unescape(children).trim() })
+        const { children, dangerouslySetInnerHTML, ...attrs } = props
+        if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
+            scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
+        } if (util.isNEString(children)) {
+            scripts.push({ ...attrs, innerText: unescape(children) })
         } else if (util.isNEArray(children)) {
-            scripts.push({ ...attrs, innerText: unescape(children.join('')).trim() })
+            scripts.push({ ...attrs, innerText: unescape(children.join('')) })
         } else {
             scripts.push(props)
         }

@@ -1294,7 +1294,12 @@ export class Project {
                 ...pageModuleTree.map(({ id }) => this._lookupAsyncDeps(id).filter(({ url }) => reStyleModuleExt.test(url)))
             ].flat())
             ret.head = head
-            ret.scripts = await this.#renderer.renderScripts()
+            ret.scripts = await Promise.all(this.#renderer.renderScripts().map(async (script: Record<string, any>) => {
+                if (!this.isDev && script.innerText) {
+                    return { ...script, innerText: (await minify(script.innerText)).code }
+                }
+                return script
+            }))
             ret.body = `<main>${html}</main>`
             ret.data = data
             this.#rendered.get(url.pagePath)!.set(key, ret)
@@ -1320,7 +1325,12 @@ export class Project {
                 e404Module ? this._lookupAsyncDeps(e404Module.id).filter(({ url }) => reStyleModuleExt.test(url)) : []
             ].flat())
             ret.head = head
-            ret.scripts = await this.#renderer.renderScripts()
+            ret.scripts = await Promise.all(this.#renderer.renderScripts().map(async (script: Record<string, any>) => {
+                if (!this.isDev && script.innerText) {
+                    return { ...script, innerText: (await minify(script.innerText)).code }
+                }
+                return script
+            }))
             ret.body = `<main>${html}</main>`
             ret.data = data
         } catch (err) {

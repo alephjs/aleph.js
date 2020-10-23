@@ -31,7 +31,7 @@ export function createHtml({
             return `<script>${v}</script>`
         } else if (util.isNEString(v.innerText)) {
             const { innerText, ...rest } = v
-            return `<script${attrString(rest)}>${innerText}</script>`
+            return `<script${attrString(rest)}>${eol}${innerText}${eol}${indent}</script>`
         } else if (util.isNEString(v.src) && !v.preload) {
             return `<script${attrString(v)}></script>`
         } else {
