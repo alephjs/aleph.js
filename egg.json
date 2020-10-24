@@ -1,7 +1,7 @@
 {
   "name": "aleph",
   "version": "0.2.13",
-  "description": "The React Framework in Deno, inspired by Next.js.",
+  "description": "The React Framework in Deno.",
   "repository": "https://github.com/postui/aleph.js",
   "entry": "./mod.ts",
   "files": [
