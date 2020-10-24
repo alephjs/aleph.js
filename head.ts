@@ -73,9 +73,9 @@ export function Scripts({ children }: PropsWithChildren<{}>) {
 }
 
 interface SEOProps {
-    title: string
-    description: string
-    keywords: string | string[]
+    title?: string
+    description?: string
+    keywords?: string | string[]
     image?: string
 }
 
@@ -83,13 +83,13 @@ export function SEO({ title, description, keywords, image }: SEOProps) {
     return createElement(
         Head,
         undefined,
-        createElement('title', undefined, title),
-        createElement('meta', { name: 'description', content: description }),
-        createElement('meta', { name: 'keywords', content: util.isArray(keywords) ? keywords.join(',') : keywords }),
-        createElement('meta', { name: 'og:title', content: title }),
-        createElement('meta', { name: 'og:description', content: description }),
-        createElement('meta', { name: 'twitter:title', content: title }),
-        createElement('meta', { name: 'twitter:description', content: description }),
+        title && createElement('title', undefined, title),
+        description && createElement('meta', { name: 'description', content: description }),
+        keywords && createElement('meta', { name: 'keywords', content: util.isArray(keywords) ? keywords.join(',') : keywords }),
+        title && createElement('meta', { name: 'og:title', content: title }),
+        description && createElement('meta', { name: 'og:description', content: description }),
+        title && createElement('meta', { name: 'twitter:title', content: title }),
+        description && createElement('meta', { name: 'twitter:description', content: description }),
         image && createElement('meta', { name: 'og:image', content: image }),
         image && createElement('meta', { name: 'twitter:image:src', content: image }),
         image && createElement('meta', { name: 'twitter:card', content: 'summary_large_image' }),
@@ -97,12 +97,12 @@ export function SEO({ title, description, keywords, image }: SEOProps) {
 }
 
 interface ViewportProps {
-    width: number | 'device-width'
+    width?: number | 'device-width'
     height?: number | 'device-height'
     initialScale?: number
     minimumScale?: number
     maximumScale?: number
-    userScalable?: boolean
+    userScalable?: 'yes' | 'no'
     targetDensitydpi?: number | 'device-dpi' | 'low-dpi' | 'medium-dpi' | 'high-dpi'
 }
 
@@ -110,18 +110,13 @@ export function Viewport(props: ViewportProps) {
     const content = Object.entries(props)
         .map(([key, value]) => {
             key = key.replace(/[A-Z]/g, c => '-' + c.toLowerCase())
-            if (value === true) {
-                value = 'yes'
-            } else if (value === false) {
-                value = 'no'
-            }
             return `${key}=${value}`
         })
         .join(',')
     return createElement(
         Head,
         undefined,
-        createElement('meta', { name: 'viewport', content })
+        content && createElement('meta', { name: 'viewport', content })
     )
 }
 
