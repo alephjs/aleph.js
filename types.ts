@@ -33,7 +33,7 @@ export interface SSROptions {
 export interface Plugin {
     test: RegExp
     resolve?(path: string): { path: string, external?: boolean }
-    transform?(path: string): { code: string, sourceMap?: string, loader?: 'js' | 'css' | 'text' }
+    transform?(content: Uint8Array): Promise<{ code: string, sourceMap?: string, loader?: 'js' | 'css' | 'markdown' }>
 }
 
 /**

@@ -7,7 +7,7 @@ import { EventEmitter } from './events.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getPagePath, RouteModule, Routing } from './routing.ts'
-import { colors, ensureDir, path, ServerRequest, Sha1, walk } from './std.ts'
+import { colors, ensureDir, fromStreamReader, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { AlephEnv, APIHandler, Config, RouterURL } from './types.ts'
 import util, { existsDirSync, existsFileSync, hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
@@ -21,11 +21,18 @@ interface Module {
     isRemote: boolean
     sourceFilePath: string
     sourceHash: string
-    deps: { url: string, hash: string, async?: boolean }[]
+    deps: ModuleDep[]
     jsFile: string
     jsContent: string
     jsSourceMap: string
     hash: string
+}
+
+interface ModuleDep {
+    url: string
+    hash: string
+    async?: boolean
+    external?: boolean
 }
 
 interface Renderer {
@@ -167,9 +174,11 @@ export class Project {
                 modId = id + '.js'
             }
         }
+        if (!this.#modules.has(modId) && modId.endsWith('.js')) {
+            modId = util.trimSuffix(modId, '.js')
+        }
         if (!this.#modules.has(modId)) {
             log.warn(`can't get the module by path '${pathname}(${modId})'`)
-            console.log(Array.from(this.#modules.keys()))
         }
         return this.getModule(modId)
     }
@@ -843,7 +852,7 @@ export class Project {
     }
 
     // todo: force recompile remote modules which URL don't specify version
-    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean, forceTarget?: string }) {
+    private async _compile(url: string, options?: { forceCompile?: boolean, forceTarget?: string }) {
         const mod = this._moduleFromURL(url)
         if (this.#modules.has(mod.id) && !options?.forceCompile) {
             return this.#modules.get(mod.id)!
@@ -870,18 +879,11 @@ export class Project {
             }
         }
 
-        let sourceContent = ''
+        let sourceContent = new Uint8Array()
         let shouldCompile = false
         let fsync = false
 
-        if (options?.sourceCode) {
-            const sourceHash = getHash(options.sourceCode, true)
-            if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
-                mod.sourceHash = sourceHash
-                sourceContent = options.sourceCode
-                shouldCompile = true
-            }
-        } else if (mod.isRemote) {
+        if (mod.isRemote) {
             let dlUrl = url
             const { imports } = this.importMap
             for (const importPath in imports) {
@@ -920,8 +922,8 @@ export class Project {
                     if (resp.status != 200) {
                         throw new Error(`Download ${url}: ${resp.status} - ${resp.statusText}`)
                     }
+                    sourceContent = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
                     mod.sourceHash = getHash(sourceContent)
-                    sourceContent = await resp.text()
                     shouldCompile = true
                 } catch (err) {
                     throw new Error(`Download ${url}: ${err.message}`)
@@ -932,11 +934,10 @@ export class Project {
                     if (resp.status != 200) {
                         throw new Error(`${resp.status} - ${resp.statusText}`)
                     }
-                    const text = await resp.text()
-                    const sourceHash = getHash(text, true)
-                    if (mod.sourceHash !== sourceHash) {
+                    sourceContent = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
+                    const sourceHash = getHash(sourceContent, true)
+                    if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
-                        sourceContent = text
                         shouldCompile = true
                     }
                 } catch (err) {
@@ -945,22 +946,10 @@ export class Project {
             }
         } else {
             const filepath = path.join(this.srcDir, url)
-            try {
-                const fileinfo = await Deno.stat(filepath)
-                // 10mb limit
-                if (fileinfo.size > 10 * (1 << 20)) {
-                    throw new Error(`ignored module '${url}': too large(${(fileinfo.size / (1 << 20)).toFixed(2)}mb)`)
-                }
-            } catch (err) {
-                if (err instanceof Deno.errors.NotFound) {
-                    throw new Error(`module '${url}' not found`)
-                }
-            }
-            const text = await Deno.readTextFile(filepath)
-            const sourceHash = getHash(text, true)
+            sourceContent = await Deno.readFile(filepath)
+            const sourceHash = getHash(sourceContent, true)
             if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                 mod.sourceHash = sourceHash
-                sourceContent = text
                 shouldCompile = true
             }
         }
@@ -968,12 +957,21 @@ export class Project {
         // compile source code
         if (shouldCompile) {
             const t = performance.now()
+            let sourceCode = (new TextDecoder).decode(sourceContent)
+            for (const plugin of this.config.plugins) {
+                if (plugin.test.test(url) && plugin.transform) {
+                    const { code, loader = 'js' } = await plugin.transform(sourceContent)
+                    sourceCode = code
+                    mod.loader = loader
+                    break
+                }
+            }
             mod.deps = []
             if (mod.loader === 'css') {
-                let css: string = sourceContent
+                let css: string = sourceCode
                 if (mod.id.endsWith('.less')) {
                     try {
-                        const output = await less.render(sourceContent || '/* empty content */')
+                        const output = await less.render(sourceCode || '/* empty content */')
                         css = output.css
                     } catch (error) {
                         throw new Error(`less: ${error}`);
@@ -1004,7 +1002,7 @@ export class Project {
                 mod.jsSourceMap = ''  // todo: sourceMap
                 mod.hash = getHash(css)
             } else if (mod.loader === 'markdown') {
-                const { __content, ...props } = safeLoadFront(sourceContent)
+                const { __content, ...props } = safeLoadFront(sourceCode)
                 const html = marked.parse(__content)
                 mod.jsContent = [
                     this.isDev && `const _s = $RefreshSig$();`,
@@ -1051,7 +1049,7 @@ export class Project {
                         return sig
                     }
                 }
-                const { diagnostics, outputText, sourceMapText } = compile(mod.sourceFilePath, sourceContent, compileOptions)
+                const { diagnostics, outputText, sourceMapText } = compile(mod.sourceFilePath, sourceCode, compileOptions)
                 if (diagnostics && diagnostics.length > 0) {
                     throw new Error(`compile ${url}: ${diagnostics.map(d => d.messageText).join('\n')}`)
                 }
@@ -1097,7 +1095,7 @@ export class Project {
         this.#modules.set(mod.id, mod)
 
         // compile deps
-        for (const dep of mod.deps.filter(({ url }) => !url.startsWith('#useDeno.'))) {
+        for (const dep of mod.deps.filter(({ url, external }) => !url.startsWith('#useDeno.') && !external)) {
             const depMod = await this._compile(dep.url)
             if (dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
@@ -1184,51 +1182,68 @@ export class Project {
         })
     }
 
-    private _rewriteImportPath(mod: Module, importPath: string, async?: boolean): string {
+    private _rewriteImportPath(importer: Module, importPath: string, async?: boolean): string {
         let rewrittenPath: string
-        if (importPath in this.importMap.imports) {
-            importPath = this.importMap.imports[importPath]
-        }
-        if (reHttp.test(importPath)) {
-            if (mod.isRemote) {
-                rewrittenPath = relativePath(
-                    path.dirname(mod.url.replace(reHttp, '/-/').replace(/:(\d+)/, '/$1')),
-                    renameImportUrl(importPath)
-                )
-            } else {
-                rewrittenPath = relativePath(
-                    path.dirname(mod.url),
-                    renameImportUrl(importPath)
-                )
+        let resolveRet: { path: string, external?: boolean } | null = null
+        for (const plugin of this.config.plugins) {
+            if (plugin.test.test(importPath) && plugin.resolve) {
+                resolveRet = plugin.resolve(importPath)
+                break
             }
+        }
+
+        // when a plugin resolver returns an external path, do NOT rewrite the `importPath`
+        if (resolveRet && resolveRet.external) {
+            rewrittenPath = resolveRet.path
         } else {
-            if (mod.isRemote) {
-                const modUrl = new URL(mod.url)
-                let pathname = importPath
-                if (!pathname.startsWith('/')) {
-                    pathname = path.join(path.dirname(modUrl.pathname), importPath)
+            if (resolveRet) {
+                importPath = resolveRet.path
+            }
+            if (importPath in this.importMap.imports) {
+                importPath = this.importMap.imports[importPath]
+            }
+            if (reHttp.test(importPath)) {
+                if (importer.isRemote) {
+                    rewrittenPath = relativePath(
+                        path.dirname(importer.url.replace(reHttp, '/-/').replace(/:(\d+)/, '/$1')),
+                        renameImportUrl(importPath)
+                    )
+                } else {
+                    rewrittenPath = relativePath(
+                        path.dirname(importer.url),
+                        renameImportUrl(importPath)
+                    )
                 }
-                const importUrl = new URL(modUrl.protocol + '//' + modUrl.host + pathname)
-                rewrittenPath = relativePath(
-                    path.dirname(mod.sourceFilePath),
-                    renameImportUrl(importUrl.toString())
-                )
             } else {
-                rewrittenPath = importPath.replace(reModuleExt, '') + '.' + 'x'.repeat(hashShort)
+                if (importer.isRemote) {
+                    const modUrl = new URL(importer.url)
+                    let pathname = importPath
+                    if (!pathname.startsWith('/')) {
+                        pathname = path.join(path.dirname(modUrl.pathname), importPath)
+                    }
+                    const importUrl = new URL(modUrl.protocol + '//' + modUrl.host + pathname)
+                    rewrittenPath = relativePath(
+                        path.dirname(importer.sourceFilePath),
+                        renameImportUrl(importUrl.toString())
+                    )
+                } else {
+                    rewrittenPath = importPath.replace(reModuleExt, '') + '.' + 'x'.repeat(hashShort)
+                }
             }
         }
+
         if (reHttp.test(importPath)) {
-            mod.deps.push({ url: importPath, hash: '', async })
+            importer.deps.push({ url: importPath, hash: '', async, external: resolveRet?.external })
         } else {
-            if (mod.isRemote) {
-                const sourceUrl = new URL(mod.url)
+            if (importer.isRemote) {
+                const sourceUrl = new URL(importer.url)
                 let pathname = importPath
                 if (!pathname.startsWith('/')) {
                     pathname = path.join(path.dirname(sourceUrl.pathname), importPath)
                 }
-                mod.deps.push({ url: sourceUrl.protocol + '//' + sourceUrl.host + pathname, hash: '', async })
+                importer.deps.push({ url: sourceUrl.protocol + '//' + sourceUrl.host + pathname, hash: '', async, external: resolveRet?.external })
             } else {
-                mod.deps.push({ url: path.join(path.dirname(mod.url), importPath), hash: '', async })
+                importer.deps.push({ url: path.join(path.dirname(importer.url), importPath), hash: '', async, external: resolveRet?.external })
             }
         }
 
@@ -1263,8 +1278,8 @@ export class Project {
                 host: 'localhost',
                 hostname: 'localhost',
                 port: '',
-                href: 'https://esm.sh' + url.pathname + url.query.toString(),
-                origin: 'https://esm.sh',
+                href: 'https://localhost' + url.pathname + url.query.toString(),
+                origin: 'https://localhost',
                 pathname: url.pathname,
                 search: url.query.toString(),
                 hash: '',
@@ -1449,7 +1464,7 @@ function renameImportUrl(importUrl: string): string {
     return pathname + ext
 }
 
-function getHash(content: string, checkVersion = false) {
+function getHash(content: string | Uint8Array, checkVersion = false) {
     const sha1 = new Sha1()
     sha1.update(content)
     if (checkVersion) {
