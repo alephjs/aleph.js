@@ -1,3 +1,4 @@
+import unescape from 'https://esm.sh/lodash/unescape?no-check'
 import React, { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import { RouterContext } from './context.ts'

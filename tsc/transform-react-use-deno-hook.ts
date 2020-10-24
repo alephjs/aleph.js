@@ -1,7 +1,5 @@
 /**
- * TypeScript AST Transformer for react refresh.
- * @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
- * @link https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js
+ * TypeScript AST Transformer for useDeno hook.
  */
 
 import ts from 'https://esm.sh/typescript'
@@ -112,8 +110,6 @@ export class RefreshTransformer {
         }
     }
 }
-
-
 
 export default function transformReactUseDenoHook(ctx: ts.TransformationContext, sf: ts.SourceFile, signUseDeno: (id: string) => string): ts.SourceFile {
     const t = new RefreshTransformer(sf, signUseDeno)

@@ -517,7 +517,7 @@ export class Project {
         Object.assign(this, { buildID: this.mode + '.' + this.config.buildTarget })
         // update routing options
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
-        // import post plugins
+        // import postcss plugins
         await Promise.all(this.config.postcss.plugins.map(async p => {
             let name: string
             if (typeof p === 'string') {
@@ -676,7 +676,10 @@ export class Project {
                             break
                         }
                     }
-                    return isDep
+                    if (isDep) {
+                        return
+                    }
+                    return this.config.plugins.findIndex(p => p.test.test(path)) > -1
                 })()
                 if (validated) {
                     const moduleID = path.replace(reModuleExt, '.js')
@@ -846,7 +849,6 @@ export class Project {
             return this.#modules.get(mod.id)!
         }
 
-        const { importMap } = this
         const name = path.basename(mod.sourceFilePath).replace(reModuleExt, '')
         const saveDir = path.join(this.buildDir, path.dirname(mod.sourceFilePath))
         const metaFile = path.join(saveDir, `${name}.meta.json`)
@@ -870,6 +872,8 @@ export class Project {
 
         let sourceContent = ''
         let shouldCompile = false
+        let fsync = false
+
         if (options?.sourceCode) {
             const sourceHash = getHash(options.sourceCode, true)
             if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
@@ -879,8 +883,9 @@ export class Project {
             }
         } else if (mod.isRemote) {
             let dlUrl = url
-            for (const importPath in importMap.imports) {
-                const alias = importMap.imports[importPath]
+            const { imports } = this.importMap
+            for (const importPath in imports) {
+                const alias = imports[importPath]
                 if (importPath === url) {
                     dlUrl = alias
                     break
@@ -959,8 +964,6 @@ export class Project {
                 shouldCompile = true
             }
         }
-
-        let fsync = false
 
         // compile source code
         if (shouldCompile) {
