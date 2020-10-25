@@ -265,8 +265,8 @@ export class Project {
             head: head,
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
                 ...scripts
             ],
             body,
@@ -283,8 +283,8 @@ export class Project {
             lang: defaultLocale,
             scripts: [
                 customLoading?.data ? { type: 'application/json', innerText: JSON.stringify(customLoading?.data), id: 'ssr-data' } : '',
-                { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
             head: customLoading?.head || [],
             body: `<main>${customLoading?.body || ''}</main>`,
@@ -369,8 +369,8 @@ export class Project {
             head: head,
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                { src: path.join(baseUrl, `/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: path.join(baseUrl, `/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
                 ...scripts
             ],
             body,
@@ -382,13 +382,13 @@ export class Project {
         const publicDir = path.join(this.appRoot, 'public')
         if (existsDirSync(publicDir)) {
             log.info(colors.bold('- Public Assets'))
-            for await (const { path: p } of walk(publicDir, { includeDirs: false, skip: [/\/\.[^\/]+($|\/)/] })) {
+            for await (const { path: p } of walk(publicDir, { includeDirs: false, skip: [/\.DS_Store$/] })) {
                 const rp = util.trimPrefix(p, publicDir)
                 const fp = path.join(outputDir, rp)
                 const fi = await Deno.lstat(p)
                 await ensureDir(path.dirname(fp))
                 await Deno.copyFile(p, fp)
-                log.info('  ✹', rp, colors.dim('•'), colorfulBytesString(fi.size))
+                log.info('  ✹', rp.split('\\').join('/'), colors.dim('•'), colorfulBytesString(fi.size))
             }
         }
 
@@ -595,13 +595,13 @@ export class Project {
 
         if (existsDirSync(apiDir)) {
             for await (const { path: p } of walk(apiDir, walkOptions)) {
-                const mod = await this._compile('/api' + util.trimPrefix(p, apiDir))
+                const mod = await this._compile('/api' + util.trimPrefix(p, apiDir).split('\\').join('/'))
                 this.#apiRouting.update(this._getRouteModule(mod))
             }
         }
 
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md'] })) {
-            const rp = util.trimPrefix(p, pagesDir)
+            const rp = util.trimPrefix(p, pagesDir).split('\\').join('/')
             const mod = await this._compile('/pages' + rp)
             this.#routing.update(this._getRouteModule(mod))
         }
@@ -1228,7 +1228,7 @@ export class Project {
                     const modUrl = new URL(importer.url)
                     let pathname = url
                     if (!pathname.startsWith('/')) {
-                        pathname = path.join(path.dirname(modUrl.pathname), url)
+                        pathname = util.cleanPath(path.dirname(modUrl.pathname) + '/' + url)
                     }
                     const importUrl = new URL(modUrl.protocol + '//' + modUrl.host + pathname)
                     rewrittenURL = getRelativePath(
@@ -1248,7 +1248,7 @@ export class Project {
                 const sourceUrl = new URL(importer.url)
                 let pathname = url
                 if (!pathname.startsWith('/')) {
-                    pathname = path.join(path.dirname(sourceUrl.pathname), url)
+                    pathname = util.cleanPath(path.dirname(sourceUrl.pathname) + '/' + url)
                 }
                 importer.deps.push({
                     url: sourceUrl.protocol + '//' + sourceUrl.host + pathname,
@@ -1258,7 +1258,7 @@ export class Project {
                 })
             } else {
                 importer.deps.push({
-                    url: path.join(path.dirname(importer.url), url),
+                    url: util.cleanPath(path.dirname(importer.url) + '/' + url),
                     hash: '',
                     async,
                     external: pluginsResolveRet?.external
