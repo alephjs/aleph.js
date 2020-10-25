@@ -330,7 +330,7 @@ export class Project {
         const { ssr } = this.config
         const SPAIndexHtml = await this.getSPAIndexHtml()
         if (ssr) {
-            log.info(colors.bold('  Pages (SSG)'))
+            log.info(colors.bold('- Pages (SSG)'))
             const paths = new Set(this.#routing.paths)
             if (typeof ssr === 'object' && ssr.staticPaths) {
                 ssr.staticPaths.forEach(path => paths.add(path))
@@ -345,11 +345,11 @@ export class Project {
                             const dataFile = path.join(outputDir, '_aleph/data', pathname, 'data.js')
                             await writeTextFile(dataFile, `export default ` + JSON.stringify(data))
                         }
-                        log.info('    ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
+                        log.info('  ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
                     } else if (status == 404) {
-                        log.info('    ○', colors.dim(pathname), colors.red(`Page not found`))
+                        log.info('  ○', colors.dim(pathname), colors.red(`Page not found`))
                     } else if (status == 500) {
-                        log.info('    ○', colors.dim(pathname), colors.red(`Error 505`))
+                        log.info('  ○', colors.dim(pathname), colors.red(`Error 505`))
                     }
                 }
             }))
@@ -387,7 +387,7 @@ export class Project {
                 const fi = await Deno.lstat(p)
                 await ensureDir(path.dirname(fp))
                 await Deno.copyFile(p, fp)
-                log.info('    ✹', rp, colors.dim('•'), colorfulBytesString(fi.size))
+                log.info('  ✹', rp, colors.dim('•'), colorfulBytesString(fi.size))
             }
         }
 
@@ -424,10 +424,10 @@ export class Project {
         }))
 
         const { deps, modules, styles } = moduleState
-        log.info(colors.bold('  Modules'))
-        log.info('    {}', colors.bold(deps.count.toString()), 'deps', colors.dim(`• ${util.bytesString(deps.bytes)} (mini, uncompress)`))
-        log.info('    {}', colors.bold(modules.count.toString()), 'modules', colors.dim(`• ${util.bytesString(modules.bytes)} (mini, uncompress)`))
-        log.info('    {}', colors.bold(styles.count.toString()), 'styles', colors.dim(`• ${util.bytesString(styles.bytes)} (mini, uncompress)`))
+        log.info(colors.bold('- Modules'))
+        log.info('  {}', colors.bold(deps.count.toString()), 'deps', colors.dim(`• ${util.bytesString(deps.bytes)} (mini, uncompress)`))
+        log.info('  {}', colors.bold(modules.count.toString()), 'modules', colors.dim(`• ${util.bytesString(modules.bytes)} (mini, uncompress)`))
+        log.info('  {}', colors.bold(styles.count.toString()), 'styles', colors.dim(`• ${util.bytesString(styles.bytes)} (mini, uncompress)`))
 
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
@@ -624,33 +624,33 @@ export class Project {
         const { renderPage, renderHead, renderScripts } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
         this.#renderer = { renderPage, renderHead, renderScripts }
 
-        log.info(colors.bold('Aleph.js'))
+        log.info(colors.bold(`Aleph.js v${version}`))
         if (this.config.__file) {
-            log.info(colors.bold('  Config'))
-            log.info('    ⚙️', this.config.__file)
+            log.info(colors.bold('- Config'))
+            log.info('  ⚙️', this.config.__file)
         }
-        log.info(colors.bold('  Global'))
+        log.info(colors.bold('- Global'))
         if (this.#modules.has('/app.js')) {
-            log.info('    ✓', 'Custom App')
+            log.info('  ✓', 'Custom App')
         }
         if (this.#modules.has('/404.js')) {
-            log.info('    ✓', 'Custom 404 Page')
+            log.info('  ✓', 'Custom 404 Page')
         }
         if (this.#modules.has('/loading.js')) {
-            log.info('    ✓', 'Custom Loading Page')
+            log.info('  ✓', 'Custom Loading Page')
         }
 
         if (this.isDev) {
             if (this.#apiRouting.paths.length > 0) {
-                log.info(colors.bold('  APIs'))
+                log.info(colors.bold('- APIs'))
             }
             for (const path of this.#apiRouting.paths) {
-                log.info('    λ', path)
+                log.info('  λ', path)
             }
-            log.info(colors.bold('  Pages'))
+            log.info(colors.bold('- Pages'))
             for (const path of this.#routing.paths) {
                 const isIndex = path == '/'
-                log.info('    ○', path, isIndex ? colors.dim('(index)') : '')
+                log.info('  ○', path, isIndex ? colors.dim('(index)') : '')
             }
         }
 

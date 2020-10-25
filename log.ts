@@ -64,7 +64,7 @@ export class Logger {
 }
 
 function colorfulTag(tag: string, colorful: (text: string) => string) {
-    return [colors.dim('['), colorful(tag), colors.dim(']')].join(' ')
+    return colorful(tag.toUpperCase())
 }
 
 export default new Logger()
