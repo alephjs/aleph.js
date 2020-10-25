@@ -53,14 +53,13 @@ export function ALEPH({ initial }: {
                         await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }, e.forceRefetch))
                     }
                     if (mod.asyncDeps.filter(({ url }) => url.startsWith('#useDeno.')).length > 0) {
-                        await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : '')).then(({ default: data }) => {
-                            if (util.isPlainObject(data)) {
-                                for (const key in data) {
-                                    const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
-                                    Object.assign(window, { [useDenoUrl]: data[key] })
-                                }
+                        const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : ''))
+                        if (util.isPlainObject(data)) {
+                            for (const key in data) {
+                                const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
+                                Object.assign(window, { [useDenoUrl]: data[key] })
                             }
-                        })
+                        }
                     }
                 }
                 const pc = ctree.find(pc => pc.id === mod.id)
@@ -70,8 +69,8 @@ export function ALEPH({ initial }: {
             })
             await Promise.all(imports)
             setRoute({ ...createPageProps(ctree), url })
-            if (util.isInt(e.scrollTo)) {
-                (window as any).scrollTo(e.scrollTo, 0)
+            if (e.resetScroll) {
+                (window as any).scrollTo(0, 0)
             }
         } else {
             setRoute({ Page: null, pageProps: {}, url })
@@ -150,14 +149,13 @@ export function ALEPH({ initial }: {
                             await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
                         }
                         if (mod.asyncDeps.filter(({ url }) => url.startsWith('#useDeno.')).length > 0) {
-                            await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`).then(({ default: data }) => {
-                                if (util.isPlainObject(data)) {
-                                    for (const key in data) {
-                                        const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
-                                        Object.assign(window, { [useDenoUrl]: data[key] })
-                                    }
+                            const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`)
+                            if (util.isPlainObject(data)) {
+                                for (const key in data) {
+                                    const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
+                                    Object.assign(window, { [useDenoUrl]: data[key] })
                                 }
-                            })
+                            }
                         }
                     }
                 })
@@ -175,6 +173,23 @@ export function ALEPH({ initial }: {
             events.off('fetch-page-module', onFetchPageModule)
         }
     }, [ref])
+
+    useEffect(() => {
+        const win = window as any
+        const { location, document, scrollX, scrollY, ALEPH } = win
+        const { hashAnchorScroll } = ALEPH
+        if (location.hash) {
+            const anchor = document.getElementById(location.hash.slice(1))
+            if (anchor) {
+                const { left, top } = anchor.getBoundingClientRect()
+                win.scroll({
+                    top: top + scrollY - (hashAnchorScroll?.offset?.top || 0),
+                    left: left + scrollX - (hashAnchorScroll?.offset?.left || 0),
+                    behavior: hashAnchorScroll?.behavior
+                })
+            }
+        }
+    }, [route])
 
     return (
         React.createElement(
@@ -211,7 +226,7 @@ export async function redirect(url: string, replace?: boolean) {
     } else {
         history.pushState(null, '', url)
     }
-    events.emit('popstate', { type: 'popstate', scrollTo: 0 })
+    events.emit('popstate', { type: 'popstate', resetScroll: true })
 }
 
 export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceRefetch = false) {
