@@ -51,8 +51,9 @@ interface RenderResult {
 }
 
 /**
- * A Project to manage the Aleph.js appliaction, features include:
- * - compile source files
+ * A Project to manage the Aleph.js appliaction.
+ * features include:
+ * - compile source codes
  * - manage deps
  * - apply plugins
  * - watch file changes
@@ -60,8 +61,8 @@ interface RenderResult {
  * - SSR/SSG
  */
 export class Project {
-    readonly mode: 'development' | 'production'
     readonly appRoot: string
+    readonly mode: 'development' | 'production'
     readonly config: Readonly<Required<Config>> & { __file?: string }
     readonly importMap: Readonly<{ imports: Record<string, string> }>
     readonly ready: Promise<void>
@@ -74,9 +75,9 @@ export class Project {
     #rendered: Map<string, Map<string, RenderResult>> = new Map()
     #postcssPlugins: Record<string, AcceptedPlugin> = {}
 
-    constructor(dir: string, mode: 'development' | 'production', reload = false) {
+    constructor(appDir: string, mode: 'development' | 'production', reload = false) {
+        this.appRoot = path.resolve(appDir)
         this.mode = mode
-        this.appRoot = dir
         this.config = {
             srcDir: '/',
             outputDir: '/dist',
@@ -298,7 +299,7 @@ export class Project {
         const outputDir = path.join(this.srcDir, this.config.outputDir)
         const distDir = path.join(outputDir, '_aleph')
         const outputModules = new Set<string>()
-        const lookup = async (moduleID: string) => {
+        const lookup = (moduleID: string) => {
             if (this.#modules.has(moduleID) && !outputModules.has(moduleID)) {
                 outputModules.add(moduleID)
                 const { deps } = this.#modules.get(moduleID)!
@@ -380,7 +381,7 @@ export class Project {
         // copy public assets
         const publicDir = path.join(this.appRoot, 'public')
         if (existsDirSync(publicDir)) {
-            log.info(colors.bold('  Public Assets'))
+            log.info(colors.bold('- Public Assets'))
             for await (const { path: p } of walk(publicDir, { includeDirs: false, skip: [/\/\.[^\/]+($|\/)/] })) {
                 const rp = util.trimPrefix(p, publicDir)
                 const fp = path.join(outputDir, rp)
@@ -536,17 +537,6 @@ export class Project {
         Object.assign(this, { buildID: this.mode + '.' + this.config.buildTarget })
         // update routing
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
-        // inject ALEPH global variable
-        Object.assign(globalThis, {
-            ALEPH: {
-                ENV: {
-                    ...this.config.env,
-                    __version: version,
-                    __buildMode: this.mode,
-                    __buildTarget: this.config.buildTarget,
-                } as AlephEnv
-            }
-        })
     }
 
     private async _init(reload: boolean) {
@@ -564,6 +554,18 @@ export class Project {
             }
             await ensureDir(this.buildDir)
         }
+
+        // inject ALEPH global variable
+        Object.assign(globalThis, {
+            ALEPH: {
+                ENV: {
+                    ...this.config.env,
+                    __version: version,
+                    __buildMode: this.mode,
+                    __buildTarget: this.config.buildTarget,
+                } as AlephEnv
+            }
+        })
 
         // change current work dir to appDoot
         Deno.chdir(this.appRoot)
@@ -1468,7 +1470,7 @@ export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
 
 /** get relative the path of `to` to `from` */
 function getRelativePath(from: string, to: string): string {
-    let r = path.relative(from, to)
+    let r = path.relative(from, to).split('\\').join('/')
     if (!r.startsWith('.') && !r.startsWith('/')) {
         r = './' + r
     }
