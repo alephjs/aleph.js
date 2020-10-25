@@ -14,6 +14,20 @@ export interface AlephEnv {
 }
 
 /**
+ * A plugin for **Aleph.js** application.
+ */
+export interface Plugin {
+    /** `name` gives the plugin a name. */
+    name?: string
+    /** `test` matches the import url. */
+    test: RegExp
+    /** `resolve` resolves the import url, if the `external` returned the compilation will skip the import url. */
+    resolve?(url: string): { url: string, external?: boolean }
+    /** `transform` transforms the source content. */
+    transform?(content: Uint8Array, url: string): Promise<{ code: string, sourceMap?: string, loader?: 'js' | 'jsx' | 'css' | 'markdown' }>
+}
+
+/**
  * The options for **SSR**.
  */
 export interface SSROptions {
@@ -25,20 +39,6 @@ export interface SSROptions {
     exclude?: RegExp[]
     /** A list of paths for **dynamic routes** in **SSR**. */
     staticPaths?: string[]
-}
-
-/**
- * A plugin for **Aleph.js** application.
- */
-export interface Plugin {
-    /** `name` gives the plugin a name. */
-    name?: string
-    /** `test` matches import url to transform */
-    test: RegExp
-    /** `resolve` resolves the import url, if the `external` returned the compilation will skip the import url. */
-    resolve?(url: string): { url: string, external?: boolean }
-    /** `transform` transforms the source content. */
-    transform?(content: Uint8Array): Promise<{ code: string, sourceMap?: string, loader?: 'js' | 'jsx' | 'css' | 'markdown' }>
 }
 
 /**

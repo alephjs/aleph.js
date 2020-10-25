@@ -536,17 +536,17 @@ export class Project {
         Object.assign(this, { buildID: this.mode + '.' + this.config.buildTarget })
         // update routing
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
-        // import postcss plugins
-        await Promise.all(this.config.postcss.plugins.map(async p => {
-            let name: string
-            if (typeof p === 'string') {
-                name = p
-            } else {
-                name = p.name
+        // inject ALEPH global variable
+        Object.assign(globalThis, {
+            ALEPH: {
+                ENV: {
+                    ...this.config.env,
+                    __version: version,
+                    __buildMode: this.mode,
+                    __buildTarget: this.config.buildTarget,
+                } as AlephEnv
             }
-            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.3&no-check`)
-            this.#postcssPlugins[name] = Plugin
-        }))
+        })
     }
 
     private async _init(reload: boolean) {
@@ -565,23 +565,20 @@ export class Project {
             await ensureDir(this.buildDir)
         }
 
-        Object.assign(globalThis, {
-            ALEPH: {
-                ENV: {
-                    ...this.config.env,
-                    __version: version,
-                    __buildMode: this.mode,
-                    __buildTarget: this.config.buildTarget,
-                } as AlephEnv
-            },
-            document: new Document(),
-            innerWidth: 1920,
-            innerHeight: 1080,
-            devicePixelRatio: 1,
-            $RefreshReg$: () => { },
-            $RefreshSig$: () => (type: any) => type,
-        })
+        // change current work dir to appDoot
         Deno.chdir(this.appRoot)
+
+        // import postcss plugins
+        await Promise.all(this.config.postcss.plugins.map(async p => {
+            let name: string
+            if (typeof p === 'string') {
+                name = p
+            } else {
+                name = p.name
+            }
+            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.3&no-check`)
+            this.#postcssPlugins[name] = Plugin
+        }))
 
         for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.jsx', '.tsx'] })) {
             const name = path.basename(p)
@@ -627,7 +624,7 @@ export class Project {
         log.info(colors.bold(`Aleph.js v${version}`))
         if (this.config.__file) {
             log.info(colors.bold('- Config'))
-            log.info('  ⚙️', this.config.__file)
+            log.info('  ▲', this.config.__file)
         }
         log.info(colors.bold('- Global'))
         if (this.#modules.has('/app.js')) {
@@ -970,7 +967,7 @@ export class Project {
             let sourceCode = (new TextDecoder).decode(sourceContent)
             for (const plugin of this.config.plugins) {
                 if (plugin.test.test(url) && plugin.transform) {
-                    const { code, loader = 'js' } = await plugin.transform(sourceContent)
+                    const { code, loader = 'js' } = await plugin.transform(sourceContent, url)
                     sourceCode = code
                     mod.loader = loader
                     break
@@ -1417,6 +1414,16 @@ export class Project {
         return __deps
     }
 }
+
+// add virtual browser global objects
+Object.assign(globalThis, {
+    document: new Document(),
+    innerWidth: 1920,
+    innerHeight: 1080,
+    devicePixelRatio: 1,
+    $RefreshReg$: () => { },
+    $RefreshSig$: () => (type: any) => type,
+})
 
 /** inject HMR and React Fast Referesh helper code  */
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {

@@ -1,4 +1,4 @@
-// mime types for web
+// MIME Types for Web
 const mimeTypes: Record<string, string[]> = {
     // application
     'application/javascript': ['js', 'mjs'],
@@ -9,16 +9,16 @@ const mimeTypes: Record<string, string[]> = {
     'application/xml': ['xml', 'xsl'],
     // text
     'text/html': ['html', 'htm'],
-    'text/markdown': ['markdown', 'md'],
+    'text/markdown': ['md', 'markdown'],
+    'text/mdx': ['mdx'],
     'text/typescript': ['ts', 'tsx'],
     'text/jsx': ['jsx'],
-    'text/mdx': ['mdx'],
     'text/css': ['css'],
     'text/less': ['less'],
     'text/sass': ['sass', 'scss'],
     'text/stylus': ['stylus', 'styl'],
     'text/csv': ['csv'],
-    'text/plain': ['txt', 'text', 'conf', 'ini', 'log'],
+    'text/plain': ['txt', 'text', 'conf', 'ini', 'log', 'yaml'],
     // font
     'font/ttf': ['ttf'],
     'font/otf': ['otf'],
@@ -44,13 +44,14 @@ const mimeTypes: Record<string, string[]> = {
     'video/ogg': ['ogv'],
     'video/webm': ['webm'],
 }
-
+const defaultType = 'application/octet-stream'
 const typesMap = Object.keys(mimeTypes).reduce((map, contentType) => {
     mimeTypes[contentType].forEach(ext => map.set(ext, contentType))
     return map
 }, new Map<string, string>())
 
-export function getContentType(filepath: string): string {
-    const ext = filepath.split('.').pop()!.toLowerCase()
-    return typesMap.get(ext) ?? 'application/octet-stream'
+/** get content type by file name */
+export function getContentType(filename: string): string {
+    const ext = filename.split('.').pop()!.toLowerCase()
+    return typesMap.get(ext) ?? defaultType
 }
