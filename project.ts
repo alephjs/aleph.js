@@ -21,14 +21,14 @@ interface Module {
     isRemote: boolean
     sourceFilePath: string
     sourceHash: string
-    deps: ModuleDep[]
+    deps: Dep[]
     jsFile: string
     jsContent: string
     jsSourceMap: string
     hash: string
 }
 
-interface ModuleDep {
+interface Dep {
     url: string
     hash: string
     async?: boolean
@@ -50,10 +50,19 @@ interface RenderResult {
     data: Record<string, string> | null
 }
 
+/**
+ * A Project to manage the Aleph.js appliaction, features include:
+ * - compile source files
+ * - manage deps
+ * - apply plugins
+ * - watch file changes
+ * - call APIs
+ * - SSR/SSG
+ */
 export class Project {
     readonly mode: 'development' | 'production'
     readonly appRoot: string
-    readonly config: Readonly<Required<Config>>
+    readonly config: Readonly<Required<Config>> & { __file?: string }
     readonly importMap: Readonly<{ imports: Record<string, string> }>
     readonly ready: Promise<void>
 
@@ -283,6 +292,7 @@ export class Project {
         return html
     }
 
+    /** build the application to a static site(SSG) */
     async build() {
         const start = performance.now()
         const outputDir = path.join(this.srcDir, this.config.outputDir)
@@ -524,7 +534,7 @@ export class Project {
         }
         // update buildID
         Object.assign(this, { buildID: this.mode + '.' + this.config.buildTarget })
-        // update routing options
+        // update routing
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
         // import postcss plugins
         await Promise.all(this.config.postcss.plugins.map(async p => {
@@ -615,9 +625,9 @@ export class Project {
         this.#renderer = { renderPage, renderHead, renderScripts }
 
         log.info(colors.bold('Aleph.js'))
-        if ('__file' in this.config) {
+        if (this.config.__file) {
             log.info(colors.bold('  Config'))
-            log.info('    ⚙️', this.config['__file'])
+            log.info('    ⚙️', this.config.__file)
         }
         log.info(colors.bold('  Global'))
         if (this.#modules.has('/app.js')) {
@@ -773,7 +783,7 @@ export class Project {
 
     private _moduleFromURL(url: string): Module {
         const isRemote = reHttp.test(url) || (url in this.importMap.imports && reHttp.test(this.importMap.imports[url]))
-        const sourceFilePath = renameImportUrl(url)
+        const sourceFilePath = fixImportUrl(url)
         const id = (isRemote ? '//' + util.trimPrefix(sourceFilePath, '/-/') : sourceFilePath).replace(reModuleExt, '.js')
         let loader = ''
         if (reStyleModuleExt.test(url)) {
@@ -993,7 +1003,7 @@ export class Project {
                     css = output.styles
                 }
                 mod.jsContent = [
-                    `import { applyCSS } from ${JSON.stringify(relativePath(
+                    `import { applyCSS } from ${JSON.stringify(getRelativePath(
                         path.dirname(mod.url),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
@@ -1006,8 +1016,8 @@ export class Project {
                 const html = marked.parse(__content)
                 mod.jsContent = [
                     this.isDev && `const _s = $RefreshSig$();`,
-                    `import React, { useEffect, useRef } from ${JSON.stringify(relativePath(path.dirname(mod.sourceFilePath), '/-/esm.sh/react.js'))};`,
-                    `import { redirect } from ${JSON.stringify(relativePath(path.dirname(mod.sourceFilePath), '/-/deno.land/x/aleph/aleph.js'))};`,
+                    `import React, { useEffect, useRef } from ${JSON.stringify(getRelativePath(path.dirname(mod.sourceFilePath), '/-/esm.sh/react.js'))};`,
+                    `import { redirect } from ${JSON.stringify(getRelativePath(path.dirname(mod.sourceFilePath), '/-/deno.land/x/aleph/aleph.js'))};`,
                     `export default function MarkdownPage() {`,
                     this.isDev && `  _s();`,
                     `  const ref = useRef(null);`,
@@ -1042,7 +1052,7 @@ export class Project {
                     mode: this.mode,
                     target: options?.forceTarget || this.config.buildTarget,
                     reactRefresh: this.isDev && !mod.isRemote,
-                    rewriteImportPath: (path: string, async?: boolean) => this._rewriteImportPath(mod, path, async),
+                    rewriteImportPath: (path: string, async?: boolean) => this._resolveImportURL(mod, path, async),
                     signUseDeno: (id: string) => {
                         const sig = 'useDeno.' + (new Sha1()).update(id).update(version).update(Date.now().toString()).hex().slice(0, hashShort)
                         useDenos.push(sig)
@@ -1053,7 +1063,7 @@ export class Project {
                 if (diagnostics && diagnostics.length > 0) {
                     throw new Error(`compile ${url}: ${diagnostics.map(d => d.messageText).join('\n')}`)
                 }
-                const jsContent = outputText.replace(/import\s*{([^}]+)}\s*from\s*("|')tslib("|');?/g, 'import {$1} from ' + JSON.stringify(relativePath(
+                const jsContent = outputText.replace(/import\s*{([^}]+)}\s*from\s*("|')tslib("|');?/g, 'import {$1} from ' + JSON.stringify(getRelativePath(
                     path.dirname(mod.sourceFilePath),
                     '/-/deno.land/x/aleph/tsc/tslib.js'
                 )) + ';')
@@ -1100,7 +1110,7 @@ export class Project {
             if (dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
                 if (!reHttp.test(dep.url)) {
-                    const depImportPath = relativePath(
+                    const depImportPath = getRelativePath(
                         path.dirname(url),
                         dep.url.replace(reModuleExt, '')
                     )
@@ -1143,7 +1153,7 @@ export class Project {
         this.#modules.forEach(mod => {
             mod.deps.forEach(dep => {
                 if (dep.url === depPath && dep.hash !== depHash && !tracing?.has(mod.id)) {
-                    const depImportPath = relativePath(
+                    const depImportPath = getRelativePath(
                         path.dirname(mod.url),
                         dep.url.replace(reModuleExt, '')
                     )
@@ -1182,79 +1192,89 @@ export class Project {
         })
     }
 
-    private _rewriteImportPath(importer: Module, importPath: string, async?: boolean): string {
-        let rewrittenPath: string
-        let resolveRet: { path: string, external?: boolean } | null = null
+    private _resolveImportURL(importer: Module, url: string, async?: boolean): string {
+        let rewrittenURL: string
+        let pluginsResolveRet: { url: string, external?: boolean } | null = null
         for (const plugin of this.config.plugins) {
-            if (plugin.test.test(importPath) && plugin.resolve) {
-                resolveRet = plugin.resolve(importPath)
+            if (plugin.test.test(url) && plugin.resolve) {
+                pluginsResolveRet = plugin.resolve(url)
                 break
             }
         }
 
-        // when a plugin resolver returns an external path, do NOT rewrite the `importPath`
-        if (resolveRet && resolveRet.external) {
-            rewrittenPath = resolveRet.path
+        // when a plugin resolver returns an external path, do NOT rewrite the `url`
+        if (pluginsResolveRet && pluginsResolveRet.external) {
+            rewrittenURL = pluginsResolveRet.url
         } else {
-            if (resolveRet) {
-                importPath = resolveRet.path
+            if (pluginsResolveRet) {
+                url = pluginsResolveRet.url
             }
-            if (importPath in this.importMap.imports) {
-                importPath = this.importMap.imports[importPath]
+            if (url in this.importMap.imports) {
+                url = this.importMap.imports[url]
             }
-            if (reHttp.test(importPath)) {
+            if (reHttp.test(url)) {
                 if (importer.isRemote) {
-                    rewrittenPath = relativePath(
+                    rewrittenURL = getRelativePath(
                         path.dirname(importer.url.replace(reHttp, '/-/').replace(/:(\d+)/, '/$1')),
-                        renameImportUrl(importPath)
+                        fixImportUrl(url)
                     )
                 } else {
-                    rewrittenPath = relativePath(
+                    rewrittenURL = getRelativePath(
                         path.dirname(importer.url),
-                        renameImportUrl(importPath)
+                        fixImportUrl(url)
                     )
                 }
             } else {
                 if (importer.isRemote) {
                     const modUrl = new URL(importer.url)
-                    let pathname = importPath
+                    let pathname = url
                     if (!pathname.startsWith('/')) {
-                        pathname = path.join(path.dirname(modUrl.pathname), importPath)
+                        pathname = path.join(path.dirname(modUrl.pathname), url)
                     }
                     const importUrl = new URL(modUrl.protocol + '//' + modUrl.host + pathname)
-                    rewrittenPath = relativePath(
+                    rewrittenURL = getRelativePath(
                         path.dirname(importer.sourceFilePath),
-                        renameImportUrl(importUrl.toString())
+                        fixImportUrl(importUrl.toString())
                     )
                 } else {
-                    rewrittenPath = importPath.replace(reModuleExt, '') + '.' + 'x'.repeat(hashShort)
+                    rewrittenURL = url.replace(reModuleExt, '') + '.' + 'x'.repeat(hashShort)
                 }
             }
         }
 
-        if (reHttp.test(importPath)) {
-            importer.deps.push({ url: importPath, hash: '', async, external: resolveRet?.external })
+        if (reHttp.test(url)) {
+            importer.deps.push({ url, hash: '', async, external: pluginsResolveRet?.external })
         } else {
             if (importer.isRemote) {
                 const sourceUrl = new URL(importer.url)
-                let pathname = importPath
+                let pathname = url
                 if (!pathname.startsWith('/')) {
-                    pathname = path.join(path.dirname(sourceUrl.pathname), importPath)
+                    pathname = path.join(path.dirname(sourceUrl.pathname), url)
                 }
-                importer.deps.push({ url: sourceUrl.protocol + '//' + sourceUrl.host + pathname, hash: '', async, external: resolveRet?.external })
+                importer.deps.push({
+                    url: sourceUrl.protocol + '//' + sourceUrl.host + pathname,
+                    hash: '',
+                    async,
+                    external: pluginsResolveRet?.external
+                })
             } else {
-                importer.deps.push({ url: path.join(path.dirname(importer.url), importPath), hash: '', async, external: resolveRet?.external })
+                importer.deps.push({
+                    url: path.join(path.dirname(importer.url), url),
+                    hash: '',
+                    async,
+                    external: pluginsResolveRet?.external
+                })
             }
         }
 
-        if (reHttp.test(rewrittenPath)) {
-            return rewrittenPath
+        if (reHttp.test(rewrittenURL)) {
+            return rewrittenURL
         }
 
-        if (!rewrittenPath.startsWith('.') && !rewrittenPath.startsWith('/')) {
-            rewrittenPath = '/' + rewrittenPath
+        if (!rewrittenURL.startsWith('.') && !rewrittenURL.startsWith('/')) {
+            rewrittenURL = '/' + rewrittenURL
         }
-        return rewrittenPath.replace(reModuleExt, '') + '.js'
+        return rewrittenURL.replace(reModuleExt, '') + '.js'
     }
 
     private async _renderPage(loc: { pathname: string, search?: string }) {
@@ -1398,6 +1418,7 @@ export class Project {
     }
 }
 
+/** inject HMR and React Fast Referesh helper code  */
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
     let hmrImportPath = path.relative(
         path.dirname(sourceFilePath),
@@ -1407,14 +1428,14 @@ export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
         hmrImportPath = './' + hmrImportPath
     }
 
-    const text = [
+    const lines = [
         `import { createHotContext, RefreshRuntime, performReactRefresh } from ${JSON.stringify(hmrImportPath)};`,
         `import.meta.hot = createHotContext(${JSON.stringify(id)});`
     ]
     const reactRefresh = id.endsWith('.js') || id.endsWith('.md') || id.endsWith('.mdx')
     if (reactRefresh) {
-        text.push('')
-        text.push(
+        lines.push('')
+        lines.push(
             `const prevRefreshReg = window.$RefreshReg$;`,
             `const prevRefreshSig = window.$RefreshSig$;`,
             `Object.assign(window, {`,
@@ -1423,22 +1444,23 @@ export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
             `});`,
         )
     }
-    text.push('')
-    text.push(jsContent)
-    text.push('')
+    lines.push('')
+    lines.push(jsContent)
+    lines.push('')
     if (reactRefresh) {
-        text.push(
+        lines.push(
             'window.$RefreshReg$ = prevRefreshReg;',
             'window.$RefreshSig$ = prevRefreshSig;',
             'import.meta.hot.accept(performReactRefresh);'
         )
     } else {
-        text.push('import.meta.hot.accept();')
+        lines.push('import.meta.hot.accept();')
     }
-    return text.join('\n')
+    return lines.join('\n')
 }
 
-function relativePath(from: string, to: string): string {
+/** get relative the path of `to` to `from` */
+function getRelativePath(from: string, to: string): string {
     let r = path.relative(from, to)
     if (!r.startsWith('.') && !r.startsWith('/')) {
         r = './' + r
@@ -1446,7 +1468,8 @@ function relativePath(from: string, to: string): string {
     return r
 }
 
-function renameImportUrl(importUrl: string): string {
+/** fix import url */
+function fixImportUrl(importUrl: string): string {
     const isRemote = reHttp.test(importUrl)
     const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
     let ext = path.extname(path.basename(url.pathname)) || '.js'
@@ -1464,6 +1487,7 @@ function renameImportUrl(importUrl: string): string {
     return pathname + ext
 }
 
+/** get hash(sha1) of the content, mix current aleph.js version when the second parameter is `true` */
 function getHash(content: string | Uint8Array, checkVersion = false) {
     const sha1 = new Sha1()
     sha1.update(content)
@@ -1473,6 +1497,12 @@ function getHash(content: string | Uint8Array, checkVersion = false) {
     return sha1.hex()
 }
 
+/**
+ * colorful the bytes string
+ * - dim: 0 - 1MB
+ * - yellow: 1MB - 10MB
+ * - red: > 10MB
+ */
 function colorfulBytesString(bytes: number) {
     let cf = colors.dim
     if (bytes > 10 * MB) {
@@ -1483,12 +1513,7 @@ function colorfulBytesString(bytes: number) {
     return cf(util.bytesString(bytes))
 }
 
-async function writeTextFile(filepath: string, content: string) {
-    const dir = path.dirname(filepath)
-    await ensureDir(dir)
-    await Deno.writeTextFile(filepath, content)
-}
-
+/** cleanup the previous compilation cache */
 async function cleanupCompilation(jsFile: string) {
     const dir = path.dirname(jsFile)
     const jsFileName = path.basename(jsFile)
@@ -1504,4 +1529,11 @@ async function cleanupCompilation(jsFile: string) {
             }
         }
     }
+}
+
+/** ensure and write text file */
+async function writeTextFile(filepath: string, content: string) {
+    const dir = path.dirname(filepath)
+    await ensureDir(dir)
+    await Deno.writeTextFile(filepath, content)
 }

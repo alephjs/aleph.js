@@ -31,9 +31,14 @@ export interface SSROptions {
  * A plugin for **Aleph.js** application.
  */
 export interface Plugin {
+    /** `name` gives the plugin a name. */
+    name?: string
+    /** `test` matches import url to transform */
     test: RegExp
-    resolve?(path: string): { path: string, external?: boolean }
-    transform?(content: Uint8Array): Promise<{ code: string, sourceMap?: string, loader?: 'js' | 'css' | 'markdown' }>
+    /** `resolve` resolves the import url, if the `external` returned the compilation will skip the import url. */
+    resolve?(url: string): { url: string, external?: boolean }
+    /** `transform` transforms the source content. */
+    transform?(content: Uint8Array): Promise<{ code: string, sourceMap?: string, loader?: 'js' | 'jsx' | 'css' | 'markdown' }>
 }
 
 /**
