@@ -685,7 +685,7 @@ export class Project {
                                 }
                         }
                     }
-                    if ((reModuleExt.test(path) || reMDExt.test(path)) && path.startsWith('/pages/')) {
+                    if (path.startsWith('/pages/') && (reModuleExt.test(path) || reMDExt.test(path))) {
                         return true
                     }
                     let isDep = false
@@ -696,7 +696,7 @@ export class Project {
                         }
                     }
                     if (isDep) {
-                        return
+                        return true
                     }
                     return this.config.plugins.findIndex(p => p.test.test(path)) > -1
                 })()
