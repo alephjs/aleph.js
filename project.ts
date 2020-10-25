@@ -663,7 +663,7 @@ export class Project {
         log.info('Start watching code changes...')
         for await (const event of w) {
             for (const p of event.paths) {
-                const path = '/' + util.trimPrefix(util.trimPrefix(p, this.appRoot), '/')
+                const path = util.cleanPath(util.trimPrefix(p, this.appRoot))
                 // handle `api` dir remove directly
                 const validated = (() => {
                     if (!reModuleExt.test(path) && !reStyleModuleExt.test(path) && !reMDExt.test(path)) {
@@ -1429,7 +1429,7 @@ Object.assign(globalThis, {
 
 /** inject HMR and React Fast Referesh helper code  */
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
-    let hmrImportPath = path.relative(
+    let hmrImportPath = getRelativePath(
         path.dirname(sourceFilePath),
         '/-/deno.land/x/aleph/hmr.js'
     )

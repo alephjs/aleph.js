@@ -48,7 +48,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                                                     type: 'update',
                                                     moduleId: mod.id,
                                                     hash,
-                                                    updateUrl: path.join('/', project.config.baseUrl, '/_aleph/', mod.id.replace(/\.js$/, '') + `.${hash!.slice(0, hashShort)}.js`)
+                                                    updateUrl: util.cleanPath(`${project.config.baseUrl}/_aleph/${mod.id.replace(/\.js$/, '')}.${hash!.slice(0, hashShort)}.js`)
                                                 })))
                                             }
                                         }

@@ -126,7 +126,7 @@ export default {
     },
     splitPath(path: string): string[] {
         return path
-            .split('/')
+            .split(/[\/\\]/g)
             .map(p => p.trim())
             .filter(p => p !== '' && p !== '.')
             .reduce((path, p) => {
