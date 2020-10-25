@@ -24,7 +24,7 @@ export interface Plugin {
     /** `resolve` resolves the import url, if the `external` returned the compilation will skip the import url. */
     resolve?(url: string): { url: string, external?: boolean }
     /** `transform` transforms the source content. */
-    transform?(content: Uint8Array, url: string): Promise<{ code: string, sourceMap?: string, loader?: 'js' | 'jsx' | 'css' | 'markdown' }>
+    transform?(content: Uint8Array, url: string): Promise<{ code: string, map?: string, loader?: 'js' | 'jsx' | 'css' | 'markdown' }>
 }
 
 /**
