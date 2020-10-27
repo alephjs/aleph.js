@@ -76,10 +76,16 @@ interface SEOProps {
     title?: string
     description?: string
     keywords?: string | string[]
+    url?: string
     image?: string
+    twitter?: {
+        card?: 'summary' | 'summary_large_image' | 'app' | 'player'
+        site?: string
+        creator?: string
+    }
 }
 
-export function SEO({ title, description, keywords, image }: SEOProps) {
+export function SEO({ title, description, keywords, url, image, twitter }: SEOProps) {
     return createElement(
         Head,
         undefined,
@@ -90,9 +96,12 @@ export function SEO({ title, description, keywords, image }: SEOProps) {
         description && createElement('meta', { name: 'og:description', content: description }),
         title && createElement('meta', { name: 'twitter:title', content: title }),
         description && createElement('meta', { name: 'twitter:description', content: description }),
+        url && createElement('meta', { name: 'og:url', content: url }),
         image && createElement('meta', { name: 'og:image', content: image }),
-        image && createElement('meta', { name: 'twitter:image:src', content: image }),
-        image && createElement('meta', { name: 'twitter:card', content: 'summary_large_image' }),
+        image && createElement('meta', { name: 'twitter:image', content: image }),
+        image && createElement('meta', { name: 'twitter:card', content: twitter?.card || 'summary_large_image' }),
+        twitter?.site && createElement('meta', { name: 'twitter:site', content: twitter.site }),
+        twitter?.creator && createElement('meta', { name: 'twitter:creator', content: twitter.creator }),
     )
 }
 
