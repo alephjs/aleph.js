@@ -176,8 +176,7 @@ export function ALEPH({ initial }: {
 
     useEffect(() => {
         const win = window as any
-        const { location, document, scrollX, scrollY, ALEPH } = win
-        const { hashAnchorScroll } = ALEPH
+        const { location, document, scrollX, scrollY, hashAnchorScroll } = win
         if (location.hash) {
             const anchor = document.getElementById(location.hash.slice(1))
             if (anchor) {
