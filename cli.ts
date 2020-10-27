@@ -1,9 +1,10 @@
 import { Request } from './api.ts'
+import { existsDirSync, existsFileSync } from './fs.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './mime.ts'
 import { listenAndServe, path, ServerRequest, walk } from './std.ts'
-import util, { existsDirSync, existsFileSync } from './util.ts'
+import util from './util.ts'
 import { version } from './version.ts'
 
 const commands = {

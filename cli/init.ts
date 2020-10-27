@@ -1,6 +1,7 @@
 import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
+import { ensureTextFile } from '../fs.ts'
 import log from '../log.ts'
-import { colors, ensureDir, ensureFile, fromStreamReader, path, Untar } from '../std.ts'
+import { colors, ensureDir, fromStreamReader, path, Untar } from '../std.ts'
 import util from '../util.ts'
 
 const gitignore = [
@@ -59,7 +60,7 @@ export default async function (appDir: string, options: Record<string, string | 
                 await ensureDir(fp)
                 continue
             }
-            await ensureFile(fp)
+            await ensureTextFile(fp, '')
             const file = await Deno.open(fp, { write: true })
             await Deno.copy(entry, file)
         }

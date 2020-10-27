@@ -4,6 +4,8 @@ import events from './events.ts'
 import { useRouter } from './hooks.ts'
 import util, { reModuleExt } from './util.ts'
 
+const prefetchedPageModules = new Set<string>()
+
 interface LinkProps {
     to: string
     replace?: boolean
@@ -12,16 +14,8 @@ interface LinkProps {
     style?: CSSProperties
 }
 
-const fetchedPageModules = new Set<string>()
-
-export default function Link({
-    to,
-    replace = false,
-    prefetch: prefetchImmediately = false,
-    className,
-    style,
-    children
-}: PropsWithChildren<LinkProps>) {
+export default function Link(props: PropsWithChildren<LinkProps>) {
+    const { to, replace = false, prefetch: prefetchNow = false, className, style, children } = props
     const { pathname: currentPathname, query: currentQuery } = useRouter()
     const currentHref = useMemo(() => {
         return [currentPathname, currentQuery.toString()].filter(Boolean).join('?')
@@ -39,9 +33,9 @@ export default function Link({
         return [pathname, search].filter(Boolean).join('?')
     }, [currentPathname, to])
     const prefetch = useCallback(() => {
-        if (!util.isHttpUrl(href) && href !== currentHref && !fetchedPageModules.has(href)) {
+        if (!util.isHttpUrl(href) && href !== currentHref && !prefetchedPageModules.has(href)) {
             events.emit('fetch-page-module', { href })
-            fetchedPageModules.add(href)
+            prefetchedPageModules.add(href)
         }
     }, [href, currentHref])
     const onClick = useCallback((e: MouseEvent) => {
@@ -52,10 +46,10 @@ export default function Link({
     }, [href, currentHref, replace])
 
     useEffect(() => {
-        if (prefetchImmediately) {
+        if (prefetchNow) {
             prefetch()
         }
-    }, [prefetchImmediately, prefetch])
+    }, [prefetchNow, prefetch])
 
     if (Children.count(children) === 1) {
         const child = Children.toArray(children)[0]
@@ -106,12 +100,8 @@ interface NavLinkProps extends LinkProps {
     activeStyle?: CSSProperties
 }
 
-export function NavLink({
-    activeClassName = 'active',
-    activeStyle,
-    to,
-    ...rest
-}: PropsWithChildren<NavLinkProps>) {
+export function NavLink(props: PropsWithChildren<NavLinkProps>) {
+    const { activeClassName = 'active', activeStyle, to, ...rest } = props
     const { pathname: currentPathname } = useRouter()
     const pathname = useMemo(() => {
         if (util.isHttpUrl(to)) {

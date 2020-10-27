@@ -5,14 +5,14 @@ export const serverHeadElements: Map<string, { type: string, props: Record<strin
 export const serverScriptsElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
 export const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
-export default function Head({ children }: PropsWithChildren<{}>) {
+export default function Head(props: PropsWithChildren<{}>) {
     if (window.Deno) {
-        parse(children).forEach(({ type, props }, key) => serverHeadElements.set(key, { type, props }))
+        parse(props.children).forEach(({ type, props }, key) => serverHeadElements.set(key, { type, props }))
     }
 
     useEffect(() => {
         const doc = (window as any).document
-        const nodes = parse(children)
+        const nodes = parse(props.children)
         const insertedEls: Array<Object> = []
 
         if (nodes.size > 0) {
@@ -53,14 +53,14 @@ export default function Head({ children }: PropsWithChildren<{}>) {
         return () => {
             insertedEls.forEach(el => doc.head.removeChild(el))
         }
-    }, [children])
+    }, [props.children])
 
     return null
 }
 
-export function Scripts({ children }: PropsWithChildren<{}>) {
+export function Scripts(props: PropsWithChildren<{}>) {
     if (window.Deno) {
-        parse(children).forEach(({ type, props }, key) => {
+        parse(props.children).forEach(({ type, props }, key) => {
             if (type === 'script') {
                 serverScriptsElements.set(key, { type, props })
             }
@@ -85,7 +85,8 @@ interface SEOProps {
     }
 }
 
-export function SEO({ title, description, keywords, url, image, twitter }: SEOProps) {
+export function SEO(props: SEOProps) {
+    const { title, description, keywords, url, image, twitter } = props
     return createElement(
         Head,
         undefined,

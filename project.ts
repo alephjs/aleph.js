@@ -4,13 +4,14 @@ import { minify } from 'https://esm.sh/terser@5.3.2'
 import { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.0'
 import { Request } from './api.ts'
 import { EventEmitter } from './events.ts'
+import { ensureTextFile, existsDirSync, existsFileSync } from './fs.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getPagePath, RouteModule, Routing } from './routing.ts'
 import { colors, ensureDir, fromStreamReader, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
 import type { AlephEnv, APIHandler, Config, RouterURL } from './types.ts'
-import util, { existsDirSync, existsFileSync, hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
+import util, { hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { cleanCSS, Document, less } from './vendor/mod.ts'
 import { version } from './version.ts'
 
@@ -341,10 +342,10 @@ export class Project {
                     const [status, html, data] = await this.getPageHtml({ pathname })
                     if (status == 200) {
                         const htmlFile = path.join(outputDir, pathname, 'index.html')
-                        await writeTextFile(htmlFile, html)
+                        await ensureTextFile(htmlFile, html)
                         if (data) {
                             const dataFile = path.join(outputDir, '_aleph/data', pathname, 'data.js')
-                            await writeTextFile(dataFile, `export default ` + JSON.stringify(data))
+                            await ensureTextFile(dataFile, `export default ` + JSON.stringify(data))
                         }
                         log.info('  ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
                     } else if (status == 404) {
@@ -355,9 +356,9 @@ export class Project {
                 }
             }))
             const fbHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback.html')
-            await writeTextFile(fbHtmlFile, SPAIndexHtml)
+            await ensureTextFile(fbHtmlFile, SPAIndexHtml)
         } else {
-            await writeTextFile(path.join(outputDir, 'index.html'), SPAIndexHtml)
+            await ensureTextFile(path.join(outputDir, 'index.html'), SPAIndexHtml)
         }
 
         // write 404 page
@@ -376,7 +377,7 @@ export class Project {
             body,
             minify: !this.isDev
         })
-        await writeTextFile(path.join(outputDir, '404.html'), e404PageHtml)
+        await ensureTextFile(path.join(outputDir, '404.html'), e404PageHtml)
 
         // copy public assets
         const publicDir = path.join(this.appRoot, 'public')
@@ -419,8 +420,8 @@ export class Project {
                 }
             }
             return Promise.all([
-                writeTextFile(jsFile, jsContent),
-                sourceMap && jsSourceMap ? writeTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
+                ensureTextFile(jsFile, jsContent),
+                sourceMap && jsSourceMap ? ensureTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
             ])
         }))
 
@@ -559,6 +560,7 @@ export class Project {
         Object.assign(globalThis, {
             ALEPH: {
                 ENV: {
+                    ...Deno.env.toObject(),
                     ...this.config.env,
                     __version: version,
                     __buildMode: this.mode,
@@ -832,7 +834,6 @@ export class Project {
             'import "./-/deno.land/x/aleph/routing.js";',
             'import "./-/deno.land/x/aleph/util.js";',
             'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js";',
-            `Object.assign(window, ${JSON.stringify({ ALEPH: (globalThis as any)['ALEPH'] }, undefined, this.isDev ? 4 : undefined)});`,
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
         ].filter(Boolean).join(this.isDev ? '\n' : '')
         module.hash = getHash(module.jsContent)
@@ -847,8 +848,8 @@ export class Project {
 
         await cleanupCompilation(module.jsFile)
         await Promise.all([
-            writeTextFile(module.jsFile, module.jsContent),
-            writeTextFile(metaFile, JSON.stringify({
+            ensureTextFile(module.jsFile, module.jsContent),
+            ensureTextFile(metaFile, JSON.stringify({
                 url: '/main.js',
                 sourceHash: module.hash,
                 hash: module.hash,
@@ -1134,14 +1135,14 @@ export class Project {
             mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + '.js'
             await cleanupCompilation(mod.jsFile)
             await Promise.all([
-                writeTextFile(metaFile, JSON.stringify({
+                ensureTextFile(metaFile, JSON.stringify({
                     url,
                     sourceHash: mod.sourceHash,
                     hash: mod.hash,
                     deps: mod.deps,
                 }, undefined, 4)),
-                writeTextFile(mod.jsFile, mod.jsContent),
-                mod.jsSourceMap !== '' ? writeTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
+                ensureTextFile(mod.jsFile, mod.jsContent),
+                mod.jsSourceMap !== '' ? ensureTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
             ])
         }
 
@@ -1172,14 +1173,14 @@ export class Project {
                         mod.hash = getHash(mod.jsContent)
                         mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
                         Promise.all([
-                            writeTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
+                            ensureTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
                                 sourceFile: mod.url,
                                 sourceHash: mod.sourceHash,
                                 hash: mod.hash,
                                 deps: mod.deps,
                             }, undefined, 4)),
-                            writeTextFile(mod.jsFile, mod.jsContent),
-                            mod.jsSourceMap !== '' ? writeTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
+                            ensureTextFile(mod.jsFile, mod.jsContent),
+                            mod.jsSourceMap !== '' ? ensureTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
                         ])
                     }
                     callback(mod)
@@ -1538,11 +1539,4 @@ async function cleanupCompilation(jsFile: string) {
             }
         }
     }
-}
-
-/** ensure and write text file */
-async function writeTextFile(filepath: string, content: string) {
-    const dir = path.dirname(filepath)
-    await ensureDir(dir)
-    await Deno.writeTextFile(filepath, content)
 }

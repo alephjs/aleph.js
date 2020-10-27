@@ -1,7 +1,6 @@
 export { Untar } from 'https://deno.land/std@0.74.0/archive/tar.ts'
 export * as colors from 'https://deno.land/std@0.74.0/fmt/colors.ts'
 export { ensureDir } from 'https://deno.land/std@0.74.0/fs/ensure_dir.ts'
-export { ensureFile } from 'https://deno.land/std@0.74.0/fs/ensure_file.ts'
 export { walk } from 'https://deno.land/std@0.74.0/fs/walk.ts'
 export { Sha1 } from 'https://deno.land/std@0.74.0/hash/sha1.ts'
 export { listenAndServe, serve, ServerRequest } from 'https://deno.land/std@0.74.0/http/server.ts'

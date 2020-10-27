@@ -208,6 +208,10 @@ export function ALEPH({ initial }: {
     )
 }
 
+export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceRefetch = false) {
+    return util.cleanPath(baseUrl + '/_aleph/' + util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js` + (forceRefetch ? `?t=${Date.now()}` : ''))
+}
+
 export async function redirect(url: string, replace?: boolean) {
     const { location, history } = window as any
 
@@ -227,8 +231,4 @@ export async function redirect(url: string, replace?: boolean) {
         history.pushState(null, '', url)
     }
     events.emit('popstate', { type: 'popstate', resetScroll: true })
-}
-
-export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceRefetch = false) {
-    return util.cleanPath(baseUrl + '/_aleph/' + util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js` + (forceRefetch ? `?t=${Date.now()}` : ''))
 }
