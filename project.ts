@@ -1,5 +1,5 @@
 import marked from 'https://esm.sh/marked@1.2.0'
-import postcss, { AcceptedPlugin } from 'https://esm.sh/postcss@8.1.3'
+import postcss, { AcceptedPlugin } from 'https://esm.sh/postcss@8.1.4'
 import { minify } from 'https://esm.sh/terser@5.3.2'
 import { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.0'
 import { Request } from './api.ts'
@@ -96,7 +96,6 @@ export class Project {
             plugins: [],
             postcss: {
                 plugins: [
-                    'postcss-flexbugs-fixes',
                     'autoprefixer'
                 ]
             }
@@ -580,7 +579,7 @@ export class Project {
             } else {
                 name = p.name
             }
-            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.3&no-check`)
+            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.4&no-check`)
             this.#postcssPlugins[name] = Plugin
         }))
 
