@@ -1331,12 +1331,6 @@ export class Project {
                     ...pageModuleTree.map(({ id }) => this._lookupDeps(id).filter(dep => !!dep.isStyle)).flat()
                 ].flat()
             )
-            console.log('---', {
-                head,
-                body,
-                data,
-                scripts
-            })
             ret.head = head
             ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
                 if (script.innerText && !this.isDev) {
@@ -1376,12 +1370,6 @@ export class Project {
                 [],
                 e404Module ? this._lookupDeps(e404Module.id).filter(dep => !!dep.isStyle) : []
             )
-            console.log('---', {
-                head,
-                body,
-                data,
-                scripts
-            })
             ret.head = head
             ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
                 if (script.innerText && !this.isDev) {
