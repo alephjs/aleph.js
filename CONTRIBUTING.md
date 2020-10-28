@@ -8,7 +8,7 @@ All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 
 ## Development Setup
 
-You will need [Deno](https://deno.land/) 1.4+ and [VS Code](https://code.visualstudio.com/) with [deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno).
+You will need [Deno](https://deno.land/) 1.5+ and [VS Code](https://code.visualstudio.com/) with [deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno).
 
 1. Fork this repository to your own GitHub account.
 2. Clone the repository to your local device.
@@ -16,7 +16,7 @@ You will need [Deno](https://deno.land/) 1.4+ and [VS Code](https://code.visuals
 4. Change code then run examples.
 
 ```bash
-deno run -A --unstable --importmap=import_map.json cli.ts ./examples/hello-world -L debug
+deno run -A --unstable --import-map=import_map.json cli.ts ./examples/hello-world -L debug
 ```
 
 ## Testing
