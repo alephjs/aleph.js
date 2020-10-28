@@ -29,4 +29,4 @@ deno test -A --unstable
 
 ## Contributing to Documentation
 
-You are welcome to improve our documentation, the documentation repository is https://github.com/postui/alephjs.org/tree/master/pages/docs.
+You are welcome to improve our [documentation](https://alephjs.org/docs).
