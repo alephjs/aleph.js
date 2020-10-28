@@ -114,7 +114,23 @@ export async function renderPage(
             data[id] = ret
         }
     })
-    Object.assign(window, { [`__asyncData_${useDenEvent}`]: {} })
+    Object.assign(window, {
+        [`__asyncData_${useDenEvent}`]: {},
+        location: {
+            protocol: 'http:',
+            host: 'localhost',
+            hostname: 'localhost',
+            port: '',
+            href: 'https://localhost' + url.pathname + url.query.toString(),
+            origin: 'https://localhost',
+            pathname: url.pathname,
+            search: url.query.toString(),
+            hash: '',
+            reload() { },
+            replace() { },
+            toString() { return this.href },
+        }
+    })
     while (true) {
         try {
             if (useDenoAsyncCalls.length > 0) {

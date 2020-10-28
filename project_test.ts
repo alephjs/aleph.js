@@ -1,6 +1,6 @@
-import { assertEquals } from 'https://deno.land/std/testing/asserts.ts';
-import { Project } from './project.ts';
-import { path } from './std.ts';
+import { assertEquals } from 'https://deno.land/std/testing/asserts.ts'
+import { Project } from './project.ts'
+import { path } from './std.ts'
 
 Deno.test({
     name: 'project build(hello world)',

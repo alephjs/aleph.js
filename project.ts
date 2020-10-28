@@ -122,13 +122,26 @@ export class Project {
     }
 
     isHMRable(moduleID: string) {
-        return !reHttp.test(moduleID) && (
-            moduleID === '/404.js' ||
-            moduleID === '/app.js' ||
-            moduleID.startsWith('/pages/') ||
-            moduleID.startsWith('/components/') ||
-            reStyleModuleExt.test(moduleID)
-        )
+        if (reHttp.test(moduleID)) {
+            return false
+        }
+        if (reStyleModuleExt.test(moduleID)) {
+            return true
+        }
+        if (reModuleExt.test(moduleID)) {
+            return moduleID === '/404.js' ||
+                moduleID === '/app.js' ||
+                moduleID.startsWith('/pages/') ||
+                moduleID.startsWith('/components/')
+        }
+        if (reMDExt.test(moduleID)) {
+            return moduleID.startsWith('/pages/')
+        }
+        const plugin = this.config.plugins.find(p => p.test.test(moduleID))
+        if (plugin?.acceptHMR) {
+            return true
+        }
+        return false
     }
 
     isSSRable(pathname: string): boolean {
@@ -555,6 +568,18 @@ export class Project {
             await ensureDir(this.buildDir)
         }
 
+        // import postcss plugins
+        await Promise.all(this.config.postcss.plugins.map(async p => {
+            let name: string
+            if (typeof p === 'string') {
+                name = p
+            } else {
+                name = p.name
+            }
+            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.4&no-check`)
+            this.#postcssPlugins[name] = Plugin
+        }))
+
         // inject ALEPH global variable
         Object.assign(globalThis, {
             ALEPH: {
@@ -570,18 +595,6 @@ export class Project {
 
         // change current work dir to appDoot
         Deno.chdir(this.appRoot)
-
-        // import postcss plugins
-        await Promise.all(this.config.postcss.plugins.map(async p => {
-            let name: string
-            if (typeof p === 'string') {
-                name = p
-            } else {
-                name = p.name
-            }
-            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.4&no-check`)
-            this.#postcssPlugins[name] = Plugin
-        }))
 
         for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.jsx', '.tsx'] })) {
             const name = path.basename(p)
@@ -825,16 +838,16 @@ export class Project {
         const metaFile = path.join(this.buildDir, 'main.meta.json')
 
         module.jsContent = [
-            this.isDev && 'import "./-/deno.land/x/aleph/hmr.js";',
-            'import "./-/deno.land/x/aleph/aleph.js";',
-            'import "./-/deno.land/x/aleph/context.js";',
-            'import "./-/deno.land/x/aleph/error.js";',
-            'import "./-/deno.land/x/aleph/events.js";',
-            'import "./-/deno.land/x/aleph/routing.js";',
-            'import "./-/deno.land/x/aleph/util.js";',
-            'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js";',
-            `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)});`
-        ].filter(Boolean).join(this.isDev ? '\n' : '')
+            this.isDev && 'import "./-/deno.land/x/aleph/hmr.js"',
+            'import "./-/deno.land/x/aleph/aleph.js"',
+            'import "./-/deno.land/x/aleph/context.js"',
+            'import "./-/deno.land/x/aleph/error.js"',
+            'import "./-/deno.land/x/aleph/events.js"',
+            'import "./-/deno.land/x/aleph/routing.js"',
+            'import "./-/deno.land/x/aleph/util.js"',
+            'import bootstrap from "./-/deno.land/x/aleph/bootstrap.js"',
+            `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)})`
+        ].filter(Boolean).join(this.isDev ? '\n' : ';')
         module.hash = getHash(module.jsContent)
         module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
         module.deps = [
@@ -1045,7 +1058,7 @@ export class Project {
                 ].filter(Boolean).map(l => !this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
                 mod.jsSourceMap = ''
                 mod.hash = getHash(mod.jsContent)
-            } else if (mod.loader === 'js') {
+            } else if (mod.loader === 'js' || mod.loader === 'ts' || mod.loader === 'jsx' || mod.loader === 'tsx') {
                 const useDenos: string[] = []
                 const compileOptions = {
                     mode: this.mode,
@@ -1291,22 +1304,6 @@ export class Project {
             }
         }
         const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], scripts: [], body: '<main></main>', data: null }
-        Object.assign(window, {
-            location: {
-                protocol: 'http:',
-                host: 'localhost',
-                hostname: 'localhost',
-                port: '',
-                href: 'https://localhost' + url.pathname + url.query.toString(),
-                origin: 'https://localhost',
-                pathname: url.pathname,
-                search: url.query.toString(),
-                hash: '',
-                reload() { },
-                replace() { },
-                toString() { return this.href },
-            }
-        })
         if (ret.status === 404) {
             if (this.isDev) {
                 log.warn(`page '${url.pathname}' not found`)
@@ -1420,6 +1417,20 @@ export class Project {
 // add virtual browser global objects
 Object.assign(globalThis, {
     document: new Document(),
+    location: {
+        protocol: 'http:',
+        host: 'localhost',
+        hostname: 'localhost',
+        port: '',
+        href: 'https://localhost/',
+        origin: 'https://localhost',
+        pathname: '/',
+        search: '',
+        hash: '',
+        reload() { },
+        replace() { },
+        toString() { return this.href },
+    },
     innerWidth: 1920,
     innerHeight: 1080,
     devicePixelRatio: 1,
