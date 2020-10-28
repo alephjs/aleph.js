@@ -4,7 +4,7 @@ import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './
 import events from './events.ts'
 import { createPageProps, RouteModule, Routing } from './routing.ts'
 import type { RouterURL } from './types.ts'
-import util, { hashShort, reModuleExt, reStyleModuleExt } from './util.ts'
+import util, { hashShort, reModuleExt } from './util.ts'
 
 export function ALEPH({ initial }: {
     initial: {
@@ -47,12 +47,12 @@ export function ALEPH({ initial }: {
             const ctree: { id: string, Component?: ComponentType<any> }[] = pageModuleTree.map(({ id }) => ({ id }))
             const imports = pageModuleTree.map(async mod => {
                 const { default: C } = await import(getModuleImportUrl(baseUrl, mod, e.forceRefetch))
-                if (mod.asyncDeps) {
+                if (mod.deps) {
                     // import async dependencies
-                    for (const dep of mod.asyncDeps.filter(({ url }) => reStyleModuleExt.test(url))) {
+                    for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
                         await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }, e.forceRefetch))
                     }
-                    if (mod.asyncDeps.filter(({ url }) => url.startsWith('#useDeno.')).length > 0) {
+                    if (mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno.')).length > 0) {
                         const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : ''))
                         if (util.isPlainObject(data)) {
                             for (const key in data) {
@@ -143,12 +143,12 @@ export function ALEPH({ initial }: {
             if (url.pagePath !== '') {
                 const imports = pageModuleTree.map(async mod => {
                     await import(getModuleImportUrl(baseUrl, mod))
-                    if (mod.asyncDeps) {
+                    if (mod.deps) {
                         // import async dependencies
-                        for (const dep of mod.asyncDeps.filter(({ url }) => reStyleModuleExt.test(url))) {
+                        for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
                             await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
                         }
-                        if (mod.asyncDeps.filter(({ url }) => url.startsWith('#useDeno.')).length > 0) {
+                        if (mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno.')).length > 0) {
                             const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`)
                             if (util.isPlainObject(data)) {
                                 for (const key in data) {

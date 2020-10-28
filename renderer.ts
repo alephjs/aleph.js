@@ -9,7 +9,7 @@ import { createPageProps } from './routing.ts'
 import type { AlephEnv, RouterURL } from './types.ts'
 import util, { hashShort } from './util.ts'
 
-export async function renderHead(styles?: { url: string, hash: string, async?: boolean }[]) {
+export async function renderHead(styles?: { url: string, hash: string }[]) {
     const { __buildMode, __buildTarget } = (window as any).ALEPH.ENV as AlephEnv
     const tags: string[] = []
     serverHeadElements.forEach(({ type, props }) => {
@@ -33,7 +33,7 @@ export async function renderHead(styles?: { url: string, hash: string, async?: b
             }
         }
     })
-    await Promise.all(styles?.filter(({ async }) => !!async).map(({ url, hash }) => {
+    await Promise.all(styles?.map(({ url, hash }) => {
         return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${__buildMode}.${__buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
     }) || [])
     styles?.forEach(({ url }) => {

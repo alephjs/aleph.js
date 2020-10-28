@@ -12,7 +12,7 @@ import { colors, ensureDir, fromStreamReader, path, ServerRequest, Sha1, walk } 
 import { compile } from './tsc/compile.ts'
 import type { AlephEnv, APIHandler, Config, RouterURL } from './types.ts'
 import util, { hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
-import { cleanCSS, Document, less } from './vendor/mod.ts'
+import { cleanCSS, less } from './vendor/mod.ts'
 import { version } from './version.ts'
 
 interface Module {
@@ -32,7 +32,8 @@ interface Module {
 interface Dep {
     url: string
     hash: string
-    async?: boolean
+    isStyle?: boolean
+    isData?: boolean
     external?: boolean
 }
 
@@ -680,9 +681,6 @@ export class Project {
                 const path = util.cleanPath(util.trimPrefix(p, this.appRoot))
                 // handle `api` dir remove directly
                 const validated = (() => {
-                    if (!reModuleExt.test(path) && !reStyleModuleExt.test(path) && !reMDExt.test(path)) {
-                        return false
-                    }
                     // ignore `.aleph` and output directories
                     if (path.startsWith('/.aleph/') || path.startsWith(this.config.outputDir)) {
                         return false
@@ -790,8 +788,8 @@ export class Project {
     }
 
     private _getRouteModule({ id, hash }: Module): RouteModule {
-        const asyncDeps = this._lookupAsyncDeps(id).filter(({ async }) => !!async).map(({ async, ...rest }) => rest)
-        return { id, hash, asyncDeps: asyncDeps.length > 0 ? asyncDeps : undefined }
+        const deps = this._lookupDeps(id).filter(({ isData, isStyle }) => !!isData || !!isStyle).map(({ external, ...rest }) => rest)
+        return { id, hash, deps: deps.length > 0 ? deps : undefined }
     }
 
     private _moduleFromURL(url: string): Module {
@@ -1064,7 +1062,7 @@ export class Project {
                     mode: this.mode,
                     target: options?.forceTarget || this.config.buildTarget,
                     reactRefresh: this.isDev && !mod.isRemote,
-                    rewriteImportPath: (path: string, async?: boolean) => this._resolveImportURL(mod, path, async),
+                    rewriteImportPath: (path: string) => this._resolveImportURL(mod, path),
                     signUseDeno: (id: string) => {
                         const sig = 'useDeno.' + (new Sha1()).update(id).update(version).update(Date.now().toString()).hex().slice(0, hashShort)
                         useDenos.push(sig)
@@ -1101,7 +1099,7 @@ export class Project {
                 }
                 mod.hash = getHash(mod.jsContent)
                 useDenos.forEach(sig => {
-                    mod.deps.push({ url: '#' + sig, hash: '', async: true })
+                    mod.deps.push({ url: '#' + sig, hash: '', isData: true })
                 })
             } else {
                 throw new Error(`Unknown loader '${mod.loader}'`)
@@ -1119,6 +1117,9 @@ export class Project {
         // compile deps
         for (const dep of mod.deps.filter(({ url, external }) => !url.startsWith('#useDeno.') && !external)) {
             const depMod = await this._compile(dep.url)
+            if (depMod.loader === 'css' && !dep.isStyle) {
+                dep.isStyle = true
+            }
             if (dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
                 if (!reHttp.test(dep.url)) {
@@ -1126,7 +1127,7 @@ export class Project {
                         path.dirname(url),
                         dep.url.replace(reModuleExt, '')
                     )
-                    mod.jsContent = mod.jsContent.replace(/(import|Import|export)([\s\S]*?)(from\s*:?\s*|\()("|')([^'"]+)("|')(\)|;)?/g, (s, key, fields, from, ql, importPath, qr, end) => {
+                    mod.jsContent = mod.jsContent.replace(/(import|Import|export)([\s\S]*?)(from\s*:?\s*|\(|)("|')([^'"]+)("|')(\)|;)?/g, (s, key, fields, from, ql, importPath, qr, end) => {
                         if (
                             reHashJs.test(importPath) &&
                             importPath.slice(0, importPath.length - (hashShort + 4)) === depImportPath
@@ -1204,7 +1205,7 @@ export class Project {
         })
     }
 
-    private _resolveImportURL(importer: Module, url: string, async?: boolean): string {
+    private _resolveImportURL(importer: Module, url: string): string {
         let rewrittenURL: string
         let pluginsResolveRet: { url: string, external?: boolean } | null = null
         for (const plugin of this.config.plugins) {
@@ -1255,7 +1256,7 @@ export class Project {
         }
 
         if (reHttp.test(url)) {
-            importer.deps.push({ url, hash: '', async, external: pluginsResolveRet?.external })
+            importer.deps.push({ url, hash: '', external: pluginsResolveRet?.external })
         } else {
             if (importer.isRemote) {
                 const sourceUrl = new URL(importer.url)
@@ -1266,14 +1267,12 @@ export class Project {
                 importer.deps.push({
                     url: sourceUrl.protocol + '//' + sourceUrl.host + pathname,
                     hash: '',
-                    async,
                     external: pluginsResolveRet?.external
                 })
             } else {
                 importer.deps.push({
                     url: util.cleanPath(path.dirname(importer.url) + '/' + url),
                     hash: '',
-                    async,
                     external: pluginsResolveRet?.external
                 })
             }
@@ -1325,8 +1324,8 @@ export class Project {
             await Promise.all(imports)
             const [html, data] = await this.#renderer.renderPage(url, App, undefined, pageComponentTree)
             const head = await this.#renderer.renderHead([
-                appModule ? this._lookupAsyncDeps(appModule.id).filter(({ url }) => reStyleModuleExt.test(url)) : [],
-                ...pageModuleTree.map(({ id }) => this._lookupAsyncDeps(id).filter(({ url }) => reStyleModuleExt.test(url)))
+                appModule ? this._lookupDeps(appModule.id).filter(dep => !!dep.isStyle) : [],
+                ...pageModuleTree.map(({ id }) => this._lookupDeps(id).filter(dep => !!dep.isStyle)).flat()
             ].flat())
             ret.head = head
             ret.scripts = await Promise.all(this.#renderer.renderScripts().map(async (script: Record<string, any>) => {
@@ -1357,7 +1356,7 @@ export class Project {
             const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
             const [html, data] = await this.#renderer.renderPage(url, undefined, E404, [])
             const head = await this.#renderer.renderHead([
-                e404Module ? this._lookupAsyncDeps(e404Module.id).filter(({ url }) => reStyleModuleExt.test(url)) : []
+                e404Module ? this._lookupDeps(e404Module.id).filter(dep => !!dep.isStyle) : []
             ].flat())
             ret.head = head
             ret.scripts = await Promise.all(this.#renderer.renderScripts().map(async (script: Record<string, any>) => {
@@ -1384,7 +1383,7 @@ export class Project {
             const url = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }
             const [html, data] = await this.#renderer.renderPage(url, undefined, undefined, [{ id: '/loading.js', Component: Loading }])
             const head = await this.#renderer.renderHead([
-                this._lookupAsyncDeps(loadingModule.id).filter(({ url }) => reStyleModuleExt.test(url))
+                this._lookupDeps(loadingModule.id).filter(dep => !!dep.isStyle)
             ].flat())
             return {
                 head,
@@ -1395,7 +1394,7 @@ export class Project {
         return null
     }
 
-    private _lookupAsyncDeps(moduleID: string, __deps: { url: string, hash: string, async?: boolean }[] = [], __tracing: Set<string> = new Set()) {
+    private _lookupDeps(moduleID: string, __deps: Dep[] = [], __tracing: Set<string> = new Set()) {
         const mod = this.getModule(moduleID)
         if (!mod) {
             return __deps
@@ -1404,10 +1403,10 @@ export class Project {
             return __deps
         }
         __tracing.add(moduleID)
-        __deps.push(...mod.deps.filter(({ url, async }) => !!async && __deps.findIndex(i => i.url === url) === -1))
+        __deps.push(...mod.deps.filter(({ url }) => __deps.findIndex(i => i.url === url) === -1))
         mod.deps.forEach(({ url }) => {
             if (reModuleExt.test(url) && !reHttp.test(url)) {
-                this._lookupAsyncDeps(url.replace(reModuleExt, '.js'), __deps, __tracing)
+                this._lookupDeps(url.replace(reModuleExt, '.js'), __deps, __tracing)
             }
         })
         return __deps
@@ -1416,7 +1415,7 @@ export class Project {
 
 // add virtual browser global objects
 Object.assign(globalThis, {
-    document: new Document(),
+    // document: new Document(),
     location: {
         protocol: 'http:',
         host: 'localhost',

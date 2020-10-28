@@ -2,7 +2,7 @@ import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './aleph.ts'
 import { Route, RouteModule, Routing } from './routing.ts'
-import { reModuleExt, reStyleModuleExt } from './util.ts'
+import { reModuleExt } from './util.ts'
 
 export default async function bootstrap({
     routes,
@@ -26,9 +26,9 @@ export default async function bootstrap({
     const pageComponentTree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
     const imports = [...preloadModules, ...pageModuleTree].map(async mod => {
         const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
-        if (mod.asyncDeps) {
+        if (mod.deps) {
             // import async dependencies
-            for (const dep of mod.asyncDeps.filter(({ url }) => reStyleModuleExt.test(url))) {
+            for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
                 await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
             }
         }

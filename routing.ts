@@ -12,7 +12,7 @@ export interface Route {
 export interface RouteModule {
     readonly id: string
     readonly hash: string
-    readonly asyncDeps?: { url: string, hash: string }[]
+    readonly deps?: { url: string, hash: string, isStyle?: boolean, isData?: boolean }[]
 }
 
 export interface PageProps {

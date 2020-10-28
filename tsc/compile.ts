@@ -8,7 +8,7 @@ export interface CompileOptions {
     mode: 'development' | 'production'
     target: string
     reactRefresh: boolean
-    rewriteImportPath: (importPath: string, async?: boolean) => string
+    rewriteImportPath: (importPath: string) => string
     signUseDeno: (id: string) => string
 }
 

@@ -1,7 +1,7 @@
 import ts from 'https://esm.sh/typescript'
 import { path } from '../std.ts'
 
-export default function transformReactJsx(sf: ts.SourceFile, node: ts.Node, options: { mode: 'development' | 'production', rewriteImportPath: (importPath: string, async: boolean) => string }): ts.VisitResult<ts.Node> {
+export default function transformReactJsx(sf: ts.SourceFile, node: ts.Node, options: { mode: 'development' | 'production', rewriteImportPath: (importPath: string) => string }): ts.VisitResult<ts.Node> {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
         let props = Array.from(node.attributes.properties)
 
@@ -9,7 +9,7 @@ export default function transformReactJsx(sf: ts.SourceFile, node: ts.Node, opti
             for (let i = 0; i < props.length; i++) {
                 const prop = props[i]
                 if (ts.isJsxAttribute(prop) && prop.name.text === 'from' && prop.initializer && ts.isStringLiteral(prop.initializer)) {
-                    const url = options.rewriteImportPath(prop.initializer.text, true)
+                    const url = options.rewriteImportPath(prop.initializer.text)
                     props.splice(i, 1)
                     props.unshift(
                         ts.createJsxAttribute(

@@ -122,6 +122,10 @@ export class Document extends Node {
     return this.querySelector("title")?.textContent || "";
   }
 
+  get scripts() {
+    return [];
+  }
+
   get cookie() {
     return ""; // TODO
   }
