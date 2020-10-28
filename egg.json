@@ -1,6 +1,6 @@
 {
   "name": "aleph",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "description": "The React Framework in Deno.",
   "repository": "https://github.com/postui/aleph.js",
   "entry": "./mod.ts",
