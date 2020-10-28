@@ -37,12 +37,6 @@ interface Dep {
     external?: boolean
 }
 
-interface Renderer {
-    renderPage: Function
-    renderHead: Function
-    renderScripts: Function
-}
-
 interface RenderResult {
     url: RouterURL
     status: number
@@ -54,10 +48,11 @@ interface RenderResult {
 
 /**
  * A Project to manage the Aleph.js appliaction.
- * features include:
- * - compile source codes
+ * core functions include:
+ * - compile source code
  * - manage deps
  * - apply plugins
+ * - map page/API routes
  * - watch file changes
  * - call APIs
  * - SSR/SSG
@@ -73,7 +68,7 @@ export class Project {
     #routing: Routing = new Routing()
     #apiRouting: Routing = new Routing()
     #fsWatchListeners: Array<EventEmitter> = []
-    #renderer: Renderer = { renderPage: () => void 0, renderHead: () => void 0, renderScripts: () => void 0 }
+    #renderer: { renderPage: CallableFunction } = { renderPage: () => void 0 }
     #rendered: Map<string, Map<string, RenderResult>> = new Map()
     #postcssPlugins: Record<string, AcceptedPlugin> = {}
 
@@ -296,7 +291,6 @@ export class Project {
         const html = createHtml({
             lang: defaultLocale,
             scripts: [
-                customLoading?.data ? { type: 'application/json', innerText: JSON.stringify(customLoading?.data), id: 'ssr-data' } : '',
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
             ],
@@ -635,8 +629,8 @@ export class Project {
         await this._compile('https://deno.land/x/aleph/renderer.ts', { forceTarget: 'es2020' })
         await this._createMainModule()
 
-        const { renderPage, renderHead, renderScripts } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
-        this.#renderer = { renderPage, renderHead, renderScripts }
+        const { renderPage } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
+        this.#renderer = { renderPage }
 
         log.info(colors.bold(`Aleph.js v${version}`))
         if (this.config.__file) {
@@ -1322,19 +1316,29 @@ export class Project {
                 }
             })
             await Promise.all(imports)
-            const [html, data] = await this.#renderer.renderPage(url, App, undefined, pageComponentTree)
-            const head = await this.#renderer.renderHead([
-                appModule ? this._lookupDeps(appModule.id).filter(dep => !!dep.isStyle) : [],
-                ...pageModuleTree.map(({ id }) => this._lookupDeps(id).filter(dep => !!dep.isStyle)).flat()
-            ].flat())
+            const {
+                head,
+                body,
+                data,
+                scripts
+            } = await this.#renderer.renderPage(
+                url,
+                App,
+                undefined,
+                pageComponentTree,
+                [
+                    appModule ? this._lookupDeps(appModule.id).filter(dep => !!dep.isStyle) : [],
+                    ...pageModuleTree.map(({ id }) => this._lookupDeps(id).filter(dep => !!dep.isStyle)).flat()
+                ].flat()
+            )
             ret.head = head
-            ret.scripts = await Promise.all(this.#renderer.renderScripts().map(async (script: Record<string, any>) => {
-                if (!this.isDev && script.innerText) {
+            ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
+                if (script.innerText && !this.isDev) {
                     return { ...script, innerText: (await minify(script.innerText)).code }
                 }
                 return script
             }))
-            ret.body = `<main>${html}</main>`
+            ret.body = `<main>${body}</main>`
             ret.data = data
             this.#rendered.get(url.pagePath)!.set(key, ret)
             if (this.isDev) {
@@ -1354,18 +1358,28 @@ export class Project {
         try {
             const e404Module = this.#modules.get('/404.js')
             const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
-            const [html, data] = await this.#renderer.renderPage(url, undefined, E404, [])
-            const head = await this.#renderer.renderHead([
-                e404Module ? this._lookupDeps(e404Module.id).filter(dep => !!dep.isStyle) : []
-            ].flat())
+            const {
+                head,
+                body,
+                data,
+                scripts
+            } = await this.#renderer.renderPage(
+                url,
+                undefined,
+                E404,
+                [],
+                [
+                    e404Module ? this._lookupDeps(e404Module.id).filter(dep => !!dep.isStyle) : []
+                ].flat()
+            )
             ret.head = head
-            ret.scripts = await Promise.all(this.#renderer.renderScripts().map(async (script: Record<string, any>) => {
-                if (!this.isDev && script.innerText) {
+            ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
+                if (script.innerText && !this.isDev) {
                     return { ...script, innerText: (await minify(script.innerText)).code }
                 }
                 return script
             }))
-            ret.body = `<main>${html}</main>`
+            ret.body = `<main>${body}</main>`
             ret.data = data
         } catch (err) {
             ret.status = 500
@@ -1381,15 +1395,24 @@ export class Project {
             const loadingModule = this.#modules.get('/loading.js')!
             const { default: Loading } = await import('file://' + loadingModule.jsFile)
             const url = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }
-            const [html, data] = await this.#renderer.renderPage(url, undefined, undefined, [{ id: '/loading.js', Component: Loading }])
-            const head = await this.#renderer.renderHead([
-                this._lookupDeps(loadingModule.id).filter(dep => !!dep.isStyle)
-            ].flat())
+
+            const {
+                head,
+                body,
+                data
+            } = await this.#renderer.renderPage(
+                url,
+                undefined,
+                undefined,
+                [{ id: '/loading.js', Component: Loading }],
+                [
+                    this._lookupDeps(loadingModule.id).filter(dep => !!dep.isStyle)
+                ].flat()
+            )
             return {
                 head,
-                body: html,
-                data,
-            } as RenderResult
+                body: `<main>${body}</main>`
+            } as Pick<RenderResult, 'head' | 'body'>
         }
         return null
     }

@@ -9,3 +9,15 @@ export const RouterContext = createContext<RouterURL>({
     query: new URLSearchParams(),
 })
 RouterContext.displayName = 'RouterContext'
+
+interface RendererCache {
+    headElements: Map<string, { type: string, props: Record<string, any> }>
+    scriptsElements: Map<string, { type: string, props: Record<string, any> }>
+}
+
+export const RendererContext = createContext<{ cache: RendererCache }>({
+    cache: {
+        headElements: new Map(),
+        scriptsElements: new Map()
+    }
+})

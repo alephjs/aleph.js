@@ -1,13 +1,14 @@
-import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useEffect } from 'https://esm.sh/react'
+import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useContext, useEffect } from 'https://esm.sh/react'
+import { RendererContext } from './context.ts'
 import util from './util.ts'
 
-export const serverHeadElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
-export const serverScriptsElements: Map<string, { type: string, props: Record<string, any> }> = new Map()
 export const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
 export default function Head(props: PropsWithChildren<{}>) {
+    const renderer = useContext(RendererContext)
+
     if (window.Deno) {
-        parse(props.children).forEach(({ type, props }, key) => serverHeadElements.set(key, { type, props }))
+        parse(props.children).forEach(({ type, props }, key) => renderer.cache.headElements.set(key, { type, props }))
     }
 
     useEffect(() => {
@@ -59,10 +60,12 @@ export default function Head(props: PropsWithChildren<{}>) {
 }
 
 export function Scripts(props: PropsWithChildren<{}>) {
+    const renderer = useContext(RendererContext)
+
     if (window.Deno) {
         parse(props.children).forEach(({ type, props }, key) => {
             if (type === 'script') {
-                serverScriptsElements.set(key, { type, props })
+                renderer.cache.scriptsElements.set(key, { type, props })
             }
         })
     }
