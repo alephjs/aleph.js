@@ -1,0 +1,36 @@
+[package]
+name = "aleph-swc"
+version = "0.0.1"
+authors = ["The Aleph.js authors"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+anyhow = "1.0.33"
+base64 = "0.13.0"
+once_cell = "1.4.1"
+serde = { version = "1.0.117", features = ["derive"] }
+sourcemap = "6.0.1"
+swc_common = { version = "=0.10.4", features = ["sourcemap"] }
+swc_ecmascript = { version = "=0.13.0", features = ["codegen", "dep_graph", "parser", "react", "transforms", "visit"] }
+
+# The `console_error_panic_hook` crate provides better debugging of panics by
+# logging them with `console.error`. This is great for development, but requires
+# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
+# code size when deploying.
+# `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
+# compared to the default allocator's ~10K. It is slower than the default
+# allocator, however.
+# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
+wasm-bindgen = {version = "0.2.63", features = ["serde-serialize"]}
+console_error_panic_hook = { version = "0.1.6", optional = true }
+wee_alloc = { version = "0.4.5", optional = true }
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"
