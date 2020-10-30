@@ -37,8 +37,10 @@ dependencies = [
  "console_error_panic_hook",
  "once_cell",
  "serde",
- "sourcemap",
  "swc_common",
+ "swc_ecma_ast",
+ "swc_ecma_utils",
+ "swc_ecma_visit",
  "swc_ecmascript",
  "wasm-bindgen",
  "wee_alloc",
@@ -417,9 +419,9 @@ dependencies = [
 
 [[package]]
 name = "num-integer"
-version = "0.1.43"
+version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d59457e662d541ba17869cf51cf177c0b5f0cbf476c66bdc90bf1edac4f875b"
+checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
 dependencies = [
  "autocfg",
  "num-traits",
@@ -427,9 +429,9 @@ dependencies = [
 
 [[package]]
 name = "num-traits"
-version = "0.2.12"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac267bcc07f48ee5f8935ab0d24f316fb722d7a1292e2913f0cc196b29ffd611"
+checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg",
 ]
@@ -913,9 +915,9 @@ dependencies = [
 
 [[package]]
 name = "swc_ecma_transforms"
-version = "0.29.0"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e2750209b0211c0f78cd9fa03bfc978fa3e1bcc350e0901db24ec114955c5aa"
+checksum = "6ee08c5add657ead50136456ae60c0a018d796cc8f1566eb428edc48a061e545"
 dependencies = [
  "Inflector",
  "arrayvec",
@@ -988,9 +990,9 @@ dependencies = [
 
 [[package]]
 name = "swc_ecmascript"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd8d139cedf8d17cd1cc126d490ba207fd2a282f07dbc772b44f10aa047799ec"
+checksum = "41561a31d6b9fb46c6d7ea3ab4bc1e851d0321d18ae038cd7bbe3ea3f4155e3b"
 dependencies = [
  "swc_ecma_ast",
  "swc_ecma_codegen",
