@@ -1,12 +1,14 @@
-mod media_type;
+// Copyright 2018-2020 the Aleph.js authors. All rights reserved. MIT license.
+
+mod jsx;
+mod sourcetype;
 mod swc;
 
-use media_type::MediaType;
-use swc::EmitOptions;
-use swc::parse;
 use serde::{Deserialize, Serialize};
-
-use wasm_bindgen::prelude::*;
+use swc::parse;
+use swc::EmitOptions;
+use swc_ecmascript::parser::JscTarget;
+use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -14,21 +16,61 @@ use wasm_bindgen::prelude::*;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+// bind `console.log`
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Options {
     #[serde(default)]
     pub filename: String,
 
-    #[serde(flatten, default)]
-    pub config: Option<Config>,
+    #[serde(default)]
+    pub config: Config,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Config {
+    #[serde(default = "default_target")]
+    pub target: JscTarget,
+
+    #[serde(default = "default_pragma")]
+    pub jsx_factory: String,
+
+    #[serde(default = "default_pragma_frag")]
+    pub jsx_fragment_factory: String,
+
     #[serde(default)]
-    pub minify: Option<bool>,
+    pub minify: bool,
+}
+
+fn default_target() -> JscTarget {
+    JscTarget::Es2020
+}
+
+fn default_pragma() -> String {
+    "React.createElement".into()
+}
+
+fn default_pragma_frag() -> String {
+    "React.Fragment".into()
+}
+
+// default config
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            target: default_target(),
+            jsx_factory: default_pragma(),
+            jsx_fragment_factory: default_pragma_frag(),
+            minify: false,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -45,12 +87,19 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
     let opts: Options = opts
         .into_serde()
         .map_err(|err| format!("failed to parse options: {}", err))?;
-
-    let module = parse(opts.filename.as_str(), s, &MediaType::TypeScript)
-        .expect("could not parse module");
+    let module =
+        parse(opts.filename.as_str(), s, opts.config.target).expect("could not parse module");
     let (code, map) = module
-        .transpile(&EmitOptions::default())
+        .transpile(&EmitOptions {
+            check_js: false,
+            emit_metadata: false,
+            inline_source_map: false,
+            jsx_factory: opts.config.jsx_factory.clone(),
+            jsx_fragment_factory: opts.config.jsx_fragment_factory.clone(),
+            transform_jsx: true,
+            minify: opts.config.minify,
+        })
         .expect("could not strip types");
 
-    Ok(JsValue::from_serde(&TransformOutput{code, map}).unwrap())
+    Ok(JsValue::from_serde(&TransformOutput { code, map }).unwrap())
 }

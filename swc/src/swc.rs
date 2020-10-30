@@ -1,38 +1,27 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
 
-use crate::media_type::MediaType;
+use crate::jsx::aleph_jsx;
+use crate::sourcetype::SourceType;
 
 use std::error::Error;
 use std::fmt;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::RwLock;
 use swc_common::{
-    errors::{Diagnostic, DiagnosticBuilder, Emitter, Handler, HandlerFlags},
-    comments::{Comment, SingleThreadedComments},
-    chain, FileName, Globals, Loc, SourceMap, Span
+  chain,
+  comments::{Comment, SingleThreadedComments},
+  errors::{Diagnostic, DiagnosticBuilder, Emitter, Handler, HandlerFlags},
+  FileName, Globals, Loc, SourceMap, Span,
 };
-use swc_ecmascript::transforms::fixer;
-use swc_ecmascript::transforms::helpers;
-use swc_ecmascript::ast::Module;
-use swc_ecmascript::ast::Program;
-use swc_ecmascript::codegen::text_writer::JsWriter;
-use swc_ecmascript::codegen::Node;
-use swc_ecmascript::dep_graph::analyze_dependencies;
-use swc_ecmascript::dep_graph::DependencyDescriptor;
+use swc_ecmascript::ast::{Module, Program};
+use swc_ecmascript::codegen::{text_writer::JsWriter, Node};
+use swc_ecmascript::dep_graph::{analyze_dependencies, DependencyDescriptor};
 use swc_ecmascript::parser::lexer::Lexer;
-use swc_ecmascript::parser::EsConfig;
-use swc_ecmascript::parser::JscTarget;
-use swc_ecmascript::parser::StringInput;
-use swc_ecmascript::parser::Syntax;
-use swc_ecmascript::parser::TsConfig;
-use swc_ecmascript::transforms::pass::Optional;
-use swc_ecmascript::transforms::proposals;
-use swc_ecmascript::transforms::react;
-use swc_ecmascript::transforms::typescript;
+use swc_ecmascript::parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig};
+use swc_ecmascript::transforms::{fixer, helpers, pass::Optional, proposals, react, typescript};
 use swc_ecmascript::visit::FoldWith;
-
-static TARGET: JscTarget = JscTarget::Es2020;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Location {
@@ -83,23 +72,22 @@ fn get_es_config(jsx: bool) -> EsConfig {
   }
 }
 
-fn get_ts_config(tsx: bool, dts: bool) -> TsConfig {
+fn get_ts_config(tsx: bool) -> TsConfig {
   TsConfig {
     decorators: true,
-    dts,
+    dts: false,
     dynamic_import: true,
     tsx,
     ..TsConfig::default()
   }
 }
 
-pub fn get_syntax(media_type: &MediaType) -> Syntax {
+pub fn get_syntax(media_type: &SourceType) -> Syntax {
   match media_type {
-    MediaType::JavaScript => Syntax::Es(get_es_config(false)),
-    MediaType::JSX => Syntax::Es(get_es_config(true)),
-    MediaType::TypeScript => Syntax::Typescript(get_ts_config(false, false)),
-    MediaType::Dts => Syntax::Typescript(get_ts_config(false, true)),
-    MediaType::TSX => Syntax::Typescript(get_ts_config(true, false)),
+    SourceType::JavaScript => Syntax::Es(get_es_config(false)),
+    SourceType::JSX => Syntax::Es(get_es_config(true)),
+    SourceType::TypeScript => Syntax::Typescript(get_ts_config(false)),
+    SourceType::TSX => Syntax::Typescript(get_ts_config(true)),
     _ => Syntax::Es(get_es_config(false)),
   }
 }
@@ -124,19 +112,22 @@ pub struct EmitOptions {
   pub jsx_fragment_factory: String,
   /// Should JSX be transformed or preserved.  Defaults to `true`.
   pub transform_jsx: bool,
+  /// Should minify the transformed code.  Defaults to `false`.
+  pub minify: bool,
 }
 
 impl Default for EmitOptions {
-    fn default() -> Self {
-        EmitOptions {
-            check_js: false,
-            emit_metadata: false,
-            inline_source_map: true,
-            jsx_factory: "React.createElement".into(),
-            jsx_fragment_factory: "React.Fragment".into(),
-            transform_jsx: true,
-        }
+  fn default() -> Self {
+    EmitOptions {
+      check_js: false,
+      emit_metadata: false,
+      inline_source_map: true,
+      jsx_factory: "React.createElement".into(),
+      jsx_fragment_factory: "React.Fragment".into(),
+      transform_jsx: true,
+      minify: false,
     }
+  }
 }
 
 /// A buffer for collecting diagnostic messages from the AST parser.
@@ -169,10 +160,7 @@ impl DiagnosticBuffer {
             FileName::Custom(n) => n,
             _ => unreachable!(),
           };
-          msg = format!(
-            "{} at {}:{}:{}",
-            msg, file_name, loc.line, loc.col_display
-          );
+          msg = format!("{} at {}:{}:{}", msg, file_name, loc.line, loc.col_display);
         }
 
         msg
@@ -240,10 +228,7 @@ impl ParsedModule {
   /// options.
   ///
   /// The result is a tuple of the code and optional source map as strings.
-  pub fn transpile(
-    self,
-    options: &EmitOptions,
-  ) -> Result<(String, Option<String>), anyhow::Error> {
+  pub fn transpile(self, options: &EmitOptions) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module);
 
     let jsx_pass = react::react(
@@ -259,6 +244,10 @@ impl ParsedModule {
       },
     );
     let mut passes = chain!(
+      Optional::new(
+        aleph_jsx(self.source_map.clone(), !options.minify),
+        options.transform_jsx
+      ),
       Optional::new(jsx_pass, options.transform_jsx),
       proposals::decorators::decorators(proposals::decorators::Config {
         legacy: true,
@@ -283,9 +272,10 @@ impl ParsedModule {
         &mut buf,
         Some(&mut src_map_buf),
       ));
-      let config = swc_ecmascript::codegen::Config { minify: false };
       let mut emitter = swc_ecmascript::codegen::Emitter {
-        cfg: config,
+        cfg: swc_ecmascript::codegen::Config {
+          minify: options.minify,
+        },
         comments: Some(&self.comments),
         cm: self.source_map.clone(),
         wr: writer,
@@ -320,7 +310,7 @@ impl ParsedModule {
 ///
 /// - `specifier` - The module specifier for the module.
 /// - `source` - The source code for the module.
-/// - `media_type` - The media type for the module.
+/// - `target` - The target for the module.
 ///
 // NOTE(bartlomieju): `specifier` has `&str` type instead of
 // `&ModuleSpecifier` because runtime compiler APIs don't
@@ -328,14 +318,15 @@ impl ParsedModule {
 pub fn parse(
   specifier: &str,
   source: &str,
-  media_type: &MediaType,
+  target: JscTarget,
 ) -> Result<ParsedModule, anyhow::Error> {
   let source_map = SourceMap::default();
   let source_file = source_map.new_source_file(
-    FileName::Custom(specifier.to_string()),
+    FileName::Real(Path::new(specifier).to_path_buf()),
     source.to_string(),
   );
   let error_buffer = ErrorBuffer::new();
+  let media_type = &SourceType::from(Path::new(specifier));
   let syntax = get_syntax(media_type);
   let input = StringInput::from(&*source_file);
   let comments = SingleThreadedComments::default();
@@ -349,20 +340,16 @@ pub fn parse(
     },
   );
 
-  let lexer = Lexer::new(syntax, TARGET, input, Some(&comments));
+  let lexer = Lexer::new(syntax, target, input, Some(&comments));
   let mut parser = swc_ecmascript::parser::Parser::new_from(lexer);
 
   let sm = &source_map;
   let module = parser.parse_module().map_err(move |err| {
     let mut diagnostic = err.into_diagnostic(&handler);
     diagnostic.emit();
-
-    DiagnosticBuffer::from_error_buffer(error_buffer, |span| {
-      sm.lookup_char_pos(span.lo)
-    })
+    DiagnosticBuffer::from_error_buffer(error_buffer, |span| sm.lookup_char_pos(span.lo))
   })?;
-  let leading_comments =
-    comments.with_leading(module.span.lo, |comments| comments.to_vec());
+  let leading_comments = comments.with_leading(module.span.lo, |comments| comments.to_vec());
 
   Ok(ParsedModule {
     leading_comments,
@@ -382,9 +369,8 @@ mod tests {
     let source = r#"import * as bar from "./test.ts";
     const foo = await import("./foo.ts");
     "#;
-    let parsed_module =
-      parse("https://deno.land/x/mod.js", source, &MediaType::JavaScript)
-        .expect("could not parse module");
+    let parsed_module = parse("https://deno.land/x/mod.js", source, JscTarget::Es2020)
+      .expect("could not parse module");
     let actual = parsed_module.analyze_dependencies();
     assert_eq!(
       actual,
@@ -428,15 +414,13 @@ mod tests {
       }
     }
     "#;
-    let module = parse("https://deno.land/x/mod.ts", source, &MediaType::TypeScript)
+    let module = parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
       .expect("could not parse module");
     let (code, maybe_map) = module
       .transpile(&EmitOptions::default())
       .expect("could not strip types");
     assert!(code.starts_with("var D;\n(function(D) {\n"));
-    assert!(
-      code.contains("\n//# sourceMappingURL=data:application/json;base64,")
-    );
+    assert!(code.contains("\n//# sourceMappingURL=data:application/json;base64,"));
     assert!(maybe_map.is_none());
   }
 
@@ -449,7 +433,7 @@ mod tests {
       }
     }
     "#;
-    let module = parse("https://deno.land/x/mod.ts", source, &MediaType::TSX)
+    let module = parse("https://deno.land/x/mod.tsx", source, JscTarget::Es2020)
       .expect("could not parse module");
     let (code, _) = module
       .transpile(&EmitOptions::default())
@@ -477,7 +461,7 @@ mod tests {
       }
     }
     "#;
-    let module = parse("https://deno.land/x/mod.ts", source, &MediaType::TypeScript)
+    let module = parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
       .expect("could not parse module");
     let (code, _) = module
       .transpile(&EmitOptions::default())
