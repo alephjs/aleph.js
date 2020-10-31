@@ -65,9 +65,7 @@ impl SourceType {
       Some(os_str) => match os_str.to_str() {
         Some("ts") => match path.file_stem() {
           Some(os_str) => match os_str.to_str() {
-            Some(_file_name) => {
-              SourceType::TypeScript
-            }
+            Some(_file_name) => SourceType::TypeScript,
             None => SourceType::TypeScript,
           },
           None => SourceType::TypeScript,
@@ -76,9 +74,8 @@ impl SourceType {
         Some("js") => SourceType::JavaScript,
         Some("jsx") => SourceType::JSX,
         Some("mjs") => SourceType::JavaScript,
-        Some("cjs") => SourceType::JavaScript,
         Some("json") => SourceType::Json,
-        Some("wasm") => SourceType::Wasm ,
+        Some("wasm") => SourceType::Wasm,
         _ => SourceType::Unknown,
       },
     }
@@ -119,11 +116,13 @@ mod tests {
       SourceType::JavaScript
     );
     assert_eq!(SourceType::from(Path::new("foo/bar.jsx")), SourceType::JSX);
-    assert_eq!(SourceType::from(Path::new("foo/bar.json")), SourceType::Json);
-    assert_eq!(SourceType::from(Path::new("foo/bar.wasm")), SourceType::Wasm);
     assert_eq!(
-      SourceType::from(Path::new("foo/bar.cjs")),
-      SourceType::JavaScript
+      SourceType::from(Path::new("foo/bar.json")),
+      SourceType::Json
+    );
+    assert_eq!(
+      SourceType::from(Path::new("foo/bar.wasm")),
+      SourceType::Wasm
     );
     assert_eq!(
       SourceType::from(Path::new("foo/bar.txt")),
