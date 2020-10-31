@@ -25,11 +25,11 @@ impl Resolver {
 impl Fold for Resolver {
   noop_fold_type!();
 
-  fn fold_module_item(&mut self, mut el: ModuleItem) -> ModuleItem {
+  fn fold_module_decl(&mut self, mut el: ModuleDecl) -> ModuleDecl {
     el
   }
 
-  // dynamic import
+  // dynamic import & useDeno
   fn fold_expr(&mut self, mut el: Expr) -> Expr {
     el
   }
