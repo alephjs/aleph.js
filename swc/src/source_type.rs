@@ -65,7 +65,7 @@ impl SourceType {
       Some(os_str) => match os_str.to_str() {
         Some("ts") => match path.file_stem() {
           Some(os_str) => match os_str.to_str() {
-            Some(file_name) => {
+            Some(_file_name) => {
               SourceType::TypeScript
             }
             None => SourceType::TypeScript,

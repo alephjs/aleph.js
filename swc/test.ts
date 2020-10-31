@@ -13,21 +13,21 @@ function test(srouce: string, opts: any) {
 test(`
 const n: number = 123
 if (true) { console.log(n) }
-`, { filename: './test.ts' })
+`, { filename: '/test.ts' })
 
 test(`
 const n: number = 123
 if (true) { console.log(n) }
-`, { filename: './test.ts', config: { minify: true } })
+`, { filename: '/test.ts', config: { minify: true } })
 
 test(`
 <div>Hello World!</div>
-`, { filename: './test.jsx' })
+`, { filename: '/test.jsx' })
 
 test(`
 <div className="title">Hello World!</div>
-`, { filename: './test.jsx', config: { minify: true } })
+`, { filename: '/test.jsx', config: { minify: true } })
 
 test(`
 <Import from="./foo.ts" />
-`, { filename: './test.jsx' })
+`, { filename: '/test.jsx' })

@@ -1,7 +1,8 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
 
 use crate::jsx::aleph_jsx;
-use crate::sourcetype::SourceType;
+use crate::resolve::{Resolver, SpecifierMap};
+use crate::source_type::SourceType;
 
 use std::error::Error;
 use std::fmt;
@@ -213,12 +214,6 @@ impl ParsedModule {
     analyze_dependencies(&self.module, &self.source_map, &self.comments)
   }
 
-  /// Get the module's leading comments, where triple slash directives might
-  /// be located.
-  pub fn get_leading_comments(&self) -> Vec<Comment> {
-    self.leading_comments.clone()
-  }
-
   /// Get a location for a given span within the module.
   pub fn get_location(&self, span: &Span) -> Location {
     self.source_map.lookup_char_pos(span.lo).into()
@@ -230,7 +225,7 @@ impl ParsedModule {
   /// The result is a tuple of the code and optional source map as strings.
   pub fn transpile(self, options: &EmitOptions) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module);
-
+    let resolver = Resolver::new(SpecifierMap::new(), false);
     let jsx_pass = react::react(
       self.source_map.clone(),
       Some(&self.comments),
@@ -245,7 +240,7 @@ impl ParsedModule {
     );
     let mut passes = chain!(
       Optional::new(
-        aleph_jsx(self.source_map.clone(), !options.minify),
+        aleph_jsx(resolver, self.source_map.clone(), !options.minify),
         options.transform_jsx
       ),
       Optional::new(jsx_pass, options.transform_jsx),
