@@ -3,6 +3,7 @@ name = "aleph-swc"
 version = "0.0.1"
 authors = ["The Aleph.js authors"]
 edition = "2018"
+unpublish = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -13,6 +14,7 @@ default = ["console_error_panic_hook"]
 [dependencies]
 anyhow = "1.0.33"
 base64 = "0.13.0"
+indexmap = "1.6.0"
 once_cell = "1.4.1"
 serde = { version = "1.0.117", features = ["derive"] }
 swc_common = { version = "0.10.4", features = ["sourcemap"] }
@@ -20,6 +22,7 @@ swc_ecmascript = { version = "0.13.0", features = ["codegen", "dep_graph", "pars
 swc_ecma_ast = "0.34.0"
 swc_ecma_visit = "0.20.0"
 swc_ecma_utils = "0.24.0"
+url = "2.1.1"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires

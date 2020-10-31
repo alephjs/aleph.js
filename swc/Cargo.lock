@@ -35,6 +35,7 @@ dependencies = [
  "anyhow",
  "base64 0.13.0",
  "console_error_panic_hook",
+ "indexmap",
  "once_cell",
  "serde",
  "swc_common",
@@ -42,6 +43,7 @@ dependencies = [
  "swc_ecma_utils",
  "swc_ecma_visit",
  "swc_ecmascript",
+ "url",
  "wasm-bindgen",
  "wee_alloc",
 ]
