@@ -1,4 +1,5 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
+// Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::jsx::aleph_jsx;
 use crate::resolve::{Resolver, SpecifierMap};
@@ -21,7 +22,7 @@ use swc_ecmascript::codegen::{text_writer::JsWriter, Node};
 use swc_ecmascript::dep_graph::{analyze_dependencies, DependencyDescriptor};
 use swc_ecmascript::parser::lexer::Lexer;
 use swc_ecmascript::parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig};
-use swc_ecmascript::transforms::{fixer, helpers, pass::Optional, proposals, react, typescript};
+use swc_ecmascript::transforms::{fixer, helpers, proposals, react, typescript};
 use swc_ecmascript::visit::FoldWith;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -96,15 +97,6 @@ pub fn get_syntax(media_type: &SourceType) -> Syntax {
 /// Options which can be adjusted when transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
-  /// Indicate if JavaScript is being checked/transformed as well, or if it is
-  /// only TypeScript.
-  pub check_js: bool,
-  /// When emitting a legacy decorator, also emit experimental decorator meta
-  /// data.  Defaults to `false`.
-  pub emit_metadata: bool,
-  /// Should the source map be inlined in the emitted code file, or provided
-  /// as a separate file.  Defaults to `true`.
-  pub inline_source_map: bool,
   /// When transforming JSX, what value should be used for the JSX factory.
   /// Defaults to `React.createElement`.
   pub jsx_factory: String,
@@ -112,20 +104,14 @@ pub struct EmitOptions {
   /// factory.  Defaults to `React.Fragment`.
   pub jsx_fragment_factory: String,
   /// Should JSX be transformed or preserved.  Defaults to `true`.
-  pub transform_jsx: bool,
-  /// Should minify the transformed code.  Defaults to `false`.
   pub minify: bool,
 }
 
 impl Default for EmitOptions {
   fn default() -> Self {
     EmitOptions {
-      check_js: false,
-      emit_metadata: false,
-      inline_source_map: true,
       jsx_factory: "React.createElement".into(),
       jsx_fragment_factory: "React.Fragment".into(),
-      transform_jsx: true,
       minify: false,
     }
   }
@@ -239,14 +225,11 @@ impl ParsedModule {
       },
     );
     let mut passes = chain!(
-      Optional::new(
-        aleph_jsx(resolver, self.source_map.clone(), !options.minify),
-        options.transform_jsx
-      ),
-      Optional::new(jsx_pass, options.transform_jsx),
+      aleph_jsx(resolver, self.source_map.clone(), !options.minify),
+      jsx_pass,
       proposals::decorators::decorators(proposals::decorators::Config {
         legacy: true,
-        emit_metadata: options.emit_metadata
+        emit_metadata: false
       }),
       typescript::strip(),
       fixer(Some(&self.comments)),
@@ -285,14 +268,7 @@ impl ParsedModule {
         .source_map
         .build_source_map_from(&mut src_map_buf, None)
         .to_writer(&mut buf)?;
-
-      if options.inline_source_map {
-        src.push_str("//# sourceMappingURL=data:application/json;base64,");
-        let encoded_map = base64::encode(buf);
-        src.push_str(&encoded_map);
-      } else {
-        map = Some(String::from_utf8(buf)?);
-      }
+      map = Some(String::from_utf8(buf)?);
     }
     Ok((src, map))
   }

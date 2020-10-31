@@ -1,4 +1,4 @@
-// Copyright 2018-2020 the Aleph.js authors. All rights reserved. MIT license.
+// Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 mod fast_refresh;
 mod jsx;
@@ -93,12 +93,8 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         parse(opts.filename.as_str(), s, opts.config.target).expect("could not parse module");
     let (code, map) = module
         .transpile(&EmitOptions {
-            check_js: false,
-            emit_metadata: false,
-            inline_source_map: false,
             jsx_factory: opts.config.jsx_factory.clone(),
             jsx_fragment_factory: opts.config.jsx_fragment_factory.clone(),
-            transform_jsx: true,
             minify: opts.config.minify,
         })
         .expect("could not strip types");
