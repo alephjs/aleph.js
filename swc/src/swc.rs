@@ -25,34 +25,26 @@ use swc_ecmascript::parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig}
 use swc_ecmascript::transforms::{fixer, helpers, proposals, react, typescript};
 use swc_ecmascript::visit::FoldWith;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Location {
-  pub filename: String,
-  pub line: usize,
-  pub col: usize,
+/// Options which can be adjusted when transpiling a module.
+#[derive(Debug, Clone)]
+pub struct EmitOptions {
+  /// When transforming JSX, what value should be used for the JSX factory.
+  /// Defaults to `React.createElement`.
+  pub jsx_factory: String,
+  /// When transforming JSX, what value should be used for the JSX fragment
+  /// factory.  Defaults to `React.Fragment`.
+  pub jsx_fragment_factory: String,
+  /// Should JSX be transformed or preserved.  Defaults to `true`.
+  pub minify: bool,
 }
 
-impl Into<Location> for swc_common::Loc {
-  fn into(self) -> Location {
-    use swc_common::FileName::*;
-
-    let filename = match &self.file.name {
-      Real(path_buf) => path_buf.to_string_lossy().to_string(),
-      Custom(str_) => str_.to_string(),
-      _ => panic!("invalid filename"),
-    };
-
-    Location {
-      filename,
-      line: self.line,
-      col: self.col_display,
+impl Default for EmitOptions {
+  fn default() -> Self {
+    EmitOptions {
+      jsx_factory: "React.createElement".into(),
+      jsx_fragment_factory: "React.Fragment".into(),
+      minify: false,
     }
-  }
-}
-
-impl std::fmt::Display for Location {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "{}:{}:{}", self.filename, self.line, self.col)
   }
 }
 
@@ -91,29 +83,6 @@ pub fn get_syntax(media_type: &SourceType) -> Syntax {
     SourceType::TypeScript => Syntax::Typescript(get_ts_config(false)),
     SourceType::TSX => Syntax::Typescript(get_ts_config(true)),
     _ => Syntax::Es(get_es_config(false)),
-  }
-}
-
-/// Options which can be adjusted when transpiling a module.
-#[derive(Debug, Clone)]
-pub struct EmitOptions {
-  /// When transforming JSX, what value should be used for the JSX factory.
-  /// Defaults to `React.createElement`.
-  pub jsx_factory: String,
-  /// When transforming JSX, what value should be used for the JSX fragment
-  /// factory.  Defaults to `React.Fragment`.
-  pub jsx_fragment_factory: String,
-  /// Should JSX be transformed or preserved.  Defaults to `true`.
-  pub minify: bool,
-}
-
-impl Default for EmitOptions {
-  fn default() -> Self {
-    EmitOptions {
-      jsx_factory: "React.createElement".into(),
-      jsx_fragment_factory: "React.Fragment".into(),
-      minify: false,
-    }
   }
 }
 
@@ -200,11 +169,6 @@ impl ParsedModule {
     analyze_dependencies(&self.module, &self.source_map, &self.comments)
   }
 
-  /// Get a location for a given span within the module.
-  pub fn get_location(&self, span: &Span) -> Location {
-    self.source_map.lookup_char_pos(span.lo).into()
-  }
-
   /// Transform a TypeScript file into a JavaScript file, based on the supplied
   /// options.
   ///
@@ -260,17 +224,13 @@ impl ParsedModule {
       };
       program.emit_with(&mut emitter)?;
     }
-    let mut src = String::from_utf8(buf)?;
-    let mut map: Option<String> = None;
-    {
-      let mut buf = Vec::new();
-      self
-        .source_map
-        .build_source_map_from(&mut src_map_buf, None)
-        .to_writer(&mut buf)?;
-      map = Some(String::from_utf8(buf)?);
-    }
-    Ok((src, map))
+    let src = String::from_utf8(buf)?;
+    let mut buf = Vec::new();
+    self
+      .source_map
+      .build_source_map_from(&mut src_map_buf, None)
+      .to_writer(&mut buf)?;
+    Ok((src, Some(String::from_utf8(buf)?)))
   }
 }
 
