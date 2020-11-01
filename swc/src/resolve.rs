@@ -1,4 +1,5 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
+
 use indexmap::IndexMap;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -34,12 +35,6 @@ impl Default for ImportHashMap {
 }
 
 impl ImportMap {
-  pub fn new() -> Self {
-    ImportMap {
-      imports: IndexMap::new(),
-      scopes: IndexMap::new(),
-    }
-  }
   pub fn from_hashmap(map: ImportHashMap) -> Self {
     let mut imports: IndexMap<String, String> = IndexMap::new();
     let mut scopes = IndexMap::new();
@@ -59,19 +54,21 @@ impl ImportMap {
 
 #[derive(Debug, Clone)]
 pub struct Resolver {
+  specifier: String,
   import_map: ImportMap,
-  has_plugins: bool,
+  plugin_resolves: bool,
 }
 
 impl Resolver {
-  pub fn new(import_map: ImportMap, has_plugins: bool) -> Self {
+  pub fn new(specifier: &str, import_map: ImportMap, plugin_resolves: bool) -> Self {
     Resolver {
+      specifier: specifier.to_string(),
       import_map,
-      has_plugins,
+      plugin_resolves,
     }
   }
-  pub fn resolve(&self, path: &str, importer: &str) -> String {
-    "".to_string()
+  pub fn resolve(&self, path: &str) -> String {
+    "?".to_string()
   }
 }
 
@@ -86,89 +83,130 @@ pub struct ResolveVistor {
 impl Fold for ResolveVistor {
   noop_fold_type!();
 
+  // resolve import/export url
+  // - `import React from "https://esm.sh/rect"` -> `import React from "/-/esm.sh/react.js"`
+  // - `export React, {useState} from "https://esm.sh/rect"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
+  // - `export * from "https://esm.sh/rect"` -> `export * from "/-/esm.sh/react.js"`
   fn fold_module_decl(&mut self, decl: ModuleDecl) -> ModuleDecl {
-    // recurse into module
-    let decl = decl.fold_children_with(self);
-
     match decl {
-      ModuleDecl::Import(_) => decl,
-      ModuleDecl::ExportDecl(_) => decl,
-      ModuleDecl::ExportNamed(_) => decl,
-      ModuleDecl::ExportDefaultDecl(_) => decl,
-      ModuleDecl::ExportDefaultExpr(_) => decl,
-      ModuleDecl::ExportAll(_) => decl,
-      _ => decl,
+      ModuleDecl::Import(decl) => ModuleDecl::Import(ImportDecl {
+        src: Str {
+          span: decl.span,
+          value: self
+            .resolver
+            .resolve(decl.src.value.chars().as_str())
+            .into(),
+          has_escape: false,
+        },
+        ..decl
+      }),
+      ModuleDecl::ExportNamed(decl) => {
+        let url = match decl.src {
+          Some(ref src) => src.value.chars().as_str(),
+          None => return ModuleDecl::ExportNamed(NamedExport { ..decl }),
+        };
+        ModuleDecl::ExportNamed(NamedExport {
+          src: Some(Str {
+            span: decl.span,
+            value: self.resolver.resolve(url).into(),
+            has_escape: false,
+          }),
+          ..decl
+        })
+      }
+      ModuleDecl::ExportAll(decl) => ModuleDecl::ExportAll(ExportAll {
+        src: Str {
+          span: decl.span,
+          value: self
+            .resolver
+            .resolve(decl.src.value.chars().as_str())
+            .into(),
+          has_escape: false,
+        },
+        ..decl
+      }),
+      _ => decl.fold_children_with(self),
     }
   }
 
-  // dynamic import & useDeno
-  fn fold_call_expr(&mut self, call: CallExpr) -> CallExpr {
-    let call = call.fold_children_with(self);
-
+  // resolve dynamic import url & sign useDeno hook
+  // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
+  // - `useDeno(() => {})` -> `useDeno(()=>{}, false, void 0, "RAND_ID")`
+  fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
-      call
-    } else if is_call_expr_by_name(&call, "useDeno") {
-      sign_use_deno_hook(call)
-    } else {
-      call
-    }
-  }
-}
-
-fn sign_use_deno_hook(mut call: CallExpr) -> CallExpr {
-  let has_callback = match call.args.first_mut() {
-    Some(&mut ExprOrSpread { ref mut expr, .. }) => match expr.deref_mut() {
-      Expr::Fn(_) => true,
-      Expr::Arrow(_) => true,
-      _ => false,
-    },
-    _ => false,
-  };
-  if has_callback {
-    if call.args.len() == 1 {
-      call.args.push(ExprOrSpread {
-        spread: None,
-        expr: Box::new(Expr::Lit(Lit::Bool(Bool {
-          span: call.span,
-          value: false,
-        }))),
-      });
-    }
-    if call.args.len() == 2 {
-      call.args.push(ExprOrSpread {
-        spread: None,
-        expr: Box::new(Expr::Unary(UnaryExpr {
-          span: call.span,
-          op: op!("void"),
-          arg: Box::new(Expr::Lit(Lit::Num(Number {
-            span: call.span,
-            value: 0.0,
-          }))),
-        })),
-      });
-    }
-    if call.args.len() > 3 {
-      call.args[3] = ExprOrSpread {
-        spread: None,
-        expr: Box::new(Expr::Lit(Lit::Str(Str {
-          span: call.span,
-          value: gen_use_deno_hook_ident().into(),
-          has_escape: false,
-        }))),
+      let url = match call.args.first_mut() {
+        Some(&mut ExprOrSpread { ref mut expr, .. }) => match expr.deref_mut() {
+          Expr::Lit(lit) => match lit {
+            Lit::Str(s) => s.value.chars().as_str(),
+            _ => return call,
+          },
+          _ => return call,
+        },
+        _ => return call,
       };
-    } else {
-      call.args.push(ExprOrSpread {
+      call.args = vec![ExprOrSpread {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(Str {
           span: call.span,
-          value: gen_use_deno_hook_ident().into(),
+          value: self.resolver.resolve(url).into(),
           has_escape: false,
         }))),
-      });
+      }];
+    } else if is_call_expr_by_name(&call, "useDeno") {
+      let has_callback = match call.args.first_mut() {
+        Some(&mut ExprOrSpread { ref mut expr, .. }) => match expr.deref_mut() {
+          Expr::Fn(_) => true,
+          Expr::Arrow(_) => true,
+          _ => false,
+        },
+        _ => false,
+      };
+      if has_callback {
+        if call.args.len() == 1 {
+          call.args.push(ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Lit(Lit::Bool(Bool {
+              span: call.span,
+              value: false,
+            }))),
+          });
+        }
+        if call.args.len() == 2 {
+          call.args.push(ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Unary(UnaryExpr {
+              span: call.span,
+              op: op!("void"),
+              arg: Box::new(Expr::Lit(Lit::Num(Number {
+                span: call.span,
+                value: 0.0,
+              }))),
+            })),
+          });
+        }
+        if call.args.len() > 3 {
+          call.args[3] = ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Lit(Lit::Str(Str {
+              span: call.span,
+              value: gen_use_deno_hook_ident().into(),
+              has_escape: false,
+            }))),
+          };
+        } else {
+          call.args.push(ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Lit(Lit::Str(Str {
+              span: call.span,
+              value: gen_use_deno_hook_ident().into(),
+              has_escape: false,
+            }))),
+          });
+        }
+      }
     }
-
+    call
   }
-  call
 }
 
 fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
@@ -184,8 +222,11 @@ fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
 }
 
 fn gen_use_deno_hook_ident() -> String {
-  return rand::thread_rng()
+  let mut ident: String = "useDeno.".to_owned();
+  let rand_id = rand::thread_rng()
     .sample_iter(&Alphanumeric)
     .take(9)
     .collect::<String>();
+  ident.push_str(rand_id.as_str());
+  return ident;
 }

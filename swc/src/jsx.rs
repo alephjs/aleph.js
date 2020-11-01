@@ -34,14 +34,6 @@ impl Fold for Jsx {
             return el;
         }
 
-        let file_lines = match self.source.span_to_lines(el.span) {
-            Ok(v) => v,
-            _ => return el,
-        };
-        let file_name = match file_lines.file.name {
-            FileName::Real(ref p) => p.display().to_string(),
-            _ => unimplemented!("file name for other than real files"),
-        };
         let is_import_el = match el.name {
             JSXElementName::Ident(ref i) => i.sym.chars().as_str().eq("Import"),
             _ => false,
@@ -82,15 +74,12 @@ impl Fold for Jsx {
             }
 
             if from_prop_index >= 0 {
-                el.attrs[from_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
+              el.attrs[from_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
                     span: DUMMY_SP,
                     name: JSXAttrName::Ident(quote_ident!("from")),
                     value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                         span: DUMMY_SP,
-                        value: self
-                            .resolver
-                            .resolve(from_prop_value, file_name.as_str())
-                            .into(),
+                        value: self.resolver.resolve(from_prop_value).into(),
                         has_escape: false,
                     }))),
                 });
@@ -99,6 +88,14 @@ impl Fold for Jsx {
 
         // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
         if self.is_dev {
+            let file_lines = match self.source.span_to_lines(el.span) {
+                Ok(v) => v,
+                _ => return el,
+            };
+            let file_name = match file_lines.file.name {
+                FileName::Real(ref p) => p.display().to_string(),
+                _ => unimplemented!("file name for other than real files"),
+            };
             el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
                 span: DUMMY_SP,
                 name: JSXAttrName::Ident(quote_ident!("__source")),
