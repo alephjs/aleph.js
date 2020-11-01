@@ -37,7 +37,9 @@ dependencies = [
  "console_error_panic_hook",
  "indexmap",
  "once_cell",
+ "rand",
  "serde",
+ "swc_atoms",
  "swc_common",
  "swc_ecma_ast",
  "swc_ecma_utils",
@@ -246,6 +248,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
