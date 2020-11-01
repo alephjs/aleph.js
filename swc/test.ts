@@ -10,7 +10,6 @@ function test(srouce: string, opts: any) {
     console.log(code.trim() + '\n')
 }
 
-
 test(`
 const A = () => {
     useDeno()
@@ -23,11 +22,11 @@ const A = () => {
     const b = useDeno(()=>{})
     const c = useDeno(function(){})
     const d = useDeno(async ()=>{})
-    const d = useDeno(async function(){})
-    const d = useDeno(async function(){}, true)
-    const d = useDeno(async function(){}, true, [])
-    const d = useDeno(async function(){}, true, [], 'abc')
-    const d = useDeno(async function(){}, true, [], 'abc', 123)
+    const e = useDeno(async function(){})
+    const f = useDeno(async function(){}, true)
+    const g = useDeno(async function(){}, true, [])
+    const h = useDeno(async function(){}, true, [], 'abc')
+    const i = useDeno(async function(){}, true, [], 'abc', 123)
     return null
 }
 
