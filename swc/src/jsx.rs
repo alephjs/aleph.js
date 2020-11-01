@@ -1,14 +1,16 @@
+// Copyright 2017-2020 The swc Project Developers. All rights reserved. MIT license.
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::resolve::Resolver;
 
-use swc_common::{sync::Lrc, FileName, SourceMap, DUMMY_SP};
+use std::rc::Rc;
+use swc_common::{FileName, SourceMap, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold};
 
-pub fn aleph_jsx(resolver: Resolver, source: Lrc<SourceMap>, is_dev: bool) -> impl Fold {
-    AlephJsx {
+pub fn aleph_swc_jsx(resolver: Rc<Resolver>, source: Rc<SourceMap>, is_dev: bool) -> impl Fold {
+    Jsx {
         resolver,
         source,
         is_dev,
@@ -18,13 +20,13 @@ pub fn aleph_jsx(resolver: Resolver, source: Lrc<SourceMap>, is_dev: bool) -> im
 // aleph.js jsx transform, core functions include:
 // 1. rewrite `Import` path
 // 2. add `__source` prop in development
-struct AlephJsx {
-    resolver: Resolver,
-    source: Lrc<SourceMap>,
+struct Jsx {
+    resolver: Rc<Resolver>,
+    source: Rc<SourceMap>,
     is_dev: bool,
 }
 
-impl Fold for AlephJsx {
+impl Fold for Jsx {
     noop_fold_type!();
 
     fn fold_jsx_opening_element(&mut self, mut el: JSXOpeningElement) -> JSXOpeningElement {
@@ -80,14 +82,15 @@ impl Fold for AlephJsx {
             }
 
             if from_prop_index >= 0 {
-                let mut owned_string: String = "@".to_owned();
-                owned_string.push_str(from_prop_value);
                 el.attrs[from_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
                     span: DUMMY_SP,
                     name: JSXAttrName::Ident(quote_ident!("from")),
                     value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                         span: DUMMY_SP,
-                        value: owned_string.into(),
+                        value: self
+                            .resolver
+                            .resolve(from_prop_value, file_name.as_str())
+                            .into(),
                         has_escape: false,
                     }))),
                 });

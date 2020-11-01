@@ -6,6 +6,7 @@ mod resolve;
 mod source_type;
 mod swc;
 
+use resolve::ImportHashMap;
 use serde::{Deserialize, Serialize};
 use swc::parse;
 use swc::EmitOptions;
@@ -28,16 +29,18 @@ extern "C" {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Options {
-    #[serde(default)]
     pub filename: String,
 
     #[serde(default)]
-    pub config: Config,
+    pub import_map: ImportHashMap,
+
+    #[serde(default)]
+    pub swc_options: SWCOptions,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Config {
+pub struct SWCOptions {
     #[serde(default = "default_target")]
     pub target: JscTarget,
 
@@ -63,10 +66,9 @@ fn default_pragma_frag() -> String {
     "React.Fragment".into()
 }
 
-// default config
-impl Default for Config {
+impl Default for SWCOptions {
     fn default() -> Self {
-        Config {
+        SWCOptions {
             target: default_target(),
             jsx_factory: default_pragma(),
             jsx_fragment_factory: default_pragma_frag(),
@@ -89,13 +91,18 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
     let opts: Options = opts
         .into_serde()
         .map_err(|err| format!("failed to parse options: {}", err))?;
-    let module =
-        parse(opts.filename.as_str(), s, opts.config.target).expect("could not parse module");
+    let module = parse(
+        opts.filename.as_str(),
+        s,
+        opts.import_map,
+        opts.swc_options.target,
+    )
+    .expect("could not parse module");
     let (code, map) = module
         .transpile(&EmitOptions {
-            jsx_factory: opts.config.jsx_factory.clone(),
-            jsx_fragment_factory: opts.config.jsx_fragment_factory.clone(),
-            minify: opts.config.minify,
+            jsx_factory: opts.swc_options.jsx_factory.clone(),
+            jsx_fragment_factory: opts.swc_options.jsx_fragment_factory.clone(),
+            minify: opts.swc_options.minify,
         })
         .expect("could not strip types");
 

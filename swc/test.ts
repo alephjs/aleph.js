@@ -10,24 +10,49 @@ function test(srouce: string, opts: any) {
     console.log(code.trim() + '\n')
 }
 
-test(`
-const n: number = 123
-if (true) { console.log(n) }
-`, { filename: '/test.ts' })
 
 test(`
-const n: number = 123
-if (true) { console.log(n) }
-`, { filename: '/test.ts', config: { minify: true } })
+const A = () => {
+    useDeno()
+    useDeno(123)
+    useDeno('abc')
+    useDeno(()=>{})
+    useDeno(function(){})
+    useDeno(async function(){})
+    const a = useDeno()
+    const b = useDeno(()=>{})
+    const c = useDeno(function(){})
+    const d = useDeno(async ()=>{})
+    const d = useDeno(async function(){})
+    const d = useDeno(async function(){}, true)
+    const d = useDeno(async function(){}, true, [])
+    const d = useDeno(async function(){}, true, [], 'abc')
+    const d = useDeno(async function(){}, true, [], 'abc', 123)
+    return null
+}
 
-test(`
-<div>Hello World!</div>
-`, { filename: '/test.jsx' })
+function B() {
+    const Title = ()=> {
+        const e = useDeno(()=>{ return 'Hello World!' })
+        return (
+            <h1>{e}</h1>
+        )
+    }
+    return (
+        <>
+        <Import from="../style.css" />
+        <Title/>
+        </>
+    )
+}
 
-test(`
-<div className="title">Hello World!</div>
-`, { filename: '/test.jsx', config: { minify: true } })
+export const C = () => {
+    const d = useDeno(async ()=>{})
+    return null
+}
 
-test(`
-<Import from="./foo.ts" />
-`, { filename: '/test.jsx' })
+export default function D() {
+    const d = useDeno(async ()=>{})
+    return null
+}
+`, { filename: '/test.tsx' })
