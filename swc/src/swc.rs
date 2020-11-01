@@ -22,7 +22,7 @@ use swc_ecmascript::codegen::{text_writer::JsWriter, Node};
 use swc_ecmascript::dep_graph::{analyze_dependencies, DependencyDescriptor};
 use swc_ecmascript::parser::lexer::Lexer;
 use swc_ecmascript::parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig};
-use swc_ecmascript::transforms::{fixer, helpers, proposals, react, typescript};
+use swc_ecmascript::transforms::{fixer, helpers, pass::Optional, proposals, react, typescript};
 use swc_ecmascript::visit::FoldWith;
 
 /// Options which can be adjusted when transpiling a module.
@@ -34,7 +34,7 @@ pub struct EmitOptions {
   /// When transforming JSX, what value should be used for the JSX fragment
   /// factory.  Defaults to `React.Fragment`.
   pub jsx_fragment_factory: String,
-  /// Should JSX be transformed or preserved.  Defaults to `true`.
+  /// Minify emit.  Defaults to `false`.
   pub minify: bool,
 }
 
@@ -75,8 +75,8 @@ fn get_ts_config(tsx: bool) -> TsConfig {
   }
 }
 
-pub fn get_syntax(media_type: &SourceType) -> Syntax {
-  match media_type {
+pub fn get_syntax(source_type: &SourceType) -> Syntax {
+  match source_type {
     SourceType::JavaScript => Syntax::Es(get_es_config(false)),
     SourceType::JSX => Syntax::Es(get_es_config(true)),
     SourceType::TypeScript => Syntax::Typescript(get_ts_config(false)),
@@ -149,6 +149,7 @@ pub struct ParsedModule {
   comments: SingleThreadedComments,
   leading_comments: Vec<Comment>,
   module: Module,
+  source_type: SourceType,
   source_map: Rc<SourceMap>,
   resolver: Rc<Resolver>,
 }
@@ -175,31 +176,46 @@ impl ParsedModule {
   /// The result is a tuple of the code and optional source map as strings.
   pub fn transpile(self, options: &EmitOptions) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module);
-    let swc_jsx_pass = react::react(
-      self.source_map.clone(),
-      Some(&self.comments),
-      react::Options {
-        pragma: options.jsx_factory.clone(),
-        pragma_frag: options.jsx_fragment_factory.clone(),
-        // this will use `Object.assign()` instead of the `_extends` helper
-        // when spreading props.
-        use_builtins: true,
-        ..Default::default()
-      },
-    );
+    let jsx = match self.source_type {
+      SourceType::JSX => true,
+      SourceType::TSX => true,
+      _ => false,
+    };
+    let ts = match self.source_type {
+      SourceType::TypeScript => true,
+      SourceType::TSX => true,
+      _ => false,
+    };
     let mut passes = chain!(
       aleph_resolve_vistor(self.resolver.clone()),
-      aleph_swc_jsx(
-        self.resolver.clone(),
-        self.source_map.clone(),
-        !options.minify
+      Optional::new(
+        aleph_swc_jsx(
+          self.resolver.clone(),
+          self.source_map.clone(),
+          !options.minify
+        ),
+        jsx
       ),
-      swc_jsx_pass,
+      Optional::new(
+        react::jsx(
+          self.source_map.clone(),
+          Some(&self.comments),
+          react::Options {
+            pragma: options.jsx_factory.clone(),
+            pragma_frag: options.jsx_fragment_factory.clone(),
+            // this will use `Object.assign()` instead of the `_extends` helper
+            // when spreading props.
+            use_builtins: true,
+            ..Default::default()
+          },
+        ),
+        jsx
+      ),
       proposals::decorators::decorators(proposals::decorators::Config {
         legacy: true,
         emit_metadata: false
       }),
-      typescript::strip(),
+      Optional::new(typescript::strip(), ts),
       fixer(Some(&self.comments)),
     );
 
@@ -241,10 +257,11 @@ impl ParsedModule {
 /// For a given specifier, source, and media type, parse the source of the
 /// module and return a representation which can be further processed.
 ///
-/// # Arguments
+/// ## Arguments
 ///
 /// - `specifier` - The module specifier for the module.
 /// - `source` - The source code for the module.
+/// - `import_map` - The import map for the module.
 /// - `target` - The target for the module.
 ///
 // NOTE(bartlomieju): `specifier` has `&str` type instead of
@@ -256,15 +273,15 @@ pub fn parse(
   import_map: ImportHashMap,
   target: JscTarget,
 ) -> Result<ParsedModule, anyhow::Error> {
-  let resolver = Resolver::new(ImportMap::from_hashmap(import_map), false);
+  let resolver = Resolver::new(specifier, ImportMap::from_hashmap(import_map), false);
   let source_map = SourceMap::default();
   let source_file = source_map.new_source_file(
     FileName::Real(Path::new(specifier).to_path_buf()),
     source.to_string(),
   );
   let error_buffer = ErrorBuffer::new();
-  let media_type = &SourceType::from(Path::new(specifier));
-  let syntax = get_syntax(media_type);
+  let source_type = SourceType::from(Path::new(specifier));
+  let syntax = get_syntax(&source_type);
   let input = StringInput::from(&*source_file);
   let comments = SingleThreadedComments::default();
 
@@ -291,6 +308,7 @@ pub fn parse(
   Ok(ParsedModule {
     leading_comments,
     module,
+    source_type,
     source_map: Rc::new(source_map),
     resolver: Rc::new(resolver),
     comments,
