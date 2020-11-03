@@ -20,6 +20,7 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 - Markdown Page
 - Built-in CSS(Less) Support
 - SSR/SSG
+- High Performance Comilper
 
 ### Installation
 ```bash
