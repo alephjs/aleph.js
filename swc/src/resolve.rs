@@ -84,9 +84,14 @@ impl Fold for ResolveVistor {
   noop_fold_type!();
 
   // resolve import/export url
-  // - `import React from "https://esm.sh/rect"` -> `import React from "/-/esm.sh/react.js"`
-  // - `export React, {useState} from "https://esm.sh/rect"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
-  // - `export * from "https://esm.sh/rect"` -> `export * from "/-/esm.sh/react.js"`
+  // - development mode:
+  //   - `import React from "https://esm.sh/react"` -> `import React from "/_alpeh/-/esm.sh/react.js"`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/_alpeh/-/esm.sh/react.js"`
+  //   - `export * from "https://esm.sh/react"` -> `export * from "/_alpeh/-/esm.sh/react.js"`
+  // - production mode:
+  //   - `import React from "https://esm.sh/react"` -> `import {dep_HASH_default as React} from "/_alpeh/-/deps.js"`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `export {dep_HASH_default as React, dep_HASH_useState as useState} from * from "/_alpeh/-/deps.js"`
+  //   - `export * from "https://esm.sh/react"` -> `export * from "/_alpeh/-/esm.sh/react.js"`
   fn fold_module_decl(&mut self, decl: ModuleDecl) -> ModuleDecl {
     match decl {
       ModuleDecl::Import(decl) => ModuleDecl::Import(ImportDecl {
@@ -130,8 +135,8 @@ impl Fold for ResolveVistor {
   }
 
   // resolve dynamic import url & sign useDeno hook
-  // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
-  // - `useDeno(() => {})` -> `useDeno(()=>{}, false, void 0, "RAND_ID")`
+  // - `import("https://esm.sh/rect")` -> `import("/_aleph/-/esm.sh/react.js")`
+  // - `useDeno(() => {})` -> `useDeno(()=>{}, false, void 0, "useDeno.RANDOM_ID")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
       let url = match call.args.first_mut() {
