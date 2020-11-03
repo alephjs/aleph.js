@@ -42,7 +42,7 @@ export function createHtml({
                 "/_aleph/-/deno.land/x/aleph/context.js",
                 "/_aleph/-/deno.land/x/aleph/events.js"
             ].map((v) =>
-                `<link rel="preload" href=${JSON.stringify(v)} as="script" />`
+                `<link rel="modulepreload" href=${JSON.stringify(v)} as="script" />`
             ),
         )
         .filter(Boolean);
