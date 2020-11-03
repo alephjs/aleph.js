@@ -276,6 +276,10 @@ export class Project {
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/error.js`), type: 'module', preload: true },
+                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/aleph.js`), type: 'module', preload: true },
+                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/context.js`), type: 'module', preload: true },
+                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/events.js`), type: 'module', preload: true },
                 ...scripts
             ],
             body,

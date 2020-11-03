@@ -35,7 +35,7 @@ export function createHtml({
             }
             return "";
         }))
-        .concat(
+        /*.concat(
             [
                 "/_aleph/-/deno.land/x/aleph/error.js",
                 "/_aleph/-/deno.land/x/aleph/aleph.js",
@@ -44,7 +44,7 @@ export function createHtml({
             ].map((v) =>
                 `<link rel="modulepreload" href=${JSON.stringify(v)} as="script" />`
             ),
-        )
+        )*/
         .filter(Boolean);
     const scriptTags = scripts.map((v) => {
         if (util.isString(v)) {
