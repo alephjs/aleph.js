@@ -20,7 +20,7 @@ export function createHtml({
             if (!util.isString(v) && util.isNEString(v.src)) {
                 if (v.type === 'module') {
                     return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
-                } else if (v.async === true) {
+                } else {
                     return `<link rel="preload" href=${JSON.stringify(v.src)} as="script" />`
                 }
             }
