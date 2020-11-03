@@ -1,64 +1,86 @@
-import util from './util.ts'
+import util from "./util.ts";
 
 export function createHtml({
-    lang = 'en',
+    lang = "en",
     head = [],
     scripts = [],
     body,
-    minify = false
+    minify = false,
 }: {
-    lang?: string,
-    head?: string[],
-    scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean, preload?: boolean })[],
-    body: string,
-    minify?: boolean
+    lang?: string;
+    head?: string[];
+    scripts?:
+    (string | {
+        id?: string;
+        type?: string;
+        src?: string;
+        innerText?: string;
+        nomodule?: boolean;
+        async?: boolean;
+        preload?: boolean;
+    })[];
+    body: string;
+    minify?: boolean;
 }) {
-    const eol = minify ? '' : '\n'
-    const indent = minify ? '' : ' '.repeat(4)
-    const headTags = head.map(tag => tag.trim())
-        .concat(scripts.map(v => {
+    const eol = minify ? "" : "\n";
+    const indent = minify ? "" : " ".repeat(4);
+    const headTags = head.map((tag) => tag.trim())
+        .concat(scripts.map((v) => {
             if (!util.isString(v) && util.isNEString(v.src)) {
-                if (v.type === 'module') {
-                    return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
+                if (v.type === "module") {
+                    return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`;
                 }
-                return `<link rel="preload" href=${JSON.stringify(v.src)} as="script" />`
+                return `<link rel="preload" href=${JSON.stringify(v.src)
+                    } as="script" />`;
             }
-            return ''
-        })).filter(Boolean)
-    const scriptTags = scripts.map(v => {
+            return "";
+        }))
+        .concat(
+            [
+                "/_aleph/-/deno.land/x/aleph/error.js",
+                "/_aleph/-/deno.land/x/aleph/aleph.js",
+                "/_aleph/-/deno.land/x/aleph/context.js",
+                "/_aleph/-/deno.land/x/aleph/events.js"
+            ].map((v) =>
+                `<link rel="preload" href=${JSON.stringify(v)} as="script" />`
+            ),
+        )
+        .filter(Boolean);
+    const scriptTags = scripts.map((v) => {
         if (util.isString(v)) {
-            return `<script>${v}</script>`
+            return `<script>${v}</script>`;
         } else if (util.isNEString(v.innerText)) {
-            const { innerText, ...rest } = v
-            return `<script${attrString(rest)}>${eol}${innerText}${eol}${indent}</script>`
+            const { innerText, ...rest } = v;
+            return `<script${attrString(rest)
+                }>${eol}${innerText}${eol}${indent}</script>`;
         } else if (util.isNEString(v.src) && !v.preload) {
-            return `<script${attrString(v)}></script>`
+            return `<script${attrString(v)}></script>`;
         } else {
-            return ''
+            return "";
         }
-    }).filter(Boolean)
+    }).filter(Boolean);
 
     return [
-        '<!DOCTYPE html>',
+        "<!DOCTYPE html>",
         `<html lang="${lang}">`,
-        '<head>',
+        "<head>",
         indent + '<meta charSet="utf-8" />',
-        ...headTags.map(tag => indent + tag),
-        '</head>',
-        '<body>',
+        ...headTags.map((tag) => indent + tag),
+        "</head>",
+        "<body>",
         indent + body,
-        ...scriptTags.map(tag => indent + tag),
-        '</body>',
-        '</html>'
-    ].join(eol)
+        ...scriptTags.map((tag) => indent + tag),
+        "</body>",
+        "</html>",
+    ].join(eol);
 }
 
 function attrString(v: any): string {
-    return Object.keys(v).map(k => {
+    return Object.keys(v).map((k) => {
         if (v[k] === true) {
-            return ` ${k}`
+            return ` ${k}`;
         } else {
-            return ` ${k}=${JSON.stringify(String(v[k]))}`
+            return ` ${k}=${JSON.stringify(String(v[k]))}`;
         }
-    }).join('')
+    }).join("");
 }
