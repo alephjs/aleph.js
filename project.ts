@@ -266,7 +266,7 @@ export class Project {
             '-/deno.land/x/aleph/context.js',
             '-/deno.land/x/aleph/error.js',
             '-/deno.land/x/aleph/events.js',
-            '-/deno.land/x/aleph/routing.js,',
+            '-/deno.land/x/aleph/routing.js',
             '-/deno.land/x/aleph/util.js'
         ]
         return scripts.map(src => ({ src: `${baseUrl}${src}`, type: 'module', preload: true }))
