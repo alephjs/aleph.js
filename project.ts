@@ -260,6 +260,18 @@ export class Project {
         return [status, data]
     }
 
+    getPreloadScripts(baseUrl: string) {
+        const scripts = [
+            '-/deno.land/x/aleph/aleph.js',
+            '-/deno.land/x/aleph/context.js',
+            '-/deno.land/x/aleph/error.js',
+            '-/deno.land/x/aleph/events.js',
+            '-/deno.land/x/aleph/routing.js,',
+            '-/deno.land/x/aleph/util.js'
+        ]
+        return scripts.map(src => ({ src: `${baseUrl}${src}`, type: 'module', preload: true }))
+    }
+
     async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string, Record<string, string> | null]> {
         if (!this.isSSRable(loc.pathname)) {
             const [url] = this.#routing.createRouter(loc)
@@ -275,11 +287,7 @@ export class Project {
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
-                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/error.js`), type: 'module', preload: true },
-                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/aleph.js`), type: 'module', preload: true },
-                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/context.js`), type: 'module', preload: true },
-                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/events.js`), type: 'module', preload: true },
+                ...this.getPreloadScripts(baseUrl),
                 ...scripts
             ],
             body,
@@ -297,6 +305,7 @@ export class Project {
             scripts: [
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                ...this.getPreloadScripts(baseUrl)
             ],
             head: customLoading?.head || [],
             body: `<main>${customLoading?.body || ''}</main>`,
@@ -383,6 +392,7 @@ export class Project {
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                ...this.getPreloadScripts(baseUrl),
                 ...scripts
             ],
             body,
