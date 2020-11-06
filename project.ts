@@ -76,7 +76,7 @@ export class Project {
         this.appRoot = path.resolve(appDir)
         this.mode = mode
         this.config = {
-            srcDir: '/',
+            srcDir: existsDirSync(path.join(this.appRoot, '/src/pages')) ? '/src' : '/',
             outputDir: '/dist',
             baseUrl: '/',
             defaultLocale: 'en',
