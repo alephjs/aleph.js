@@ -20,7 +20,7 @@ export default function Home() {
                 <span>&middot;</span>
                 <a href="https://alephjs.org/docs" target="_blank">Docs</a>
                 <span>&middot;</span>
-                <a href="https://github.com/postui/alephjs" target="_blank">Github</a>
+                <a href="https://github.com/alephjs/alephjs" target="_blank">Github</a>
             </p>
             <p className="counter">
                 <span>Counter:</span>
