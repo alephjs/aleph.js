@@ -1,6 +1,6 @@
 ---
 title: Hello World
-author: postUI Lab.
+author: The Aleph.js Authors
 date: 2020-10-01
 ---
 

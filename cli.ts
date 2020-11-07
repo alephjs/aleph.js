@@ -19,7 +19,7 @@ const helpMessage = `Aleph.js v${version}
 The React Framework in deno.
 
 Docs: https://alephjs.org/docs
-Bugs: https://github.com/postui/aleph.js/issues
+Bugs: https://github.com/alephjs/aleph.js/issues
 
 Usage:
     aleph <command> [...options]

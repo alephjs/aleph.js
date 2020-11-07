@@ -1,6 +1,6 @@
 ---
 title: Bla Bla Bla
-author: postUI Lab.
+author: The Aleph.js Authors
 date: 2020-10-01
 ---
 

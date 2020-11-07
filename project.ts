@@ -457,15 +457,15 @@ export class Project {
     }
 
     private async _loadConfig() {
-        const { ALEPH_IMPORT_MAP } = globalThis as any
-        if (ALEPH_IMPORT_MAP) {
-            const { imports } = ALEPH_IMPORT_MAP
-            Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
-        }
-
         const importMapFile = path.join(this.appRoot, 'import_map.json')
         if (existsFileSync(importMapFile)) {
             const { imports } = JSON.parse(await Deno.readTextFile(importMapFile))
+            Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
+        }
+
+        const { ALEPH_IMPORT_MAP } = globalThis as any
+        if (ALEPH_IMPORT_MAP) {
+            const { imports } = ALEPH_IMPORT_MAP
             Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
         }
 
@@ -687,7 +687,7 @@ export class Project {
         log.info('Start watching code changes...')
         for await (const event of w) {
             for (const p of event.paths) {
-                const path = util.cleanPath(util.trimPrefix(p, this.appRoot))
+                const path = util.cleanPath(util.trimPrefix(p, this.srcDir))
                 // handle `api` dir remove directly
                 const validated = (() => {
                     // ignore `.aleph` and output directories
