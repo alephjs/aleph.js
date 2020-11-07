@@ -1,7 +1,7 @@
-import ts from 'https://esm.sh/typescript'
+import reactRefreshTS from 'https://esm.sh/react-refresh-typescript@1.0.4'
+import ts from 'https://esm.sh/typescript@4.0.5'
 import transformImportPathRewrite from './transform-import-path-rewrite.ts'
 import transformReactJsx from './transform-react-jsx.ts'
-import transformReactRefresh from './transform-react-refresh.ts'
 import transformReactUseDenoHook from './transform-react-use-deno-hook.ts'
 
 export interface CompileOptions {
@@ -25,11 +25,9 @@ const allowTargets = [
 export function compile(fileName: string, source: string, { mode, target: targetName, rewriteImportPath, reactRefresh, signUseDeno }: CompileOptions) {
     const target = allowTargets.indexOf(targetName.toLowerCase())
     const transformers: ts.CustomTransformers = { before: [], after: [] }
+    if (reactRefresh) transformers.before!.push(reactRefreshTS())
+    transformers.before!.push(createPlainTransformer(transformReactUseDenoHook, { index: 0, signUseDeno }))
     transformers.before!.push(createPlainTransformer(transformReactJsx, { mode, rewriteImportPath }))
-    transformers.before!.push(createTransformer(transformReactUseDenoHook, signUseDeno))
-    if (reactRefresh) {
-        transformers.before!.push(createTransformer(transformReactRefresh))
-    }
     transformers.after!.push(createPlainTransformer(transformImportPathRewrite, rewriteImportPath))
 
     return ts.transpileModule(source, {

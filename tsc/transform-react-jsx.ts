@@ -1,4 +1,4 @@
-import ts from 'https://esm.sh/typescript'
+import ts from 'https://esm.sh/typescript@4.0.5'
 import { path } from '../std.ts'
 
 export default function transformReactJsx(sf: ts.SourceFile, node: ts.Node, options: { mode: 'development' | 'production', rewriteImportPath: (importPath: string) => string }): ts.VisitResult<ts.Node> {

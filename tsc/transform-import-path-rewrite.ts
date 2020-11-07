@@ -1,4 +1,4 @@
-import ts from 'https://esm.sh/typescript'
+import ts from 'https://esm.sh/typescript@4.0.5'
 
 /**
  * TS AST transformer to rewrite import path.
