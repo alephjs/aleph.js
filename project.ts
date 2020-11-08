@@ -1,3 +1,4 @@
+import CleanCSS from 'https://esm.sh/clean-css@4.2.3?no-check'
 import marked from 'https://esm.sh/marked@1.2.0'
 import postcss, { AcceptedPlugin } from 'https://esm.sh/postcss@8.1.4'
 import { minify } from 'https://esm.sh/terser@5.3.2'
@@ -12,7 +13,7 @@ import { colors, ensureDir, fromStreamReader, path, ServerRequest, Sha1, walk } 
 import { compile } from './tsc/compile.ts'
 import type { AlephEnv, APIHandler, Config, RouterURL } from './types.ts'
 import util, { hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
-import { cleanCSS, less } from './vendor/mod.ts'
+import less from './vendor/less/less.js'
 import { version } from './version.ts'
 
 interface Module {
@@ -71,6 +72,7 @@ export class Project {
     #renderer: { renderPage: CallableFunction } = { renderPage: () => void 0 }
     #rendered: Map<string, Map<string, RenderResult>> = new Map()
     #postcssPlugins: Record<string, AcceptedPlugin> = {}
+    #cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
 
     constructor(appDir: string, mode: 'development' | 'production', reload = false) {
         this.appRoot = path.resolve(appDir)
@@ -1018,7 +1020,7 @@ export class Project {
                 if (this.isDev) {
                     css = css.trim()
                 } else {
-                    const output = cleanCSS.minify(css)
+                    const output = this.#cleanCSS.minify(css)
                     css = output.styles
                 }
                 mod.jsContent = [
@@ -1447,30 +1449,6 @@ export class Project {
         return __deps
     }
 }
-
-// add virtual browser global objects
-Object.assign(globalThis, {
-    // document: new Document(),
-    location: {
-        protocol: 'http:',
-        host: 'localhost',
-        hostname: 'localhost',
-        port: '',
-        href: 'https://localhost/',
-        origin: 'https://localhost',
-        pathname: '/',
-        search: '',
-        hash: '',
-        reload() { },
-        replace() { },
-        toString() { return this.href },
-    },
-    innerWidth: 1920,
-    innerHeight: 1080,
-    devicePixelRatio: 1,
-    $RefreshReg$: () => { },
-    $RefreshSig$: () => (type: any) => type,
-})
 
 /** inject HMR and React Fast Referesh helper code  */
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {

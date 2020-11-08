@@ -1,55 +1,36 @@
-import { getLock, setLock } from "./constructor-lock.ts";
+import { setLock } from "./constructor-lock.ts";
 import { Element } from "./element.ts";
 import { NodeList, nodeListMutatorSym } from "./node-list.ts";
 import { Comment, Node, NodeType, Text } from "./node.ts";
 import { DOM as NWAPI } from "./nwsapi-types.ts";
 
-export class DOMImplementation {
-  constructor() {
-    if (getLock()) {
-      throw new TypeError("Illegal constructor.");
-    }
-  }
+export function createHTMLDocument(titleStr?: string): Document {
+  titleStr += "";
 
-  createDocument() {
-    throw new Error("Unimplemented"); // TODO
-  }
+  // TODO: Figure out a way to make `setLock` invocations less redundant
+  setLock(false);
+  const doc = new Document();
 
-  createHTMLDocument(titleStr?: string): HTMLDocument {
-    titleStr += "";
+  setLock(false);
+  const docType = new DocumentType("html", "", "");
+  doc.appendChild(docType);
 
-    // TODO: Figure out a way to make `setLock` invocations less redundant
-    setLock(false);
-    const doc = new HTMLDocument();
+  const html = new Element("html", doc, []);
+  html._setOwnerDocument(doc);
 
-    setLock(false);
-    const docType = new DocumentType("html", "", "");
-    doc.appendChild(docType);
+  const head = new Element("head", html, []);
+  const body = new Element("body", html, []);
 
-    const html = new Element("html", doc, []);
-    html._setOwnerDocument(doc);
+  const title = new Element("title", head, []);
+  const titleText = new Text(titleStr);
+  title.appendChild(titleText);
 
-    const head = new Element("head", html, []);
-    const body = new Element("body", html, []);
+  doc.rootElement = html;
+  doc.head = head;
+  doc.body = body;
 
-    const title = new Element("title", head, []);
-    const titleText = new Text(titleStr);
-    title.appendChild(titleText);
-
-    doc.head = head;
-    doc.body = body;
-
-    setLock(true);
-    return doc;
-  }
-
-  createDocumentType(qualifiedName: string, publicId: string, systemId: string): DocumentType {
-    setLock(false);
-    const doctype = new DocumentType(qualifiedName, publicId, systemId);
-    setLock(true);
-
-    return doctype;
-  }
+  setLock(true);
+  return doc;
 }
 
 export class DocumentType extends Node {
@@ -91,11 +72,12 @@ export interface ElementCreationOptions {
 }
 
 export type VisibilityState = "visible" | "hidden" | "prerender";
+export type NamespaceURI = "http://www.w3.org/1999/xhtml" | "http://www.w3.org/2000/svg" | "http://www.w3.org/1998/Math/MathML";
 
 export class Document extends Node {
+  public rootElement: Element = <Element><unknown>null;
   public head: Element = <Element><unknown>null;
   public body: Element = <Element><unknown>null;
-  public implementation: DOMImplementation;
 
   #lockState = false;
   #documentURI = "about:blank"; // TODO
@@ -109,9 +91,13 @@ export class Document extends Node {
       null,
     );
 
-    setLock(false);
-    this.implementation = new DOMImplementation();
     setLock(true);
+  }
+
+  // Expose the document's NWAPI for Element's access to
+  // querySelector/querySelectorAll
+  get _nwapi() {
+    return this.#nwapi;
   }
 
   get documentURI() {
@@ -156,9 +142,10 @@ export class Document extends Node {
     return null;
   }
 
-  appendChild(child: Node) {
+  appendChild(child: Node): Node {
     super.appendChild(child);
     child._setOwnerDocument(this);
+    return child;
   }
 
   createElement(tagName: string, options?: ElementCreationOptions): Element {
@@ -169,6 +156,18 @@ export class Document extends Node {
     elm._setOwnerDocument(this);
     setLock(true);
     return elm;
+  }
+
+  createElementNS(
+    namespace: NamespaceURI,
+    qualifiedName: string,
+    options?: ElementCreationOptions,
+  ): Element {
+    if (namespace === "http://www.w3.org/1999/xhtml") {
+      return this.createElement(qualifiedName, options);
+    } else {
+      throw new Error(`createElementNS: "${namespace}" namespace unimplemented`); // TODO
+    }
   }
 
   createTextNode(data?: string): Text {
@@ -270,17 +269,3 @@ export class Document extends Node {
     return true;
   }
 }
-
-export class HTMLDocument extends Document {
-  constructor() {
-    let lock = getLock();
-    super();
-
-    if (lock) {
-      throw new TypeError("Illegal constructor.");
-    }
-
-    setLock(false);
-  }
-}
-
