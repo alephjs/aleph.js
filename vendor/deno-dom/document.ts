@@ -5,8 +5,6 @@ import { Comment, Node, NodeType, Text } from "./node.ts";
 import { DOM as NWAPI } from "./nwsapi-types.ts";
 
 export function createHTMLDocument(titleStr?: string): Document {
-  titleStr += "";
-
   // TODO: Figure out a way to make `setLock` invocations less redundant
   setLock(false);
   const doc = new Document();
@@ -22,10 +20,9 @@ export function createHTMLDocument(titleStr?: string): Document {
   const body = new Element("body", html, []);
 
   const title = new Element("title", head, []);
-  const titleText = new Text(titleStr);
+  const titleText = new Text(titleStr || '');
   title.appendChild(titleText);
 
-  doc.rootElement = html;
   doc.head = head;
   doc.body = body;
 
@@ -75,13 +72,10 @@ export type VisibilityState = "visible" | "hidden" | "prerender";
 export type NamespaceURI = "http://www.w3.org/1999/xhtml" | "http://www.w3.org/2000/svg" | "http://www.w3.org/1998/Math/MathML";
 
 export class Document extends Node {
-  public rootElement: Element = <Element><unknown>null;
   public head: Element = <Element><unknown>null;
   public body: Element = <Element><unknown>null;
 
-  #lockState = false;
   #documentURI = "about:blank"; // TODO
-  #title = "";
   #nwapi = NWAPI(this);
 
   constructor() {
