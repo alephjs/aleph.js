@@ -160,33 +160,6 @@ async function main() {
         }
     }
 
-    // add virtual browser global objects
-    if (command !== 'init' && command !== 'upgrade') {
-        const { createHTMLDocument } = await import('./vendor/deno-dom/document.ts')
-        Object.assign(globalThis, {
-            document: createHTMLDocument(),
-            location: {
-                protocol: 'http:',
-                host: 'localhost',
-                hostname: 'localhost',
-                port: '',
-                href: 'https://localhost/',
-                origin: 'https://localhost',
-                pathname: '/',
-                search: '',
-                hash: '',
-                reload() { },
-                replace() { },
-                toString() { return this.href },
-            },
-            innerWidth: 1920,
-            innerHeight: 1080,
-            devicePixelRatio: 1,
-            $RefreshReg$: () => { },
-            $RefreshSig$: () => (type: any) => type,
-        })
-    }
-
     const { default: cmd } = await import(`./cli/${command}.ts`)
     if (command === 'upgrade') {
         await cmd(argOptions.v || argOptions.version || 'latest')

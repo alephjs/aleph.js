@@ -1,4 +1,3 @@
-import unescape from 'https://esm.sh/lodash/unescape?no-check'
 import React, { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import { RendererContext, RouterContext } from './context.ts'
@@ -63,6 +62,7 @@ export async function renderPage(
         headElements: new Map(),
         scriptsElements: new Map()
     }
+    const { __createHTMLDocument } = (window as any)
     const { __buildMode, __buildTarget } = (window as any).ALEPH.ENV as AlephEnv
     const data: Record<string, any> = {}
     const useDenEvent = `useDeno://${url.pathname + '?' + url.query.toString()}`
@@ -70,6 +70,7 @@ export async function renderPage(
 
     Object.assign(window, {
         [`__asyncData_${useDenEvent}`]: {},
+        document: __createHTMLDocument(),
         location: {
             protocol: 'http:',
             host: 'localhost',
@@ -155,9 +156,9 @@ export async function renderPage(
         if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
             ret.scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
         } if (util.isNEString(children)) {
-            ret.scripts.push({ ...attrs, innerText: unescape(children) })
+            ret.scripts.push({ ...attrs, innerText: children })
         } else if (util.isNEArray(children)) {
-            ret.scripts.push({ ...attrs, innerText: unescape(children.join('')) })
+            ret.scripts.push({ ...attrs, innerText: children.join('') })
         } else {
             ret.scripts.push(props)
         }

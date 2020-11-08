@@ -13,6 +13,7 @@ import { colors, ensureDir, fromStreamReader, path, ServerRequest, Sha1, walk } 
 import { compile } from './tsc/compile.ts'
 import type { AlephEnv, APIHandler, Config, RouterURL } from './types.ts'
 import util, { hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
+import { createHTMLDocument } from './vendor/deno-dom/document.ts'
 import less from './vendor/less/less.js'
 import { version } from './version.ts'
 
@@ -1449,6 +1450,30 @@ export class Project {
         return __deps
     }
 }
+
+Object.assign(globalThis, {
+    __createHTMLDocument: () => createHTMLDocument(),
+    document: createHTMLDocument(),
+    location: {
+        protocol: 'http:',
+        host: 'localhost',
+        hostname: 'localhost',
+        port: '',
+        href: 'https://localhost/',
+        origin: 'https://localhost',
+        pathname: '/',
+        search: '',
+        hash: '',
+        reload() { },
+        replace() { },
+        toString() { return this.href },
+    },
+    innerWidth: 1920,
+    innerHeight: 1080,
+    devicePixelRatio: 1,
+    $RefreshReg$: () => { },
+    $RefreshSig$: () => (type: any) => type,
+})
 
 /** inject HMR and React Fast Referesh helper code  */
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
