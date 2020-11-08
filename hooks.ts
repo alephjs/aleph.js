@@ -52,10 +52,3 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), browser?: boo
 
     return data
 }
-
-export function useEnv<T>(predicate: (env: AlephEnv) => T): T {
-    const env = useDeno<T>(() => {
-        return predicate((globalThis as any).ALEPH.ENV)
-    })
-    return env
-}

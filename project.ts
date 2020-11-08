@@ -11,7 +11,7 @@ import log from './log.ts'
 import { getPagePath, RouteModule, Routing } from './routing.ts'
 import { colors, ensureDir, fromStreamReader, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
-import type { AlephEnv, APIHandler, Config, RouterURL } from './types.ts'
+import type { APIHandler, Config, RouterURL } from './types.ts'
 import util, { hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { createHTMLDocument } from './vendor/deno-dom/document.ts'
 import less from './vendor/less/less.js'
@@ -593,18 +593,13 @@ export class Project {
             this.#postcssPlugins[name] = Plugin
         }))
 
-        // inject ALEPH global variable
-        Object.assign(globalThis, {
-            ALEPH: {
-                ENV: {
-                    ...Deno.env.toObject(),
-                    ...this.config.env,
-                    __version: version,
-                    __buildMode: this.mode,
-                    __buildTarget: this.config.buildTarget,
-                } as AlephEnv
-            }
-        })
+        // inject env variables
+        Object.entries({
+            ...this.config.env,
+            __version: version,
+            __buildMode: this.mode,
+            __buildTarget: this.config.buildTarget,
+        }).forEach(([key, value]) => Deno.env.set(key, value))
 
         // change current work dir to appDoot
         Deno.chdir(this.appRoot)

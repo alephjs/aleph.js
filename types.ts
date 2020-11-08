@@ -1,19 +1,6 @@
 import type { ServerRequest } from './std.ts';
 
 /**
- * The **ENV** of Aleph.js runtime, you can access it with `window.ALEPH.ENV[key]`.
- */
-export interface AlephEnv {
-    [key: string]: string
-    /** The version of **Aleph.js** */
-    readonly __version: string
-    /** The build mode of the appliaction (possible values: '**development**' | '**production**') */
-    readonly __buildMode: string
-    /** The build target of the appliaction (possible values: '**ES2015**' - '**ES2020**' | '**ESNext**') */
-    readonly __buildTarget: string
-}
-
-/**
  * A plugin for **Aleph.js** application.
  */
 export interface Plugin {
@@ -71,7 +58,7 @@ export interface Config {
     buildTarget?: string
     /** Enable sourceMap in **production** mode (default is **false**). */
     sourceMap?: boolean
-    /** `env` defines the `Window.ALEPH.ENV` object in the application. */
+    /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable) */
     env?: Record<string, string>
 }
 

@@ -5,7 +5,7 @@ import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page } from
 import events from './events.ts'
 import { serverStyles } from './head.ts'
 import { createPageProps } from './routing.ts'
-import type { AlephEnv, RouterURL } from './types.ts'
+import type { RouterURL } from './types.ts'
 import util, { hashShort } from './util.ts'
 
 interface RenderResult {
@@ -63,7 +63,8 @@ export async function renderPage(
         scriptsElements: new Map()
     }
     const { __createHTMLDocument } = (window as any)
-    const { __buildMode, __buildTarget } = (window as any).ALEPH.ENV as AlephEnv
+    const buildMode = Deno.env.get('__buildMode')
+    const buildTarget = Deno.env.get('__buildTarget')
     const data: Record<string, any> = {}
     const useDenEvent = `useDeno://${url.pathname + '?' + url.query.toString()}`
     const useDenoAsyncCalls: Array<Promise<any>> = []
@@ -167,7 +168,7 @@ export async function renderPage(
     rendererCache.scriptsElements.clear()
 
     await Promise.all(styles?.map(({ url, hash }) => {
-        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${__buildMode}.${__buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
+        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}.${buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
     }) || [])
     styles?.forEach(({ url }) => {
         if (serverStyles.has(url)) {
