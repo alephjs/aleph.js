@@ -1,7 +1,6 @@
 import { Import, useDeno } from 'https://deno.land/x/aleph/mod.ts'
 import React, { useState } from 'https://esm.sh/react'
 import Logo from '../components/logo.tsx'
-import { style } from 'https://esm.sh/typestyle'
 
 export default function Home() {
     const [count, setCount] = useState(0)
@@ -9,13 +8,11 @@ export default function Home() {
         return Deno.version
     })
 
-    const red = style({ backgroundColor: 'red' })
-
     return (
         <div className="page">
             <Import from="../style/index.less" />
             <p className="logo"><Logo /></p>
-            <h1 className={red}>Welcome to use <strong>Aleph.js</strong>!</h1>
+            <h1>Welcome to use <strong>Aleph.js</strong>!</h1>
             <p className="links">
                 <a href="https://alephjs.org" target="_blank">Website</a>
                 <span>&middot;</span>
