@@ -90,8 +90,8 @@ export class Project {
             },
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
-            reactUrl: 'https://esm.sh/react@16.14.0',
-            reactDomUrl: 'https://esm.sh/react-dom@16.14.0',
+            reactUrl: 'https://esm.sh/react@17.0.1',
+            reactDomUrl: 'https://esm.sh/react-dom@17.0.1',
             plugins: [],
             postcss: {
                 plugins: [
@@ -466,7 +466,7 @@ export class Project {
             Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
         }
 
-        const { ALEPH_IMPORT_MAP } = globalThis as any
+        const { ALEPH_IMPORT_MAP, navigator } = globalThis as any
         if (ALEPH_IMPORT_MAP) {
             const { imports } = ALEPH_IMPORT_MAP
             Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
@@ -525,6 +525,7 @@ export class Project {
             Object.assign(this.config, { sourceMap })
         }
         if (util.isNEString(defaultLocale)) {
+            navigator.language = defaultLocale
             Object.assign(this.config, { defaultLocale })
         }
         if (util.isArray(locales)) {
@@ -559,8 +560,6 @@ export class Project {
                 log.warn('bad postcss.config.json', e.message)
             }
         }
-        // update buildID
-        Object.assign(this, { buildID: this.mode + '.' + this.config.buildTarget })
         // update routing
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
     }
@@ -923,10 +922,10 @@ export class Project {
                     break
                 }
             }
-            if (/^https?:\/\/[0-9a-z\.\-]+\/react(@[0-9a-z\.\-]+)?\/?$/i.test(dlUrl)) {
+            if (/^(https?:\/\/[0-9a-z\.\-]+)?\/react(@[0-9a-z\.\-]+)?\/?$/i.test(dlUrl)) {
                 dlUrl = this.config.reactUrl
             }
-            if (/^https?:\/\/[0-9a-z\.\-]+\/react\-dom(@[0-9a-z\.\-]+)?(\/server)?\/?$/i.test(dlUrl)) {
+            if (/^(https?:\/\/[0-9a-z\.\-]+)?\/react\-dom(@[0-9a-z\.\-]+)?(\/server)?\/?$/i.test(dlUrl)) {
                 dlUrl = this.config.reactDomUrl
                 if (/\/server\/?$/i.test(url)) {
                     dlUrl += '/server'
@@ -1449,6 +1448,23 @@ export class Project {
 Object.assign(globalThis, {
     __createHTMLDocument: () => createHTMLDocument(),
     document: createHTMLDocument(),
+    navigator: {
+        connection: {
+            downlink: 1.5,
+            effectiveType: "3g",
+            onchange: null,
+            rtt: 300,
+            saveData: false,
+        },
+        cookieEnabled: false,
+        deviceMemory: 8,
+        hardwareConcurrency: Deno.systemCpuInfo().cores,
+        language: 'en',
+        maxTouchPoints: 0,
+        onLine: true,
+        userAgent: `Deno/${Deno.version.deno}`,
+        vendor: "Deno Land",
+    },
     location: {
         protocol: 'http:',
         host: 'localhost',
