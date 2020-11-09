@@ -10,6 +10,24 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 [![nest badge](https://nest.land/badge.svg)](https://nest.land/package/aleph)
 [![Twitter Follow](https://img.shields.io/twitter/follow/alephjs?style=social)](https://twitter.com/intent/follow?screen_name=alephjs)
 
+Different with Next.js, Aleph.js don't need **webpack** or other bundler since Aleph.js use the **ESM** imports syntax. Every module only needs to be compiled once and then cached on the disk. When a module changes, Aleph.js just recompile that single module, there's no time wasted re-bundling every changes, and instant updates in the browser by **HMR** (Hot Module Replacement) with **React Fast Refresh**.
+
+Aleph.js works in **Deno**, a *simple*, *modern* and *secure* runtime for JavaScript and TypeScript. No `package.json` and `node_modules` directory needed, all dependencies are imported as URL and managed by Aleph.js:
+
+```jsx
+import React from "https://esm.sh/react"
+import Logo from "../components/logo.tsx"
+
+export default function Page() {
+    return (
+      <div>
+        <Logo />
+        <h1>Hello World!</h1>
+      </div>
+    )
+}
+```
+
 ### Features
 - Zero Config
 - Typescript in Deno
