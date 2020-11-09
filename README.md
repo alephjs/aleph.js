@@ -8,6 +8,7 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 
 [![Aleph.js in Deno](https://github.com/alephjs/aleph.js/workflows/Aleph.js%20in%20Deno/badge.svg)](https://github.com/alephjs/aleph.js/actions?query=workflow%3A%22Aleph.js+in+Deno%22)
 [![nest badge](https://nest.land/badge.svg)](https://nest.land/package/aleph)
+[![Chat](https://img.shields.io/discord/775256646821085215?color=%23008181&label=Chat&labelColor=%23111&logo=discord&logoColor=%23aaaaaa)](https://discord.com/channels/775256646821085215)
 [![Twitter Follow](https://img.shields.io/twitter/follow/alephjs?style=social)](https://twitter.com/intent/follow?screen_name=alephjs)
 
 Different with Next.js, Aleph.js don't need **webpack** or other bundler since Aleph.js use the **ESM** imports syntax. Every module only needs to be compiled once and then cached on the disk. When a module changes, Aleph.js just recompile that single module, there's no time wasted re-bundling every changes, and instant updates in the browser by **HMR** (Hot Module Replacement) with **React Fast Refresh**.
