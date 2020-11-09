@@ -11,15 +11,15 @@ The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://
 [![Chat](https://img.shields.io/discord/775256646821085215?color=%23008181&label=Chat&labelColor=%23111&logo=discord&logoColor=%23aaaaaa)](https://discord.gg/pWGdS7sAqD)
 [![Twitter Follow](https://img.shields.io/twitter/follow/alephjs?style=social)](https://twitter.com/intent/follow?screen_name=alephjs)
 
-Different with Next.js, Aleph.js don't need **webpack** or other bundler since Aleph.js use the **ESM** imports syntax. Every module only needs to be compiled once and then cached on the disk. When a module changes, Aleph.js just recompile that single module, there's no time wasted re-bundling every changes, and instant updates in the browser by **HMR** (Hot Module Replacement) with **React Fast Refresh**.
+Different with Next.js, Aleph.js don't need **webpack** or other bundler since it uses the **ESM** imports syntax. Every module only needs to be compiled once and then cached on the disk. When a module changes, Aleph.js just needs to re-compile that single module, there's no time wasted to *re-bundle* every changes, and instantly updates in the browser by **HMR** (Hot Module Replacement) with **React Fast Refresh**.
 
 Aleph.js works in **Deno**, a *simple*, *modern* and *secure* runtime for JavaScript and TypeScript. No `package.json` and `node_modules` directory needed, all dependencies are imported as URL and managed by Aleph.js:
 
 ```jsx
-import React from "https://esm.sh/react"
+import React from "https://esm.sh/react@17.0.1"
 import Logo from "../components/logo.tsx"
 
-export default function Page() {
+export default function Home() {
     return (
       <div>
         <Logo />
@@ -36,7 +36,8 @@ export default function Page() {
 - Import Maps
 - HMR with Fast Refresh
 - File-system Routing
-- Markdown Page
+- APIs Routing
+- Built-in Markdown Page
 - Built-in CSS(Less) Support
 - SSR/SSG
 
