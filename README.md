@@ -2,7 +2,7 @@
 
 # Aleph.js
 
-The React Framework in [Deno](https://deno.land), inspired by [Next.js](https://nextjs.org).
+Aleph.js (or **Aleph** or **א**, /ˈɑːlɛf/) is a React Framework in [Deno](https://deno.land), inspired by [Next.js](https://nextjs.org).
 <br>
 [Website](https://alephjs.org) | [Get Started](https://alephjs.org/docs/get-started)  | [Docs](https://alephjs.org/docs) | [ESM](https://esm.sh) | [The Aleph  (by Jorge Luis Borges)](http://www.phinnweb.org/links/literature/borges/aleph.html)
 
