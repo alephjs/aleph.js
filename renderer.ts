@@ -6,7 +6,7 @@ import events from './events.ts'
 import { serverStyles } from './head.ts'
 import { createPageProps } from './routing.ts'
 import type { RouterURL } from './types.ts'
-import util, { hashShort } from './util.ts'
+import util, { hashShort, reHttp } from './util.ts'
 
 interface RenderResult {
     head: string[]
@@ -168,7 +168,8 @@ export async function renderPage(
     rendererCache.scriptsElements.clear()
 
     await Promise.all(styles?.map(({ url, hash }) => {
-        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}.${buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
+        const path = reHttp.test(url) ? url.replace(reHttp, '/-/') : `${url}.${hash.slice(0, hashShort)}`
+        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}.${buildTarget}/${path}.js`))
     }) || [])
     styles?.forEach(({ url }) => {
         if (serverStyles.has(url)) {

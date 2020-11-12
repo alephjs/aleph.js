@@ -2,20 +2,22 @@ import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './aleph.ts'
 import { Route, RouteModule, Routing } from './routing.ts'
-import { reModuleExt } from './util.ts'
+import util, { reHttp } from './util.ts'
 
 export default async function bootstrap({
     routes,
     baseUrl,
     defaultLocale,
     locales,
-    preloadModules
+    preloadModules,
+    renderMode
 }: {
     routes: Route[]
     baseUrl: string
     defaultLocale: string
     locales: string[]
-    preloadModules: RouteModule[]
+    preloadModules: RouteModule[],
+    renderMode: 'ssr' | 'spa'
 }) {
     const { document } = window as any
     const mainEl = document.querySelector('main')
@@ -29,7 +31,7 @@ export default async function bootstrap({
         if (mod.deps) {
             // import async dependencies
             for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
-                await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
+                await import(getModuleImportUrl(baseUrl, { id: util.ensureExt(dep.url.replace(reHttp, '/-/'), '.js'), hash: dep.hash }))
             }
         }
         switch (mod.id) {
@@ -67,7 +69,7 @@ export default async function bootstrap({
             }
         }
     )
-    if (mainEl.childElementCount > 0) {
+    if (renderMode === 'ssr') {
         hydrate(el, mainEl)
     } else {
         render(el, mainEl)

@@ -26,8 +26,8 @@ export function compile(fileName: string, source: string, { mode, target: target
     const target = allowTargets.indexOf(targetName.toLowerCase())
     const transformers: ts.CustomTransformers = { before: [], after: [] }
     if (reactRefresh) transformers.before!.push(reactRefreshTS())
-    transformers.before!.push(createPlainTransformer(transformReactUseDenoHook, { index: 0, signUseDeno }))
     transformers.before!.push(createPlainTransformer(transformReactJsx, { mode, rewriteImportPath }))
+    transformers.after!.push(createPlainTransformer(transformReactUseDenoHook, { index: 0, signUseDeno }))
     transformers.after!.push(createPlainTransformer(transformImportPathRewrite, rewriteImportPath))
 
     return ts.transpileModule(source, {
