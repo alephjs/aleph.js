@@ -127,14 +127,14 @@ export class Project {
         if (reStyleModuleExt.test(moduleID)) {
             return true
         }
+        if (reMDExt.test(moduleID)) {
+            return moduleID.startsWith('/pages/')
+        }
         if (reModuleExt.test(moduleID)) {
             return moduleID === '/404.js' ||
                 moduleID === '/app.js' ||
                 moduleID.startsWith('/pages/') ||
                 moduleID.startsWith('/components/')
-        }
-        if (reMDExt.test(moduleID)) {
-            return moduleID.startsWith('/pages/')
         }
         const plugin = this.config.plugins.find(p => p.test.test(moduleID))
         if (plugin?.acceptHMR) {
@@ -836,7 +836,8 @@ export class Project {
             routes: this.#routing.routes,
             preloadModules: ['/404.js', '/app.js'].filter(id => this.#modules.has(id)).map(id => {
                 return this._getRouteModule(this.#modules.get(id)!)
-            })
+            }),
+            renderMode: this.config.ssr ? 'ssr' : 'spa'
         }
         const module = this._moduleFromURL('/main.js')
         const metaFile = path.join(this.buildDir, 'main.meta.json')
@@ -1020,7 +1021,7 @@ export class Project {
                 }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(getRelativePath(
-                        path.dirname(mod.url),
+                        path.dirname(fixImportUrl(mod.url)),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
                     `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
