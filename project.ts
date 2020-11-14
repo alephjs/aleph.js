@@ -160,8 +160,9 @@ export class Project {
                     }
                 }
             }
+            return true
         }
-        return true
+        return ssr
     }
 
     getModule(id: string): Module | null {
