@@ -1,5 +1,7 @@
 import { Config } from 'https://deno.land/x/aleph/types.ts'
 
-export default {
+const config: Config = {
     ssr: false
-} as Config
+}
+
+export default config
