@@ -6,8 +6,9 @@ mod resolve;
 mod source_type;
 mod swc;
 
-use resolve::ImportHashMap;
+use resolve::{ImportHashMap, ImportMap, Resolver};
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 use swc::parse;
 use swc::EmitOptions;
 use swc_ecmascript::parser::JscTarget;
@@ -78,19 +79,23 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
     let opts: Options = opts
         .into_serde()
         .map_err(|err| format!("failed to parse options: {}", err))?;
-    let module = parse(
+    let module =
+        parse(opts.filename.as_str(), s, opts.swc_options.target).expect("could not parse module");
+    let resolver = Rc::new(Resolver::new(
         opts.filename.as_str(),
-        s,
-        opts.import_map,
-        opts.swc_options.target,
-    )
-    .expect("could not parse module");
+        ImportMap::from_hashmap(opts.import_map),
+        !opts.swc_options.minify,
+        false, // todo: has_plugin_resolves
+    ));
     let (code, map) = module
-        .transpile(&EmitOptions {
-            jsx_factory: opts.swc_options.jsx_factory.clone(),
-            jsx_fragment_factory: opts.swc_options.jsx_fragment_factory.clone(),
-            minify: opts.swc_options.minify,
-        })
+        .transpile(
+            resolver,
+            &EmitOptions {
+                jsx_factory: opts.swc_options.jsx_factory.clone(),
+                jsx_fragment_factory: opts.swc_options.jsx_fragment_factory.clone(),
+                minify: opts.swc_options.minify,
+            },
+        )
         .expect("could not strip types");
 
     Ok(JsValue::from_serde(&TransformOutput { code, map }).unwrap())

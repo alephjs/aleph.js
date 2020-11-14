@@ -13,11 +13,17 @@ sh ./build.sh
 ## Debug
 
 ```bash
-wasm-pack build --target web --dev
+wasm-pack build --target web --dev && deno run -A test.ts
 ```
 
 ## Run tests
 
 ```bash
 cargo test --all --all-features
+```
+
+## Banchmark
+
+```bash
+wasm-pack build --target web && deno run -A banchmark.ts
 ```

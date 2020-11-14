@@ -1,8 +1,8 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
-use crate::jsx::aleph_swc_jsx;
-use crate::resolve::{aleph_resolve_vistor, ImportHashMap, ImportMap, Resolver};
+use crate::jsx::aleph_swc_jsx_fold;
+use crate::resolve::{aleph_resolve_fold, Resolver};
 use crate::source_type::SourceType;
 
 use std::error::Error;
@@ -151,7 +151,6 @@ pub struct ParsedModule {
   module: Module,
   source_type: SourceType,
   source_map: Rc<SourceMap>,
-  resolver: Rc<Resolver>,
 }
 
 impl fmt::Debug for ParsedModule {
@@ -174,7 +173,11 @@ impl ParsedModule {
   /// options.
   ///
   /// The result is a tuple of the code and optional source map as strings.
-  pub fn transpile(self, options: &EmitOptions) -> Result<(String, Option<String>), anyhow::Error> {
+  pub fn transpile(
+    self,
+    resolver: Rc<Resolver>,
+    options: &EmitOptions,
+  ) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module);
     let jsx = match self.source_type {
       SourceType::JSX => true,
@@ -186,14 +189,11 @@ impl ParsedModule {
       SourceType::TSX => true,
       _ => false,
     };
+
     let mut passes = chain!(
-      aleph_resolve_vistor(self.resolver.clone()),
+      aleph_resolve_fold(resolver.clone()),
       Optional::new(
-        aleph_swc_jsx(
-          self.resolver.clone(),
-          self.source_map.clone(),
-          !options.minify
-        ),
+        aleph_swc_jsx_fold(resolver.clone(), self.source_map.clone(), !options.minify),
         jsx
       ),
       Optional::new(
@@ -215,6 +215,7 @@ impl ParsedModule {
         legacy: true,
         emit_metadata: false
       }),
+      helpers::inject_helpers(),
       Optional::new(typescript::strip(), ts),
       fixer(Some(&self.comments)),
     );
@@ -270,10 +271,8 @@ impl ParsedModule {
 pub fn parse(
   specifier: &str,
   source: &str,
-  import_map: ImportHashMap,
   target: JscTarget,
 ) -> Result<ParsedModule, anyhow::Error> {
-  let resolver = Resolver::new(specifier, ImportMap::from_hashmap(import_map), false);
   let source_map = SourceMap::default();
   let source_file = source_map.new_source_file(
     FileName::Real(Path::new(specifier).to_path_buf()),
@@ -310,7 +309,6 @@ pub fn parse(
     module,
     source_type,
     source_map: Rc::new(source_map),
-    resolver: Rc::new(resolver),
     comments,
   })
 }
@@ -318,6 +316,7 @@ pub fn parse(
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::resolve::{ImportHashMap, ImportMap, Resolver};
   use swc_ecmascript::dep_graph::DependencyKind;
 
   #[test]
@@ -325,13 +324,8 @@ mod tests {
     let source = r#"import * as bar from "./test.ts";
     const foo = await import("./foo.ts");
     "#;
-    let parsed_module = parse(
-      "https://deno.land/x/mod.js",
-      source,
-      ImportHashMap::default(),
-      JscTarget::Es2020,
-    )
-    .expect("could not parse module");
+    let parsed_module = parse("https://deno.land/x/mod.js", source, JscTarget::Es2020)
+      .expect("could not parse module");
     let actual = parsed_module.analyze_dependencies();
     assert_eq!(
       actual,
@@ -375,15 +369,18 @@ mod tests {
       }
     }
     "#;
-    let module = parse(
-      "https://deno.land/x/mod.ts",
-      source,
-      ImportHashMap::default(),
-      JscTarget::Es2020,
-    )
-    .expect("could not parse module");
+    let module = parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
+      .expect("could not parse module");
     let (code, maybe_map) = module
-      .transpile(&EmitOptions::default())
+      .transpile(
+        Rc::new(Resolver::new(
+          ".",
+          ImportMap::from_hashmap(ImportHashMap::default()),
+          true,
+          false,
+        )),
+        &EmitOptions::default(),
+      )
       .expect("could not strip types");
     assert!(code.starts_with("var D;\n(function(D) {\n"));
     assert!(code.contains("\n//# sourceMappingURL=data:application/json;base64,"));
@@ -399,15 +396,18 @@ mod tests {
       }
     }
     "#;
-    let module = parse(
-      "https://deno.land/x/mod.tsx",
-      source,
-      ImportHashMap::default(),
-      JscTarget::Es2020,
-    )
-    .expect("could not parse module");
+    let module = parse("https://deno.land/x/mod.tsx", source, JscTarget::Es2020)
+      .expect("could not parse module");
     let (code, _) = module
-      .transpile(&EmitOptions::default())
+      .transpile(
+        Rc::new(Resolver::new(
+          ".",
+          ImportMap::from_hashmap(ImportHashMap::default()),
+          true,
+          false,
+        )),
+        &EmitOptions::default(),
+      )
       .expect("could not strip types");
     assert!(code.contains("React.createElement(\"div\", null"));
   }
@@ -432,15 +432,18 @@ mod tests {
       }
     }
     "#;
-    let module = parse(
-      "https://deno.land/x/mod.ts",
-      source,
-      ImportHashMap::default(),
-      JscTarget::Es2020,
-    )
-    .expect("could not parse module");
+    let module = parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
+      .expect("could not parse module");
     let (code, _) = module
-      .transpile(&EmitOptions::default())
+      .transpile(
+        Rc::new(Resolver::new(
+          ".",
+          ImportMap::from_hashmap(ImportHashMap::default()),
+          true,
+          false,
+        )),
+        &EmitOptions::default(),
+      )
       .expect("could not strip types");
     assert!(code.contains("_applyDecoratedDescriptor("));
   }
