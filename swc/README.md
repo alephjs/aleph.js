@@ -10,12 +10,6 @@ You will need [rust](https://www.rust-lang.org/tools/install) 1.30+ and [wasm-pa
 sh ./build.sh
 ```
 
-## Debug
-
-```bash
-wasm-pack build --target web --dev && deno run -A test.ts
-```
-
 ## Run tests
 
 ```bash
