@@ -1,64 +1,23 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
-use indexmap::IndexMap;
+use crate::import_map::ImportMap;
+
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
-use serde::Deserialize;
-use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::rc::Rc;
 use swc_ecma_ast::*;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
+use swc_ecmascript::dep_graph::DependencyDescriptor;
 use url::Url;
-
-#[derive(Debug, Clone)]
-pub struct ImportMap {
-  imports: IndexMap<String, String>,
-  scopes: IndexMap<String, IndexMap<String, String>>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ImportHashMap {
-  #[serde(default)]
-  pub imports: HashMap<String, String>,
-  #[serde(default)]
-  pub scopes: HashMap<String, HashMap<String, String>>,
-}
-
-impl Default for ImportHashMap {
-  fn default() -> Self {
-    ImportHashMap {
-      imports: HashMap::new(),
-      scopes: HashMap::new(),
-    }
-  }
-}
-
-impl ImportMap {
-  pub fn from_hashmap(map: ImportHashMap) -> Self {
-    let mut imports: IndexMap<String, String> = IndexMap::new();
-    let mut scopes = IndexMap::new();
-    for (k, v) in map.imports.iter() {
-      imports.insert(k.to_string(), v.to_string());
-    }
-    for (k, v) in map.scopes.iter() {
-      let mut imports_: IndexMap<String, String> = IndexMap::new();
-      for (k_, v_) in v.iter() {
-        imports_.insert(k_.to_string(), v_.to_string());
-      }
-      scopes.insert(k.to_string(), imports_);
-    }
-    ImportMap { imports, scopes }
-  }
-}
 
 #[derive(Debug, Clone)]
 pub struct Resolver {
   specifier: String,
   import_map: ImportMap,
-  is_dev: bool,
+  dep_graph: Vec<DependencyDescriptor>,
+  bundle_mode: bool,
   has_plugin_resolves: bool,
   regex_http: Regex,
 }
@@ -67,18 +26,24 @@ impl Resolver {
   pub fn new(
     specifier: &str,
     import_map: ImportMap,
-    is_dev: bool,
+    bundle_mode: bool,
     has_plugin_resolves: bool,
   ) -> Self {
     Resolver {
       specifier: specifier.to_string(),
       import_map,
-      is_dev,
+      dep_graph: Vec::new(),
+      bundle_mode,
       has_plugin_resolves,
       regex_http: Regex::new(r"^https?://").unwrap(),
     }
   }
 
+  // fix import/export url
+  //  - `https://esm.sh/react` -> `/_alpeh/-/https/esm.sh/react.js`
+  //  - `https://esm.sh/react@17.0.1?dev` -> `/_alpeh/-/https/esm.sh/react@17.0.1~dev.js`
+  //  - `../components/logo.tsx` -> `/_alpeh/components/logo.js`
+  //  - `../style/app.css` -> `/_alpeh/style/app.css.js`
   fn fix_import_url(&self, url: &str) -> String {
     let mut fixed_url: String = url.to_owned();
     let isRemote = self.regex_http.is_match(url);
@@ -91,11 +56,11 @@ impl Resolver {
   //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/_alpeh/-/esm.sh/react.js"`
   //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/_alpeh/-/esm.sh/react.js"`
   //   - `export * from "https://esm.sh/react"` -> `export * from "/_alpeh/-/esm.sh/react.js"`
-  // - production mode:
-  //   - `import React, {useState} from "https://esm.sh/react"` -> `import {esm_sh_react_default as React, esm_sh_react_star} from "/_alpeh/-/deps.js"; const {useState} = esm_sh_react_star`
-  //   - `import * as React from "https://esm.sh/react"` -> `import {esm_sh_react_star as React} from "/_alpeh/-/deps.js"`
-  //   - `export React, {useState} from "https://esm.sh/react"` -> `import {esm_sh_react_default , esm_sh_react_star} from * from "/_alpeh/-/deps.js"; const {useState} = esm_sh_react_star; export {React: esm_sh_react_default, useState}`
-  //   - `export * from "https://esm.sh/react"` -> `import {esm_sh_react_star} from "/_alpeh/-/deps.js"; const {...} = esm_sh_react_star; export {...}`
+  // - bundling mode:
+  //   - `import React, {useState} from "https://esm.sh/react"` -> `const {default: React, useState} = window.__ALEPH_BUNDLING["https://esm.sh/react"]`
+  //   - `import * as React from "https://esm.sh/react"` -> `const {__star__: React} = window.__ALEPH_BUNDLING["https://esm.sh/react"]`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `__export((() => {const {default: React, useState} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return {React, useState}})())`
+  //   - `export * from "https://esm.sh/react"` -> `__export((() => {const {__star__} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return __star__})())`
   pub fn resolve(&self, url: &str) -> String {
     let mut resolved_url: String = url.to_owned();
     resolved_url

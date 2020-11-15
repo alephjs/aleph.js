@@ -1,12 +1,15 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
+mod error;
 mod fast_refresh;
+mod import_map;
 mod jsx;
 mod resolve;
 mod source_type;
 mod swc;
 
-use resolve::{ImportHashMap, ImportMap, Resolver};
+use import_map::{ImportHashMap, ImportMap};
+use resolve::Resolver;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use swc::parse;
@@ -39,7 +42,18 @@ pub struct SWCOptions {
     pub jsx_fragment_factory: String,
 
     #[serde(default)]
-    pub minify: bool,
+    pub is_dev: bool,
+}
+
+impl Default for SWCOptions {
+    fn default() -> Self {
+        SWCOptions {
+            target: default_target(),
+            jsx_factory: default_pragma(),
+            jsx_fragment_factory: default_pragma_frag(),
+            is_dev: true,
+        }
+    }
 }
 
 fn default_target() -> JscTarget {
@@ -52,17 +66,6 @@ fn default_pragma() -> String {
 
 fn default_pragma_frag() -> String {
     "React.Fragment".into()
-}
-
-impl Default for SWCOptions {
-    fn default() -> Self {
-        SWCOptions {
-            target: default_target(),
-            jsx_factory: default_pragma(),
-            jsx_fragment_factory: default_pragma_frag(),
-            minify: false,
-        }
-    }
 }
 
 #[derive(Debug, Serialize)]
@@ -84,7 +87,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
     let resolver = Rc::new(Resolver::new(
         opts.filename.as_str(),
         ImportMap::from_hashmap(opts.import_map),
-        !opts.swc_options.minify,
+        !opts.swc_options.is_dev,
         false, // todo: has_plugin_resolves
     ));
     let (code, map) = module
@@ -93,10 +96,10 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
             &EmitOptions {
                 jsx_factory: opts.swc_options.jsx_factory.clone(),
                 jsx_fragment_factory: opts.swc_options.jsx_fragment_factory.clone(),
-                minify: opts.swc_options.minify,
+                is_dev: opts.swc_options.is_dev,
             },
         )
-        .expect("could not strip types");
+        .expect("could not transpile module");
 
     Ok(JsValue::from_serde(&TransformOutput { code, map }).unwrap())
 }

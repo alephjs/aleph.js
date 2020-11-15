@@ -9,7 +9,11 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold};
 
-pub fn aleph_swc_jsx_fold(resolver: Rc<Resolver>, source: Rc<SourceMap>, is_dev: bool) -> impl Fold {
+pub fn aleph_swc_jsx_fold(
+    resolver: Rc<Resolver>,
+    source: Rc<SourceMap>,
+    is_dev: bool,
+) -> impl Fold {
     JsxFold {
         resolver,
         source,
@@ -17,9 +21,9 @@ pub fn aleph_swc_jsx_fold(resolver: Rc<Resolver>, source: Rc<SourceMap>, is_dev:
     }
 }
 
-// aleph.js jsx fold for swc, core functions include:
-// - rewrite `Import` path
-// - add `__source` prop in development
+/// aleph.js jsx fold for swc, core functions include:
+/// - rewrite `Import` path
+/// - add `__source` prop in development
 struct JsxFold {
     resolver: Rc<Resolver>,
     source: Rc<SourceMap>,
@@ -74,7 +78,7 @@ impl Fold for JsxFold {
             }
 
             if from_prop_index >= 0 {
-              el.attrs[from_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
+                el.attrs[from_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
                     span: DUMMY_SP,
                     name: JSXAttrName::Ident(quote_ident!("from")),
                     value: Some(JSXAttrValue::Lit(Lit::Str(Str {
