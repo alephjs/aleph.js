@@ -3,7 +3,6 @@ name = "aleph-swc"
 version = "0.0.1"
 authors = ["The Aleph.js authors"]
 edition = "2018"
-unpublish = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -15,7 +14,7 @@ default = ["console_error_panic_hook"]
 anyhow = "1.0.34"
 base64 = "0.13.0"
 indexmap = "1.6.0"
-once_cell = "1.4.1"
+once_cell = "1.5.2"
 rand = { version = "0.7.3", features = ["wasm-bindgen"]}
 regex = "1.4.2"
 relative-path = "1.3.2"
@@ -36,8 +35,5 @@ wasm-bindgen = {version = "0.2.63", features = ["serde-serialize"]}
 console_error_panic_hook = { version = "0.1.6", optional = true }
 
 [profile.release]
-# Tell `rustc` to optimize for small code size.
-# opt-level = "s"
-
 # Tell `rustc` to optimize for speed
 lto = true
