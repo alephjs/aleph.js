@@ -93,6 +93,8 @@ export interface APIRequest extends ServerRequest {
     send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
     /** `json` replies to the request with a json content */
     json(data: any): Promise<void>
+    /** `jsonBody` will return the request body in a JSON format */
+    jsonBody(): Promise<any>
 }
 
 /**

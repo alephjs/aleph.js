@@ -84,6 +84,13 @@ export class Request extends ServerRequest implements APIRequest {
         await this.send(JSON.stringify(data, replacer, space), 'application/json; charset=utf-8')
     }
 
+    async jsonBody(): Promise<any> {
+        const buff: Uint8Array = await Deno.readAll(this.body);
+        const encoded = new TextDecoder("utf-8").decode(buff);
+        const json = JSON.parse(encoded);
+        return json;
+    }
+
     async send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void> {
         if (this.#resp.done) {
             log.warn('ServerRequest: repeat respond calls')
