@@ -85,10 +85,15 @@ export class Request extends ServerRequest implements APIRequest {
     }
 
     async jsonBody(): Promise<any> {
-        const buff: Uint8Array = await Deno.readAll(this.body);
-        const encoded = new TextDecoder("utf-8").decode(buff);
-        const json = JSON.parse(encoded);
-        return json;
+        try {
+            const buff: Uint8Array = await Deno.readAll(this.body);
+            const encoded = new TextDecoder("utf-8").decode(buff);
+            const json = JSON.parse(encoded);
+            return json;
+        } catch (err) {
+            console.error("Failed to parse the request body.", err);
+            return null;
+        }
     }
 
     async send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void> {
