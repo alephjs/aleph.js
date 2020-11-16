@@ -1,4 +1,4 @@
-import { renderSync } from 'https://esm.sh/sass@1.27.0'
+import { renderSync } from 'https://esm.sh/sass@1.29.0'
 
 export default {
     name: 'sass-loader',

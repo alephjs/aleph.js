@@ -593,6 +593,48 @@ export class Project {
             this.#postcssPlugins[name] = Plugin
         }))
 
+        // inject virtual browser gloabl objects
+        Object.assign(globalThis, {
+            __createHTMLDocument: () => createHTMLDocument(),
+            document: createHTMLDocument(),
+            navigator: {
+                connection: {
+                    downlink: 1.5,
+                    effectiveType: "3g",
+                    onchange: null,
+                    rtt: 300,
+                    saveData: false,
+                },
+                cookieEnabled: false,
+                deviceMemory: 0,
+                hardwareConcurrency: 0,
+                language: 'en',
+                maxTouchPoints: 0,
+                onLine: true,
+                userAgent: `Deno/${Deno.version.deno}`,
+                vendor: "Deno Land",
+            },
+            location: {
+                protocol: 'http:',
+                host: 'localhost',
+                hostname: 'localhost',
+                port: '',
+                href: 'https://localhost/',
+                origin: 'https://localhost',
+                pathname: '/',
+                search: '',
+                hash: '',
+                reload() { },
+                replace() { },
+                toString() { return this.href },
+            },
+            innerWidth: 1920,
+            innerHeight: 1080,
+            devicePixelRatio: 1,
+            $RefreshReg$: () => { },
+            $RefreshSig$: () => (type: any) => type,
+        })
+
         // inject env variables
         Object.entries({
             ...this.config.env,
@@ -1446,48 +1488,6 @@ export class Project {
         return __deps
     }
 }
-
-Object.assign(globalThis, {
-    __createHTMLDocument: () => createHTMLDocument(),
-    document: createHTMLDocument(),
-    navigator: {
-        connection: {
-            downlink: 1.5,
-            effectiveType: "3g",
-            onchange: null,
-            rtt: 300,
-            saveData: false,
-        },
-        cookieEnabled: false,
-        deviceMemory: 0,
-        hardwareConcurrency: 0,
-        // hardwareConcurrency: Deno.systemCpuInfo().cores,
-        language: 'en',
-        maxTouchPoints: 0,
-        onLine: true,
-        userAgent: `Deno/${Deno.version.deno}`,
-        vendor: "Deno Land",
-    },
-    location: {
-        protocol: 'http:',
-        host: 'localhost',
-        hostname: 'localhost',
-        port: '',
-        href: 'https://localhost/',
-        origin: 'https://localhost',
-        pathname: '/',
-        search: '',
-        hash: '',
-        reload() { },
-        replace() { },
-        toString() { return this.href },
-    },
-    innerWidth: 1920,
-    innerHeight: 1080,
-    devicePixelRatio: 1,
-    $RefreshReg$: () => { },
-    $RefreshSig$: () => (type: any) => type,
-})
 
 /** inject HMR and React Fast Referesh helper code  */
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
