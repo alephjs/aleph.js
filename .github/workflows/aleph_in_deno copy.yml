@@ -23,16 +23,6 @@ jobs:
       - name: Setup repo
         uses: actions/checkout@v2
 
-      - name: Setup rust
-        uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: stable
-
-       - name: Setup wasm-pack
-         uses: jetli/wasm-pack-action@v0.3.0
-         with:
-          version: latest
-
       - name: Setup Deno
         uses: denolib/setup-deno@v2
         with:
@@ -41,8 +31,5 @@ jobs:
       - name: Cache std modules
         run: deno cache std.ts
 
-      - name: Run deno tests
+      - name: Run tests
         run: deno test -A --unstable
-
-      - name: Run swc tests
-        run: cd swc && cargo test --all
