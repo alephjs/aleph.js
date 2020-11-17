@@ -12,8 +12,8 @@ use import_map::{ImportHashMap, ImportMap};
 use resolve::Resolver;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use swc::parse;
 use swc::EmitOptions;
+use swc::ParsedModule;
 use swc_ecmascript::parser::JscTarget;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
@@ -82,8 +82,8 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
     let opts: Options = opts
         .into_serde()
         .map_err(|err| format!("failed to parse options: {}", err))?;
-    let module =
-        parse(opts.filename.as_str(), s, opts.swc_options.target).expect("could not parse module");
+    let module = ParsedModule::parse(opts.filename.as_str(), s, opts.swc_options.target)
+        .expect("could not parse module");
     let resolver = Rc::new(Resolver::new(
         opts.filename.as_str(),
         ImportMap::from_hashmap(opts.import_map),

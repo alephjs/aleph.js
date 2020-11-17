@@ -2,11 +2,14 @@
 
 use crate::import_map::ImportMap;
 
+use pathdiff::diff_paths;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
 use std::ops::DerefMut;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::str::FromStr;
 use swc_ecma_ast::*;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 use swc_ecmascript::dep_graph::DependencyDescriptor;
@@ -19,7 +22,9 @@ pub struct Resolver {
   dep_graph: Vec<DependencyDescriptor>,
   bundle_mode: bool,
   has_plugin_resolves: bool,
+  specifier_is_remote: bool,
   regex_http: Regex,
+  regex_version: Regex,
 }
 
 impl Resolver {
@@ -29,41 +34,151 @@ impl Resolver {
     bundle_mode: bool,
     has_plugin_resolves: bool,
   ) -> Self {
+    let regex_http = Regex::new(r"^https?://").unwrap();
     Resolver {
       specifier: specifier.to_string(),
       import_map,
       dep_graph: Vec::new(),
       bundle_mode,
       has_plugin_resolves,
-      regex_http: Regex::new(r"^https?://").unwrap(),
+      specifier_is_remote: regex_http.is_match(specifier),
+      regex_http: regex_http,
+      regex_version: Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap(),
     }
   }
 
   // fix import/export url
-  //  - `https://esm.sh/react` -> `/_alpeh/-/https/esm.sh/react.js`
-  //  - `https://esm.sh/react@17.0.1?dev` -> `/_alpeh/-/https/esm.sh/react@17.0.1~dev.js`
-  //  - `../components/logo.tsx` -> `/_alpeh/components/logo.js`
-  //  - `../style/app.css` -> `/_alpeh/style/app.css.js`
+  //  - `https://esm.sh/react` -> `/-/esm.sh/react.js`
+  //  - `https://esm.sh/react@17.0.1?dev` -> `/-/esm.sh/react@17.0.1_dev.js`
+  //  - `http://localhost:8080/mod` -> `/-/http_localhost_8080/mod.js`
+  //  - `/components/logo.tsx` -> `/components/logo.tsx`
+  //  - `@/components/logo.tsx` -> `/components/logo.tsx`
+  //  - `../components/logo.tsx` -> `../components/logo.tsx`
+  //  - `./button.tsx` -> `./button.tsx`
+  //  - `/style/app.css` -> `/style/app.css`
   fn fix_import_url(&self, url: &str) -> String {
-    let mut fixed_url: String = url.to_owned();
-    let isRemote = self.regex_http.is_match(url);
-    fixed_url
+    if url.starts_with("./") || url.starts_with("../") || url.starts_with("/") {
+      return url.to_string();
+    }
+    if url.starts_with("@/") {
+      return url.trim_start_matches("@").to_string();
+    }
+    let url = Url::from_str(url).unwrap();
+    let path = Path::new(url.path());
+    let mut path_buf = path.to_owned();
+    let mut ext = ".".to_owned();
+    ext.push_str(match path.extension() {
+      Some(os_str) => match os_str.to_str() {
+        Some(s) => {
+          if self.regex_version.is_match(url.path()) {
+            "js"
+          } else {
+            s
+          }
+        }
+        None => "js",
+      },
+      None => "js",
+    });
+    match path.file_name() {
+      Some(os_str) => match os_str.to_str() {
+        Some(s) => {
+          let mut file_name = s.trim_end_matches(ext.as_str()).to_owned();
+          match url.query() {
+            Some(q) => {
+              file_name.push('_');
+              file_name.push_str(q);
+            }
+            _ => {}
+          };
+          file_name.push_str(ext.as_str());
+          path_buf.set_file_name(file_name);
+        }
+        _ => {}
+      },
+      _ => {}
+    };
+    let mut p = "/-/".to_owned();
+    if url.scheme() == "http" {
+      p.push_str("http_");
+    }
+    p.push_str(url.host_str().unwrap());
+    match url.port() {
+      Some(port) => {
+        p.push('_');
+        p.push_str(port.to_string().as_str());
+      }
+      _ => {}
+    }
+    p.push_str(path_buf.to_str().unwrap());
+    p
   }
 
   // resolve import/export url
-  // - development mode:
-  //   - `import React, {useState} from "https://esm.sh/react"` -> `import React, {useState} from "/_alpeh/-/esm.sh/react.js"`
-  //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/_alpeh/-/esm.sh/react.js"`
-  //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/_alpeh/-/esm.sh/react.js"`
-  //   - `export * from "https://esm.sh/react"` -> `export * from "/_alpeh/-/esm.sh/react.js"`
-  // - bundling mode:
-  //   - `import React, {useState} from "https://esm.sh/react"` -> `const {default: React, useState} = window.__ALEPH_BUNDLING["https://esm.sh/react"]`
-  //   - `import * as React from "https://esm.sh/react"` -> `const {__star__: React} = window.__ALEPH_BUNDLING["https://esm.sh/react"]`
-  //   - `export React, {useState} from "https://esm.sh/react"` -> `__export((() => {const {default: React, useState} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return {React, useState}})())`
-  //   - `export * from "https://esm.sh/react"` -> `__export((() => {const {__star__} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return __star__})())`
   pub fn resolve(&self, url: &str) -> String {
-    let mut resolved_url: String = url.to_owned();
-    resolved_url
+    let url = match self.import_map.imports.get(url) {
+      Some(url) => url,
+      _ => url,
+    };
+    let is_remote = self.regex_http.is_match(url);
+    let mut resolved_path = if is_remote {
+      if self.specifier_is_remote {
+        let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
+        specifier_path.pop();
+        diff_paths(self.fix_import_url(url), specifier_path.to_str().unwrap()).unwrap()
+      } else {
+        let mut specifier_path = PathBuf::from(self.specifier.as_str());
+        specifier_path.pop();
+        diff_paths(self.fix_import_url(url), specifier_path.to_str().unwrap()).unwrap()
+      }
+    } else {
+      if self.specifier_is_remote {
+        let mut new_url = Url::from_str(self.specifier.as_str()).unwrap();
+        let mut pathname = PathBuf::from(url);
+        let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
+        specifier_path.pop();
+        if !url.starts_with("/") {
+          pathname = PathBuf::from(new_url.path());
+          pathname.pop();
+          pathname.push(url);
+        }
+        new_url.set_path(pathname.to_str().unwrap());
+        diff_paths(
+          self.fix_import_url(new_url.as_str()),
+          specifier_path.to_str().unwrap(),
+        )
+        .unwrap()
+      } else {
+        if url.starts_with("@/") {
+          let mut specifier_path = PathBuf::from(self.specifier.as_str());
+          specifier_path.pop();
+          diff_paths(
+            url.trim_start_matches("@"),
+            specifier_path.to_str().unwrap(),
+          )
+          .unwrap()
+        } else {
+          PathBuf::from(url)
+        }
+      }
+    };
+    match resolved_path.extension() {
+      Some(os_str) => match os_str.to_str() {
+        Some(s) => match s {
+          "jsx" | "ts" | "tsx" | "mjs" => {
+            resolved_path.set_extension("js");
+          }
+          _ => {}
+        },
+        None => {}
+      },
+      None => {}
+    };
+    let p = resolved_path.to_str().unwrap();
+    if !p.starts_with("./") && !p.starts_with("../") && !p.starts_with("/") {
+      return format!("./{}", p);
+    }
+    p.to_string()
   }
 }
 
@@ -79,6 +194,23 @@ impl Fold for ResolveFold {
   noop_fold_type!();
 
   // resolve import/export url
+  // [/pages/index.tsx]
+  // - development mode:
+  //   - `import React, {useState} from "https://esm.sh/react"` -> `import React, {useState} from "/_aleph/-/esm.sh/react.js"`
+  //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/_aleph/-/esm.sh/react.js"`
+  //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/_aleph/components/logo.js"`
+  //   - `import Logo from "@/components/logo.tsx"` -> `import Logo from "/_aleph/components/logo.js"`
+  //   - `import "../style/index.css" -> `import "/_aleph/style/index.css.js"`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/_aleph/-/esm.sh/react.js"`
+  //   - `export * from "https://esm.sh/react"` -> `export * from "/_aleph/-/esm.sh/react.js"`
+  // - bundling mode:
+  //   - `import React, {useState} from "https://esm.sh/react"` -> `const {default: React, useState} = window.__ALEPH_BUNDLING["https://esm.sh/react"]`
+  //   - `import * as React from "https://esm.sh/react"` -> `const {__star__: React} = window.__ALEPH_BUNDLING["https://esm.sh/react"]`
+  //   - `import Logo from "../components/logo.tsx"` -> `const {default: Logo} = window.__ALEPH_BUNDLING["/components/logo.tsx"]`
+  //   - `import Logo from "@/components/logo.tsx"` -> `const {default: Logo} = window.__ALEPH_BUNDLING["/components/logo.tsx"]`
+  //   - `import "../style/index.css" -> `__apply_style("CSS_CODE")`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `__export((() => {const {default: React, useState} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return {React, useState}})())`
+  //   - `export * from "https://esm.sh/react"` -> `__export((() => {const {__star__} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return __star__})())`
   fn fold_module_decl(&mut self, decl: ModuleDecl) -> ModuleDecl {
     match decl {
       ModuleDecl::Import(decl) => ModuleDecl::Import(ImportDecl {
@@ -208,4 +340,92 @@ fn new_use_deno_hook_ident() -> String {
     .collect::<String>();
   ident.push_str(rand_id.as_str());
   return ident;
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::import_map::{ImportHashMap, ImportMap};
+
+  #[test]
+  fn test_resolver_fix_import_url() {
+    let resolver = Resolver::new(
+      ".",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      false,
+      false,
+    );
+    assert_eq!(
+      resolver.fix_import_url("https://esm.sh/react"),
+      "/-/esm.sh/react.js"
+    );
+    assert_eq!(
+      resolver.fix_import_url("https://esm.sh/react@17.0.1?dev"),
+      "/-/esm.sh/react@17.0.1_dev.js"
+    );
+    assert_eq!(
+      resolver.fix_import_url("http://localhost:8080/mod"),
+      "/-/http_localhost_8080/mod.js"
+    );
+    assert_eq!(
+      resolver.fix_import_url("/components/logo.tsx"),
+      "/components/logo.tsx"
+    );
+    assert_eq!(
+      resolver.fix_import_url("@/components/logo.tsx"),
+      "/components/logo.tsx"
+    );
+    assert_eq!(
+      resolver.fix_import_url("../components/logo.tsx"),
+      "../components/logo.tsx"
+    );
+    assert_eq!(resolver.fix_import_url("./button.tsx"), "./button.tsx");
+    assert_eq!(resolver.fix_import_url("/style/app.css"), "/style/app.css");
+  }
+
+  #[test]
+  fn test_resolver_resolve() {
+    let resolver = Resolver::new(
+      "/pages/index.tsx",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      false,
+      false,
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/react"),
+      "../-/esm.sh/react.js"
+    );
+    assert_eq!(
+      resolver.resolve("../components/logo.tsx"),
+      "../components/logo.js"
+    );
+    assert_eq!(
+      resolver.resolve("@/components/logo.tsx"),
+      "../components/logo.js"
+    );
+    let resolver = Resolver::new(
+      "https://esm.sh/react-dom",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      false,
+      false,
+    );
+    assert_eq!(
+      resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js"),
+      "../cdn.esm.sh/react@17.0.1/es2020/react.js"
+    );
+    assert_eq!(resolver.resolve("./react"), "./react.js");
+    assert_eq!(resolver.resolve("/react"), "./react.js");
+    let resolver = Resolver::new(
+      "https://esm.sh/preact/hooks",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      false,
+      false,
+    );
+    assert_eq!(
+      resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js"),
+      "../../cdn.esm.sh/preact@10.5.7/es2020/preact.js"
+    );
+    assert_eq!(resolver.resolve("../preact"), "../preact.js");
+    assert_eq!(resolver.resolve("/preact"), "../preact.js");
+  }
 }

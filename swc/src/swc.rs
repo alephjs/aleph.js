@@ -6,23 +6,24 @@ use crate::jsx::aleph_swc_jsx_fold;
 use crate::resolve::{aleph_resolve_fold, Resolver};
 use crate::source_type::SourceType;
 
-use std::fmt;
 use std::path::Path;
 use std::rc::Rc;
 use swc_common::{
   chain,
-  comments::{Comment, SingleThreadedComments},
+  comments::SingleThreadedComments,
   errors::{Handler, HandlerFlags},
   FileName, Globals, SourceMap,
 };
-use swc_ecmascript::ast::{Module, Program};
-use swc_ecmascript::codegen::{text_writer::JsWriter, Node};
-use swc_ecmascript::parser::lexer::Lexer;
-use swc_ecmascript::parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig};
-use swc_ecmascript::transforms::{fixer, helpers, pass::Optional, proposals, react, typescript};
-use swc_ecmascript::visit::FoldWith;
+use swc_ecmascript::{
+  ast::{Module, Program},
+  codegen::{text_writer::JsWriter, Node},
+  parser::lexer::Lexer,
+  parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig},
+  transforms::{fixer, helpers, pass::Optional, proposals, react, typescript},
+  visit::FoldWith,
+};
 
-/// Options which can be adjusted when transpiling a module.
+/// Options for transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
   pub jsx_factory: String,
@@ -43,41 +44,79 @@ impl Default for EmitOptions {
 /// A logical structure to hold the value of a parsed module for further processing.
 #[derive(Clone)]
 pub struct ParsedModule {
-  comments: SingleThreadedComments,
-  leading_comments: Vec<Comment>,
   module: Module,
+  comments: SingleThreadedComments,
   source_type: SourceType,
   source_map: Rc<SourceMap>,
 }
 
-impl fmt::Debug for ParsedModule {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    f.debug_struct("ParsedModule")
-      .field("comments", &self.comments)
-      .field("leading_comments", &self.leading_comments)
-      .field("module", &self.module)
-      .finish()
-  }
-}
-
 impl ParsedModule {
-  /// Transform a TypeScript file into a JavaScript file, based on the supplied
-  /// options.
+  /// parse the source of the module.
   ///
-  /// The result is a tuple of the code and optional source map as strings.
+  /// ### Arguments
+  ///
+  /// - `specifier` - The module specifier for the module.
+  /// - `source` - The source code for the module.
+  /// - `target` - The target for the module.
+  ///
+  pub fn parse(specifier: &str, source: &str, target: JscTarget) -> Result<Self, anyhow::Error> {
+    let source_map = SourceMap::default();
+    let source_file = source_map.new_source_file(
+      FileName::Real(Path::new(specifier).to_path_buf()),
+      source.to_string(),
+    );
+    let sm = &source_map;
+    let error_buffer = ErrorBuffer::new();
+    let source_type = SourceType::from(Path::new(specifier));
+    let syntax = get_syntax(&source_type);
+    let input = StringInput::from(&*source_file);
+    let comments = SingleThreadedComments::default();
+
+    let lexer = Lexer::new(syntax, target, input, Some(&comments));
+    let mut parser = swc_ecmascript::parser::Parser::new_from(lexer);
+
+    let handler = Handler::with_emitter_and_flags(
+      Box::new(error_buffer.clone()),
+      HandlerFlags {
+        can_emit_warnings: true,
+        dont_buffer_diagnostics: true,
+        ..HandlerFlags::default()
+      },
+    );
+    let module = parser.parse_module().map_err(move |err| {
+      let mut diagnostic = err.into_diagnostic(&handler);
+      diagnostic.emit();
+      DiagnosticBuffer::from_error_buffer(error_buffer, |span| sm.lookup_char_pos(span.lo))
+    })?;
+
+    Ok(ParsedModule {
+      module,
+      comments,
+      source_type,
+      source_map: Rc::new(source_map),
+    })
+  }
+
+  /// Transform a JS/TS/JSX file into a JS file, based on the supplied options.
+  ///
+  /// ### Arguments
+  ///
+  /// - `resolver` - a resolver to resolve import/export url.
+  /// - `options` - the options for emit code.
+  ///
   pub fn transpile(
     self,
     resolver: Rc<Resolver>,
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module);
-    let jsx = match self.source_type {
-      SourceType::JSX => true,
+   let ts = match self.source_type {
+      SourceType::TypeScript => true,
       SourceType::TSX => true,
       _ => false,
     };
-    let ts = match self.source_type {
-      SourceType::TypeScript => true,
+    let jsx = match self.source_type {
+      SourceType::JSX => true,
       SourceType::TSX => true,
       _ => false,
     };
@@ -146,62 +185,6 @@ impl ParsedModule {
   }
 }
 
-/// For a given specifier, source, and media type, parse the source of the
-/// module and return a representation which can be further processed.
-///
-/// ## Arguments
-///
-/// - `specifier` - The module specifier for the module.
-/// - `source` - The source code for the module.
-/// - `target` - The target for the module.
-///
-// NOTE(bartlomieju): `specifier` has `&str` type instead of
-// `&ModuleSpecifier` because runtime compiler APIs don't
-// require valid module specifiers
-pub fn parse(
-  specifier: &str,
-  source: &str,
-  target: JscTarget,
-) -> Result<ParsedModule, anyhow::Error> {
-  let source_map = SourceMap::default();
-  let source_file = source_map.new_source_file(
-    FileName::Real(Path::new(specifier).to_path_buf()),
-    source.to_string(),
-  );
-  let sm = &source_map;
-  let error_buffer = ErrorBuffer::new();
-  let source_type = SourceType::from(Path::new(specifier));
-  let syntax = get_syntax(&source_type);
-  let input = StringInput::from(&*source_file);
-  let comments = SingleThreadedComments::default();
-
-  let lexer = Lexer::new(syntax, target, input, Some(&comments));
-  let mut parser = swc_ecmascript::parser::Parser::new_from(lexer);
-
-  let handler = Handler::with_emitter_and_flags(
-    Box::new(error_buffer.clone()),
-    HandlerFlags {
-      can_emit_warnings: true,
-      dont_buffer_diagnostics: true,
-      ..HandlerFlags::default()
-    },
-  );
-  let module = parser.parse_module().map_err(move |err| {
-    let mut diagnostic = err.into_diagnostic(&handler);
-    diagnostic.emit();
-    DiagnosticBuffer::from_error_buffer(error_buffer, |span| sm.lookup_char_pos(span.lo))
-  })?;
-  let leading_comments = comments.with_leading(module.span.lo, |comments| comments.to_vec());
-
-  Ok(ParsedModule {
-    leading_comments,
-    module,
-    source_type,
-    source_map: Rc::new(source_map),
-    comments,
-  })
-}
-
 fn get_es_config(jsx: bool) -> EsConfig {
   EsConfig {
     class_private_methods: true,
@@ -254,6 +237,16 @@ mod tests {
       C,
     }
 
+    function enumerable(value: boolean) {
+      return function (
+        _target: any,
+        _propertyKey: string,
+        descriptor: PropertyDescriptor,
+      ) {
+        descriptor.enumerable = value;
+      };
+    }
+
     export class A {
       private b: string;
       protected c: number = 1;
@@ -262,9 +255,11 @@ mod tests {
         const e = "foo" as const;
         this.e = e;
       }
+      @enumerable(false)
+      bar() {}
     }
     "#;
-    let module = parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
+    let module = ParsedModule::parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
       .expect("could not parse module");
     let (code, maybe_map) = module
       .transpile(
@@ -276,8 +271,10 @@ mod tests {
         )),
         &EmitOptions::default(),
       )
-      .expect("could not strip types");
-    assert!(code.starts_with("var D;\n(function(D) {\n"));
+      .expect("could not transpile module");
+    println!("{}", code);
+    assert!(code.contains("var D;\n(function(D) {\n"));
+    assert!(code.contains("_applyDecoratedDescriptor("));
     assert!(!maybe_map.is_none());
   }
 
@@ -285,10 +282,15 @@ mod tests {
   fn test_transpile_jsx() {
     let source = r#"
     export default function Hi() {
-      return <><h1>Hello World</h1></>
+      return (
+        <>
+          <Import from="../components/logo.tsx" />
+          <h1>Hello World</h1>
+        </>
+      )
     }
     "#;
-    let module = parse("https://deno.land/x/mod.tsx", source, JscTarget::Es2020)
+    let module = ParsedModule::parse("https://deno.land/x/mod.tsx", source, JscTarget::Es2020)
       .expect("could not parse module");
     let (code, _) = module
       .transpile(
@@ -304,43 +306,11 @@ mod tests {
           is_dev: true,
         },
       )
-      .expect("could not strip types");
+      .expect("could not transpile module");
+    println!("{}", code);
     assert!(code.contains("h(\"h1\", {"));
     assert!(code.contains("h(Fragment, null"));
-  }
-
-  #[test]
-  fn test_transpile_decorators() {
-    let source = r#"
-    function enumerable(value: boolean) {
-      return function (
-        _target: any,
-        _propertyKey: string,
-        descriptor: PropertyDescriptor,
-      ) {
-        descriptor.enumerable = value;
-      };
-    }
-
-    export class A {
-      @enumerable(false)
-      a() {}
-    }
-    "#;
-    let module = parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
-      .expect("could not parse module");
-    let (code, _) = module
-      .transpile(
-        Rc::new(Resolver::new(
-          ".",
-          ImportMap::from_hashmap(ImportHashMap::default()),
-          true,
-          false,
-        )),
-        &EmitOptions::default(),
-      )
-      .expect("could not strip types");
-
-    assert!(code.contains("_applyDecoratedDescriptor("));
+    assert!(code.contains("__source: {"));
+    assert!(code.contains("from: \"../components/logo.js\""));
   }
 }

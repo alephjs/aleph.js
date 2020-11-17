@@ -6,8 +6,8 @@ use std::fmt;
 use std::sync::Arc;
 use std::sync::RwLock;
 use swc_common::{
-    errors::{Diagnostic, DiagnosticBuilder, Emitter,  },
-    FileName,  Loc,  Span,
+    errors::{Diagnostic, DiagnosticBuilder, Emitter},
+    FileName, Loc, Span,
 };
 
 /// A buffer for collecting diagnostic messages from the AST parser.
@@ -56,13 +56,13 @@ impl DiagnosticBuffer {
 pub struct ErrorBuffer(Arc<RwLock<Vec<Diagnostic>>>);
 
 impl ErrorBuffer {
-  pub fn new() -> Self {
-    Self(Arc::new(RwLock::new(Vec::new())))
-  }
+    pub fn new() -> Self {
+        Self(Arc::new(RwLock::new(Vec::new())))
+    }
 }
 
 impl Emitter for ErrorBuffer {
-  fn emit(&mut self, db: &DiagnosticBuilder) {
-    self.0.write().unwrap().push((**db).clone());
-  }
+    fn emit(&mut self, db: &DiagnosticBuilder) {
+        self.0.write().unwrap().push((**db).clone());
+    }
 }

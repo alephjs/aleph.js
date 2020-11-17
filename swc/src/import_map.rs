@@ -6,8 +6,8 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ImportMap {
-    imports: IndexMap<String, String>,
-    scopes: IndexMap<String, IndexMap<String, String>>,
+    pub imports: IndexMap<String, String>,
+    pub scopes: IndexMap<String, IndexMap<String, String>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

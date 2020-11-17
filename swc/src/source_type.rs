@@ -1,13 +1,10 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
-use serde::Serialize;
-use serde::Serializer;
+use serde::{Serialize, Serializer};
 use std::fmt;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-#[allow(non_camel_case_types)]
 #[repr(i32)]
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum SourceType {
