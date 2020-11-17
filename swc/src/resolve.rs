@@ -65,6 +65,7 @@ impl Resolver {
   //  - `https://esm.sh/react@17.0.1?dev` -> `/-/esm.sh/react@17.0.1_dev.js`
   //  - `http://localhost:8080/mod` -> `/-/http_localhost_8080/mod.js`
   //  - `/components/logo.tsx` -> `/components/logo.tsx`
+  //  - `\\components\\logo.tsx` -> `/components/logo.tsx` (windows)
   //  - `@/components/logo.tsx` -> `/components/logo.tsx`
   //  - `../components/logo.tsx` -> `../components/logo.tsx`
   //  - `./button.tsx` -> `./button.tsx`
@@ -72,10 +73,11 @@ impl Resolver {
   fn fix_import_url(&self, url: &str) -> String {
     let is_remote = RE_HTTP.is_match(url);
     if !is_remote {
-       if url.starts_with("@/") {
-        return url.trim_start_matches("@").into();
+      let slash = PathBuf::from(url).to_slash().unwrap();
+      if slash.starts_with("@/") {
+        return slash.trim_start_matches("@").into();
       }
-      return url.into();
+      return slash;
     }
     let url = Url::from_str(url).unwrap();
     let path = Path::new(url.path());
