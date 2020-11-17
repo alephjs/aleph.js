@@ -2,6 +2,7 @@
 
 use crate::import_map::ImportMap;
 
+use path_slash::PathBufExt;
 use pathdiff::diff_paths;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -69,11 +70,12 @@ impl Resolver {
   //  - `./button.tsx` -> `./button.tsx`
   //  - `/style/app.css` -> `/style/app.css`
   fn fix_import_url(&self, url: &str) -> String {
-    if url.starts_with("./") || url.starts_with("../") || url.starts_with("/") {
+    let is_remote = RE_HTTP.is_match(url);
+    if !is_remote {
+       if url.starts_with("@/") {
+        return url.trim_start_matches("@").into();
+      }
       return url.into();
-    }
-    if url.starts_with("@/") {
-      return url.trim_start_matches("@").into();
     }
     let url = Url::from_str(url).unwrap();
     let path = Path::new(url.path());
@@ -222,11 +224,11 @@ impl Resolver {
         }
       }
     }
-    let path = resolved_path.to_str().unwrap();
+    let path = resolved_path.to_slash().unwrap();
     if !path.starts_with("./") && !path.starts_with("../") && !path.starts_with("/") {
       return format!("./{}", path);
     }
-    path.into()
+    path
   }
 }
 
