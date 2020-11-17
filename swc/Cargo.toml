@@ -16,6 +16,7 @@ base64 = "0.13.0"
 indexmap = "1.6.0"
 lazy_static = "1.4.0"
 once_cell = "1.5.2"
+path-slash = "0.1.3"
 pathdiff = "0.2.0"
 rand = { version = "0.7.3", features = ["wasm-bindgen"]}
 regex = "1.4.2"
