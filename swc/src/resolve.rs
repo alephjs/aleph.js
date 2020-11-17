@@ -220,7 +220,7 @@ impl Resolver {
             .normalize()
             .to_path(Path::new(""));
           self.dep_graph.push(DependencyDescriptor {
-            specifier: path.to_str().unwrap().into(),
+            specifier: path.to_slash().unwrap(),
             is_dynamic,
           });
         }
