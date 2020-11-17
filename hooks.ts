@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from 'https://esm.sh/react'
 import { RouterContext } from './context.ts'
 import { AsyncUseDenoError } from './error.ts'
 import events from './events.ts'
-import type { AlephEnv, RouterURL } from './types.ts'
+import type { RouterURL } from './types.ts'
 
 export function useRouter(): RouterURL {
     return useContext(RouterContext)
