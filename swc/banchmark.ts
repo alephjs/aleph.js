@@ -55,7 +55,7 @@ async function banchmark() {
         }
         if (d > d1.max) {
             d1.max = d
-            d1.maxFileName = filename.slice(rootDir.length)
+            d1.maxFileName = `${path.basename(filename)},${Math.round(code.length / 1024)}KB`
         }
         d1.d += d
     }
@@ -70,7 +70,7 @@ async function banchmark() {
         }
         if (d > d2.max) {
             d2.max = d
-            d2.maxFileName = filename.slice(rootDir.length)
+            d2.maxFileName = `${path.basename(filename)},${Math.round(code.length / 1024)}KB`
         }
         d2.d += d
     }
