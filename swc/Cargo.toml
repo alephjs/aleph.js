@@ -14,10 +14,12 @@ default = ["console_error_panic_hook"]
 anyhow = "1.0.34"
 base64 = "0.13.0"
 indexmap = "1.6.0"
+lazy_static = "1.4.0"
 once_cell = "1.5.2"
 pathdiff = "0.2.0"
 rand = { version = "0.7.3", features = ["wasm-bindgen"]}
 regex = "1.4.2"
+relative-path = "1.3.2"
 serde = { version = "1.0.117", features = ["derive"] }
 url = "2.2.0"
 

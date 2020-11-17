@@ -36,10 +36,12 @@ dependencies = [
  "base64 0.13.0",
  "console_error_panic_hook",
  "indexmap",
+ "lazy_static",
  "once_cell",
  "pathdiff",
  "rand",
  "regex",
+ "relative-path",
  "serde",
  "swc_common",
  "swc_ecma_ast",
@@ -650,6 +652,12 @@ name = "regex-syntax"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b181ba2dcf07aaccad5448e8ead58db5b742cf85dfe035e2227f137a539a189"
+
+[[package]]
+name = "relative-path"
+version = "1.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65aff7c83039e88c1c0b4bedf8dfa93d6ec84d5fc2945b37c1fa4186f46c5f94"
 
 [[package]]
 name = "retain_mut"
