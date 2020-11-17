@@ -64,7 +64,7 @@ impl ParsedModule {
     let source_map = SourceMap::default();
     let source_file = source_map.new_source_file(
       FileName::Real(Path::new(specifier).to_path_buf()),
-      source.to_string(),
+      source.into(),
     );
     let sm = &source_map;
     let error_buffer = ErrorBuffer::new();

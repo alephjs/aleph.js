@@ -33,14 +33,14 @@ impl ImportMap {
         let mut imports: IndexMap<String, String> = IndexMap::new();
         let mut scopes = IndexMap::new();
         for (k, v) in map.imports.iter() {
-            imports.insert(k.to_string(), v.to_string());
+            imports.insert(k.into(), v.into());
         }
         for (k, v) in map.scopes.iter() {
             let mut imports_: IndexMap<String, String> = IndexMap::new();
             for (k_, v_) in v.iter() {
-                imports_.insert(k_.to_string(), v_.to_string());
+                imports_.insert(k_.into(), v_.into());
             }
-            scopes.insert(k.to_string(), imports_);
+            scopes.insert(k.into(), imports_);
         }
         ImportMap { imports, scopes }
     }
