@@ -3,9 +3,6 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-# This workflow will install Deno and run tests across stable and nightly builds on Windows, Ubuntu and macOS.
-# For more information see: https://github.com/denolib/setup-deno
-
 name: Aleph.js in Deno
 
 on:
@@ -16,24 +13,36 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }} # runs a test on Ubuntu, Windows and macOS
+    runs-on: ${{ matrix.os }} # runs a test on macOS, Windows and Ubuntu
 
     strategy:
       matrix:
-        deno: ["v1.x", "nightly"]
         os: [macOS-latest, windows-latest, ubuntu-latest]
 
     steps:
       - name: Setup repo
         uses: actions/checkout@v2
 
-      - name: Setup Deno
-        uses: denolib/setup-deno@c7d7968ad4a59c159a777f79adddad6872ee8d96
+      - name: Setup rust
+        uses: hecrj/setup-rust-action@v1
         with:
-          deno-version: ${{ matrix.deno }} # tests across multiple Deno versions
+          rust-version: stable
 
-      - name: Cache Dependencies
+       - name: Setup wasm-pack
+         uses: jetli/wasm-pack-action@v0.3.0
+         with:
+          version: latest
+
+      - name: Setup Deno
+        uses: denolib/setup-deno@v2
+        with:
+          deno-version: v1.x
+
+      - name: Cache std modules
         run: deno cache std.ts
 
-      - name: Run Tests
+      - name: Run deno tests
         run: deno test -A --unstable
+
+      - name: Run swc tests
+        run: cd swc && cargo test --all
