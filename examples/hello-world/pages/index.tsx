@@ -1,12 +1,12 @@
-import { Import } from 'https://deno.land/x/aleph/mod.ts'
+import { Import, useDeno } from 'https://deno.land/x/aleph/mod.ts'
 import React, { useState } from 'https://esm.sh/react'
 import Logo from '../components/logo.tsx'
 
 export default function Home() {
     const [count, setCount] = useState(0)
-    // const version = useDeno(() => {
-    //     return Deno.version
-    // })
+    const version = useDeno(() => {
+        return Deno.version
+    })
 
     return (
         <div className="page">
@@ -28,7 +28,7 @@ export default function Home() {
                 <button onClick={() => setCount(n => n - 1)}>-</button>
                 <button onClick={() => setCount(n => n + 1)}>+</button>
             </p>
-            <p className="copyinfo">Built by Aleph.js in Deno v{""}</p>
+            <p className="copyinfo">Built by Aleph.js in Deno v{version.deno}</p>
         </div>
     )
 }
