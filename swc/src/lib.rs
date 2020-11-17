@@ -1,5 +1,8 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
+#[macro_use]
+extern crate lazy_static;
+
 mod error;
 mod fast_refresh;
 mod import_map;
@@ -12,6 +15,7 @@ use import_map::{ImportHashMap, ImportMap};
 use resolve::Resolver;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
+use std::cell::RefCell;
 use swc::EmitOptions;
 use swc::ParsedModule;
 use swc_ecmascript::parser::JscTarget;
@@ -84,12 +88,12 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         .map_err(|err| format!("failed to parse options: {}", err))?;
     let module = ParsedModule::parse(opts.filename.as_str(), s, opts.swc_options.target)
         .expect("could not parse module");
-    let resolver = Rc::new(Resolver::new(
+    let resolver = Rc::new(RefCell::new(Resolver::new(
         opts.filename.as_str(),
         ImportMap::from_hashmap(opts.import_map),
         !opts.swc_options.is_dev,
         false, // todo: has_plugin_resolves
-    ));
+    )));
     let (code, map) = module
         .transpile(
             resolver,

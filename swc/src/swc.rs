@@ -6,6 +6,7 @@ use crate::jsx::aleph_swc_jsx_fold;
 use crate::resolve::{aleph_resolve_fold, Resolver};
 use crate::source_type::SourceType;
 
+use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 use swc_common::{
@@ -106,11 +107,11 @@ impl ParsedModule {
   ///
   pub fn transpile(
     self,
-    resolver: Rc<Resolver>,
+    resolver: Rc<RefCell<Resolver>>,
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module);
-   let ts = match self.source_type {
+    let ts = match self.source_type {
       SourceType::TypeScript => true,
       SourceType::TSX => true,
       _ => false,
@@ -226,7 +227,7 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
 mod tests {
   use super::*;
   use crate::import_map::{ImportHashMap, ImportMap};
-  use crate::resolve::Resolver;
+  use crate::resolve::{DependencyDescriptor, Resolver};
 
   #[test]
   fn test_transpile_ts() {
@@ -261,16 +262,14 @@ mod tests {
     "#;
     let module = ParsedModule::parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
       .expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      ".",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      false,
+      false,
+    )));
     let (code, maybe_map) = module
-      .transpile(
-        Rc::new(Resolver::new(
-          ".",
-          ImportMap::from_hashmap(ImportHashMap::default()),
-          true,
-          false,
-        )),
-        &EmitOptions::default(),
-      )
+      .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
     println!("{}", code);
     assert!(code.contains("var D;\n(function(D) {\n"));
@@ -281,7 +280,8 @@ mod tests {
   #[test]
   fn test_transpile_jsx() {
     let source = r#"
-    export default function Hi() {
+    import React from "https://esm.sh/react"
+    export default function Index() {
       return (
         <>
           <Import from="../components/logo.tsx" />
@@ -292,25 +292,34 @@ mod tests {
     "#;
     let module = ParsedModule::parse("https://deno.land/x/mod.tsx", source, JscTarget::Es2020)
       .expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      "/pages/index.tsx",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      false,
+      false,
+    )));
     let (code, _) = module
-      .transpile(
-        Rc::new(Resolver::new(
-          ".",
-          ImportMap::from_hashmap(ImportHashMap::default()),
-          true,
-          false,
-        )),
-        &EmitOptions {
-          jsx_factory: "h".into(),
-          jsx_fragment_factory: "Fragment".into(),
-          is_dev: true,
-        },
-      )
+      .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
     println!("{}", code);
-    assert!(code.contains("h(\"h1\", {"));
-    assert!(code.contains("h(Fragment, null"));
+    assert!(code.contains("React.createElement(\"h1\", {"));
+    assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("__source: {"));
+    assert!(code.contains("import React from \"../-/esm.sh/react.js\""));
     assert!(code.contains("from: \"../components/logo.js\""));
+    let r = resolver.borrow_mut();
+    assert_eq!(
+      r.dep_graph,
+      vec![
+        DependencyDescriptor {
+          specifier: "https://esm.sh/react".into(),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: "/components/logo.tsx".into(),
+          is_dynamic: true,
+        }
+      ]
+    );
   }
 }

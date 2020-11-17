@@ -3,6 +3,7 @@
 
 use crate::resolve::Resolver;
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use swc_common::{FileName, SourceMap, DUMMY_SP};
 use swc_ecma_ast::*;
@@ -10,7 +11,7 @@ use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold};
 
 pub fn aleph_swc_jsx_fold(
-    resolver: Rc<Resolver>,
+    resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
     is_dev: bool,
 ) -> impl Fold {
@@ -25,7 +26,7 @@ pub fn aleph_swc_jsx_fold(
 /// - rewrite `Import` path
 /// - add `__source` prop in development
 struct JsxFold {
-    resolver: Rc<Resolver>,
+    resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
     is_dev: bool,
 }
@@ -78,12 +79,13 @@ impl Fold for JsxFold {
             }
 
             if from_prop_index >= 0 {
+                let mut r = self.resolver.borrow_mut();
                 el.attrs[from_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
                     span: DUMMY_SP,
                     name: JSXAttrName::Ident(quote_ident!("from")),
                     value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                         span: DUMMY_SP,
-                        value: self.resolver.resolve(from_prop_value).into(),
+                        value: r.resolve(from_prop_value, true).into(),
                         has_escape: false,
                     }))),
                 });

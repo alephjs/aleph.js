@@ -6,25 +6,39 @@ use pathdiff::diff_paths;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
+use relative_path::RelativePath;
+use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 use swc_ecma_ast::*;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
-use swc_ecmascript::dep_graph::DependencyDescriptor;
 use url::Url;
 
-#[derive(Debug, Clone)]
+lazy_static! {
+  static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
+  static ref RE_VERSION: Regex =
+    Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DependencyDescriptor {
+  /// The text specifier associated with the import/export statement.
+  pub specifier: String,
+  /// A flag indicating if the import is dynamic or not.
+  pub is_dynamic: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolver {
   specifier: String,
   import_map: ImportMap,
-  dep_graph: Vec<DependencyDescriptor>,
   bundle_mode: bool,
   has_plugin_resolves: bool,
   specifier_is_remote: bool,
-  regex_http: Regex,
-  regex_version: Regex,
+  /// dependency graph
+  pub dep_graph: Vec<DependencyDescriptor>,
 }
 
 impl Resolver {
@@ -36,14 +50,12 @@ impl Resolver {
   ) -> Self {
     let regex_http = Regex::new(r"^https?://").unwrap();
     Resolver {
-      specifier: specifier.to_string(),
+      specifier: specifier.into(),
       import_map,
       dep_graph: Vec::new(),
       bundle_mode,
       has_plugin_resolves,
       specifier_is_remote: regex_http.is_match(specifier),
-      regex_http: regex_http,
-      regex_version: Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap(),
     }
   }
 
@@ -58,10 +70,10 @@ impl Resolver {
   //  - `/style/app.css` -> `/style/app.css`
   fn fix_import_url(&self, url: &str) -> String {
     if url.starts_with("./") || url.starts_with("../") || url.starts_with("/") {
-      return url.to_string();
+      return url.into();
     }
     if url.starts_with("@/") {
-      return url.trim_start_matches("@").to_string();
+      return url.trim_start_matches("@").into();
     }
     let url = Url::from_str(url).unwrap();
     let path = Path::new(url.path());
@@ -70,7 +82,7 @@ impl Resolver {
     ext.push_str(match path.extension() {
       Some(os_str) => match os_str.to_str() {
         Some(s) => {
-          if self.regex_version.is_match(url.path()) {
+          if RE_VERSION.is_match(url.path()) {
             "js"
           } else {
             s
@@ -115,12 +127,12 @@ impl Resolver {
   }
 
   // resolve import/export url
-  pub fn resolve(&self, url: &str) -> String {
+  pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> String {
     let url = match self.import_map.imports.get(url) {
       Some(url) => url,
       _ => url,
     };
-    let is_remote = self.regex_http.is_match(url);
+    let is_remote = RE_HTTP.is_match(url);
     let mut resolved_path = if is_remote {
       if self.specifier_is_remote {
         let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
@@ -138,9 +150,12 @@ impl Resolver {
         let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
         specifier_path.pop();
         if !url.starts_with("/") {
-          pathname = PathBuf::from(new_url.path());
-          pathname.pop();
-          pathname.push(url);
+          let mut p = PathBuf::from(new_url.path());
+          p.pop();
+          p.push(url);
+          pathname = RelativePath::new(p.to_str().unwrap())
+            .normalize()
+            .to_path(Path::new(""))
         }
         new_url.set_path(pathname.to_str().unwrap());
         diff_paths(
@@ -174,20 +189,53 @@ impl Resolver {
       },
       None => {}
     };
-    let p = resolved_path.to_str().unwrap();
-    if !p.starts_with("./") && !p.starts_with("../") && !p.starts_with("/") {
-      return format!("./{}", p);
+    if is_remote {
+      self.dep_graph.push(DependencyDescriptor {
+        specifier: url.into(),
+        is_dynamic,
+      });
+    } else {
+      if self.specifier_is_remote {
+      } else {
+        if url.starts_with("@/") {
+          self.dep_graph.push(DependencyDescriptor {
+            specifier: url.trim_start_matches("@").into(),
+            is_dynamic,
+          });
+        }
+        if url.starts_with("/") {
+          self.dep_graph.push(DependencyDescriptor {
+            specifier: url.into(),
+            is_dynamic,
+          });
+        } else {
+          let mut p = PathBuf::from(self.specifier.as_str());
+          p.pop();
+          p.push(url);
+          let path = RelativePath::new(p.to_str().unwrap())
+            .normalize()
+            .to_path(Path::new(""));
+          self.dep_graph.push(DependencyDescriptor {
+            specifier: path.to_str().unwrap().into(),
+            is_dynamic,
+          });
+        }
+      }
     }
-    p.to_string()
+    let path = resolved_path.to_str().unwrap();
+    if !path.starts_with("./") && !path.starts_with("../") && !path.starts_with("/") {
+      return format!("./{}", path);
+    }
+    path.into()
   }
 }
 
-pub fn aleph_resolve_fold(resolver: Rc<Resolver>) -> impl Fold {
+pub fn aleph_resolve_fold(resolver: Rc<RefCell<Resolver>>) -> impl Fold {
   ResolveFold { resolver }
 }
 
 pub struct ResolveFold {
-  resolver: Rc<Resolver>,
+  resolver: Rc<RefCell<Resolver>>,
 }
 
 impl Fold for ResolveFold {
@@ -213,18 +261,19 @@ impl Fold for ResolveFold {
   //   - `export * from "https://esm.sh/react"` -> `__export((() => {const {__star__} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return __star__})())`
   fn fold_module_decl(&mut self, decl: ModuleDecl) -> ModuleDecl {
     match decl {
-      ModuleDecl::Import(decl) => ModuleDecl::Import(ImportDecl {
-        src: Str {
-          span: decl.span,
-          value: self
-            .resolver
-            .resolve(decl.src.value.chars().as_str())
-            .into(),
-          has_escape: false,
-        },
-        ..decl
-      }),
+      ModuleDecl::Import(decl) => {
+        let mut r = self.resolver.borrow_mut();
+        ModuleDecl::Import(ImportDecl {
+          src: Str {
+            span: decl.span,
+            value: r.resolve(decl.src.value.chars().as_str(), false).into(),
+            has_escape: false,
+          },
+          ..decl
+        })
+      }
       ModuleDecl::ExportNamed(decl) => {
+        let mut r = self.resolver.borrow_mut();
         let url = match decl.src {
           Some(ref src) => src.value.chars().as_str(),
           None => return ModuleDecl::ExportNamed(NamedExport { ..decl }),
@@ -232,23 +281,23 @@ impl Fold for ResolveFold {
         ModuleDecl::ExportNamed(NamedExport {
           src: Some(Str {
             span: decl.span,
-            value: self.resolver.resolve(url).into(),
+            value: r.resolve(url, false).into(),
             has_escape: false,
           }),
           ..decl
         })
       }
-      ModuleDecl::ExportAll(decl) => ModuleDecl::ExportAll(ExportAll {
-        src: Str {
-          span: decl.span,
-          value: self
-            .resolver
-            .resolve(decl.src.value.chars().as_str())
-            .into(),
-          has_escape: false,
-        },
-        ..decl
-      }),
+      ModuleDecl::ExportAll(decl) => {
+        let mut r = self.resolver.borrow_mut();
+        ModuleDecl::ExportAll(ExportAll {
+          src: Str {
+            span: decl.span,
+            value: r.resolve(decl.src.value.chars().as_str(), false).into(),
+            has_escape: false,
+          },
+          ..decl
+        })
+      }
       _ => decl.fold_children_with(self),
     }
   }
@@ -258,6 +307,7 @@ impl Fold for ResolveFold {
   // - `useDeno(() => {})` -> `useDeno(() => {}, false, "useDeno.RANDOM_ID")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
+      let mut r = self.resolver.borrow_mut();
       let url = match call.args.first_mut() {
         Some(&mut ExprOrSpread { ref mut expr, .. }) => match expr.deref_mut() {
           Expr::Lit(lit) => match lit {
@@ -272,7 +322,7 @@ impl Fold for ResolveFold {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(Str {
           span: call.span,
-          value: self.resolver.resolve(url).into(),
+          value: r.resolve(url, true).into(),
           has_escape: false,
         }))),
       }];
@@ -385,47 +435,47 @@ mod tests {
 
   #[test]
   fn test_resolver_resolve() {
-    let resolver = Resolver::new(
+    let mut resolver = Resolver::new(
       "/pages/index.tsx",
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
       false,
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react"),
+      resolver.resolve("https://esm.sh/react", true),
       "../-/esm.sh/react.js"
     );
     assert_eq!(
-      resolver.resolve("../components/logo.tsx"),
+      resolver.resolve("../components/logo.tsx", true),
       "../components/logo.js"
     );
     assert_eq!(
-      resolver.resolve("@/components/logo.tsx"),
+      resolver.resolve("@/components/logo.tsx", true),
       "../components/logo.js"
     );
-    let resolver = Resolver::new(
+    let mut resolver = Resolver::new(
       "https://esm.sh/react-dom",
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
       false,
     );
     assert_eq!(
-      resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js"),
+      resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js", true),
       "../cdn.esm.sh/react@17.0.1/es2020/react.js"
     );
-    assert_eq!(resolver.resolve("./react"), "./react.js");
-    assert_eq!(resolver.resolve("/react"), "./react.js");
-    let resolver = Resolver::new(
+    assert_eq!(resolver.resolve("./react", true), "./react.js");
+    assert_eq!(resolver.resolve("/react", true), "./react.js");
+    let mut resolver = Resolver::new(
       "https://esm.sh/preact/hooks",
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
       false,
     );
     assert_eq!(
-      resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js"),
+      resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js", true),
       "../../cdn.esm.sh/preact@10.5.7/es2020/preact.js"
     );
-    assert_eq!(resolver.resolve("../preact"), "../preact.js");
-    assert_eq!(resolver.resolve("/preact"), "../preact.js");
+    assert_eq!(resolver.resolve("../preact", true), "../preact.js");
+    assert_eq!(resolver.resolve("/preact", true), "../preact.js");
   }
 }

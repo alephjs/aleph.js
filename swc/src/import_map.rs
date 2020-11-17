@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImportMap {
     pub imports: IndexMap<String, String>,
     pub scopes: IndexMap<String, IndexMap<String, String>>,
