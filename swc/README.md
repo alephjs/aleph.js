@@ -13,7 +13,7 @@ sh ./build.sh
 ## Run tests
 
 ```bash
-cargo test --all --all-features
+cargo test --all
 ```
 
 ## Banchmark
