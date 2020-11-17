@@ -157,11 +157,11 @@ impl Resolver {
           let mut p = PathBuf::from(new_url.path());
           p.pop();
           p.push(url);
-          pathname = RelativePath::new(p.to_str().unwrap())
+          pathname = RelativePath::new(p.to_slash().unwrap().as_str())
             .normalize()
             .to_path(Path::new(""))
         }
-        new_url.set_path(pathname.to_str().unwrap());
+        new_url.set_path(pathname.to_slash().unwrap().as_str());
         diff_paths(
           self.fix_import_url(new_url.as_str()),
           specifier_path.to_str().unwrap(),
@@ -216,11 +216,11 @@ impl Resolver {
           let mut p = PathBuf::from(self.specifier.as_str());
           p.pop();
           p.push(url);
-          let path = RelativePath::new(p.to_str().unwrap())
+          let path = RelativePath::new(p.to_slash().unwrap().as_str())
             .normalize()
             .to_path(Path::new(""));
           self.dep_graph.push(DependencyDescriptor {
-            specifier: path.to_slash().unwrap(),
+            specifier: path.to_str().unwrap().into(),
             is_dynamic,
           });
         }
