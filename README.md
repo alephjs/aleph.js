@@ -43,7 +43,7 @@ export default function Home() {
 
 ### Installation
 ```bash
-deno install -A -f -n aleph https://deno.land/x/aleph@v0.2.25/cli.ts
+deno install -A -f -n aleph https://deno.land/x/aleph@v0.2.26/cli.ts
 ```
 
 ### Usage
