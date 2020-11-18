@@ -221,7 +221,7 @@ export class Project {
     }
 
     async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandler | null> {
-        const [url] = this.#apiRouting.createRouter(loc)
+        const [url] = this.#apiRouting.createRouter({ ...loc, pathname: decodeURI(loc.pathname) })
         if (url.pagePath != '') {
             const moduleID = url.pagePath + '.js'
             if (this.#modules.has(moduleID)) {
@@ -1555,7 +1555,8 @@ function fixImportUrl(importUrl: string): string {
     if (isRemote) {
         return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
     }
-    return pathname + ext
+    const result = pathname + ext
+    return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result;
 }
 
 /** get hash(sha1) of the content, mix current aleph.js version when the second parameter is `true` */
