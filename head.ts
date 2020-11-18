@@ -32,6 +32,9 @@ export default function Head(props: PropsWithChildren<{}>) {
             }
 
             nodes.forEach(({ type, props }) => {
+                if (type === 'script') {
+                    return
+                }
                 const el = doc.createElement(type)
                 Object.keys(props).forEach(key => {
                     const value = props[key]

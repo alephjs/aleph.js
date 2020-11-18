@@ -132,21 +132,21 @@ export async function renderPage(
     }
 
     rendererCache.headElements.forEach(({ type, props }) => {
+        const { children, ...rest } = props
         if (type === 'title') {
-            if (util.isNEString(props.children)) {
-                ret.head.push(`<title ssr>${props.children}</title>`)
-            } else if (util.isNEArray(props.children)) {
-                ret.head.push(`<title ssr>${props.children.join('')}</title>`)
+            if (util.isNEString(children)) {
+                ret.head.push(`<title ssr>${children}</title>`)
+            } else if (util.isNEArray(children)) {
+                ret.head.push(`<title ssr>${children.join('')}</title>`)
             }
         } else {
-            const attrs = Object.keys(props)
-                .filter(key => key !== 'children')
-                .map(key => ` ${key}=${JSON.stringify(props[key])}`)
-                .join('')
-            if (util.isNEString(props.children)) {
-                ret.head.push(`<${type}${attrs} ssr>${props.children}</${type}>`)
-            } else if (util.isNEArray(props.children)) {
-                ret.head.push(`<${type}${attrs} ssr>${props.children.join('')}</${type}>`)
+            const attrs = Object.entries(rest).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`).join('')
+            if (type === 'script') {
+                ret.head.push(`<${type}${attrs}>${Array.isArray(children) ? children.join('') : children || ''}</${type}>`)
+            } else if (util.isNEString(children)) {
+                ret.head.push(`<${type}${attrs} ssr>${children}</${type}>`)
+            } else if (util.isNEArray(children)) {
+                ret.head.push(`<${type}${attrs} ssr>${children.join('')}</${type}>`)
             } else {
                 ret.head.push(`<${type}${attrs} ssr />`)
             }
