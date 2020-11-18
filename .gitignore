@@ -2,3 +2,5 @@
 Thumbs.db
 .aleph/
 dist/
+
+.vscode/launch.json
