@@ -2,7 +2,7 @@ import { compress as brotli } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from './log.ts'
 import { ServerRequest } from './std.ts'
-import type { APIRequest } from './types.ts'
+import type { APIRequest, FormDataBody } from './types.ts'
 
 export class Request extends ServerRequest implements APIRequest {
     #pathname: string
@@ -84,15 +84,30 @@ export class Request extends ServerRequest implements APIRequest {
         await this.send(JSON.stringify(data, replacer, space), 'application/json; charset=utf-8')
     }
 
-    async jsonBody(): Promise<any> {
-        try {
-            const buff: Uint8Array = await Deno.readAll(this.body);
-            const encoded = new TextDecoder("utf-8").decode(buff);
-            const json = JSON.parse(encoded);
-            return json;
-        } catch (err) {
-            console.error("Failed to parse the request body.", err);
-            return null;
+    async decodeBody(type: "text" | "json" | "form-data"): Promise<string | any | FormDataBody> {
+        if (type === "text") {
+            try {
+                const buff: Uint8Array = await Deno.readAll(this.body);
+                const encoded = new TextDecoder("utf-8").decode(buff);
+                return encoded;
+            } catch (err) {
+                console.error("Failed to parse the request body.", err);
+            }
+        }
+
+        if (type === "json") {
+            try {
+                const buff: Uint8Array = await Deno.readAll(this.body);
+                const encoded = new TextDecoder("utf-8").decode(buff);
+                const json = JSON.parse(encoded);
+                return json;
+            } catch (err) {
+                console.error("Failed to parse the request body.", err);
+            }
+        }
+
+        if (type === "form-data") {
+            // TODO
         }
     }
 

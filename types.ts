@@ -93,8 +93,10 @@ export interface APIRequest extends ServerRequest {
     send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
     /** `json` replies to the request with a json content */
     json(data: any): Promise<void>
-    /** `jsonBody` will return the request body in a JSON format */
-    jsonBody(): Promise<any>
+    /** `decodeBody` will return a string, a form-data or any json object  */
+    decodeBody(type: "text"): Promise<string>
+    decodeBody(type: "json"): Promise<any>
+    decodeBody(type: "form-data"): Promise<FormDataBody>
 }
 
 /**
@@ -106,4 +108,22 @@ export interface RouterURL {
     readonly pagePath: string
     readonly params: Record<string, string>
     readonly query: URLSearchParams
+}
+
+/**
+ * The form data body
+ */
+export interface FormDataBody {
+    get(key: string): string
+    getFile(key: string): FormFile
+}
+
+/**
+ * The form file data
+ */
+export interface FormFile {
+    filename: string
+    contentType: string
+    content: Uint8Array
+    size: number
 }
