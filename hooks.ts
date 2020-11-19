@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'https://esm.sh/react'
+import React, { useContext, useEffect, useState } from 'https://esm.sh/react'
 import { RouterContext } from './context.ts'
 import { AsyncUseDenoError } from './error.ts'
 import events from './events.ts'
@@ -51,4 +51,16 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), browser?: boo
     }, deps)
 
     return data
+}
+
+export function withUseDeno<T>(callback: () => (T | Promise<T>), browser?: boolean, deps?: ReadonlyArray<any>) {
+    return function <P extends T, >(Component: React.ComponentType<P>): React.ComponentType<Exclude<P, keyof T>> {
+        return function (props: Exclude<P, keyof T>) {
+            const denoProps = useDeno(callback, browser, deps);
+            if (typeof denoProps === 'object') {
+                return React.createElement(Component, { ...props, ...denoProps });
+            }
+            return React.createElement(Component);
+        }
+    };
 }
