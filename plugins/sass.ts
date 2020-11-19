@@ -19,7 +19,7 @@ const defaultPlugin = {
     }
 }
 
-let plugin: any = (opts: Options) => ({
+const pluginFactory = (opts: Options) => ({
     ...defaultPlugin,
     transform(content: Uint8Array, path: string) {
         const ret = renderSync({
@@ -37,6 +37,6 @@ let plugin: any = (opts: Options) => ({
     }
 })
 
-plugin = { ...plugin, ...defaultPlugin }
+Object.assign(pluginFactory, defaultPlugin)
 
-export default plugin;
+export default pluginFactory;
