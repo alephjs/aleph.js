@@ -24,10 +24,14 @@ Deno.test('project sass loader plugin', () => {
             href: 'https://localhost/'
         }
     })
-    const { code, loader } = plugin.transform(
+    let ret = plugin.transform(
         (new TextEncoder).encode('$someVar: 123px\n.some-selector\n  width: 123px'),
         'test.sass'
     )
-    assertEquals(code, '.some-selector {\n  width: 123px;\n}')
-    assertEquals(loader, 'css')
+    assertEquals(ret.code, '.some-selector {\n  width: 123px;\n}')
+    ret = plugin({ indentType: 'tab', indentWidth: 2 }).transform(
+        (new TextEncoder).encode('$someVar: 123px\n.some-selector\n  width: 123px'),
+        'test.sass'
+    )
+    assertEquals(ret.code, '.some-selector {\n\t\twidth: 123px;\n}')
 })
