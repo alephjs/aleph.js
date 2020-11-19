@@ -37,6 +37,9 @@ const pluginFactory = (opts: Options) => ({
     }
 })
 
-Object.assign(pluginFactory, defaultPlugin)
+pluginFactory.displayName = defaultPlugin.name
+pluginFactory.test = defaultPlugin.test
+pluginFactory.acceptHMR = defaultPlugin.acceptHMR
+pluginFactory.transform = defaultPlugin.transform
 
-export default pluginFactory;
+export default pluginFactory
