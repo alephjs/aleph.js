@@ -53,8 +53,7 @@ export default async function (appDir: string, options: Record<string, string | 
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))
 
-    // todo: add template select ui
-    let template = await Input.prompt('What Aleph.js Template Do You Want To Use (Press Enter To Us?')
+    const template = await Input.prompt('What Aleph.js Template Do You Want To Use (Press Enter To Use Default)?')
     for await (const entry of entryList) {
         if (entry.fileName.startsWith(`alephjs-templates-${rev}/${template}/`)) {
             const fp = path.join(appDir, util.trimPrefix(entry.fileName, `alephjs-templates-${rev}/${template}/`))
