@@ -19,7 +19,7 @@ use url::Url;
 
 lazy_static! {
   static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
-  static ref RE_VERSION: Regex =
+  static ref RE_ENDS_WITH_VERSION: Regex =
     Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
 }
 
@@ -86,7 +86,7 @@ impl Resolver {
     ext.push_str(match path.extension() {
       Some(os_str) => match os_str.to_str() {
         Some(s) => {
-          if RE_VERSION.is_match(url.path()) {
+          if RE_ENDS_WITH_VERSION.is_match(url.path()) {
             "js"
           } else {
             s
@@ -132,10 +132,8 @@ impl Resolver {
 
   // resolve import/export url
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> String {
-    let url = match self.import_map.imports.get(url) {
-      Some(url) => url,
-      _ => url,
-    };
+    let url = self.import_map.resolve(self.specifier.as_str(),url);
+    let url = url.as_str();
     let is_remote = RE_HTTP.is_match(url);
     let mut resolved_path = if is_remote {
       if self.specifier_is_remote {
@@ -400,6 +398,7 @@ fn new_use_deno_hook_ident() -> String {
 mod tests {
   use super::*;
   use crate::import_map::{ImportHashMap, ImportMap};
+  use std::collections::HashMap;
 
   #[test]
   fn test_resolver_fix_import_url() {
@@ -439,24 +438,39 @@ mod tests {
 
   #[test]
   fn test_resolver_resolve() {
+    let mut imports:HashMap<String, String> = HashMap::new();
+    imports.insert("react".into(), "https://esm.sh/react".into());
+    imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
     let mut resolver = Resolver::new(
       "/pages/index.tsx",
-      ImportMap::from_hashmap(ImportHashMap::default()),
+      ImportMap::from_hashmap(ImportHashMap {
+        imports,
+        scopes: HashMap::new(),
+      }),
       false,
       false,
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react", true),
+      resolver.resolve("https://esm.sh/react", false),
       "../-/esm.sh/react.js"
     );
     assert_eq!(
-      resolver.resolve("../components/logo.tsx", true),
+      resolver.resolve("react", false),
+      "../-/esm.sh/react.js"
+    );
+    assert_eq!(
+      resolver.resolve("react-dom/server", false),
+      "../-/esm.sh/react-dom/server.js"
+    );
+    assert_eq!(
+      resolver.resolve("../components/logo.tsx", false),
       "../components/logo.js"
     );
     assert_eq!(
-      resolver.resolve("@/components/logo.tsx", true),
+      resolver.resolve("@/components/logo.tsx", false),
       "../components/logo.js"
     );
+
     let mut resolver = Resolver::new(
       "https://esm.sh/react-dom",
       ImportMap::from_hashmap(ImportHashMap::default()),
@@ -464,11 +478,12 @@ mod tests {
       false,
     );
     assert_eq!(
-      resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js", true),
+      resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js", false),
       "../cdn.esm.sh/react@17.0.1/es2020/react.js"
     );
-    assert_eq!(resolver.resolve("./react", true), "./react.js");
-    assert_eq!(resolver.resolve("/react", true), "./react.js");
+    assert_eq!(resolver.resolve("./react", false), "./react.js");
+    assert_eq!(resolver.resolve("/react", false), "./react.js");
+
     let mut resolver = Resolver::new(
       "https://esm.sh/preact/hooks",
       ImportMap::from_hashmap(ImportHashMap::default()),
@@ -476,10 +491,10 @@ mod tests {
       false,
     );
     assert_eq!(
-      resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js", true),
+      resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js", false),
       "../../cdn.esm.sh/preact@10.5.7/es2020/preact.js"
     );
-    assert_eq!(resolver.resolve("../preact", true), "../preact.js");
-    assert_eq!(resolver.resolve("/preact", true), "../preact.js");
+    assert_eq!(resolver.resolve("../preact", false), "../preact.js");
+    assert_eq!(resolver.resolve("/preact", false), "../preact.js");
   }
 }
