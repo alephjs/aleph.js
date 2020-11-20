@@ -53,14 +53,26 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), browser?: boo
     return data
 }
 
+/**
+ * `withDeno` allows you to use `useDeno` hook with class component.
+ *
+ * ```javascript
+ *   class MyComponent extends React.Component {
+ *     render() {
+ *       return <p>{this.props.version.deno}</p>
+ *     }
+ *   }
+ *   export default withDeno(() => Deno.version)(MyComponent)
+ * ```
+ */
 export function withDeno<T>(callback: () => (T | Promise<T>), browser?: boolean, deps?: ReadonlyArray<any>) {
-    return function <P extends T, >(Component: React.ComponentType<P>): React.ComponentType<Exclude<P, keyof T>> {
-        return function (props: Exclude<P, keyof T>) {
-            const denoProps = useDeno(callback, browser, deps);
+    return function <P extends T>(Component: React.ComponentType<P>): React.ComponentType<Exclude<P, keyof T>> {
+        return function WithDeno(props: Exclude<P, keyof T>) {
+            const denoProps = useDeno(callback, browser, deps)
             if (typeof denoProps === 'object') {
-                return React.createElement(Component, { ...props, ...denoProps });
+                return React.createElement(Component, { ...props, ...denoProps })
             }
-            return React.createElement(Component);
+            return React.createElement(Component, props)
         }
-    };
+    }
 }
