@@ -1,8 +1,10 @@
+import { Input } from 'https://deno.land/x/cliffy/prompt/mod.ts'
 import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import { ensureTextFile } from '../fs.ts'
 import log from '../log.ts'
 import { colors, ensureDir, fromStreamReader, path, Untar } from '../std.ts'
 import util from '../util.ts'
+
 
 const gitignore = [
     '.DS_Store',
@@ -52,7 +54,7 @@ export default async function (appDir: string, options: Record<string, string | 
     const entryList = new Untar(new Deno.Buffer(tarData))
 
     // todo: add template select ui
-    let template = 'hello-world'
+    let template = await Input.prompt('What Aleph.js Template Do You Want To Use?')
     for await (const entry of entryList) {
         if (entry.fileName.startsWith(`alephjs-templates-${rev}/${template}/`)) {
             const fp = path.join(appDir, util.trimPrefix(entry.fileName, `alephjs-templates-${rev}/${template}/`))
