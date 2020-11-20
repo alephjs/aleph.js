@@ -53,7 +53,7 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), browser?: boo
     return data
 }
 
-export function withUseDeno<T>(callback: () => (T | Promise<T>), browser?: boolean, deps?: ReadonlyArray<any>) {
+export function withDeno<T>(callback: () => (T | Promise<T>), browser?: boolean, deps?: ReadonlyArray<any>) {
     return function <P extends T, >(Component: React.ComponentType<P>): React.ComponentType<Exclude<P, keyof T>> {
         return function (props: Exclude<P, keyof T>) {
             const denoProps = useDeno(callback, browser, deps);
