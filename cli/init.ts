@@ -46,8 +46,9 @@ Options:
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
     const rev = 'master'
+    const templateRepo = await Input.prompt({ message: 'What Aleph.js Github Template Repository Do You Want To Use (Press Enter To Use Default)?', default: 'aleph.js/alephjs-templates' })
     log.info('Downloading template...')
-    const resp = await fetch('https://codeload.github.com/alephjs/alephjs-templates/tar.gz/' + rev)
+    const resp = await fetch(`https://codeload.github.com/${templateRepo}/tar.gz/${rev}`)
     const gzData = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
     log.info('Saving template...')
     const tarData = gzipDecode(gzData)
