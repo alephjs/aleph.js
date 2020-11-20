@@ -1,4 +1,4 @@
-import { Input } from 'https://deno.land/x/cliffy/prompt/mod.ts'
+import { Confirm, Input } from 'https://deno.land/x/cliffy/prompt/mod.ts'
 import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import { ensureTextFile } from '../fs.ts'
 import log from '../log.ts'
@@ -68,9 +68,11 @@ export default async function (appDir: string, options: Record<string, string | 
         }
     }
 
-    await ensureDir(path.join(appDir, '.vscode'))
-    await Deno.writeTextFile(path.join(appDir, '.vscode', 'extensions.json'), JSON.stringify(vscExtensions, undefined, 4))
-    await Deno.writeTextFile(path.join(appDir, '.vscode', 'settings.json'), JSON.stringify(vscSettings, undefined, 4))
+    if (await Confirm.prompt('Are you using Visual Studio Code?')) {
+        await ensureDir(path.join(appDir, '.vscode'))
+        await Deno.writeTextFile(path.join(appDir, '.vscode', 'extensions.json'), JSON.stringify(vscExtensions, undefined, 4))
+        await Deno.writeTextFile(path.join(appDir, '.vscode', 'settings.json'), JSON.stringify(vscSettings, undefined, 4))
+    }
     await Deno.writeTextFile(path.join(appDir, '.gitignore'), gitignore.join('\n'))
     await Deno.writeTextFile(path.join(appDir, 'import_map.json'), JSON.stringify({ imports: {} }, undefined, 4))
 
