@@ -132,7 +132,7 @@ impl Resolver {
 
   // resolve import/export url
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> String {
-    let url = self.import_map.resolve(self.specifier.as_str(),url);
+    let url = self.import_map.resolve(self.specifier.as_str(), url);
     let url = url.as_str();
     let is_remote = RE_HTTP.is_match(url);
     let mut resolved_path = if is_remote {
@@ -233,14 +233,14 @@ impl Resolver {
 }
 
 pub fn aleph_resolve_fold(resolver: Rc<RefCell<Resolver>>) -> impl Fold {
-  ResolveFold { resolver }
+  AlephResolveFold { resolver }
 }
 
-pub struct ResolveFold {
+pub struct AlephResolveFold {
   resolver: Rc<RefCell<Resolver>>,
 }
 
-impl Fold for ResolveFold {
+impl Fold for AlephResolveFold {
   noop_fold_type!();
 
   // resolve import/export url
@@ -438,9 +438,12 @@ mod tests {
 
   #[test]
   fn test_resolver_resolve() {
-    let mut imports:HashMap<String, String> = HashMap::new();
-    imports.insert("react".into(), "https://esm.sh/react".into());
-    imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
+    let mut imports: HashMap<String, Vec<String>> = HashMap::new();
+    imports.insert("react".into(), vec!["https://esm.sh/react".into()]);
+    imports.insert(
+      "react-dom/".into(),
+      vec!["https://esm.sh/react-dom/".into()],
+    );
     let mut resolver = Resolver::new(
       "/pages/index.tsx",
       ImportMap::from_hashmap(ImportHashMap {
@@ -454,10 +457,7 @@ mod tests {
       resolver.resolve("https://esm.sh/react", false),
       "../-/esm.sh/react.js"
     );
-    assert_eq!(
-      resolver.resolve("react", false),
-      "../-/esm.sh/react.js"
-    );
+    assert_eq!(resolver.resolve("react", false), "../-/esm.sh/react.js");
     assert_eq!(
       resolver.resolve("react-dom/server", false),
       "../-/esm.sh/react-dom/server.js"

@@ -9,26 +9,49 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::{private_ident, quote_ident};
 use swc_ecma_visit::{noop_fold_type, Fold};
 
-pub struct FastRefresh {}
+pub fn fast_refresh_fold(refresh_reg: &str, refresh_sig: &str) -> impl Fold {
+  FastRefreshFold {
+    refresh_reg: refresh_reg.into(),
+    refresh_sig: refresh_sig.into(),
+  }
+}
 
-impl Fold for FastRefresh {
+pub struct FastRefreshFold {
+  refresh_reg: String,
+  refresh_sig: String,
+}
+
+impl Fold for FastRefreshFold {
   noop_fold_type!();
 
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
-    let mut registration_handles = Vec::<Ident>::new();
     let mut refresh_regs = Vec::<CallExpr>::new();
+    let mut registrations = Vec::<Ident>::new();
 
     for item in module_items {
       let persistent_id: Option<Ident> = match &item {
         // function Foo() {}
-        ModuleItem::Stmt(Stmt::Decl(Decl::Fn(FnDecl { ident, .. }))) => get_persistent_id(ident),
+        ModuleItem::Stmt(Stmt::Decl(Decl::Fn(FnDecl {
+          ident,
+          function: Function {
+            body: Some(body), ..
+          },
+          ..
+        }))) => get_persistent_fc(ident, body),
 
         // export function Foo() {}
         ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-          decl: Decl::Fn(FnDecl { ident, .. }),
+          decl:
+            Decl::Fn(FnDecl {
+              ident,
+              function: Function {
+                body: Some(body), ..
+              },
+              ..
+            }),
           ..
-        })) => get_persistent_id(ident),
+        })) => get_persistent_fc(ident, body),
 
         // export default function Foo() {}
         ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(ExportDefaultDecl {
@@ -36,10 +59,13 @@ impl Fold for FastRefresh {
             DefaultDecl::Fn(FnExpr {
               // We don't currently handle anonymous default exports.
               ident: Some(ident),
+              function: Function {
+                body: Some(body), ..
+              },
               ..
             }),
           ..
-        })) => get_persistent_id(ident),
+        })) => get_persistent_fc(ident, body),
 
         // const Foo = () => {}
         // export const Foo = () => {}
@@ -47,7 +73,7 @@ impl Fold for FastRefresh {
         | ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
           decl: Decl::Var(var_decl),
           ..
-        })) => get_persistent_id_from_var_decl(var_decl),
+        })) => get_persistent_fc_from_var_decl(var_decl),
 
         _ => None,
       };
@@ -56,18 +82,20 @@ impl Fold for FastRefresh {
 
       if let Some(persistent_id) = persistent_id {
         let mut registration_handle = String::from("_c");
-        let registration_index = registration_handles.len() + 1; // 1-based
+        let registration_index = registrations.len() + 1;
         if registration_index > 1 {
           registration_handle.push_str(&registration_index.to_string());
         };
         let registration_handle = private_ident!(registration_handle.as_str());
 
-        registration_handles.push(registration_handle.clone());
+        registrations.push(registration_handle.clone());
 
         // $RefreshReg$(_c, "Hello");
         refresh_regs.push(CallExpr {
           span: DUMMY_SP,
-          callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("$RefreshReg$")))),
+          callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!(self
+            .refresh_reg
+            .as_str())))),
           args: vec![
             ExprOrSpread {
               spread: None,
@@ -101,21 +129,25 @@ impl Fold for FastRefresh {
     // ```
     // var _c, _c2;
     // ```
-    if registration_handles.len() > 0 {
-      items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
-        span: DUMMY_SP,
-        kind: VarDeclKind::Var,
-        declare: false,
-        decls: registration_handles
-          .into_iter()
-          .map(|handle| VarDeclarator {
-            span: DUMMY_SP,
-            name: Pat::Ident(handle),
-            init: None,
-            definite: false,
-          })
-          .collect(),
-      }))));
+    if registrations.len() > 0 {
+      items.insert(
+        0,
+        ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
+          span: DUMMY_SP,
+          kind: VarDeclKind::Var,
+          declare: false,
+          decls: registrations
+            .clone()
+            .into_iter()
+            .map(|handle| VarDeclarator {
+              span: DUMMY_SP,
+              name: Pat::Ident(handle),
+              init: None,
+              definite: false,
+            })
+            .collect(),
+        }))),
+      );
     }
 
     // Insert
@@ -138,7 +170,7 @@ fn is_componentish_name(name: &str) -> bool {
   name.starts_with(char::is_uppercase)
 }
 
-fn get_persistent_id(ident: &Ident) -> Option<Ident> {
+fn get_persistent_fc(ident: &Ident, block_stmt: &BlockStmt) -> Option<Ident> {
   if is_componentish_name(ident.as_ref()) {
     Some(ident.clone())
   } else {
@@ -146,40 +178,26 @@ fn get_persistent_id(ident: &Ident) -> Option<Ident> {
   }
 }
 
-fn get_persistent_id_from_var_decl(var_decl: &VarDecl) -> Option<Ident> {
+fn get_persistent_fc_from_var_decl(var_decl: &VarDecl) -> Option<Ident> {
   match var_decl.decls.as_slice() {
     // We only handle the case when a single variable is declared
     [VarDeclarator {
       name: Pat::Ident(ident),
       init: Some(init_expr),
       ..
-    }] => {
-      if let Some(persistent_id) = get_persistent_id(ident) {
-        match init_expr.as_ref() {
-          Expr::Fn(_) => Some(persistent_id),
-          Expr::Arrow(ArrowExpr { body, .. }) => {
-            if is_body_arrow_fn(body) {
-              // Ignore complex function expressions like
-              // let Foo = () => () => {}
-              None
-            } else {
-              Some(persistent_id)
-            }
-          }
-          _ => None,
-        }
-      } else {
-        None
-      }
-    }
+    }] => match init_expr.as_ref() {
+      Expr::Fn(FnExpr {
+        function: Function {
+          body: Some(body), ..
+        },
+        ..
+      }) => get_persistent_fc(ident, body),
+      Expr::Arrow(ArrowExpr {
+        body: BlockStmtOrExpr::BlockStmt(body),
+        ..
+      }) => get_persistent_fc(ident, body),
+      _ => None,
+    },
     _ => None,
-  }
-}
-
-fn is_body_arrow_fn(body: &BlockStmtOrExpr) -> bool {
-  if let BlockStmtOrExpr::Expr(body) = body {
-    matches!(body.as_ref(), Expr::Arrow(_))
-  } else {
-    false
   }
 }

@@ -4,13 +4,16 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+type SpecifierHashMap = HashMap<String, Vec<String>>;
+type SpecifierMap = IndexMap<String, Vec<String>>;
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ImportHashMap {
     #[serde(default)]
-    pub imports: HashMap<String, String>,
+    pub imports: SpecifierHashMap,
     #[serde(default)]
-    pub scopes: HashMap<String, HashMap<String, String>>,
+    pub scopes: HashMap<String, SpecifierHashMap>,
 }
 
 impl Default for ImportHashMap {
@@ -24,21 +27,21 @@ impl Default for ImportHashMap {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImportMap {
-    pub imports: IndexMap<String, String>,
-    pub scopes: IndexMap<String, IndexMap<String, String>>,
+    pub imports: SpecifierMap,
+    pub scopes: IndexMap<String, SpecifierMap>,
 }
 
 impl ImportMap {
     pub fn from_hashmap(map: ImportHashMap) -> Self {
-        let mut imports: IndexMap<String, String> = IndexMap::new();
+        let mut imports: SpecifierMap = IndexMap::new();
         let mut scopes = IndexMap::new();
         for (k, v) in map.imports.iter() {
-            imports.insert(k.into(), v.into());
+            imports.insert(k.into(), v.to_vec());
         }
         for (k, v) in map.scopes.iter() {
-            let mut imports_: IndexMap<String, String> = IndexMap::new();
+            let mut imports_: SpecifierMap = IndexMap::new();
             for (k_, v_) in v.iter() {
-                imports_.insert(k_.into(), v_.into());
+                imports_.insert(k_.into(), v_.to_vec());
             }
             scopes.insert(k.into(), imports_);
         }
@@ -49,27 +52,43 @@ impl ImportMap {
         for (prefix, scope_imports) in self.scopes.iter() {
             if prefix.ends_with("/") && specifier.starts_with(prefix) {
                 match scope_imports.get(url) {
-                    Some(url) => return url.into(),
+                    Some(alias) => {
+                        let n = alias.len();
+                        if n > 0 {
+                            return alias[n - 1].to_owned();
+                        }
+                    }
                     _ => {}
                 };
-                for (k, v) in scope_imports.iter() {
+                for (k, alias) in scope_imports.iter() {
                     if k.ends_with("/") && url.starts_with(k) {
-                        let mut alias = v.to_owned();
-                        alias.push_str(url[k.len()..].into());
-                        return alias.into();
+                        let n = alias.len();
+                        if n > 0 {
+                            let mut alias = alias[n - 1].to_owned();
+                            alias.push_str(url[k.len()..].into());
+                            return alias;
+                        }
                     }
                 }
             }
         }
         match self.imports.get(url) {
-            Some(url) => return url.into(),
+            Some(alias) => {
+                let n = alias.len();
+                if n > 0 {
+                    return alias[n - 1].to_owned();
+                }
+            }
             _ => {}
         };
-        for (k, v) in self.imports.iter() {
+        for (k, alias) in self.imports.iter() {
             if k.ends_with("/") && url.starts_with(k) {
-                let mut alias = v.to_owned();
-                alias.push_str(url[k.len()..].into());
-                return alias.into();
+                let n = alias.len();
+                if n > 0 {
+                    let mut alias = alias[n - 1].to_owned();
+                    alias.push_str(url[k.len()..].into());
+                    return alias;
+                }
             }
         }
         url.into()
@@ -82,19 +101,25 @@ mod tests {
 
     #[test]
     fn test_import_maps() {
-        let mut imports: HashMap<String, String> = HashMap::new();
-        imports.insert("react".into(), "https://esm.sh/react".into());
-        imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
-        let mut scope_imports: HashMap<String, String> = HashMap::new();
-        scope_imports.insert("react".into(), "https://esm.sh/react@16.4.0".into());
-        let mut scopes: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut imports: SpecifierHashMap = HashMap::new();
+        imports.insert("react".into(), vec!["https://esm.sh/react".into()]);
+        imports.insert(
+            "react-dom/".into(),
+            vec!["https://esm.sh/react-dom/".into()],
+        );
+        let mut scope_imports: SpecifierHashMap = HashMap::new();
+        scope_imports.insert("react".into(), vec!["https://esm.sh/react@16.4.0".into()]);
+        let mut scopes: HashMap<String, SpecifierHashMap> = HashMap::new();
         scopes.insert("/scope/".into(), scope_imports);
-        let import_map = ImportMap::from_hashmap(ImportHashMap {
-            imports,
-            scopes,
-        });
+        let import_map = ImportMap::from_hashmap(ImportHashMap { imports, scopes });
         assert_eq!(import_map.resolve(".", "react"), "https://esm.sh/react");
-        assert_eq!(import_map.resolve(".", "react-dom/server"), "https://esm.sh/react-dom/server");
-        assert_eq!(import_map.resolve("/scope/react-dom", "react"), "https://esm.sh/react@16.4.0");
+        assert_eq!(
+            import_map.resolve(".", "react-dom/server"),
+            "https://esm.sh/react-dom/server"
+        );
+        assert_eq!(
+            import_map.resolve("/scope/react-dom", "react"),
+            "https://esm.sh/react@16.4.0"
+        );
     }
 }

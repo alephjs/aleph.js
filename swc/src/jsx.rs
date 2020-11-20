@@ -10,12 +10,12 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold};
 
-pub fn aleph_swc_jsx_fold(
+pub fn aleph_jsx_fold(
     resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
     is_dev: bool,
 ) -> impl Fold {
-    JsxFold {
+    AlephJsxFold {
         resolver,
         source,
         is_dev,
@@ -25,13 +25,13 @@ pub fn aleph_swc_jsx_fold(
 /// aleph.js jsx fold for swc, core functions include:
 /// - rewrite `Import` path
 /// - add `__source` prop in development
-struct JsxFold {
+struct AlephJsxFold {
     resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
     is_dev: bool,
 }
 
-impl Fold for JsxFold {
+impl Fold for AlephJsxFold {
     noop_fold_type!();
 
     fn fold_jsx_opening_element(&mut self, mut el: JSXOpeningElement) -> JSXOpeningElement {

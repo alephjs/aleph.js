@@ -2,7 +2,8 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
-use crate::jsx::aleph_swc_jsx_fold;
+use crate::fast_refresh::fast_refresh_fold;
+use crate::jsx::aleph_jsx_fold;
 use crate::resolve::{aleph_resolve_fold, Resolver};
 use crate::source_type::SourceType;
 
@@ -125,7 +126,11 @@ impl ParsedModule {
     let mut passes = chain!(
       aleph_resolve_fold(resolver.clone()),
       Optional::new(
-        aleph_swc_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+        fast_refresh_fold("$RefreshReg$", "$RefreshSig$"),
+        jsx && options.is_dev
+      ),
+      Optional::new(
+        aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
         jsx
       ),
       Optional::new(
