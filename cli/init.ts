@@ -56,8 +56,8 @@ export default async function (appDir: string, options: Record<string, string | 
 
     const template = await Input.prompt({ message: 'What Aleph.js Template Do You Want To Use (Press Enter To Use Default)?', default: 'hello-world' })
     for await (const entry of entryList) {
-        if (entry.fileName.startsWith(`alephjs-templates-${rev}/${template}/`)) {
-            const fp = path.join(appDir, util.trimPrefix(entry.fileName, `alephjs-templates-${rev}/${template}/`))
+        if (entry.fileName.startsWith(`${templateRepo.match(/([^/]+$)/i)}-${rev}/${template}/`)) {
+            const fp = path.join(appDir, util.trimPrefix(entry.fileName, `${templateRepo.match(/([^/]+$)/i)}-${rev}/${template}/`))
             if (entry.type === 'directory') {
                 await ensureDir(fp)
                 continue
