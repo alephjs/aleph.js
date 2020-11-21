@@ -285,8 +285,10 @@ mod tests {
   #[test]
   fn test_transpile_jsx() {
     let source = r#"
-    import React from "https://esm.sh/react"
+    import React, { useState } from "https://esm.sh/react"
     export default function Index() {
+      const [count, setCount] = useState(0)
+      useEffect(() => {}, [])
       return (
         <>
           <Import from="../components/logo.tsx" />
@@ -312,6 +314,7 @@ mod tests {
     assert!(code.contains("__source: {"));
     assert!(code.contains("import React from \"../-/esm.sh/react.js\""));
     assert!(code.contains("from: \"../components/logo.js\""));
+    assert!(code.contains("dddd"));
     let r = resolver.borrow_mut();
     assert_eq!(
       r.dep_graph,
