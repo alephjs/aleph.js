@@ -33,11 +33,11 @@ pub struct DependencyDescriptor {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolver {
-  specifier: String,
   import_map: ImportMap,
+  specifier: String,
+  specifier_is_remote: bool,
   bundle_mode: bool,
   has_plugin_resolves: bool,
-  specifier_is_remote: bool,
   /// dependency graph
   pub dep_graph: Vec<DependencyDescriptor>,
 }
@@ -58,6 +58,10 @@ impl Resolver {
       has_plugin_resolves,
       specifier_is_remote: regex_http.is_match(specifier),
     }
+  }
+
+  pub fn is_remote_module(&self) -> bool {
+    return self.specifier_is_remote;
   }
 
   // fix import/export url

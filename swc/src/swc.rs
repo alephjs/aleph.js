@@ -46,6 +46,7 @@ impl Default for EmitOptions {
 /// A logical structure to hold the value of a parsed module for further processing.
 #[derive(Clone)]
 pub struct ParsedModule {
+  specifier: String,
   module: Module,
   comments: SingleThreadedComments,
   source_type: SourceType,
@@ -92,6 +93,7 @@ impl ParsedModule {
     })?;
 
     Ok(ParsedModule {
+      specifier: specifier.into(),
       module,
       comments,
       source_type,
@@ -111,6 +113,7 @@ impl ParsedModule {
     resolver: Rc<RefCell<Resolver>>,
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
+    let is_remote_module = resolver.borrow_mut().is_remote_module();
     let program = Program::Module(self.module);
     let ts = match self.source_type {
       SourceType::TypeScript => true,
@@ -126,11 +129,15 @@ impl ParsedModule {
     let mut passes = chain!(
       aleph_resolve_fold(resolver.clone()),
       Optional::new(
-        fast_refresh_fold("$RefreshReg$", "$RefreshSig$"),
-        jsx && options.is_dev
+        fast_refresh_fold("$RefreshReg$", "$RefreshSig$", self.source_map.clone()),
+        jsx && options.is_dev && !is_remote_module
       ),
       Optional::new(
-        aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+        aleph_jsx_fold(
+          resolver.clone(),
+          self.source_map.clone(),
+          options.is_dev && !is_remote_module
+        ),
         jsx
       ),
       Optional::new(
@@ -173,7 +180,7 @@ impl ParsedModule {
       ));
       let mut emitter = swc_ecmascript::codegen::Emitter {
         cfg: swc_ecmascript::codegen::Config {
-          minify: false, // use swc minify in the future, currently use terser
+          minify: false, // todo: use swc minify in the future, currently use terser
         },
         comments: Some(&self.comments),
         cm: self.source_map.clone(),
@@ -268,7 +275,7 @@ mod tests {
     let module = ParsedModule::parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
-      ".",
+      "https://deno.land/x/mod.ts",
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
       false,
@@ -297,7 +304,7 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("https://deno.land/x/mod.tsx", source, JscTarget::Es2020)
+    let module = ParsedModule::parse("/pages/index.tsx", source, JscTarget::Es2020)
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
@@ -312,9 +319,11 @@ mod tests {
     assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("__source: {"));
-    assert!(code.contains("import React from \"../-/esm.sh/react.js\""));
+    assert!(code.contains("import React, { useState } from \"../-/esm.sh/react.js\""));
     assert!(code.contains("from: \"../components/logo.js\""));
-    assert!(code.contains("dddd"));
+    assert!(code.contains("$RefreshReg$(_c, \"Index\")"));
+    assert!(code.contains("$RefreshSig$()"));
+    assert!(code.contains("_s(Index, \"useState{[count, setCount](0)}\\nuseEffect{}\")"));
     let r = resolver.borrow_mut();
     assert_eq!(
       r.dep_graph,
