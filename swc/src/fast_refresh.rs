@@ -6,8 +6,7 @@
 use indexmap::IndexMap;
 use sha1::{Digest, Sha1};
 use std::rc::Rc;
-use swc_common::SourceMap;
-use swc_common::{Spanned, DUMMY_SP};
+use swc_common::{SourceMap, Spanned, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::{private_ident, quote_ident};
 use swc_ecma_visit::{noop_fold_type, Fold};

@@ -1,10 +1,7 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
-use std::error::Error;
-use std::fmt;
-use std::sync::Arc;
-use std::sync::RwLock;
+use std::{error::Error, fmt, sync::Arc, sync::RwLock};
 use swc_common::{
     errors::{Diagnostic, DiagnosticBuilder, Emitter},
     FileName, Loc, Span,

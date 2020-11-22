@@ -2,8 +2,10 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use serde::{Serialize, Serializer};
-use std::fmt;
-use std::path::{Path, PathBuf};
+use std::{
+  fmt,
+  path::{Path, PathBuf},
+};
 
 #[repr(i32)]
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]

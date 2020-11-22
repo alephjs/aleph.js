@@ -14,10 +14,8 @@ mod swc;
 use import_map::{ImportHashMap, ImportMap};
 use resolve::{DependencyDescriptor, Resolver};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
-use std::rc::Rc;
-use swc::EmitOptions;
-use swc::ParsedModule;
+use std::{cell::RefCell, rc::Rc};
+use swc::{EmitOptions, ParsedModule};
 use swc_ecmascript::parser::JscTarget;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 

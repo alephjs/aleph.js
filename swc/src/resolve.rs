@@ -4,16 +4,17 @@ use crate::import_map::ImportMap;
 
 use path_slash::PathBufExt;
 use pathdiff::diff_paths;
-use rand::distributions::Alphanumeric;
-use rand::Rng;
+use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use relative_path::RelativePath;
 use serde::Serialize;
-use std::cell::RefCell;
-use std::ops::DerefMut;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::str::FromStr;
+use std::{
+  cell::RefCell,
+  ops::DerefMut,
+  path::{Path, PathBuf},
+  rc::Rc,
+  str::FromStr,
+};
 use swc_common::DUMMY_SP;
 use swc_ecma_ast::*;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};

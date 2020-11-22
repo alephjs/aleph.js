@@ -7,9 +7,7 @@ use crate::jsx::aleph_jsx_fold;
 use crate::resolve::{aleph_resolve_fold, Resolver};
 use crate::source_type::SourceType;
 
-use std::cell::RefCell;
-use std::path::Path;
-use std::rc::Rc;
+use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::{
   chain,
   comments::SingleThreadedComments,

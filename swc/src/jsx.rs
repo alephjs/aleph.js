@@ -3,8 +3,7 @@
 
 use crate::resolve::Resolver;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 use swc_common::{FileName, SourceMap, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
