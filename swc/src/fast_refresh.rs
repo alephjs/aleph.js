@@ -1,4 +1,3 @@
-// Copyright 2017-2020 The swc Project Developers. All rights reserved. MIT license.
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 // @ref https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js
@@ -1111,7 +1110,7 @@ $RefreshReg$(_c, "App");
   }
 
   #[test]
-  fn test_fast_refresh_hoc() {
+  fn test_fast_refresh_hocs() {
     let source = r#"
     const A = forwardRef(function() {
       return <h1>Foo</h1>;
@@ -1160,7 +1159,7 @@ $RefreshReg$(_c12, "%default%");
   }
 
   #[test]
-  fn test_fast_refresh_ignore() {
+  fn test_fast_refresh_ignored() {
     let source = r#"
     const NotAComp = 'hi';
     export { Baz, NotAComp };
