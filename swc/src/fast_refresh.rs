@@ -19,7 +19,6 @@ pub fn fast_refresh_fold(
 ) -> impl Fold {
   FastRefreshFold {
     source,
-    bindings: IndexMap::new(),
     signature_index: 0,
     refresh_reg: refresh_reg.into(),
     refresh_sig: refresh_sig.into(),
@@ -29,7 +28,6 @@ pub fn fast_refresh_fold(
 
 pub struct FastRefreshFold {
   source: Rc<SourceMap>,
-  bindings: IndexMap<String, bool>,
   signature_index: u32,
   refresh_reg: String,
   refresh_sig: String,
@@ -54,6 +52,7 @@ struct Signature {
 impl FastRefreshFold {
   fn get_persistent_fn(
     &mut self,
+    bindings: IndexMap<String, bool>,
     ident: &Ident,
     block_stmt: &mut BlockStmt,
   ) -> (Option<Ident>, Option<Signature>) {
@@ -62,10 +61,46 @@ impl FastRefreshFold {
     } else {
       None
     };
+    let mut bindings_scope = IndexMap::<String, bool>::new();
     let mut hook_calls = Vec::<HookCall>::new();
     let mut exotic_signatures = Vec::<(usize, Signature)>::new();
     let mut index: usize = 0;
     let stmts = &mut block_stmt.stmts;
+
+    for id in bindings.keys() {
+      bindings_scope.insert(id.into(), true);
+    }
+
+    // collect scope bindings
+    stmts.into_iter().for_each(|stmt| {
+      match stmt {
+        // function useFancyState() {}
+        Stmt::Decl(Decl::Fn(FnDecl { ident, .. })) => {
+          bindings_scope.insert(ident.sym.as_ref().into(), true);
+        }
+        Stmt::Decl(Decl::Var(VarDecl { decls, .. })) => {
+          decls.into_iter().for_each(|decl| match decl {
+            VarDeclarator {
+              name: Pat::Ident(ident),
+              init: Some(init_expr),
+              ..
+            } => match init_expr.as_ref() {
+              // const useFancyState = function () {}
+              Expr::Fn(_) => {
+                bindings_scope.insert(ident.sym.as_ref().into(), true);
+              }
+              // const useFancyState = () => {}
+              Expr::Arrow(_) => {
+                bindings_scope.insert(ident.sym.as_ref().into(), true);
+              }
+              _ => {}
+            },
+            _ => {}
+          });
+        }
+        _ => {}
+      }
+    });
 
     stmts.into_iter().for_each(|stmt| {
       match stmt {
@@ -77,7 +112,8 @@ impl FastRefreshFold {
           },
           ..
         })) => {
-          if let (_, Some(signature)) = self.get_persistent_fn(ident, body) {
+          if let (_, Some(signature)) = self.get_persistent_fn(bindings_scope.clone(), ident, body)
+          {
             exotic_signatures.push((index, signature));
           }
         }
@@ -94,20 +130,30 @@ impl FastRefreshFold {
                   body: Some(body), ..
                 },
                 ..
-              }) => {
-                if let (_, Some(signature)) = self.get_persistent_fn(ident, body) {
-                  exotic_signatures.push((index, signature));
+              }) => match name {
+                Pat::Ident(ident) => {
+                  if let (_, Some(signature)) =
+                    self.get_persistent_fn(bindings_scope.clone(), ident, body)
+                  {
+                    exotic_signatures.push((index, signature));
+                  }
                 }
-              }
+                _ => {}
+              },
               // const useFancyState = () => {}
               Expr::Arrow(ArrowExpr {
                 body: BlockStmtOrExpr::BlockStmt(body),
                 ..
-              }) => {
-                if let (_, Some(signature)) = self.get_persistent_fn(ident, body) {
-                  exotic_signatures.push((index, signature));
+              }) => match name {
+                Pat::Ident(ident) => {
+                  if let (_, Some(signature)) =
+                    self.get_persistent_fn(bindings_scope.clone(), ident, body)
+                  {
+                    exotic_signatures.push((index, signature));
+                  }
                 }
-              }
+                _ => {}
+              },
               // cosnt [state, setState] = useSate()
               Expr::Call(call) => match self.get_hook_call(Some(name.clone()), call) {
                 Some(hc) => hook_calls.push(hc),
@@ -126,13 +172,13 @@ impl FastRefreshFold {
           },
           _ => {}
         },
-        // other
+
         _ => {}
       }
       index += 1;
     });
 
-    // !insert
+    // ! insert
     // _s();
     let signature = if hook_calls.len() > 0 {
       let mut handle_ident = String::from("_s");
@@ -163,7 +209,7 @@ impl FastRefreshFold {
     };
 
     if exotic_signatures.len() > 0 {
-      // !insert
+      // ! insert
       // var _s = $RefreshSig$(), _s2 = $RefreshSig$();
       block_stmt.stmts.insert(
         1,
@@ -193,7 +239,8 @@ impl FastRefreshFold {
 
       let mut inserted: usize = 0;
       for (index, exotic_signature) in exotic_signatures {
-        let args = self.create_arguments_for_signature(exotic_signature.clone());
+        let args =
+          self.create_arguments_for_signature(bindings_scope.clone(), exotic_signature.clone());
         block_stmt.stmts.insert(
           index + inserted + 3,
           Stmt::Expr(ExprStmt {
@@ -296,7 +343,11 @@ impl FastRefreshFold {
     None
   }
 
-  fn create_arguments_for_signature(&self, signature: Signature) -> Vec<ExprOrSpread> {
+  fn create_arguments_for_signature(
+    &self,
+    bindings: IndexMap<String, bool>,
+    signature: Signature,
+  ) -> Vec<ExprOrSpread> {
     let mut key = Vec::<String>::new();
     let mut custom_hooks_in_scope = Vec::<(Option<Ident>, Ident)>::new();
     let mut args: Vec<ExprOrSpread> = vec![ExprOrSpread {
@@ -309,11 +360,11 @@ impl FastRefreshFold {
       key.push(call.key);
       if !call.is_builtin {
         match call.object {
-          Some(obj) => match self.bindings.get(obj.sym.as_ref().into()) {
+          Some(obj) => match bindings.get(obj.sym.as_ref().into()) {
             Some(_) => custom_hooks_in_scope.push((Some(obj.clone()), call.ident.clone())),
             None => force_reset = true,
           },
-          None => match self.bindings.get(call.ident.sym.as_ref().into()) {
+          None => match bindings.get(call.ident.sym.as_ref().into()) {
             Some(_) => custom_hooks_in_scope.push((None, call.ident.clone())),
             None => force_reset = true,
           },
@@ -393,6 +444,7 @@ impl Fold for FastRefreshFold {
     let mut raw_items = Vec::<ModuleItem>::new();
     let mut registrations = Vec::<(Ident, Ident)>::new();
     let mut signatures = Vec::<Signature>::new();
+    let mut bindings = IndexMap::<String, bool>::new();
 
     // collect top bindings
     for item in module_items.clone() {
@@ -405,7 +457,7 @@ impl Fold for FastRefreshFold {
               ImportSpecifier::Named(ImportNamedSpecifier { local, .. })
               | ImportSpecifier::Default(ImportDefaultSpecifier { local, .. })
               | ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => {
-                self.bindings.insert(local.sym.as_ref().into(), true);
+                bindings.insert(local.sym.as_ref().into(), true);
               }
             });
         }
@@ -415,7 +467,7 @@ impl Fold for FastRefreshFold {
           decl: Decl::Fn(FnDecl { ident, .. }),
           ..
         })) => {
-          self.bindings.insert(ident.sym.as_ref().into(), true);
+          bindings.insert(ident.sym.as_ref().into(), true);
         }
 
         // export default function App() {}
@@ -425,12 +477,12 @@ impl Fold for FastRefreshFold {
           }),
           ..
         })) => {
-          self.bindings.insert(ident.sym.as_ref().into(), true);
+          bindings.insert(ident.sym.as_ref().into(), true);
         }
 
         // function App() {}
         ModuleItem::Stmt(Stmt::Decl(Decl::Fn(FnDecl { ident, .. }))) => {
-          self.bindings.insert(ident.sym.as_ref().into(), true);
+          bindings.insert(ident.sym.as_ref().into(), true);
         }
 
         // const Foo = () => {}
@@ -445,7 +497,7 @@ impl Fold for FastRefreshFold {
               name: Pat::Ident(ident),
               ..
             } => {
-              self.bindings.insert(ident.sym.as_ref().into(), true);
+              bindings.insert(ident.sym.as_ref().into(), true);
             }
             _ => {}
           });
@@ -470,7 +522,7 @@ impl Fold for FastRefreshFold {
             }),
           ..
         })) => {
-          persistent_fns.push(self.get_persistent_fn(ident, body));
+          persistent_fns.push(self.get_persistent_fn(bindings.clone(), ident, body));
         }
 
         // export default function App() {}
@@ -485,7 +537,7 @@ impl Fold for FastRefreshFold {
             }),
           ..
         })) => {
-          persistent_fns.push(self.get_persistent_fn(ident, body));
+          persistent_fns.push(self.get_persistent_fn(bindings.clone(), ident, body));
         }
 
         // function App() {}
@@ -496,7 +548,7 @@ impl Fold for FastRefreshFold {
           },
           ..
         }))) => {
-          persistent_fns.push(self.get_persistent_fn(ident, body));
+          persistent_fns.push(self.get_persistent_fn(bindings.clone(), ident, body));
         }
 
         // const Foo = () => {}
@@ -520,14 +572,14 @@ impl Fold for FastRefreshFold {
                   },
                   ..
                 }) => {
-                  persistent_fns.push(self.get_persistent_fn(ident, body));
+                  persistent_fns.push(self.get_persistent_fn(bindings.clone(), ident, body));
                 }
                 // const Foo = () => {}
                 Expr::Arrow(ArrowExpr {
                   body: BlockStmtOrExpr::BlockStmt(body),
                   ..
                 }) => {
-                  persistent_fns.push(self.get_persistent_fn(ident, body));
+                  persistent_fns.push(self.get_persistent_fn(bindings.clone(), ident, body));
                 }
                 // const Bar = () => <div />
                 Expr::Arrow(ArrowExpr {
@@ -570,7 +622,7 @@ impl Fold for FastRefreshFold {
 
           registrations.push((registration_id.clone(), fc_id.clone()));
 
-          // !insert
+          // ! insert
           // _c = App;
           // _c2 = Foo;
           raw_items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
@@ -590,7 +642,7 @@ impl Fold for FastRefreshFold {
       }
     }
 
-    // !insert
+    // ! insert
     // var _c, _c2;
     if registrations.len() > 0 {
       items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
@@ -610,7 +662,7 @@ impl Fold for FastRefreshFold {
       }))));
     }
 
-    // !insert
+    // ! insert
     // var _s = $RefreshSig$(), _s2 = $RefreshSig$();
     if signatures.len() > 0 {
       items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
@@ -637,15 +689,15 @@ impl Fold for FastRefreshFold {
       }))));
     }
 
-    // insert raw items
+    // ! insert raw items
     for item in raw_items {
       items.push(item);
     }
 
-    // !insert
+    // ! insert
     // _s(App, "useState{[count, setCount](0)}\nuseEffect{}");
     for signature in signatures {
-      let args = self.create_arguments_for_signature(signature.clone());
+      let args = self.create_arguments_for_signature(bindings.clone(), signature.clone());
       items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
         span: DUMMY_SP,
         expr: Box::new(Expr::Call(CallExpr {
@@ -657,7 +709,7 @@ impl Fold for FastRefreshFold {
       })));
     }
 
-    // !insert
+    // ! insert
     // $RefreshReg$(_c, "App");
     // $RefreshReg$(_c2, "Foo");
     for (registration_id, fc_id) in registrations {
@@ -743,10 +795,15 @@ mod tests {
           break;
         }
       }
+      let mut diff = code.get(p..p + 1).unwrap();
+      if diff.trim() == "" {
+        diff = "_"
+      }
       println!(
-        "{}\x1b[0;31m_\x1b[0m{}",
+        "{}\x1b[0;31m{}\x1b[0m{}",
         code.get(0..p).unwrap(),
-        code.get(p..).unwrap()
+        diff,
+        code.get(p + 1..).unwrap()
       );
     }
     code == expect
@@ -870,7 +927,7 @@ $RefreshReg$(_c, "App");
     import FancyHook from 'fancy';
 
     export default function App() {
-      function useFancyState() {
+      const useFancyState = () => {
         const [foo, setFoo] = React.useState(0);
         useFancyEffect();
         return foo;
@@ -879,30 +936,45 @@ $RefreshReg$(_c, "App");
       const baz = FancyHook.useThing();
       React.useState();
       useThePlatform();
+      useFancyEffect();
+
+      function useFancyEffect() {
+        useEffect();
+      }
+
       return <h1>{bar}{baz}</h1>;
     }
     "#;
     let expect = r#"var _c;
-var _s2 = $RefreshSig$();
+var _s3 = $RefreshSig$();
 import FancyHook from 'fancy';
 export default function App() {
-    _s2();
-    var _s = $RefreshSig$();
-    function useFancyState() {
+    _s3();
+    var _s = $RefreshSig$(), _s2 = $RefreshSig$();
+    const useFancyState = ()=>{
         _s();
         const [foo, setFoo] = React.useState(0);
         useFancyEffect();
         return foo;
-    }
-    _s(useFancyState, "useState{[foo, setFoo](0)}\nuseFancyEffect{}", true);
+    };
+    _s(useFancyState, "useState{[foo, setFoo](0)}\nuseFancyEffect{}", false, ()=>[
+            useFancyEffect
+        ]
+    );
     const bar = useFancyState();
     const baz = FancyHook.useThing();
     React.useState();
     useThePlatform();
+    useFancyEffect();
+    function useFancyEffect() {
+        _s2();
+        useEffect();
+    }
+    _s2(useFancyEffect, "useEffect{}");
     return <h1 >{bar}{baz}</h1>;
 };
 _c = App;
-_s2(App, "useFancyState{bar}\nuseThing{baz}\nuseState{}\nuseThePlatform{}", true, ()=>[
+_s3(App, "useFancyState{bar}\nuseThing{baz}\nuseState{}\nuseThePlatform{}\nuseFancyEffect{}", true, ()=>[
         FancyHook.useThing
     ]
 );
