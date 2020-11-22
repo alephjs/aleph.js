@@ -1,4 +1,5 @@
 import { compress as brotli } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
+import { FormDataReader } from 'https://deno.land/x/oak@v6.3.2/multipart.ts'
 import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from './log.ts'
 import { ServerRequest } from './std.ts'
@@ -84,7 +85,9 @@ export class Request extends ServerRequest implements APIRequest {
         await this.send(JSON.stringify(data, replacer, space), 'application/json; charset=utf-8')
     }
 
-    async decodeBody(type: "text" | "json" | "form-data"): Promise<string | any | FormDataBody> {
+    async decodeBody(type: "text"): Promise<string>
+    async decodeBody(type: "json"): Promise<any>
+    async decodeBody(type: "form-data"): Promise<FormDataBody> {
         if (type === "text") {
             try {
                 const buff: Uint8Array = await Deno.readAll(this.body);
@@ -107,7 +110,23 @@ export class Request extends ServerRequest implements APIRequest {
         }
 
         if (type === "form-data") {
-            // TODO
+            try {
+                const boundary = this.headers.get("content-type");
+
+                if (!boundary) throw new Error("Failed to get the content-type")
+
+                const reader = new FormDataReader(boundary, this.body);
+                const { fields, files } = await reader.read({ maxSize: 1024 * 1024 * 10 });
+
+                return {
+                    get: (key: string) => fields[key],
+                    getFile: (key: string) => files?.find(i => i.name === key)
+                }
+
+            } catch (err) {
+                console.error("Failed to parse the request form-data", err)
+            }
+
         }
     }
 

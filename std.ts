@@ -8,4 +8,5 @@ export type { Response } from 'https://deno.land/std@0.76.0/http/server.ts'
 export { fromStreamReader } from 'https://deno.land/std@0.76.0/io/mod.ts'
 export * as path from 'https://deno.land/std@0.76.0/path/mod.ts'
 export * as ws from 'https://deno.land/std@0.76.0/ws/mod.ts'
+export * as multipart from 'https://deno.land/std@0.78.0/mime/multipart.ts'
 
