@@ -285,6 +285,7 @@ impl Fold for FastRefreshFold {
             } => {
               bindings.insert(ident.sym.as_ref().into(), true);
               match init_expr.as_mut() {
+                // const Foo = () => {}
                 Expr::Fn(FnExpr {
                   function: Function {
                     body: Some(body), ..
@@ -299,6 +300,18 @@ impl Fold for FastRefreshFold {
                 }) => {
                   persistent_fns.push(self.get_persistent_fn(ident, body));
                 }
+                // const Bar = () => <div/>
+                Expr::Arrow(ArrowExpr {
+                  body: BlockStmtOrExpr::Expr(expr),
+                  ..
+                }) => match &**expr {
+                  Expr::JSXElement(jsx) => match &**jsx {
+                    JSXElement { .. } => {
+                      persistent_fns.push((Some(ident.clone()), None));
+                    }
+                  },
+                  _ => {}
+                },
                 _ => {}
               };
             }
@@ -558,32 +571,69 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_react_fast_refresh() {
+  fn test_transpile_fast_refresh() {
     let source = r#"
+    const NotAComp = 'hi';
+    export { Baz, NotAComp };
+    export function sum() {}
+    export const Bad = 42;
+    function Hello() {
+      return <h1>Hi</h1>;
+    }
+    Hello = connect(Hello);
+    const Bar = () => {
+      return <Hello />;
+    };
+    var Baz = () => <div />;
     export default function App() {
       const [foo, setFoo] = useState(0);
+      const bar = useState(() => 0);
+      const [state, dispatch] = useReducer(reducer, initialState, init);
       React.useEffect(() => {}, []);
       return <h1>{foo}</h1>;
     }
     "#;
-    let expect = r#"var _c;
+    let expect = r#"var _c, _c2, _c3, _c4;
 var _s = $RefreshSig$();
+const NotAComp = 'hi';
+export { Baz, NotAComp };
+export function sum() {
+}
+export const Bad = 42;
+function Hello() {
+    return <h1 >Hi</h1>;
+}
+_c = Hello;
+Hello = connect(Hello);
+const Bar = ()=>{
+    return <Hello />;
+};
+_c2 = Bar;
+var Baz = ()=><div />
+;
+_c3 = Baz;
 export default function App() {
     _s();
     const [foo, setFoo] = useState(0);
+    const bar = useState(()=>0
+    );
+    const [state, dispatch] = useReducer(reducer, initialState, init);
     React.useEffect(()=>{
     }, []);
     return <h1 >{foo}</h1>;
 };
-_c = App;
-_s(App, "useState{[foo, setFoo](0)}\nuseEffect{}");
-$RefreshReg$(_c, "App");
+_c4 = App;
+_s(App, "useState{[foo, setFoo](0)}\nuseState{bar(() => 0)}\nuseReducer{[state, dispatch](initialState)}\nuseEffect{}");
+$RefreshReg$(_c, "Hello");
+$RefreshReg$(_c2, "Bar");
+$RefreshReg$(_c3, "Baz");
+$RefreshReg$(_c4, "App");
 "#;
     assert!(t("/app.jsx", source, expect));
   }
 
   #[test]
-  fn test_transpile_react_fast_refresh_custom_hooks() {
+  fn test_transpile_fast_refresh_custom_hooks() {
     let source = r#"
     const useFancyEffect = () => {
       React.useEffect(() => { });
@@ -593,13 +643,17 @@ $RefreshReg$(_c, "App");
       useFancyEffect();
       return foo;
     }
+    function useFoo() {
+      const [x] = useBar(1, 2, 3);
+      useBarEffect();
+    }
     export default function App() {
       const bar = useFancyState();
       return <h1>{bar}</h1>;
     }
     "#;
     let expect = r#"var _c;
-var _s = $RefreshSig$(), _s2 = $RefreshSig$(), _s3 = $RefreshSig$();
+var _s = $RefreshSig$(), _s2 = $RefreshSig$(), _s3 = $RefreshSig$(), _s4 = $RefreshSig$();
 const useFancyEffect = ()=>{
     _s();
     React.useEffect(()=>{
@@ -611,8 +665,13 @@ function useFancyState() {
     useFancyEffect();
     return foo;
 }
-export default function App() {
+function useFoo() {
     _s3();
+    const [x] = useBar(1, 2, 3);
+    useBarEffect();
+}
+export default function App() {
+    _s4();
     const bar = useFancyState();
     return <h1 >{bar}</h1>;
 };
@@ -622,7 +681,8 @@ _s2(useFancyState, "useState{[foo, setFoo](0)}\nuseFancyEffect{}", false, ()=>[
         useFancyEffect
     ]
 );
-_s3(App, "useFancyState{bar}", false, ()=>[
+_s3(useFoo, "useBar{[x]}\nuseBarEffect{}", true);
+_s4(App, "useFancyState{bar}", false, ()=>[
         useFancyState
     ]
 );

@@ -170,7 +170,7 @@ impl ParsedModule {
           false,
           self.source_map.clone()
         ),
-        jsx && options.is_dev && !is_remote_module
+        options.is_dev && !is_remote_module
       ),
       Optional::new(
         aleph_jsx_fold(
