@@ -122,8 +122,9 @@ export interface FormDataBody {
  * The form file data
  */
 export interface FormFile {
-    filename: string
-    contentType: string
+    name: string
     content: Uint8Array
-    size: number
+    contentType: string
+    filename: string
+    originalName: string
 }
