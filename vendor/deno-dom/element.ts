@@ -359,6 +359,10 @@ export class Element extends Node {
     return search;
   }
 
+  get style(): Record<string, string> {
+    return {}
+  }
+
   getContext(type: string) {
     const isCanvas = this.tagName === "CANVAS"
     if (isCanvas && type === "2d") {

@@ -127,14 +127,14 @@ export class Project {
         if (reStyleModuleExt.test(moduleID)) {
             return true
         }
+        if (reMDExt.test(moduleID)) {
+            return moduleID.startsWith('/pages/')
+        }
         if (reModuleExt.test(moduleID)) {
             return moduleID === '/404.js' ||
                 moduleID === '/app.js' ||
                 moduleID.startsWith('/pages/') ||
                 moduleID.startsWith('/components/')
-        }
-        if (reMDExt.test(moduleID)) {
-            return moduleID.startsWith('/pages/')
         }
         const plugin = this.config.plugins.find(p => p.test.test(moduleID))
         if (plugin?.acceptHMR) {
@@ -160,8 +160,9 @@ export class Project {
                     }
                 }
             }
+            return true
         }
-        return true
+        return ssr
     }
 
     getModule(id: string): Module | null {
@@ -220,7 +221,7 @@ export class Project {
     }
 
     async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandler | null> {
-        const [url] = this.#apiRouting.createRouter(loc)
+        const [url] = this.#apiRouting.createRouter({ ...loc, pathname: decodeURI(loc.pathname) })
         if (url.pagePath != '') {
             const moduleID = url.pagePath + '.js'
             if (this.#modules.has(moduleID)) {
@@ -592,6 +593,48 @@ export class Project {
             this.#postcssPlugins[name] = Plugin
         }))
 
+        // inject virtual browser gloabl objects
+        Object.assign(globalThis, {
+            __createHTMLDocument: () => createHTMLDocument(),
+            document: createHTMLDocument(),
+            navigator: {
+                connection: {
+                    downlink: 1.5,
+                    effectiveType: "3g",
+                    onchange: null,
+                    rtt: 300,
+                    saveData: false,
+                },
+                cookieEnabled: false,
+                deviceMemory: 0,
+                hardwareConcurrency: 0,
+                language: 'en',
+                maxTouchPoints: 0,
+                onLine: true,
+                userAgent: `Deno/${Deno.version.deno}`,
+                vendor: "Deno Land",
+            },
+            location: {
+                protocol: 'http:',
+                host: 'localhost',
+                hostname: 'localhost',
+                port: '',
+                href: 'https://localhost/',
+                origin: 'https://localhost',
+                pathname: '/',
+                search: '',
+                hash: '',
+                reload() { },
+                replace() { },
+                toString() { return this.href },
+            },
+            innerWidth: 1920,
+            innerHeight: 1080,
+            devicePixelRatio: 1,
+            $RefreshReg$: () => { },
+            $RefreshSig$: () => (type: any) => type,
+        })
+
         // inject env variables
         Object.entries({
             ...this.config.env,
@@ -836,7 +879,8 @@ export class Project {
             routes: this.#routing.routes,
             preloadModules: ['/404.js', '/app.js'].filter(id => this.#modules.has(id)).map(id => {
                 return this._getRouteModule(this.#modules.get(id)!)
-            })
+            }),
+            renderMode: this.config.ssr ? 'ssr' : 'spa'
         }
         const module = this._moduleFromURL('/main.js')
         const metaFile = path.join(this.buildDir, 'main.meta.json')
@@ -1020,7 +1064,7 @@ export class Project {
                 }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(getRelativePath(
-                        path.dirname(mod.url),
+                        path.dirname(fixImportUrl(mod.url)),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
                     `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
@@ -1445,48 +1489,6 @@ export class Project {
     }
 }
 
-Object.assign(globalThis, {
-    __createHTMLDocument: () => createHTMLDocument(),
-    document: createHTMLDocument(),
-    navigator: {
-        connection: {
-            downlink: 1.5,
-            effectiveType: "3g",
-            onchange: null,
-            rtt: 300,
-            saveData: false,
-        },
-        cookieEnabled: false,
-        deviceMemory: 0,
-        hardwareConcurrency: 0,
-        // hardwareConcurrency: Deno.systemCpuInfo().cores,
-        language: 'en',
-        maxTouchPoints: 0,
-        onLine: true,
-        userAgent: `Deno/${Deno.version.deno}`,
-        vendor: "Deno Land",
-    },
-    location: {
-        protocol: 'http:',
-        host: 'localhost',
-        hostname: 'localhost',
-        port: '',
-        href: 'https://localhost/',
-        origin: 'https://localhost',
-        pathname: '/',
-        search: '',
-        hash: '',
-        reload() { },
-        replace() { },
-        toString() { return this.href },
-    },
-    innerWidth: 1920,
-    innerHeight: 1080,
-    devicePixelRatio: 1,
-    $RefreshReg$: () => { },
-    $RefreshSig$: () => (type: any) => type,
-})
-
 /** inject HMR and React Fast Referesh helper code  */
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
     let hmrImportPath = getRelativePath(
@@ -1553,7 +1555,8 @@ function fixImportUrl(importUrl: string): string {
     if (isRemote) {
         return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
     }
-    return pathname + ext
+    const result = pathname + ext
+    return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result;
 }
 
 /** get hash(sha1) of the content, mix current aleph.js version when the second parameter is `true` */

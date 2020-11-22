@@ -63,6 +63,22 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                         continue
                     }
 
+                    // serve public files
+                    const filePath = path.join(project.appRoot, 'public', decodeURI(pathname))
+                    if (existsFileSync(filePath)) {
+                        const info = Deno.lstatSync(filePath)
+                        const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
+                        if (lastModified === req.headers.get('If-Modified-Since')) {
+                            resp.status(304).send('')
+                            continue
+                        }
+
+                        const body = Deno.readFileSync(filePath)
+                        resp.setHeader('Last-Modified', lastModified)
+                        resp.send(body, getContentType(filePath))
+                        continue
+                    }
+
                     // serve APIs
                     if (pathname.startsWith('/api/')) {
                         project.callAPI(req, { pathname, search: url.search })
@@ -111,21 +127,6 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                                 continue
                             }
                         }
-                    }
-
-                    // serve public files
-                    const filePath = path.join(project.appRoot, 'public', pathname)
-                    if (existsFileSync(filePath)) {
-                        const info = await Deno.lstat(filePath)
-                        if (info.mtime?.toUTCString() === req.headers.get('If-Modified-Since')) {
-                            resp.status(304).send('')
-                            continue
-                        }
-
-                        const body = await Deno.readFile(filePath)
-                        resp.setHeader('Last-Modified', info.mtime!.toUTCString())
-                        resp.send(body, getContentType(filePath))
-                        continue
                     }
 
                     // ssr
