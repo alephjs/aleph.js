@@ -12,10 +12,10 @@ mod source_type;
 mod swc;
 
 use import_map::{ImportHashMap, ImportMap};
-use resolve::Resolver;
+use resolve::{DependencyDescriptor, Resolver};
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 use swc::EmitOptions;
 use swc::ParsedModule;
 use swc_ecmascript::parser::JscTarget;
@@ -73,7 +73,9 @@ fn default_pragma_frag() -> String {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransformOutput {
+    pub dep_graph: Vec<DependencyDescriptor>,
     pub code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub map: Option<String>,
@@ -85,18 +87,19 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
 
     let opts: Options = opts
         .into_serde()
-        .map_err(|err| format!("failed to parse options: {}", err))?;
-    let module = ParsedModule::parse(opts.filename.as_str(), s, opts.swc_options.target)
-        .expect("could not parse module");
+        .map_err(|err| format!("failed to parse options: {}", err))
+        .unwrap();
     let resolver = Rc::new(RefCell::new(Resolver::new(
         opts.filename.as_str(),
         ImportMap::from_hashmap(opts.import_map),
         !opts.swc_options.is_dev,
         false, // todo: has_plugin_resolves
     )));
+    let module = ParsedModule::parse(opts.filename.as_str(), s, opts.swc_options.target)
+        .expect("could not parse module");
     let (code, map) = module
         .transpile(
-            resolver,
+            resolver.clone(),
             &EmitOptions {
                 jsx_factory: opts.swc_options.jsx_factory.clone(),
                 jsx_fragment_factory: opts.swc_options.jsx_fragment_factory.clone(),
@@ -104,6 +107,11 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
             },
         )
         .expect("could not transpile module");
-
-    Ok(JsValue::from_serde(&TransformOutput { code, map }).unwrap())
+    let r = resolver.borrow_mut();
+    Ok(JsValue::from_serde(&TransformOutput {
+        dep_graph: r.dep_graph.clone(),
+        code,
+        map,
+    })
+    .unwrap())
 }

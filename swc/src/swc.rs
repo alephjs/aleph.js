@@ -22,7 +22,7 @@ use swc_ecmascript::{
   parser::lexer::Lexer,
   parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig},
   transforms::{fixer, helpers, pass::Optional, proposals, react, typescript},
-  visit::FoldWith,
+  visit::{Fold, FoldWith},
 };
 
 /// Options for transpiling a module.
@@ -43,14 +43,13 @@ impl Default for EmitOptions {
   }
 }
 
-/// A logical structure to hold the value of a parsed module for further processing.
 #[derive(Clone)]
 pub struct ParsedModule {
-  specifier: String,
-  module: Module,
-  comments: SingleThreadedComments,
-  source_type: SourceType,
-  source_map: Rc<SourceMap>,
+  pub specifier: String,
+  pub module: Module,
+  pub source_type: SourceType,
+  pub source_map: Rc<SourceMap>,
+  pub comments: SingleThreadedComments,
 }
 
 impl ParsedModule {
@@ -74,10 +73,8 @@ impl ParsedModule {
     let syntax = get_syntax(&source_type);
     let input = StringInput::from(&*source_file);
     let comments = SingleThreadedComments::default();
-
     let lexer = Lexer::new(syntax, target, input, Some(&comments));
     let mut parser = swc_ecmascript::parser::Parser::new_from(lexer);
-
     let handler = Handler::with_emitter_and_flags(
       Box::new(error_buffer.clone()),
       HandlerFlags {
@@ -86,19 +83,60 @@ impl ParsedModule {
         ..HandlerFlags::default()
       },
     );
-    let module = parser.parse_module().map_err(move |err| {
-      let mut diagnostic = err.into_diagnostic(&handler);
-      diagnostic.emit();
-      DiagnosticBuffer::from_error_buffer(error_buffer, |span| sm.lookup_char_pos(span.lo))
-    })?;
+    let module = parser
+      .parse_module()
+      .map_err(move |err| {
+        let mut diagnostic = err.into_diagnostic(&handler);
+        diagnostic.emit();
+        DiagnosticBuffer::from_error_buffer(error_buffer, |span| sm.lookup_char_pos(span.lo))
+      })
+      .unwrap();
 
     Ok(ParsedModule {
       specifier: specifier.into(),
       module,
-      comments,
       source_type,
       source_map: Rc::new(source_map),
+      comments,
     })
+  }
+
+  /// Apply transform with fold.
+  pub fn apply_transform<T: Fold>(
+    &self,
+    mut tr: T,
+  ) -> Result<(String, Option<String>), anyhow::Error> {
+    let program = Program::Module(self.module.clone());
+    let program = swc_common::GLOBALS.set(&Globals::new(), || {
+      helpers::HELPERS.set(&helpers::Helpers::new(false), || program.fold_with(&mut tr))
+    });
+    let mut src_map_buf = vec![];
+    let mut buf = vec![];
+    {
+      let writer = Box::new(JsWriter::new(
+        self.source_map.clone(),
+        "\n",
+        &mut buf,
+        Some(&mut src_map_buf),
+      ));
+      let mut emitter = swc_ecmascript::codegen::Emitter {
+        cfg: swc_ecmascript::codegen::Config {
+          minify: false, // todo: use swc minify in the future, currently use terser
+        },
+        comments: Some(&self.comments),
+        cm: self.source_map.clone(),
+        wr: writer,
+      };
+      program.emit_with(&mut emitter).unwrap();
+    }
+    let src = String::from_utf8(buf).unwrap();
+    let mut buf = Vec::new();
+    self
+      .source_map
+      .build_source_map_from(&mut src_map_buf, None)
+      .to_writer(&mut buf)
+      .unwrap();
+    Ok((src, Some(String::from_utf8(buf)?)))
   }
 
   /// Transform a JS/TS/JSX file into a JS file, based on the supplied options.
@@ -114,7 +152,6 @@ impl ParsedModule {
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     let is_remote_module = resolver.borrow_mut().is_remote_module();
-    let program = Program::Module(self.module);
     let ts = match self.source_type {
       SourceType::TypeScript => true,
       SourceType::TSX => true,
@@ -163,38 +200,7 @@ impl ParsedModule {
       fixer(Some(&self.comments)),
     );
 
-    let program = swc_common::GLOBALS.set(&Globals::new(), || {
-      helpers::HELPERS.set(&helpers::Helpers::new(false), || {
-        program.fold_with(&mut passes)
-      })
-    });
-
-    let mut src_map_buf = vec![];
-    let mut buf = vec![];
-    {
-      let writer = Box::new(JsWriter::new(
-        self.source_map.clone(),
-        "\n",
-        &mut buf,
-        Some(&mut src_map_buf),
-      ));
-      let mut emitter = swc_ecmascript::codegen::Emitter {
-        cfg: swc_ecmascript::codegen::Config {
-          minify: false, // todo: use swc minify in the future, currently use terser
-        },
-        comments: Some(&self.comments),
-        cm: self.source_map.clone(),
-        wr: writer,
-      };
-      program.emit_with(&mut emitter)?;
-    }
-    let src = String::from_utf8(buf)?;
-    let mut buf = Vec::new();
-    self
-      .source_map
-      .build_source_map_from(&mut src_map_buf, None)
-      .to_writer(&mut buf)?;
-    Ok((src, Some(String::from_utf8(buf)?)))
+    self.apply_transform(&mut passes)
   }
 }
 

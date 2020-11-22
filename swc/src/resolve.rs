@@ -8,6 +8,7 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use regex::Regex;
 use relative_path::RelativePath;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
@@ -24,7 +25,8 @@ lazy_static! {
     Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DependencyDescriptor {
   /// The text specifier associated with the import/export statement.
   pub specifier: String,

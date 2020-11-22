@@ -524,82 +524,67 @@ fn is_builtin_hook(obj: Option<Ident>, id: &str) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::import_map::{ImportHashMap, ImportMap};
-  use crate::resolve::Resolver;
-  use crate::swc::{EmitOptions, ParsedModule};
-
-  use std::cell::RefCell;
+  use crate::swc::ParsedModule;
   use swc_ecmascript::parser::JscTarget;
 
-  fn tt(specifier: &str, source: &str, except: &str) -> bool {
+  fn t(specifier: &str, source: &str, expect: &str) -> bool {
     let module =
       ParsedModule::parse(specifier, source, JscTarget::Es2020).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      specifier,
-      ImportMap::from_hashmap(ImportHashMap::default()),
-      false,
-      false,
-    )));
     let (code, _) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
+      .apply_transform(fast_refresh_fold(
+        "$RefreshReg$",
+        "$RefreshSig$",
+        module.source_map.clone(),
+      ))
       .expect("could not transpile module");
-    if code != except {
+    if code != expect {
       println!("{}", code);
     }
-    code == except
+    code == expect
   }
 
   #[test]
   fn test_transpile_react_fast_refresh() {
-    assert!(tt(
-      "/app.jsx",
-      r#"
-      export default function App() {
-        const [foo, setFoo] = useState(0);
-        React.useEffect(() => {}, []);
-        return <h1>{foo}</h1>;
-      }
-      "#,
-      r#"var _c;
+    let source = r#"
+    export default function App() {
+      const [foo, setFoo] = useState(0);
+      React.useEffect(() => {}, []);
+      return <h1>{foo}</h1>;
+    }
+    "#;
+    let expect = r#"var _c;
 var _s = $RefreshSig$();
 export default function App() {
     _s();
     const [foo, setFoo] = useState(0);
     React.useEffect(()=>{
     }, []);
-    return React.createElement("h1", {
-        __source: {
-            fileName: "/app.jsx",
-            lineNumber: 5
-        }
-    }, foo);
+    return <h1 >{foo}</h1>;
 };
 _c = App;
 _s(App, "useState{[foo, setFoo](0)}\nuseEffect{}");
 $RefreshReg$(_c, "App");
-"#
-    ));
+"#;
+    assert!(t("/app.jsx", source, expect));
   }
 
   #[test]
   fn test_transpile_react_fast_refresh_custom_hooks() {
-    assert!(tt(
-      "/app.jsx",
-      r#"
-      const useFancyEffect = () => {
-        React.useEffect(() => { });
-      };
-      function useFancyState() {
-        const [foo, setFoo] = React.useState(0);
-        useFancyEffect();
-        return foo;
-      }
-      export default function App() {
-        const bar = useFancyState();
-        return <h1>{bar}</h1>;
-      }
-      "#,
-      r#"var _c;
+    let source = r#"
+    const useFancyEffect = () => {
+      React.useEffect(() => { });
+    };
+    function useFancyState() {
+      const [foo, setFoo] = React.useState(0);
+      useFancyEffect();
+      return foo;
+    }
+    export default function App() {
+      const bar = useFancyState();
+      return <h1>{bar}</h1>;
+    }
+    "#;
+    let expect = r#"var _c;
 var _s = $RefreshSig$(), _s2 = $RefreshSig$(), _s3 = $RefreshSig$();
 const useFancyEffect = ()=>{
     _s();
@@ -615,19 +600,14 @@ function useFancyState() {
 export default function App() {
     _s3();
     const bar = useFancyState();
-    return React.createElement("h1", {
-        __source: {
-            fileName: "/app.jsx",
-            lineNumber: 12
-        }
-    }, bar);
+    return <h1 >{bar}</h1>;
 };
 _c = App;
 _s(useFancyEffect, "useEffect{}");
 _s2(useFancyState, "useState{[foo, setFoo](0)}\nuseFancyEffect{}", false, () => ([useFancyEffect]));
 _s3(App, "useFancyState{bar}", false, () => ([useFancyState]));
 $RefreshReg$(_c, "App");
-"#
-    ));
+"#;
+    assert!(t("/app.jsx", source, expect));
   }
 }
