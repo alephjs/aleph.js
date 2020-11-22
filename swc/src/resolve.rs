@@ -13,6 +13,7 @@ use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
+use swc_common::DUMMY_SP;
 use swc_ecma_ast::*;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 use url::Url;
@@ -271,8 +272,8 @@ impl Fold for AlephResolveFold {
         let mut r = self.resolver.borrow_mut();
         ModuleDecl::Import(ImportDecl {
           src: Str {
-            span: decl.span,
-            value: r.resolve(decl.src.value.chars().as_str(), false).into(),
+            span: DUMMY_SP,
+            value: r.resolve(decl.src.value.as_ref(), false).into(),
             has_escape: false,
           },
           ..decl
@@ -281,12 +282,12 @@ impl Fold for AlephResolveFold {
       ModuleDecl::ExportNamed(decl) => {
         let mut r = self.resolver.borrow_mut();
         let url = match decl.src {
-          Some(ref src) => src.value.chars().as_str(),
+          Some(ref src) => src.value.as_ref(),
           None => return ModuleDecl::ExportNamed(NamedExport { ..decl }),
         };
         ModuleDecl::ExportNamed(NamedExport {
           src: Some(Str {
-            span: decl.span,
+            span: DUMMY_SP,
             value: r.resolve(url, false).into(),
             has_escape: false,
           }),
@@ -297,8 +298,8 @@ impl Fold for AlephResolveFold {
         let mut r = self.resolver.borrow_mut();
         ModuleDecl::ExportAll(ExportAll {
           src: Str {
-            span: decl.span,
-            value: r.resolve(decl.src.value.chars().as_str(), false).into(),
+            span: DUMMY_SP,
+            value: r.resolve(decl.src.value.as_ref(), false).into(),
             has_escape: false,
           },
           ..decl
@@ -317,7 +318,7 @@ impl Fold for AlephResolveFold {
       let url = match call.args.first_mut() {
         Some(&mut ExprOrSpread { ref mut expr, .. }) => match expr.deref_mut() {
           Expr::Lit(lit) => match lit {
-            Lit::Str(s) => s.value.chars().as_str(),
+            Lit::Str(s) => s.value.as_ref(),
             _ => return call,
           },
           _ => return call,
@@ -327,7 +328,7 @@ impl Fold for AlephResolveFold {
       call.args = vec![ExprOrSpread {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(Str {
-          span: call.span,
+          span: DUMMY_SP,
           value: r.resolve(url, true).into(),
           has_escape: false,
         }))),
@@ -346,7 +347,7 @@ impl Fold for AlephResolveFold {
           call.args.push(ExprOrSpread {
             spread: None,
             expr: Box::new(Expr::Lit(Lit::Bool(Bool {
-              span: call.span,
+              span: DUMMY_SP,
               value: false,
             }))),
           });
@@ -355,7 +356,7 @@ impl Fold for AlephResolveFold {
           call.args[2] = ExprOrSpread {
             spread: None,
             expr: Box::new(Expr::Lit(Lit::Str(Str {
-              span: call.span,
+              span: DUMMY_SP,
               value: new_use_deno_hook_ident().into(),
               has_escape: false,
             }))),
@@ -364,7 +365,7 @@ impl Fold for AlephResolveFold {
           call.args.push(ExprOrSpread {
             spread: None,
             expr: Box::new(Expr::Lit(Lit::Str(Str {
-              span: call.span,
+              span: DUMMY_SP,
               value: new_use_deno_hook_ident().into(),
               has_escape: false,
             }))),
@@ -383,7 +384,7 @@ fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
   };
 
   match callee {
-    Expr::Ident(id) => id.sym.chars().as_str().eq(name),
+    Expr::Ident(id) => id.sym.as_ref().eq(name),
     _ => false,
   }
 }

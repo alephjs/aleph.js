@@ -40,7 +40,7 @@ impl Fold for AlephJsxFold {
         }
 
         let is_import_el = match el.name {
-            JSXElementName::Ident(ref i) => i.sym.chars().as_str().eq("Import"),
+            JSXElementName::Ident(ref i) => i.sym.as_ref().eq("Import"),
             _ => false,
         };
 
@@ -52,7 +52,7 @@ impl Fold for AlephJsxFold {
                 match attr {
                     JSXAttrOrSpread::JSXAttr(ref a) => {
                         let name_is_from = match a.name {
-                            JSXAttrName::Ident(ref i) => i.sym.chars().as_str().eq("from"),
+                            JSXAttrName::Ident(ref i) => i.sym.as_ref().eq("from"),
                             _ => continue,
                         };
                         if name_is_from {
@@ -62,7 +62,7 @@ impl Fold for AlephJsxFold {
                                         JSXAttrValue::Lit(ref l) => match l {
                                             Lit::Str(ref s) => {
                                                 from_prop_index = i as i32;
-                                                from_prop_value = s.value.chars().as_str();
+                                                from_prop_value = s.value.as_ref();
                                             }
                                             _ => {}
                                         },

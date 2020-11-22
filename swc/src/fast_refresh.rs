@@ -2,7 +2,6 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 // @ref https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js
-// @ref https://github.com/vovacodes/swc/tree/feature/transform-react-fast-refresh
 
 use std::rc::Rc;
 use swc_common::SourceMap;
@@ -46,7 +45,7 @@ impl FastRefreshFold {
     ident: &Ident,
     block_stmt: &mut BlockStmt,
   ) -> (Option<Ident>, Option<Signature>) {
-    let persistent_id = if is_componentish_name(ident.as_ref()) {
+    let fc_id = if is_componentish_name(ident.as_ref()) {
       Some(ident.clone())
     } else {
       None
@@ -104,7 +103,7 @@ impl FastRefreshFold {
     } else {
       None
     };
-    (persistent_id, signature)
+    (fc_id, signature)
   }
 
   fn get_persistent_fc_from_var_decl(
@@ -112,7 +111,6 @@ impl FastRefreshFold {
     var_decl: &mut VarDecl,
   ) -> (Option<Ident>, Option<Signature>) {
     match var_decl.decls.as_mut_slice() {
-      // We only handle the case when a single variable is declared
       [VarDeclarator {
         name: Pat::Ident(ident),
         init: Some(init_expr),
@@ -158,8 +156,8 @@ impl FastRefreshFold {
     };
 
     if let Some((obj, id)) = callee {
-      let id = id.sym.chars().as_str();
-      let is_builtin = is_builtin_hook(obj, id.chars().as_str());
+      let id = id.sym.as_ref();
+      let is_builtin = is_builtin_hook(obj, id);
       if is_builtin
         || (id.len() > 3 && id.starts_with("use") && id[3..].starts_with(char::is_uppercase))
       {
@@ -169,16 +167,28 @@ impl FastRefreshFold {
             let name = self.source.span_to_snippet(pat.span()).unwrap();
             key.push('{');
             key.push_str(name.as_str());
-            if call.args.len() > 0 {
+            // `useState` first argument is initial state.
+            if call.args.len() > 0 && is_builtin && id == "useState" {
               key.push('(');
-              match call.args.as_slice() {
-                [expr_or_spread] => {
-                  let span = expr_or_spread.span();
-                  let s = self.source.span_to_snippet(span).unwrap();
-                  key.push_str(s.as_str());
-                }
-                _ => {}
-              }
+              key.push_str(
+                self
+                  .source
+                  .span_to_snippet(call.args[0].span())
+                  .unwrap()
+                  .as_str(),
+              );
+              key.push(')');
+            }
+            // `useReducer` second argument is initial state.
+            if call.args.len() > 1 && is_builtin && id == "useReducer" {
+              key.push('(');
+              key.push_str(
+                self
+                  .source
+                  .span_to_snippet(call.args[1].span())
+                  .unwrap()
+                  .as_str(),
+              );
               key.push(')');
             }
             key.push('}');
@@ -202,8 +212,8 @@ impl Fold for FastRefreshFold {
     let mut signatures = Vec::<Signature>::new();
 
     for mut item in module_items {
-      let (persistent_id, signature) = match &mut item {
-        // function Foo() {}
+      let (fc_id, signature) = match &mut item {
+        // function App() {}
         ModuleItem::Stmt(Stmt::Decl(Decl::Fn(FnDecl {
           ident,
           function: Function {
@@ -212,7 +222,7 @@ impl Fold for FastRefreshFold {
           ..
         }))) => self.get_persistent_fc(ident, body),
 
-        // export function Foo() {}
+        // export function App() {}
         ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
           decl:
             Decl::Fn(FnDecl {
@@ -225,11 +235,10 @@ impl Fold for FastRefreshFold {
           ..
         })) => self.get_persistent_fc(ident, body),
 
-        // export default function Foo() {}
+        // export default function App() {}
         ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(ExportDefaultDecl {
           decl:
             DefaultDecl::Fn(FnExpr {
-              // We don't currently handle anonymous default exports.
               ident: Some(ident),
               function: Function {
                 body: Some(body), ..
@@ -240,7 +249,7 @@ impl Fold for FastRefreshFold {
         })) => self.get_persistent_fc(ident, body),
 
         // const Foo = () => {}
-        // export const Foo = () => {}
+        // export const App = () => {}
         ModuleItem::Stmt(Stmt::Decl(Decl::Var(var_decl)))
         | ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
           decl: Decl::Var(var_decl),
@@ -252,23 +261,25 @@ impl Fold for FastRefreshFold {
 
       raw_items.push(item);
 
-      if let Some(persistent_id) = persistent_id {
+      if let Some(fc_id) = fc_id {
         let mut registration_handle = String::from("_c");
         let registration_index = registrations.len() + 1;
         if registration_index > 1 {
           registration_handle.push_str(&registration_index.to_string());
         };
-        let registration_handle = private_ident!(registration_handle.as_str());
+        let registration_id = private_ident!(registration_handle.as_str());
 
-        registrations.push((registration_handle.clone(), persistent_id.clone()));
+        registrations.push((registration_id.clone(), fc_id.clone()));
 
+        // _c = App;
+        // _c2 = Foo;
         raw_items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
           span: DUMMY_SP,
           expr: Box::new(Expr::Assign(AssignExpr {
             span: DUMMY_SP,
             op: AssignOp::Assign,
-            left: PatOrExpr::Pat(Box::new(Pat::Ident(registration_handle))),
-            right: Box::new(Expr::Ident(persistent_id)),
+            left: PatOrExpr::Pat(Box::new(Pat::Ident(registration_id))),
+            right: Box::new(Expr::Ident(fc_id)),
           })),
         })));
       }
@@ -278,10 +289,7 @@ impl Fold for FastRefreshFold {
       }
     }
 
-    // Insert
-    // ```
     // var _c, _c2;
-    // ```
     if registrations.len() > 0 {
       items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
         span: DUMMY_SP,
@@ -300,10 +308,7 @@ impl Fold for FastRefreshFold {
       }))));
     }
 
-    // Insert
-    // ```
     // var _s = $RefreshSig$(), _s2 = $RefreshSig$();
-    // ```
     if signatures.len() > 0 {
       items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
         span: DUMMY_SP,
@@ -329,15 +334,12 @@ impl Fold for FastRefreshFold {
       }))));
     }
 
-    // Insert raw items
+    // insert raw items
     for item in raw_items {
       items.push(item);
     }
 
-    // Insert
-    // ```
-    // _s(App, "useState{[count, setCount](0)}\nuseEffect{}")
-    // ```
+    // _s(App, "useState{[count, setCount](0)}\nuseEffect{}");
     for signature in signatures {
       items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
         span: DUMMY_SP,
@@ -369,12 +371,9 @@ impl Fold for FastRefreshFold {
       })));
     }
 
-    // Insert
-    // ```
     // $RefreshReg$(_c, "App");
     // $RefreshReg$(_c2, "Foo");
-    // ```
-    for (handle_id, persistent_id) in registrations {
+    for (registration_id, fc_id) in registrations {
       items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
         span: DUMMY_SP,
         expr: Box::new(Expr::Call(CallExpr {
@@ -385,13 +384,13 @@ impl Fold for FastRefreshFold {
           args: vec![
             ExprOrSpread {
               spread: None,
-              expr: Box::new(Expr::Ident(handle_id)),
+              expr: Box::new(Expr::Ident(registration_id)),
             },
             ExprOrSpread {
               spread: None,
               expr: Box::new(Expr::Lit(Lit::Str(Str {
                 span: DUMMY_SP,
-                value: persistent_id.sym.clone(),
+                value: fc_id.sym.clone(),
                 has_escape: false,
               }))),
             },
@@ -423,7 +422,7 @@ fn is_builtin_hook(obj: Option<Ident>, id: &str) -> bool {
     _ => false,
   };
   match obj {
-    Some(obj) => match obj.sym.chars().as_str() {
+    Some(obj) => match obj.sym.as_ref() {
       "React" => ok,
       _ => false,
     },
@@ -441,19 +440,11 @@ mod tests {
   use std::cell::RefCell;
   use swc_ecmascript::parser::JscTarget;
 
-  #[test]
-  fn test_transpile_react_fast_refresh() {
-    let source = r#"
-    export default function App() {
-      const [foo, setFoo] = useState(0);
-      React.useEffect(() => {});
-      return <h1>{foo}</h1>;
-    }
-    "#;
+  fn tr(specifier: &str, source: &str, except: &str) -> bool {
     let module =
-      ParsedModule::parse("/app.jsx", source, JscTarget::Es2020).expect("could not parse module");
+      ParsedModule::parse(specifier, source, JscTarget::Es2020).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/app.jsx",
+      specifier,
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
       false,
@@ -461,9 +452,23 @@ mod tests {
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
-    println!("{}", code);
-    assert_eq!(
-      code,
+    if code != except {
+      println!("{}", code);
+    }
+    code == except
+  }
+
+  #[test]
+  fn test_transpile_react_fast_refresh() {
+    assert!(tr(
+      "/app.jsx",
+      r#"
+      export default function App() {
+        const [foo, setFoo] = useState(0);
+        React.useEffect(() => {});
+        return <h1>{foo}</h1>;
+      }
+      "#,
       r#"var _c;
 var _s = $RefreshSig$();
 export default function App() {
@@ -482,6 +487,6 @@ _c = App;
 _s(App, "useState{[foo, setFoo](0)}\nuseEffect{}");
 $RefreshReg$(_c, "App");
 "#
-    );
+    ));
   }
 }
