@@ -4,6 +4,7 @@
 // @ref https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js
 
 use indexmap::IndexMap;
+use sha1::{Digest, Sha1};
 use std::rc::Rc;
 use swc_common::SourceMap;
 use swc_common::{Spanned, DUMMY_SP};
@@ -11,10 +12,16 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::{private_ident, quote_ident};
 use swc_ecma_visit::{noop_fold_type, Fold};
 
-pub fn fast_refresh_fold(refresh_reg: &str, refresh_sig: &str, source: Rc<SourceMap>) -> impl Fold {
+pub fn fast_refresh_fold(
+  refresh_reg: &str,
+  refresh_sig: &str,
+  emit_full_signatures: bool,
+  source: Rc<SourceMap>,
+) -> impl Fold {
   FastRefreshFold {
     refresh_reg: refresh_reg.into(),
     refresh_sig: refresh_sig.into(),
+    emit_full_signatures,
     signature_index: 0,
     source,
   }
@@ -23,6 +30,7 @@ pub fn fast_refresh_fold(refresh_reg: &str, refresh_sig: &str, source: Rc<Source
 pub struct FastRefreshFold {
   refresh_reg: String,
   refresh_sig: String,
+  emit_full_signatures: bool,
   signature_index: u32,
   source: Rc<SourceMap>,
 }
@@ -200,7 +208,7 @@ impl Fold for FastRefreshFold {
     let mut raw_items = Vec::<ModuleItem>::new();
     let mut registrations = Vec::<(Ident, Ident)>::new();
     let mut signatures = Vec::<Signature>::new();
-    let mut bindings = IndexMap::<Ident, bool>::new();
+    let mut bindings = IndexMap::<String, bool>::new();
 
     for mut item in module_items {
       let mut persistent_fns = Vec::<(Option<Ident>, Option<Signature>)>::new();
@@ -214,7 +222,7 @@ impl Fold for FastRefreshFold {
               ImportSpecifier::Named(ImportNamedSpecifier { local, .. })
               | ImportSpecifier::Default(ImportDefaultSpecifier { local, .. })
               | ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => {
-                bindings.insert(local.clone(), true);
+                bindings.insert(local.sym.as_ref().into(), true);
               }
             });
         }
@@ -227,7 +235,7 @@ impl Fold for FastRefreshFold {
           },
           ..
         }))) => {
-          bindings.insert(ident.clone(), true);
+          bindings.insert(ident.sym.as_ref().into(), true);
           persistent_fns.push(self.get_persistent_fn(ident, body));
         }
 
@@ -243,7 +251,7 @@ impl Fold for FastRefreshFold {
             }),
           ..
         })) => {
-          bindings.insert(ident.clone(), true);
+          bindings.insert(ident.sym.as_ref().into(), true);
           persistent_fns.push(self.get_persistent_fn(ident, body));
         }
 
@@ -259,7 +267,7 @@ impl Fold for FastRefreshFold {
             }),
           ..
         })) => {
-          bindings.insert(ident.clone(), true);
+          bindings.insert(ident.sym.as_ref().into(), true);
           persistent_fns.push(self.get_persistent_fn(ident, body));
         }
 
@@ -276,7 +284,7 @@ impl Fold for FastRefreshFold {
               init: Some(init_expr),
               ..
             } => {
-              bindings.insert(ident.clone(), true);
+              bindings.insert(ident.sym.as_ref().into(), true);
               match init_expr.as_mut() {
                 Expr::Fn(FnExpr {
                   function: Function {
@@ -398,22 +406,28 @@ impl Fold for FastRefreshFold {
         hooks_key.push(call.key);
         if !call.is_builtin {
           match call.object {
-            Some(obj) => match bindings.get(&obj) {
+            Some(obj) => match bindings.get(obj.sym.as_ref().into()) {
               Some(_) => custom_hooks_in_scope.push(call.ident.clone()),
               None => force_reset = true,
             },
-            None => match bindings.get(&call.ident) {
+            None => match bindings.get(call.ident.sym.as_ref().into()) {
               Some(_) => custom_hooks_in_scope.push(call.ident.clone()),
               None => force_reset = true,
             },
           }
         }
       });
+      let mut key = hooks_key.join("\n");
+      if !self.emit_full_signatures {
+        let mut hasher = Sha1::new();
+        hasher.update(key);
+        key = base64::encode(hasher.finalize());
+      }
       args.push(ExprOrSpread {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(Str {
           span: DUMMY_SP,
-          value: hooks_key.join("\n").into(),
+          value: key.into(),
           has_escape: false,
         }))),
       });
@@ -534,6 +548,7 @@ mod tests {
       .apply_transform(fast_refresh_fold(
         "$RefreshReg$",
         "$RefreshSig$",
+        true,
         module.source_map.clone(),
       ))
       .expect("could not transpile module");
@@ -604,8 +619,14 @@ export default function App() {
 };
 _c = App;
 _s(useFancyEffect, "useEffect{}");
-_s2(useFancyState, "useState{[foo, setFoo](0)}\nuseFancyEffect{}", false, () => ([useFancyEffect]));
-_s3(App, "useFancyState{bar}", false, () => ([useFancyState]));
+_s2(useFancyState, "useState{[foo, setFoo](0)}\nuseFancyEffect{}", false, ()=>[
+        useFancyEffect
+    ]
+);
+_s3(App, "useFancyState{bar}", false, ()=>[
+        useFancyState
+    ]
+);
 $RefreshReg$(_c, "App");
 "#;
     assert!(t("/app.jsx", source, expect));

@@ -110,8 +110,8 @@ impl ParsedModule {
     let program = swc_common::GLOBALS.set(&Globals::new(), || {
       helpers::HELPERS.set(&helpers::Helpers::new(false), || program.fold_with(&mut tr))
     });
-    let mut src_map_buf = vec![];
     let mut buf = vec![];
+    let mut src_map_buf = vec![];
     {
       let writer = Box::new(JsWriter::new(
         self.source_map.clone(),
@@ -136,7 +136,7 @@ impl ParsedModule {
       .build_source_map_from(&mut src_map_buf, None)
       .to_writer(&mut buf)
       .unwrap();
-    Ok((src, Some(String::from_utf8(buf)?)))
+    Ok((src, Some(String::from_utf8(buf).unwrap())))
   }
 
   /// Transform a JS/TS/JSX file into a JS file, based on the supplied options.
@@ -166,7 +166,12 @@ impl ParsedModule {
     let mut passes = chain!(
       aleph_resolve_fold(resolver.clone()),
       Optional::new(
-        fast_refresh_fold("$RefreshReg$", "$RefreshSig$", self.source_map.clone()),
+        fast_refresh_fold(
+          "$RefreshReg$",
+          "$RefreshSig$",
+          false,
+          self.source_map.clone()
+        ),
         jsx && options.is_dev && !is_remote_module
       ),
       Optional::new(
@@ -327,9 +332,6 @@ mod tests {
     assert!(code.contains("__source: {"));
     assert!(code.contains("import React, { useState } from \"../-/esm.sh/react.js\""));
     assert!(code.contains("from: \"../components/logo.js\""));
-    assert!(code.contains("$RefreshReg$(_c, \"Index\")"));
-    assert!(code.contains("$RefreshSig$()"));
-    assert!(code.contains("_s(Index, \"useState{[count, setCount](0)}\\nuseEffect{}\")"));
     let r = resolver.borrow_mut();
     assert_eq!(
       r.dep_graph,
