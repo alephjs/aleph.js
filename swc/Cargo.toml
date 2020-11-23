@@ -1,6 +1,6 @@
 [package]
 name = "aleph-swc"
-version = "0.0.1"
+version = "0.3.0-alpha"
 authors = ["The Aleph.js authors"]
 edition = "2018"
 
@@ -28,14 +28,14 @@ url = "2.2.0"
 # swc
 # docs: https://swc.rs
 swc_common = { version = "0.10.5", features = ["sourcemap"] }
-swc_ecmascript = { version = "0.13.3", features = ["codegen", "dep_graph", "parser", "react", "transforms", "visit"] }
-swc_ecma_ast = "0.34.0"
-swc_ecma_visit = "0.20.0"
-swc_ecma_utils = "0.24.0"
+swc_ecmascript = { version = "0.14.3", features = ["codegen", "parser", "react", "transforms", "visit"] }
+swc_ecma_ast = "0.35.0"
+swc_ecma_visit = "0.21.0"
+swc_ecma_utils = "0.25.0"
 
 # wasm-bindgen
 # docs: https://rustwasm.github.io/docs/wasm-bindgen
-wasm-bindgen = {version = "0.2.63", features = ["serde-serialize"]}
+wasm-bindgen = {version = "0.2.68", features = ["serde-serialize"]}
 console_error_panic_hook = { version = "0.1.6", optional = true }
 
 [profile.release]
