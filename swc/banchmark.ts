@@ -35,20 +35,19 @@ function coloredDiff(d: number) {
     return cf(d.toFixed(2) + 'x')
 }
 
-async function banchmark() {
-    const rootDir = path.dirname(Deno.cwd())
+async function banchmark(isDev: boolean) {
     const sourceFiles: Array<{ code: string, filename: string }> = []
     const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.ts', '.tsx'], skip: [/[\._]aleph\//, /_dist\//, /swc\//, /\.d\.ts$/i, /[\._]test\.(j|t)sx?$/i] }
     for await (const { path: filename } of walk(path.resolve('..'), walkOptions)) {
         sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
     }
 
-    console.log(`[banchmark] ${sourceFiles.length} files`)
+    console.log(`[banchmark] ${sourceFiles.length} files ${isDev ? '(development mode)' : ''}`)
 
     const d1 = { d: 0, min: 0, max: 0, maxFileName: '' }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        tsc(code, { filename })
+        tsc(code, { filename, swcOptions: { isDev } })
         const d = performance.now() - t
         if (d1.min === 0 || d < d1.min) {
             d1.min = d
@@ -63,7 +62,7 @@ async function banchmark() {
     const d2 = { d: 0, min: 0, max: 0, maxFileName: '' }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        transformSync(code, { filename })
+        transformSync(code, { filename, swcOptions: { isDev } })
         const d = performance.now() - t
         if (d2.min === 0 || d < d2.min) {
             d2.min = d
@@ -83,5 +82,6 @@ async function banchmark() {
 if (import.meta.main) {
     const wasmCode = Deno.readFileSync('./pkg/aleph_swc_bg.wasm')
     await init(wasmCode)
-    await banchmark()
+    await banchmark(false)
+    await banchmark(true)
 }
