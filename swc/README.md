@@ -6,6 +6,7 @@ The compiler of Aleph.js written in Rust, powered by [swc](https://github.com/sw
 You will need [rust](https://www.rust-lang.org/tools/install) 1.30+ and [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/).
 
 ## Build
+
 ```bash
 sh ./build.sh
 ```
