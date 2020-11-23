@@ -21,6 +21,7 @@ pub fn fast_refresh_fold(
     signature_index: 0,
     registration_index: 0,
     registrations: vec![],
+    signatures: vec![],
     refresh_reg: refresh_reg.into(),
     refresh_sig: refresh_sig.into(),
     emit_full_signatures,
@@ -32,9 +33,17 @@ pub struct FastRefreshFold {
   signature_index: u32,
   registration_index: u32,
   registrations: Vec<(Ident, String)>,
+  signatures: Vec<Signature>,
   refresh_reg: String,
   refresh_sig: String,
   emit_full_signatures: bool,
+}
+
+#[derive(Clone, Debug)]
+struct Signature {
+  parent_ident: Option<Ident>,
+  handle_ident: Ident,
+  hook_calls: Vec<HookCall>,
 }
 
 #[derive(Clone, Debug)]
@@ -43,13 +52,6 @@ struct HookCall {
   ident: Ident,
   key: String,
   is_builtin: bool,
-}
-
-#[derive(Clone, Debug)]
-struct Signature {
-  parent_ident: Ident,
-  handle_ident: Ident,
-  hook_calls: Vec<HookCall>,
 }
 
 impl FastRefreshFold {
@@ -65,13 +67,18 @@ impl FastRefreshFold {
   fn get_persistent_fn(
     &mut self,
     bindings: &IndexMap<String, bool>,
-    ident: &Ident,
+    ident: Option<&Ident>,
     block_stmt: &mut BlockStmt,
   ) -> (Option<Ident>, Option<Signature>) {
-    let fc_id = if is_componentish_name(ident.as_ref()) {
-      Some(ident.clone())
-    } else {
-      None
+    let fc_id = match ident {
+      Some(ident) => {
+        if is_componentish_name(ident.as_ref()) {
+          Some(ident.clone())
+        } else {
+          None
+        }
+      }
+      None => None,
     };
     let mut bindings_scope = IndexMap::<String, bool>::new();
     let mut hook_calls = Vec::<HookCall>::new();
@@ -125,7 +132,7 @@ impl FastRefreshFold {
           },
           ..
         })) => {
-          if let (_, Some(signature)) = self.get_persistent_fn(&bindings_scope, ident, body) {
+          if let (_, Some(signature)) = self.get_persistent_fn(&bindings_scope, Some(ident), body) {
             exotic_signatures.push((index, signature));
           }
         }
@@ -144,7 +151,8 @@ impl FastRefreshFold {
                 ..
               }) => match name {
                 Pat::Ident(ident) => {
-                  if let (_, Some(signature)) = self.get_persistent_fn(&bindings_scope, ident, body)
+                  if let (_, Some(signature)) =
+                    self.get_persistent_fn(&bindings_scope, Some(ident), body)
                   {
                     exotic_signatures.push((index, signature));
                   }
@@ -157,7 +165,8 @@ impl FastRefreshFold {
                 ..
               }) => match name {
                 Pat::Ident(ident) => {
-                  if let (_, Some(signature)) = self.get_persistent_fn(&bindings_scope, ident, body)
+                  if let (_, Some(signature)) =
+                    self.get_persistent_fn(&bindings_scope, Some(ident), body)
                   {
                     exotic_signatures.push((index, signature));
                   }
@@ -210,7 +219,10 @@ impl FastRefreshFold {
         }),
       );
       Some(Signature {
-        parent_ident: ident.clone(),
+        parent_ident: match ident {
+          Some(ident) => Some(ident.clone()),
+          None => None,
+        },
         handle_ident,
         hook_calls,
       })
@@ -330,7 +342,12 @@ impl FastRefreshFold {
     None
   }
 
-  fn find_inner_component(&mut self, parent_name: &str, call: &mut CallExpr) -> bool {
+  fn find_inner_component(
+    &mut self,
+    bindings: &IndexMap<String, bool>,
+    parent_name: &str,
+    call: &mut CallExpr,
+  ) -> bool {
     if !is_componentish_name(parent_name) && !parent_name.starts_with("%default%") {
       return false;
     }
@@ -339,6 +356,7 @@ impl FastRefreshFold {
       return false;
     }
 
+    // first arg should be a function or call
     match call.args[0].expr.as_ref() {
       Expr::Fn(_) => {}
       Expr::Arrow(_) => {}
@@ -357,11 +375,11 @@ impl FastRefreshFold {
         _ => {}
       }
       ident_str.push_str(ident.sym.as_ref());
-      // first args should be a function
       match call.args[0].expr.as_mut() {
         Expr::Call(inner_call) => {
           if let Some(_) = get_call_callee(inner_call) {
-            if self.find_inner_component(ident_str.as_str(), inner_call) {
+            let ok = self.find_inner_component(bindings, ident_str.as_str(), inner_call);
+            if ok {
               let handle_ident = self.create_registration_handle_ident();
               self
                 .registrations
@@ -374,11 +392,9 @@ impl FastRefreshFold {
                   left: PatOrExpr::Expr(Box::new(Expr::Ident(handle_ident))),
                   right: Box::new(Expr::Call(inner_call.clone())),
                 })),
-              };
-              return true;
-            } else {
-              return false;
+              }
             }
+            return ok;
           }
         }
         _ => {}
@@ -388,26 +404,74 @@ impl FastRefreshFold {
       self.registrations.push((handle_ident.clone(), ident_str));
       match call.args[0].expr.as_mut() {
         Expr::Fn(fn_expr) => {
+          let mut right = Box::new(Expr::Fn(fn_expr.clone()));
+          match &mut fn_expr.function {
+            Function {
+              body: Some(body), ..
+            } => {
+              if let (_, Some(signature)) = self.get_persistent_fn(bindings, None, body) {
+                let mut args = self.create_arguments_for_signature(bindings, &signature);
+                args.insert(
+                  0,
+                  ExprOrSpread {
+                    spread: None,
+                    expr: Box::new(Expr::Fn(fn_expr.clone())),
+                  },
+                );
+                right = Box::new(Expr::Call(CallExpr {
+                  span: DUMMY_SP,
+                  callee: ExprOrSuper::Expr(Box::new(Expr::Ident(signature.handle_ident.clone()))),
+                  args,
+                  type_args: None,
+                }));
+                self.signatures.push(signature);
+              }
+            }
+            _ => {}
+          };
           call.args[0] = ExprOrSpread {
             spread: None,
             expr: Box::new(Expr::Assign(AssignExpr {
               span: DUMMY_SP,
               op: AssignOp::Assign,
               left: PatOrExpr::Expr(Box::new(Expr::Ident(handle_ident))),
-              right: Box::new(Expr::Fn(fn_expr.clone())),
+              right,
             })),
-          };
+          }
         }
         Expr::Arrow(arrow_expr) => {
+          let mut right = Box::new(Expr::Arrow(arrow_expr.clone()));
+          match &mut arrow_expr.body {
+            BlockStmtOrExpr::BlockStmt(body) => {
+              if let (_, Some(signature)) = self.get_persistent_fn(bindings, None, body) {
+                let mut args = self.create_arguments_for_signature(bindings, &signature);
+                args.insert(
+                  0,
+                  ExprOrSpread {
+                    spread: None,
+                    expr: Box::new(Expr::Arrow(arrow_expr.clone())),
+                  },
+                );
+                right = Box::new(Expr::Call(CallExpr {
+                  span: DUMMY_SP,
+                  callee: ExprOrSuper::Expr(Box::new(Expr::Ident(signature.handle_ident.clone()))),
+                  args,
+                  type_args: None,
+                }));
+                self.signatures.push(signature);
+              }
+            }
+            _ => {}
+          };
           call.args[0] = ExprOrSpread {
             spread: None,
             expr: Box::new(Expr::Assign(AssignExpr {
               span: DUMMY_SP,
               op: AssignOp::Assign,
               left: PatOrExpr::Expr(Box::new(Expr::Ident(handle_ident))),
-              right: Box::new(Expr::Arrow(arrow_expr.clone())),
+              right,
             })),
-          };
+          }
         }
         _ => {}
       }
@@ -423,10 +487,14 @@ impl FastRefreshFold {
   ) -> Vec<ExprOrSpread> {
     let mut key = Vec::<String>::new();
     let mut custom_hooks_in_scope = Vec::<(Option<Ident>, Ident)>::new();
-    let mut args: Vec<ExprOrSpread> = vec![ExprOrSpread {
-      spread: None,
-      expr: Box::new(Expr::Ident(signature.parent_ident.clone())),
-    }];
+    let mut args: Vec<ExprOrSpread> = vec![];
+    match &signature.parent_ident {
+      Some(parent_ident) => args.push(ExprOrSpread {
+        spread: None,
+        expr: Box::new(Expr::Ident(parent_ident.clone())),
+      }),
+      None => {}
+    }
     let mut force_reset = false;
     // todo: parse @refresh reset command
     signature.hook_calls.clone().into_iter().for_each(|call| {
@@ -515,7 +583,6 @@ impl Fold for FastRefreshFold {
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
     let mut raw_items = Vec::<ModuleItem>::new();
-    let mut signatures = Vec::<Signature>::new();
     let mut bindings = IndexMap::<String, bool>::new();
 
     // collect top bindings
@@ -594,7 +661,7 @@ impl Fold for FastRefreshFold {
               ..
             }),
           ..
-        })) => persistent_fns.push(self.get_persistent_fn(&bindings, ident, body)),
+        })) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(ident), body)),
 
         // export default function App() {}
         ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(ExportDefaultDecl {
@@ -607,14 +674,14 @@ impl Fold for FastRefreshFold {
               ..
             }),
           ..
-        })) => persistent_fns.push(self.get_persistent_fn(&bindings, ident, body)),
+        })) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(ident), body)),
 
         // export default React.memo(() => {})
         ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(ExportDefaultExpr {
           expr, ..
         })) => match expr.as_mut() {
           Expr::Call(call) => {
-            if self.find_inner_component("%default%", call) {
+            if self.find_inner_component(&bindings, "%default%", call) {
               let handle_ident = self.create_registration_handle_ident();
               self
                 .registrations
@@ -641,7 +708,7 @@ impl Fold for FastRefreshFold {
             body: Some(body), ..
           },
           ..
-        }))) => persistent_fns.push(self.get_persistent_fn(&bindings, ident, body)),
+        }))) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(ident), body)),
 
         // const Foo = () => {}
         // export const App = () => {}
@@ -663,12 +730,12 @@ impl Fold for FastRefreshFold {
                     body: Some(body), ..
                   },
                   ..
-                }) => persistent_fns.push(self.get_persistent_fn(&bindings, ident, body)),
+                }) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(ident), body)),
                 // const Foo = () => {}
                 Expr::Arrow(ArrowExpr {
                   body: BlockStmtOrExpr::BlockStmt(body),
                   ..
-                }) => persistent_fns.push(self.get_persistent_fn(&bindings, ident, body)),
+                }) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(ident), body)),
                 // const Bar = () => <div />
                 Expr::Arrow(ArrowExpr {
                   body: BlockStmtOrExpr::Expr(expr),
@@ -681,7 +748,7 @@ impl Fold for FastRefreshFold {
                 },
                 // const A = forwardRef(function() {});
                 Expr::Call(call) => {
-                  if self.find_inner_component(ident.sym.as_ref(), call) {
+                  if self.find_inner_component(&bindings, ident.sym.as_ref(), call) {
                     let handle_ident = self.create_registration_handle_ident();
                     self
                       .registrations
@@ -723,7 +790,7 @@ impl Fold for FastRefreshFold {
         }
 
         if let Some(signature) = signature {
-          signatures.push(signature);
+          self.signatures.push(signature);
         }
       }
 
@@ -766,12 +833,13 @@ impl Fold for FastRefreshFold {
 
     // ! insert
     // var _s = $RefreshSig$(), _s2 = $RefreshSig$();
-    if signatures.len() > 0 {
+    if self.signatures.len() > 0 {
       items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
         span: DUMMY_SP,
         kind: VarDeclKind::Var,
         declare: false,
-        decls: signatures
+        decls: self
+          .signatures
           .clone()
           .into_iter()
           .map(|signature| VarDeclarator {
@@ -798,17 +866,22 @@ impl Fold for FastRefreshFold {
 
     // ! insert
     // _s(App, "useState{[count, setCount](0)}\nuseEffect{}");
-    for signature in signatures {
-      let args = self.create_arguments_for_signature(&bindings, &signature);
-      items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
-        span: DUMMY_SP,
-        expr: Box::new(Expr::Call(CallExpr {
-          span: DUMMY_SP,
-          callee: ExprOrSuper::Expr(Box::new(Expr::Ident(signature.handle_ident.clone()))),
-          args,
-          type_args: None,
-        })),
-      })));
+    for signature in &self.signatures {
+      match signature.parent_ident {
+        Some(_) => {
+          let args = self.create_arguments_for_signature(&bindings, &signature);
+          items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(Expr::Call(CallExpr {
+              span: DUMMY_SP,
+              callee: ExprOrSuper::Expr(Box::new(Expr::Ident(signature.handle_ident.clone()))),
+              args,
+              type_args: None,
+            })),
+          })));
+        }
+        None => {}
+      }
     }
 
     // ! insert
@@ -844,30 +917,6 @@ impl Fold for FastRefreshFold {
   }
 }
 
-fn get_call_callee(call: &CallExpr) -> Option<(Option<Ident>, Ident)> {
-  let callee = match &call.callee {
-    ExprOrSuper::Super(_) => return None,
-    ExprOrSuper::Expr(callee) => callee.as_ref(),
-  };
-
-  match callee {
-    // useState()
-    Expr::Ident(id) => Some((None, id.clone())),
-    // React.useState()
-    Expr::Member(expr) => match &expr.obj {
-      ExprOrSuper::Expr(obj) => match obj.as_ref() {
-        Expr::Ident(obj) => match expr.prop.as_ref() {
-          Expr::Ident(prop) => Some((Some(obj.clone()), prop.clone())),
-          _ => None,
-        },
-        _ => None,
-      },
-      _ => None,
-    },
-    _ => None,
-  }
-}
-
 fn is_componentish_name(name: &str) -> bool {
   name.starts_with(char::is_uppercase)
 }
@@ -892,6 +941,30 @@ fn is_builtin_hook(obj: Option<&Ident>, id: &str) -> bool {
       _ => false,
     },
     None => ok,
+  }
+}
+
+fn get_call_callee(call: &CallExpr) -> Option<(Option<Ident>, Ident)> {
+  let callee = match &call.callee {
+    ExprOrSuper::Super(_) => return None,
+    ExprOrSuper::Expr(callee) => callee.as_ref(),
+  };
+
+  match callee {
+    // useState()
+    Expr::Ident(id) => Some((None, id.clone())),
+    // React.useState()
+    Expr::Member(expr) => match &expr.obj {
+      ExprOrSuper::Expr(obj) => match obj.as_ref() {
+        Expr::Ident(obj) => match expr.prop.as_ref() {
+          Expr::Ident(prop) => Some((Some(obj.clone()), prop.clone())),
+          _ => None,
+        },
+        _ => None,
+      },
+      _ => None,
+    },
+    _ => None,
   }
 }
 
@@ -1119,13 +1192,32 @@ $RefreshReg$(_c, "App");
       return <h1>Foo</h1>;
     }));
     const C = forwardRef(memo(forwardRef(()=>null)))
-    const D = forwardRef(memo(forwardRef()))
-    const E = memo('Foo');
+    export const D = React.memo(React.forwardRef((props, ref) => {
+      const [foo, setFoo] = useState(0);
+      React.useEffect(() => {});
+      return <h1 ref={ref}>{foo}</h1>;
+    }));
+    export const E = React.memo(React.forwardRef(function(props, ref) {
+      const [foo, setFoo] = useState(0);
+      React.useEffect(() => {});
+      return <h1 ref={ref}>{foo}</h1>;
+    }));
+    function hoc() {
+      return function Inner() {
+        const [foo, setFoo] = useState(0);
+        React.useEffect(() => {});
+        return <h1 ref={ref}>{foo}</h1>;
+      };
+    }
+    export let H = hoc();
+    const I = forwardRef(memo(forwardRef()))
+    const J = memo('Foo');
     export default React.memo(forwardRef((props, ref) => {
       return <h1>Foo</h1>;
     }));
     "#;
-    let expect = r#"var _c, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _c12;
+    let expect = r#"var _c, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _c12, _c13, _c14, _c15, _c16, _c17, _c18;
+var _s = $RefreshSig$(), _s2 = $RefreshSig$();
 const A = forwardRef(_c = function() {
     return <h1 >Foo</h1>;
 });
@@ -1137,9 +1229,34 @@ B = _c5;
 const C = forwardRef(_c8 = memo(_c7 = forwardRef(_c6 = ()=>null
 )));
 C = _c9;
-const D = forwardRef(memo(forwardRef()));
-const E = memo('Foo');
-export default _c12 = React.memo(_c11 = forwardRef(_c10 = (props, ref)=>{
+export const D = React.memo(_c11 = React.forwardRef(_c10 = _s((props, ref)=>{
+    _s();
+    const [foo, setFoo] = useState(0);
+    React.useEffect(()=>{
+    });
+    return <h1 ref={ref}>{foo}</h1>;
+}, "useState{[foo, setFoo](0)}\nuseEffect{}")));
+D = _c12;
+export const E = React.memo(_c14 = React.forwardRef(_c13 = _s2(function(props, ref) {
+    _s2();
+    const [foo, setFoo] = useState(0);
+    React.useEffect(()=>{
+    });
+    return <h1 ref={ref}>{foo}</h1>;
+}, "useState{[foo, setFoo](0)}\nuseEffect{}")));
+E = _c15;
+function hoc() {
+    return function Inner() {
+        const [foo, setFoo] = useState(0);
+        React.useEffect(()=>{
+        });
+        return <h1 ref={ref}>{foo}</h1>;
+    };
+}
+export let H = hoc();
+const I = forwardRef(memo(forwardRef()));
+const J = memo('Foo');
+export default _c18 = React.memo(_c17 = forwardRef(_c16 = (props, ref)=>{
     return <h1 >Foo</h1>;
 }));
 $RefreshReg$(_c, "A$forwardRef");
@@ -1151,9 +1268,15 @@ $RefreshReg$(_c6, "C$forwardRef$memo$forwardRef");
 $RefreshReg$(_c7, "C$forwardRef$memo");
 $RefreshReg$(_c8, "C$forwardRef");
 $RefreshReg$(_c9, "C");
-$RefreshReg$(_c10, "%default%$React.memo$forwardRef");
-$RefreshReg$(_c11, "%default%$React.memo");
-$RefreshReg$(_c12, "%default%");
+$RefreshReg$(_c10, "D$React.memo$React.forwardRef");
+$RefreshReg$(_c11, "D$React.memo");
+$RefreshReg$(_c12, "D");
+$RefreshReg$(_c13, "E$React.memo$React.forwardRef");
+$RefreshReg$(_c14, "E$React.memo");
+$RefreshReg$(_c15, "E");
+$RefreshReg$(_c16, "%default%$React.memo$forwardRef");
+$RefreshReg$(_c17, "%default%$React.memo");
+$RefreshReg$(_c18, "%default%");
 "#;
     assert!(t("/app.jsx", source, expect));
   }
