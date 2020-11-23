@@ -87,7 +87,8 @@ export class Request extends ServerRequest implements APIRequest {
 
     async decodeBody(type: "text"): Promise<string>
     async decodeBody(type: "json"): Promise<any>
-    async decodeBody(type: "form-data"): Promise<FormDataBody> {
+    async decodeBody(type: "form-data"): Promise<FormDataBody>
+    async decodeBody(type: string): Promise<any> {
         if (type === "text") {
             try {
                 const buff: Uint8Array = await Deno.readAll(this.body);
@@ -126,7 +127,6 @@ export class Request extends ServerRequest implements APIRequest {
             } catch (err) {
                 console.error("Failed to parse the request form-data", err)
             }
-
         }
     }
 
