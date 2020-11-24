@@ -1,4 +1,4 @@
-import { compile } from 'https://deno.land/x/aleph@v0.2.25/tsc/compile.ts';
+import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.25/tsc/compile.ts';
 import { colors, path, Sha1, walk } from '../std.ts';
 import init, { transformSync } from './pkg/aleph_swc.js';
 
@@ -6,7 +6,7 @@ const hashShort = 9
 const reHttp = /^https?:\/\//i
 
 function tsc(source: string, opts: any) {
-    const compileOptions = {
+    const compileOptions: CompileOptions = {
         mode: opts.isDev ? 'development' : 'production',
         target: 'es2020',
         reactRefresh: opts.isDev,
@@ -16,7 +16,7 @@ function tsc(source: string, opts: any) {
             return sig
         }
     }
-    compile(opts.filename, source, compileOptions as any)
+    compile(opts.filename, source, compileOptions)
 }
 
 /**
@@ -35,13 +35,7 @@ function coloredDiff(d: number) {
     return cf(d.toFixed(2) + 'x')
 }
 
-async function banchmark(isDev: boolean) {
-    const sourceFiles: Array<{ code: string, filename: string }> = []
-    const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.ts', '.tsx'], skip: [/[\._]aleph\//, /_dist\//, /swc\//, /\.d\.ts$/i, /[\._]test\.(j|t)sx?$/i] }
-    for await (const { path: filename } of walk(path.resolve('..'), walkOptions)) {
-        sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
-    }
-
+async function banchmark(sourceFiles: Array<{ code: string, filename: string }>, isDev: boolean) {
     console.log(`[banchmark] ${sourceFiles.length} files ${isDev ? '(development mode)' : ''}`)
 
     const d1 = { d: 0, min: 0, max: 0, maxDetails: '' }
@@ -80,8 +74,17 @@ async function banchmark(isDev: boolean) {
 }
 
 if (import.meta.main) {
-    const wasmCode = Deno.readFileSync('./pkg/aleph_swc_bg.wasm')
-    await init(wasmCode)
-    await banchmark(false)
-    await banchmark(true)
+    (async () => {
+        const wasmCode = Deno.readFileSync('./pkg/aleph_swc_bg.wasm')
+        await init(wasmCode)
+
+        const sourceFiles: Array<{ code: string, filename: string }> = []
+        const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.ts', '.tsx'], skip: [/[\._]aleph\//, /_dist\//, /swc\//, /\.d\.ts$/i, /[\._]test\.(j|t)sx?$/i] }
+        for await (const { path: filename } of walk(path.resolve('..'), walkOptions)) {
+            sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
+        }
+
+        await banchmark(sourceFiles, false)
+        await banchmark(sourceFiles, true)
+    })()
 }
