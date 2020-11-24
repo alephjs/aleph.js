@@ -82,7 +82,7 @@ impl FastRefreshFold {
     };
     let mut bindings_scope = IndexMap::<String, bool>::new();
     let mut hook_calls = Vec::<HookCall>::new();
-    let mut exotic_signatures = Vec::<(usize, Signature)>::new();
+    let mut exotic_signatures = Vec::<(usize, Signature, Option<Expr>)>::new();
     let mut index: usize = 0;
     let stmts = &mut block_stmt.stmts;
 
@@ -133,9 +133,10 @@ impl FastRefreshFold {
           ..
         })) => {
           if let (_, Some(signature)) = self.get_persistent_fn(&bindings_scope, Some(ident), body) {
-            exotic_signatures.push((index, signature));
+            exotic_signatures.push((index, signature, None));
           }
         }
+        // var ...
         Stmt::Decl(Decl::Var(VarDecl { decls, .. })) => {
           decls.into_iter().for_each(|decl| match decl {
             VarDeclarator {
@@ -154,7 +155,7 @@ impl FastRefreshFold {
                   if let (_, Some(signature)) =
                     self.get_persistent_fn(&bindings_scope, Some(ident), body)
                   {
-                    exotic_signatures.push((index, signature));
+                    exotic_signatures.push((index, signature, None));
                   }
                 }
                 _ => {}
@@ -168,7 +169,7 @@ impl FastRefreshFold {
                   if let (_, Some(signature)) =
                     self.get_persistent_fn(&bindings_scope, Some(ident), body)
                   {
-                    exotic_signatures.push((index, signature));
+                    exotic_signatures.push((index, signature, None));
                   }
                 }
                 _ => {}
@@ -191,7 +192,30 @@ impl FastRefreshFold {
           },
           _ => {}
         },
-
+        // return ..
+        Stmt::Return(ReturnStmt { arg: Some(arg), .. }) => match arg.as_mut() {
+          // return function() {}
+          Expr::Fn(FnExpr {
+            function: Function {
+              body: Some(body), ..
+            },
+            ..
+          }) => {
+            if let (_, Some(signature)) = self.get_persistent_fn(&bindings_scope, None, body) {
+              exotic_signatures.push((index, signature, Some(arg.as_ref().clone())));
+            }
+          }
+          // return () => {}
+          Expr::Arrow(ArrowExpr {
+            body: BlockStmtOrExpr::BlockStmt(body),
+            ..
+          }) => {
+            if let (_, Some(signature)) = self.get_persistent_fn(&bindings_scope, None, body) {
+              exotic_signatures.push((index, signature, Some(arg.as_ref().clone())));
+            }
+          }
+          _ => {}
+        },
         _ => {}
       }
       index += 1;
@@ -199,6 +223,7 @@ impl FastRefreshFold {
 
     // ! insert
     // _s();
+    let mut inserted: usize = 0;
     let signature = if hook_calls.len() > 0 {
       let mut handle_ident = String::from("_s");
       self.signature_index += 1;
@@ -218,6 +243,7 @@ impl FastRefreshFold {
           })),
         }),
       );
+      inserted += 1;
       Some(Signature {
         parent_ident: match ident {
           Some(ident) => Some(ident.clone()),
@@ -234,7 +260,7 @@ impl FastRefreshFold {
       // ! insert
       // var _s = $RefreshSig$(), _s2 = $RefreshSig$();
       block_stmt.stmts.insert(
-        1,
+        inserted,
         Stmt::Decl(Decl::Var(VarDecl {
           span: DUMMY_SP,
           kind: VarDeclKind::Var,
@@ -258,25 +284,46 @@ impl FastRefreshFold {
             .collect(),
         })),
       );
+      inserted += 1;
 
-      let mut inserted: usize = 0;
-      for (index, exotic_signature) in exotic_signatures {
-        let args = self.create_arguments_for_signature(&bindings_scope, &exotic_signature);
-        block_stmt.stmts.insert(
-          index + inserted + 3,
-          Stmt::Expr(ExprStmt {
+      for (index, exotic_signature, return_expr) in exotic_signatures {
+        let mut args = self.create_arguments_for_signature(&bindings_scope, &exotic_signature);
+        if let Some(return_expr) = return_expr {
+          args.insert(
+            0,
+            ExprOrSpread {
+              spread: None,
+              expr: Box::new(return_expr),
+            },
+          );
+          block_stmt.stmts[index + inserted] = Stmt::Return(ReturnStmt {
             span: DUMMY_SP,
-            expr: Box::new(Expr::Call(CallExpr {
+            arg: Some(Box::new(Expr::Call(CallExpr {
               span: DUMMY_SP,
               callee: ExprOrSuper::Expr(Box::new(Expr::Ident(
                 exotic_signature.handle_ident.clone(),
               ))),
               args,
               type_args: None,
-            })),
-          }),
-        );
-        inserted += 1
+            }))),
+          });
+        } else {
+          block_stmt.stmts.insert(
+            index + inserted + 1,
+            Stmt::Expr(ExprStmt {
+              span: DUMMY_SP,
+              expr: Box::new(Expr::Call(CallExpr {
+                span: DUMMY_SP,
+                callee: ExprOrSuper::Expr(Box::new(Expr::Ident(
+                  exotic_signature.handle_ident.clone(),
+                ))),
+                args,
+                type_args: None,
+              })),
+            }),
+          );
+          inserted += 1
+        }
       }
     }
     (fc_id, signature)
@@ -1246,12 +1293,14 @@ export const E = React.memo(_c14 = React.forwardRef(_c13 = _s2(function(props, r
 }, "useState{[foo, setFoo](0)}\nuseEffect{}")));
 E = _c15;
 function hoc() {
-    return function Inner() {
+    var _s3 = $RefreshSig$();
+    return _s3(function Inner() {
+        _s3();
         const [foo, setFoo] = useState(0);
         React.useEffect(()=>{
         });
         return <h1 ref={ref}>{foo}</h1>;
-    };
+    }, "useState{[foo, setFoo](0)}\nuseEffect{}");
 }
 export let H = hoc();
 const I = forwardRef(memo(forwardRef()));
