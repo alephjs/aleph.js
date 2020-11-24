@@ -28,8 +28,8 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Cache std modules
-        run: deno cache std.ts
+      - name: Cache deps modules
+        run: deno cache deps.ts
 
       - name: Run tests
         run: deno test -A --unstable
