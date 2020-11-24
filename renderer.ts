@@ -1,4 +1,3 @@
-import unescape from 'https://esm.sh/lodash/unescape?no-check'
 import React, { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import { RendererContext, RouterContext } from './context.ts'
@@ -6,8 +5,8 @@ import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page } from
 import events from './events.ts'
 import { serverStyles } from './head.ts'
 import { createPageProps } from './routing.ts'
-import type { AlephEnv, RouterURL } from './types.ts'
-import util, { hashShort } from './util.ts'
+import type { RouterURL } from './types.ts'
+import util, { hashShort, reHttp } from './util.ts'
 
 interface RenderResult {
     head: string[]
@@ -63,13 +62,16 @@ export async function renderPage(
         headElements: new Map(),
         scriptsElements: new Map()
     }
-    const { __buildMode, __buildTarget } = (window as any).ALEPH.ENV as AlephEnv
+    const { __createHTMLDocument } = (window as any)
+    const buildMode = Deno.env.get('__buildMode')
+    const buildTarget = Deno.env.get('__buildTarget')
     const data: Record<string, any> = {}
     const useDenEvent = `useDeno://${url.pathname + '?' + url.query.toString()}`
     const useDenoAsyncCalls: Array<Promise<any>> = []
 
     Object.assign(window, {
         [`__asyncData_${useDenEvent}`]: {},
+        document: __createHTMLDocument(),
         location: {
             protocol: 'http:',
             host: 'localhost',
@@ -130,21 +132,21 @@ export async function renderPage(
     }
 
     rendererCache.headElements.forEach(({ type, props }) => {
+        const { children, ...rest } = props
         if (type === 'title') {
-            if (util.isNEString(props.children)) {
-                ret.head.push(`<title ssr>${props.children}</title>`)
-            } else if (util.isNEArray(props.children)) {
-                ret.head.push(`<title ssr>${props.children.join('')}</title>`)
+            if (util.isNEString(children)) {
+                ret.head.push(`<title ssr>${children}</title>`)
+            } else if (util.isNEArray(children)) {
+                ret.head.push(`<title ssr>${children.join('')}</title>`)
             }
         } else {
-            const attrs = Object.keys(props)
-                .filter(key => key !== 'children')
-                .map(key => ` ${key}=${JSON.stringify(props[key])}`)
-                .join('')
-            if (util.isNEString(props.children)) {
-                ret.head.push(`<${type}${attrs} ssr>${props.children}</${type}>`)
-            } else if (util.isNEArray(props.children)) {
-                ret.head.push(`<${type}${attrs} ssr>${props.children.join('')}</${type}>`)
+            const attrs = Object.entries(rest).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`).join('')
+            if (type === 'script') {
+                ret.head.push(`<${type}${attrs}>${Array.isArray(children) ? children.join('') : children || ''}</${type}>`)
+            } else if (util.isNEString(children)) {
+                ret.head.push(`<${type}${attrs} ssr>${children}</${type}>`)
+            } else if (util.isNEArray(children)) {
+                ret.head.push(`<${type}${attrs} ssr>${children.join('')}</${type}>`)
             } else {
                 ret.head.push(`<${type}${attrs} ssr />`)
             }
@@ -155,9 +157,9 @@ export async function renderPage(
         if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
             ret.scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
         } if (util.isNEString(children)) {
-            ret.scripts.push({ ...attrs, innerText: unescape(children) })
+            ret.scripts.push({ ...attrs, innerText: children })
         } else if (util.isNEArray(children)) {
-            ret.scripts.push({ ...attrs, innerText: unescape(children.join('')) })
+            ret.scripts.push({ ...attrs, innerText: children.join('') })
         } else {
             ret.scripts.push(props)
         }
@@ -166,7 +168,8 @@ export async function renderPage(
     rendererCache.scriptsElements.clear()
 
     await Promise.all(styles?.map(({ url, hash }) => {
-        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${__buildMode}.${__buildTarget}/${url}.${hash.slice(0, hashShort)}.js`))
+        const path = reHttp.test(url) ? url.replace(reHttp, '/-/') : `${url}.${hash.slice(0, hashShort)}`
+        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}.${buildTarget}/${path}.js`))
     }) || [])
     styles?.forEach(({ url }) => {
         if (serverStyles.has(url)) {

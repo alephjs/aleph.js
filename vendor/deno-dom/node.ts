@@ -132,13 +132,13 @@ export class Node extends EventTarget {
     }
   }
 
-  appendChild(child: Node) {
+  appendChild(child: Node): Node {
     const oldParentNode = child.parentNode;
 
     // Check if we already own this child
     if (oldParentNode === this) {
       if (this.#childNodesMutator.indexOf(child) !== -1) {
-        return;
+        return child;
       }
     } else if (oldParentNode) {
       child.remove();
@@ -156,14 +156,20 @@ export class Node extends EventTarget {
 
     child._setOwnerDocument(this.#ownerDocument);
     this.#childNodesMutator.push(child);
+
+    return child;
   }
 
   removeChild(child: Node) {
     // TODO
   }
 
-  replaceChild(child: Node) {
-    // TODO
+  replaceChild(newChild: Node, oldChild: Node): Node {
+    if (oldChild.parentNode !== this) {
+      throw new Error("Old child's parent is not the current node.");
+    }
+    oldChild.replaceWith(newChild);
+    return oldChild;
   }
 
   private insertBeforeAfter(nodes: (Node | string)[], side: number) {
@@ -309,4 +315,3 @@ export class Comment extends CharacterData {
     return <string>this.nodeValue;
   }
 }
-

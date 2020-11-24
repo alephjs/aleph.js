@@ -1,6 +1,7 @@
 import { CanvasContext2D } from "./canvas.ts";
 import { getLock } from "./constructor-lock.ts";
 import { fragmentNodesFromString } from "./deserialize.ts";
+import { NodeList, nodeListMutatorSym } from "./node-list.ts";
 import { Node, NodeType, Text } from "./node.ts";
 
 export class DOMTokenList extends Set<string> {
@@ -106,11 +107,11 @@ export class Element extends Node {
     for (const attribute of Object.getOwnPropertyNames(attributes)) {
       out += ` ${attribute.toLowerCase()}`;
 
+      // escaping: https://www.w3.org/TR/2009/WD-html5-20090212/serializing-html-fragments.html#escapingString
       if (attributes[attribute] != null) {
         out += `="${attributes[attribute]
           .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
+          .replace(/\xA0/g, "&nbsp;")
           .replace(/"/g, "&quot;")
           }"`;
       }
@@ -156,8 +157,10 @@ export class Element extends Node {
           out += (<Element>child).outerHTML;
           break;
         case NodeType.TEXT_NODE:
+          // escaping: https://www.w3.org/TR/2009/WD-html5-20090212/serializing-html-fragments.html#escapingString
           out += (<Text>child).data
             .replace(/&/g, "&amp;")
+            .replace(/\xA0/g, "&nbsp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
           break;
@@ -178,10 +181,11 @@ export class Element extends Node {
 
     if (html.length) {
       const parsed = fragmentNodesFromString(html);
-      mutator.push(...parsed.childNodes);
+      mutator.push(...parsed.childNodes[0].childNodes);
 
       for (const child of this.childNodes) {
         child.parentNode = child.parentElement = this;
+        child._setOwnerDocument(this.ownerDocument);
       }
     }
   }
@@ -204,6 +208,10 @@ export class Element extends Node {
     if (name === "id") {
       this.#currentId = value;
     }
+  }
+
+  removeAttribute(name: string) {
+    this.attributes[name] = null as any as string;
   }
 
   hasAttribute(name: string): boolean {
@@ -259,6 +267,26 @@ export class Element extends Node {
     }
 
     return prev;
+  }
+
+  querySelector(selectors: string): Element | null {
+    if (!this.ownerDocument) {
+      throw new Error("Element must have an owner document");
+    }
+
+    return this.ownerDocument!._nwapi.first(selectors, this);
+  }
+
+  querySelectorAll(selectors: string): NodeList {
+    if (!this.ownerDocument) {
+      throw new Error("Element must have an owner document");
+    }
+
+    const nodeList = new NodeList();
+    const mutator = nodeList[nodeListMutatorSym]();
+    mutator.push(...this.ownerDocument!._nwapi.select(selectors, this))
+
+    return nodeList;
   }
 
   // TODO: DRY!!!
@@ -329,6 +357,10 @@ export class Element extends Node {
     }
 
     return search;
+  }
+
+  get style(): Record<string, string> {
+    return {}
   }
 
   getContext(type: string) {

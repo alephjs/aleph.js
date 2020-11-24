@@ -176,7 +176,8 @@ export class Routing {
 }
 
 export function getPagePath(moduleId: string): string {
-    return util.trimSuffix(moduleId, '.js').replace(reMDExt, '').toLowerCase().replace(/\s+/g, '-').replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
+    const id = util.trimSuffix(moduleId, '.js').replace(reMDExt, '').toLowerCase().replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
+    return id.startsWith('/api/') ? id : id.replace(/\s+/g, '-')
 }
 
 function matchPath(routePath: string, locPath: string): [Record<string, string>, boolean] {

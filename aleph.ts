@@ -4,7 +4,7 @@ import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './
 import events from './events.ts'
 import { createPageProps, RouteModule, Routing } from './routing.ts'
 import type { RouterURL } from './types.ts'
-import util, { hashShort, reModuleExt } from './util.ts'
+import util, { hashShort, reHttp } from './util.ts'
 
 export function ALEPH({ initial }: {
     initial: {
@@ -50,7 +50,7 @@ export function ALEPH({ initial }: {
                 if (mod.deps) {
                     // import async dependencies
                     for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
-                        await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }, e.forceRefetch))
+                        await import(getModuleImportUrl(baseUrl, { id: util.ensureExt(dep.url.replace(reHttp, '/-/'), '.js'), hash: dep.hash }, e.forceRefetch))
                     }
                     if (mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno.')).length > 0) {
                         const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : ''))
@@ -146,7 +146,7 @@ export function ALEPH({ initial }: {
                     if (mod.deps) {
                         // import async dependencies
                         for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
-                            await import(getModuleImportUrl(baseUrl, { id: dep.url.replace(reModuleExt, '.js'), hash: dep.hash }))
+                            await import(getModuleImportUrl(baseUrl, { id: util.ensureExt(dep.url.replace(reHttp, '/-/'), '.js'), hash: dep.hash }))
                         }
                         if (mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno.')).length > 0) {
                             const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`)
@@ -208,7 +208,7 @@ export function ALEPH({ initial }: {
 }
 
 export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceRefetch = false) {
-    return util.cleanPath(baseUrl + '/_aleph/' + util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js` + (forceRefetch ? `?t=${Date.now()}` : ''))
+    return util.cleanPath(baseUrl + '/_aleph/' + (mod.id.startsWith('/-/') ? mod.id : util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js`) + (forceRefetch ? `?t=${Date.now()}` : ''))
 }
 
 export async function redirect(url: string, replace?: boolean) {

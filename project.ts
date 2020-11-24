@@ -1,3 +1,4 @@
+import CleanCSS from 'https://esm.sh/clean-css@4.2.3?no-check'
 import marked from 'https://esm.sh/marked@1.2.0'
 import postcss, { AcceptedPlugin } from 'https://esm.sh/postcss@8.1.4'
 import { minify } from 'https://esm.sh/terser@5.3.2'
@@ -10,9 +11,10 @@ import log from './log.ts'
 import { getPagePath, RouteModule, Routing } from './routing.ts'
 import { colors, ensureDir, fromStreamReader, path, ServerRequest, Sha1, walk } from './std.ts'
 import { compile } from './tsc/compile.ts'
-import type { AlephEnv, APIHandler, Config, RouterURL } from './types.ts'
+import type { APIHandler, Config, RouterURL } from './types.ts'
 import util, { hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
-import { cleanCSS, less } from './vendor/mod.ts'
+import { createHTMLDocument } from './vendor/deno-dom/document.ts'
+import less from './vendor/less/less.js'
 import { version } from './version.ts'
 
 interface Module {
@@ -71,12 +73,13 @@ export class Project {
     #renderer: { renderPage: CallableFunction } = { renderPage: () => void 0 }
     #rendered: Map<string, Map<string, RenderResult>> = new Map()
     #postcssPlugins: Record<string, AcceptedPlugin> = {}
+    #cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
 
     constructor(appDir: string, mode: 'development' | 'production', reload = false) {
         this.appRoot = path.resolve(appDir)
         this.mode = mode
         this.config = {
-            srcDir: '/',
+            srcDir: existsDirSync(path.join(this.appRoot, '/src/pages')) ? '/src' : '/',
             outputDir: '/dist',
             baseUrl: '/',
             defaultLocale: 'en',
@@ -87,8 +90,8 @@ export class Project {
             },
             buildTarget: mode === 'development' ? 'es2018' : 'es2015',
             sourceMap: false,
-            reactUrl: 'https://esm.sh/react@16.14.0',
-            reactDomUrl: 'https://esm.sh/react-dom@16.14.0',
+            reactUrl: 'https://esm.sh/react@17.0.1',
+            reactDomUrl: 'https://esm.sh/react-dom@17.0.1',
             plugins: [],
             postcss: {
                 plugins: [
@@ -124,14 +127,14 @@ export class Project {
         if (reStyleModuleExt.test(moduleID)) {
             return true
         }
+        if (reMDExt.test(moduleID)) {
+            return moduleID.startsWith('/pages/')
+        }
         if (reModuleExt.test(moduleID)) {
             return moduleID === '/404.js' ||
                 moduleID === '/app.js' ||
                 moduleID.startsWith('/pages/') ||
                 moduleID.startsWith('/components/')
-        }
-        if (reMDExt.test(moduleID)) {
-            return moduleID.startsWith('/pages/')
         }
         const plugin = this.config.plugins.find(p => p.test.test(moduleID))
         if (plugin?.acceptHMR) {
@@ -157,8 +160,9 @@ export class Project {
                     }
                 }
             }
+            return true
         }
-        return true
+        return ssr
     }
 
     getModule(id: string): Module | null {
@@ -217,7 +221,7 @@ export class Project {
     }
 
     async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandler | null> {
-        const [url] = this.#apiRouting.createRouter(loc)
+        const [url] = this.#apiRouting.createRouter({ ...loc, pathname: decodeURI(loc.pathname) })
         if (url.pagePath != '') {
             const moduleID = url.pagePath + '.js'
             if (this.#modules.has(moduleID)) {
@@ -260,6 +264,19 @@ export class Project {
         return [status, data]
     }
 
+    getPreloadScripts() {
+        const { baseUrl } = this.config
+        const scripts = [
+            'deno.land/x/aleph/aleph.js',
+            'deno.land/x/aleph/context.js',
+            'deno.land/x/aleph/error.js',
+            'deno.land/x/aleph/events.js',
+            'deno.land/x/aleph/routing.js',
+            'deno.land/x/aleph/util.js'
+        ]
+        return scripts.map(src => ({ src: `${baseUrl}_aleph/-/${src}`, type: 'module', preload: true }))
+    }
+
     async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string, Record<string, string> | null]> {
         if (!this.isSSRable(loc.pathname)) {
             const [url] = this.#routing.createRouter(loc)
@@ -275,7 +292,7 @@ export class Project {
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                ...this.getPreloadScripts(),
                 ...scripts
             ],
             body,
@@ -293,6 +310,7 @@ export class Project {
             scripts: [
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                ...this.getPreloadScripts()
             ],
             head: customLoading?.head || [],
             body: `<main>${customLoading?.body || ''}</main>`,
@@ -379,6 +397,7 @@ export class Project {
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                ...this.getPreloadScripts(),
                 ...scripts
             ],
             body,
@@ -442,15 +461,15 @@ export class Project {
     }
 
     private async _loadConfig() {
-        const { ALEPH_IMPORT_MAP } = globalThis as any
-        if (ALEPH_IMPORT_MAP) {
-            const { imports } = ALEPH_IMPORT_MAP
-            Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
-        }
-
         const importMapFile = path.join(this.appRoot, 'import_map.json')
         if (existsFileSync(importMapFile)) {
             const { imports } = JSON.parse(await Deno.readTextFile(importMapFile))
+            Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
+        }
+
+        const { ALEPH_IMPORT_MAP, navigator } = globalThis as any
+        if (ALEPH_IMPORT_MAP) {
+            const { imports } = ALEPH_IMPORT_MAP
             Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
         }
 
@@ -507,6 +526,7 @@ export class Project {
             Object.assign(this.config, { sourceMap })
         }
         if (util.isNEString(defaultLocale)) {
+            navigator.language = defaultLocale
             Object.assign(this.config, { defaultLocale })
         }
         if (util.isArray(locales)) {
@@ -541,8 +561,6 @@ export class Project {
                 log.warn('bad postcss.config.json', e.message)
             }
         }
-        // update buildID
-        Object.assign(this, { buildID: this.mode + '.' + this.config.buildTarget })
         // update routing
         this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
     }
@@ -575,18 +593,55 @@ export class Project {
             this.#postcssPlugins[name] = Plugin
         }))
 
-        // inject ALEPH global variable
+        // inject virtual browser gloabl objects
         Object.assign(globalThis, {
-            ALEPH: {
-                ENV: {
-                    ...Deno.env.toObject(),
-                    ...this.config.env,
-                    __version: version,
-                    __buildMode: this.mode,
-                    __buildTarget: this.config.buildTarget,
-                } as AlephEnv
-            }
+            __createHTMLDocument: () => createHTMLDocument(),
+            document: createHTMLDocument(),
+            navigator: {
+                connection: {
+                    downlink: 1.5,
+                    effectiveType: "3g",
+                    onchange: null,
+                    rtt: 300,
+                    saveData: false,
+                },
+                cookieEnabled: false,
+                deviceMemory: 0,
+                hardwareConcurrency: 0,
+                language: 'en',
+                maxTouchPoints: 0,
+                onLine: true,
+                userAgent: `Deno/${Deno.version.deno}`,
+                vendor: "Deno Land",
+            },
+            location: {
+                protocol: 'http:',
+                host: 'localhost',
+                hostname: 'localhost',
+                port: '',
+                href: 'https://localhost/',
+                origin: 'https://localhost',
+                pathname: '/',
+                search: '',
+                hash: '',
+                reload() { },
+                replace() { },
+                toString() { return this.href },
+            },
+            innerWidth: 1920,
+            innerHeight: 1080,
+            devicePixelRatio: 1,
+            $RefreshReg$: () => { },
+            $RefreshSig$: () => (type: any) => type,
         })
+
+        // inject env variables
+        Object.entries({
+            ...this.config.env,
+            __version: version,
+            __buildMode: this.mode,
+            __buildTarget: this.config.buildTarget,
+        }).forEach(([key, value]) => Deno.env.set(key, value))
 
         // change current work dir to appDoot
         Deno.chdir(this.appRoot)
@@ -672,7 +727,7 @@ export class Project {
         log.info('Start watching code changes...')
         for await (const event of w) {
             for (const p of event.paths) {
-                const path = util.cleanPath(util.trimPrefix(p, this.appRoot))
+                const path = util.cleanPath(util.trimPrefix(p, this.srcDir))
                 // handle `api` dir remove directly
                 const validated = (() => {
                     // ignore `.aleph` and output directories
@@ -824,7 +879,8 @@ export class Project {
             routes: this.#routing.routes,
             preloadModules: ['/404.js', '/app.js'].filter(id => this.#modules.has(id)).map(id => {
                 return this._getRouteModule(this.#modules.get(id)!)
-            })
+            }),
+            renderMode: this.config.ssr ? 'ssr' : 'spa'
         }
         const module = this._moduleFromURL('/main.js')
         const metaFile = path.join(this.buildDir, 'main.meta.json')
@@ -910,10 +966,10 @@ export class Project {
                     break
                 }
             }
-            if (/^https?:\/\/[0-9a-z\.\-]+\/react(@[0-9a-z\.\-]+)?\/?$/i.test(dlUrl)) {
+            if (/^(https?:\/\/[0-9a-z\.\-]+)?\/react(@[0-9a-z\.\-]+)?\/?$/i.test(dlUrl)) {
                 dlUrl = this.config.reactUrl
             }
-            if (/^https?:\/\/[0-9a-z\.\-]+\/react\-dom(@[0-9a-z\.\-]+)?(\/server)?\/?$/i.test(dlUrl)) {
+            if (/^(https?:\/\/[0-9a-z\.\-]+)?\/react\-dom(@[0-9a-z\.\-]+)?(\/server)?\/?$/i.test(dlUrl)) {
                 dlUrl = this.config.reactDomUrl
                 if (/\/server\/?$/i.test(url)) {
                     dlUrl += '/server'
@@ -1003,12 +1059,12 @@ export class Project {
                 if (this.isDev) {
                     css = css.trim()
                 } else {
-                    const output = cleanCSS.minify(css)
+                    const output = this.#cleanCSS.minify(css)
                     css = output.styles
                 }
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(getRelativePath(
-                        path.dirname(mod.url),
+                        path.dirname(fixImportUrl(mod.url)),
                         '/-/deno.land/x/aleph/head.js'
                     ))};`,
                     `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
@@ -1433,30 +1489,6 @@ export class Project {
     }
 }
 
-// add virtual browser global objects
-Object.assign(globalThis, {
-    // document: new Document(),
-    location: {
-        protocol: 'http:',
-        host: 'localhost',
-        hostname: 'localhost',
-        port: '',
-        href: 'https://localhost/',
-        origin: 'https://localhost',
-        pathname: '/',
-        search: '',
-        hash: '',
-        reload() { },
-        replace() { },
-        toString() { return this.href },
-    },
-    innerWidth: 1920,
-    innerHeight: 1080,
-    devicePixelRatio: 1,
-    $RefreshReg$: () => { },
-    $RefreshSig$: () => (type: any) => type,
-})
-
 /** inject HMR and React Fast Referesh helper code  */
 export function injectHmr({ id, sourceFilePath, jsContent }: Module): string {
     let hmrImportPath = getRelativePath(
@@ -1523,7 +1555,8 @@ function fixImportUrl(importUrl: string): string {
     if (isRemote) {
         return '/-/' + url.hostname + (url.port ? '/' + url.port : '') + pathname + ext
     }
-    return pathname + ext
+    const result = pathname + ext
+    return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result;
 }
 
 /** get hash(sha1) of the content, mix current aleph.js version when the second parameter is `true` */

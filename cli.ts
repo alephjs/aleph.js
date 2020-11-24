@@ -19,7 +19,7 @@ const helpMessage = `Aleph.js v${version}
 The React Framework in deno.
 
 Docs: https://alephjs.org/docs
-Bugs: https://github.com/postui/aleph.js/issues
+Bugs: https://github.com/alephjs/aleph.js/issues
 
 Usage:
     aleph <command> [...options]
@@ -160,17 +160,16 @@ async function main() {
         }
     }
 
-    import(`./cli/${command}.ts`).then(({ default: cmd }) => {
-        if (command === 'upgrade') {
-            cmd(argOptions.v || argOptions.version || 'latest')
-        } else {
-            const appDir = path.resolve(args[0] || '.')
-            if (command !== 'init' && !existsDirSync(appDir)) {
-                log.fatal('No such directory:', appDir)
-            }
-            cmd(appDir, argOptions)
+    const { default: cmd } = await import(`./cli/${command}.ts`)
+    if (command === 'upgrade') {
+        await cmd(argOptions.v || argOptions.version || 'latest')
+    } else {
+        const appDir = path.resolve(args[0] || '.')
+        if (command !== 'init' && !existsDirSync(appDir)) {
+            log.fatal('No such directory:', appDir)
         }
-    })
+        await cmd(appDir, argOptions)
+    }
 }
 
 if (import.meta.main) {

@@ -1,8 +1,9 @@
 {
   "name": "aleph",
-  "version": "0.2.19",
+  "version": "0.2.26",
   "description": "The React Framework in Deno.",
-  "repository": "https://github.com/postui/aleph.js",
+  "homepage": "https://alephjs.org",
+  "repository": "https://github.com/alephjs/aleph.js",
   "entry": "./mod.ts",
   "files": [
     "./*.ts",
@@ -14,8 +15,10 @@
     "./LICENSE",
     "./mod.ts"
   ],
-  "checkFormat": false,
-  "checkTests": true,
+  "ignore": [],
+  "check": true,
   "checkAll": true,
+  "checkTests": true,
+  "checkFormat": false,
   "unlisted": false
 }
