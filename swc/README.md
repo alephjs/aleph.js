@@ -8,7 +8,7 @@ You will need [rust](https://www.rust-lang.org/tools/install) 1.30+ and [wasm-pa
 ## Build
 
 ```bash
-sh ./build.sh
+deno run -A build.ts
 ```
 
 ## Run tests
@@ -20,5 +20,5 @@ cargo test --all
 ## Banchmark
 
 ```bash
-wasm-pack build --target web && deno run -A banchmark.ts
+deno run -A build.ts && deno run -A banchmark.ts
 ```
