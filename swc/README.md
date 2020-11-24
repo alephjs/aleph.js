@@ -20,6 +20,5 @@ cargo test --all
 ## Banchmark
 
 ```bash
-wasm-pack build --target web
-deno run -A banchmark.ts
+wasm-pack build --target web && deno run -A banchmark.ts
 ```
