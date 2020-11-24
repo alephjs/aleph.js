@@ -1,4 +1,4 @@
-import { colors, ensureDir, fromStreamReader, gzipDecode, path, Untar } from '../deps.ts'
+import { colors, ensureDir, gzipDecode, path, readerFromStreamReader, Untar } from '../deps.ts'
 import { ensureTextFile } from '../fs.ts'
 import log from '../log.ts'
 import util from '../util.ts'
@@ -45,7 +45,7 @@ export default async function (appDir: string, options: Record<string, string | 
     const rev = 'master'
     log.info('Downloading template...')
     const resp = await fetch('https://codeload.github.com/alephjs/alephjs-templates/tar.gz/' + rev)
-    const gzData = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
+    const gzData = await Deno.readAll(readerFromStreamReader(resp.body!.getReader()))
     log.info('Saving template...')
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))

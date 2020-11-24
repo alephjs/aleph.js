@@ -1,6 +1,6 @@
 import { Request } from './api.ts'
 import type { AcceptedPlugin, ServerRequest } from './deps.ts'
-import { CleanCSS, colors, createHTMLDocument, ensureDir, fromStreamReader, less, marked, minify, path, postcss, safeLoadFront, Sha1, walk } from './deps.ts'
+import { CleanCSS, colors, createHTMLDocument, ensureDir, less, marked, minify, path, postcss, readerFromStreamReader, safeLoadFront, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from './fs.ts'
 import { createHtml } from './html.ts'
@@ -986,7 +986,7 @@ export class Project {
                     if (resp.status != 200) {
                         throw new Error(`Download ${url}: ${resp.status} - ${resp.statusText}`)
                     }
-                    sourceContent = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
+                    sourceContent = await Deno.readAll(readerFromStreamReader(resp.body!.getReader()))
                     mod.sourceHash = getHash(sourceContent)
                     shouldCompile = true
                 } catch (err) {
@@ -998,7 +998,7 @@ export class Project {
                     if (resp.status != 200) {
                         throw new Error(`${resp.status} - ${resp.statusText}`)
                     }
-                    sourceContent = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
+                    sourceContent = await Deno.readAll(readerFromStreamReader(resp.body!.getReader()))
                     const sourceHash = getHash(sourceContent, true)
                     if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
