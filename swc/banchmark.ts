@@ -7,9 +7,9 @@ const reHttp = /^https?:\/\//i
 
 function tsc(source: string, opts: any) {
     const compileOptions = {
-        mode: opts.swcOptions?.isDev ? 'development' : 'production',
-        target: opts.swcOptions?.target || 'es2020',
-        reactRefresh: opts.swcOptions?.isDev,
+        mode: opts.isDev ? 'development' : 'production',
+        target: 'es2020',
+        reactRefresh: opts.isDev,
         rewriteImportPath: (path: string) => path.replace(reHttp, '/-/'),
         signUseDeno: (id: string) => {
             const sig = 'useDeno.' + (new Sha1()).update(id).update("0.2.25").update(Date.now().toString()).hex().slice(0, hashShort)
@@ -44,38 +44,38 @@ async function banchmark(isDev: boolean) {
 
     console.log(`[banchmark] ${sourceFiles.length} files ${isDev ? '(development mode)' : ''}`)
 
-    const d1 = { d: 0, min: 0, max: 0, maxFileName: '' }
+    const d1 = { d: 0, min: 0, max: 0, maxDetails: '' }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        tsc(code, { filename, swcOptions: { isDev } })
+        tsc(code, { filename, isDev })
         const d = performance.now() - t
         if (d1.min === 0 || d < d1.min) {
             d1.min = d
         }
         if (d > d1.max) {
             d1.max = d
-            d1.maxFileName = `${path.basename(filename)},${Math.round(code.length / 1024)}KB`
+            d1.maxDetails = `${Math.round(code.length / 1024)}KB`
         }
         d1.d += d
     }
 
-    const d2 = { d: 0, min: 0, max: 0, maxFileName: '' }
+    const d2 = { d: 0, min: 0, max: 0, maxDetails: '' }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        transformSync(code, { filename, swcOptions: { isDev } })
+        transformSync(code, { filename, isDev })
         const d = performance.now() - t
         if (d2.min === 0 || d < d2.min) {
             d2.min = d
         }
         if (d > d2.max) {
             d2.max = d
-            d2.maxFileName = `${path.basename(filename)},${Math.round(code.length / 1024)}KB`
+            d2.maxDetails = `${Math.round(code.length / 1024)}KB`
         }
         d2.d += d
     }
 
-    console.log(`tsc done in ${(d1.d / 1000).toFixed(2)}s, min in ${d1.min.toFixed(2)}ms, max in ${d1.max.toFixed(2)}ms (${d1.maxFileName})`)
-    console.log(`swc done in ${(d2.d / 1000).toFixed(2)}s, min in ${d2.min.toFixed(2)}ms, max in ${d2.max.toFixed(2)}ms (${d1.maxFileName})`)
+    console.log(`tsc done in ${(d1.d / 1000).toFixed(2)}s, min in ${d1.min.toFixed(2)}ms, max in ${d1.max.toFixed(2)}ms (${d1.maxDetails})`)
+    console.log(`swc done in ${(d2.d / 1000).toFixed(2)}s, min in ${d2.min.toFixed(2)}ms, max in ${d2.max.toFixed(2)}ms (${d1.maxDetails})`)
     console.log(`swc is ${coloredDiff(d1.d / d2.d)} ${d1.d > d2.d ? 'faster' : 'slower'} than tsc`)
 }
 
