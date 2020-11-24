@@ -29,6 +29,7 @@ pub struct EmitOptions {
   pub jsx_factory: String,
   pub jsx_fragment_factory: String,
   pub is_dev: bool,
+  pub source_map: bool,
 }
 
 impl Default for EmitOptions {
@@ -37,6 +38,7 @@ impl Default for EmitOptions {
       jsx_factory: "React.createElement".into(),
       jsx_fragment_factory: "React.Fragment".into(),
       is_dev: true,
+      source_map: true,
     }
   }
 }
@@ -163,26 +165,32 @@ impl ParsedModule {
       fixer(Some(&self.comments)),
     );
 
-    self.apply_transform(&mut passes)
+    self.apply_transform(&mut passes, options.source_map)
   }
 
   /// Apply transform with fold.
   pub fn apply_transform<T: Fold>(
     &self,
     mut tr: T,
+    source_map: bool,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module.clone());
     let program = swc_common::GLOBALS.set(&Globals::new(), || {
       helpers::HELPERS.set(&helpers::Helpers::new(false), || program.fold_with(&mut tr))
     });
-    let mut buf = vec![];
-    let mut src_map_buf = vec![];
+    let mut buf = Vec::new();
+    let mut src_map_buf = Vec::new();
+    let src_map = if source_map {
+      Some(&mut src_map_buf)
+    } else {
+      None
+    };
     {
       let writer = Box::new(JsWriter::new(
         self.source_map.clone(),
         "\n",
         &mut buf,
-        Some(&mut src_map_buf),
+        src_map,
       ));
       let mut emitter = swc_ecmascript::codegen::Emitter {
         cfg: swc_ecmascript::codegen::Config {
@@ -195,13 +203,17 @@ impl ParsedModule {
       program.emit_with(&mut emitter).unwrap();
     }
     let src = String::from_utf8(buf).unwrap();
-    let mut buf = Vec::new();
-    self
-      .source_map
-      .build_source_map_from(&mut src_map_buf, None)
-      .to_writer(&mut buf)
-      .unwrap();
-    Ok((src, Some(String::from_utf8(buf).unwrap())))
+    if source_map {
+      let mut buf = Vec::new();
+      self
+        .source_map
+        .build_source_map_from(&mut src_map_buf, None)
+        .to_writer(&mut buf)
+        .unwrap();
+      Ok((src, Some(String::from_utf8(buf).unwrap())))
+    } else {
+      Ok((src, None))
+    }
   }
 }
 

@@ -1033,12 +1033,15 @@ mod tests {
     let module =
       ParsedModule::parse(specifier, source, JscTarget::Es2020).expect("could not parse module");
     let (code, _) = module
-      .apply_transform(fast_refresh_fold(
-        "$RefreshReg$",
-        "$RefreshSig$",
-        true,
-        module.source_map.clone(),
-      ))
+      .apply_transform(
+        fast_refresh_fold(
+          "$RefreshReg$",
+          "$RefreshSig$",
+          true,
+          module.source_map.clone(),
+        ),
+        false,
+      )
       .expect("could not transpile module");
     if code != expect {
       let mut p: usize = 0;

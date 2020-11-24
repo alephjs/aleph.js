@@ -26,10 +26,10 @@ pub struct Options {
     pub filename: String,
 
     #[serde(default)]
-    pub is_dev: bool,
+    pub import_map: ImportHashMap,
 
     #[serde(default)]
-    pub import_map: ImportHashMap,
+    pub is_dev: bool,
 
     #[serde(default)]
     pub swc_options: SWCOptions,
@@ -46,6 +46,9 @@ pub struct SWCOptions {
 
     #[serde(default = "default_pragma_frag")]
     pub jsx_fragment_factory: String,
+
+    #[serde(default)]
+    pub source_map: bool,
 }
 
 impl Default for SWCOptions {
@@ -54,6 +57,7 @@ impl Default for SWCOptions {
             target: default_target(),
             jsx_factory: default_pragma(),
             jsx_fragment_factory: default_pragma_frag(),
+            source_map: true,
         }
     }
 }
@@ -102,6 +106,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
                 jsx_factory: opts.swc_options.jsx_factory.clone(),
                 jsx_fragment_factory: opts.swc_options.jsx_fragment_factory.clone(),
                 is_dev: opts.is_dev,
+                source_map: opts.swc_options.source_map,
             },
         )
         .expect("could not transpile module");
