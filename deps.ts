@@ -9,6 +9,7 @@ export type { Response } from 'https://deno.land/std@0.78.0/http/server.ts'
 export { fromStreamReader } from 'https://deno.land/std@0.78.0/io/mod.ts'
 export * as path from 'https://deno.land/std@0.78.0/path/mod.ts'
 export * as ws from 'https://deno.land/std@0.78.0/ws/mod.ts'
+export * as base64 from 'https://deno.land/std@0.79.0/encoding/base64.ts'
 // deno.land/x
 export * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 export { gzipDecode, gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
