@@ -1,4 +1,4 @@
-import { ensureDir, path } from './std.ts'
+import { ensureDir, path } from './deps.ts'
 
 export async function existsDir(path: string) {
     try {

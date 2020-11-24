@@ -1,8 +1,6 @@
-import { compress as brotli } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
-import { FormDataReader } from 'https://deno.land/x/oak@v6.3.2/multipart.ts'
-import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
+import { FormDataReader } from 'https://deno.land/x/oak@v6.3.2/multipart.ts' // remove it
+import { brotli, gzipEncode, ServerRequest } from './deps.ts'
 import log from './log.ts'
-import { ServerRequest } from './std.ts'
 import type { APIRequest, FormDataBody } from './types.ts'
 
 export class Request extends ServerRequest implements APIRequest {
@@ -166,7 +164,7 @@ export class Request extends ServerRequest implements APIRequest {
             if (this.headers.get('accept-encoding')?.includes('br')) {
                 this.#resp.headers.set('Vary', 'Origin')
                 this.#resp.headers.set('Content-Encoding', 'br')
-                body = brotli(body)
+                body = brotli.compress(body)
             } else if (this.headers.get('accept-encoding')?.includes('gzip')) {
                 this.#resp.headers.set('Vary', 'Origin')
                 this.#resp.headers.set('Content-Encoding', 'gzip')

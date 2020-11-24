@@ -1,10 +1,10 @@
 import { Request } from './api.ts'
+import { path, serve, ws } from './deps.ts'
 import { existsFileSync } from './fs.ts'
 import { createHtml } from './html.ts'
 import log from './log.ts'
 import { getContentType } from './mime.ts'
 import { injectHmr, Project } from './project.ts'
-import { path, serve, ws } from './std.ts'
 import util, { hashShort } from './util.ts'
 
 export async function start(appDir: string, port: number, isDev = false, reload = false) {

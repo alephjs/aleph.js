@@ -1,8 +1,8 @@
-import React, { Children, cloneElement, ComponentType, CSSProperties, isValidElement, MouseEvent, PropsWithChildren, ReactElement, useCallback, useEffect, useMemo, useState } from 'https://esm.sh/react'
+import React, { Children, cloneElement, CSSProperties, isValidElement, MouseEvent, PropsWithChildren, useCallback, useEffect, useMemo } from 'https://esm.sh/react'
 import { redirect } from './aleph.ts'
 import events from './events.ts'
 import { useRouter } from './hooks.ts'
-import util, { reModuleExt } from './util.ts'
+import util from './util.ts'
 
 const prefetchedPageModules = new Set<string>()
 

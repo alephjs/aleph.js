@@ -1,4 +1,4 @@
-import type { ServerRequest } from './std.ts';
+import type { ServerRequest } from './deps.ts';
 
 /**
  * A plugin for **Aleph.js** application.
