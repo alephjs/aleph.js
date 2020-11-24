@@ -2,5 +2,5 @@
 Thumbs.db
 .aleph/
 dist/
-
-.vscode/launch.json
+swc/target/
+swc/pkg/
