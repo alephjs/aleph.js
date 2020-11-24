@@ -21,9 +21,14 @@ pub fn aleph_jsx_fold(
     }
 }
 
-/// aleph.js jsx fold for swc, core functions include:
-/// - rewrite `Import` path
-/// - add `__source` prop in development
+/// aleph.js jsx fold, core functions include:
+/// - add `__sourceFile` prop in dev mode
+/// - resolve `Import` component `from` prop
+/// - transform `a` to `Link`
+/// - transform `head` to `Head`
+/// - transform `link` to `Import`
+/// - transform `style` to `Style`
+/// - optimize `img`
 struct AlephJsxFold {
     resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
@@ -48,18 +53,18 @@ impl Fold for AlephJsxFold {
             let mut from_prop_value = "";
 
             for (i, attr) in el.attrs.iter().enumerate() {
-                match attr {
-                    JSXAttrOrSpread::JSXAttr(ref a) => {
-                        let name_is_from = match a.name {
-                            JSXAttrName::Ident(ref i) => i.sym.as_ref().eq("from"),
+                match &attr {
+                    JSXAttrOrSpread::JSXAttr(a) => {
+                        let name_is_from = match &a.name {
+                            JSXAttrName::Ident(i) => i.sym.as_ref().eq("from"),
                             _ => continue,
                         };
                         if name_is_from {
-                            match a.value {
-                                Some(ref val) => {
+                            match &a.value {
+                                Some(val) => {
                                     match val {
-                                        JSXAttrValue::Lit(ref l) => match l {
-                                            Lit::Str(ref s) => {
+                                        JSXAttrValue::Lit(l) => match l {
+                                            Lit::Str(s) => {
                                                 from_prop_index = i as i32;
                                                 from_prop_value = s.value.as_ref();
                                             }
@@ -97,8 +102,8 @@ impl Fold for AlephJsxFold {
                 Ok(v) => v,
                 _ => return el,
             };
-            let file_name = match file_lines.file.name {
-                FileName::Real(ref p) => p.display().to_string(),
+            let file_name = match &file_lines.file.name {
+                FileName::Real(p) => p.display().to_string(),
                 _ => unimplemented!("file name for other than real files"),
             };
             el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {

@@ -10,7 +10,6 @@ use relative_path::RelativePath;
 use serde::Serialize;
 use std::{
   cell::RefCell,
-  ops::DerefMut,
   path::{Path, PathBuf},
   rc::Rc,
   str::FromStr,
@@ -35,6 +34,7 @@ pub struct DependencyDescriptor {
   pub is_dynamic: bool,
 }
 
+/// A Resolver to resolve aleph.js import/export URL.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolver {
   import_map: ImportMap,
@@ -68,7 +68,7 @@ impl Resolver {
     return self.specifier_is_remote;
   }
 
-  // fix import/export url
+  /// fix import/export url.
   //  - `https://esm.sh/react` -> `/-/esm.sh/react.js`
   //  - `https://esm.sh/react@17.0.1?dev` -> `/-/esm.sh/react@17.0.1_dev.js`
   //  - `http://localhost:8080/mod` -> `/-/http_localhost_8080/mod.js`
@@ -138,7 +138,11 @@ impl Resolver {
     p
   }
 
-  // resolve import/export url
+  /// resolve import/export url.
+  // [/pages/index.tsx]
+  // - `https://esm.sh/react` -> `/_aleph/-/esm.sh/react.js`
+  // - `../components/logo.tsx` -> `/_aleph/components/logo.js`
+  // - `@/components/logo.tsx` -> `import Logo from "/_aleph/components/logo.js`
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> String {
     let url = self.import_map.resolve(self.specifier.as_str(), url);
     let url = url.as_str();
@@ -284,8 +288,8 @@ impl Fold for AlephResolveFold {
       }
       ModuleDecl::ExportNamed(decl) => {
         let mut r = self.resolver.borrow_mut();
-        let url = match decl.src {
-          Some(ref src) => src.value.as_ref(),
+        let url = match &decl.src {
+          Some(src) => src.value.as_ref(),
           None => return ModuleDecl::ExportNamed(NamedExport { ..decl }),
         };
         ModuleDecl::ExportNamed(NamedExport {
@@ -318,8 +322,8 @@ impl Fold for AlephResolveFold {
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
       let mut r = self.resolver.borrow_mut();
-      let url = match call.args.first_mut() {
-        Some(&mut ExprOrSpread { ref mut expr, .. }) => match expr.deref_mut() {
+      let url = match call.args.first() {
+        Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
           Expr::Lit(lit) => match lit {
             Lit::Str(s) => s.value.as_ref(),
             _ => return call,
@@ -337,8 +341,8 @@ impl Fold for AlephResolveFold {
         }))),
       }];
     } else if is_call_expr_by_name(&call, "useDeno") {
-      let has_callback = match call.args.first_mut() {
-        Some(&mut ExprOrSpread { ref mut expr, .. }) => match expr.deref_mut() {
+      let has_callback = match call.args.first() {
+        Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
           Expr::Fn(_) => true,
           Expr::Arrow(_) => true,
           _ => false,
@@ -383,7 +387,7 @@ impl Fold for AlephResolveFold {
 fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
   let callee = match &call.callee {
     ExprOrSuper::Super(_) => return false,
-    ExprOrSuper::Expr(callee) => &**callee,
+    ExprOrSuper::Expr(callee) => callee.as_ref(),
   };
 
   match callee {

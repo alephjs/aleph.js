@@ -1,7 +1,5 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
-// @ref https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js
-
 use indexmap::IndexMap;
 use sha1::{Digest, Sha1};
 use std::rc::Rc;
@@ -28,6 +26,9 @@ pub fn fast_refresh_fold(
   }
 }
 
+/// aleph.js fast-refresh fold.
+///
+/// @ref https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js
 pub struct FastRefreshFold {
   source: Rc<SourceMap>,
   signature_index: u32,
@@ -1041,15 +1042,10 @@ mod tests {
           break;
         }
       }
-      let mut diff = code.get(p..p + 1).unwrap();
-      if diff.trim() == "" {
-        diff = "_"
-      }
       println!(
-        "{}\x1b[0;31m{}\x1b[0m{}",
+        "{}\x1b[0;31m{}\x1b[0m",
         code.get(0..p).unwrap(),
-        diff,
-        code.get(p + 1..).unwrap()
+        code.get(p..).unwrap()
       );
     }
     code == expect
@@ -1256,9 +1252,10 @@ $RefreshReg$(_c, "App");
         return <h1 ref={ref}>{foo}</h1>;
       };
     }
+    const F = memo('Foo');
+    const G = forwardRef(memo(forwardRef()));
+    const I = forwardRef(memo(forwardRef(0, () => {})));
     export let H = hoc();
-    const I = forwardRef(memo(forwardRef()))
-    const J = memo('Foo');
     export default React.memo(forwardRef((props, ref) => {
       return <h1>Foo</h1>;
     }));
@@ -1302,9 +1299,11 @@ function hoc() {
         return <h1 ref={ref}>{foo}</h1>;
     }, "useState{[foo, setFoo](0)}\nuseEffect{}");
 }
+const F = memo('Foo');
+const G = forwardRef(memo(forwardRef()));
+const I = forwardRef(memo(forwardRef(0, ()=>{
+})));
 export let H = hoc();
-const I = forwardRef(memo(forwardRef()));
-const J = memo('Foo');
 export default _c18 = React.memo(_c17 = forwardRef(_c16 = (props, ref)=>{
     return <h1 >Foo</h1>;
 }));
