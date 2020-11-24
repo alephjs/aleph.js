@@ -126,6 +126,14 @@ impl ParsedModule {
     let mut passes = chain!(
       aleph_resolve_fold(resolver.clone()),
       Optional::new(
+        aleph_jsx_fold(
+          resolver.clone(),
+          self.source_map.clone(),
+          options.is_dev && !is_remote_module
+        ),
+        jsx
+      ),
+      Optional::new(
         fast_refresh_fold(
           "$RefreshReg$",
           "$RefreshSig$",
@@ -133,14 +141,6 @@ impl ParsedModule {
           self.source_map.clone()
         ),
         options.is_dev && !is_remote_module
-      ),
-      Optional::new(
-        aleph_jsx_fold(
-          resolver.clone(),
-          self.source_map.clone(),
-          options.is_dev && !is_remote_module
-        ),
-        jsx
       ),
       Optional::new(
         react::jsx(
@@ -301,7 +301,7 @@ mod tests {
   #[test]
   fn test_transpile_jsx() {
     let source = r#"
-    import React, { useState } from "https://esm.sh/react"
+    import React, { useState, useEffect } from "https://esm.sh/react"
     export default function Index() {
       const [count, setCount] = useState(0)
       useEffect(() => {}, [])
@@ -309,6 +309,68 @@ mod tests {
         <>
           <Import from="../components/logo.tsx" />
           <h1>Hello World</h1>
+        </>
+      )
+    }
+    "#;
+    let module = ParsedModule::parse("/pages/index.tsx", source, JscTarget::Es2020)
+      .expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      "/pages/index.tsx",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      false,
+      false,
+    )));
+    let (code, _) = module
+      .transpile(resolver.clone(), &EmitOptions::default())
+      .expect("could not transpile module");
+    println!("{}", code);
+    assert!(code.contains("React.createElement(\"h1\", {"));
+    assert!(code.contains("React.createElement(React.Fragment, null"));
+    assert!(code.contains("__source: {"));
+    assert!(code.contains("import React, { useState, useEffect } from \"../-/esm.sh/react.js\""));
+    assert!(code.contains("from: \"../components/logo.js\""));
+    let r = resolver.borrow_mut();
+    assert_eq!(
+      r.dep_graph,
+      vec![
+        DependencyDescriptor {
+          specifier: "https://esm.sh/react".into(),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: "/components/logo.tsx".into(),
+          is_dynamic: true,
+        }
+      ]
+    );
+  }
+
+  #[test]
+  fn test_transpile_jsx_builtin_tags() {
+    let source = r#"
+    import React from "https://esm.sh/react"
+    export default function Index() {
+      return (
+        <>
+          <a href="/about">About</a>
+          <head>
+            <link rel="stylesheet" href="/about" />
+          </head>
+          <style>{`
+            :root {
+              --color: white;
+            }
+          `}</style>
+          <script src="ga.js"></script>
+          <script>{`
+            function gtag() {
+              dataLayer.push(arguments)
+            }
+            window.dataLayer = window.dataLayer || [];
+            gtag("js", new Date());
+            gtag("config", "G-WDCBBBRC98");
+          `}</script>
         </>
       )
     }

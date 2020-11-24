@@ -22,13 +22,14 @@ pub fn aleph_jsx_fold(
 }
 
 /// aleph.js jsx fold, core functions include:
-/// - add `__sourceFile` prop in dev mode
-/// - resolve `Import` component `from` prop
-/// - transform `a` to `Link`
-/// - transform `head` to `Head`
-/// - transform `link` to `Import`
-/// - transform `style` to `Style`
-/// - optimize `img`
+/// - add `__sourceFile` prop in development mode
+/// - resolve `Link` component `href` prop
+/// - rename `a` to `A`
+/// - rename `head` to `Head`
+/// - rename `link` to `Link`
+/// - rename `script` to `Script`
+/// - rename `style` to `Style`
+/// - optimize `img` in producation mode
 struct AlephJsxFold {
     resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
@@ -43,58 +44,71 @@ impl Fold for AlephJsxFold {
             return el;
         }
 
-        let is_import_el = match el.name {
-            JSXElementName::Ident(ref i) => i.sym.as_ref().eq("Import"),
-            _ => false,
-        };
+        match &el.name {
+            JSXElementName::Ident(id) => match id.sym.as_ref() {
+                "a" | "head" | "script" | "style" => {
+                    let id = uppercase_first_letter(id.sym.as_ref());
+                    el.name = JSXElementName::Ident(quote_ident!(id))
+                }
 
-        if is_import_el {
-            let mut from_prop_index: i32 = -1;
-            let mut from_prop_value = "";
+                "img" => {
+                    //todo: optimize img
+                }
 
-            for (i, attr) in el.attrs.iter().enumerate() {
-                match &attr {
-                    JSXAttrOrSpread::JSXAttr(a) => {
-                        let name_is_from = match &a.name {
-                            JSXAttrName::Ident(i) => i.sym.as_ref().eq("from"),
+                "link" | "Link" => {
+                    let mut href_prop_index: i32 = -1;
+                    let mut href_prop_value = "";
+
+                    for (i, attr) in el.attrs.iter().enumerate() {
+                        match &attr {
+                            JSXAttrOrSpread::JSXAttr(a) => {
+                                let is_href = match &a.name {
+                                    JSXAttrName::Ident(i) => i.sym.as_ref().eq("href"),
+                                    _ => false,
+                                };
+                                if is_href {
+                                    match &a.value {
+                                        Some(val) => {
+                                            match val {
+                                                JSXAttrValue::Lit(l) => match l {
+                                                    Lit::Str(s) => {
+                                                        href_prop_index = i as i32;
+                                                        href_prop_value = s.value.as_ref();
+                                                    }
+                                                    _ => {}
+                                                },
+                                                _ => {}
+                                            };
+                                        }
+                                        None => {}
+                                    };
+                                    break;
+                                }
+                            }
                             _ => continue,
                         };
-                        if name_is_from {
-                            match &a.value {
-                                Some(val) => {
-                                    match val {
-                                        JSXAttrValue::Lit(l) => match l {
-                                            Lit::Str(s) => {
-                                                from_prop_index = i as i32;
-                                                from_prop_value = s.value.as_ref();
-                                            }
-                                            _ => {}
-                                        },
-                                        _ => {}
-                                    };
-                                }
-                                None => {}
-                            };
-                            break;
-                        }
                     }
-                    _ => continue,
-                };
-            }
 
-            if from_prop_index >= 0 {
-                let mut r = self.resolver.borrow_mut();
-                el.attrs[from_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
-                    span: DUMMY_SP,
-                    name: JSXAttrName::Ident(quote_ident!("from")),
-                    value: Some(JSXAttrValue::Lit(Lit::Str(Str {
-                        span: DUMMY_SP,
-                        value: r.resolve(from_prop_value, true).into(),
-                        has_escape: false,
-                    }))),
-                });
-            }
-        }
+                    if href_prop_index >= 0 {
+                        let mut r = self.resolver.borrow_mut();
+                        el.attrs[href_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
+                            span: DUMMY_SP,
+                            name: JSXAttrName::Ident(quote_ident!("href")),
+                            value: Some(JSXAttrValue::Lit(Lit::Str(Str {
+                                span: DUMMY_SP,
+                                value: r.resolve(href_prop_value, true).into(),
+                                has_escape: false,
+                            }))),
+                        });
+                    }
+
+                    let id = uppercase_first_letter(id.sym.as_ref());
+                    el.name = JSXElementName::Ident(quote_ident!(id))
+                }
+                _ => {}
+            },
+            _ => {}
+        };
 
         // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
         if self.is_dev {
@@ -139,5 +153,13 @@ impl Fold for AlephJsxFold {
         }
 
         el
+    }
+}
+
+fn uppercase_first_letter(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
 }
