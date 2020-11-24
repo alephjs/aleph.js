@@ -122,17 +122,15 @@ impl ParsedModule {
       SourceType::TSX => true,
       _ => false,
     };
-
+    let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) = aleph_jsx_fold(
+      resolver.clone(),
+      self.source_map.clone(),
+      options.is_dev && !is_remote_module,
+    );
     let mut passes = chain!(
       aleph_resolve_fold(resolver.clone()),
-      Optional::new(
-        aleph_jsx_fold(
-          resolver.clone(),
-          self.source_map.clone(),
-          options.is_dev && !is_remote_module
-        ),
-        jsx
-      ),
+      Optional::new(aleph_jsx_fold, jsx),
+      Optional::new(aleph_jsx_builtin_resolve_fold, jsx),
       Optional::new(
         fast_refresh_fold(
           "$RefreshReg$",
@@ -247,6 +245,7 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::aleph::get_aleph_version;
   use crate::import_map::{ImportHashMap, ImportMap};
   use crate::resolve::{DependencyDescriptor, Resolver};
 
@@ -301,22 +300,19 @@ mod tests {
   #[test]
   fn test_transpile_jsx() {
     let source = r#"
-    import React, { useState, useEffect } from "https://esm.sh/react"
-    export default function Index() {
-      const [count, setCount] = useState(0)
-      useEffect(() => {}, [])
+    import React from "https://esm.sh/react"
+    export default function App() {
       return (
         <>
-          <Import from="../components/logo.tsx" />
           <h1>Hello World</h1>
         </>
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/index.tsx", source, JscTarget::Es2020)
+    let module = ParsedModule::parse("/pages/App.tsx", source, JscTarget::Es2020)
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/index.tsx",
+      "/pages/App.tsx",
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
       false,
@@ -328,26 +324,59 @@ mod tests {
     assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("__source: {"));
-    assert!(code.contains("import React, { useState, useEffect } from \"../-/esm.sh/react.js\""));
-    assert!(code.contains("from: \"../components/logo.js\""));
+    assert!(code.contains("import React from \"../-/esm.sh/react.js\""));
     let r = resolver.borrow_mut();
     assert_eq!(
       r.dep_graph,
-      vec![
-        DependencyDescriptor {
-          specifier: "https://esm.sh/react".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "/components/logo.tsx".into(),
-          is_dynamic: true,
-        }
-      ]
+      vec![DependencyDescriptor {
+        specifier: "https://esm.sh/react".into(),
+        is_dynamic: false,
+      }]
     );
   }
 
   #[test]
+  fn test_transpile_use_deno() {
+    let source = r#"
+    export default function App() {
+      const verison = useDeno(() => Deno.version)
+      const V8 = () => {
+        const verison = useDeno(() => Deno.version, true)
+        return <p>v8 v{version.v8}</p>
+      }
+      const TS = () => {
+        const verison = useDeno(() => Deno.version, 1)
+        return <p>typescript v{version.typescript}</p>
+      }
+      return (
+        <>
+          <p>Deno v{version.deno}</p>
+          <V8 />
+          <TS />
+        </>
+      )
+    }
+    "#;
+    let module = ParsedModule::parse("/pages/App.tsx", source, JscTarget::Es2020)
+      .expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      "/pages/App.tsx",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      false,
+      false,
+    )));
+    let (code, _) = module
+      .transpile(resolver.clone(), &EmitOptions::default())
+      .expect("could not transpile module");
+    println!("{}", code);
+    assert!(code.contains(", false, \"useDeno."));
+    assert!(code.contains(", true, \"useDeno."));
+    assert!(code.contains(", 1, \"useDeno."));
+  }
+
+  #[test]
   fn test_transpile_jsx_builtin_tags() {
+    let aleph_version = get_aleph_version();
     let source = r#"
     import React from "https://esm.sh/react"
     export default function Index() {
@@ -355,7 +384,7 @@ mod tests {
         <>
           <a href="/about">About</a>
           <head>
-            <link rel="stylesheet" href="/about" />
+            <link rel="stylesheet" href="../style/index.css" />
           </head>
           <style>{`
             :root {
@@ -387,11 +416,46 @@ mod tests {
       .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
     println!("{}", code);
-    assert!(code.contains("React.createElement(\"h1\", {"));
-    assert!(code.contains("React.createElement(React.Fragment, null"));
-    assert!(code.contains("__source: {"));
-    assert!(code.contains("import React, { useState } from \"../-/esm.sh/react.js\""));
-    assert!(code.contains("from: \"../components/logo.js\""));
+    assert!(code.contains(
+      format!(
+        "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v{}/anchor.js\"",
+        aleph_version
+      )
+      .as_str()
+    ));
+    assert!(code.contains(
+      format!(
+        "import __ALEPH_Head from \"../-/deno.land/x/aleph@v{}/head.js\"",
+        aleph_version
+      )
+      .as_str()
+    ));
+    assert!(code.contains(
+      format!(
+        "import __ALEPH_Link from \"../-/deno.land/x/aleph@v{}/link.js\"",
+        aleph_version
+      )
+      .as_str()
+    ));
+    assert!(code.contains(
+      format!(
+        "import __ALEPH_Style from \"../-/deno.land/x/aleph@v{}/style.js\"",
+        aleph_version
+      )
+      .as_str()
+    ));
+    assert!(code.contains(
+      format!(
+        "import __ALEPH_Script from \"../-/deno.land/x/aleph@v{}/script.js\"",
+        aleph_version
+      )
+      .as_str()
+    ));
+    assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
+    assert!(code.contains("React.createElement(__ALEPH_Head,"));
+    assert!(code.contains("React.createElement(__ALEPH_Link,"));
+    assert!(code.contains("React.createElement(__ALEPH_Style,"));
+    assert!(code.contains("React.createElement(__ALEPH_Script,"));
     let r = resolver.borrow_mut();
     assert_eq!(
       r.dep_graph,
@@ -401,8 +465,28 @@ mod tests {
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: "/components/logo.tsx".into(),
+          specifier: "/style/index.css".into(),
           is_dynamic: true,
+        },
+        DependencyDescriptor {
+          specifier: format!("https://deno.land/x/aleph@v{}/anchor.ts", aleph_version),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: format!("https://deno.land/x/aleph@v{}/head.ts", aleph_version),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: format!("https://deno.land/x/aleph@v{}/link.ts", aleph_version),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: format!("https://deno.land/x/aleph@v{}/style.ts", aleph_version),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: format!("https://deno.land/x/aleph@v{}/script.ts", aleph_version),
+          is_dynamic: false,
         }
       ]
     );

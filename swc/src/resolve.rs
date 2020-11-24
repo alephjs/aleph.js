@@ -2,6 +2,7 @@
 
 use crate::import_map::ImportMap;
 
+use indexmap::IndexSet;
 use path_slash::PathBufExt;
 use pathdiff::diff_paths;
 use rand::{distributions::Alphanumeric, Rng};
@@ -37,11 +38,13 @@ pub struct DependencyDescriptor {
 /// A Resolver to resolve aleph.js import/export URL.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolver {
-  import_map: ImportMap,
   specifier: String,
   specifier_is_remote: bool,
+  import_map: ImportMap,
   bundle_mode: bool,
   has_plugin_resolves: bool,
+  ///  builtin jsx tags like `a`, `head`, etc
+  pub builtin_jsx_tags: IndexSet<String>,
   /// dependency graph
   pub dep_graph: Vec<DependencyDescriptor>,
 }
@@ -60,6 +63,7 @@ impl Resolver {
       dep_graph: Vec::new(),
       bundle_mode,
       has_plugin_resolves,
+      builtin_jsx_tags: IndexSet::new(),
       specifier_is_remote: regex_http.is_match(specifier),
     }
   }
@@ -266,13 +270,13 @@ impl Fold for AlephResolveFold {
   //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/_aleph/-/esm.sh/react.js"`
   //   - `export * from "https://esm.sh/react"` -> `export * from "/_aleph/-/esm.sh/react.js"`
   // - bundling mode:
-  //   - `import React, {useState} from "https://esm.sh/react"` -> `const {default: React, useState} = window.__ALEPH_BUNDLING["https://esm.sh/react"]`
-  //   - `import * as React from "https://esm.sh/react"` -> `const {__star__: React} = window.__ALEPH_BUNDLING["https://esm.sh/react"]`
-  //   - `import Logo from "../components/logo.tsx"` -> `const {default: Logo} = window.__ALEPH_BUNDLING["/components/logo.tsx"]`
-  //   - `import Logo from "@/components/logo.tsx"` -> `const {default: Logo} = window.__ALEPH_BUNDLING["/components/logo.tsx"]`
+  //   - `import React, {useState} from "https://esm.sh/react"` -> `const {default: React, useState} = window.__ALEPH_PACK["https://esm.sh/react"]`
+  //   - `import * as React from "https://esm.sh/react"` -> `const {__star__: React} = window.__ALEPH_PACK["https://esm.sh/react"]`
+  //   - `import Logo from "../components/logo.tsx"` -> `const {default: Logo} = window.__ALEPH_PACK["/components/logo.tsx"]`
+  //   - `import Logo from "@/components/logo.tsx"` -> `const {default: Logo} = window.__ALEPH_PACK["/components/logo.tsx"]`
   //   - `import "../style/index.css" -> `__apply_style("CSS_CODE")`
-  //   - `export React, {useState} from "https://esm.sh/react"` -> `__export((() => {const {default: React, useState} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return {React, useState}})())`
-  //   - `export * from "https://esm.sh/react"` -> `__export((() => {const {__star__} = window.__ALEPH_BUNDLING["https://esm.sh/react"]; return __star__})())`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `__export((() => {const {default: React, useState} = window.__ALEPH_PACK["https://esm.sh/react"]; return {React, useState}})())`
+  //   - `export * from "https://esm.sh/react"` -> `__export((() => {const {__star__} = window.__ALEPH_PACK["https://esm.sh/react"]; return __star__})())`
   fn fold_module_decl(&mut self, decl: ModuleDecl) -> ModuleDecl {
     match decl {
       ModuleDecl::Import(decl) => {
@@ -287,26 +291,26 @@ impl Fold for AlephResolveFold {
         })
       }
       ModuleDecl::ExportNamed(decl) => {
-        let mut r = self.resolver.borrow_mut();
         let url = match &decl.src {
           Some(src) => src.value.as_ref(),
-          None => return ModuleDecl::ExportNamed(NamedExport { ..decl }),
+          None => return ModuleDecl::ExportNamed(decl),
         };
+        let mut resolver = self.resolver.borrow_mut();
         ModuleDecl::ExportNamed(NamedExport {
           src: Some(Str {
             span: DUMMY_SP,
-            value: r.resolve(url, false).into(),
+            value: resolver.resolve(url, false).into(),
             has_escape: false,
           }),
           ..decl
         })
       }
       ModuleDecl::ExportAll(decl) => {
-        let mut r = self.resolver.borrow_mut();
+        let mut resolver = self.resolver.borrow_mut();
         ModuleDecl::ExportAll(ExportAll {
           src: Str {
             span: DUMMY_SP,
-            value: r.resolve(decl.src.value.as_ref(), false).into(),
+            value: resolver.resolve(decl.src.value.as_ref(), false).into(),
             has_escape: false,
           },
           ..decl
@@ -415,7 +419,7 @@ mod tests {
   #[test]
   fn test_resolver_fix_import_url() {
     let resolver = Resolver::new(
-      ".",
+      "/app.tsx",
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
       false,

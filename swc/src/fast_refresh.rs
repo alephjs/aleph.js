@@ -1,6 +1,6 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
-use indexmap::IndexMap;
+use indexmap::IndexSet;
 use sha1::{Digest, Sha1};
 use std::rc::Rc;
 use swc_common::{SourceMap, Spanned, DUMMY_SP};
@@ -67,7 +67,7 @@ impl FastRefreshFold {
 
   fn get_persistent_fn(
     &mut self,
-    bindings: &IndexMap<String, bool>,
+    bindings: &IndexSet<String>,
     ident: Option<&Ident>,
     block_stmt: &mut BlockStmt,
   ) -> (Option<Ident>, Option<Signature>) {
@@ -81,15 +81,15 @@ impl FastRefreshFold {
       }
       None => None,
     };
-    let mut bindings_scope = IndexMap::<String, bool>::new();
+    let mut bindings_scope = IndexSet::<String>::new();
     let mut hook_calls = Vec::<HookCall>::new();
     let mut exotic_signatures = Vec::<(usize, Signature, Option<Expr>)>::new();
     let mut index: usize = 0;
     let stmts = &mut block_stmt.stmts;
 
     // marge top bindings
-    for id in bindings.keys() {
-      bindings_scope.insert(id.into(), true);
+    for id in bindings.iter() {
+      bindings_scope.insert(id.to_string());
     }
 
     // collect scope bindings
@@ -97,7 +97,7 @@ impl FastRefreshFold {
       match stmt {
         // function useFancyState() {}
         Stmt::Decl(Decl::Fn(FnDecl { ident, .. })) => {
-          bindings_scope.insert(ident.sym.as_ref().into(), true);
+          bindings_scope.insert(ident.sym.as_ref().into());
         }
         Stmt::Decl(Decl::Var(VarDecl { decls, .. })) => {
           decls.into_iter().for_each(|decl| match decl {
@@ -108,11 +108,11 @@ impl FastRefreshFold {
             } => match init_expr.as_ref() {
               // const useFancyState = function () {}
               Expr::Fn(_) => {
-                bindings_scope.insert(ident.sym.as_ref().into(), true);
+                bindings_scope.insert(ident.sym.as_ref().into());
               }
               // const useFancyState = () => {}
               Expr::Arrow(_) => {
-                bindings_scope.insert(ident.sym.as_ref().into(), true);
+                bindings_scope.insert(ident.sym.as_ref().into());
               }
               _ => {}
             },
@@ -392,7 +392,7 @@ impl FastRefreshFold {
 
   fn find_inner_component(
     &mut self,
-    bindings: &IndexMap<String, bool>,
+    bindings: &IndexSet<String>,
     parent_name: &str,
     call: &mut CallExpr,
   ) -> bool {
@@ -530,7 +530,7 @@ impl FastRefreshFold {
 
   fn create_arguments_for_signature(
     &self,
-    bindings: &IndexMap<String, bool>,
+    bindings: &IndexSet<String>,
     signature: &Signature,
   ) -> Vec<ExprOrSpread> {
     let mut key = Vec::<String>::new();
@@ -549,14 +549,20 @@ impl FastRefreshFold {
       key.push(call.key);
       if !call.is_builtin {
         match call.obj {
-          Some(obj) => match bindings.get(obj.sym.as_ref().into()) {
-            Some(_) => custom_hooks_in_scope.push((Some(obj.clone()), call.ident.clone())),
-            None => force_reset = true,
-          },
-          None => match bindings.get(call.ident.sym.as_ref().into()) {
-            Some(_) => custom_hooks_in_scope.push((None, call.ident.clone())),
-            None => force_reset = true,
-          },
+          Some(obj) => {
+            if bindings.contains(obj.sym.as_ref().into()) {
+              custom_hooks_in_scope.push((Some(obj.clone()), call.ident.clone()));
+            } else {
+              force_reset = true
+            }
+          }
+          None => {
+            if bindings.contains(call.ident.sym.as_ref().into()) {
+              custom_hooks_in_scope.push((None, call.ident.clone()));
+            } else {
+              force_reset = true;
+            }
+          }
         }
       }
     });
@@ -631,7 +637,7 @@ impl Fold for FastRefreshFold {
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
     let mut raw_items = Vec::<ModuleItem>::new();
-    let mut bindings = IndexMap::<String, bool>::new();
+    let mut bindings = IndexSet::<String>::new();
 
     // collect top bindings
     for item in module_items.clone() {
@@ -644,7 +650,7 @@ impl Fold for FastRefreshFold {
               ImportSpecifier::Named(ImportNamedSpecifier { local, .. })
               | ImportSpecifier::Default(ImportDefaultSpecifier { local, .. })
               | ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => {
-                bindings.insert(local.sym.as_ref().into(), true);
+                bindings.insert(local.sym.as_ref().into());
               }
             });
         }
@@ -654,7 +660,7 @@ impl Fold for FastRefreshFold {
           decl: Decl::Fn(FnDecl { ident, .. }),
           ..
         })) => {
-          bindings.insert(ident.sym.as_ref().into(), true);
+          bindings.insert(ident.sym.as_ref().into());
         }
 
         // export default function App() {}
@@ -664,12 +670,12 @@ impl Fold for FastRefreshFold {
           }),
           ..
         })) => {
-          bindings.insert(ident.sym.as_ref().into(), true);
+          bindings.insert(ident.sym.as_ref().into());
         }
 
         // function App() {}
         ModuleItem::Stmt(Stmt::Decl(Decl::Fn(FnDecl { ident, .. }))) => {
-          bindings.insert(ident.sym.as_ref().into(), true);
+          bindings.insert(ident.sym.as_ref().into());
         }
 
         // const Foo = () => {}
@@ -684,7 +690,7 @@ impl Fold for FastRefreshFold {
               name: Pat::Ident(ident),
               ..
             } => {
-              bindings.insert(ident.sym.as_ref().into(), true);
+              bindings.insert(ident.sym.as_ref().into());
             }
             _ => {}
           });

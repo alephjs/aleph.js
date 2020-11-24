@@ -1,6 +1,7 @@
 // Copyright 2017-2020 The swc Project Developers. All rights reserved. MIT license.
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
+use crate::aleph::get_aleph_version;
 use crate::resolve::Resolver;
 
 use std::{cell::RefCell, rc::Rc};
@@ -13,18 +14,23 @@ pub fn aleph_jsx_fold(
     resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
     is_dev: bool,
-) -> impl Fold {
-    AlephJsxFold {
-        resolver,
-        source,
-        is_dev,
-    }
+) -> (impl Fold, impl Fold) {
+    (
+        AlephJsxFold {
+            resolver: resolver.clone(),
+            source,
+            is_dev,
+        },
+        AlephJsxBuiltinResolveFold {
+            resolver: resolver.clone(),
+        },
+    )
 }
 
 /// aleph.js jsx fold, core functions include:
 /// - add `__sourceFile` prop in development mode
 /// - resolve `Link` component `href` prop
-/// - rename `a` to `A`
+/// - rename `a` to `Anchor`
 /// - rename `head` to `Head`
 /// - rename `link` to `Link`
 /// - rename `script` to `Script`
@@ -44,69 +50,76 @@ impl Fold for AlephJsxFold {
             return el;
         }
 
+        let mut resolver = self.resolver.borrow_mut();
+
         match &el.name {
-            JSXElementName::Ident(id) => match id.sym.as_ref() {
-                "a" | "head" | "script" | "style" => {
-                    let id = uppercase_first_letter(id.sym.as_ref());
-                    el.name = JSXElementName::Ident(quote_ident!(id))
-                }
+            JSXElementName::Ident(id) => {
+                let name = id.sym.as_ref();
+                match name {
+                    "a" | "head" | "script" | "style" => {
+                        resolver.builtin_jsx_tags.insert(name.into());
+                        el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                    }
 
-                "img" => {
-                    //todo: optimize img
-                }
+                    "img" => {
+                        //todo: optimize img
+                    }
 
-                "link" | "Link" => {
-                    let mut href_prop_index: i32 = -1;
-                    let mut href_prop_value = "";
+                    "link" | "Link" => {
+                        let mut href_prop_index: i32 = -1;
+                        let mut href_prop_value = "";
 
-                    for (i, attr) in el.attrs.iter().enumerate() {
-                        match &attr {
-                            JSXAttrOrSpread::JSXAttr(a) => {
-                                let is_href = match &a.name {
-                                    JSXAttrName::Ident(i) => i.sym.as_ref().eq("href"),
-                                    _ => false,
-                                };
-                                if is_href {
-                                    match &a.value {
-                                        Some(val) => {
-                                            match val {
-                                                JSXAttrValue::Lit(l) => match l {
-                                                    Lit::Str(s) => {
-                                                        href_prop_index = i as i32;
-                                                        href_prop_value = s.value.as_ref();
-                                                    }
-                                                    _ => {}
-                                                },
-                                                _ => {}
-                                            };
-                                        }
-                                        None => {}
+                        for (i, attr) in el.attrs.iter().enumerate() {
+                            match &attr {
+                                JSXAttrOrSpread::JSXAttr(a) => {
+                                    let is_href = match &a.name {
+                                        JSXAttrName::Ident(i) => i.sym.as_ref().eq("href"),
+                                        _ => false,
                                     };
-                                    break;
+                                    if is_href {
+                                        match &a.value {
+                                            Some(val) => {
+                                                match val {
+                                                    JSXAttrValue::Lit(l) => match l {
+                                                        Lit::Str(s) => {
+                                                            href_prop_index = i as i32;
+                                                            href_prop_value = s.value.as_ref();
+                                                        }
+                                                        _ => {}
+                                                    },
+                                                    _ => {}
+                                                };
+                                            }
+                                            None => {}
+                                        };
+                                        break;
+                                    }
                                 }
-                            }
-                            _ => continue,
-                        };
-                    }
+                                _ => continue,
+                            };
+                        }
 
-                    if href_prop_index >= 0 {
-                        let mut r = self.resolver.borrow_mut();
-                        el.attrs[href_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
-                            span: DUMMY_SP,
-                            name: JSXAttrName::Ident(quote_ident!("href")),
-                            value: Some(JSXAttrValue::Lit(Lit::Str(Str {
-                                span: DUMMY_SP,
-                                value: r.resolve(href_prop_value, true).into(),
-                                has_escape: false,
-                            }))),
-                        });
-                    }
+                        if href_prop_index >= 0 {
+                            el.attrs[href_prop_index as usize] =
+                                JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                    span: DUMMY_SP,
+                                    name: JSXAttrName::Ident(quote_ident!("href")),
+                                    value: Some(JSXAttrValue::Lit(Lit::Str(Str {
+                                        span: DUMMY_SP,
+                                        value: resolver.resolve(href_prop_value, true).into(),
+                                        has_escape: false,
+                                    }))),
+                                });
+                        }
 
-                    let id = uppercase_first_letter(id.sym.as_ref());
-                    el.name = JSXElementName::Ident(quote_ident!(id))
+                        if name.eq("link") {
+                            resolver.builtin_jsx_tags.insert(name.into());
+                            el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             _ => {}
         };
 
@@ -156,10 +169,60 @@ impl Fold for AlephJsxFold {
     }
 }
 
-fn uppercase_first_letter(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
+/// aleph.js jsx builtin fold.
+struct AlephJsxBuiltinResolveFold {
+    resolver: Rc<RefCell<Resolver>>,
+}
+
+impl Fold for AlephJsxBuiltinResolveFold {
+    noop_fold_type!();
+
+    fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
+        let aleph_version = get_aleph_version();
+        let mut items = Vec::<ModuleItem>::new();
+        let mut resolver = self.resolver.borrow_mut();
+
+        for mut name in resolver.builtin_jsx_tags.clone() {
+            if name.eq("a") {
+                name = "anchor".to_owned()
+            }
+            items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+                span: DUMMY_SP,
+                specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+                    span: DUMMY_SP,
+                    local: quote_ident!(rename_builtin_tag(name.as_str())),
+                })],
+                src: Str {
+                    span: DUMMY_SP,
+                    value: resolver
+                        .resolve(
+                            format!("https://deno.land/x/aleph@v{}/{}.ts", aleph_version, name)
+                                .as_str(),
+                            false,
+                        )
+                        .into(),
+                    has_escape: false,
+                },
+                type_only: false,
+                asserts: None,
+            })));
+        }
+
+        for item in module_items {
+            items.push(item)
+        }
+        items
+    }
+}
+
+fn rename_builtin_tag(name: &str) -> String {
+    let mut c = name.chars();
+    let mut name = match c.next() {
         None => String::new(),
         Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+    };
+    if name.eq("A") {
+        name = "Anchor".into();
     }
+    "__ALEPH_".to_owned() + name.as_str()
 }
