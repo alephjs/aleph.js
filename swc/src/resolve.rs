@@ -314,30 +314,38 @@ impl Fold for AlephResolveFold {
   fn fold_module_decl(&mut self, decl: ModuleDecl) -> ModuleDecl {
     match decl {
       ModuleDecl::Import(decl) => {
-        let mut r = self.resolver.borrow_mut();
-        ModuleDecl::Import(ImportDecl {
-          src: Str {
-            span: DUMMY_SP,
-            value: r.resolve(decl.src.value.as_ref(), false).into(),
-            has_escape: false,
-          },
-          ..decl
-        })
+        if decl.type_only {
+          ModuleDecl::Import(decl)
+        } else {
+          let mut resolver = self.resolver.borrow_mut();
+          ModuleDecl::Import(ImportDecl {
+            src: Str {
+              span: DUMMY_SP,
+              value: resolver.resolve(decl.src.value.as_ref(), false).into(),
+              has_escape: false,
+            },
+            ..decl
+          })
+        }
       }
       ModuleDecl::ExportNamed(decl) => {
-        let url = match &decl.src {
-          Some(src) => src.value.as_ref(),
-          None => return ModuleDecl::ExportNamed(decl),
-        };
-        let mut resolver = self.resolver.borrow_mut();
-        ModuleDecl::ExportNamed(NamedExport {
-          src: Some(Str {
-            span: DUMMY_SP,
-            value: resolver.resolve(url, false).into(),
-            has_escape: false,
-          }),
-          ..decl
-        })
+        if decl.type_only {
+          ModuleDecl::ExportNamed(decl)
+        } else {
+          let url = match &decl.src {
+            Some(src) => src.value.as_ref(),
+            None => return ModuleDecl::ExportNamed(decl),
+          };
+          let mut resolver = self.resolver.borrow_mut();
+          ModuleDecl::ExportNamed(NamedExport {
+            src: Some(Str {
+              span: DUMMY_SP,
+              value: resolver.resolve(url, false).into(),
+              has_escape: false,
+            }),
+            ..decl
+          })
+        }
       }
       ModuleDecl::ExportAll(decl) => {
         let mut resolver = self.resolver.borrow_mut();
