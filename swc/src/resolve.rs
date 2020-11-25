@@ -33,6 +33,8 @@ pub struct DependencyDescriptor {
   pub specifier: String,
   /// A flag indicating if the import is dynamic or not.
   pub is_dynamic: bool,
+  /// A flag indicating if the import is data or not.
+  pub is_data: bool,
 }
 
 /// A Resolver to resolve aleph.js import/export URL.
@@ -219,6 +221,7 @@ impl Resolver {
       self.dep_graph.push(DependencyDescriptor {
         specifier: url.into(),
         is_dynamic,
+        is_data: false,
       });
     } else {
       if self.specifier_is_remote {
@@ -227,12 +230,14 @@ impl Resolver {
           self.dep_graph.push(DependencyDescriptor {
             specifier: url.trim_start_matches("@").into(),
             is_dynamic,
+            is_data: false,
           });
         }
         if url.starts_with("/") {
           self.dep_graph.push(DependencyDescriptor {
             specifier: url.into(),
             is_dynamic,
+            is_data: false,
           });
         } else {
           let mut p = PathBuf::from(self.specifier.as_str());
@@ -244,6 +249,7 @@ impl Resolver {
           self.dep_graph.push(DependencyDescriptor {
             specifier: path.to_slash().unwrap(),
             is_dynamic,
+            is_data: false,
           });
         }
       }
@@ -332,8 +338,8 @@ impl Fold for AlephResolveFold {
   // - `import("https://esm.sh/rect")` -> `import("/_aleph/-/esm.sh/react.js")`
   // - `useDeno(() => {})` -> `useDeno(() => {}, false, "useDeno.RANDOM_ID")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
+    let mut resolver = self.resolver.borrow_mut();
     if is_call_expr_by_name(&call, "import") {
-      let mut r = self.resolver.borrow_mut();
       let url = match call.args.first() {
         Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
           Expr::Lit(lit) => match lit {
@@ -348,7 +354,7 @@ impl Fold for AlephResolveFold {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(Str {
           span: DUMMY_SP,
-          value: r.resolve(url, true).into(),
+          value: resolver.resolve(url, true).into(),
           has_escape: false,
         }))),
       }];
@@ -362,6 +368,7 @@ impl Fold for AlephResolveFold {
         _ => false,
       };
       if has_callback {
+        let id = new_use_deno_hook_ident();
         if call.args.len() == 1 {
           call.args.push(ExprOrSpread {
             spread: None,
@@ -376,7 +383,7 @@ impl Fold for AlephResolveFold {
             spread: None,
             expr: Box::new(Expr::Lit(Lit::Str(Str {
               span: DUMMY_SP,
-              value: new_use_deno_hook_ident().into(),
+              value: id.clone().into(),
               has_escape: false,
             }))),
           };
@@ -385,11 +392,16 @@ impl Fold for AlephResolveFold {
             spread: None,
             expr: Box::new(Expr::Lit(Lit::Str(Str {
               span: DUMMY_SP,
-              value: new_use_deno_hook_ident().into(),
+              value: id.clone().into(),
               has_escape: false,
             }))),
           });
         }
+        resolver.dep_graph.push(DependencyDescriptor {
+          specifier: "#".to_owned() + id.clone().as_str(),
+          is_dynamic: false,
+          is_data: true,
+        });
       }
     }
     call

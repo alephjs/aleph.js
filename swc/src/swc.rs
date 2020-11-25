@@ -343,6 +343,7 @@ mod tests {
       vec![DependencyDescriptor {
         specifier: "https://esm.sh/react".into(),
         is_dynamic: false,
+        is_data: false,
       }]
     );
   }
@@ -475,30 +476,37 @@ mod tests {
         DependencyDescriptor {
           specifier: "https://esm.sh/react".into(),
           is_dynamic: false,
+          is_data: false,
         },
         DependencyDescriptor {
           specifier: "/style/index.css".into(),
           is_dynamic: true,
+          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/anchor.ts", aleph_version),
           is_dynamic: false,
+          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/head.ts", aleph_version),
           is_dynamic: false,
+          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/link.ts", aleph_version),
           is_dynamic: false,
+          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/style.ts", aleph_version),
           is_dynamic: false,
+          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/script.ts", aleph_version),
           is_dynamic: false,
+          is_data: false,
         }
       ]
     );
