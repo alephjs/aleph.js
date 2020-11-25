@@ -1,4 +1,5 @@
 import { default as init_wasm, transformSync } from './aleph_swc.js';
+import getWasmData from './aleph_swc.wasm.js';
 
 type ImportMap = Record<string, string[]>
 
@@ -6,6 +7,7 @@ export interface SWCOptions {
     target?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     jsxFactory?: string
     jsxFragmentFactory?: string
+    sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
     sourceMap?: boolean
     isDev?: boolean,
 }
@@ -14,6 +16,18 @@ export interface TransformOptions {
     filename: string
     importMap?: { imports: ImportMap, scopes: Record<string, ImportMap> }
     swcOptions?: SWCOptions
+}
+
+interface DependencyDescriptor {
+    specifier: string,
+    isDynamic: boolean,
+    isData: boolean,
+}
+
+export interface TransformRet {
+    code: string
+    map?: string
+    deps: DependencyDescriptor[]
 }
 
 /**
@@ -32,14 +46,11 @@ export interface TransformOptions {
  * })
  * ```
  */
-export default function transpileSync(code: string, opts?: TransformOptions) {
-    transformSync(code, opts)
+export function transpileSync(code: string, opts?: TransformOptions): TransformRet {
+    return transformSync(code, opts)
 }
 
 /**
  * load and initiate compiler wasm.
  */
-export const init = async () => {
-    const { default: getWasmData } = await import('./aleph_swc.wasm.js')
-    init_wasm(getWasmData())
-}
+export const initSWC = () => init_wasm(getWasmData())
