@@ -1,5 +1,5 @@
 import { default as init_wasm, transformSync } from './aleph_swc.js';
-import getWasmData from './aleph_swc.wasm.js';
+import getWasmData from './aleph_swc_wasm.js';
 
 type ImportMap = Record<string, string[]>
 
@@ -13,8 +13,10 @@ export interface SWCOptions {
 }
 
 export interface TransformOptions {
-    filename: string
+    url: string
     importMap?: { imports: ImportMap, scopes: Record<string, ImportMap> }
+    reactUrl?: string,
+    reactDomUrl?: string,
     swcOptions?: SWCOptions
 }
 
@@ -34,12 +36,14 @@ export interface TransformRet {
  * transpile code synchronously by swc.
  *
  * ```javascript
- * transpileSync(`
+ * transpileSync(
+ * `
  *   export default App() {
  *     return <h1>Hello World</h1>
  *   }
- * `, {
- *   filename: '/app.tsx'
+ * `,
+ * {
+ *   url: '/app.tsx'
  *   swcOptions: {
  *     target: 'es2020'
  *   }

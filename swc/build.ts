@@ -15,7 +15,7 @@ async function build() {
     const wasmData = await Deno.readFile('./pkg/aleph_swc_bg.wasm')
     const data = brotli.compress(wasmData)
     const dataStr = base64.encode(data)
-    await Deno.writeTextFile('./aleph_swc.wasm.js', [
+    await Deno.writeTextFile('./aleph_swc_wasm.js', [
         `import { base64, brotli } from '../deps.ts';`,
         `const dataRaw = '${dataStr}';`,
         `export default () => brotli.decompress(base64.decode(dataRaw))`
