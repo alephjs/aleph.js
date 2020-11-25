@@ -83,7 +83,7 @@ if (import.meta.main) {
             sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
         }
 
-        await banchmark(sourceFiles, false)
-        await banchmark(sourceFiles, true)
+        banchmark(sourceFiles, true)
+        banchmark(sourceFiles, false)
     })()
 }
