@@ -78,10 +78,10 @@ fn default_pragma_frag() -> String {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransformOutput {
-    pub dep_graph: Vec<DependencyDescriptor>,
     pub code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub map: Option<String>,
+    pub deps: Vec<DependencyDescriptor>,
 }
 
 #[wasm_bindgen(js_name = "transformSync")]
@@ -113,9 +113,9 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         .expect("could not transpile module");
     let r = resolver.borrow_mut();
     Ok(JsValue::from_serde(&TransformOutput {
-        dep_graph: r.dep_graph.clone(),
         code,
         map,
+        deps: r.dep_graph.clone(),
     })
     .unwrap())
 }
