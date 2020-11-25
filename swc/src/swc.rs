@@ -311,6 +311,7 @@ mod tests {
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "https://deno.land/x/mod.ts",
       ImportMap::from_hashmap(ImportHashMap::default()),
+      None,
       false,
     )));
     let (code, maybe_map) = module
@@ -351,6 +352,7 @@ mod tests {
         imports,
         scopes: HashMap::new(),
       }),
+      None,
       false,
     )));
     let (code, _) = module
@@ -406,6 +408,7 @@ mod tests {
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/App.tsx",
       ImportMap::from_hashmap(ImportHashMap::default()),
+      None,
       false,
     )));
     let (code, _) = module
@@ -453,6 +456,7 @@ mod tests {
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportMap::from_hashmap(ImportHashMap::default()),
+      None,
       false,
     )));
     let (code, _) = module
