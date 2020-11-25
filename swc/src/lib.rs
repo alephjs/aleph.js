@@ -24,7 +24,7 @@ use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Options {
-    pub filename: String,
+    pub url: String,
 
     #[serde(default)]
     pub import_map: ImportHashMap,
@@ -112,7 +112,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         .map_err(|err| format!("failed to parse options: {}", err))
         .unwrap();
     let resolver = Rc::new(RefCell::new(Resolver::new(
-        opts.filename.as_str(),
+        opts.url.as_str(),
         ImportMap::from_hashmap(opts.import_map),
         Some((opts.react_url, opts.react_dom_url)),
         !opts.swc_options.is_dev,
@@ -125,7 +125,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         _ => None,
     };
     let module = ParsedModule::parse(
-        opts.filename.as_str(),
+        opts.url.as_str(),
         s,
         specify_source_type,
         opts.swc_options.target,
