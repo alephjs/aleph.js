@@ -53,4 +53,4 @@ export function transpileSync(code: string, opts?: TransformOptions): TransformR
 /**
  * load and initiate compiler wasm.
  */
-export const initSWC = () => init_wasm(getWasmData())
+export const initSWC = async () => await init_wasm(getWasmData())
