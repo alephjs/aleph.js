@@ -2,7 +2,7 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::aleph::VERSION;
-use crate::resolve::Resolver;
+use crate::resolve::{Resolver, RE_HTTP};
 
 use std::{cell::RefCell, rc::Rc};
 use swc_common::{FileName, SourceMap, DUMMY_SP};
@@ -56,7 +56,35 @@ impl Fold for AlephJsxFold {
             JSXElementName::Ident(id) => {
                 let name = id.sym.as_ref();
                 match name {
-                    "a" | "head" | "script" | "style" => {
+                    "a" => {
+                        let mut should_replace = true;
+
+                        for attr in &el.attrs {
+                            match &attr {
+                                JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                    name: JSXAttrName::Ident(id),
+                                    value: Some(JSXAttrValue::Lit(Lit::Str(Str { value, .. }))),
+                                    ..
+                                }) => {
+                                    let key = id.sym.as_ref();
+                                    let value = value.as_ref();
+                                    if (key == "href" && RE_HTTP.is_match(value))
+                                        || (key == "target" && value == "_blank")
+                                    {
+                                        should_replace = false
+                                    }
+                                }
+                                _ => {}
+                            };
+                        }
+
+                        if should_replace {
+                            resolver.builtin_jsx_tags.insert(name.into());
+                            el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                        }
+                    }
+
+                    "head" | "script" | "style" => {
                         resolver.builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                     }

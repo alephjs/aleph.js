@@ -425,6 +425,8 @@ mod tests {
       return (
         <>
           <a href="/about">About</a>
+          <a href="https://github.com">About</a>
+          <a href="/about" target="_blank">About</a>
           <head>
             <link rel="stylesheet" href="../style/index.css" />
           </head>
@@ -492,6 +494,7 @@ mod tests {
       )
       .as_str()
     ));
+    assert!(code.contains("React.createElement(\"a\","));
     assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
     assert!(code.contains("React.createElement(__ALEPH_Head,"));
     assert!(code.contains("React.createElement(__ALEPH_Link,"));

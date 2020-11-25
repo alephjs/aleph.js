@@ -22,8 +22,8 @@ use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 use url::Url;
 
 lazy_static! {
-  static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
-  static ref RE_ENDS_WITH_VERSION: Regex =
+  pub static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
+  pub static ref RE_ENDS_WITH_VERSION: Regex =
     Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
 }
 
