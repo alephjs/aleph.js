@@ -15,6 +15,7 @@ mod swc;
 use import_map::{ImportHashMap, ImportMap};
 use resolve::{DependencyDescriptor, Resolver};
 use serde::{Deserialize, Serialize};
+use source_type::SourceType;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, ParsedModule};
 use swc_ecmascript::parser::JscTarget;
@@ -45,6 +46,9 @@ pub struct SWCOptions {
     pub jsx_fragment_factory: String,
 
     #[serde(default)]
+    pub source_type: String,
+
+    #[serde(default)]
     pub source_map: bool,
 
     #[serde(default)]
@@ -57,7 +61,8 @@ impl Default for SWCOptions {
             target: default_target(),
             jsx_factory: default_pragma(),
             jsx_fragment_factory: default_pragma_frag(),
-            source_map: true,
+            source_type: "".into(),
+            source_map: false,
             is_dev: false,
         }
     }
@@ -96,10 +101,21 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         opts.filename.as_str(),
         ImportMap::from_hashmap(opts.import_map),
         !opts.swc_options.is_dev,
-        false, // todo: has_plugin_resolves
     )));
-    let module = ParsedModule::parse(opts.filename.as_str(), s, opts.swc_options.target)
-        .expect("could not parse module");
+    let specify_source_type = match opts.swc_options.source_type.as_str() {
+        "js" => Some(SourceType::JavaScript),
+        "jsx" => Some(SourceType::JSX),
+        "ts" => Some(SourceType::TypeScript),
+        "tsx" => Some(SourceType::TSX),
+        _ => None,
+    };
+    let module = ParsedModule::parse(
+        opts.filename.as_str(),
+        s,
+        specify_source_type,
+        opts.swc_options.target,
+    )
+    .expect("could not parse module");
     let (code, map) = module
         .transpile(
             resolver.clone(),

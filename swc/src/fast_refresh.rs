@@ -1030,8 +1030,8 @@ mod tests {
   use swc_ecmascript::parser::JscTarget;
 
   fn t(specifier: &str, source: &str, expect: &str) -> bool {
-    let module =
-      ParsedModule::parse(specifier, source, JscTarget::Es2020).expect("could not parse module");
+    let module = ParsedModule::parse(specifier, source, None, JscTarget::Es2020)
+      .expect("could not parse module");
     let (code, _) = module
       .apply_transform(
         fast_refresh_fold(

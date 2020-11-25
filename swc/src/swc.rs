@@ -61,7 +61,12 @@ impl ParsedModule {
   /// - `source` - The source code for the module.
   /// - `target` - The target for the module.
   ///
-  pub fn parse(specifier: &str, source: &str, target: JscTarget) -> Result<Self, anyhow::Error> {
+  pub fn parse(
+    specifier: &str,
+    source: &str,
+    source_type: Option<SourceType>,
+    target: JscTarget,
+  ) -> Result<Self, anyhow::Error> {
     let source_map = SourceMap::default();
     let source_file = source_map.new_source_file(
       FileName::Real(Path::new(specifier).to_path_buf()),
@@ -69,7 +74,10 @@ impl ParsedModule {
     );
     let sm = &source_map;
     let error_buffer = ErrorBuffer::new();
-    let source_type = SourceType::from(Path::new(specifier));
+    let source_type = match source_type {
+      Some(source_type) => source_type,
+      None => SourceType::from(Path::new(specifier)),
+    };
     let syntax = get_syntax(&source_type);
     let input = StringInput::from(&*source_file);
     let comments = SingleThreadedComments::default();
@@ -260,6 +268,7 @@ mod tests {
   use crate::aleph::get_aleph_version;
   use crate::import_map::{ImportHashMap, ImportMap};
   use crate::resolve::{DependencyDescriptor, Resolver};
+  use std::collections::HashMap;
 
   #[test]
   fn test_transpile_ts() {
@@ -292,12 +301,16 @@ mod tests {
       bar() {}
     }
     "#;
-    let module = ParsedModule::parse("https://deno.land/x/mod.ts", source, JscTarget::Es2020)
-      .expect("could not parse module");
+    let module = ParsedModule::parse(
+      "https://deno.land/x/mod.ts",
+      source,
+      None,
+      JscTarget::Es2020,
+    )
+    .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "https://deno.land/x/mod.ts",
       ImportMap::from_hashmap(ImportHashMap::default()),
-      false,
       false,
     )));
     let (code, maybe_map) = module
@@ -313,20 +326,31 @@ mod tests {
   fn test_transpile_jsx() {
     let source = r#"
     import React from "https://esm.sh/react"
+    import { Head } from 'https://deno.land/x/aleph/mod.ts'
     export default function App() {
       return (
         <>
+          <Head>
+            <title>Hello World!</title>
+          </Head>
           <h1>Hello World</h1>
         </>
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/App.tsx", source, JscTarget::Es2020)
+    let module = ParsedModule::parse("/pages/App.tsx", source, None, JscTarget::Es2020)
       .expect("could not parse module");
+    let mut imports: HashMap<String, Vec<String>> = HashMap::new();
+    imports.insert(
+      "https://deno.land/x/aleph/".into(),
+      vec!["http://localhost:9006/".into()],
+    );
     let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/App.tsx",
-      ImportMap::from_hashmap(ImportHashMap::default()),
-      false,
+      "/pages/index.tsx",
+      ImportMap::from_hashmap(ImportHashMap {
+        imports,
+        scopes: HashMap::new(),
+      }),
       false,
     )));
     let (code, _) = module
@@ -340,11 +364,18 @@ mod tests {
     let r = resolver.borrow_mut();
     assert_eq!(
       r.dep_graph,
-      vec![DependencyDescriptor {
-        specifier: "https://esm.sh/react".into(),
-        is_dynamic: false,
-        is_data: false,
-      }]
+      vec![
+        DependencyDescriptor {
+          specifier: "https://esm.sh/react".into(),
+          is_dynamic: false,
+          is_data: false,
+        },
+        DependencyDescriptor {
+          specifier: "http://localhost:9006/mod.ts".into(),
+          is_dynamic: false,
+          is_data: false,
+        }
+      ]
     );
   }
 
@@ -370,12 +401,11 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/App.tsx", source, JscTarget::Es2020)
+    let module = ParsedModule::parse("/pages/App.tsx", source, None, JscTarget::Es2020)
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/App.tsx",
       ImportMap::from_hashmap(ImportHashMap::default()),
-      false,
       false,
     )));
     let (code, _) = module
@@ -417,12 +447,11 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/index.tsx", source, JscTarget::Es2020)
+    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportMap::from_hashmap(ImportHashMap::default()),
-      false,
       false,
     )));
     let (code, _) = module

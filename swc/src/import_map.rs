@@ -102,19 +102,30 @@ mod tests {
     #[test]
     fn test_import_maps() {
         let mut imports: SpecifierHashMap = HashMap::new();
+        let mut scopes: HashMap<String, SpecifierHashMap> = HashMap::new();
+        let mut scope_imports: SpecifierHashMap = HashMap::new();
         imports.insert("react".into(), vec!["https://esm.sh/react".into()]);
         imports.insert(
             "react-dom/".into(),
             vec!["https://esm.sh/react-dom/".into()],
         );
-        let mut scope_imports: SpecifierHashMap = HashMap::new();
+        imports.insert(
+            "https://deno.land/x/aleph/".into(),
+            vec!["http://localhost:9006/".into()],
+        );
         scope_imports.insert("react".into(), vec!["https://esm.sh/react@16.4.0".into()]);
-        let mut scopes: HashMap<String, SpecifierHashMap> = HashMap::new();
         scopes.insert("/scope/".into(), scope_imports);
         let import_map = ImportMap::from_hashmap(ImportHashMap { imports, scopes });
-        assert_eq!(import_map.resolve(".", "react"), "https://esm.sh/react");
         assert_eq!(
-            import_map.resolve(".", "react-dom/server"),
+            import_map.resolve("./app.tsx", "react"),
+            "https://esm.sh/react"
+        );
+        assert_eq!(
+            import_map.resolve("./app.tsx", "https://deno.land/x/aleph/mod.ts"),
+            "http://localhost:9006/mod.ts"
+        );
+        assert_eq!(
+            import_map.resolve("./renderer.ts", "react-dom/server"),
             "https://esm.sh/react-dom/server"
         );
         assert_eq!(

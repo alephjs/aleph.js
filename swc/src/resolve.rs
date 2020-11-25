@@ -1,5 +1,6 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
+use crate::aleph::get_aleph_version;
 use crate::import_map::ImportMap;
 
 use indexmap::IndexSet;
@@ -44,7 +45,6 @@ pub struct Resolver {
   pub specifier_is_remote: bool,
   import_map: ImportMap,
   bundle_mode: bool,
-  has_plugin_resolves: bool,
   ///  builtin jsx tags like `a`, `head`, etc
   pub builtin_jsx_tags: IndexSet<String>,
   /// dependency graph
@@ -52,19 +52,13 @@ pub struct Resolver {
 }
 
 impl Resolver {
-  pub fn new(
-    specifier: &str,
-    import_map: ImportMap,
-    bundle_mode: bool,
-    has_plugin_resolves: bool,
-  ) -> Self {
+  pub fn new(specifier: &str, import_map: ImportMap, bundle_mode: bool) -> Self {
     let regex_http = Regex::new(r"^https?://").unwrap();
     Resolver {
       specifier: specifier.into(),
       import_map,
       dep_graph: Vec::new(),
       bundle_mode,
-      has_plugin_resolves,
       builtin_jsx_tags: IndexSet::new(),
       specifier_is_remote: regex_http.is_match(specifier),
     }
@@ -157,8 +151,16 @@ impl Resolver {
   // - `https://esm.sh/react` -> `/_aleph/-/esm.sh/react.js`
   // - `../components/logo.tsx` -> `/_aleph/components/logo.js`
   // - `@/components/logo.tsx` -> `import Logo from "/_aleph/components/logo.js`
+  // - `https://deno.land/x/aleph/mod.ts` -> `https://deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> String {
-    let url = self.import_map.resolve(self.specifier.as_str(), url);
+    let mut url = self.import_map.resolve(self.specifier.as_str(), url);
+    if url.starts_with("https://deno.land/x/aleph/") {
+      url = format!(
+        "https://deno.land/x/aleph@v{}/{}",
+        get_aleph_version(),
+        url.trim_start_matches("https://deno.land/x/aleph/")
+      );
+    }
     let url = url.as_str();
     let is_remote = RE_HTTP.is_match(url);
     let mut resolved_path = if is_remote {
@@ -225,6 +227,24 @@ impl Resolver {
       });
     } else {
       if self.specifier_is_remote {
+        let mut new_url = Url::from_str(self.specifier.as_str()).unwrap();
+        let mut pathname = PathBuf::from(url);
+        let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
+        specifier_path.pop();
+        if !url.starts_with("/") {
+          let mut p = PathBuf::from(new_url.path());
+          p.pop();
+          p.push(url);
+          pathname = RelativePath::new(p.to_str().unwrap())
+            .normalize()
+            .to_path(Path::new(""))
+        }
+        new_url.set_path(pathname.to_str().unwrap());
+        self.dep_graph.push(DependencyDescriptor {
+          specifier: new_url.as_str().into(),
+          is_dynamic,
+          is_data: false,
+        });
       } else {
         if url.starts_with("@/") {
           self.dep_graph.push(DependencyDescriptor {
@@ -442,7 +462,6 @@ mod tests {
       "/app.tsx",
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
-      false,
     );
     assert_eq!(
       resolver.fix_import_url("https://esm.sh/react"),
@@ -487,6 +506,10 @@ mod tests {
       "react-dom/".into(),
       vec!["https://esm.sh/react-dom/".into()],
     );
+    imports.insert(
+      "https://deno.land/x/aleph/".into(),
+      vec!["http://localhost:9006/".into()],
+    );
     let mut resolver = Resolver::new(
       "/pages/index.tsx",
       ImportMap::from_hashmap(ImportHashMap {
@@ -494,11 +517,14 @@ mod tests {
         scopes: HashMap::new(),
       }),
       false,
-      false,
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react", false),
       "../-/esm.sh/react.js"
+    );
+    assert_eq!(
+      resolver.resolve("https://deno.land/x/aleph/mod.ts", false),
+      "../-/http_localhost_9006/mod.js"
     );
     assert_eq!(resolver.resolve("react", false), "../-/esm.sh/react.js");
     assert_eq!(
@@ -518,7 +544,6 @@ mod tests {
       "https://esm.sh/react-dom",
       ImportMap::from_hashmap(ImportHashMap::default()),
       false,
-      false,
     );
     assert_eq!(
       resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js", false),
@@ -530,7 +555,6 @@ mod tests {
     let mut resolver = Resolver::new(
       "https://esm.sh/preact/hooks",
       ImportMap::from_hashmap(ImportHashMap::default()),
-      false,
       false,
     );
     assert_eq!(
