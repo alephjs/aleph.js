@@ -38,8 +38,8 @@ pub struct DependencyDescriptor {
 /// A Resolver to resolve aleph.js import/export URL.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolver {
-  specifier: String,
-  specifier_is_remote: bool,
+  pub specifier: String,
+  pub specifier_is_remote: bool,
   import_map: ImportMap,
   bundle_mode: bool,
   has_plugin_resolves: bool,
@@ -68,28 +68,36 @@ impl Resolver {
     }
   }
 
-  pub fn is_remote_module(&self) -> bool {
-    return self.specifier_is_remote;
-  }
-
   /// fix import/export url.
   //  - `https://esm.sh/react` -> `/-/esm.sh/react.js`
-  //  - `https://esm.sh/react@17.0.1?dev` -> `/-/esm.sh/react@17.0.1_dev.js`
+  //  - `https://esm.sh/react@17.0.1?target=es2015&dev` -> `/-/esm.sh/react@17.0.1_target=es2015&dev.js`
   //  - `http://localhost:8080/mod` -> `/-/http_localhost_8080/mod.js`
   //  - `/components/logo.tsx` -> `/components/logo.tsx`
-  //  - `\\components\\logo.tsx` -> `/components/logo.tsx` (windows)
   //  - `@/components/logo.tsx` -> `/components/logo.tsx`
   //  - `../components/logo.tsx` -> `../components/logo.tsx`
   //  - `./button.tsx` -> `./button.tsx`
-  //  - `/style/app.css` -> `/style/app.css`
+  //  - `/components/foo/./logo.tsx` -> `/components/foo/logo.tsx`
+  //  - `/components/foo/../logo.tsx` -> `/components/logo.tsx`
   fn fix_import_url(&self, url: &str) -> String {
     let is_remote = RE_HTTP.is_match(url);
     if !is_remote {
-      let slash = PathBuf::from(url).to_slash().unwrap();
-      if slash.starts_with("@/") {
-        return slash.trim_start_matches("@").into();
+      let mut url = url;
+      let mut root = Path::new("");
+      if url.starts_with("./") {
+        url = url.trim_start_matches(".");
+        root = Path::new(".");
+      } else if url.starts_with("../") {
+        url = url.trim_start_matches("..");
+        root = Path::new("..");
+      } else if url.starts_with("@/") {
+        url = url.trim_start_matches("@");
       }
-      return slash;
+      return RelativePath::new(url)
+        .normalize()
+        .to_path(root)
+        .to_str()
+        .unwrap()
+        .to_owned();
     }
     let url = Url::from_str(url).unwrap();
     let path = Path::new(url.path());
@@ -171,11 +179,11 @@ impl Resolver {
           let mut p = PathBuf::from(new_url.path());
           p.pop();
           p.push(url);
-          pathname = RelativePath::new(p.to_slash().unwrap().as_str())
+          pathname = RelativePath::new(p.to_str().unwrap())
             .normalize()
             .to_path(Path::new(""))
         }
-        new_url.set_path(pathname.to_slash().unwrap().as_str());
+        new_url.set_path(pathname.to_str().unwrap());
         diff_paths(
           self.fix_import_url(new_url.as_str()),
           specifier_path.to_str().unwrap(),
@@ -230,7 +238,7 @@ impl Resolver {
           let mut p = PathBuf::from(self.specifier.as_str());
           p.pop();
           p.push(url);
-          let path = RelativePath::new(p.to_slash().unwrap().as_str())
+          let path = RelativePath::new(p.to_str().unwrap())
             .normalize()
             .to_path(Path::new(""));
           self.dep_graph.push(DependencyDescriptor {
@@ -429,12 +437,20 @@ mod tests {
       "/-/esm.sh/react.js"
     );
     assert_eq!(
-      resolver.fix_import_url("https://esm.sh/react@17.0.1?dev"),
-      "/-/esm.sh/react@17.0.1_dev.js"
+      resolver.fix_import_url("https://esm.sh/react@17.0.1?target=es2015&dev"),
+      "/-/esm.sh/react@17.0.1_target=es2015&dev.js"
     );
     assert_eq!(
       resolver.fix_import_url("http://localhost:8080/mod"),
       "/-/http_localhost_8080/mod.js"
+    );
+    assert_eq!(
+      resolver.fix_import_url("/components/foo/./logo.tsx"),
+      "/components/foo/logo.tsx"
+    );
+    assert_eq!(
+      resolver.fix_import_url("/components/foo/../logo.tsx"),
+      "/components/logo.tsx"
     );
     assert_eq!(
       resolver.fix_import_url("/components/logo.tsx"),
@@ -449,7 +465,6 @@ mod tests {
       "../components/logo.tsx"
     );
     assert_eq!(resolver.fix_import_url("./button.tsx"), "./button.tsx");
-    assert_eq!(resolver.fix_import_url("/style/app.css"), "/style/app.css");
   }
 
   #[test]

@@ -113,7 +113,7 @@ impl ParsedModule {
     resolver: Rc<RefCell<Resolver>>,
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
-    let is_remote_module = resolver.borrow_mut().is_remote_module();
+    let specifier_is_remote = resolver.borrow_mut().specifier_is_remote;
     let ts = match self.source_type {
       SourceType::TypeScript => true,
       SourceType::TSX => true,
@@ -127,7 +127,7 @@ impl ParsedModule {
     let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) = aleph_jsx_fold(
       resolver.clone(),
       self.source_map.clone(),
-      options.is_dev && !is_remote_module,
+      options.is_dev && !specifier_is_remote,
     );
     let mut passes = chain!(
       aleph_resolve_fold(resolver.clone()),
@@ -140,7 +140,7 @@ impl ParsedModule {
           false,
           self.source_map.clone()
         ),
-        options.is_dev && !is_remote_module
+        options.is_dev && !specifier_is_remote
       ),
       Optional::new(
         react::jsx(
@@ -410,7 +410,7 @@ mod tests {
             }
             window.dataLayer = window.dataLayer || [];
             gtag("js", new Date());
-            gtag("config", "G-WDCBBBRC98");
+            gtag("config", "G-1234567890");
           `}</script>
         </>
       )
