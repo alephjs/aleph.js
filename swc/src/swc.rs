@@ -265,7 +265,7 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::aleph::get_aleph_version;
+  use crate::aleph::VERSION;
   use crate::import_map::{ImportHashMap, ImportMap};
   use crate::resolve::{DependencyDescriptor, Resolver};
   use std::collections::HashMap;
@@ -419,7 +419,6 @@ mod tests {
 
   #[test]
   fn test_transpile_jsx_builtin_tags() {
-    let aleph_version = get_aleph_version();
     let source = r#"
     import React from "https://esm.sh/react"
     export default function Index() {
@@ -461,35 +460,35 @@ mod tests {
     assert!(code.contains(
       format!(
         "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v{}/anchor.js\"",
-        aleph_version
+        VERSION.as_str()
       )
       .as_str()
     ));
     assert!(code.contains(
       format!(
         "import __ALEPH_Head from \"../-/deno.land/x/aleph@v{}/head.js\"",
-        aleph_version
+        VERSION.as_str()
       )
       .as_str()
     ));
     assert!(code.contains(
       format!(
         "import __ALEPH_Link from \"../-/deno.land/x/aleph@v{}/link.js\"",
-        aleph_version
+        VERSION.as_str()
       )
       .as_str()
     ));
     assert!(code.contains(
       format!(
         "import __ALEPH_Style from \"../-/deno.land/x/aleph@v{}/style.js\"",
-        aleph_version
+        VERSION.as_str()
       )
       .as_str()
     ));
     assert!(code.contains(
       format!(
         "import __ALEPH_Script from \"../-/deno.land/x/aleph@v{}/script.js\"",
-        aleph_version
+        VERSION.as_str()
       )
       .as_str()
     ));
@@ -513,27 +512,27 @@ mod tests {
           is_data: false,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/anchor.ts", aleph_version),
+          specifier: format!("https://deno.land/x/aleph@v{}/anchor.ts", VERSION.as_str()),
           is_dynamic: false,
           is_data: false,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/head.ts", aleph_version),
+          specifier: format!("https://deno.land/x/aleph@v{}/head.ts", VERSION.as_str()),
           is_dynamic: false,
           is_data: false,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/link.ts", aleph_version),
+          specifier: format!("https://deno.land/x/aleph@v{}/link.ts", VERSION.as_str()),
           is_dynamic: false,
           is_data: false,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/style.ts", aleph_version),
+          specifier: format!("https://deno.land/x/aleph@v{}/style.ts", VERSION.as_str()),
           is_dynamic: false,
           is_data: false,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/script.ts", aleph_version),
+          specifier: format!("https://deno.land/x/aleph@v{}/script.ts", VERSION.as_str()),
           is_dynamic: false,
           is_data: false,
         }

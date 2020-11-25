@@ -1,7 +1,7 @@
 // Copyright 2017-2020 The swc Project Developers. All rights reserved. MIT license.
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
-use crate::aleph::get_aleph_version;
+use crate::aleph::VERSION;
 use crate::resolve::Resolver;
 
 use std::{cell::RefCell, rc::Rc};
@@ -178,7 +178,6 @@ impl Fold for AlephJsxBuiltinResolveFold {
     noop_fold_type!();
 
     fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
-        let aleph_version = get_aleph_version();
         let mut items = Vec::<ModuleItem>::new();
         let mut resolver = self.resolver.borrow_mut();
 
@@ -196,8 +195,12 @@ impl Fold for AlephJsxBuiltinResolveFold {
                     span: DUMMY_SP,
                     value: resolver
                         .resolve(
-                            format!("https://deno.land/x/aleph@v{}/{}.ts", aleph_version, name)
-                                .as_str(),
+                            format!(
+                                "https://deno.land/x/aleph@v{}/{}.ts",
+                                VERSION.as_str(),
+                                name
+                            )
+                            .as_str(),
                             false,
                         )
                         .into(),

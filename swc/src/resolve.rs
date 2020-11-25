@@ -1,6 +1,6 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
-use crate::aleph::get_aleph_version;
+use crate::aleph::VERSION;
 use crate::import_map::ImportMap;
 
 use indexmap::IndexSet;
@@ -157,7 +157,7 @@ impl Resolver {
     if url.starts_with("https://deno.land/x/aleph/") {
       url = format!(
         "https://deno.land/x/aleph@v{}/{}",
-        get_aleph_version(),
+        VERSION.as_str(),
         url.trim_start_matches("https://deno.land/x/aleph/")
       );
     }
