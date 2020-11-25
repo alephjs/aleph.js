@@ -1,6 +1,6 @@
 import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.25/tsc/compile.ts';
 import { colors, path, Sha1, walk } from '../deps.ts';
-import transformSync, { init } from './mod.ts';
+import { initSWC, transpileSync } from './mod.ts';
 
 const hashShort = 9
 const reHttp = /^https?:\/\//i
@@ -56,7 +56,7 @@ async function banchmark(sourceFiles: Array<{ code: string, filename: string }>,
     const d2 = { d: 0, min: 0, max: 0, maxDetails: '' }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        transformSync(code, { filename, swcOptions: { isDev } })
+        transpileSync(code, { filename, swcOptions: { isDev } })
         const d = performance.now() - t
         if (d2.min === 0 || d < d2.min) {
             d2.min = d
@@ -75,7 +75,7 @@ async function banchmark(sourceFiles: Array<{ code: string, filename: string }>,
 
 if (import.meta.main) {
     (async () => {
-        await init()
+        await initSWC()
 
         const sourceFiles: Array<{ code: string, filename: string }> = []
         const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.ts', '.tsx'], skip: [/[\._]aleph\//, /_dist\//, /swc\//, /\.d\.ts$/i, /[\._]test\.(j|t)sx?$/i] }
