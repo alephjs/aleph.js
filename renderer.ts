@@ -3,8 +3,8 @@ import { renderToString } from 'https://esm.sh/react-dom/server'
 import { RendererContext, RouterContext } from './context.ts'
 import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page } from './error.ts'
 import events from './events.ts'
-import { serverStyles } from './head.ts'
 import { createPageProps } from './routing.ts'
+import { serverStyles } from './style.ts'
 import type { RouterURL } from './types.ts'
 import util, { hashShort, reHttp } from './util.ts'
 
@@ -167,7 +167,7 @@ export async function renderPage(
     rendererCache.headElements.clear()
     rendererCache.scriptsElements.clear()
 
-    await Promise.all(styles?.map(({ url, hash }) => {
+    await Promise.all(styles?.filter(({ url }) => !url.startsWith("#inline-style-")).map(({ url, hash }) => {
         const path = reHttp.test(url) ? url.replace(reHttp, '/-/') : `${url}.${hash.slice(0, hashShort)}`
         return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}.${buildTarget}/${path}.js`))
     }) || [])

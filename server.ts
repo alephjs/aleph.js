@@ -115,7 +115,7 @@ export async function start(appDir: string, port: number, isDev = false, reload 
 
                                 let body = ''
                                 if (reqSourceMap) {
-                                    body = mod.jsSourceMap
+                                    body = mod.jsSourceMap || ''
                                 } else {
                                     body = mod.jsContent
                                     if (project.isHMRable(mod.id)) {

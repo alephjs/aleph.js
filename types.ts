@@ -40,9 +40,9 @@ export interface Config {
     outputDir?: string
     /** `baseUrl` specifies the path prefix for the application (default is '/'). */
     baseUrl?: string
-    /** `reactUrl` specifies the **react** download URL (default is 'https://esm.sh/react@16.14.0'). */
+    /** `reactUrl` specifies the **react** download URL (default is 'https://esm.sh/react@17.0.1'). */
     reactUrl?: string
-    /** `reactDomUrl` specifies the **react-dom** download URL (default is 'https://esm.sh/react-dom@16.14.0'). */
+    /** `reactDomUrl` specifies the **react-dom** download URL (default is 'https://esm.sh/react-dom@17.0.1'). */
     reactDomUrl?: string
     /** `defaultLocale` specifies the default locale of the application (default is '**en**'). */
     defaultLocale?: string
@@ -54,8 +54,8 @@ export interface Config {
     plugins?: Plugin[]
     /** A list of plugin of PostCSS. */
     postcss?: { plugins: (string | { name: string, options: Record<string, any> })[] }
-    /** `buildTarget` specifies the build target for **tsc** (possible values: '**ES2015**' - '**ES2020**' | '**ESNext**', default is **ES2015** for `production` and **ES2018** for `development`). */
-    buildTarget?: string
+    /** `buildTarget` specifies the build target for **swc**, default is **ES2015** for `production` and **ES2020** for `development`). */
+    buildTarget?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     /** Enable sourceMap in **production** mode (default is **false**). */
     sourceMap?: boolean
     /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable) */

@@ -1,8 +1,7 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useContext, useEffect } from 'https://esm.sh/react'
 import { RendererContext } from './context.ts'
+import Script from './script.ts'
 import util from './util.ts'
-
-export const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 
 export default function Head(props: PropsWithChildren<{}>) {
     const renderer = useContext(RendererContext)
@@ -58,22 +57,6 @@ export default function Head(props: PropsWithChildren<{}>) {
             insertedEls.forEach(el => doc.head.removeChild(el))
         }
     }, [props.children])
-
-    return null
-}
-
-export function Scripts(props: PropsWithChildren<{}>) {
-    const renderer = useContext(RendererContext)
-
-    if (window.Deno) {
-        parse(props.children).forEach(({ type, props }, key) => {
-            if (type === 'script') {
-                renderer.cache.scriptsElements.set(key, { type, props })
-            }
-        })
-    }
-
-    // todo: insert page scripts in browser
 
     return null
 }
@@ -136,43 +119,13 @@ export function Viewport(props: ViewportProps) {
     )
 }
 
-export function applyCSS(id: string, css: string, asLink: boolean = false) {
-    if (window.Deno) {
-        serverStyles.set(id, { css, asLink })
-    } else {
-        const { document } = (window as any)
-        const styleEl = document.createElement(asLink ? 'link' : 'style')
-        const prevStyleEls = Array.from(document.head.children).filter((el: any) => el.getAttribute('data-module-id') === id)
-        if (asLink) {
-            styleEl.rel = 'stylesheet'
-            styleEl.href = css
-        } else {
-            styleEl.type = 'text/css'
-            styleEl.appendChild(document.createTextNode(css))
-        }
-        styleEl.setAttribute('data-module-id', id)
-        document.head.appendChild(styleEl)
-        if (prevStyleEls.length > 0) {
-            if (asLink) {
-                styleEl.addEventListener('load', () => {
-                    prevStyleEls.forEach(el => document.head.removeChild(el))
-                })
-            } else {
-                setTimeout(() => {
-                    prevStyleEls.forEach(el => document.head.removeChild(el))
-                }, 0)
-            }
-        }
-    }
-}
-
 function parse(node: ReactNode, els: Map<string, { type: string, props: Record<string, any> }> = new Map()) {
     Children.forEach(node, child => {
         if (!isValidElement(child)) {
             return
         }
 
-        const { type, props } = child
+        let { type, props } = child
         switch (type) {
             case React.Fragment:
                 parse(props.children, els)
@@ -181,6 +134,8 @@ function parse(node: ReactNode, els: Map<string, { type: string, props: Record<s
             case Viewport:
                 parse((type(props) as ReactElement).props.children, els)
                 break
+            case Script:
+                type = "script"
             case 'base':
             case 'title':
             case 'meta':

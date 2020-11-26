@@ -120,12 +120,11 @@ async function main() {
     // proxy https://deno.land/x/aleph
     if (['dev', 'start', 'build'].includes(command) && existsFileSync('./import_map.json')) {
         const { imports } = JSON.parse(Deno.readTextFileSync('./import_map.json'))
-        Object.assign(globalThis, { ALEPH_IMPORT_MAP: { imports } })
         if (imports['https://deno.land/x/aleph/']) {
-            const match = String(imports['https://deno.land/x/aleph/']).match(/^http:\/\/(localhost|127.0.0.1):(\d+)\/$/)
+            const match = String(imports['https://deno.land/x/aleph/']).match(/^http:\/\/localhost:(\d+)\/$/)
             if (match) {
                 const cwd = Deno.cwd()
-                const port = parseInt(match[2])
+                const port = parseInt(match[1])
                 listenAndServe({ port }, async (req: ServerRequest) => {
                     const url = new URL('http://localhost' + req.url)
                     const resp = new Request(req, util.cleanPath(url.pathname), {}, url.searchParams)
@@ -155,6 +154,7 @@ async function main() {
                         resp.status(500).send(err.message)
                     }
                 })
+                Object.assign(globalThis, { __ALEPH_DEV_PORT: port })
                 log.info(`Proxy https://deno.land/x/aleph on http://localhost:${port}`)
             }
         }

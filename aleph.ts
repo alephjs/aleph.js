@@ -211,23 +211,3 @@ export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceRefet
     return util.cleanPath(baseUrl + '/_aleph/' + (mod.id.startsWith('/-/') ? mod.id : util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js`) + (forceRefetch ? `?t=${Date.now()}` : ''))
 }
 
-export async function redirect(url: string, replace?: boolean) {
-    const { location, history } = window as any
-
-    if (!util.isNEString(url)) {
-        return
-    }
-
-    if (util.isHttpUrl(url)) {
-        location.href = url
-        return
-    }
-
-    url = util.cleanPath(url)
-    if (replace) {
-        history.replaceState(null, '', url)
-    } else {
-        history.pushState(null, '', url)
-    }
-    events.emit('popstate', { type: 'popstate', resetScroll: true })
-}
