@@ -23,7 +23,6 @@ export interface TransformOptions {
 interface DependencyDescriptor {
     specifier: string,
     isDynamic: boolean,
-    isData: boolean,
 }
 
 export interface TransformRet {

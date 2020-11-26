@@ -370,12 +370,10 @@ mod tests {
         DependencyDescriptor {
           specifier: "https://esm.sh/react".into(),
           is_dynamic: false,
-          is_data: false,
         },
         DependencyDescriptor {
           specifier: "http://localhost:9006/mod.ts".into(),
           is_dynamic: false,
-          is_data: false,
         }
       ]
     );
@@ -415,9 +413,9 @@ mod tests {
       .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
     println!("{}", code);
-    assert!(code.contains(", false, \"useDeno."));
-    assert!(code.contains(", true, \"useDeno."));
-    assert!(code.contains(", 1, \"useDeno."));
+    assert!(code.contains(", false, \"useDeno-"));
+    assert!(code.contains(", true, \"useDeno-"));
+    assert!(code.contains(", 1, \"useDeno-"));
   }
 
   #[test]
@@ -433,11 +431,6 @@ mod tests {
           <head>
             <link rel="stylesheet" href="../style/index.css" />
           </head>
-          <style>{`
-            :root {
-              --color: white;
-            }
-          `}</style>
           <script src="ga.js"></script>
           <script>{`
             function gtag() {
@@ -486,13 +479,6 @@ mod tests {
     ));
     assert!(code.contains(
       format!(
-        "import __ALEPH_Style from \"../-/deno.land/x/aleph@v{}/style.js\"",
-        VERSION.as_str()
-      )
-      .as_str()
-    ));
-    assert!(code.contains(
-      format!(
         "import __ALEPH_Script from \"../-/deno.land/x/aleph@v{}/script.js\"",
         VERSION.as_str()
       )
@@ -504,8 +490,6 @@ mod tests {
     assert!(code.contains("React.createElement(__ALEPH_Link,"));
     assert!(code.contains("href: \"../style/index.css.xxxxxxxxx.js\""));
     assert!(code.contains("__baseUrl: \"/pages\""));
-    assert!(code.contains("__styleId: \"style-"));
-    assert!(code.contains("React.createElement(__ALEPH_Style,"));
     assert!(code.contains("React.createElement(__ALEPH_Script,"));
     let r = resolver.borrow_mut();
     assert_eq!(
@@ -514,39 +498,66 @@ mod tests {
         DependencyDescriptor {
           specifier: "https://esm.sh/react".into(),
           is_dynamic: false,
-          is_data: false,
         },
         DependencyDescriptor {
           specifier: "/style/index.css".into(),
           is_dynamic: true,
-          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/anchor.ts", VERSION.as_str()),
           is_dynamic: false,
-          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/head.ts", VERSION.as_str()),
           is_dynamic: false,
-          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/link.ts", VERSION.as_str()),
           is_dynamic: false,
-          is_data: false,
-        },
-        DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/style.ts", VERSION.as_str()),
-          is_dynamic: false,
-          is_data: false,
         },
         DependencyDescriptor {
           specifier: format!("https://deno.land/x/aleph@v{}/script.ts", VERSION.as_str()),
           is_dynamic: false,
-          is_data: false,
         }
       ]
     );
+  }
+
+  #[test]
+  fn test_transpile_inlie_style() {
+    let source = r#"
+    export default function App() {
+      return (
+        <>
+          <style>{`
+            :root {
+              --color: white;
+            }
+          `}</style>
+        </>
+      )
+    }
+    "#;
+    let module = ParsedModule::parse("/pages/App.tsx", source, None, JscTarget::Es2020)
+      .expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      "/pages/App.tsx",
+      ImportMap::from_hashmap(ImportHashMap::default()),
+      None,
+      false,
+    )));
+    let (code, _) = module
+      .transpile(resolver.clone(), &EmitOptions::default())
+      .expect("could not transpile module");
+    println!("{}", code);
+    assert!(code.contains(
+      format!(
+        "import __ALEPH_Style from \"../-/deno.land/x/aleph@v{}/style.js\"",
+        VERSION.as_str()
+      )
+      .as_str()
+    ));
+    assert!(code.contains("React.createElement(__ALEPH_Style,"));
+    assert!(code.contains("__inlineStyle: \"inline-style-"));
   }
 }

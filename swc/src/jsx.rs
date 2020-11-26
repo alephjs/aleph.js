@@ -2,7 +2,7 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::aleph::VERSION;
-use crate::resolve::{Resolver, RE_HTTP};
+use crate::resolve::{DependencyDescriptor, Resolver, RE_HTTP};
 
 use rand::{distributions::Alphanumeric, Rng};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
@@ -190,7 +190,7 @@ impl Fold for AlephJsxFold {
                                     name: JSXAttrName::Ident(id),
                                     ..
                                 }) => match id.sym.as_ref() {
-                                    "__styleId" => {
+                                    "__inlineStyle" => {
                                         id_prop_index = i as i32;
                                     }
                                     _ => {}
@@ -199,12 +199,13 @@ impl Fold for AlephJsxFold {
                             };
                         }
 
+                        let id = new_inline_style_ident();
                         let id_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
                             span: DUMMY_SP,
-                            name: JSXAttrName::Ident(quote_ident!("__styleId")),
+                            name: JSXAttrName::Ident(quote_ident!("__inlineStyle")),
                             value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                                 span: DUMMY_SP,
-                                value: new_style_ident().into(),
+                                value: id.clone().into(),
                                 has_escape: false,
                             }))),
                         });
@@ -213,6 +214,11 @@ impl Fold for AlephJsxFold {
                         } else {
                             el.attrs.push(id_attr);
                         }
+
+                        resolver.dep_graph.push(DependencyDescriptor {
+                            specifier: "#".to_owned() + id.as_str(),
+                            is_dynamic: false,
+                        });
 
                         resolver.builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
@@ -335,8 +341,8 @@ fn rename_builtin_tag(name: &str) -> String {
     "__ALEPH_".to_owned() + name.as_str()
 }
 
-fn new_style_ident() -> String {
-    let mut ident: String = "style-".to_owned();
+fn new_inline_style_ident() -> String {
+    let mut ident: String = "inline-style-".to_owned();
     let rand_id = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(9)

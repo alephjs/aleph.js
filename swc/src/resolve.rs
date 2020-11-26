@@ -41,8 +41,6 @@ pub struct DependencyDescriptor {
   pub specifier: String,
   /// A flag indicating if the import is dynamic or not.
   pub is_dynamic: bool,
-  /// A flag indicating if the import is data or not.
-  pub is_data: bool,
 }
 
 /// A Resolver to resolve aleph.js import/export URL.
@@ -273,7 +271,6 @@ impl Resolver {
       self.dep_graph.push(DependencyDescriptor {
         specifier: url.into(),
         is_dynamic,
-        is_data: false,
       });
     } else {
       if self.specifier_is_remote {
@@ -293,21 +290,18 @@ impl Resolver {
         self.dep_graph.push(DependencyDescriptor {
           specifier: new_url.as_str().into(),
           is_dynamic,
-          is_data: false,
         });
       } else {
         if url.starts_with("@/") {
           self.dep_graph.push(DependencyDescriptor {
             specifier: url.trim_start_matches("@").into(),
             is_dynamic,
-            is_data: false,
           });
         }
         if url.starts_with("/") {
           self.dep_graph.push(DependencyDescriptor {
             specifier: url.into(),
             is_dynamic,
-            is_data: false,
           });
         } else {
           let mut p = PathBuf::from(self.specifier.as_str());
@@ -319,7 +313,6 @@ impl Resolver {
           self.dep_graph.push(DependencyDescriptor {
             specifier: path.to_slash().unwrap(),
             is_dynamic,
-            is_data: false,
           });
         }
       }
@@ -478,7 +471,6 @@ impl Fold for AlephResolveFold {
         resolver.dep_graph.push(DependencyDescriptor {
           specifier: "#".to_owned() + id.clone().as_str(),
           is_dynamic: false,
-          is_data: true,
         });
       }
     }
@@ -499,7 +491,7 @@ fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
 }
 
 fn new_use_deno_hook_ident() -> String {
-  let mut ident: String = "useDeno.".to_owned();
+  let mut ident: String = "useDeno-".to_owned();
   let rand_id = rand::thread_rng()
     .sample_iter(&Alphanumeric)
     .take(9)
