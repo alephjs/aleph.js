@@ -4,13 +4,7 @@
 use crate::aleph::VERSION;
 use crate::resolve::{Resolver, RE_HTTP};
 
-use path_slash::PathBufExt;
-use relative_path::RelativePath;
-use std::{
-    cell::RefCell,
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use swc_common::{FileName, SourceMap, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
@@ -100,67 +94,96 @@ impl Fold for AlephJsxFold {
                     }
 
                     "link" | "Link" => {
-                        let mut href_prop_index: i32 = -1;
-                        let mut href_prop_value = "";
+                        let mut should_replace = false;
 
-                        for (i, attr) in el.attrs.iter().enumerate() {
+                        for attr in &el.attrs {
                             match &attr {
-                                JSXAttrOrSpread::JSXAttr(a) => {
-                                    let is_href = match &a.name {
-                                        JSXAttrName::Ident(i) => i.sym.as_ref().eq("href"),
-                                        _ => false,
-                                    };
-                                    if is_href {
-                                        match &a.value {
-                                            Some(val) => {
-                                                match val {
-                                                    JSXAttrValue::Lit(l) => match l {
-                                                        Lit::Str(s) => {
-                                                            href_prop_index = i as i32;
-                                                            href_prop_value = s.value.as_ref();
-                                                        }
-                                                        _ => {}
-                                                    },
-                                                    _ => {}
-                                                };
-                                            }
-                                            None => {}
-                                        };
-                                        break;
+                                JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                    name: JSXAttrName::Ident(id),
+                                    value: Some(JSXAttrValue::Lit(Lit::Str(Str { value, .. }))),
+                                    ..
+                                }) => {
+                                    let key = id.sym.as_ref();
+                                    let value = value.as_ref();
+                                    if key == "rel"
+                                        && (value == "stylesheet"
+                                            || value == "style"
+                                            || value == "component")
+                                    {
+                                        should_replace = true
                                     }
                                 }
-                                _ => continue,
+                                _ => {}
                             };
                         }
 
-                        let mut href = PathBuf::from(
-                            resolver
-                                .fix_import_url(resolver.specifier.as_str())
-                                .as_str(),
-                        );
-                        href.pop();
-                        href.push(resolver.resolve(href_prop_value, true));
-                        if href_prop_index >= 0 {
-                            el.attrs[href_prop_index as usize] =
-                                JSXAttrOrSpread::JSXAttr(JSXAttr {
-                                    span: DUMMY_SP,
-                                    name: JSXAttrName::Ident(quote_ident!("href")),
-                                    value: Some(JSXAttrValue::Lit(Lit::Str(Str {
-                                        span: DUMMY_SP,
-                                        value: RelativePath::new(href.to_str().unwrap())
-                                            .normalize()
-                                            .to_path(Path::new(""))
-                                            .to_slash()
-                                            .unwrap()
-                                            .into(),
-                                        has_escape: false,
-                                    }))),
-                                });
-                        }
+                        if should_replace {
+                            let mut href_prop_index: i32 = -1;
+                            let mut href_prop_value = "";
 
-                        if name.eq("link") {
-                            resolver.builtin_jsx_tags.insert(name.into());
-                            el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                            for (i, attr) in el.attrs.iter().enumerate() {
+                                match &attr {
+                                    JSXAttrOrSpread::JSXAttr(a) => {
+                                        let is_href = match &a.name {
+                                            JSXAttrName::Ident(i) => i.sym.as_ref().eq("href"),
+                                            _ => false,
+                                        };
+                                        if is_href {
+                                            match &a.value {
+                                                Some(val) => {
+                                                    match val {
+                                                        JSXAttrValue::Lit(l) => match l {
+                                                            Lit::Str(s) => {
+                                                                href_prop_index = i as i32;
+                                                                href_prop_value = s.value.as_ref();
+                                                            }
+                                                            _ => {}
+                                                        },
+                                                        _ => {}
+                                                    };
+                                                }
+                                                None => {}
+                                            };
+                                            break;
+                                        }
+                                    }
+                                    _ => continue,
+                                };
+                            }
+
+                            if href_prop_index >= 0 {
+                                el.attrs[href_prop_index as usize] =
+                                    JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                        span: DUMMY_SP,
+                                        name: JSXAttrName::Ident(quote_ident!("href")),
+                                        value: Some(JSXAttrValue::Lit(Lit::Str(Str {
+                                            span: DUMMY_SP,
+                                            value: resolver.resolve(href_prop_value, true).into(),
+                                            has_escape: false,
+                                        }))),
+                                    });
+                            }
+                            let mut base = PathBuf::from(
+                                resolver
+                                    .fix_import_url(resolver.specifier.as_str())
+                                    .as_str(),
+                            );
+                            base.pop();
+                            el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                span: DUMMY_SP,
+                                name: JSXAttrName::Ident(quote_ident!("__baseUrl")),
+                                value: Some(JSXAttrValue::Lit(Lit::Str(Str {
+                                    span: DUMMY_SP,
+                                    value: base.to_str().unwrap().into(),
+                                    has_escape: false,
+                                }))),
+                            }));
+
+                            if name.eq("link") {
+                                resolver.builtin_jsx_tags.insert(name.into());
+                                el.name =
+                                    JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                            }
                         }
                     }
                     _ => {}
