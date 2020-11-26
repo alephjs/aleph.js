@@ -87,7 +87,7 @@ impl Resolver {
   //  - `./button.tsx` -> `./button.tsx`
   //  - `/components/foo/./logo.tsx` -> `/components/foo/logo.tsx`
   //  - `/components/foo/../logo.tsx` -> `/components/logo.tsx`
-  fn fix_import_url(&self, url: &str) -> String {
+  pub fn fix_import_url(&self, url: &str) -> String {
     let is_remote = RE_HTTP.is_match(url);
     if !is_remote {
       let mut url = url;
@@ -104,7 +104,7 @@ impl Resolver {
       return RelativePath::new(url)
         .normalize()
         .to_path(root)
-        .to_str()
+        .to_slash()
         .unwrap()
         .to_owned();
     }
