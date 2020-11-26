@@ -502,7 +502,7 @@ mod tests {
     assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
     assert!(code.contains("React.createElement(__ALEPH_Head,"));
     assert!(code.contains("React.createElement(__ALEPH_Link,"));
-    assert!(code.contains("/style/index.css.xxxxxxxxx.js"));
+    assert!(code.contains("\"/style/index.css.xxxxxxxxx.js\""));
     assert!(code.contains("React.createElement(__ALEPH_Style,"));
     assert!(code.contains("React.createElement(__ALEPH_Script,"));
     let r = resolver.borrow_mut();

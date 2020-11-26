@@ -6,8 +6,11 @@ use crate::resolve::{Resolver, RE_HTTP};
 
 use path_slash::PathBufExt;
 use relative_path::RelativePath;
-use std::path::Path;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 use swc_common::{FileName, SourceMap, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
@@ -130,12 +133,13 @@ impl Fold for AlephJsxFold {
                             };
                         }
 
-                        let href = resolver.resolve(href_prop_value, true);
-                        let href = RelativePath::new(href.as_str()).to_path(Path::new(
+                        let mut href = PathBuf::from(
                             resolver
                                 .fix_import_url(resolver.specifier.as_str())
                                 .as_str(),
-                        ));
+                        );
+                        href.pop();
+                        href.push(resolver.resolve(href_prop_value, true));
                         if href_prop_index >= 0 {
                             el.attrs[href_prop_index as usize] =
                                 JSXAttrOrSpread::JSXAttr(JSXAttr {
@@ -143,7 +147,12 @@ impl Fold for AlephJsxFold {
                                     name: JSXAttrName::Ident(quote_ident!("href")),
                                     value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                                         span: DUMMY_SP,
-                                        value: href.to_slash().unwrap().into(),
+                                        value: RelativePath::new(href.to_str().unwrap())
+                                            .normalize()
+                                            .to_path(Path::new(""))
+                                            .to_slash()
+                                            .unwrap()
+                                            .into(),
                                         has_escape: false,
                                     }))),
                                 });
