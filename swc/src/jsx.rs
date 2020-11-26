@@ -4,6 +4,7 @@
 use crate::aleph::VERSION;
 use crate::resolve::{Resolver, RE_HTTP};
 
+use rand::{distributions::Alphanumeric, Rng};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use swc_common::{FileName, SourceMap, DUMMY_SP};
 use swc_ecma_ast::*;
@@ -56,6 +57,11 @@ impl Fold for AlephJsxFold {
             JSXElementName::Ident(id) => {
                 let name = id.sym.as_ref();
                 match name {
+                    "head" | "script" => {
+                        resolver.builtin_jsx_tags.insert(name.into());
+                        el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                    }
+
                     "a" => {
                         let mut should_replace = true;
 
@@ -84,15 +90,6 @@ impl Fold for AlephJsxFold {
                         }
                     }
 
-                    "head" | "script" | "style" => {
-                        resolver.builtin_jsx_tags.insert(name.into());
-                        el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
-                    }
-
-                    "img" => {
-                        //todo: optimize img
-                    }
-
                     "link" | "Link" => {
                         let mut should_replace = false;
 
@@ -119,34 +116,25 @@ impl Fold for AlephJsxFold {
 
                         if should_replace {
                             let mut href_prop_index: i32 = -1;
+                            let mut base_url_prop_index: i32 = -1;
                             let mut href_prop_value = "";
 
                             for (i, attr) in el.attrs.iter().enumerate() {
                                 match &attr {
-                                    JSXAttrOrSpread::JSXAttr(a) => {
-                                        let is_href = match &a.name {
-                                            JSXAttrName::Ident(i) => i.sym.as_ref().eq("href"),
-                                            _ => false,
-                                        };
-                                        if is_href {
-                                            match &a.value {
-                                                Some(val) => {
-                                                    match val {
-                                                        JSXAttrValue::Lit(l) => match l {
-                                                            Lit::Str(s) => {
-                                                                href_prop_index = i as i32;
-                                                                href_prop_value = s.value.as_ref();
-                                                            }
-                                                            _ => {}
-                                                        },
-                                                        _ => {}
-                                                    };
-                                                }
-                                                None => {}
-                                            };
-                                            break;
+                                    JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                        name: JSXAttrName::Ident(id),
+                                        value: Some(JSXAttrValue::Lit(Lit::Str(Str { value, .. }))),
+                                        ..
+                                    }) => match id.sym.as_ref() {
+                                        "href" => {
+                                            href_prop_index = i as i32;
+                                            href_prop_value = value.as_ref();
                                         }
-                                    }
+                                        "__baseUrl" => {
+                                            base_url_prop_index = i as i32;
+                                        }
+                                        _ => {}
+                                    },
                                     _ => continue,
                                 };
                             }
@@ -169,7 +157,8 @@ impl Fold for AlephJsxFold {
                                     .as_str(),
                             );
                             base.pop();
-                            el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
+
+                            let base_url_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
                                 span: DUMMY_SP,
                                 name: JSXAttrName::Ident(quote_ident!("__baseUrl")),
                                 value: Some(JSXAttrValue::Lit(Lit::Str(Str {
@@ -177,7 +166,12 @@ impl Fold for AlephJsxFold {
                                     value: base.to_str().unwrap().into(),
                                     has_escape: false,
                                 }))),
-                            }));
+                            });
+                            if base_url_prop_index >= 0 {
+                                el.attrs[base_url_prop_index as usize] = base_url_attr;
+                            } else {
+                                el.attrs.push(base_url_attr);
+                            }
 
                             if name.eq("link") {
                                 resolver.builtin_jsx_tags.insert(name.into());
@@ -186,6 +180,48 @@ impl Fold for AlephJsxFold {
                             }
                         }
                     }
+
+                    "style" => {
+                        let mut id_prop_index: i32 = -1;
+
+                        for (i, attr) in el.attrs.iter().enumerate() {
+                            match &attr {
+                                JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                    name: JSXAttrName::Ident(id),
+                                    ..
+                                }) => match id.sym.as_ref() {
+                                    "__styleId" => {
+                                        id_prop_index = i as i32;
+                                    }
+                                    _ => {}
+                                },
+                                _ => continue,
+                            };
+                        }
+
+                        let id_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
+                            span: DUMMY_SP,
+                            name: JSXAttrName::Ident(quote_ident!("__styleId")),
+                            value: Some(JSXAttrValue::Lit(Lit::Str(Str {
+                                span: DUMMY_SP,
+                                value: new_style_ident().into(),
+                                has_escape: false,
+                            }))),
+                        });
+                        if id_prop_index >= 0 {
+                            el.attrs[id_prop_index as usize] = id_attr;
+                        } else {
+                            el.attrs.push(id_attr);
+                        }
+
+                        resolver.builtin_jsx_tags.insert(name.into());
+                        el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                    }
+
+                    "img" => {
+                        //todo: optimize img
+                    }
+
                     _ => {}
                 }
             }
@@ -297,4 +333,14 @@ fn rename_builtin_tag(name: &str) -> String {
         name = "Anchor".into();
     }
     "__ALEPH_".to_owned() + name.as_str()
+}
+
+fn new_style_ident() -> String {
+    let mut ident: String = "style-".to_owned();
+    let rand_id = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(9)
+        .collect::<String>();
+    ident.push_str(rand_id.as_str());
+    return ident;
 }

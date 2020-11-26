@@ -504,6 +504,7 @@ mod tests {
     assert!(code.contains("React.createElement(__ALEPH_Link,"));
     assert!(code.contains("href: \"../style/index.css.xxxxxxxxx.js\""));
     assert!(code.contains("__baseUrl: \"/pages\""));
+    assert!(code.contains("__styleId: \"style-"));
     assert!(code.contains("React.createElement(__ALEPH_Style,"));
     assert!(code.contains("React.createElement(__ALEPH_Script,"));
     let r = resolver.borrow_mut();
