@@ -160,11 +160,12 @@ impl Resolver {
 
   /// resolve import/export url.
   // [/pages/index.tsx]
-  // - `https://esm.sh/swr` -> `/_aleph/-/esm.sh/swr.js`
-  // - `https://esm.sh/react` -> `/_aleph/-/esm.sh/react${REACT_VERSION}.js`
+  // - `https://esm.sh/swr` -> `/-/esm.sh/swr.js`
+  // - `https://esm.sh/react` -> `/-/esm.sh/react${REACT_VERSION}.js`
   // - `https://deno.land/x/aleph/mod.ts` -> `https://deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
-  // - `../components/logo.tsx` -> `/_aleph/components/logo.js`
-  // - `@/components/logo.tsx` -> `import Logo from "/_aleph/components/logo.js`
+  // - `../components/logo.tsx` -> `/components/logo.xxxxxxxxx.js`
+  // - `@/components/logo.tsx` -> `import Logo from "/components/logo.xxxxxxxxx.js`
+  // - `@/styles/app.css` -> `import Logo from "/styles/app.css.xxxxxxxxx.js`
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> String {
     let mut url = self.import_map.resolve(self.specifier.as_str(), url);
     if url.starts_with("https://deno.land/x/aleph/") {
@@ -232,10 +233,33 @@ impl Resolver {
     match resolved_path.extension() {
       Some(os_str) => match os_str.to_str() {
         Some(s) => match s {
-          "jsx" | "ts" | "tsx" | "mjs" => {
-            resolved_path.set_extension("js");
+          "js" | "jsx" | "ts" | "tsx" | "mjs" => {
+            let mut filename = resolved_path
+              .file_name()
+              .unwrap()
+              .to_str()
+              .unwrap()
+              .trim_end_matches(s)
+              .to_owned();
+            if !is_remote && !self.specifier_is_remote {
+              filename.push_str("xxxxxxxxx.js");
+            } else {
+              filename.push_str("js");
+            }
+            resolved_path.set_file_name(filename);
           }
-          _ => {}
+          _ => {
+            if !is_remote && !self.specifier_is_remote {
+              let mut filename = resolved_path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned();
+              filename.push_str(".xxxxxxxxx.js");
+              resolved_path.set_file_name(filename);
+            }
+          }
         },
         None => {}
       },
@@ -318,13 +342,13 @@ impl Fold for AlephResolveFold {
   // resolve import/export url
   // [/pages/index.tsx]
   // - development mode:
-  //   - `import React, {useState} from "https://esm.sh/react"` -> `import React, {useState} from "/_aleph/-/esm.sh/react.js"`
-  //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/_aleph/-/esm.sh/react.js"`
-  //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/_aleph/components/logo.js"`
-  //   - `import Logo from "@/components/logo.tsx"` -> `import Logo from "/_aleph/components/logo.js"`
-  //   - `import "../style/index.css" -> `import "/_aleph/style/index.css.js"`
-  //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/_aleph/-/esm.sh/react.js"`
-  //   - `export * from "https://esm.sh/react"` -> `export * from "/_aleph/-/esm.sh/react.js"`
+  //   - `import React, {useState} from "https://esm.sh/react"` -> `import React, {useState} from "/-/esm.sh/react.js"`
+  //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/-/esm.sh/react.js"`
+  //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/components/logo.xxxxxxxxx.js"`
+  //   - `import Logo from "@/components/logo.tsx"` -> `import Logo from "/components/logo.xxxxxxxxx.js"`
+  //   - `import "../style/index.css" -> `import "/style/index.css.xxxxxxxxx..js"`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
+  //   - `export * from "https://esm.sh/react"` -> `export * from "/-/esm.sh/react.js"`
   // - bundling mode:
   //   - `import React, {useState} from "https://esm.sh/react"` -> `const {default: React, useState} = window.__ALEPH_PACK["https://esm.sh/react"]`
   //   - `import * as React from "https://esm.sh/react"` -> `const {__star__: React} = window.__ALEPH_PACK["https://esm.sh/react"]`
@@ -385,7 +409,7 @@ impl Fold for AlephResolveFold {
   }
 
   // resolve dynamic import url & sign useDeno hook
-  // - `import("https://esm.sh/rect")` -> `import("/_aleph/-/esm.sh/react.js")`
+  // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
   // - `useDeno(() => {})` -> `useDeno(() => {}, false, "useDeno.RANDOM_ID")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     let mut resolver = self.resolver.borrow_mut();
@@ -591,11 +615,15 @@ mod tests {
     );
     assert_eq!(
       resolver.resolve("../components/logo.tsx", false),
-      "../components/logo.js"
+      "../components/logo.xxxxxxxxx.js"
     );
     assert_eq!(
       resolver.resolve("@/components/logo.tsx", false),
-      "../components/logo.js"
+      "../components/logo.xxxxxxxxx.js"
+    );
+    assert_eq!(
+      resolver.resolve("@/styles/app.css", false),
+      "../styles/app.css.xxxxxxxxx.js"
     );
 
     let mut resolver = Resolver::new(
