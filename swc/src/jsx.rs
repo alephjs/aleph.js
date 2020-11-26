@@ -22,7 +22,7 @@ pub fn aleph_jsx_fold(
             source,
             is_dev,
         },
-        AlephJsxBuiltinResolveFold {
+        AlephJsxBuiltinModuleResolveFold {
             resolver: resolver.clone(),
         },
     )
@@ -31,11 +31,11 @@ pub fn aleph_jsx_fold(
 /// aleph.js jsx fold, core functions include:
 /// - add `__sourceFile` prop in development mode
 /// - resolve `Link` component `href` prop
-/// - rename `a` to `Anchor`
-/// - rename `head` to `Head`
-/// - rename `link` to `Link`
-/// - rename `script` to `Script`
-/// - rename `style` to `Style`
+/// - resolve `a` to `Anchor`
+/// - resolve `head` to `Head`
+/// - resolve `link` to `Link`
+/// - resolve `script` to `Script`
+/// - resolve `style` to `Style`
 /// - optimize `img` in producation mode
 struct AlephJsxFold {
     resolver: Rc<RefCell<Resolver>>,
@@ -280,12 +280,12 @@ impl Fold for AlephJsxFold {
     }
 }
 
-/// aleph.js jsx builtin fold.
-struct AlephJsxBuiltinResolveFold {
+/// aleph.js jsx builtin module resolve fold.
+struct AlephJsxBuiltinModuleResolveFold {
     resolver: Rc<RefCell<Resolver>>,
 }
 
-impl Fold for AlephJsxBuiltinResolveFold {
+impl Fold for AlephJsxBuiltinModuleResolveFold {
     noop_fold_type!();
 
     fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
