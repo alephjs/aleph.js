@@ -1,5 +1,7 @@
-import React from 'https://esm.sh/react'
+import React from 'react'
+// @ts-expect-error
 import wasm from './42.wasm'
+// @ts-expect-error
 import './style.sass'
 
 export default function Home() {

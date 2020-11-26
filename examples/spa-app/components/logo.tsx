@@ -1,4 +1,4 @@
-import React from 'https://esm.sh/react'
+import React from 'react'
 
 export default function Logo({ width = 75 }: { width?: number }) {
     return (

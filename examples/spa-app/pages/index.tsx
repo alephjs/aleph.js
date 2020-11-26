@@ -1,5 +1,4 @@
-import { Import } from 'https://deno.land/x/aleph/mod.ts'
-import React, { useState } from 'https://esm.sh/react'
+import React, { useState } from 'react'
 import Logo from '../components/logo.tsx'
 
 export default function Home() {
@@ -10,7 +9,7 @@ export default function Home() {
 
     return (
         <div className="page">
-            <Import from="../style/index.less" />
+            <link rel="stylesheet" href="../style/index.less" />
             <p className="logo"><Logo /></p>
             <h1>Welcome to use <strong>Aleph.js</strong>!</h1>
             <p className="links">
