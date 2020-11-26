@@ -22,15 +22,16 @@ use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 use url::Url;
 
 lazy_static! {
+  pub static ref HASH_SHORT: usize = 9;
   pub static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
   pub static ref RE_ENDS_WITH_VERSION: Regex =
     Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
   pub static ref RE_REACT_URL: Regex =
-    Regex::new(r"^https?://[a-z0-9\-.:]+/react(@[0-9a-z\.\-]+)?(/|\?)?").unwrap();
+    Regex::new(r"^https?://[a-z0-9\-.:]+/react(@[0-9a-z\.\-]+)?(/|\?|$)").unwrap();
   pub static ref RE_REACT_DOM_URL: Regex =
-    Regex::new(r"^https?://[a-z0-9\-.:]+/react\-dom(@[0-9a-z\.\-]+)?(/|\?)?").unwrap();
+    Regex::new(r"^https?://[a-z0-9\-.:]+/react\-dom(@[0-9a-z\.\-]+)?(/|\?|$)").unwrap();
   pub static ref RE_REACT_SERVER_URL: Regex =
-    Regex::new(r"^https?://[a-z0-9\-.:]+/react\-dom(@[0-9a-z\.\-]+)?/server(/|\?)?").unwrap();
+    Regex::new(r"^https?://[a-z0-9\-.:]+/react\-dom(@[0-9a-z\.\-]+)?/server(/|\?|$)").unwrap();
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -242,7 +243,8 @@ impl Resolver {
               .trim_end_matches(s)
               .to_owned();
             if !is_remote && !self.specifier_is_remote {
-              filename.push_str("xxxxxxxxx.js");
+              filename.push_str("x".repeat(*HASH_SHORT).as_str());
+              filename.push_str(".js");
             } else {
               filename.push_str("js");
             }
@@ -256,7 +258,9 @@ impl Resolver {
                 .to_str()
                 .unwrap()
                 .to_owned();
-              filename.push_str(".xxxxxxxxx.js");
+              filename.push('.');
+              filename.push_str("x".repeat(*HASH_SHORT).as_str());
+              filename.push_str(".js");
               resolved_path.set_file_name(filename);
             }
           }
@@ -580,6 +584,10 @@ mod tests {
     assert_eq!(
       resolver.resolve("https://esm.sh/react", false),
       "../-/esm.sh/react@17.0.1.js"
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/react-refresh", false),
+      "../-/esm.sh/react-refresh.js"
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react@16", false),
