@@ -2,6 +2,7 @@ import { colors, ensureDir, gzipDecode, path, readerFromStreamReader, Untar } fr
 import { ensureTextFile } from '../fs.ts'
 import log from '../log.ts'
 import util from '../util.ts'
+import { version } from '../version.ts'
 
 const gitignore = [
     '.DS_Store',
@@ -69,7 +70,15 @@ export default async function (appDir: string, options: Record<string, string | 
     await Deno.writeTextFile(path.join(appDir, '.vscode', 'extensions.json'), JSON.stringify(vscExtensions, undefined, 4))
     await Deno.writeTextFile(path.join(appDir, '.vscode', 'settings.json'), JSON.stringify(vscSettings, undefined, 4))
     await Deno.writeTextFile(path.join(appDir, '.gitignore'), gitignore.join('\n'))
-    await Deno.writeTextFile(path.join(appDir, 'import_map.json'), JSON.stringify({ imports: {} }, undefined, 4))
+    await Deno.writeTextFile(path.join(appDir, 'import_map.json'), JSON.stringify({
+        imports: {
+            'aleph': `https://deno.land/x/aleph@v${version}/mod.ts`,
+            'aleph/': `https://deno.land/x/aleph@v${version}/`,
+            'react': 'https://esm.sh/react@17.0.1',
+            'react-dom': 'https://esm.sh/react-dom@17.0.1',
+        },
+        scopes: {}
+    }, undefined, 4))
 
     log.info('Done')
     log.info('---')
