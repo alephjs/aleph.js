@@ -10,12 +10,6 @@ export default function Home() {
 
     return (
         <div className="page">
-            <style>{`
-                a {
-                    font-size: 12px;
-                    color: red;
-                }
-            `}</style>
             <link rel="stylesheet" href="../style/index.less" />
             <p className="logo"><Logo /></p>
             <h1>Welcome to use <strong>Aleph.js</strong>!</h1>

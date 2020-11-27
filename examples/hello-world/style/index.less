@@ -76,7 +76,7 @@ main {
         margin: 30px auto 0;
         border: 1px solid #eee;
         border-radius: 6px;
-        transition: all 0.15s ease-in;
+        transition: border-color 0.15s ease-in;
 
         &:hover {
             border-color: #ccc;
@@ -102,12 +102,12 @@ main {
             font-family: Courier, monospace;
             font-weight: 600;
             color: #666;
-            transition: all 0.1s ease-in-out;
+            transition: color 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
             cursor: pointer;
 
             &:hover {
                 color: #111;
-                box-shadow: 0 0 2px rgba(0, 0, 0, 0.75);
+                box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
             }
         }
         button + button {
