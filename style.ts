@@ -1,19 +1,41 @@
-import { StyleHTMLAttributes } from 'https://esm.sh/react'
+import { StyleHTMLAttributes, useEffect } from 'https://esm.sh/react'
 
-type StyleProps = StyleHTMLAttributes<{}> & { __inlineStyle?: string }
+export const serverStyles: Map<string, { css: string, asLink?: boolean }> = new Map()
 
-export default function Style({ children, __inlineStyle: id }: StyleProps) {
+type StyleProps = StyleHTMLAttributes<{}> & { __styleId?: string }
+
+export default function Style({ children, __styleId: id }: StyleProps) {
+    const css = children?.toLocaleString()
+
     if (window.Deno) {
-        const css = children?.toLocaleString()
         if (css && id) {
             serverStyles.set('#' + id, { css })
         }
     }
 
+    useEffect(() => {
+        const { document } = (window as any)
+        const styleEl = document.createElement('style')
+        const ssrStyleEls = Array.from(document.head.children).filter((el: any) => {
+            return el.getAttribute('data-module-id') === '#' + id && el.hasAttribute('ssr')
+        })
+        styleEl.type = 'text/css'
+        styleEl.setAttribute('data-module-id', '#' + id)
+        styleEl.appendChild(document.createTextNode(css))
+        document.head.appendChild(styleEl)
+        if (ssrStyleEls.length > 0) {
+            setTimeout(() => {
+                ssrStyleEls.forEach(el => document.head.removeChild(el))
+            }, 0)
+        }
+        return () => {
+            document.head.removeChild(styleEl)
+            console.log('remove', id)
+        }
+    }, [css])
+
     return null
 }
-
-export const serverStyles: Map<string, { css: string, asLink?: boolean }> = new Map()
 
 export function applyCSS(id: string, css: string, asLink: boolean = false) {
     if (window.Deno) {
@@ -21,7 +43,9 @@ export function applyCSS(id: string, css: string, asLink: boolean = false) {
     } else {
         const { document } = (window as any)
         const styleEl = document.createElement(asLink ? 'link' : 'style')
-        const prevStyleEls = Array.from(document.head.children).filter((el: any) => el.getAttribute('data-module-id') === id)
+        const prevStyleEls = Array.from(document.head.children).filter((el: any) => {
+            return el.getAttribute('data-module-id') === id
+        })
         if (asLink) {
             styleEl.rel = 'stylesheet'
             styleEl.href = css

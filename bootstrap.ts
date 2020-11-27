@@ -30,7 +30,7 @@ export default async function bootstrap({
         const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
         if (mod.deps) {
             // import async dependencies
-            for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
+            for (const dep of mod.deps.filter(({ url, isStyle }) => !!isStyle && !url.startsWith('#inline-style-'))) {
                 await import(getModuleImportUrl(baseUrl, { id: util.ensureExt(dep.url.replace(reHttp, '/-/'), '.js'), hash: dep.hash }))
             }
         }
@@ -78,7 +78,7 @@ export default async function bootstrap({
     // remove ssr head elements, set a timmer to avoid the tab title flash
     setTimeout(() => {
         Array.from(document.head.children).forEach((el: any) => {
-            if (el.hasAttribute('ssr')) {
+            if (el.hasAttribute('ssr') && el.tagName.toLowerCase() !== "style") {
                 document.head.removeChild(el)
             }
         })

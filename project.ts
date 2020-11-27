@@ -926,11 +926,39 @@ export class Project {
         return module
     }
 
+    private async _preprocessStyle(sourceCode: string, isLess: boolean) {
+        let css: string = sourceCode
+        if (isLess) {
+            try {
+                const output = await less.render(sourceCode || '/* empty content */')
+                css = output.css
+            } catch (error) {
+                throw new Error(`less: ${error}`);
+            }
+        }
+        const plugins = this.config.postcss.plugins.map(p => {
+            if (typeof p === 'string') {
+                return this.#postcssPlugins[p]
+            } else {
+                const Plugin = this.#postcssPlugins[p.name] as Function
+                return Plugin(p.options)
+            }
+        })
+        css = (await postcss(plugins).process(css).async()).content
+        if (this.isDev) {
+            css = css.trim()
+        } else {
+            const output = this.#cleanCSS.minify(css)
+            css = output.styles
+        }
+        return css
+    }
+
     // todo: force recompile remote modules which URL don't specify version
-    private async _compile(url: string, options?: { forceCompile?: boolean }) {
+    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean }) {
         const mod = this._moduleFromURL(url)
 
-        if (this.#modules.has(mod.id) && !options?.forceCompile) {
+        if (this.#modules.has(mod.id) && !options?.forceCompile && !options?.sourceCode) {
             return this.#modules.get(mod.id)!
         }
 
@@ -960,7 +988,14 @@ export class Project {
         let shouldCompile = false
         let fsync = false
 
-        if (mod.isRemote) {
+        if (options?.sourceCode) {
+            sourceContent = (new TextEncoder).encode(options.sourceCode)
+            const sourceHash = getHash(sourceContent)
+            if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
+                mod.sourceHash = sourceHash
+                shouldCompile = true
+            }
+        } else if (mod.isRemote) {
             let dlUrl = url
             if (dlUrl.startsWith('https://esm.sh/')) {
                 const u = new URL(dlUrl)
@@ -993,8 +1028,11 @@ export class Project {
                         throw new Error(`Download ${url}: ${resp.status} - ${resp.statusText}`)
                     }
                     sourceContent = await Deno.readAll(readerFromStreamReader(resp.body!.getReader()))
-                    mod.sourceHash = getHash(sourceContent)
-                    shouldCompile = true
+                    const sourceHash = getHash(sourceContent)
+                    if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
+                        mod.sourceHash = sourceHash
+                        shouldCompile = true
+                    }
                 } catch (err) {
                     throw new Error(`Download ${url}: ${err.message}`)
                 }
@@ -1022,7 +1060,7 @@ export class Project {
             const t = performance.now()
             let sourceCode = (new TextDecoder).decode(sourceContent)
             for (const plugin of this.config.plugins) {
-                if (plugin.test.test(url) && plugin.transform) {
+                if (plugin.test.test(url) && util.isFunction(plugin.transform)) {
                     const { code, loader = 'js' } = await plugin.transform(sourceContent, url)
                     sourceCode = code
                     mod.loader = loader
@@ -1031,30 +1069,7 @@ export class Project {
             }
             mod.deps = []
             if (mod.loader === 'css') {
-                let css: string = sourceCode
-                if (mod.id.endsWith('.less')) {
-                    try {
-                        const output = await less.render(sourceCode || '/* empty content */')
-                        css = output.css
-                    } catch (error) {
-                        throw new Error(`less: ${error}`);
-                    }
-                }
-                const plugins = this.config.postcss.plugins.map(p => {
-                    if (typeof p === 'string') {
-                        return this.#postcssPlugins[p]
-                    } else {
-                        const Plugin = this.#postcssPlugins[p.name] as Function
-                        return Plugin(p.options)
-                    }
-                })
-                css = (await postcss(plugins).process(css).async()).content
-                if (this.isDev) {
-                    css = css.trim()
-                } else {
-                    const output = this.#cleanCSS.minify(css)
-                    css = output.styles
-                }
+                const css = await this._preprocessStyle(sourceCode, mod.id.endsWith('.less'))
                 mod.jsContent = [
                     `import { applyCSS } from ${JSON.stringify(getRelativePath(
                         path.dirname(fixImportUrl(mod.url)),
@@ -1069,7 +1084,7 @@ export class Project {
                 mod.jsContent = [
                     this.isDev && `const _s = $RefreshSig$();`,
                     `import React, { useEffect, useRef } from ${JSON.stringify(getRelativePath(path.dirname(mod.localUrl), fixImportUrl(this.config.reactUrl)))};`,
-                    `import { redirect } from ${JSON.stringify(getRelativePath(path.dirname(mod.localUrl), `/-/${amlUrlPreifx}/aleph.js`))};`,
+                    `import { redirect } from ${JSON.stringify(getRelativePath(path.dirname(mod.localUrl), `/-/${amlUrlPreifx}/anchor.js`))};`,
                     `export default function MarkdownPage() {`,
                     this.isDev && `  _s();`,
                     `  const ref = useRef(null);`,
@@ -1104,7 +1119,7 @@ export class Project {
                     sourceMap: this.isDev || this.config.sourceMap,
                     isDev: this.isDev,
                 }
-                const { code, map, deps } = transpileSync(sourceCode, {
+                const { code, map, deps, inlineStyles } = transpileSync(sourceCode, {
                     url,
                     importMap: this.importMap,
                     reactUrl: this.config.reactUrl,
@@ -1113,6 +1128,41 @@ export class Project {
                 })
                 mod.jsContent = code
                 mod.jsSourceMap = map!
+                await Promise.all(Object.entries(inlineStyles).map(async ([key, style]) => {
+                    let type = style.type
+                    let tpl = style.quasis.reduce((css, quais, i, a) => {
+                        css += quais
+                        if (i < a.length - 1) {
+                            css += `%%aleph-inline-style-expr-${i}%%`
+                        }
+                        return css
+                    }, '')
+                        .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
+                        .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
+                    if (type !== 'css' && type !== 'less') {
+                        for (const plugin of this.config.plugins) {
+                            if (plugin.test.test(`${key}.${type}`) && util.isFunction(plugin.transform)) {
+                                const { code, loader } = await plugin.transform((new TextEncoder).encode(tpl), url)
+                                if (loader === 'css') {
+                                    tpl = code
+                                    type = 'css'
+                                }
+                                break
+                            }
+                        }
+                    }
+                    if (type === 'css' || type === 'less') {
+                        tpl = await this._preprocessStyle(tpl, type === 'less')
+                        tpl = tpl.replace(
+                            /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
+                            (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'
+                        ).replace(
+                            /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
+                            (_, id) => '${' + style.exprs[parseInt(id)] + '}'
+                        )
+                        mod.jsContent = mod.jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
+                    }
+                }))
                 deps.forEach(({ specifier, isDynamic }) => {
                     const dep: DependencyDescriptor = { url: specifier, hash: '' }
                     if (isDynamic) {

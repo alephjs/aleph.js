@@ -175,9 +175,9 @@ export async function renderPage(
         if (serverStyles.has(url)) {
             const { css, asLink } = serverStyles.get(url)!
             if (asLink) {
-                ret.head.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(url)} />`)
+                ret.head.push(`<link rel="stylesheet" href="${css}" data-module-id=${JSON.stringify(url)} ssr />`)
             } else {
-                ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)}>${css}</style>`)
+                ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
             }
         }
     })

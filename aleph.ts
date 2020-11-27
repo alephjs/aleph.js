@@ -49,7 +49,7 @@ export function ALEPH({ initial }: {
                 const { default: C } = await import(getModuleImportUrl(baseUrl, mod, e.forceRefetch))
                 if (mod.deps) {
                     // import async dependencies
-                    for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
+                    for (const dep of mod.deps.filter(({ url, isStyle }) => !!isStyle && !url.startsWith('#inline-style-'))) {
                         await import(getModuleImportUrl(baseUrl, { id: util.ensureExt(dep.url.replace(reHttp, '/-/'), '.js'), hash: dep.hash }, e.forceRefetch))
                     }
                     if (mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno.')).length > 0) {
