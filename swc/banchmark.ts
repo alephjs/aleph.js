@@ -56,7 +56,7 @@ async function banchmark(sourceFiles: Array<{ code: string, filename: string }>,
     const d2 = { d: 0, min: 0, max: 0, maxDetails: '' }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        transpileSync(code, { filename, swcOptions: { isDev } })
+        transpileSync(code, { url: filename, swcOptions: { isDev } })
         const d = performance.now() - t
         if (d2.min === 0 || d < d2.min) {
             d2.min = d
