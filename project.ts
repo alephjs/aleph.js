@@ -999,7 +999,6 @@ export class Project {
             let dlUrl = url
             if (dlUrl.startsWith('https://esm.sh/')) {
                 const u = new URL(dlUrl)
-                u.searchParams.set('target', this.config.buildTarget)
                 if (this.isDev && !u.searchParams.has('dev')) {
                     u.searchParams.set('dev', '')
                 }
@@ -1224,7 +1223,7 @@ export class Project {
                     compress: true,
                     mangle: true,
                     sourceMap: {
-                        content: mod.jsContent,
+                        content: mod.jsSourceMap || undefined,
                     }
                 })
                 if (code) {
