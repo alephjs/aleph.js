@@ -1,7 +1,7 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::aleph::VERSION;
-use crate::import_map::ImportMap;
+use crate::import_map::{ImportHashMap, ImportMap};
 
 use indexmap::IndexSet;
 use path_slash::PathBufExt;
@@ -10,6 +10,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use relative_path::RelativePath;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::{
   cell::RefCell,
   path::{Path, PathBuf},
@@ -49,29 +50,32 @@ pub struct Resolver {
   pub specifier: String,
   pub specifier_is_remote: bool,
   import_map: ImportMap,
-  bundle_mode: bool,
   react_url: Option<(String, String)>,
-  ///  builtin jsx tags like `a`, `head`, etc
+  bundle_mode: bool,
+  ///  builtin jsx tags like `a`, `link`, `head`, etc
   pub builtin_jsx_tags: IndexSet<String>,
   /// dependency graph
   pub dep_graph: Vec<DependencyDescriptor>,
+  /// inline styles
+  pub inline_styles: HashMap<String, String>,
 }
 
 impl Resolver {
   pub fn new(
     specifier: &str,
-    import_map: ImportMap,
+    import_map: ImportHashMap,
     react_url: Option<(String, String)>,
     bundle_mode: bool,
   ) -> Self {
     Resolver {
       specifier: specifier.into(),
-      import_map,
-      dep_graph: Vec::new(),
+      specifier_is_remote: RE_HTTP.is_match(specifier),
+      import_map: ImportMap::from_hashmap(import_map),
       bundle_mode,
       react_url,
       builtin_jsx_tags: IndexSet::new(),
-      specifier_is_remote: RE_HTTP.is_match(specifier),
+      dep_graph: Vec::new(),
+      inline_styles: HashMap::new(),
     }
   }
 
@@ -503,17 +507,12 @@ fn new_use_deno_hook_ident() -> String {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::import_map::{ImportHashMap, ImportMap};
+  use crate::import_map::ImportHashMap;
   use std::collections::HashMap;
 
   #[test]
   fn test_resolver_fix_import_url() {
-    let resolver = Resolver::new(
-      "/app.tsx",
-      ImportMap::from_hashmap(ImportHashMap::default()),
-      None,
-      false,
-    );
+    let resolver = Resolver::new("/app.tsx", ImportHashMap::default(), None, false);
     assert_eq!(
       resolver.fix_import_url("https://esm.sh/react"),
       "/-/esm.sh/react.js"
@@ -563,10 +562,10 @@ mod tests {
     );
     let mut resolver = Resolver::new(
       "/pages/index.tsx",
-      ImportMap::from_hashmap(ImportHashMap {
+      ImportHashMap {
         imports,
         scopes: HashMap::new(),
-      }),
+      },
       Some((
         "https://esm.sh/react@17.0.1".into(),
         "https://esm.sh/react-dom@17.0.1".into(),
@@ -628,7 +627,7 @@ mod tests {
 
     let mut resolver = Resolver::new(
       "https://esm.sh/react-dom",
-      ImportMap::from_hashmap(ImportHashMap::default()),
+      ImportHashMap::default(),
       None,
       false,
     );
@@ -641,7 +640,7 @@ mod tests {
 
     let mut resolver = Resolver::new(
       "https://esm.sh/preact/hooks",
-      ImportMap::from_hashmap(ImportHashMap::default()),
+      ImportHashMap::default(),
       None,
       false,
     );

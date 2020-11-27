@@ -29,6 +29,7 @@ export interface TransformRet {
     code: string
     map?: string
     deps: DependencyDescriptor[]
+    inlineStyles: Record<string, string>
 }
 
 /**

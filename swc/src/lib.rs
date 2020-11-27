@@ -12,10 +12,11 @@ mod resolve;
 mod source_type;
 mod swc;
 
-use import_map::{ImportHashMap, ImportMap};
+use import_map::ImportHashMap;
 use resolve::{DependencyDescriptor, Resolver};
 use serde::{Deserialize, Serialize};
 use source_type::SourceType;
+use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, ParsedModule};
 use swc_ecmascript::parser::JscTarget;
@@ -101,6 +102,7 @@ pub struct TransformOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub map: Option<String>,
     pub deps: Vec<DependencyDescriptor>,
+    pub inline_styles: HashMap<String, String>,
 }
 
 #[wasm_bindgen(js_name = "transformSync")]
@@ -113,7 +115,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         .unwrap();
     let resolver = Rc::new(RefCell::new(Resolver::new(
         opts.url.as_str(),
-        ImportMap::from_hashmap(opts.import_map),
+        opts.import_map,
         Some((opts.react_url, opts.react_dom_url)),
         !opts.swc_options.is_dev,
     )));
@@ -147,6 +149,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         code,
         map,
         deps: r.dep_graph.clone(),
+        inline_styles: r.inline_styles.clone(),
     })
     .unwrap())
 }

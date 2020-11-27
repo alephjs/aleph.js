@@ -266,7 +266,7 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
 mod tests {
   use super::*;
   use crate::aleph::VERSION;
-  use crate::import_map::{ImportHashMap, ImportMap};
+  use crate::import_map::ImportHashMap;
   use crate::resolve::{DependencyDescriptor, Resolver};
   use std::collections::HashMap;
 
@@ -310,7 +310,7 @@ mod tests {
     .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "https://deno.land/x/mod.ts",
-      ImportMap::from_hashmap(ImportHashMap::default()),
+      ImportHashMap::default(),
       None,
       false,
     )));
@@ -348,10 +348,10 @@ mod tests {
     );
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
-      ImportMap::from_hashmap(ImportHashMap {
+      ImportHashMap {
         imports,
         scopes: HashMap::new(),
-      }),
+      },
       None,
       false,
     )));
@@ -405,7 +405,7 @@ mod tests {
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/App.tsx",
-      ImportMap::from_hashmap(ImportHashMap::default()),
+      ImportHashMap::default(),
       None,
       false,
     )));
@@ -448,7 +448,7 @@ mod tests {
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
-      ImportMap::from_hashmap(ImportHashMap::default()),
+      ImportHashMap::default(),
       None,
       false,
     )));
@@ -527,11 +527,18 @@ mod tests {
   fn test_transpile_inlie_style() {
     let source = r#"
     export default function App() {
+      const [color, setColor] = useState('white');
+
       return (
         <>
           <style>{`
             :root {
-              --color: white;
+              --color: ${color};
+            }
+          `}</style>
+          <style>{`
+            h1 {
+              font-size: 12px;
             }
           `}</style>
         </>
@@ -542,7 +549,7 @@ mod tests {
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/App.tsx",
-      ImportMap::from_hashmap(ImportHashMap::default()),
+      ImportHashMap::default(),
       None,
       false,
     )));
@@ -558,6 +565,8 @@ mod tests {
       .as_str()
     ));
     assert!(code.contains("React.createElement(__ALEPH_Style,"));
-    assert!(code.contains("__inlineStyle: \"inline-style-"));
+    assert!(code.contains("__styleId: \"inline-style-"));
+    let r = resolver.borrow_mut();
+    assert!(r.inline_styles.len() == 2);
   }
 }

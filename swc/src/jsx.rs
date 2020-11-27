@@ -9,7 +9,7 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use swc_common::{FileName, SourceMap, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
-use swc_ecma_visit::{noop_fold_type, Fold};
+use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 
 pub fn aleph_jsx_fold(
     resolver: Rc<RefCell<Resolver>>,
@@ -30,10 +30,10 @@ pub fn aleph_jsx_fold(
 
 /// aleph.js jsx fold, core functions include:
 /// - add `__sourceFile` prop in development mode
-/// - resolve `Link` component `href` prop
 /// - resolve `a` to `Anchor`
 /// - resolve `head` to `Head`
 /// - resolve `link` to `Link`
+/// - resolve `Link` component `href` prop
 /// - resolve `script` to `Script`
 /// - resolve `style` to `Style`
 /// - optimize `img` in producation mode
@@ -43,15 +43,13 @@ struct AlephJsxFold {
     is_dev: bool,
 }
 
-impl Fold for AlephJsxFold {
-    noop_fold_type!();
-
-    fn fold_jsx_opening_element(&mut self, mut el: JSXOpeningElement) -> JSXOpeningElement {
-        if el.span == DUMMY_SP {
-            return el;
-        }
-
+impl AlephJsxFold {
+    fn fold_jsx_opening_element(
+        &mut self,
+        mut el: JSXOpeningElement,
+    ) -> (JSXOpeningElement, Option<String>) {
         let mut resolver = self.resolver.borrow_mut();
+        let mut style_id: Option<String> = None;
 
         match &el.name {
             JSXElementName::Ident(id) => {
@@ -190,7 +188,7 @@ impl Fold for AlephJsxFold {
                                     name: JSXAttrName::Ident(id),
                                     ..
                                 }) => match id.sym.as_ref() {
-                                    "__inlineStyle" => {
+                                    "__styleId" => {
                                         id_prop_index = i as i32;
                                     }
                                     _ => {}
@@ -202,7 +200,7 @@ impl Fold for AlephJsxFold {
                         let id = new_inline_style_ident();
                         let id_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
                             span: DUMMY_SP,
-                            name: JSXAttrName::Ident(quote_ident!("__inlineStyle")),
+                            name: JSXAttrName::Ident(quote_ident!("__styleId")),
                             value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                                 span: DUMMY_SP,
                                 value: id.clone().into(),
@@ -222,6 +220,7 @@ impl Fold for AlephJsxFold {
 
                         resolver.builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                        style_id = Some(id.clone());
                     }
 
                     "img" => {
@@ -236,47 +235,97 @@ impl Fold for AlephJsxFold {
 
         // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
         if self.is_dev {
-            let file_lines = match self.source.span_to_lines(el.span) {
-                Ok(v) => v,
-                _ => return el,
-            };
-            let file_name = match &file_lines.file.name {
-                FileName::Real(p) => p.display().to_string(),
-                _ => unimplemented!("file name for other than real files"),
-            };
-            el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
-                span: DUMMY_SP,
-                name: JSXAttrName::Ident(quote_ident!("__source")),
-                value: Some(JSXAttrValue::JSXExprContainer(JSXExprContainer {
-                    span: DUMMY_SP,
-                    expr: JSXExpr::Expr(Box::new(
-                        ObjectLit {
+            match self.source.span_to_lines(el.span) {
+                Ok(file_lines) => {
+                    let file_name = match &file_lines.file.name {
+                        FileName::Real(p) => p.display().to_string(),
+                        _ => unimplemented!("file name for other than real files"),
+                    };
+                    el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
+                        span: DUMMY_SP,
+                        name: JSXAttrName::Ident(quote_ident!("__source")),
+                        value: Some(JSXAttrValue::JSXExprContainer(JSXExprContainer {
                             span: DUMMY_SP,
-                            props: vec![
-                                PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                    key: PropName::Ident(quote_ident!("fileName")),
-                                    value: Box::new(Expr::Lit(Lit::Str(Str {
-                                        span: DUMMY_SP,
-                                        value: file_name.clone().into(),
-                                        has_escape: false,
-                                    }))),
-                                }))),
-                                PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                    key: PropName::Ident(quote_ident!("lineNumber")),
-                                    value: Box::new(Expr::Lit(Lit::Num(Number {
-                                        span: DUMMY_SP,
-                                        value: (file_lines.lines[0].line_index + 1) as _,
-                                    }))),
-                                }))),
-                            ],
-                        }
-                        .into(),
-                    )),
-                })),
-            }));
+                            expr: JSXExpr::Expr(Box::new(
+                                ObjectLit {
+                                    span: DUMMY_SP,
+                                    props: vec![
+                                        PropOrSpread::Prop(Box::new(Prop::KeyValue(
+                                            KeyValueProp {
+                                                key: PropName::Ident(quote_ident!("fileName")),
+                                                value: Box::new(Expr::Lit(Lit::Str(Str {
+                                                    span: DUMMY_SP,
+                                                    value: file_name.clone().into(),
+                                                    has_escape: false,
+                                                }))),
+                                            },
+                                        ))),
+                                        PropOrSpread::Prop(Box::new(Prop::KeyValue(
+                                            KeyValueProp {
+                                                key: PropName::Ident(quote_ident!("lineNumber")),
+                                                value: Box::new(Expr::Lit(Lit::Num(Number {
+                                                    span: DUMMY_SP,
+                                                    value: (file_lines.lines[0].line_index + 1)
+                                                        as _,
+                                                }))),
+                                            },
+                                        ))),
+                                    ],
+                                }
+                                .into(),
+                            )),
+                        })),
+                    }));
+                }
+                _ => {}
+            };
         }
 
-        el
+        (el, style_id)
+    }
+}
+
+impl Fold for AlephJsxFold {
+    noop_fold_type!();
+
+    fn fold_jsx_element(&mut self, mut el: JSXElement) -> JSXElement {
+        if el.span == DUMMY_SP {
+            return el;
+        }
+
+        let mut children: Vec<JSXElementChild> = vec![];
+        let (opening, style_id) = self.fold_jsx_opening_element(el.opening);
+        match style_id {
+            Some(ref id) => {
+                if el.children.len() == 1 {
+                    match el.children.first().unwrap() {
+                        JSXElementChild::JSXExprContainer(JSXExprContainer {
+                            expr: JSXExpr::Expr(expr),
+                            ..
+                        }) => match expr.as_ref() {
+                            Expr::Tpl(Tpl { span, .. }) => {
+                                let mut resolver = self.resolver.borrow_mut();
+                                let tpl = self.source.span_to_snippet(span.clone()).unwrap();
+                                resolver.inline_styles.insert(id.to_string(), tpl);
+                                el.children = vec![];
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+        for child in el.children {
+            children.push(child.fold_children_with(self));
+        }
+        JSXElement {
+            span: DUMMY_SP,
+            opening,
+            children,
+            ..el
+        }
     }
 }
 
