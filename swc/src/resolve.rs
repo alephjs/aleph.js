@@ -309,17 +309,16 @@ impl Resolver {
             specifier: url.trim_start_matches("@").into(),
             is_dynamic,
           });
-        }
-        if url.starts_with("/") {
+        } else if url.starts_with("/") {
           self.dep_graph.push(DependencyDescriptor {
             specifier: url.into(),
             is_dynamic,
           });
         } else {
-          let mut p = PathBuf::from(self.specifier.as_str());
-          p.pop();
-          p.push(url);
-          let path = RelativePath::new(p.to_str().unwrap())
+          let mut path = PathBuf::from(self.specifier.as_str());
+          path.pop();
+          path.push(url);
+          let path = RelativePath::new(path.to_str().unwrap())
             .normalize()
             .to_path(Path::new(""));
           self.dep_graph.push(DependencyDescriptor {
@@ -540,6 +539,10 @@ mod tests {
     assert_eq!(
       resolver.fix_import_url("/components/foo/../logo.tsx"),
       "/components/logo.tsx"
+    );
+    assert_eq!(
+      resolver.fix_import_url("/components/../foo/logo.tsx"),
+      "/foo/logo.tsx"
     );
     assert_eq!(
       resolver.fix_import_url("/components/logo.tsx"),
