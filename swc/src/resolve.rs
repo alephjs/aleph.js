@@ -47,10 +47,9 @@ pub struct DependencyDescriptor {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InlineStyle {
-  // inline style type
   pub r#type: String,
-  // inline style content
-  pub content: String,
+  pub quasis: Vec<String>,
+  pub exprs: Vec<String>,
 }
 
 /// A Resolver to resolve aleph.js import/export URL.

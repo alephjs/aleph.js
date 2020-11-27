@@ -6,7 +6,7 @@ use crate::resolve::{DependencyDescriptor, InlineStyle, Resolver, RE_HTTP};
 
 use rand::{distributions::Alphanumeric, Rng};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
-use swc_common::{FileName, SourceMap, DUMMY_SP};
+use swc_common::{FileName, SourceMap, Spanned, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
@@ -309,21 +309,40 @@ impl Fold for AlephJsxFold {
                             expr: JSXExpr::Expr(expr),
                             ..
                         }) => match expr.as_ref() {
-                            Expr::Tpl(Tpl { span, .. }) => {
+                            Expr::Tpl(Tpl { exprs, quasis, .. }) => {
                                 let mut resolver = self.resolver.borrow_mut();
-                                let tpl = self.source.span_to_snippet(span.clone()).unwrap();
+                                let mut es: Vec<String> = vec![];
+                                let mut qs: Vec<String> = vec![];
+                                for expr in exprs {
+                                    let raw = self
+                                        .source
+                                        .span_to_snippet(expr.as_ref().span().clone())
+                                        .unwrap();
+                                    es.push(raw.into());
+                                }
+                                for quasi in quasis {
+                                    let raw =
+                                        self.source.span_to_snippet(quasi.span.clone()).unwrap();
+                                    qs.push(raw.into());
+                                }
                                 let (t, id) = inline_style;
                                 resolver.inline_styles.insert(
                                     id.into(),
                                     InlineStyle {
                                         r#type: t.into(),
-                                        content: tpl
-                                            .trim_start_matches("`")
-                                            .trim_end_matches("`")
-                                            .into(),
+                                        exprs: es,
+                                        quasis: qs,
                                     },
                                 );
-                                el.children = vec![];
+                                el.children =
+                                    vec![JSXElementChild::JSXExprContainer(JSXExprContainer {
+                                        span: DUMMY_SP,
+                                        expr: JSXExpr::Expr(Box::new(Expr::Lit(Lit::Str(Str {
+                                            span: DUMMY_SP,
+                                            value: format!("%%{}-placeholder%%", id).into(),
+                                            has_escape: false,
+                                        })))),
+                                    })];
                             }
                             _ => {}
                         },
