@@ -13,7 +13,7 @@ mod source_type;
 mod swc;
 
 use import_map::ImportHashMap;
-use resolve::{DependencyDescriptor, Resolver};
+use resolve::{DependencyDescriptor, InlineStyle, Resolver};
 use serde::{Deserialize, Serialize};
 use source_type::SourceType;
 use std::collections::HashMap;
@@ -102,7 +102,7 @@ pub struct TransformOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub map: Option<String>,
     pub deps: Vec<DependencyDescriptor>,
-    pub inline_styles: HashMap<String, String>,
+    pub inline_styles: HashMap<String, InlineStyle>,
 }
 
 #[wasm_bindgen(js_name = "transformSync")]

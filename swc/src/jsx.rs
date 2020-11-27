@@ -2,7 +2,7 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::aleph::VERSION;
-use crate::resolve::{DependencyDescriptor, Resolver, RE_HTTP};
+use crate::resolve::{DependencyDescriptor, InlineStyle, Resolver, RE_HTTP};
 
 use rand::{distributions::Alphanumeric, Rng};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
@@ -47,9 +47,9 @@ impl AlephJsxFold {
     fn fold_jsx_opening_element(
         &mut self,
         mut el: JSXOpeningElement,
-    ) -> (JSXOpeningElement, Option<String>) {
+    ) -> (JSXOpeningElement, Option<(String, String)>) {
         let mut resolver = self.resolver.borrow_mut();
-        let mut style_id: Option<String> = None;
+        let mut inline_style: Option<(String, String)> = None;
 
         match &el.name {
             JSXElementName::Ident(id) => {
@@ -181,15 +181,21 @@ impl AlephJsxFold {
 
                     "style" => {
                         let mut id_prop_index: i32 = -1;
+                        let mut type_prop_value = "css".to_owned();
 
                         for (i, attr) in el.attrs.iter().enumerate() {
                             match &attr {
                                 JSXAttrOrSpread::JSXAttr(JSXAttr {
                                     name: JSXAttrName::Ident(id),
+                                    value: Some(JSXAttrValue::Lit(Lit::Str(Str { value, .. }))),
                                     ..
                                 }) => match id.sym.as_ref() {
                                     "__styleId" => {
                                         id_prop_index = i as i32;
+                                    }
+                                    "type" => {
+                                        type_prop_value =
+                                            value.as_ref().trim_start_matches("text/").to_string();
                                     }
                                     _ => {}
                                 },
@@ -220,7 +226,7 @@ impl AlephJsxFold {
 
                         resolver.builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
-                        style_id = Some(id.clone());
+                        inline_style = Some((type_prop_value, id.into()));
                     }
 
                     "img" => {
@@ -281,7 +287,7 @@ impl AlephJsxFold {
             };
         }
 
-        (el, style_id)
+        (el, inline_style)
     }
 }
 
@@ -294,9 +300,9 @@ impl Fold for AlephJsxFold {
         }
 
         let mut children: Vec<JSXElementChild> = vec![];
-        let (opening, style_id) = self.fold_jsx_opening_element(el.opening);
-        match style_id {
-            Some(ref id) => {
+        let (opening, inline_style) = self.fold_jsx_opening_element(el.opening);
+        match inline_style {
+            Some(ref inline_style) => {
                 if el.children.len() == 1 {
                     match el.children.first().unwrap() {
                         JSXElementChild::JSXExprContainer(JSXExprContainer {
@@ -306,7 +312,17 @@ impl Fold for AlephJsxFold {
                             Expr::Tpl(Tpl { span, .. }) => {
                                 let mut resolver = self.resolver.borrow_mut();
                                 let tpl = self.source.span_to_snippet(span.clone()).unwrap();
-                                resolver.inline_styles.insert(id.to_string(), tpl);
+                                let (t, id) = inline_style;
+                                resolver.inline_styles.insert(
+                                    id.into(),
+                                    InlineStyle {
+                                        r#type: t.into(),
+                                        content: tpl
+                                            .trim_start_matches("`")
+                                            .trim_end_matches("`")
+                                            .into(),
+                                    },
+                                );
                                 el.children = vec![];
                             }
                             _ => {}
