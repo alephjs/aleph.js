@@ -62,7 +62,6 @@ export async function renderPage(
         headElements: new Map(),
         scriptsElements: new Map()
     }
-    const { __createHTMLDocument } = (window as any)
     const buildMode = Deno.env.get('__buildMode')
     const buildTarget = Deno.env.get('__buildTarget')
     const data: Record<string, any> = {}
@@ -71,7 +70,6 @@ export async function renderPage(
 
     Object.assign(window, {
         [`__asyncData_${useDenEvent}`]: {},
-        document: __createHTMLDocument(),
         location: {
             protocol: 'http:',
             host: 'localhost',

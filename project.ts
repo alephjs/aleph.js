@@ -1,6 +1,6 @@
 import { Request } from './api.ts'
 import type { AcceptedPlugin, ServerRequest } from './deps.ts'
-import { CleanCSS, colors, createHTMLDocument, ensureDir, less, marked, minify, path, postcss, readerFromStreamReader, safeLoadFront, Sha1, walk } from './deps.ts'
+import { CleanCSS, colors, ensureDir, less, marked, minify, path, postcss, readerFromStreamReader, safeLoadFront, Sha1, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from './fs.ts'
 import { createHtml } from './html.ts'
@@ -517,8 +517,6 @@ export class Project {
 
         // inject virtual browser gloabl objects
         Object.assign(globalThis, {
-            __createHTMLDocument: () => createHTMLDocument(),
-            document: createHTMLDocument(),
             navigator: {
                 connection: {
                     downlink: 1.5,
