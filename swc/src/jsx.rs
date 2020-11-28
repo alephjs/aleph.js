@@ -144,7 +144,7 @@ impl AlephJsxFold {
                                         name: JSXAttrName::Ident(quote_ident!("href")),
                                         value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                                             span: DUMMY_SP,
-                                            value: resolver.resolve(href_prop_value, true).into(),
+                                            value: resolver.resolve(href_prop_value, true).0.into(),
                                             has_escape: false,
                                         }))),
                                     });
@@ -398,6 +398,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                             .as_str(),
                             false,
                         )
+                        .0
                         .into(),
                     has_escape: false,
                 },

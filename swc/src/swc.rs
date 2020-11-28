@@ -328,7 +328,7 @@ mod tests {
     let source = r#"
     import React from "https://esm.sh/react"
     import { Head } from 'https://deno.land/x/aleph/mod.ts'
-    export default function App() {
+    export default function Index() {
       return (
         <>
           <Head>
@@ -339,7 +339,7 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/App.tsx", source, None, JscTarget::Es2020)
+    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
       .expect("could not parse module");
     let mut imports: HashMap<String, Vec<String>> = HashMap::new();
     imports.insert(
@@ -382,7 +382,7 @@ mod tests {
   #[test]
   fn test_transpile_use_deno() {
     let source = r#"
-    export default function App() {
+    export default function Index() {
       const verison = useDeno(() => Deno.version)
       const V8 = () => {
         const verison = useDeno(() => Deno.version, true)
@@ -401,10 +401,10 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/App.tsx", source, None, JscTarget::Es2020)
+    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/App.tsx",
+      "/pages/index.tsx",
       ImportHashMap::default(),
       None,
       false,
@@ -532,7 +532,7 @@ mod tests {
   #[test]
   fn test_transpile_inlie_style() {
     let source = r#"
-    export default function App() {
+    export default function Index() {
       const [color, setColor] = useState('white');
 
       return (
@@ -551,10 +551,10 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/App.tsx", source, None, JscTarget::Es2020)
+    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
       .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/App.tsx",
+      "/pages/index.tsx",
       ImportHashMap::default(),
       None,
       false,
@@ -574,5 +574,68 @@ mod tests {
     assert!(code.contains("__styleId: \"inline-style-"));
     let r = resolver.borrow_mut();
     assert!(r.inline_styles.len() == 2);
+  }
+
+  #[test]
+  fn test_transpile_bundling_import() {
+    let source = r#"
+    import React, { useState, useEffect as useEffect_ } from "https://esm.sh/react"
+    import * as React_ from "https://esm.sh/react"
+    import Logo from '../components/logo.ts'
+    import '../shared/iife.ts'
+    export default function Index() {
+      return (
+        <>
+          <Logo />
+          <h1>Hello World</h1>
+        </>
+      )
+    }
+    "#;
+    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
+      .expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      "/pages/index.tsx",
+      ImportHashMap::default(),
+      None,
+      true,
+    )));
+    let (code, _) = module
+      .transpile(resolver.clone(), &EmitOptions::default())
+      .expect("could not transpile module");
+    println!("{}", code);
+    assert!(code.contains("React = window.__ALEPH_PACK[\"https://esm.sh/react\"].default"));
+    assert!(code.contains("useState = window.__ALEPH_PACK[\"https://esm.sh/react\"].useState"));
+    assert!(code.contains("useEffect_ = window.__ALEPH_PACK[\"https://esm.sh/react\"].useEffect"));
+    assert!(code.contains("React_ = window.__ALEPH_PACK[\"https://esm.sh/react\"]"));
+    assert!(code.contains("Logo = window.__ALEPH_PACK[\"/components/logo.ts\"].default"));
+    assert!(!code.contains("window.__ALEPH_PACK[\"/shared/iife.ts\"]"));
+  }
+
+  #[test]
+  fn test_transpile_bundling_export() {
+    let source = r#"
+      export {default as React, useState, useEffect as useEffect_ } from "https://esm.sh/react"
+      export * as React_ from "https://esm.sh/react"
+      export * from "https://esm.sh/react"
+    "#;
+    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
+      .expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      "/pages/index.tsx",
+      ImportHashMap::default(),
+      None,
+      true,
+    )));
+    let (code, _) = module
+      .transpile(resolver.clone(), &EmitOptions::default())
+      .expect("could not transpile module");
+    println!("{}", code);
+    assert!(code.contains("__export(\"/pages/index.tsx\", \"https://esm.sh/react\", {"));
+    assert!(code.contains("__export_star(\"/pages/index.tsx\", \"https://esm.sh/react\")"));
+    assert!(code.contains("\"default\": \"React\""));
+    assert!(code.contains("\"useState\": \"useState\""));
+    assert!(code.contains("\"useEffect\": \"useEffect_\""));
+    assert!(code.contains("\"*\": \"React_\""));
   }
 }
