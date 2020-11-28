@@ -64,7 +64,7 @@ export class Project {
     readonly ready: Promise<void>
 
     #modules: Map<string, Module> = new Map()
-    #routing: Routing = new Routing()
+    #pageRouting: Routing = new Routing()
     #apiRouting: Routing = new Routing()
     #fsWatchListeners: Array<EventEmitter> = []
     #renderer: { renderPage: CallableFunction } = { renderPage: () => void 0 }
@@ -85,7 +85,7 @@ export class Project {
             ssr: {
                 fallback: '_fallback.html'
             },
-            buildTarget: mode === 'development' ? 'es2020' : 'es2015',
+            buildTarget: 'es2020',
             sourceMap: false,
             reactUrl: 'https://esm.sh/react@17.0.1',
             reactDomUrl: 'https://esm.sh/react-dom@17.0.1',
@@ -279,7 +279,7 @@ export class Project {
 
     async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string, Record<string, string> | null]> {
         if (!this.isSSRable(loc.pathname)) {
-            const [url] = this.#routing.createRouter(loc)
+            const [url] = this.#pageRouting.createRouter(loc)
             return [url.pagePath === '' ? 404 : 200, await this.getSPAIndexHtml(), null]
         }
 
@@ -340,7 +340,7 @@ export class Project {
         await this.ready
 
         // lookup output modules
-        this.#routing.lookup(path => path.forEach(r => lookup(r.module.id)))
+        this.#pageRouting.lookup(path => path.forEach(r => lookup(r.module.id)))
         lookup('/main.js')
         lookup('/404.js')
         lookup('/app.js')
@@ -357,7 +357,7 @@ export class Project {
         const SPAIndexHtml = await this.getSPAIndexHtml()
         if (ssr) {
             log.info(colors.bold('- Pages (SSG)'))
-            const paths = new Set(this.#routing.paths)
+            const paths = new Set(this.#pageRouting.paths)
             if (typeof ssr === 'object' && ssr.staticPaths) {
                 ssr.staticPaths.forEach(path => paths.add(path))
             }
@@ -581,7 +581,7 @@ export class Project {
         })
 
         // update routing
-        this.#routing = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
+        this.#pageRouting = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
     }
 
     private async _init(reload: boolean) {
@@ -665,6 +665,15 @@ export class Project {
         // change current work dir to appDoot
         Deno.chdir(this.appRoot)
 
+        // craete api routing
+        if (existsDirSync(apiDir)) {
+            for await (const { path: p } of walk(apiDir, walkOptions)) {
+                const mod = this._moduleFromURL('/api' + util.trimPrefix(p, apiDir).split('\\').join('/'))
+                mod.hash = getHash(await Deno.readFile(p))
+                this.#apiRouting.update(this._getRouteModule(mod))
+            }
+        }
+
         for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.jsx', '.tsx'] })) {
             const name = path.basename(p)
             switch (name.replace(reModuleExt, '')) {
@@ -676,27 +685,16 @@ export class Project {
             }
         }
 
-        if (existsDirSync(apiDir)) {
-            for await (const { path: p } of walk(apiDir, walkOptions)) {
-                const mod = await this._compile('/api' + util.trimPrefix(p, apiDir).split('\\').join('/'))
-                this.#apiRouting.update(this._getRouteModule(mod))
-            }
-        }
-
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md'] })) {
             const rp = util.trimPrefix(p, pagesDir).split('\\').join('/')
             const mod = await this._compile('/pages' + rp)
-            this.#routing.update(this._getRouteModule(mod))
+            this.#pageRouting.update(this._getRouteModule(mod))
         }
 
         const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-        const precompileMods = [
-            'bootstrap.ts',
-            'nomodule.ts',
-            'renderer.ts'
-        ]
+        const precompileMods = ['renderer.ts']
         if (this.isDev) {
-            precompileMods.push('hmr.ts')
+            precompileMods.push('bootstrap.ts', 'hmr.ts', 'nomodule.ts')
         }
         for (const mod of precompileMods) {
             if (devPort) {
@@ -734,7 +732,7 @@ export class Project {
                 log.info('  λ', path)
             }
             log.info(colors.bold('- Pages'))
-            for (const path of this.#routing.paths) {
+            for (const path of this.#pageRouting.paths) {
                 const isIndex = path == '/'
                 log.info('  ○', path, isIndex ? colors.dim('(index)') : '')
             }
@@ -804,43 +802,54 @@ export class Project {
                                 type = 'add'
                             }
                             log.info(type, path)
-                            this._compile(path, { forceCompile: true }).then(mod => {
-                                const hmrable = this.isHMRable(mod.id)
-                                if (hmrable) {
-                                    if (type === 'add') {
-                                        this.#fsWatchListeners.forEach(e => e.emit('add', mod.id, mod.hash))
-                                    } else {
-                                        this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.id, mod.hash))
-                                    }
+                            if (moduleID.startsWith('/api/')) {
+                                let mod: Module
+                                if (this.#modules.has(moduleID)) {
+                                    mod = this.#modules.get(moduleID)!
+                                } else {
+                                    mod = this._moduleFromURL(moduleID)
                                 }
-                                if (moduleID === '/app.js') {
-                                    this.#rendered.clear()
-                                } else if (moduleID.startsWith('/pages/')) {
-                                    this.#rendered.delete(getPagePath(moduleID))
-                                    this.#routing.update(this._getRouteModule(mod))
-                                } else if (moduleID.startsWith('/api/')) {
+                                Deno.readFile(p).then(content => {
+                                    mod.hash = getHash(content)
                                     this.#apiRouting.update(this._getRouteModule(mod))
-                                }
-                                if (shouldUpdateMainModule) {
-                                    this._createMainModule()
-                                }
-                                this._updateDependency(path, mod.hash, ({ id, hash }) => {
-                                    if (id.startsWith('/pages/')) {
-                                        this.#rendered.delete(getPagePath(id))
-                                    }
-                                    if (!hmrable && this.isHMRable(id)) {
-                                        this.#fsWatchListeners.forEach(e => e.emit('modify-' + id, hash))
-                                    }
                                 })
-                            }).catch(err => {
-                                log.error(`compile(${path}):`, err.message)
-                            })
+                            } else {
+                                this._compile(path, { forceCompile: true }).then(mod => {
+                                    const hmrable = this.isHMRable(mod.id)
+                                    if (hmrable) {
+                                        if (type === 'add') {
+                                            this.#fsWatchListeners.forEach(e => e.emit('add', mod.id, mod.hash))
+                                        } else {
+                                            this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.id, mod.hash))
+                                        }
+                                    }
+                                    if (moduleID === '/app.js') {
+                                        this.#rendered.clear()
+                                    } else if (moduleID.startsWith('/pages/')) {
+                                        this.#rendered.delete(getPagePath(moduleID))
+                                        this.#pageRouting.update(this._getRouteModule(mod))
+                                    }
+                                    if (shouldUpdateMainModule) {
+                                        this._createMainModule()
+                                    }
+                                    this._updateDependency(path, mod.hash, ({ id, hash }) => {
+                                        if (id.startsWith('/pages/')) {
+                                            this.#rendered.delete(getPagePath(id))
+                                        }
+                                        if (!hmrable && this.isHMRable(id)) {
+                                            this.#fsWatchListeners.forEach(e => e.emit('modify-' + id, hash))
+                                        }
+                                    })
+                                }).catch(err => {
+                                    log.error(`compile(${path}):`, err.message)
+                                })
+                            }
                         } else if (this.#modules.has(moduleID)) {
                             if (moduleID === '/app.js') {
                                 this.#rendered.clear()
                             } else if (moduleID.startsWith('/pages/')) {
                                 this.#rendered.delete(getPagePath(moduleID))
-                                this.#routing.removeRoute(moduleID)
+                                this.#pageRouting.removeRoute(moduleID)
                             } else if (moduleID.startsWith('/api/')) {
                                 this.#apiRouting.removeRoute(moduleID)
                             }
@@ -903,7 +912,7 @@ export class Project {
             baseUrl,
             defaultLocale,
             locales: [],
-            routes: this.#routing.routes,
+            routes: this.#pageRouting.routes,
             preloadModules: ['/404.js', '/app.js'].filter(id => this.#modules.has(id)).map(id => {
                 return this._getRouteModule(this.#modules.get(id)!)
             }),
@@ -1297,7 +1306,7 @@ export class Project {
 
     private async _renderPage(loc: { pathname: string, search?: string }) {
         const start = performance.now()
-        const [url, pageModuleTree] = this.#routing.createRouter(loc)
+        const [url, pageModuleTree] = this.#pageRouting.createRouter(loc)
         const key = [url.pathname, url.query.toString()].filter(Boolean).join('?')
         if (url.pagePath !== '') {
             if (this.#rendered.has(url.pagePath)) {

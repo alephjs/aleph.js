@@ -31,23 +31,10 @@ for (var key in style) {
 for (var key in hStyle) {
     (hEl.style as any)[key] = hStyle[key]
 }
-var isDev = false
-var scripts = document.getElementsByTagName('script')
-for (var i = 0; i < scripts.length; i++) {
-    var s = scripts[i]
-    if (/nomodule\.js\?dev$/.test(s.src)) {
-        isDev = true
-        break
-    }
-}
 // todo: i18n
 // todo: add browser info
 hEl.innerText = 'Your browser is out of date.'
-if (isDev) {
-    pEl.innerHTML = 'Aleph.js requires <a href="https://caniuse.com/es6-module" style="font-weight:500;color:#000;">ES module</a> support during development.'
-} else {
-    pEl.innerHTML = 'Update your browser for more security, speed and the best experience on this site.'
-}
+pEl.innerHTML = 'Aleph.js requires <a href="https://caniuse.com/es6-module" style="font-weight:500;color:#000;">ES module</a> support during development.'
 el.appendChild(hEl)
 el.appendChild(pEl)
 document.body.appendChild(el)
