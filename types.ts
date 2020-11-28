@@ -114,8 +114,10 @@ export interface RouterURL {
  * The form data body
  */
 export interface FormDataBody {
-    get(key: string): string
-    getFile(key: string): FormFile
+    fields: Record<string, string>;
+    files: FormFile[];
+    get(key: string): string | undefined;
+    getFile(key: string): FormFile | undefined;
 }
 
 /**
@@ -126,5 +128,5 @@ export interface FormFile {
     content: Uint8Array
     contentType: string
     filename: string
-    originalName: string
+    size: number
 }

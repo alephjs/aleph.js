@@ -1,7 +1,7 @@
 import { compress as brotli } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
-import { FormDataReader } from 'https://deno.land/x/oak@v6.3.2/multipart.ts'
 import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from './log.ts'
+import { multiParser } from './multiparser.ts'
 import { ServerRequest } from './std.ts'
 import type { APIRequest, FormDataBody } from './types.ts'
 
@@ -90,43 +90,22 @@ export class Request extends ServerRequest implements APIRequest {
     async decodeBody(type: "form-data"): Promise<FormDataBody>
     async decodeBody(type: string): Promise<any> {
         if (type === "text") {
-            try {
-                const buff: Uint8Array = await Deno.readAll(this.body);
-                const encoded = new TextDecoder("utf-8").decode(buff);
-                return encoded;
-            } catch (err) {
-                console.error("Failed to parse the request body.", err);
-            }
+            const buff: Uint8Array = await Deno.readAll(this.body);
+            const encoded = new TextDecoder("utf-8").decode(buff);
+            return encoded;
         }
 
         if (type === "json") {
-            try {
-                const buff: Uint8Array = await Deno.readAll(this.body);
-                const encoded = new TextDecoder("utf-8").decode(buff);
-                const json = JSON.parse(encoded);
-                return json;
-            } catch (err) {
-                console.error("Failed to parse the request body.", err);
-            }
+            const buff: Uint8Array = await Deno.readAll(this.body);
+            const encoded = new TextDecoder("utf-8").decode(buff);
+            const json = JSON.parse(encoded);
+            return json;
         }
 
         if (type === "form-data") {
-            try {
-                const boundary = this.headers.get("content-type");
-
-                if (!boundary) throw new Error("Failed to get the content-type")
-
-                const reader = new FormDataReader(boundary, this.body);
-                const { fields, files } = await reader.read({ maxSize: 1024 * 1024 * 10 });
-
-                return {
-                    get: (key: string) => fields[key],
-                    getFile: (key: string) => files?.find(i => i.name === key)
-                }
-
-            } catch (err) {
-                console.error("Failed to parse the request form-data", err)
-            }
+            const contentType = this.headers.get("content-type") as string
+            const form = await multiParser(this.body, contentType);
+            return form;
         }
     }
 
