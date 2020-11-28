@@ -49,7 +49,6 @@ function createFormData(): FormDataBody {
 
 function getForm(pieces: Uint8Array[]) {
     let form: FormDataBody = createFormData();
-    // let form: Form = { fields: {}, files: {} };
 
     for (let piece of pieces) {
         const { headerByte, contentByte } = splitPiece(piece);
@@ -60,11 +59,15 @@ function getForm(pieces: Uint8Array[]) {
             // empty content, discard it
             if (contentByte.byteLength === 1 && contentByte[0] === 13) {
                 continue;
-            } else {
-                // headers = "field1"
+            }
+
+            // headers = "field1"
+            else {
                 form.fields[headers] = decoder.decode(contentByte);
             }
-        } // it's a file field
+        }
+
+        // it's a file field
         else {
             let file: FormFile = {
                 name: headers.name,
@@ -86,7 +89,9 @@ function getHeaders(headerByte: Uint8Array) {
     // no contentType, it may be a string field, return name only
     if (contentTypeIndex < 0) {
         return getNameOnly(headerByte);
-    } // file field, return with name, filename and contentType
+    }
+
+    // file field, return with name, filename and contentType
     else {
         return getHeaderNContentType(headerByte, contentTypeIndex);
     }
@@ -137,11 +142,13 @@ function getNameNFilename(headerLineByte: Uint8Array, filenameIndex: number) {
 
 function getNameOnly(headerLineByte: Uint8Array) {
     let nameIndex = bytes.findIndex(headerLineByte, encode.name);
+
     // jump <name="> and get string inside double quote => "string"
     let nameByte = headerLineByte.slice(
         nameIndex + encode.name.byteLength + 2,
         headerLineByte.byteLength - 1,
     );
+
     return decoder.decode(nameByte);
 }
 
@@ -166,6 +173,7 @@ function getFieldPieces(
         // jump over boundary + '\r\n'
         buf = buf.slice(startBoundaryByte.byteLength + 2);
         let boundaryIndex = bytes.findIndex(buf, startBoundaryByte);
+
         // get field content piece
         pieces.push(buf.slice(0, boundaryIndex - 1));
         buf = buf.slice(boundaryIndex);
@@ -177,6 +185,7 @@ function getFieldPieces(
 function getBoundary(contentType: string): Uint8Array | undefined {
     let contentTypeByte = encoder.encode(contentType);
     let boundaryIndex = bytes.findIndex(contentTypeByte, encode.boundaryEqual);
+
     if (boundaryIndex >= 0) {
         // jump over 'boundary=' to get the real boundary
         let boundary = contentTypeByte.slice(
