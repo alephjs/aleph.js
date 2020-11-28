@@ -1,5 +1,4 @@
 import React from 'https://esm.sh/react'
-import Head from './head.ts'
 
 export class ErrorBoundary extends React.Component {
     state: { stack: string | null }
@@ -60,15 +59,6 @@ export function StatusError({ status, message, showRefreshButton }: { status: nu
         React.createElement(
             React.Fragment,
             null,
-            React.createElement(
-                Head,
-                null,
-                React.createElement(
-                    'title',
-                    null,
-                    `${status} - ${message} | Aleph.js`
-                ),
-            ),
             React.createElement(
                 'p',
                 null,
