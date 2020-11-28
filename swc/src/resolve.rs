@@ -207,11 +207,11 @@ impl Resolver {
       if self.specifier_is_remote {
         let mut buf = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
         buf.pop();
-        diff_paths(self.fix_import_url(url), buf.to_str().unwrap()).unwrap()
+        diff_paths(self.fix_import_url(url), buf.to_slash().unwrap()).unwrap()
       } else {
         let mut buf = PathBuf::from(self.specifier.as_str());
         buf.pop();
-        diff_paths(self.fix_import_url(url), buf.to_str().unwrap()).unwrap()
+        diff_paths(self.fix_import_url(url), buf.to_slash().unwrap()).unwrap()
       }
     } else {
       if self.specifier_is_remote {
@@ -223,19 +223,23 @@ impl Resolver {
           buf.pop();
           buf.push(url);
           let path = "/".to_owned()
-            + RelativePath::new(buf.to_str().unwrap())
+            + RelativePath::new(buf.to_slash().unwrap().as_str())
               .normalize()
               .as_str();
           new_url.set_path(path.as_str());
         }
         let mut buf = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
         buf.pop();
-        diff_paths(self.fix_import_url(new_url.as_str()), buf.to_str().unwrap()).unwrap()
+        diff_paths(
+          self.fix_import_url(new_url.as_str()),
+          buf.to_slash().unwrap(),
+        )
+        .unwrap()
       } else {
         if url.starts_with("/") || url.starts_with("@/") {
           let mut buf = PathBuf::from(self.specifier.as_str());
           buf.pop();
-          diff_paths(url.trim_start_matches("@"), buf.to_str().unwrap()).unwrap()
+          diff_paths(url.trim_start_matches("@"), buf.to_slash().unwrap()).unwrap()
         } else {
           PathBuf::from(url)
         }
@@ -292,7 +296,7 @@ impl Resolver {
           buf.pop();
           buf.push(url);
           let path = "/".to_owned()
-            + RelativePath::new(buf.to_str().unwrap())
+            + RelativePath::new(buf.to_slash().unwrap().as_str())
               .normalize()
               .as_str();
           new_url.set_path(path.as_str());
@@ -308,7 +312,7 @@ impl Resolver {
           buf.pop();
           buf.push(url);
           "/".to_owned()
-            + RelativePath::new(buf.to_str().unwrap())
+            + RelativePath::new(buf.to_slash().unwrap().as_str())
               .normalize()
               .as_str()
         }
