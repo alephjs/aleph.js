@@ -23,7 +23,7 @@ use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 use url::Url;
 
 lazy_static! {
-  pub static ref HASH_SHORT: usize = 9;
+  pub static ref HASH_PLACEHOLDER: String = "x".repeat(9);
   pub static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
   pub static ref RE_ENDS_WITH_VERSION: Regex =
     Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
@@ -174,11 +174,13 @@ impl Resolver {
   // - `https://esm.sh/swr` -> `/-/esm.sh/swr.js`
   // - `https://esm.sh/react` -> `/-/esm.sh/react${REACT_VERSION}.js`
   // - `https://deno.land/x/aleph/mod.ts` -> `https://deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
-  // - `../components/logo.tsx` -> `/components/logo.xxxxxxxxx.js`
-  // - `@/components/logo.tsx` -> `import Logo from "/components/logo.xxxxxxxxx.js`
-  // - `@/styles/app.css` -> `import Logo from "/styles/app.css.xxxxxxxxx.js`
+  // - `../components/logo.tsx` -> `/components/logo.{HASH_PLACEHOLDER}.js`
+  // - `@/components/logo.tsx` -> `import Logo from "/components/logo.{HASH_PLACEHOLDER}.js`
+  // - `@/styles/app.css` -> `import Logo from "/styles/app.css.{HASH_PLACEHOLDER}.js`
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> String {
+    // apply import map
     let mut url = self.import_map.resolve(self.specifier.as_str(), url);
+    // fix deno.land/x/aleph url
     if url.starts_with("https://deno.land/x/aleph/") {
       url = format!(
         "https://deno.land/x/aleph@v{}/{}",
@@ -186,6 +188,7 @@ impl Resolver {
         url.trim_start_matches("https://deno.land/x/aleph/")
       );
     }
+    // fix react/react-dom url
     if let Some((react_url, react_dom_url)) = &self.react_url {
       if RE_REACT_SERVER_URL.is_match(url.as_str()) {
         url = react_dom_url.clone() + "/server";
@@ -214,10 +217,10 @@ impl Resolver {
         let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
         specifier_path.pop();
         if !url.starts_with("/") {
-          let mut p = PathBuf::from(new_url.path());
-          p.pop();
-          p.push(url);
-          pathname = RelativePath::new(p.to_str().unwrap())
+          let mut buf = PathBuf::from(new_url.path());
+          buf.pop();
+          buf.push(url);
+          pathname = RelativePath::new(buf.to_str().unwrap())
             .normalize()
             .to_path(Path::new(""))
         }
@@ -241,6 +244,7 @@ impl Resolver {
         }
       }
     };
+    // fix extension & add hash placeholder
     match resolved_path.extension() {
       Some(os_str) => match os_str.to_str() {
         Some(s) => match s {
@@ -253,7 +257,7 @@ impl Resolver {
               .trim_end_matches(s)
               .to_owned();
             if !is_remote && !self.specifier_is_remote {
-              filename.push_str("x".repeat(*HASH_SHORT).as_str());
+              filename.push_str(HASH_PLACEHOLDER.as_str());
               filename.push_str(".js");
             } else {
               filename.push_str("js");
@@ -269,7 +273,7 @@ impl Resolver {
                 .unwrap()
                 .to_owned();
               filename.push('.');
-              filename.push_str("x".repeat(*HASH_SHORT).as_str());
+              filename.push_str(HASH_PLACEHOLDER.as_str());
               filename.push_str(".js");
               resolved_path.set_file_name(filename);
             }
@@ -291,10 +295,10 @@ impl Resolver {
         let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
         specifier_path.pop();
         if !url.starts_with("/") {
-          let mut p = PathBuf::from(new_url.path());
-          p.pop();
-          p.push(url);
-          pathname = RelativePath::new(p.to_str().unwrap())
+          let mut buf = PathBuf::from(new_url.path());
+          buf.pop();
+          buf.push(url);
+          pathname = RelativePath::new(buf.to_str().unwrap())
             .normalize()
             .to_path(Path::new(""))
         }
@@ -315,10 +319,10 @@ impl Resolver {
             is_dynamic,
           });
         } else {
-          let mut path = PathBuf::from(self.specifier.as_str());
-          path.pop();
-          path.push(url);
-          let path = RelativePath::new(path.to_str().unwrap())
+          let mut buf = PathBuf::from(self.specifier.as_str());
+          buf.pop();
+          buf.push(url);
+          let path = RelativePath::new(buf.to_str().unwrap())
             .normalize()
             .to_path(Path::new(""));
           self.dep_graph.push(DependencyDescriptor {
@@ -352,9 +356,9 @@ impl Fold for AlephResolveFold {
   // - development mode:
   //   - `import React, {useState} from "https://esm.sh/react"` -> `import React, {useState} from "/-/esm.sh/react.js"`
   //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/-/esm.sh/react.js"`
-  //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/components/logo.xxxxxxxxx.js"`
-  //   - `import Logo from "@/components/logo.tsx"` -> `import Logo from "/components/logo.xxxxxxxxx.js"`
-  //   - `import "../style/index.css" -> `import "/style/index.css.xxxxxxxxx..js"`
+  //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/components/logo.{HASH_PLACEHOLDER}.js"`
+  //   - `import Logo from "@/components/logo.tsx"` -> `import Logo from "/components/logo.{HASH_PLACEHOLDER}.js"`
+  //   - `import "../style/index.css" -> `import "/style/index.css.{HASH_PLACEHOLDER}.js"`
   //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
   //   - `export * from "https://esm.sh/react"` -> `export * from "/-/esm.sh/react.js"`
   // - bundling mode:
@@ -625,15 +629,15 @@ mod tests {
     );
     assert_eq!(
       resolver.resolve("../components/logo.tsx", false),
-      "../components/logo.xxxxxxxxx.js"
+      format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str())
     );
     assert_eq!(
       resolver.resolve("@/components/logo.tsx", false),
-      "../components/logo.xxxxxxxxx.js"
+      format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str())
     );
     assert_eq!(
       resolver.resolve("@/styles/app.css", false),
-      "../styles/app.css.xxxxxxxxx.js"
+      format!("../styles/app.css.{}.js", HASH_PLACEHOLDER.as_str())
     );
 
     let mut resolver = Resolver::new(

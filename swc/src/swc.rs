@@ -267,7 +267,7 @@ mod tests {
   use super::*;
   use crate::aleph::VERSION;
   use crate::import_map::ImportHashMap;
-  use crate::resolve::{DependencyDescriptor, Resolver};
+  use crate::resolve::{DependencyDescriptor, Resolver, HASH_PLACEHOLDER};
   use std::collections::HashMap;
 
   #[test]
@@ -488,7 +488,13 @@ mod tests {
     assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
     assert!(code.contains("React.createElement(__ALEPH_Head,"));
     assert!(code.contains("React.createElement(__ALEPH_Link,"));
-    assert!(code.contains("href: \"../style/index.css.xxxxxxxxx.js\""));
+    assert!(code.contains(
+      format!(
+        "href: \"../style/index.css.{}.js\"",
+        HASH_PLACEHOLDER.as_str()
+      )
+      .as_str()
+    ));
     assert!(code.contains("__baseUrl: \"/pages\""));
     assert!(code.contains("React.createElement(__ALEPH_Script,"));
     let r = resolver.borrow_mut();
