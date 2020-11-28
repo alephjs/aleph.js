@@ -1001,9 +1001,9 @@ dependencies = [
 
 [[package]]
 name = "swc_ecma_transforms"
-version = "0.30.2"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e708dd5223c2e890f434e8b8cd65b0695f09f823bb1b64b255c9a213f084fa05"
+checksum = "49e8cfe7e5e05795c3647534e68036a1764bea326611db40451507529db68528"
 dependencies = [
  "Inflector",
  "arrayvec",
@@ -1077,9 +1077,9 @@ dependencies = [
 
 [[package]]
 name = "swc_ecmascript"
-version = "0.14.3"
+version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3c071fe7828d1575780cc57142281a720f77867e47b4b7e1db7f752eb34c0ec"
+checksum = "4b4658cfd64f6931c38d283d3ee65e2f3f964e07c711782eab2a8c71f35d2ba1"
 dependencies = [
  "swc_ecma_ast",
  "swc_ecma_codegen",
@@ -1126,9 +1126,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.50"
+version = "1.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "443b4178719c5a851e1bde36ce12da21d74a0e60b4d982ec3385a933c812f0f6"
+checksum = "6c1e438504729046a5cfae47f97c30d6d083c7d91d94603efdae3477fc070d4c"
 dependencies = [
  "proc-macro2",
  "quote",

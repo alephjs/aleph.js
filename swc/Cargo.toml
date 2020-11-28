@@ -28,7 +28,7 @@ url = "2.2.0"
 # swc
 # docs: https://swc.rs
 swc_common = { version = "0.10.5", features = ["sourcemap"] }
-swc_ecmascript = { version = "0.14.3", features = ["codegen", "parser", "react", "transforms", "visit"] }
+swc_ecmascript = { version = "0.14.4", features = ["codegen", "parser", "react", "transforms", "visit"] }
 swc_ecma_ast = "0.35.0"
 swc_ecma_visit = "0.21.0"
 swc_ecma_utils = "0.25.0"
