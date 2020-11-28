@@ -120,7 +120,6 @@ export class Project {
         return path.join(this.appRoot, '.aleph', this.mode + '.' + this.config.buildTarget)
     }
 
-
     isHMRable(moduleID: string) {
         if (reStyleModuleExt.test(moduleID)) {
             return true
@@ -262,21 +261,6 @@ export class Project {
         return [status, data]
     }
 
-    getPreloadScripts() {
-        const { baseUrl } = this.config
-        const amlUrlPreifx = getAlephModuleLocalUrlPreifx()
-        const scripts = [
-            `/-/${amlUrlPreifx}/aleph.js`,
-            `/-/${amlUrlPreifx}/bootstrap.js`,
-            `/-/${amlUrlPreifx}/context.js`,
-            `/-/${amlUrlPreifx}/error.js`,
-            `/-/${amlUrlPreifx}/events.js`,
-            `/-/${amlUrlPreifx}/routing.js`,
-            `/-/${amlUrlPreifx}/util.js`
-        ]
-        return scripts.map(src => ({ src: util.cleanPath(`${baseUrl}/_aleph/${src}`), type: 'module', preload: true }))
-    }
-
     async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string, Record<string, string> | null]> {
         if (!this.isSSRable(loc.pathname)) {
             const [url] = this.#pageRouting.createRouter(loc)
@@ -292,7 +276,7 @@ export class Project {
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                ...this.getPreloadScripts(),
+                ...this._getPreloadScripts(),
                 ...scripts
             ],
             body,
@@ -310,7 +294,7 @@ export class Project {
             scripts: [
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
-                ...this.getPreloadScripts()
+                ...this._getPreloadScripts()
             ],
             head: customLoading?.head || [],
             body: `<main>${customLoading?.body || ''}</main>`,
@@ -363,16 +347,31 @@ export class Project {
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
+    private _getPreloadScripts() {
+        const { baseUrl } = this.config
+        const amlUrlPreifx = getAlephModuleLocalUrlPreifx()
+        const scripts = [
+            `/-/${amlUrlPreifx}/aleph.js`,
+            `/-/${amlUrlPreifx}/bootstrap.js`,
+            `/-/${amlUrlPreifx}/context.js`,
+            `/-/${amlUrlPreifx}/error.js`,
+            `/-/${amlUrlPreifx}/events.js`,
+            `/-/${amlUrlPreifx}/routing.js`,
+            `/-/${amlUrlPreifx}/util.js`
+        ]
+        return scripts.map(src => ({ src: util.cleanPath(`${baseUrl}/_aleph/${src}`), type: 'module', preload: true }))
+    }
+
     /** load config from `aleph.config.(json|mjs|js|ts)` */
     private async _loadConfig() {
         const importMapFile = path.join(this.appRoot, 'import_map.json')
         if (existsFileSync(importMapFile)) {
             const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
-            const imports: ImportMap = _fixImportMap(importMap.imports)
+            const imports: ImportMap = fixImportMap(importMap.imports)
             const scopes: Record<string, ImportMap> = {}
             if (util.isPlainObject(importMap.scopes)) {
                 Object.entries(importMap.scopes).forEach(([key, imports]) => {
-                    scopes[key] = _fixImportMap(imports)
+                    scopes[key] = fixImportMap(imports)
                 })
             }
             Object.assign(this.importMap, { imports, scopes })
@@ -1355,7 +1354,7 @@ export class Project {
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
-                ...this.getPreloadScripts(),
+                ...this._getPreloadScripts(),
                 ...scripts
             ],
             body,
@@ -1596,7 +1595,7 @@ function fixImportUrl(importUrl: string): string {
 }
 
 /** fix import map */
-function _fixImportMap(v: any) {
+function fixImportMap(v: any) {
     const imports: ImportMap = {}
     if (util.isPlainObject(v)) {
         Object.entries(v).forEach(([key, value]) => {
