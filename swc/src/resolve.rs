@@ -28,6 +28,7 @@ lazy_static! {
   pub static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
   pub static ref RE_ENDS_WITH_VERSION: Regex =
     Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
+  pub static ref RE_JS_MODULE: Regex = Regex::new(r"\.(js|jsx|mjs|ts|tsx)$").unwrap();
   pub static ref RE_REACT_URL: Regex =
     Regex::new(r"^https?://[a-z0-9\-.:]+/react(@[0-9a-z\.\-]+)?(/|\?|$)").unwrap();
   pub static ref RE_REACT_DOM_URL: Regex =
@@ -354,14 +355,13 @@ impl Fold for AlephResolveFold {
   //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
   //   - `export * from "https://esm.sh/react"` -> `export * from "/-/esm.sh/react.js"`
   // - bundling mode:
-  //   - `import React, {useState} from "https://esm.sh/react"` -> `var React = window.__ALEPH_PACK["https://esm.sh/react"].default, useState = window.__ALEPH_PACK["https://esm.sh/react"].useState;`
-  //   - `import * as React from "https://esm.sh/react"` -> `var React = window.__ALEPH_PACK["https://esm.sh/react"]`
-  //   - `import Logo from "../components/logo.tsx"` -> `var Logo = window.__ALEPH_PACK["/components/logo.tsx"].default`
-  //   - `import Logo from "@/components/logo.tsx"` -> `var Logo = window.__ALEPH_PACK["/components/logo.tsx"].default`
-  //   - `import "../style/index.css" -> `__apply_style("/style/index.css")`
-  //   - `export React, {useState} from "https://esm.sh/react"` -> `__export("/pages/index.tsx", "https://esm.sh/react", {"default": "React", "useState": "useState'})`
-  //   - `export * as React from "https://esm.sh/react"` -> `__export("/pages/index.tsx", "https://esm.sh/react", {"*": "React"})`
-  //   - `export * from "https://esm.sh/react"` -> `__export_star("/pages/index.tsx", "https://esm.sh/react")`
+  //   - `import React, {useState} from "https://esm.sh/react"` -> `var React = __ALEPH.pack["https://esm.sh/react"].default, useState = __ALEPH__.PACK["https://esm.sh/react"].useState;`
+  //   - `import * as React from "https://esm.sh/react"` -> `var React = __ALEPH.pack["https://esm.sh/react"]`
+  //   - `import Logo from "../components/logo.tsx"` -> `var Logo = __ALEPH.pack["/components/logo.tsx"].default`
+  //   - `import Logo from "@/components/logo.tsx"` -> `var Logo = __ALEPH.pack["/components/logo.tsx"].default`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `__ALEPH.export("/pages/index.tsx", "https://esm.sh/react", {"default": "React", "useState": "useState'})`
+  //   - `export * as React from "https://esm.sh/react"` -> `__ALEPH.export("/pages/index.tsx", "https://esm.sh/react", {"*": "React"})`
+  //   - `export * from "https://esm.sh/react"` -> `__ALEPH.exportStar("/pages/index.tsx", "https://esm.sh/react")`
   //   - remove `import "../shared/iife.ts" (add into dep_graph)
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
@@ -414,7 +414,7 @@ impl Fold for AlephResolveFold {
                       }
                     });
                   if var_decls.len() > 0 {
-                    // var React = window.__ALEPH_PACK["https://esm.sh/react"].default, useState = window.__ALEPH_PACK["https://esm.sh/react"].useState;
+                    // var React = __ALEPH.pack["https://esm.sh/react"].default, useState = __ALEPH.pack["https://esm.sh/react"].useState;
                     ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
                       span: DUMMY_SP,
                       kind: VarDeclKind::Var,
@@ -453,10 +453,10 @@ impl Fold for AlephResolveFold {
                 let mut resolver = self.resolver.borrow_mut();
                 let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
                 if resolver.bundle_mode {
-                  // __export("/pages/index.tsx", "https://esm.sh/react", {"default": "React", "useState": "useState'})
+                  // __ALEPH.export("/pages/index.tsx", "https://esm.sh/react", {"default": "React", "useState": "useState'})
                   let call = CallExpr {
                     span: DUMMY_SP,
-                    callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__export")))),
+                    callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("export")))),
                     args: vec![
                       ExprOrSpread {
                         spread: None,
@@ -543,7 +543,12 @@ impl Fold for AlephResolveFold {
                   };
                   ModuleItem::Stmt(Stmt::Expr(ExprStmt {
                     span: DUMMY_SP,
-                    expr: Box::new(Expr::Call(call)),
+                    expr: Box::new(Expr::Member(MemberExpr {
+                      span: DUMMY_SP,
+                      obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH")))),
+                      prop: Box::new(Expr::Call(call)),
+                      computed: false,
+                    })),
                   }))
                 } else {
                   ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(NamedExport {
@@ -563,10 +568,10 @@ impl Fold for AlephResolveFold {
               let mut resolver = self.resolver.borrow_mut();
               let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
               if resolver.bundle_mode {
-                // __export_star("/pages/index.tsx", "https://esm.sh/react")
+                // __ALEPH.export_star("/pages/index.tsx", "https://esm.sh/react")
                 let call = CallExpr {
                   span: DUMMY_SP,
-                  callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__export_star")))),
+                  callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("export_star")))),
                   args: vec![
                     ExprOrSpread {
                       spread: None,
@@ -589,7 +594,12 @@ impl Fold for AlephResolveFold {
                 };
                 ModuleItem::Stmt(Stmt::Expr(ExprStmt {
                   span: DUMMY_SP,
-                  expr: Box::new(Expr::Call(call)),
+                  expr: Box::new(Expr::Member(MemberExpr {
+                    span: DUMMY_SP,
+                    obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH")))),
+                    prop: Box::new(Expr::Call(call)),
+                    computed: false,
+                  })),
                 }))
               } else {
                 ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
@@ -713,10 +723,10 @@ fn new_use_deno_hook_ident() -> String {
 fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -> VarDeclarator {
   let m = Expr::Member(MemberExpr {
     span: DUMMY_SP,
-    obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("window")))),
+    obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH")))),
     prop: Box::new(Expr::Member(MemberExpr {
       span: DUMMY_SP,
-      obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH_PACK")))),
+      obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("pack")))),
       prop: Box::new(Expr::Lit(Lit::Str(Str {
         span: DUMMY_SP,
         value: url.into(),

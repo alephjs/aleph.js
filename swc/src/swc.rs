@@ -604,12 +604,12 @@ mod tests {
       .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
     println!("{}", code);
-    assert!(code.contains("React = window.__ALEPH_PACK[\"https://esm.sh/react\"].default"));
-    assert!(code.contains("useState = window.__ALEPH_PACK[\"https://esm.sh/react\"].useState"));
-    assert!(code.contains("useEffect_ = window.__ALEPH_PACK[\"https://esm.sh/react\"].useEffect"));
-    assert!(code.contains("React_ = window.__ALEPH_PACK[\"https://esm.sh/react\"]"));
-    assert!(code.contains("Logo = window.__ALEPH_PACK[\"/components/logo.ts\"].default"));
-    assert!(!code.contains("window.__ALEPH_PACK[\"/shared/iife.ts\"]"));
+    assert!(code.contains("React = __ALEPH.pack[\"https://esm.sh/react\"].default"));
+    assert!(code.contains("useState = __ALEPH.pack[\"https://esm.sh/react\"].useState"));
+    assert!(code.contains("useEffect_ = __ALEPH.pack[\"https://esm.sh/react\"].useEffect"));
+    assert!(code.contains("React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));
+    assert!(code.contains("Logo = __ALEPH.pack[\"/components/logo.ts\"].default"));
+    assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
   }
 
   #[test]
@@ -631,8 +631,8 @@ mod tests {
       .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
     println!("{}", code);
-    assert!(code.contains("__export(\"/pages/index.tsx\", \"https://esm.sh/react\", {"));
-    assert!(code.contains("__export_star(\"/pages/index.tsx\", \"https://esm.sh/react\")"));
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"https://esm.sh/react\", {"));
+    assert!(code.contains("__ALEPH.export_star(\"/pages/index.tsx\", \"https://esm.sh/react\")"));
     assert!(code.contains("\"default\": \"React\""));
     assert!(code.contains("\"useState\": \"useState\""));
     assert!(code.contains("\"useEffect\": \"useEffect_\""));
