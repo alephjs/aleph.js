@@ -4,7 +4,7 @@ import getWasmData from './aleph_swc_wasm.js';
 type ImportMap = Record<string, string[]>
 
 export interface SWCOptions {
-    target?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
+    target?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     jsxFactory?: string
     jsxFragmentFactory?: string
     sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
