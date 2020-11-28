@@ -43,7 +43,7 @@ interface RenderResult {
     data: Record<string, string> | null
 }
 
-type ImportMap = Record<string, string[]>
+type ImportMap = Record<string, ReadonlyArray<string>>
 
 /**
  * A Project to manage the Aleph.js appliaction.
@@ -611,7 +611,6 @@ export class Project {
         // pre-compile some modules
         const { __ALEPH_DEV_PORT: devPort } = globalThis as any
         const precompileMods = [
-            'bootstrap.ts',
             'nomodule.ts',
             'renderer.ts'
         ]
@@ -818,7 +817,6 @@ export class Project {
 
     /** create re-compiled main module. */
     private async _createMainModule(): Promise<Module> {
-        const amlUrlPreifx = getAlephModuleLocalUrlPreifx()
         const { baseUrl, defaultLocale } = this.config
         const config: Record<string, any> = {
             baseUrl,
@@ -830,16 +828,13 @@ export class Project {
             }),
             renderMode: this.config.ssr ? 'ssr' : 'spa'
         }
-        const module = this._moduleFromURL('/main.js')
 
-        module.jsContent = [
-            this.isDev && `import "./-/${amlUrlPreifx}/hmr.js"`,
-            `import bootstrap from "./-/${amlUrlPreifx}/bootstrap.js"`,
+        const sourceCode = [
+            this.isDev && `import "https://deno.land/x/aleph/hmr.ts"`,
+            `import bootstrap from "https://deno.land/x/aleph/bootstrap.ts"`,
             `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)})`
-        ].filter(Boolean).join(this.isDev ? '\n' : ';')
-        module.hash = getHash(module.jsContent)
-        module.jsFile = path.join(this.buildDir, `main.${module.hash.slice(0, hashShort)}.js`)
-
+        ].filter(Boolean).join('\n')
+        const module = await this._compile("/main.ts", { sourceCode })
         await cleanupCompilation(module.jsFile)
         await ensureTextFile(module.jsFile, module.jsContent)
         this.#modules.set(module.id, module)
@@ -877,8 +872,9 @@ export class Project {
     }
 
     /** download and compile a moudle by giving url, then cache on the disk. */
-    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean, bundleMode?: boolean }) {
+    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean, es5?: boolean, bundleMode?: boolean }) {
         const mod = this._moduleFromURL(url)
+        const bundleMode = !!options?.bundleMode
 
         if (this.#modules.has(mod.id) && !options?.forceCompile && !options?.sourceCode) {
             return this.#modules.get(mod.id)!
@@ -1035,18 +1031,18 @@ export class Project {
                 mod.jsSourceMap = null
             } else if (mod.loader === 'js' || mod.loader === 'ts' || mod.loader === 'jsx' || mod.loader === 'tsx') {
                 const swcOptions: SWCOptions = {
-                    target: this.config.buildTarget,
+                    target: !!options?.es5 ? 'es5' : this.config.buildTarget,
                     sourceType: mod.loader,
                     sourceMap: this.isDev || this.config.sourceMap,
-                    isDev: this.isDev,
-                    bundleMode: !!options?.bundleMode,
                 }
                 const { code, map, deps, inlineStyles } = transpileSync(sourceCode, {
                     url,
                     importMap: this.importMap,
                     reactUrl: this.config.reactUrl,
                     reactDomUrl: this.config.reactDomUrl,
-                    swcOptions
+                    swcOptions,
+                    isDev: this.isDev,
+                    bundleMode,
                 })
                 mod.jsContent = code
                 mod.jsSourceMap = map!
@@ -1111,7 +1107,9 @@ export class Project {
             }
         }
 
-        this.#modules.set(mod.id, mod)
+        if (!bundleMode) {
+            this.#modules.set(mod.id, mod)
+        }
 
         // compile deps
         for (const dep of mod.deps.filter(({ url, external }) => !url.startsWith('#useDeno-') && !url.startsWith('#inline-style-') && !external)) {
@@ -1141,33 +1139,18 @@ export class Project {
         }
 
         if (fsync) {
-            if (!this.isDev) {
-                const { code, map } = await minify(mod.jsContent, {
-                    compress: true,
-                    mangle: true,
-                    sourceMap: {
-                        content: mod.jsSourceMap || undefined,
-                    }
-                })
-                if (code) {
-                    mod.jsContent = code
-                    if (util.isNEString(map)) {
-                        mod.jsSourceMap = map
-                    }
-                }
-            }
             mod.hash = getHash(mod.jsContent)
-            mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + '.js'
+            mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + (bundleMode ? '.bundling' : '') + '.js'
             await cleanupCompilation(mod.jsFile)
             await Promise.all([
-                ensureTextFile(metaFile, JSON.stringify({
+                !bundleMode ? ensureTextFile(metaFile, JSON.stringify({
                     url,
                     sourceHash: mod.sourceHash,
                     hash: mod.hash,
                     deps: mod.deps,
-                }, undefined, 4)),
+                }, undefined, 4)) : Promise.resolve(),
                 ensureTextFile(mod.jsFile, mod.jsContent),
-                mod.jsSourceMap ? ensureTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
+                !bundleMode && mod.jsSourceMap ? ensureTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
             ])
         }
 
@@ -1221,7 +1204,104 @@ export class Project {
 
     /** bundle modules for production. */
     private async _bundle() {
+        const refCounter = new Map<string, number>()
+        const lookup = (moduleID: string) => {
+            if (this.#modules.has(moduleID)) {
+                const { deps } = this.#modules.get(moduleID)!
+                deps.forEach(({ url }) => {
+                    if (!refCounter.has(url)) {
+                        refCounter.set(url, 1)
+                    } else {
+                        refCounter.set(url, refCounter.get(url)! + 1)
+                    }
+                })
+            }
+        }
 
+        lookup('/main.js')
+        lookup('/app.js')
+        lookup('/404.js')
+        this.#pageRouting.lookup(path => path.forEach(r => lookup(r.module.id)))
+
+        const remoteList: string[] = []
+        const localList: string[] = []
+        Array.from(refCounter.entries()).forEach(([url, count]) => {
+            if (util.isHttpUrl(url)) {
+                remoteList.push(url)
+            } else if (!url.startsWith('#') && !url.startsWith('/pages/') && reModuleExt.test(url) && count > 1) {
+                localList.push(url)
+            }
+        })
+        log.info('- Bundle')
+        await this._runBundle('deps', remoteList)
+        if (localList.length > 0) {
+            await this._runBundle('shared', localList)
+        }
+    }
+
+    private async _runBundle(name: string, list: string[]) {
+        const header = `
+            var __ALEPH = window.__ALEPH || (window.__ALEPH = {
+                pack: {},
+                export: function(specifier, url, exports) {
+
+                },
+                exportStar: function(specifier, url) {
+
+                }
+            });
+        `.replaceAll(' '.repeat(12), '').trim()
+        const imports = list.map((url, i) => {
+            const { id } = this._moduleFromURL(url)
+            const mod = this.getModule(id)!
+            if (mod) {
+                return [
+                    `import * as mod_${i} from "file://${mod.jsFile}"`,
+                    `__ALEPH.pack["${url}"] = mod_${i}`
+                ]
+            }
+            return []
+        }).flat().join('\n')
+        const entryFile = path.join(this.buildDir, name + '_entry.js')
+        const bundleFile = path.join(this.buildDir, name + '.js')
+
+        if (existsFileSync(bundleFile)) {
+            !Deno.remove(bundleFile)
+        }
+        await Deno.writeTextFile(entryFile, header + '\n' + imports)
+
+        // run deno bundle
+        const p = Deno.run({
+            cmd: ['deno', 'bundle', '--no-check', entryFile, bundleFile].filter(Boolean),
+            stdout: 'null',
+            stderr: 'piped'
+        })
+        const data = await p.stderrOutput()
+        p.close()
+
+        if (!existsFileSync(bundleFile)) {
+            const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.buildDir, '/aleph.js')
+            await Deno.stderr.write((new TextEncoder).encode(msg))
+            return
+        }
+
+        // compile bundle code to es5
+        const sourceCode = await Deno.readTextFile(bundleFile)
+        const { code } = transpileSync(sourceCode, {
+            url: '/bundle.js',
+            swcOptions: {
+                target: 'es5'
+            },
+        })
+        const { code: codeMini } = await minify(code, {
+            compress: true,
+            mangle: true,
+            sourceMap: false
+        })
+        if (codeMini) {
+            log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(codeMini.length))}`)
+            await Deno.writeTextFile(bundleFile, codeMini);
+        }
     }
 
     /** optimize images for production. */
@@ -1233,7 +1313,6 @@ export class Project {
     private async _ssg() {
         const { ssr } = this.config
         const outputDir = path.join(this.srcDir, this.config.outputDir)
-        const SPAIndexHtml = await this.getSPAIndexHtml()
 
         if (ssr) {
             log.info(colors.bold('- Pages (SSG)'))
@@ -1260,9 +1339,9 @@ export class Project {
                 }
             }))
             const fbHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback.html')
-            await ensureTextFile(fbHtmlFile, SPAIndexHtml)
+            await ensureTextFile(fbHtmlFile, await this.getSPAIndexHtml())
         } else {
-            await ensureTextFile(path.join(outputDir, 'index.html'), SPAIndexHtml)
+            await ensureTextFile(path.join(outputDir, 'index.html'), await this.getSPAIndexHtml())
         }
 
         // write 404 page
