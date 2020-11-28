@@ -12,20 +12,21 @@ use swc_common::{
   chain,
   comments::SingleThreadedComments,
   errors::{Handler, HandlerFlags},
-  FileName, Globals, SourceMap,
+  FileName, Globals, Mark, SourceMap,
 };
 use swc_ecmascript::{
   ast::{Module, Program},
   codegen::{text_writer::JsWriter, Node},
   parser::lexer::Lexer,
   parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig},
-  transforms::{fixer, helpers, pass::Optional, proposals, react, typescript},
+  transforms::{compat::*, fixer, helpers, hygiene, pass::Optional, proposals, react, typescript},
   visit::{Fold, FoldWith},
 };
 
 /// Options for transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
+  pub target: JscTarget,
   pub jsx_factory: String,
   pub jsx_fragment_factory: String,
   pub is_dev: bool,
@@ -35,6 +36,7 @@ pub struct EmitOptions {
 impl Default for EmitOptions {
   fn default() -> Self {
     EmitOptions {
+      target: JscTarget::Es2020,
       jsx_factory: "React.createElement".into(),
       jsx_fragment_factory: "React.Fragment".into(),
       is_dev: true,
@@ -65,7 +67,6 @@ impl ParsedModule {
     specifier: &str,
     source: &str,
     source_type: Option<SourceType>,
-    target: JscTarget,
   ) -> Result<Self, anyhow::Error> {
     let source_map = SourceMap::default();
     let source_file = source_map.new_source_file(
@@ -81,7 +82,7 @@ impl ParsedModule {
     let syntax = get_syntax(&source_type);
     let input = StringInput::from(&*source_file);
     let comments = SingleThreadedComments::default();
-    let lexer = Lexer::new(syntax, target, input, Some(&comments));
+    let lexer = Lexer::new(syntax, JscTarget::Es2020, input, Some(&comments));
     let mut parser = swc_ecmascript::parser::Parser::new_from(lexer);
     let handler = Handler::with_emitter_and_flags(
       Box::new(error_buffer.clone()),
@@ -121,59 +122,72 @@ impl ParsedModule {
     resolver: Rc<RefCell<Resolver>>,
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
-    let specifier_is_remote = resolver.borrow_mut().specifier_is_remote;
-    let ts = match self.source_type {
-      SourceType::TypeScript => true,
-      SourceType::TSX => true,
-      _ => false,
-    };
-    let jsx = match self.source_type {
-      SourceType::JSX => true,
-      SourceType::TSX => true,
-      _ => false,
-    };
-    let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) = aleph_jsx_fold(
-      resolver.clone(),
-      self.source_map.clone(),
-      options.is_dev && !specifier_is_remote,
-    );
-    let mut passes = chain!(
-      aleph_resolve_fold(resolver.clone()),
-      Optional::new(aleph_jsx_fold, jsx),
-      Optional::new(aleph_jsx_builtin_resolve_fold, jsx),
-      Optional::new(
-        fast_refresh_fold(
-          "$RefreshReg$",
-          "$RefreshSig$",
-          false,
-          self.source_map.clone()
+    swc_common::GLOBALS.set(&Globals::new(), || {
+      let specifier_is_remote = resolver.borrow_mut().specifier_is_remote;
+      let ts = match self.source_type {
+        SourceType::TypeScript => true,
+        SourceType::TSX => true,
+        _ => false,
+      };
+      let jsx = match self.source_type {
+        SourceType::JSX => true,
+        SourceType::TSX => true,
+        _ => false,
+      };
+      let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) = aleph_jsx_fold(
+        resolver.clone(),
+        self.source_map.clone(),
+        options.is_dev && !specifier_is_remote,
+      );
+      let root_mark = Mark::fresh(Mark::root());
+      let mut passes = chain!(
+        aleph_resolve_fold(resolver.clone()),
+        Optional::new(aleph_jsx_fold, jsx),
+        Optional::new(aleph_jsx_builtin_resolve_fold, jsx),
+        Optional::new(
+          fast_refresh_fold(
+            "$RefreshReg$",
+            "$RefreshSig$",
+            false,
+            self.source_map.clone()
+          ),
+          options.is_dev && !specifier_is_remote
         ),
-        options.is_dev && !specifier_is_remote
-      ),
-      Optional::new(
-        react::jsx(
-          self.source_map.clone(),
-          Some(&self.comments),
-          react::Options {
-            pragma: options.jsx_factory.clone(),
-            pragma_frag: options.jsx_fragment_factory.clone(),
-            // this will use `Object.assign()` instead of the `_extends` helper when spreading props.
-            use_builtins: true,
-            ..Default::default()
-          },
+        Optional::new(
+          react::jsx(
+            self.source_map.clone(),
+            Some(&self.comments),
+            react::Options {
+              pragma: options.jsx_factory.clone(),
+              pragma_frag: options.jsx_fragment_factory.clone(),
+              // this will use `Object.assign()` instead of the `_extends` helper when spreading props.
+              use_builtins: true,
+              ..Default::default()
+            },
+          ),
+          jsx
         ),
-        jsx
-      ),
-      proposals::decorators::decorators(proposals::decorators::Config {
-        legacy: true,
-        emit_metadata: false
-      }),
-      helpers::inject_helpers(),
-      Optional::new(typescript::strip(), ts),
-      fixer(Some(&self.comments)),
-    );
+        proposals::decorators::decorators(proposals::decorators::Config {
+          legacy: true,
+          emit_metadata: false
+        }),
+        Optional::new(es2020(), options.target < JscTarget::Es2020),
+        Optional::new(typescript::strip(), ts),
+        Optional::new(es2018(), options.target < JscTarget::Es2018),
+        Optional::new(es2017(), options.target < JscTarget::Es2017),
+        Optional::new(es2016(), options.target < JscTarget::Es2016),
+        Optional::new(
+          es2015(root_mark, Default::default()),
+          options.target < JscTarget::Es2015
+        ),
+        reserved_words::reserved_words(),
+        helpers::inject_helpers(),
+        hygiene(),
+        fixer(Some(&self.comments)),
+      );
 
-    self.apply_transform(&mut passes, options.source_map)
+      self.apply_transform(&mut passes, options.source_map)
+    })
   }
 
   /// Apply transform with fold.
@@ -301,13 +315,8 @@ mod tests {
       bar() {}
     }
     "#;
-    let module = ParsedModule::parse(
-      "https://deno.land/x/mod.ts",
-      source,
-      None,
-      JscTarget::Es2020,
-    )
-    .expect("could not parse module");
+    let module = ParsedModule::parse("https://deno.land/x/mod.ts", source, None)
+      .expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "https://deno.land/x/mod.ts",
       ImportHashMap::default(),
@@ -340,8 +349,8 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
-      .expect("could not parse module");
+    let module =
+      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let mut imports: HashMap<String, Vec<String>> = HashMap::new();
     imports.insert(
       "https://deno.land/x/aleph/".into(),
@@ -403,8 +412,8 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
-      .expect("could not parse module");
+    let module =
+      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportHashMap::default(),
@@ -447,8 +456,8 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
-      .expect("could not parse module");
+    let module =
+      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportHashMap::default(),
@@ -555,8 +564,8 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
-      .expect("could not parse module");
+    let module =
+      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportHashMap::default(),
@@ -599,8 +608,8 @@ mod tests {
       )
     }
     "#;
-    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
-      .expect("could not parse module");
+    let module =
+      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportHashMap::default(),
@@ -629,8 +638,8 @@ mod tests {
       export * as React_ from "https://esm.sh/react"
       export * from "https://esm.sh/react"
     "#;
-    let module = ParsedModule::parse("/pages/index.tsx", source, None, JscTarget::Es2020)
-      .expect("could not parse module");
+    let module =
+      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportHashMap::default(),

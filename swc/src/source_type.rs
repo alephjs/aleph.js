@@ -63,13 +63,7 @@ impl SourceType {
     match path.extension() {
       None => SourceType::Unknown,
       Some(os_str) => match os_str.to_str() {
-        Some("ts") => match path.file_stem() {
-          Some(os_str) => match os_str.to_str() {
-            Some(_file_name) => SourceType::TypeScript,
-            None => SourceType::TypeScript,
-          },
-          None => SourceType::TypeScript,
-        },
+        Some("ts") => SourceType::TypeScript,
         Some("tsx") => SourceType::TSX,
         Some("js") => SourceType::JavaScript,
         Some("jsx") => SourceType::JSX,
@@ -91,9 +85,9 @@ impl Serialize for SourceType {
       SourceType::JavaScript => 0 as i32,
       SourceType::JSX => 1 as i32,
       SourceType::TypeScript => 2 as i32,
-      SourceType::TSX => 4 as i32,
-      SourceType::Json => 5 as i32,
-      SourceType::Wasm => 6 as i32,
+      SourceType::TSX => 3 as i32,
+      SourceType::Json => 4 as i32,
+      SourceType::Wasm => 5 as i32,
       SourceType::Unknown => 9 as i32,
     };
     Serialize::serialize(&value, serializer)

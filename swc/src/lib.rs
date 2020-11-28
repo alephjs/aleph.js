@@ -132,21 +132,17 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         "tsx" => Some(SourceType::TSX),
         _ => None,
     };
-    let module = ParsedModule::parse(
-        opts.url.as_str(),
-        s,
-        specify_source_type,
-        opts.swc_options.target,
-    )
-    .expect("could not parse module");
+    let module = ParsedModule::parse(opts.url.as_str(), s, specify_source_type)
+        .expect("could not parse module");
     let (code, map) = module
         .transpile(
             resolver.clone(),
             &EmitOptions {
+                target: opts.swc_options.target,
                 jsx_factory: opts.swc_options.jsx_factory.clone(),
                 jsx_fragment_factory: opts.swc_options.jsx_fragment_factory.clone(),
-                is_dev: opts.is_dev,
                 source_map: opts.swc_options.source_map,
+                is_dev: opts.is_dev,
             },
         )
         .expect("could not transpile module");
