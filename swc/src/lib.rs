@@ -60,6 +60,9 @@ pub struct SWCOptions {
 
     #[serde(default)]
     pub is_dev: bool,
+
+    #[serde(default)]
+    pub bundle_mode: bool,
 }
 
 impl Default for SWCOptions {
@@ -71,6 +74,7 @@ impl Default for SWCOptions {
             source_type: "".into(),
             source_map: false,
             is_dev: false,
+            bundle_mode: false,
         }
     }
 }
@@ -117,7 +121,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         opts.url.as_str(),
         opts.import_map,
         Some((opts.react_url, opts.react_dom_url)),
-        !opts.swc_options.is_dev,
+        opts.swc_options.bundle_mode,
     )));
     let specify_source_type = match opts.swc_options.source_type.as_str() {
         "js" => Some(SourceType::JavaScript),

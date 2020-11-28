@@ -10,6 +10,7 @@ export interface SWCOptions {
     sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
     sourceMap?: boolean
     isDev?: boolean,
+    bundleMode?: boolean,
 }
 
 export interface TransformOptions {
