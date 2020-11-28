@@ -34,8 +34,6 @@ interface DependencyDescriptor {
     external?: boolean
 }
 
-type ImportMap = Record<string, string[]>
-
 interface RenderResult {
     url: RouterURL
     status: number
@@ -44,6 +42,8 @@ interface RenderResult {
     body: string
     data: Record<string, string> | null
 }
+
+type ImportMap = Record<string, string[]>
 
 /**
  * A Project to manage the Aleph.js appliaction.
@@ -59,7 +59,7 @@ interface RenderResult {
 export class Project {
     readonly appRoot: string
     readonly mode: 'development' | 'production'
-    readonly config: Readonly<Required<Config>> & { readonly __file?: string }
+    readonly config: Readonly<Required<Config>>
     readonly importMap: Readonly<{ imports: ImportMap, scopes: Record<string, ImportMap> }>
     readonly ready: Promise<void>
 
@@ -98,6 +98,8 @@ export class Project {
         }
         this.importMap = { imports: {}, scopes: {} }
         this.ready = (async () => {
+            log.info(colors.bold(`Aleph.js v${version}`))
+            log.info(colors.bold('- Global'))
             const t = performance.now()
             await initSWC()
             await this._loadConfig()
@@ -118,10 +120,8 @@ export class Project {
         return path.join(this.appRoot, '.aleph', this.mode + '.' + this.config.buildTarget)
     }
 
+
     isHMRable(moduleID: string) {
-        if (reHttp.test(moduleID)) {
-            return false
-        }
         if (reStyleModuleExt.test(moduleID)) {
             return true
         }
@@ -324,142 +324,46 @@ export class Project {
         const start = performance.now()
         const outputDir = path.join(this.srcDir, this.config.outputDir)
         const distDir = path.join(outputDir, '_aleph')
-        const outputModules = new Set<string>()
-        const lookup = (moduleID: string) => {
-            if (this.#modules.has(moduleID) && !outputModules.has(moduleID)) {
-                outputModules.add(moduleID)
-                const { deps } = this.#modules.get(moduleID)!
-                deps.forEach(({ url }) => {
-                    const { id } = this._moduleFromURL(url)
-                    lookup(id)
-                })
-            }
-        }
 
         // wait for project ready
         await this.ready
 
-        // lookup output modules
-        this.#pageRouting.lookup(path => path.forEach(r => lookup(r.module.id)))
-        lookup('/main.js')
-        lookup('/404.js')
-        lookup('/app.js')
-        lookup('//deno.land/x/aleph/nomodule.js')
-
+        // clean old build
         if (existsDirSync(outputDir)) {
             await Deno.remove(outputDir, { recursive: true })
         }
+
+        // ensure output dirs
         await ensureDir(outputDir)
         await ensureDir(distDir)
 
-        // ssg
-        const { ssr } = this.config
-        const SPAIndexHtml = await this.getSPAIndexHtml()
-        if (ssr) {
-            log.info(colors.bold('- Pages (SSG)'))
-            const paths = new Set(this.#pageRouting.paths)
-            if (typeof ssr === 'object' && ssr.staticPaths) {
-                ssr.staticPaths.forEach(path => paths.add(path))
-            }
-            await Promise.all(Array.from(paths).map(async pathname => {
-                if (this.isSSRable(pathname)) {
-                    const [status, html, data] = await this.getPageHtml({ pathname })
-                    if (status == 200) {
-                        const htmlFile = path.join(outputDir, pathname, 'index.html')
-                        await ensureTextFile(htmlFile, html)
-                        if (data) {
-                            const dataFile = path.join(outputDir, '_aleph/data', pathname, 'data.js')
-                            await ensureTextFile(dataFile, `export default ` + JSON.stringify(data))
-                        }
-                        log.info('  ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
-                    } else if (status == 404) {
-                        log.info('  ○', colors.dim(pathname), colors.red(`Page not found`))
-                    } else if (status == 500) {
-                        log.info('  ○', colors.dim(pathname), colors.red(`Error 505`))
-                    }
-                }
-            }))
-            const fbHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback.html')
-            await ensureTextFile(fbHtmlFile, SPAIndexHtml)
-        } else {
-            await ensureTextFile(path.join(outputDir, 'index.html'), SPAIndexHtml)
-        }
-
-        // write 404 page
-        const { baseUrl } = this.config
-        const { url, head, scripts, body, data } = await this._render404Page()
-        const mainModule = this.#modules.get('/main.js')!
-        const e404PageHtml = createHtml({
-            lang: url.locale,
-            head: head,
-            scripts: [
-                data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
-                ...this.getPreloadScripts(),
-                ...scripts
-            ],
-            body,
-            minify: !this.isDev
-        })
-        await ensureTextFile(path.join(outputDir, '404.html'), e404PageHtml)
+        // ssg, bunding & optimizing
+        await this._ssg()
+        await this._bundle()
+        await this._optimize()
 
         // copy public assets
         const publicDir = path.join(this.appRoot, 'public')
         if (existsDirSync(publicDir)) {
-            log.info(colors.bold('- Public Assets'))
-            for await (const { path: p } of walk(publicDir, { includeDirs: false, skip: [/\.DS_Store$/] })) {
+            let n = 0
+            for await (const { path: p } of walk(publicDir, { includeDirs: false, skip: [/(^|\/)\.DS_Store$/] })) {
                 const rp = util.trimPrefix(p, publicDir)
                 const fp = path.join(outputDir, rp)
                 const fi = await Deno.lstat(p)
                 await ensureDir(path.dirname(fp))
                 await Deno.copyFile(p, fp)
-                log.info('  ✹', rp.split('\\').join('/'), colors.dim('•'), colorfulBytesString(fi.size))
-            }
-        }
-
-        const moduleState = {
-            deps: { bytes: 0, count: 0 },
-            modules: { bytes: 0, count: 0 },
-            styles: { bytes: 0, count: 0 }
-        }
-        const logModule = (key: 'deps' | 'modules' | 'styles', size: number) => {
-            moduleState[key].bytes += size
-            moduleState[key].count++
-        }
-
-        // write modules
-        const { sourceMap } = this.config
-        await Promise.all(Array.from(outputModules).map((moduleID) => {
-            const { localUrl, loader, isRemote, jsContent, jsSourceMap, hash } = this.#modules.get(moduleID)!
-            const saveDir = path.join(distDir, path.dirname(localUrl))
-            const name = path.basename(localUrl).replace(reModuleExt, '')
-            const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
-            if (isRemote) {
-                logModule('deps', jsContent.length)
-            } else {
-                if (loader === 'css') {
-                    logModule('styles', jsContent.length)
-                } else {
-                    logModule('modules', jsContent.length)
+                if (n === 0) {
+                    log.info(colors.bold('- Public Assets'))
                 }
+                log.info('  ✹', rp.split('\\').join('/'), colors.dim('•'), colorfulBytesString(fi.size))
+                n++
             }
-            return Promise.all([
-                ensureTextFile(jsFile, jsContent),
-                sourceMap && jsSourceMap ? ensureTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
-            ])
-        }))
-
-        const { deps, modules, styles } = moduleState
-        log.info(colors.bold('- Modules'))
-        log.info('  {}', colors.bold(deps.count.toString()), 'deps', colors.dim(`• ${util.bytesString(deps.bytes)} (mini, uncompress)`))
-        log.info('  {}', colors.bold(modules.count.toString()), 'modules', colors.dim(`• ${util.bytesString(modules.bytes)} (mini, uncompress)`))
-        log.info('  {}', colors.bold(styles.count.toString()), 'styles', colors.dim(`• ${util.bytesString(styles.bytes)} (mini, uncompress)`))
+        }
 
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
-
+    /** load config from `aleph.config.(json|mjs|js|ts)` */
     private async _loadConfig() {
         const importMapFile = path.join(this.appRoot, 'import_map.json')
         if (existsFileSync(importMapFile)) {
@@ -478,11 +382,11 @@ export class Project {
         for (const name of Array.from(['aleph.config', 'config']).map(name => ['ts', 'js', 'mjs', 'json'].map(ext => `${name}.${ext}`)).flat()) {
             const p = path.join(this.appRoot, name)
             if (existsFileSync(p)) {
+                log.info('  ✓', name)
                 if (name.endsWith('.json')) {
                     const conf = JSON.parse(await Deno.readTextFile(p))
                     if (util.isPlainObject(conf)) {
                         Object.assign(config, conf)
-                        Object.assign(this.config, { __file: name })
                     }
                 } else {
                     let { default: conf } = await import('file://' + p)
@@ -491,7 +395,6 @@ export class Project {
                     }
                     if (util.isPlainObject(conf)) {
                         Object.assign(config, conf)
-                        Object.assign(this.config, { __file: name })
                     }
                 }
                 break
@@ -584,6 +487,7 @@ export class Project {
         this.#pageRouting = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
     }
 
+    /** initialize project */
     private async _init(reload: boolean) {
         const walkOptions = { includeDirs: false, exts: ['.js', '.ts', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
         const apiDir = path.join(this.srcDir, 'api')
@@ -674,27 +578,45 @@ export class Project {
             }
         }
 
+        // check custom components
         for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.jsx', '.tsx'] })) {
             const name = path.basename(p)
+            let isCustom = true
             switch (name.replace(reModuleExt, '')) {
                 case 'app':
-                case '404':
-                case 'loading':
-                    await this._compile('/' + name)
+                    log.info('  ✓', 'Custom App')
                     break
+                case '404':
+                    log.info('  ✓', 'Custom 404 Page')
+                    break
+                case 'loading':
+                    log.info('  ✓', 'Custom Loading Page')
+                    break
+                default:
+                    isCustom = false
+                    break
+            }
+            if (isCustom) {
+                await this._compile('/' + name)
             }
         }
 
+        // craete page routing
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md'] })) {
             const rp = util.trimPrefix(p, pagesDir).split('\\').join('/')
             const mod = await this._compile('/pages' + rp)
             this.#pageRouting.update(this._getRouteModule(mod))
         }
 
+        // pre-compile some modules
         const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-        const precompileMods = ['renderer.ts']
+        const precompileMods = [
+            'bootstrap.ts',
+            'nomodule.ts',
+            'renderer.ts'
+        ]
         if (this.isDev) {
-            precompileMods.push('bootstrap.ts', 'hmr.ts', 'nomodule.ts')
+            precompileMods.push('hmr.ts')
         }
         for (const mod of precompileMods) {
             if (devPort) {
@@ -705,24 +627,10 @@ export class Project {
         }
         await this._createMainModule()
 
+        // loading renderer
         const amlUrlPreifx = getAlephModuleLocalUrlPreifx()
         const { renderPage } = await import('file://' + this.#modules.get(`//${amlUrlPreifx}/renderer.js`)!.jsFile)
         this.#renderer = { renderPage }
-
-        log.info(colors.bold(`Aleph.js v${version}`))
-        log.info(colors.bold('- Global'))
-        if (this.config.__file) {
-            log.info('  ✓', this.config.__file)
-        }
-        if (this.#modules.has('/app.js')) {
-            log.info('  ✓', 'Custom App')
-        }
-        if (this.#modules.has('/404.js')) {
-            log.info('  ✓', 'Custom 404 Page')
-        }
-        if (this.#modules.has('/loading.js')) {
-            log.info('  ✓', 'Custom Loading Page')
-        }
 
         if (this.isDev) {
             if (this.#apiRouting.paths.length > 0) {
@@ -743,6 +651,7 @@ export class Project {
         }
     }
 
+    /** watch file changes, re-compile modules and send HMR signal. */
     private async _watch() {
         const w = Deno.watchFs(this.srcDir, { recursive: true })
         log.info('Start watching code changes...')
@@ -832,7 +741,7 @@ export class Project {
                                     if (shouldUpdateMainModule) {
                                         this._createMainModule()
                                     }
-                                    this._updateDependency(path, mod.hash, ({ id, hash }) => {
+                                    this._updateHash(path, mod.hash, ({ id, hash }) => {
                                         if (id.startsWith('/pages/')) {
                                             this.#rendered.delete(getPagePath(id))
                                         }
@@ -868,11 +777,13 @@ export class Project {
         }
     }
 
+    /** returns the route module by giving module id and hash. */
     private _getRouteModule({ id, hash }: Module): RouteModule {
         const deps = this._lookupDeps(id).filter(({ isData, isStyle }) => !!isData || !!isStyle).map(({ external, ...rest }) => rest)
         return { id, hash, deps: deps.length > 0 ? deps : undefined }
     }
 
+    /** returns a module by giving url. */
     private _moduleFromURL(url: string): Module {
         const isRemote = reHttp.test(url)
         const localUrl = fixImportUrl(url)
@@ -905,6 +816,7 @@ export class Project {
         } as Module
     }
 
+    /** create re-compiled main module. */
     private async _createMainModule(): Promise<Module> {
         const amlUrlPreifx = getAlephModuleLocalUrlPreifx()
         const { baseUrl, defaultLocale } = this.config
@@ -935,6 +847,7 @@ export class Project {
         return module
     }
 
+    /** preprocess a style with postcss pluings */
     private async _preprocessStyle(sourceCode: string, isLess: boolean) {
         let css: string = sourceCode
         if (isLess) {
@@ -963,8 +876,8 @@ export class Project {
         return css
     }
 
-    // todo: force recompile remote modules which URL don't specify version
-    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean }) {
+    /** download and compile a moudle by giving url, then cache on the disk. */
+    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean, bundleMode?: boolean }) {
         const mod = this._moduleFromURL(url)
 
         if (this.#modules.has(mod.id) && !options?.forceCompile && !options?.sourceCode) {
@@ -1126,6 +1039,7 @@ export class Project {
                     sourceType: mod.loader,
                     sourceMap: this.isDev || this.config.sourceMap,
                     isDev: this.isDev,
+                    bundleMode: !!options?.bundleMode,
                 }
                 const { code, map, deps, inlineStyles } = transpileSync(sourceCode, {
                     url,
@@ -1260,7 +1174,8 @@ export class Project {
         return mod
     }
 
-    private _updateDependency(depUrl: string, depHash: string, callback: (mod: Module) => void) {
+    /** update module hash since the dependency changed. */
+    private _updateHash(depUrl: string, depHash: string, callback: (mod: Module) => void) {
         this.#modules.forEach(mod => {
             for (const dep of mod.deps) {
                 if (dep.url === depUrl) {
@@ -1296,7 +1211,7 @@ export class Project {
                         }
                         callback(mod)
                         log.debug('update dependency:', mod.url, '<-', depUrl)
-                        this._updateDependency(mod.url, mod.hash, callback)
+                        this._updateHash(mod.url, mod.hash, callback)
                     }
                     break
                 }
@@ -1304,6 +1219,73 @@ export class Project {
         })
     }
 
+    /** bundle modules for production. */
+    private async _bundle() {
+
+    }
+
+    /** optimize images for production. */
+    private async _optimize() {
+
+    }
+
+    /** render all pages in routing. */
+    private async _ssg() {
+        const { ssr } = this.config
+        const outputDir = path.join(this.srcDir, this.config.outputDir)
+        const SPAIndexHtml = await this.getSPAIndexHtml()
+
+        if (ssr) {
+            log.info(colors.bold('- Pages (SSG)'))
+            const paths = new Set(this.#pageRouting.paths)
+            if (typeof ssr === 'object' && ssr.staticPaths) {
+                ssr.staticPaths.forEach(path => paths.add(path))
+            }
+            await Promise.all(Array.from(paths).map(async pathname => {
+                if (this.isSSRable(pathname)) {
+                    const [status, html, data] = await this.getPageHtml({ pathname })
+                    if (status == 200) {
+                        const htmlFile = path.join(outputDir, pathname, 'index.html')
+                        await ensureTextFile(htmlFile, html)
+                        if (data) {
+                            const dataFile = path.join(outputDir, '_aleph/data', pathname, 'data.js')
+                            await ensureTextFile(dataFile, `export default ` + JSON.stringify(data))
+                        }
+                        log.info('  ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
+                    } else if (status == 404) {
+                        log.info('  ○', colors.dim(pathname), colors.red(`Page not found`))
+                    } else if (status == 500) {
+                        log.info('  ○', colors.dim(pathname), colors.red(`Error 500`))
+                    }
+                }
+            }))
+            const fbHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback.html')
+            await ensureTextFile(fbHtmlFile, SPAIndexHtml)
+        } else {
+            await ensureTextFile(path.join(outputDir, 'index.html'), SPAIndexHtml)
+        }
+
+        // write 404 page
+        const { baseUrl } = this.config
+        const { url, head, scripts, body, data } = await this._render404Page()
+        const mainModule = this.#modules.get('/main.js')!
+        const e404PageHtml = createHtml({
+            lang: url.locale,
+            head: head,
+            scripts: [
+                data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
+                { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
+                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js${this.isDev ? '?dev' : ''}`), nomodule: true },
+                ...this.getPreloadScripts(),
+                ...scripts
+            ],
+            body,
+            minify: !this.isDev
+        })
+        await ensureTextFile(path.join(outputDir, '404.html'), e404PageHtml)
+    }
+
+    /** render page base the giving location. */
     private async _renderPage(loc: { pathname: string, search?: string }) {
         const start = performance.now()
         const [url, pageModuleTree] = this.#pageRouting.createRouter(loc)
@@ -1375,6 +1357,7 @@ export class Project {
         return ret
     }
 
+    /** render custom 404 page. */
     private async _render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
         const ret: RenderResult = { url, status: 404, head: [], scripts: [], body: '<main></main>', data: null }
         try {
@@ -1410,6 +1393,7 @@ export class Project {
         return ret
     }
 
+    /** render custom loading page for SPA mode. */
     private async _renderLoadingPage() {
         if (this.#modules.has('/loading.js')) {
             const loadingModule = this.#modules.get('/loading.js')!
