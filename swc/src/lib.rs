@@ -38,6 +38,15 @@ pub struct Options {
 
     #[serde(default)]
     pub swc_options: SWCOptions,
+
+    #[serde(default)]
+    pub is_dev: bool,
+
+    #[serde(default)]
+    pub bundle_mode: bool,
+
+    #[serde(default)]
+    pub bundle_local_paths: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -57,12 +66,6 @@ pub struct SWCOptions {
 
     #[serde(default)]
     pub source_map: bool,
-
-    #[serde(default)]
-    pub is_dev: bool,
-
-    #[serde(default)]
-    pub bundle_mode: bool,
 }
 
 impl Default for SWCOptions {
@@ -73,8 +76,6 @@ impl Default for SWCOptions {
             jsx_fragment_factory: default_pragma_frag(),
             source_type: "".into(),
             source_map: false,
-            is_dev: false,
-            bundle_mode: false,
         }
     }
 }
@@ -121,7 +122,8 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
         opts.url.as_str(),
         opts.import_map,
         Some((opts.react_url, opts.react_dom_url)),
-        opts.swc_options.bundle_mode,
+        opts.bundle_mode,
+        opts.bundle_local_paths,
     )));
     let specify_source_type = match opts.swc_options.source_type.as_str() {
         "js" => Some(SourceType::JavaScript),
@@ -143,7 +145,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
             &EmitOptions {
                 jsx_factory: opts.swc_options.jsx_factory.clone(),
                 jsx_fragment_factory: opts.swc_options.jsx_fragment_factory.clone(),
-                is_dev: opts.swc_options.is_dev,
+                is_dev: opts.is_dev,
                 source_map: opts.swc_options.source_map,
             },
         )

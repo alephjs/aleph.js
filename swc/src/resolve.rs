@@ -25,7 +25,6 @@ use url::Url;
 
 lazy_static! {
   pub static ref HASH_PLACEHOLDER: String = "x".repeat(9);
-  pub static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
   pub static ref RE_ENDS_WITH_VERSION: Regex =
     Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
   pub static ref RE_REACT_URL: Regex =
@@ -69,6 +68,7 @@ pub struct Resolver {
   import_map: ImportMap,
   react_url: Option<(String, String)>,
   bundle_mode: bool,
+  bundle_local_paths: IndexSet<String>,
 }
 
 impl Resolver {
@@ -77,16 +77,22 @@ impl Resolver {
     import_map: ImportHashMap,
     react_url: Option<(String, String)>,
     bundle_mode: bool,
+    bundle_local_paths: Vec<String>,
   ) -> Self {
+    let mut set = IndexSet::<String>::new();
+    for url in bundle_local_paths {
+      set.insert(url);
+    }
     Resolver {
       specifier: specifier.into(),
-      specifier_is_remote: RE_HTTP.is_match(specifier),
+      specifier_is_remote: is_remote_url(specifier),
       builtin_jsx_tags: IndexSet::new(),
       dep_graph: Vec::new(),
       inline_styles: HashMap::new(),
       import_map: ImportMap::from_hashmap(import_map),
       react_url,
       bundle_mode,
+      bundle_local_paths: set,
     }
   }
 
@@ -101,7 +107,7 @@ impl Resolver {
   //  - `/components/foo/./logo.tsx` -> `/components/foo/logo.tsx`
   //  - `/components/foo/../logo.tsx` -> `/components/logo.tsx`
   pub fn fix_import_url(&self, url: &str) -> String {
-    let is_remote = RE_HTTP.is_match(url);
+    let is_remote = is_remote_url(url);
     if !is_remote {
       let mut url = url;
       let mut root = Path::new("");
@@ -202,7 +208,7 @@ impl Resolver {
       }
     }
     let url = url.as_str();
-    let is_remote = RE_HTTP.is_match(url);
+    let is_remote = is_remote_url(url);
     let mut resolved_path = if is_remote {
       if self.specifier_is_remote {
         let mut buf = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
@@ -374,7 +380,10 @@ impl Fold for AlephResolveFold {
                 let mut resolver = self.resolver.borrow_mut();
                 let (resolved_path, fixed_url) =
                   resolver.resolve(import_decl.src.value.as_ref(), false);
-                if resolver.bundle_mode {
+                if resolver.bundle_mode
+                  && (is_remote_url(fixed_url.as_str())
+                    || resolver.bundle_local_paths.contains(fixed_url.as_str()))
+                {
                   let mut var_decls: Vec<VarDeclarator> = vec![];
                   import_decl
                     .specifiers
@@ -449,7 +458,10 @@ impl Fold for AlephResolveFold {
               } else {
                 let mut resolver = self.resolver.borrow_mut();
                 let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
-                if resolver.bundle_mode {
+                if resolver.bundle_mode
+                  && (is_remote_url(fixed_url.as_str())
+                    || resolver.bundle_local_paths.contains(fixed_url.as_str()))
+                {
                   // __ALEPH.export("/pages/index.tsx", "https://esm.sh/react", {"default": "React", "useState": "useState'})
                   let call = CallExpr {
                     span: DUMMY_SP,
@@ -564,7 +576,10 @@ impl Fold for AlephResolveFold {
             ModuleDecl::ExportAll(ExportAll { src, .. }) => {
               let mut resolver = self.resolver.borrow_mut();
               let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
-              if resolver.bundle_mode {
+              if resolver.bundle_mode
+                && (is_remote_url(fixed_url.as_str())
+                  || resolver.bundle_local_paths.contains(fixed_url.as_str()))
+              {
                 // __ALEPH.export_star("/pages/index.tsx", "https://esm.sh/react")
                 let call = CallExpr {
                   span: DUMMY_SP,
@@ -695,6 +710,10 @@ impl Fold for AlephResolveFold {
   }
 }
 
+pub fn is_remote_url(url: &str) -> bool {
+  return url.starts_with("https://") || url.starts_with("http://");
+}
+
 fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
   let callee = match &call.callee {
     ExprOrSuper::Super(_) => return false,
@@ -763,7 +782,7 @@ mod tests {
 
   #[test]
   fn test_resolver_fix_import_url() {
-    let resolver = Resolver::new("/app.tsx", ImportHashMap::default(), None, false);
+    let resolver = Resolver::new("/app.tsx", ImportHashMap::default(), None, false, vec![]);
     assert_eq!(
       resolver.fix_import_url("https://esm.sh/react"),
       "/-/esm.sh/react.js"
@@ -826,6 +845,7 @@ mod tests {
         "https://esm.sh/react-dom@17.0.1".into(),
       )),
       false,
+      vec![],
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react", false),
@@ -924,6 +944,7 @@ mod tests {
       ImportHashMap::default(),
       None,
       false,
+      vec![],
     );
     assert_eq!(
       resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js", false),
@@ -946,6 +967,7 @@ mod tests {
       ImportHashMap::default(),
       None,
       false,
+      vec![],
     );
     assert_eq!(
       resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js", false),

@@ -1,7 +1,7 @@
 import { default as init_wasm, transformSync } from './aleph_swc.js';
 import getWasmData from './aleph_swc_wasm.js';
 
-type ImportMap = Record<string, string[]>
+type ImportMap = Record<string, ReadonlyArray<string>>
 
 export interface SWCOptions {
     target?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
@@ -9,8 +9,6 @@ export interface SWCOptions {
     jsxFragmentFactory?: string
     sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
     sourceMap?: boolean
-    isDev?: boolean,
-    bundleMode?: boolean,
 }
 
 export interface TransformOptions {
@@ -19,6 +17,9 @@ export interface TransformOptions {
     reactUrl?: string,
     reactDomUrl?: string,
     swcOptions?: SWCOptions
+    isDev?: boolean,
+    bundleMode?: boolean,
+    bundleLocalPaths?: string[],
 }
 
 interface DependencyDescriptor {

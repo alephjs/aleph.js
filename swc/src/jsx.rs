@@ -2,7 +2,7 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::aleph::VERSION;
-use crate::resolve::{DependencyDescriptor, InlineStyle, Resolver, RE_HTTP};
+use crate::resolve::{is_remote_url, DependencyDescriptor, InlineStyle, Resolver};
 
 use rand::{distributions::Alphanumeric, Rng};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
@@ -72,7 +72,7 @@ impl AlephJsxFold {
                                 }) => {
                                     let key = id.sym.as_ref();
                                     let value = value.as_ref();
-                                    if (key == "href" && RE_HTTP.is_match(value))
+                                    if (key == "href" && is_remote_url(value))
                                         || (key == "target" && value == "_blank")
                                     {
                                         should_replace = false

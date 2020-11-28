@@ -313,6 +313,7 @@ mod tests {
       ImportHashMap::default(),
       None,
       false,
+      vec![],
     )));
     let (code, maybe_map) = module
       .transpile(resolver.clone(), &EmitOptions::default())
@@ -354,6 +355,7 @@ mod tests {
       },
       None,
       false,
+      vec![],
     )));
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
@@ -408,6 +410,7 @@ mod tests {
       ImportHashMap::default(),
       None,
       false,
+      vec![],
     )));
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
@@ -451,6 +454,7 @@ mod tests {
       ImportHashMap::default(),
       None,
       false,
+      vec![],
     )));
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
@@ -558,6 +562,7 @@ mod tests {
       ImportHashMap::default(),
       None,
       false,
+      vec![],
     )));
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
@@ -582,11 +587,13 @@ mod tests {
     import React, { useState, useEffect as useEffect_ } from "https://esm.sh/react"
     import * as React_ from "https://esm.sh/react"
     import Logo from '../components/logo.ts'
+    import Nav from '../components/nav.ts'
     import '../shared/iife.ts'
     export default function Index() {
       return (
         <>
           <Logo />
+          <Nav />
           <h1>Hello World</h1>
         </>
       )
@@ -599,6 +606,7 @@ mod tests {
       ImportHashMap::default(),
       None,
       true,
+      vec!["/components/logo.ts".into(), "/shared/iife.ts".into()],
     )));
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
@@ -609,6 +617,8 @@ mod tests {
     assert!(code.contains("useEffect_ = __ALEPH.pack[\"https://esm.sh/react\"].useEffect"));
     assert!(code.contains("React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("Logo = __ALEPH.pack[\"/components/logo.ts\"].default"));
+    assert!(!code.contains("Nav = __ALEPH.pack[\"/components/nav.ts\"].default"));
+    assert!(code.contains("import Nav from \""));
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
   }
 
@@ -626,6 +636,7 @@ mod tests {
       ImportHashMap::default(),
       None,
       true,
+      vec![],
     )));
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
