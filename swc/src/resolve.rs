@@ -28,7 +28,6 @@ lazy_static! {
   pub static ref RE_HTTP: Regex = Regex::new(r"^https?://").unwrap();
   pub static ref RE_ENDS_WITH_VERSION: Regex =
     Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
-  pub static ref RE_JS_MODULE: Regex = Regex::new(r"\.(js|jsx|mjs|ts|tsx)$").unwrap();
   pub static ref RE_REACT_URL: Regex =
     Regex::new(r"^https?://[a-z0-9\-.:]+/react(@[0-9a-z\.\-]+)?(/|\?|$)").unwrap();
   pub static ref RE_REACT_DOM_URL: Regex =
@@ -206,43 +205,37 @@ impl Resolver {
     let is_remote = RE_HTTP.is_match(url);
     let mut resolved_path = if is_remote {
       if self.specifier_is_remote {
-        let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
-        specifier_path.pop();
-        diff_paths(self.fix_import_url(url), specifier_path.to_str().unwrap()).unwrap()
+        let mut buf = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
+        buf.pop();
+        diff_paths(self.fix_import_url(url), buf.to_str().unwrap()).unwrap()
       } else {
-        let mut specifier_path = PathBuf::from(self.specifier.as_str());
-        specifier_path.pop();
-        diff_paths(self.fix_import_url(url), specifier_path.to_str().unwrap()).unwrap()
+        let mut buf = PathBuf::from(self.specifier.as_str());
+        buf.pop();
+        diff_paths(self.fix_import_url(url), buf.to_str().unwrap()).unwrap()
       }
     } else {
       if self.specifier_is_remote {
         let mut new_url = Url::from_str(self.specifier.as_str()).unwrap();
-        let mut pathname = PathBuf::from(url);
-        let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
-        specifier_path.pop();
-        if !url.starts_with("/") {
+        if url.starts_with("/") {
+          new_url.set_path(url);
+        } else {
           let mut buf = PathBuf::from(new_url.path());
           buf.pop();
           buf.push(url);
-          pathname = RelativePath::new(buf.to_str().unwrap())
-            .normalize()
-            .to_path(Path::new(""))
+          let path = "/".to_owned()
+            + RelativePath::new(buf.to_str().unwrap())
+              .normalize()
+              .as_str();
+          new_url.set_path(path.as_str());
         }
-        new_url.set_path(pathname.to_str().unwrap());
-        diff_paths(
-          self.fix_import_url(new_url.as_str()),
-          specifier_path.to_str().unwrap(),
-        )
-        .unwrap()
+        let mut buf = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
+        buf.pop();
+        diff_paths(self.fix_import_url(new_url.as_str()), buf.to_str().unwrap()).unwrap()
       } else {
-        if url.starts_with("@/") {
-          let mut specifier_path = PathBuf::from(self.specifier.as_str());
-          specifier_path.pop();
-          diff_paths(
-            url.trim_start_matches("@"),
-            specifier_path.to_str().unwrap(),
-          )
-          .unwrap()
+        if url.starts_with("/") || url.starts_with("@/") {
+          let mut buf = PathBuf::from(self.specifier.as_str());
+          buf.pop();
+          diff_paths(url.trim_start_matches("@"), buf.to_str().unwrap()).unwrap()
         } else {
           PathBuf::from(url)
         }
@@ -292,32 +285,32 @@ impl Resolver {
     } else {
       if self.specifier_is_remote {
         let mut new_url = Url::from_str(self.specifier.as_str()).unwrap();
-        let mut pathname = PathBuf::from(url);
-        let mut specifier_path = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
-        specifier_path.pop();
-        if !url.starts_with("/") {
+        if url.starts_with("/") {
+          new_url.set_path(url);
+        } else {
           let mut buf = PathBuf::from(new_url.path());
           buf.pop();
           buf.push(url);
-          pathname = RelativePath::new(buf.to_str().unwrap())
-            .normalize()
-            .to_path(Path::new(""))
+          let path = "/".to_owned()
+            + RelativePath::new(buf.to_str().unwrap())
+              .normalize()
+              .as_str();
+          new_url.set_path(path.as_str());
         }
-        new_url.set_path(pathname.to_slash().unwrap().as_str());
         new_url.as_str().into()
       } else {
-        if url.starts_with("@/") {
-          url.trim_start_matches("@").into()
-        } else if url.starts_with("/") {
+        if url.starts_with("/") {
           url.into()
+        } else if url.starts_with("@/") {
+          url.trim_start_matches("@").into()
         } else {
           let mut buf = PathBuf::from(self.specifier.as_str());
           buf.pop();
           buf.push(url);
-          let path = RelativePath::new(buf.to_str().unwrap())
-            .normalize()
-            .to_path(Path::new(""));
-          path.to_slash().unwrap()
+          "/".to_owned()
+            + RelativePath::new(buf.to_str().unwrap())
+              .normalize()
+              .as_str()
         }
       }
     };
