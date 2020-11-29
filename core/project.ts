@@ -1260,10 +1260,13 @@ export class Project {
         const header = `
             const __ALEPH = window.__ALEPH || (window.__ALEPH = {
                 pack: {},
-                export: (specifier, url, exports) => {
+                import: (url) => {
 
                 },
-                exportStar: (specifier, url) => {
+                export: (specifier, name, expr) => {
+
+                },
+                exportFrom: (specifier, url, exports) => {
 
                 }
             });
