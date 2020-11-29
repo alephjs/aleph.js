@@ -63,7 +63,6 @@ export async function renderPage(
         scriptsElements: new Map()
     }
     const buildMode = Deno.env.get('__buildMode')
-    const buildTarget = Deno.env.get('__buildTarget')
     const data: Record<string, any> = {}
     const useDenEvent = `useDeno://${url.pathname + '?' + url.query.toString()}`
     const useDenoAsyncCalls: Array<Promise<any>> = []
@@ -167,7 +166,7 @@ export async function renderPage(
 
     await Promise.all(styles?.filter(({ url }) => !url.startsWith("#inline-style-")).map(({ url, hash }) => {
         const path = reHttp.test(url) ? url.replace(reHttp, '/-/') : `${url}.${hash.slice(0, hashShort)}`
-        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}.${buildTarget}/${path}.js`))
+        return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}/${path}.js`))
     }) || [])
     styles?.forEach(({ url }) => {
         if (serverStyles.has(url)) {

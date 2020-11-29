@@ -54,10 +54,8 @@ export interface Config {
     plugins?: Plugin[]
     /** A list of plugin of PostCSS. */
     postcss?: { plugins: (string | { name: string, options: Record<string, any> })[] }
-    /** `buildTarget` specifies the build target for **swc**, default is **es2020**. */
-    buildTarget?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
-    /** Enable sourceMap in **production** mode (default is **false**). */
-    sourceMap?: boolean
+    /** `buildTarget` specifies the build target for **swc** in production mode (default is **es5**). */
+    buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable) */
     env?: Record<string, string>
 }

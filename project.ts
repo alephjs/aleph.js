@@ -1,6 +1,7 @@
+import { ECMA } from "https://esm.sh/terser@5.3.2/tools/terser.d.ts"
 import { Request } from './api.ts'
 import type { AcceptedPlugin, ServerRequest } from './deps.ts'
-import { CleanCSS, colors, ensureDir, less, marked, minify, path, postcss, readerFromStreamReader, safeLoadFront, Sha1, walk } from './deps.ts'
+import { CleanCSS, colors, ensureDir, less, marked, minify, path, postcss, readerFromStreamReader, safeLoadFront, Sha1, Sha256, walk } from './deps.ts'
 import { EventEmitter } from './events.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from './fs.ts'
 import { createHtml } from './html.ts'
@@ -23,6 +24,7 @@ interface Module {
     jsFile: string
     jsContent: string
     jsSourceMap: string | null
+    error: Error | null
 }
 
 interface DependencyDescriptor {
@@ -71,6 +73,8 @@ export class Project {
     #rendered: Map<string, Map<string, RenderResult>> = new Map()
     #postcssPlugins: Record<string, AcceptedPlugin> = {}
     #cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
+    #denoCacheDir = ''
+    #reload = false
 
     constructor(appDir: string, mode: 'development' | 'production', reload = false) {
         this.appRoot = path.resolve(appDir)
@@ -85,8 +89,7 @@ export class Project {
             ssr: {
                 fallback: '_fallback.html'
             },
-            buildTarget: 'es2020',
-            sourceMap: false,
+            buildTarget: 'es5',
             reactUrl: 'https://esm.sh/react@17.0.1',
             reactDomUrl: 'https://esm.sh/react-dom@17.0.1',
             plugins: [],
@@ -117,7 +120,7 @@ export class Project {
     }
 
     get buildDir() {
-        return path.join(this.appRoot, '.aleph', this.mode + '.' + this.config.buildTarget)
+        return path.join(this.appRoot, '.aleph', this.mode)
     }
 
     isHMRable(moduleID: string) {
@@ -377,6 +380,17 @@ export class Project {
             Object.assign(this.importMap, { imports, scopes })
         }
 
+        const p = Deno.run({
+            cmd: ['deno', 'info'],
+            stdout: 'piped',
+            stderr: 'null'
+        })
+        this.#denoCacheDir = (new TextDecoder).decode(await p.output()).split('"')[1]
+        p.close()
+        if (!existsDirSync(this.#denoCacheDir)) {
+            throw new Error("invalid deno cache dir")
+        }
+
         const config: Record<string, any> = {}
         for (const name of Array.from(['aleph.config', 'config']).map(name => ['ts', 'js', 'mjs', 'json'].map(ext => `${name}.${ext}`)).flat()) {
             const p = path.join(this.appRoot, name)
@@ -422,7 +436,7 @@ export class Project {
         if (util.isNEString(baseUrl)) {
             Object.assign(this.config, { baseUrl: util.cleanPath(encodeURI(baseUrl)) })
         }
-        if (/^es(20\d{2}|next)$/i.test(buildTarget)) {
+        if (/^es(20\d{2}|5)$/i.test(buildTarget)) {
             Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
         }
         if (typeof sourceMap === 'boolean') {
@@ -497,6 +511,7 @@ export class Project {
         }
 
         if (reload) {
+            this.#reload = true
             if (existsDirSync(this.buildDir)) {
                 await Deno.remove(this.buildDir, { recursive: true })
             }
@@ -560,7 +575,6 @@ export class Project {
             ...this.config.env,
             __version: version,
             __buildMode: this.mode,
-            __buildTarget: this.config.buildTarget,
         }).forEach(([key, value]) => Deno.env.set(key, value))
 
         // change current work dir to appDoot
@@ -622,6 +636,11 @@ export class Project {
             }
         }
         await this._createMainModule()
+
+        // reload end
+        if (reload) {
+            this.#reload = false
+        }
 
         // loading renderer
         const amlUrlPreifx = getAlephModuleLocalUrlPreifx()
@@ -808,7 +827,8 @@ export class Project {
             deps: [],
             jsFile: '',
             jsContent: '',
-            jsSourceMap: '',
+            jsSourceMap: null,
+            error: null,
         } as Module
     }
 
@@ -934,21 +954,18 @@ export class Project {
                 } catch (err) {
                     throw new Error(`Download ${url}: ${err.message}`)
                 }
-            } else if (mod.sourceHash === '' || !reFullVersion.test(url)) {
-                log.info('Download', url, dlUrl != url ? colors.dim(`• ${dlUrl}`) : '')
+            } else if (mod.sourceHash === '' || !reFullVersion.test(dlUrl)) {
                 try {
-                    const resp = await fetch(dlUrl)
-                    if (resp.status != 200) {
-                        throw new Error(`Download ${url}: ${resp.status} - ${resp.statusText}`)
-                    }
-                    sourceContent = await Deno.readAll(readerFromStreamReader(resp.body!.getReader()))
+                    sourceContent = await this._loadDependency(dlUrl)
                     const sourceHash = getHash(sourceContent)
                     if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
                         shouldCompile = true
                     }
                 } catch (err) {
-                    throw new Error(`Download ${url}: ${err.message}`)
+                    log.error(`dependency '${url}' not found`)
+                    mod.error = err
+                    return mod
                 }
             }
         } else {
@@ -963,6 +980,7 @@ export class Project {
             } catch (err) {
                 if (err instanceof Deno.errors.NotFound) {
                     log.error(`module '${filepath}' not found`)
+                    mod.error = err
                     return mod
                 }
                 throw err
@@ -1019,7 +1037,11 @@ export class Project {
                     `    }`,
                     `    return () => anchors.forEach(a => a.removeEventListener("click", onClick));`,
                     `  }, []);`,
-                    `  return React.createElement("div", {className: "markdown-page", ref, dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}});`,
+                    `  return React.createElement("div", {`,
+                    `    className: "markdown-page",`,
+                    `    ref,`,
+                    `    dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}`,
+                    `  });`,
                     `}`,
                     `MarkdownPage.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
                     this.isDev && `_s(MarkdownPage, "useRef{ref}\\nuseEffect{}");`,
@@ -1028,9 +1050,9 @@ export class Project {
                 mod.jsSourceMap = null
             } else if (mod.loader === 'js' || mod.loader === 'ts' || mod.loader === 'jsx' || mod.loader === 'tsx') {
                 const swcOptions: SWCOptions = {
-                    target: !!options?.es5 ? 'es5' : this.config.buildTarget,
+                    target: 'es2020',
                     sourceType: mod.loader,
-                    sourceMap: this.isDev || this.config.sourceMap,
+                    sourceMap: true,
                 }
                 const { code, map, deps, inlineStyles } = transpileSync(sourceCode, {
                     url,
@@ -1109,7 +1131,7 @@ export class Project {
         }
 
         // compile deps
-        for (const dep of mod.deps.filter(({ url, external }) => !url.startsWith('#useDeno-') && !url.startsWith('#inline-style-') && !external)) {
+        for (const dep of mod.deps.filter(({ url, external }) => !url.startsWith('#') && !external)) {
             const depMod = await this._compile(dep.url)
             if (depMod.loader === 'css' && !dep.isStyle) {
                 dep.isStyle = true
@@ -1199,6 +1221,32 @@ export class Project {
         })
     }
 
+    /** load dependency conentent, use deno builtin cache system */
+    private async _loadDependency(url: string): Promise<Uint8Array> {
+        const { protocol, hostname, port, pathname, search } = new URL(url)
+        const versioned = reFullVersion.test(pathname)
+        const dir = path.join(this.#denoCacheDir, 'deps', util.trimSuffix(protocol, ':'), hostname + (port ? '_PORT' + port : ''))
+        const filename = path.join(dir, (new Sha256()).update(pathname + search).hex())
+
+        if (versioned && !this.#reload && existsFileSync(filename)) {
+            return await Deno.readFile(filename)
+        }
+
+        const p = Deno.run({
+            cmd: ['deno', 'cache', this.#reload || !versioned ? '--reload' : '', url].filter(Boolean),
+            stdout: 'inherit',
+            stderr: 'inherit'
+        })
+        await p.status()
+        p.close()
+
+        if (existsFileSync(filename)) {
+            return await Deno.readFile(filename)
+        } else {
+            throw new Error(`not found`)
+        }
+    }
+
     /** bundle modules for production. */
     private async _bundle() {
         const refCounter = new Map<string, number>()
@@ -1238,12 +1286,12 @@ export class Project {
 
     private async _runBundle(name: string, list: string[]) {
         const header = `
-            var __ALEPH = window.__ALEPH || (window.__ALEPH = {
+            const __ALEPH = window.__ALEPH || (window.__ALEPH = {
                 pack: {},
-                export: function(specifier, url, exports) {
+                export: (specifier, url, exports) => {
 
                 },
-                exportStar: function(specifier, url) {
+                exportStar: (specifier, url) => {
 
                 }
             });
@@ -1253,8 +1301,8 @@ export class Project {
             const mod = this.getModule(id)!
             if (mod) {
                 return [
-                    `import * as mod_${i} from "file://${mod.jsFile}"`,
-                    `__ALEPH.pack["${url}"] = mod_${i}`
+                    `import * as mod${i} from "${mod.jsFile}"`,
+                    `__ALEPH.pack["${url}"] = mod${i}`
                 ]
             }
             return []
@@ -1263,13 +1311,13 @@ export class Project {
         const bundleFile = path.join(this.buildDir, name + '.js')
 
         if (existsFileSync(bundleFile)) {
-            !Deno.remove(bundleFile)
+            Deno.remove(bundleFile)
         }
         await Deno.writeTextFile(entryFile, header + '\n' + imports)
 
         // run deno bundle
         const p = Deno.run({
-            cmd: ['deno', 'bundle', '--no-check', entryFile, bundleFile].filter(Boolean),
+            cmd: ['deno', 'bundle', '--no-check', entryFile, bundleFile],
             stdout: 'null',
             stderr: 'piped'
         })
@@ -1284,21 +1332,24 @@ export class Project {
 
         // compile bundle code to es5
         const sourceCode = await Deno.readTextFile(bundleFile)
-        const { code } = transpileSync(sourceCode, {
+        let { code } = transpileSync(sourceCode, {
             url: '/bundle.js',
             swcOptions: {
-                target: 'es5'
+                target: this.config.buildTarget
             },
         })
-        const { code: codeMini } = await minify(code, {
+        const ret = await minify(code, {
             compress: true,
             mangle: true,
+            ecma: parseInt(util.trimPrefix(this.config.buildTarget, 'es')) as ECMA,
             sourceMap: false
         })
-        if (codeMini) {
-            log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(codeMini.length))}`)
-            await Deno.writeTextFile(bundleFile, codeMini);
+        if (ret.code) {
+            code = ret.code
         }
+
+        log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(code.length))}`)
+        await Deno.writeTextFile(bundleFile, code)
     }
 
     /** optimize images for production. */
@@ -1376,7 +1427,14 @@ export class Project {
                 this.#rendered.set(url.pagePath, new Map())
             }
         }
-        const ret: RenderResult = { url, status: url.pagePath === '' ? 404 : 200, head: [], scripts: [], body: '<main></main>', data: null }
+        const ret: RenderResult = {
+            url,
+            status: url.pagePath === '' ? 404 : 200,
+            head: [],
+            scripts: [],
+            body: '<main></main>',
+            data: null,
+        }
         if (ret.status === 404) {
             if (this.isDev) {
                 log.warn(`page '${url.pathname}' not found`)
@@ -1474,7 +1532,13 @@ export class Project {
         if (this.#modules.has('/loading.js')) {
             const loadingModule = this.#modules.get('/loading.js')!
             const { default: Loading } = await import('file://' + loadingModule.jsFile)
-            const url = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }
+            const url = {
+                locale: this.config.defaultLocale,
+                pagePath: '',
+                pathname: '/',
+                params: {},
+                query: new URLSearchParams()
+            }
 
             const {
                 head,
@@ -1586,7 +1650,14 @@ function fixImportUrl(importUrl: string): string {
         pathname += '_' + search.join(',')
     }
     if (isRemote) {
-        return '/-/' + (url.protocol === 'http:' ? 'http_' : '') + url.hostname + (url.port ? '_' + url.port : '') + pathname + ext
+        return [
+            '/-/',
+            (url.protocol === 'http:' ? 'http_' : ''),
+            url.hostname,
+            (url.port ? '_' + url.port : ''),
+            pathname,
+            ext
+        ].join('')
     }
     const result = pathname + ext
     return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result;
