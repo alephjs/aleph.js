@@ -17,7 +17,7 @@ import log from './log.ts'
 import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
 import {
     cleanupCompilation, colorfulBytesString, createHtml, ensureTextFile, existsDirSync, existsFileSync,
-    fixImportMap, fixImportUrl, getAlephModuleLocalUrlPreifx, getHash, getRelativePath, moduleFromURL
+    fixImportMap, getAlephModuleLocalUrlPreifx, getHash, getRelativePath, moduleFromURL
 } from './util.ts'
 
 /**
@@ -585,7 +585,7 @@ export class Project {
             }
         }
 
-        // craete page routing
+        // create page routing
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.jsx', '.tsx', '.md'] })) {
             const rp = util.trimPrefix(p, pagesDir).split('\\').join('/')
             const mod = await this._compile('/pages' + rp)
@@ -765,9 +765,9 @@ export class Project {
         }
     }
 
-    /** returns the route module by giving module id and hash. */
+    /** returns the route module by given module id and hash. */
     private _getRouteModule({ id, hash }: Module): RouteModule {
-        const deps = this._lookupDeps(id).filter(({ isData, isStyle }) => !!isData || !!isStyle).map(({ external, ...rest }) => rest)
+        const deps = this._lookupDeps(id).filter(({ isData }) => !!isData)
         return { id, hash, deps: deps.length > 0 ? deps : undefined }
     }
 
@@ -827,21 +827,20 @@ export class Project {
         return css
     }
 
-    /** download and compile a moudle by giving url, then cache on the disk. */
-    private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean, es5?: boolean, bundleMode?: boolean }) {
+    /** download and compile a moudle by given url, then cache on the disk. */
+    private async _compile(url: string, options?: { sourceCode?: string, loader?: string, forceCompile?: boolean, bundleMode?: boolean, bundleLocalPaths?: string[] }): Promise<Module> {
         const mod = moduleFromURL(url)
         const bundleMode = !!options?.bundleMode
 
-        if (this.#modules.has(mod.id) && !options?.forceCompile && !options?.sourceCode) {
+        if (this.#modules.has(mod.id) && !options?.forceCompile && !options?.sourceCode && !bundleMode) {
             return this.#modules.get(mod.id)!
         }
 
-        const amlUrlPreifx = getAlephModuleLocalUrlPreifx()
         const name = path.basename(mod.localUrl).replace(reModuleExt, '')
         const saveDir = path.join(this.buildDir, path.dirname(mod.localUrl))
         const metaFile = path.join(saveDir, `${name}.meta.json`)
 
-        if (existsFileSync(metaFile)) {
+        if (!bundleMode && existsFileSync(metaFile)) {
             const { sourceHash, hash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
             const jsFile = path.join(saveDir, name + (mod.isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
             if (util.isNEString(sourceHash) && util.isNEString(hash) && util.isArray(deps) && existsFileSync(jsFile)) {
@@ -930,67 +929,72 @@ export class Project {
         if (shouldCompile) {
             const t = performance.now()
             let sourceCode = (new TextDecoder).decode(sourceContent)
-            for (const plugin of this.config.plugins) {
-                if (plugin.test.test(url) && util.isFunction(plugin.transform)) {
-                    const { code, loader = 'js' } = await plugin.transform(sourceContent, url)
-                    sourceCode = code
-                    mod.loader = loader
-                    break
+            let loader = mod.loader
+            if (!options?.loader) {
+                for (const plugin of this.config.plugins) {
+                    if (plugin.test.test(url) && util.isFunction(plugin.transform)) {
+                        const { code, loader: pluginLodaer = 'js' } = await plugin.transform(sourceContent, url)
+                        sourceCode = code
+                        loader = pluginLodaer
+                        mod.loader = pluginLodaer
+                        break
+                    }
                 }
+            } else {
+                loader = options.loader
             }
             mod.deps = []
-            if (mod.loader === 'css') {
+            if (loader === 'css') {
                 const css = await this._preprocessStyle(sourceCode, mod.id.endsWith('.less'))
-                mod.jsContent = [
-                    `import { applyCSS } from ${JSON.stringify(getRelativePath(
-                        path.dirname(fixImportUrl(mod.url)),
-                        `/-/${amlUrlPreifx}/style.js`
-                    ))};`,
-                    `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css}\n` : css)});`,
-                ].join(this.isDev ? '\n' : '')
-                mod.jsSourceMap = null  // todo: sourceMap
-            } else if (mod.loader === 'markdown') {
+                return await this._compile(url, {
+                    ...options,
+                    loader: 'js',
+                    sourceCode: (`
+                        import { applyCSS } from "https://deno.land/x/aleph@v${version}/style.ts";\
+                        applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css}\n` : css)});
+                    `).replaceAll(' '.repeat(24), '').trim(),
+                })
+            } else if (loader === 'markdown') {
                 const { __content, ...props } = safeLoadFront(sourceCode)
                 const html = marked.parse(__content)
-                mod.jsContent = [
-                    this.isDev && `const _s = $RefreshSig$();`,
-                    `import React, { useEffect, useRef } from ${JSON.stringify(getRelativePath(path.dirname(mod.localUrl), fixImportUrl(this.config.reactUrl)))};`,
-                    `import { redirect } from ${JSON.stringify(getRelativePath(path.dirname(mod.localUrl), `/-/${amlUrlPreifx}/anchor.js`))};`,
-                    `export default function MarkdownPage() {`,
-                    this.isDev && `  _s();`,
-                    `  const ref = useRef(null);`,
-                    `  useEffect(() => {`,
-                    `    const anchors = [];`,
-                    `    const onClick = e => {`,
-                    `      e.preventDefault();`,
-                    `      redirect(e.currentTarget.getAttribute("href"));`,
-                    `    };`,
-                    `    if (ref.current) {`,
-                    `      ref.current.querySelectorAll("a").forEach(a => {`,
-                    `        const href = a.getAttribute("href");`,
-                    `        if (href && !/^[a-z0-9]+:/i.test(href)) {`,
-                    `          a.addEventListener("click", onClick, false);`,
-                    `          anchors.push(a);`,
-                    `        }`,
-                    `      });`,
-                    `    }`,
-                    `    return () => anchors.forEach(a => a.removeEventListener("click", onClick));`,
-                    `  }, []);`,
-                    `  return React.createElement("div", {`,
-                    `    className: "markdown-page",`,
-                    `    ref,`,
-                    `    dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}`,
-                    `  });`,
-                    `}`,
-                    `MarkdownPage.meta = ${JSON.stringify(props, undefined, this.isDev ? 4 : undefined)};`,
-                    this.isDev && `_s(MarkdownPage, "useRef{ref}\\nuseEffect{}");`,
-                    this.isDev && `$RefreshReg$(MarkdownPage, "MarkdownPage");`,
-                ].filter(Boolean).map(l => !this.isDev ? String(l).trim() : l).join(this.isDev ? '\n' : '')
-                mod.jsSourceMap = null
-            } else if (mod.loader === 'js' || mod.loader === 'ts' || mod.loader === 'jsx' || mod.loader === 'tsx') {
+                return await this._compile(url, {
+                    ...options,
+                    loader: 'js',
+                    sourceCode: (`
+                        import React, { useEffect, useRef } from ${JSON.stringify(this.config.reactUrl)};
+                        import { redirect } from "https://deno.land/x/aleph@v${version}/anchor.ts";
+                        export default function MarkdownPage() {
+                            const ref = useRef(null);
+                            useEffect(() => {
+                                const anchors = [];
+                                const onClick = e => {
+                                    e.preventDefault();
+                                    redirect(e.currentTarget.getAttribute("href"));
+                                };
+                                if (ref.current) {
+                                    ref.current.querySelectorAll("a").forEach(a => {
+                                        const href = a.getAttribute("href");
+                                        if (href && !/^[a-z0-9]+:/i.test(href)) {
+                                            a.addEventListener("click", onClick, false);
+                                            anchors.push(a);
+                                        }
+                                    });
+                                }
+                                return () => anchors.forEach(a => a.removeEventListener("click", onClick));
+                            }, []);
+                            return React.createElement("div", {
+                                className: "markdown-page",
+                                ref,
+                                dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}
+                            });
+                        }
+                        MarkdownPage.meta = ${JSON.stringify(props, undefined, 4)};
+                    `).replaceAll(' '.repeat(24), '').trim(),
+                })
+            } else if (loader === 'js' || loader === 'ts' || loader === 'jsx' || loader === 'tsx') {
                 const swcOptions: SWCOptions = {
                     target: 'es2020',
-                    sourceType: mod.loader,
+                    sourceType: loader,
                     sourceMap: true,
                 }
                 const { code, map, deps, inlineStyles } = transpileSync(sourceCode, {
@@ -1001,6 +1005,7 @@ export class Project {
                     swcOptions,
                     isDev: this.isDev,
                     bundleMode,
+                    bundleLocalPaths: options?.bundleLocalPaths
                 })
                 mod.jsContent = code
                 mod.jsSourceMap = map!
@@ -1055,10 +1060,10 @@ export class Project {
                     mod.deps.push(dep)
                 })
             } else {
-                throw new Error(`Unknown loader '${mod.loader}'`)
+                throw new Error(`Unknown loader '${loader}'`)
             }
 
-            log.debug(`compile '${url}' in ${Math.round(performance.now() - t)}ms`)
+            log.debug(`compile '${url}' in ${Math.round(performance.now() - t)}ms ${bundleMode ? '(bundle mode)' : ''}`)
 
             if (!fsync) {
                 fsync = true
@@ -1070,12 +1075,14 @@ export class Project {
         }
 
         // compile deps
-        for (const dep of mod.deps.filter(({ url, external }) => !url.startsWith('#') && !external)) {
-            const depMod = await this._compile(dep.url)
+        for (const dep of mod.deps.filter(({ url }) => {
+            return !url.startsWith('#') && (!bundleMode || (!reHttp.test(url) && !options?.bundleLocalPaths?.includes(url)))
+        })) {
+            const depMod = await this._compile(dep.url, { bundleMode, bundleLocalPaths: options?.bundleLocalPaths })
             if (depMod.loader === 'css' && !dep.isStyle) {
                 dep.isStyle = true
             }
-            if (dep.hash === "" || dep.hash !== depMod.hash) {
+            if (dep.hash === '' || dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
                 if (!reHttp.test(dep.url)) {
                     const depImportPath = getRelativePath(
@@ -1084,7 +1091,11 @@ export class Project {
                     )
                     mod.jsContent = mod.jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
                         if (importPath.slice(0, - (hashShort + 4)) === depImportPath) {
-                            return `${key}${spaces}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}`
+                            if (bundleMode) {
+                                return `${key}${spaces}${ql}${depImportPath}.bundling.js${qr}`
+                            } else {
+                                return `${key}${spaces}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}`
+                            }
                         }
                         return s
                     })
@@ -1096,20 +1107,25 @@ export class Project {
             }
         }
 
-        if (fsync) {
-            mod.hash = getHash(mod.jsContent)
-            mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + (bundleMode ? '.bundling' : '') + '.js'
-            await cleanupCompilation(mod.jsFile)
-            await Promise.all([
-                !bundleMode ? ensureTextFile(metaFile, JSON.stringify({
-                    url,
-                    sourceHash: mod.sourceHash,
-                    hash: mod.hash,
-                    deps: mod.deps,
-                }, undefined, 4)) : Promise.resolve(),
-                ensureTextFile(mod.jsFile, mod.jsContent),
-                !bundleMode && mod.jsSourceMap ? ensureTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
-            ])
+        if (!bundleMode) {
+            if (fsync) {
+                mod.hash = getHash(mod.jsContent)
+                mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + (bundleMode ? '.bundling' : '') + '.js'
+                await cleanupCompilation(mod.jsFile)
+                await Promise.all([
+                    ensureTextFile(metaFile, JSON.stringify({
+                        url,
+                        sourceHash: mod.sourceHash,
+                        hash: mod.hash,
+                        deps: mod.deps,
+                    }, undefined, 4)),
+                    ensureTextFile(mod.jsFile, mod.jsContent),
+                    mod.jsSourceMap ? ensureTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
+                ])
+            }
+        } else {
+            mod.jsFile = path.join(saveDir, name + '.bundling.js')
+            await ensureTextFile(mod.jsFile, mod.jsContent)
         }
 
         return mod
@@ -1205,25 +1221,42 @@ export class Project {
         lookup('/main.js')
         lookup('/app.js')
         lookup('/404.js')
-        this.#pageRouting.lookup(path => path.forEach(r => lookup(r.module.id)))
+        this.#pageRouting.lookup(routes => routes.forEach(r => lookup(r.module.id)))
 
         const remoteList: string[] = []
         const localList: string[] = []
         Array.from(refCounter.entries()).forEach(([url, count]) => {
             if (reHttp.test(url)) {
                 remoteList.push(url)
-            } else if (!url.startsWith('#') && !url.startsWith('/pages/') && reModuleExt.test(url) && count > 1) {
+            } else if (!url.startsWith('#') && !url.startsWith('/pages/') && count > 1) {
                 localList.push(url)
             }
         })
+
         log.info('- Bundle')
-        await this._runBundle('deps', remoteList)
+        await this._createBundle('deps', remoteList)
         if (localList.length > 0) {
-            await this._runBundle('shared', localList)
+            await this._createBundle('shared', localList)
         }
+
+        const pageModules: Module[] = []
+        this.#pageRouting.lookup(routes => routes.forEach(({ module: { id } }) => {
+            const mod = this.getModule(id)
+            if (mod) {
+                pageModules.push(mod)
+            }
+        }))
+        await Promise.all(pageModules.map(async mod => {
+            const { jsFile } = await this._compile(mod.url, { bundleMode: true })
+            const bundleFile = util.trimSuffix(jsFile, '.bundling.js') + '.bundle.js'
+            const ok = await this._runDenoBundle(jsFile, bundleFile)
+            if (!ok) {
+                return
+            }
+        }))
     }
 
-    private async _runBundle(name: string, list: string[]) {
+    private async _createBundle(name: string, list: string[]) {
         const header = `
             const __ALEPH = window.__ALEPH || (window.__ALEPH = {
                 pack: {},
@@ -1255,6 +1288,15 @@ export class Project {
         await Deno.writeTextFile(entryFile, header + '\n' + imports)
 
         // run deno bundle
+        const n = await this._runDenoBundle(entryFile, bundleFile)
+        if (!n) {
+            return
+        }
+
+        log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(n))}`)
+    }
+
+    private async _runDenoBundle(entryFile: string, bundleFile: string) {
         const p = Deno.run({
             cmd: ['deno', 'bundle', '--no-check', entryFile, bundleFile],
             stdout: 'null',
@@ -1262,14 +1304,13 @@ export class Project {
         })
         const data = await p.stderrOutput()
         p.close()
-
         if (!existsFileSync(bundleFile)) {
             const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.buildDir, '/aleph.js')
             await Deno.stderr.write((new TextEncoder).encode(msg))
-            return
+            return 0
         }
 
-        // compile bundle code to es5
+        // compile bundle code to `buildTarget`
         const sourceCode = await Deno.readTextFile(bundleFile)
         let { code } = transpileSync(sourceCode, {
             url: '/bundle.js',
@@ -1277,6 +1318,8 @@ export class Project {
                 target: this.config.buildTarget
             },
         })
+
+        // minify code
         const ret = await minify(code, {
             compress: true,
             mangle: true,
@@ -1287,8 +1330,8 @@ export class Project {
             code = ret.code
         }
 
-        log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(code.length))}`)
         await Deno.writeTextFile(bundleFile, code)
+        return code.length
     }
 
     /** optimize images for production. */
@@ -1351,7 +1394,7 @@ export class Project {
         await ensureTextFile(path.join(outputDir, '404.html'), e404PageHtml)
     }
 
-    /** render page base the giving location. */
+    /** render page base the given location. */
     private async _renderPage(loc: { pathname: string, search?: string }) {
         const start = performance.now()
         const [url, pageModuleTree] = this.#pageRouting.createRouter(loc)
@@ -1487,9 +1530,7 @@ export class Project {
                 undefined,
                 undefined,
                 [{ id: '/loading.js', Component: Loading }],
-                [
-                    this._lookupDeps(loadingModule.id).filter(dep => !!dep.isStyle)
-                ].flat()
+                this._lookupDeps(loadingModule.id).filter(dep => !!dep.isStyle)
             )
             return {
                 head,

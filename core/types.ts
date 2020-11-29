@@ -21,7 +21,6 @@ export interface DependencyDescriptor {
     isDynamic?: boolean
     isStyle?: boolean
     isData?: boolean
-    external?: boolean
 }
 
 export interface RenderResult {
