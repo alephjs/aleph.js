@@ -2,7 +2,9 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use crate::aleph::VERSION;
-use crate::resolve::{is_remote_url, DependencyDescriptor, InlineStyle, Resolver};
+use crate::resolve::{
+    create_aleph_pack_var_decl, is_remote_url, DependencyDescriptor, InlineStyle, Resolver,
+};
 
 use rand::{distributions::Alphanumeric, Rng};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
@@ -380,31 +382,50 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
             if name.eq("a") {
                 name = "anchor".to_owned()
             }
-            items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-                span: DUMMY_SP,
-                specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+            let id = quote_ident!(rename_builtin_tag(name.as_str()));
+            if resolver.bundle_mode {
+                items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
                     span: DUMMY_SP,
-                    local: quote_ident!(rename_builtin_tag(name.as_str())),
-                })],
-                src: Str {
-                    span: DUMMY_SP,
-                    value: resolver
-                        .resolve(
-                            format!(
-                                "https://deno.land/x/aleph@v{}/{}.ts",
-                                VERSION.as_str(),
-                                name
-                            )
-                            .as_str(),
-                            false,
+                    kind: VarDeclKind::Var,
+                    declare: false,
+                    decls: vec![create_aleph_pack_var_decl(
+                        id,
+                        format!(
+                            "https://deno.land/x/aleph@v{}/{}.ts",
+                            VERSION.as_str(),
+                            name
                         )
-                        .0
-                        .into(),
-                    has_escape: false,
-                },
-                type_only: false,
-                asserts: None,
-            })));
+                        .as_str(),
+                        Some("default"),
+                    )],
+                }))));
+            } else {
+                items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+                    span: DUMMY_SP,
+                    specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+                        span: DUMMY_SP,
+                        local: id,
+                    })],
+                    src: Str {
+                        span: DUMMY_SP,
+                        value: resolver
+                            .resolve(
+                                format!(
+                                    "https://deno.land/x/aleph@v{}/{}.ts",
+                                    VERSION.as_str(),
+                                    name
+                                )
+                                .as_str(),
+                                false,
+                            )
+                            .0
+                            .into(),
+                        has_escape: false,
+                    },
+                    type_only: false,
+                    asserts: None,
+                })));
+            }
         }
 
         for item in module_items {

@@ -65,10 +65,11 @@ pub struct Resolver {
   pub dep_graph: Vec<DependencyDescriptor>,
   /// inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
+  /// bundle mode
+  pub bundle_mode: bool,
+  bundle_local_paths: IndexSet<String>,
   import_map: ImportMap,
   react_url: Option<(String, String)>,
-  bundle_mode: bool,
-  bundle_local_paths: IndexSet<String>,
 }
 
 impl Resolver {
@@ -736,7 +737,7 @@ fn new_use_deno_hook_ident() -> String {
   ident
 }
 
-fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -> VarDeclarator {
+pub fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -> VarDeclarator {
   let m = Expr::Member(MemberExpr {
     span: DUMMY_SP,
     obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH")))),

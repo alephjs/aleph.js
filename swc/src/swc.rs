@@ -601,6 +601,7 @@ mod tests {
     export default function Index() {
       return (
         <>
+          <head></head>
           <Logo />
           <Nav />
           <h1>Hello World</h1>
@@ -629,6 +630,13 @@ mod tests {
     assert!(!code.contains("Nav = __ALEPH.pack[\"/components/nav.ts\"].default"));
     assert!(code.contains("import Nav from \""));
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
+    assert!(code.contains(
+      format!(
+        "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph@v{}/head.ts\"].default",
+        VERSION.as_str()
+      )
+      .as_str()
+    ));
   }
 
   #[test]
