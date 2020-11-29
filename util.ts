@@ -78,14 +78,6 @@ export default {
                 return false
         }
     },
-    isHttpUrl(url: string) {
-        try {
-            const { protocol } = new URL(url)
-            return protocol === 'https:' || protocol === 'http:'
-        } catch (error) {
-            return false
-        }
-    },
     trimPrefix(s: string, prefix: string): string {
         if (prefix !== '' && s.startsWith(prefix)) {
             return s.slice(prefix.length)
@@ -131,7 +123,7 @@ export default {
     },
     splitPath(path: string): string[] {
         return path
-            .split(/[\/\\]/g)
+            .split(/[\/\\]+/g)
             .map(p => p.trim())
             .filter(p => p !== '' && p !== '.')
             .reduce((path, p) => {

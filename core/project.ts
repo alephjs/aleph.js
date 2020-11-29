@@ -1,28 +1,23 @@
 import { Request } from '../api.ts'
 import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
 import {
-    CleanCSS, colors, ensureDir,
-    less, marked, minify,
-    path, postcss, readerFromStreamReader,
-    safeLoadFront, Sha256, walk
+    CleanCSS, colors, ensureDir, less, marked, minify,
+    path, postcss, readerFromStreamReader, safeLoadFront, Sha256, walk
 } from '../deps.ts'
 import { EventEmitter } from '../events.ts'
 import { getPagePath, RouteModule, Routing } from '../routing.ts'
 import { initSWC, SWCOptions, transpileSync } from '../swc/mod.ts'
 import type { APIHandler, Config, RouterURL } from '../types.ts'
 import util, {
-    hashShort, reFullVersion, reHashJs,
-    reHashResolve, reLocaleID, reMDExt,
-    reModuleExt, reStyleModuleExt
+    hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID,
+    reMDExt, reModuleExt, reStyleModuleExt
 } from '../util.ts'
 import { version } from '../version.ts'
 import log from './log.ts'
 import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
 import {
-    cleanupCompilation, colorfulBytesString, createHtml,
-    ensureTextFile, existsDirSync, existsFileSync,
-    fixImportMap, fixImportUrl, getAlephModuleLocalUrlPreifx,
-    getHash, getRelativePath, moduleFromURL
+    cleanupCompilation, colorfulBytesString, createHtml, ensureTextFile, existsDirSync, existsFileSync,
+    fixImportMap, fixImportUrl, getAlephModuleLocalUrlPreifx, getHash, getRelativePath, moduleFromURL
 } from './util.ts'
 
 /**
@@ -1082,7 +1077,7 @@ export class Project {
             }
             if (dep.hash === "" || dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
-                if (!util.isHttpUrl(dep.url)) {
+                if (!reHttp.test(dep.url)) {
                     const depImportPath = getRelativePath(
                         path.dirname(url),
                         dep.url.replace(reModuleExt, '')
@@ -1215,7 +1210,7 @@ export class Project {
         const remoteList: string[] = []
         const localList: string[] = []
         Array.from(refCounter.entries()).forEach(([url, count]) => {
-            if (util.isHttpUrl(url)) {
+            if (reHttp.test(url)) {
                 remoteList.push(url)
             } else if (!url.startsWith('#') && !url.startsWith('/pages/') && reModuleExt.test(url) && count > 1) {
                 localList.push(url)
@@ -1515,7 +1510,7 @@ export class Project {
         __tracing.add(moduleID)
         __deps.push(...mod.deps.filter(({ url }) => __deps.findIndex(i => i.url === url) === -1))
         mod.deps.forEach(({ url }) => {
-            if (reModuleExt.test(url) && !util.isHttpUrl(url)) {
+            if (reModuleExt.test(url) && !reHttp.test(url)) {
                 this._lookupDeps(url.replace(reModuleExt, '.js'), __deps, __tracing)
             }
         })

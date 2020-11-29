@@ -1,5 +1,5 @@
 import { colors, ensureDir, path, Sha1 } from '../deps.ts'
-import util, { MB, reHashJs, reMDExt, reModuleExt, reStyleModuleExt } from '../util.ts'
+import util, { MB, reHashJs, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from '../util.ts'
 import { version } from '../version.ts'
 import { ImportMap, Module } from './types.ts'
 
@@ -76,7 +76,7 @@ export async function ensureTextFile(name: string, content: string) {
 
 /** returns a module by given url. */
 export function moduleFromURL(url: string): Module {
-    const isRemote = util.isHttpUrl(url)
+    const isRemote = reHttp.test(url)
     const localUrl = fixImportUrl(url)
     const id = (isRemote ? '//' + util.trimPrefix(localUrl, '/-/') : localUrl).replace(reModuleExt, '.js')
     let loader = ''
@@ -167,7 +167,7 @@ export function getRelativePath(from: string, to: string): string {
 
 /** fix import url */
 export function fixImportUrl(importUrl: string): string {
-    const isRemote = util.isHttpUrl(importUrl)
+    const isRemote = reHttp.test(importUrl)
     const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
     let ext = path.extname(path.basename(url.pathname)) || '.js'
     if (isRemote && !reModuleExt.test(ext) && !reStyleModuleExt.test(ext) && !reMDExt.test(ext)) {

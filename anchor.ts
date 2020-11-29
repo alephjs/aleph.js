@@ -39,7 +39,7 @@ export default function Anchor(props: AnchorProps) {
         if (!util.isNEString(propHref)) {
             return ''
         }
-        if (util.isHttpUrl(propHref)) {
+        if (isHttpUrl(propHref)) {
             return propHref
         }
         let [pathname, search] = util.splitBy(propHref, '?')
@@ -72,7 +72,7 @@ export default function Anchor(props: AnchorProps) {
         return undefined
     }, [href, propAriaCurrent])
     const prefetch = useCallback(() => {
-        if (href && !util.isHttpUrl(href) && href !== currentHref && !prefetchedPages.has(href)) {
+        if (href && !isHttpUrl(href) && href !== currentHref && !prefetchedPages.has(href)) {
             events.emit('fetch-page-module', { href })
             prefetchedPages.add(href)
         }
@@ -127,7 +127,7 @@ export async function redirect(url: string, replace?: boolean) {
         return
     }
 
-    if (util.isHttpUrl(url)) {
+    if (isHttpUrl(url)) {
         location.href = url
         return
     }
@@ -139,4 +139,13 @@ export async function redirect(url: string, replace?: boolean) {
         history.pushState(null, '', url)
     }
     events.emit('popstate', { type: 'popstate', resetScroll: true })
+}
+
+function isHttpUrl(url: string) {
+    try {
+        const { protocol } = new URL(url)
+        return protocol === 'https:' || protocol === 'http:'
+    } catch (error) {
+        return false
+    }
 }
