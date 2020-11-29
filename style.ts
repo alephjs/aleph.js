@@ -37,10 +37,29 @@ export default function Style({ children, __styleId: id }: StyleProps) {
     return null
 }
 
+
+const removeTimers = new Map<string, number>()
+
+export function removeCSS(id: string) {
+    const { document } = (window as any)
+    const styleEls = Array.from(document.head.children).filter((el: any) => {
+        return el.getAttribute('data-module-id') === id
+    })
+
+    removeTimers.set(id, setTimeout(() => {
+        removeTimers.delete(id)
+        styleEls.forEach(el => document.head.removeChild(el))
+    }, 500))
+}
+
 export function applyCSS(id: string, css: string, asLink: boolean = false) {
     if (window.Deno) {
         serverStyles.set(id, { css, asLink })
     } else {
+        if (removeTimers.has(id)) {
+            clearTimeout(removeTimers.get(id))
+            removeTimers.delete(id)
+        }
         const { document } = (window as any)
         const styleEl = document.createElement(asLink ? 'link' : 'style')
         const prevStyleEls = Array.from(document.head.children).filter((el: any) => {

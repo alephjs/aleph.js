@@ -2,7 +2,6 @@ import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { ALEPH, getModuleImportUrl } from './aleph.ts'
 import { Route, RouteModule, Routing } from './routing.ts'
-import util, { reHttp } from './util.ts'
 
 export default async function bootstrap({
     routes,
@@ -28,12 +27,6 @@ export default async function bootstrap({
     const pageComponentTree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
     const imports = [...preloadModules, ...pageModuleTree].map(async mod => {
         const { default: C } = await import(getModuleImportUrl(baseUrl, mod))
-        if (mod.deps) {
-            // import async dependencies
-            for (const dep of mod.deps.filter(({ url, isStyle }) => !!isStyle && !url.startsWith('#inline-style-'))) {
-                await import(getModuleImportUrl(baseUrl, { id: util.ensureExt(dep.url.replace(reHttp, '/-/'), '.js'), hash: dep.hash }))
-            }
-        }
         switch (mod.id) {
             case '/app.js':
                 components['App'] = C

@@ -1,4 +1,5 @@
 import type { ComponentType } from 'https://esm.sh/react'
+import { DependencyDescriptor } from './core/types.ts'
 import { E400MissingDefaultExportAsComponent } from './error.ts'
 import type { RouterURL } from './types.ts'
 import util, { reMDExt, reModuleExt } from './util.ts'
@@ -12,7 +13,7 @@ export interface Route {
 export interface RouteModule {
     readonly id: string
     readonly hash: string
-    readonly deps?: { url: string, hash: string, isStyle?: boolean, isData?: boolean }[]
+    readonly deps?: DependencyDescriptor[]
 }
 
 export interface PageProps {

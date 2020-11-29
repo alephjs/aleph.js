@@ -4,7 +4,7 @@ import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './
 import events from './events.ts'
 import { createPageProps, RouteModule, Routing } from './routing.ts'
 import type { RouterURL } from './types.ts'
-import util, { hashShort, reHttp } from './util.ts'
+import util, { hashShort } from './util.ts'
 
 export function ALEPH({ initial }: {
     initial: {
@@ -47,18 +47,12 @@ export function ALEPH({ initial }: {
             const ctree: { id: string, Component?: ComponentType<any> }[] = pageModuleTree.map(({ id }) => ({ id }))
             const imports = pageModuleTree.map(async mod => {
                 const { default: C } = await import(getModuleImportUrl(baseUrl, mod, e.forceRefetch))
-                if (mod.deps) {
-                    // import async dependencies
-                    for (const dep of mod.deps.filter(({ url, isStyle }) => !!isStyle && !url.startsWith('#inline-style-'))) {
-                        await import(getModuleImportUrl(baseUrl, { id: util.ensureExt(dep.url.replace(reHttp, '/-/'), '.js'), hash: dep.hash }, e.forceRefetch))
-                    }
-                    if (mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno.')).length > 0) {
-                        const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : ''))
-                        if (util.isPlainObject(data)) {
-                            for (const key in data) {
-                                const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
-                                Object.assign(window, { [useDenoUrl]: data[key] })
-                            }
+                if (mod.deps && mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno-')).length > 0) {
+                    const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : ''))
+                    if (util.isPlainObject(data)) {
+                        for (const key in data) {
+                            const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
+                            Object.assign(window, { [useDenoUrl]: data[key] })
                         }
                     }
                 }
@@ -143,18 +137,12 @@ export function ALEPH({ initial }: {
             if (url.pagePath !== '') {
                 const imports = pageModuleTree.map(async mod => {
                     await import(getModuleImportUrl(baseUrl, mod))
-                    if (mod.deps) {
-                        // import async dependencies
-                        for (const dep of mod.deps.filter(({ isStyle }) => !!isStyle)) {
-                            await import(getModuleImportUrl(baseUrl, { id: util.ensureExt(dep.url.replace(reHttp, '/-/'), '.js'), hash: dep.hash }))
-                        }
-                        if (mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno.')).length > 0) {
-                            const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`)
-                            if (util.isPlainObject(data)) {
-                                for (const key in data) {
-                                    const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
-                                    Object.assign(window, { [useDenoUrl]: data[key] })
-                                }
+                    if (mod.deps && mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno-')).length > 0) {
+                        const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`)
+                        if (util.isPlainObject(data)) {
+                            for (const key in data) {
+                                const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
+                                Object.assign(window, { [useDenoUrl]: data[key] })
                             }
                         }
                     }
