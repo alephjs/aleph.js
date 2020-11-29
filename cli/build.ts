@@ -1,4 +1,4 @@
-import { Project } from '../project.ts'
+import { Project } from '../core/project.ts'
 
 export const helpMessage = `
 Usage:

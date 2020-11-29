@@ -1,57 +1,35 @@
-import { ECMA } from "https://esm.sh/terser@5.3.2/tools/terser.d.ts"
-import { Request } from './api.ts'
-import type { AcceptedPlugin, ServerRequest } from './deps.ts'
-import { CleanCSS, colors, ensureDir, less, marked, minify, path, postcss, readerFromStreamReader, safeLoadFront, Sha1, Sha256, walk } from './deps.ts'
-import { EventEmitter } from './events.ts'
-import { ensureTextFile, existsDirSync, existsFileSync } from './fs.ts'
-import { createHtml } from './html.ts'
+import { Request } from '../api.ts'
+import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
+import {
+    CleanCSS, colors, ensureDir,
+    less, marked, minify,
+    path, postcss, readerFromStreamReader,
+    safeLoadFront, Sha256, walk
+} from '../deps.ts'
+import { EventEmitter } from '../events.ts'
+import { getPagePath, RouteModule, Routing } from '../routing.ts'
+import { initSWC, SWCOptions, transpileSync } from '../swc/mod.ts'
+import type { APIHandler, Config, RouterURL } from '../types.ts'
+import util, {
+    hashShort, reFullVersion, reHashJs,
+    reHashResolve, reLocaleID, reMDExt,
+    reModuleExt, reStyleModuleExt
+} from '../util.ts'
+import { version } from '../version.ts'
 import log from './log.ts'
-import { getPagePath, RouteModule, Routing } from './routing.ts'
-import { initSWC, SWCOptions, transpileSync } from './swc/mod.ts'
-import type { APIHandler, Config, RouterURL } from './types.ts'
-import util, { hashShort, MB, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
-import { version } from './version.ts'
-
-interface Module {
-    id: string
-    loader: string
-    url: string
-    localUrl: string
-    isRemote: boolean
-    sourceHash: string
-    hash: string
-    deps: DependencyDescriptor[]
-    jsFile: string
-    jsContent: string
-    jsSourceMap: string | null
-    error: Error | null
-}
-
-interface DependencyDescriptor {
-    url: string
-    hash: string
-    isDynamic?: boolean
-    isStyle?: boolean
-    isData?: boolean
-    external?: boolean
-}
-
-interface RenderResult {
-    url: RouterURL
-    status: number
-    head: string[]
-    scripts: Record<string, any>[]
-    body: string
-    data: Record<string, string> | null
-}
-
-type ImportMap = Record<string, ReadonlyArray<string>>
+import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
+import {
+    cleanupCompilation, colorfulBytesString, createHtml,
+    ensureTextFile, existsDirSync, existsFileSync,
+    fixImportMap, fixImportUrl, getAlephModuleLocalUrlPreifx,
+    getHash, getRelativePath, moduleFromURL
+} from './util.ts'
 
 /**
  * A Project to manage the Aleph.js appliaction.
  * core functions include:
- * - compile source code
  * - manage deps
+ * - compile & bundle
  * - apply plugins
  * - map page/API routes
  * - watch file changes
@@ -583,7 +561,7 @@ export class Project {
         // craete api routing
         if (existsDirSync(apiDir)) {
             for await (const { path: p } of walk(apiDir, walkOptions)) {
-                const mod = this._moduleFromURL('/api' + util.trimPrefix(p, apiDir).split('\\').join('/'))
+                const mod = moduleFromURL('/api' + util.trimPrefix(p, apiDir).split('\\').join('/'))
                 mod.hash = getHash(await Deno.readFile(p))
                 this.#apiRouting.update(this._getRouteModule(mod))
             }
@@ -731,7 +709,7 @@ export class Project {
                                 if (this.#modules.has(moduleID)) {
                                     mod = this.#modules.get(moduleID)!
                                 } else {
-                                    mod = this._moduleFromURL(moduleID)
+                                    mod = moduleFromURL(moduleID)
                                 }
                                 Deno.readFile(p).then(content => {
                                     mod.hash = getHash(content)
@@ -798,40 +776,6 @@ export class Project {
         return { id, hash, deps: deps.length > 0 ? deps : undefined }
     }
 
-    /** returns a module by giving url. */
-    private _moduleFromURL(url: string): Module {
-        const isRemote = reHttp.test(url)
-        const localUrl = fixImportUrl(url)
-        const id = (isRemote ? '//' + util.trimPrefix(localUrl, '/-/') : localUrl).replace(reModuleExt, '.js')
-        let loader = ''
-        if (reStyleModuleExt.test(url)) {
-            loader = 'css'
-        } else if (reMDExt.test(url)) {
-            loader = 'markdown'
-        } else if (reModuleExt.test(url)) {
-            loader = url.split('.').pop()!
-            if (loader === 'mjs') {
-                loader = 'js'
-            }
-        } else if (isRemote) {
-            loader = 'js'
-        }
-        return {
-            id,
-            loader,
-            url,
-            isRemote,
-            localUrl,
-            sourceHash: '',
-            hash: '',
-            deps: [],
-            jsFile: '',
-            jsContent: '',
-            jsSourceMap: null,
-            error: null,
-        } as Module
-    }
-
     /** create re-compiled main module. */
     private async _createMainModule(): Promise<Module> {
         const { baseUrl, defaultLocale } = this.config
@@ -890,7 +834,7 @@ export class Project {
 
     /** download and compile a moudle by giving url, then cache on the disk. */
     private async _compile(url: string, options?: { sourceCode?: string, forceCompile?: boolean, es5?: boolean, bundleMode?: boolean }) {
-        const mod = this._moduleFromURL(url)
+        const mod = moduleFromURL(url)
         const bundleMode = !!options?.bundleMode
 
         if (this.#modules.has(mod.id) && !options?.forceCompile && !options?.sourceCode) {
@@ -1138,7 +1082,7 @@ export class Project {
             }
             if (dep.hash === "" || dep.hash !== depMod.hash) {
                 dep.hash = depMod.hash
-                if (!reHttp.test(dep.url)) {
+                if (!util.isHttpUrl(dep.url)) {
                     const depImportPath = getRelativePath(
                         path.dirname(url),
                         dep.url.replace(reModuleExt, '')
@@ -1297,7 +1241,7 @@ export class Project {
             });
         `.replaceAll(' '.repeat(12), '').trim()
         const imports = list.map((url, i) => {
-            const { id } = this._moduleFromURL(url)
+            const { id } = moduleFromURL(url)
             const mod = this.getModule(id)!
             if (mod) {
                 return [
@@ -1571,166 +1515,10 @@ export class Project {
         __tracing.add(moduleID)
         __deps.push(...mod.deps.filter(({ url }) => __deps.findIndex(i => i.url === url) === -1))
         mod.deps.forEach(({ url }) => {
-            if (reModuleExt.test(url) && !reHttp.test(url)) {
+            if (reModuleExt.test(url) && !util.isHttpUrl(url)) {
                 this._lookupDeps(url.replace(reModuleExt, '.js'), __deps, __tracing)
             }
         })
         return __deps
-    }
-}
-
-/** inject HMR and React Fast Referesh helper code  */
-export function injectHmr({ id, localUrl, jsContent }: Module): string {
-    const alephModuleLocalUrlPreifx = getAlephModuleLocalUrlPreifx()
-    let hmrImportPath = getRelativePath(
-        path.dirname(localUrl),
-        `/-/${alephModuleLocalUrlPreifx}/hmr.js`
-    )
-    if (!hmrImportPath.startsWith('.') && !hmrImportPath.startsWith('/')) {
-        hmrImportPath = './' + hmrImportPath
-    }
-
-    const lines = [
-        `import { createHotContext, RefreshRuntime, performReactRefresh } from ${JSON.stringify(hmrImportPath)};`,
-        `import.meta.hot = createHotContext(${JSON.stringify(id)});`
-    ]
-    const reactRefresh = id.endsWith('.js') || id.endsWith('.md') || id.endsWith('.mdx')
-    if (reactRefresh) {
-        lines.push('')
-        lines.push(
-            `const prevRefreshReg = window.$RefreshReg$;`,
-            `const prevRefreshSig = window.$RefreshSig$;`,
-            `Object.assign(window, {`,
-            `    $RefreshReg$: (type, id) => RefreshRuntime.register(type, ${JSON.stringify(id)} + " " + id),`,
-            `    $RefreshSig$: RefreshRuntime.createSignatureFunctionForTransform`,
-            `});`,
-        )
-    }
-    lines.push('')
-    lines.push(jsContent)
-    lines.push('')
-    if (reactRefresh) {
-        lines.push(
-            'window.$RefreshReg$ = prevRefreshReg;',
-            'window.$RefreshSig$ = prevRefreshSig;',
-            'import.meta.hot.accept(performReactRefresh);'
-        )
-    } else {
-        lines.push('import.meta.hot.accept();')
-    }
-    return lines.join('\n')
-}
-
-/** get Aleph.js module local URL preifx */
-function getAlephModuleLocalUrlPreifx(): string {
-    const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-    return devPort ? `http_localhost_${devPort}` : `deno.land/x/aleph@v${version}`
-}
-
-/** get relative the path of `to` to `from` */
-function getRelativePath(from: string, to: string): string {
-    let r = path.relative(from, to).split('\\').join('/')
-    if (!r.startsWith('.') && !r.startsWith('/')) {
-        r = './' + r
-    }
-    return r
-}
-
-/** fix import url */
-function fixImportUrl(importUrl: string): string {
-    const isRemote = reHttp.test(importUrl)
-    const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
-    let ext = path.extname(path.basename(url.pathname)) || '.js'
-    if (isRemote && !reModuleExt.test(ext) && !reStyleModuleExt.test(ext) && !reMDExt.test(ext)) {
-        ext = '.js'
-    }
-    let pathname = util.trimSuffix(url.pathname, ext)
-    let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
-    if (search.length > 0) {
-        pathname += '_' + search.join(',')
-    }
-    if (isRemote) {
-        return [
-            '/-/',
-            (url.protocol === 'http:' ? 'http_' : ''),
-            url.hostname,
-            (url.port ? '_' + url.port : ''),
-            pathname,
-            ext
-        ].join('')
-    }
-    const result = pathname + ext
-    return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result;
-}
-
-/** fix import map */
-function fixImportMap(v: any) {
-    const imports: ImportMap = {}
-    if (util.isPlainObject(v)) {
-        Object.entries(v).forEach(([key, value]) => {
-            if (key == "" || key == "/") {
-                return
-            }
-            const isPrefix = key.endsWith('/')
-            const tmp: string[] = []
-            if (util.isNEString(value)) {
-                if (isPrefix && !value.endsWith('/')) {
-                    return
-                }
-                tmp.push(value)
-            } else if (util.isNEArray(value)) {
-                value.forEach(v => {
-                    if (util.isNEString(v)) {
-                        if (isPrefix && !v.endsWith('/')) {
-                            return
-                        }
-                        tmp.push(v)
-                    }
-                })
-            }
-            imports[key] = tmp
-        })
-    }
-    return imports
-}
-
-/** get hash(sha1) of the content */
-function getHash(content: string | Uint8Array) {
-    const sha1 = new Sha1()
-    sha1.update(content)
-    return sha1.hex()
-}
-
-/**
- * colorful the bytes string
- * - dim: 0 - 1MB
- * - yellow: 1MB - 10MB
- * - red: > 10MB
- */
-function colorfulBytesString(bytes: number) {
-    let cf = colors.dim
-    if (bytes > 10 * MB) {
-        cf = colors.red
-    } else if (bytes > MB) {
-        cf = colors.yellow
-    }
-    return cf(util.bytesString(bytes))
-}
-
-/** cleanup the previous compilation cache */
-async function cleanupCompilation(jsFile: string) {
-    const dir = path.dirname(jsFile)
-    const jsFileName = path.basename(jsFile)
-    if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {
-        return
-    }
-    const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'
-    for await (const entry of Deno.readDir(dir)) {
-        if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
-            const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
-            if (_jsName === jsName && jsFileName !== entry.name) {
-                await Deno.remove(path.join(dir, entry.name))
-            }
-        }
     }
 }

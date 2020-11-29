@@ -1,6 +1,6 @@
 import { FormDataReader } from 'https://deno.land/x/oak@v6.3.2/multipart.ts' // remove it
+import log from './core/log.ts'
 import { brotli, gzipEncode, ServerRequest } from './deps.ts'
-import log from './log.ts'
 import type { APIRequest, FormDataBody } from './types.ts'
 
 export class Request extends ServerRequest implements APIRequest {

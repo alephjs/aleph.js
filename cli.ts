@@ -1,9 +1,8 @@
 import { Request } from './api.ts'
+import log from './core/log.ts'
+import { getContentType } from './core/mime.ts'
+import { createHtml, existsDirSync, existsFileSync } from './core/util.ts'
 import { listenAndServe, path, ServerRequest, walk } from './deps.ts'
-import { existsDirSync, existsFileSync } from './fs.ts'
-import { createHtml } from './html.ts'
-import log from './log.ts'
-import { getContentType } from './mime.ts'
 import util from './util.ts'
 import { version } from './version.ts'
 

@@ -1,6 +1,6 @@
+import log from '../core/log.ts'
+import { ensureTextFile } from '../core/util.ts'
 import { colors, ensureDir, gzipDecode, path, readerFromStreamReader, Untar } from '../deps.ts'
-import { ensureTextFile } from '../fs.ts'
-import log from '../log.ts'
 import util from '../util.ts'
 import { version } from '../version.ts'
 

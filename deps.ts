@@ -20,6 +20,7 @@ export { default as marked } from 'https://esm.sh/marked@1.2.5'
 export { default as postcss } from 'https://esm.sh/postcss@8.1.10'
 export type { AcceptedPlugin } from 'https://esm.sh/postcss@8.1.10'
 export { minify } from 'https://esm.sh/terser@5.3.2'
+export type { ECMA } from 'https://esm.sh/terser@5.3.2'
 export { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.0'
 // verdor/
 export { default as less } from './vendor/less/less.js'
