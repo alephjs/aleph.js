@@ -501,14 +501,15 @@ mod tests {
     assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
     assert!(code.contains("React.createElement(__ALEPH_Head,"));
     assert!(code.contains("React.createElement(__ALEPH_Link,"));
-    assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
-        "__resolved: \"/style/index.css.{}.js\"",
+        "href: \"../style/index.css.{}.js\"",
         HASH_PLACEHOLDER.as_str()
       )
       .as_str()
     ));
+    assert!(code.contains("__url: \"/style/index.css\""));
+    assert!(code.contains("__base: \"/pages\""));
     assert!(code.contains("React.createElement(__ALEPH_Script,"));
     let r = resolver.borrow_mut();
     assert_eq!(

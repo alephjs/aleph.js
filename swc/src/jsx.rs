@@ -8,7 +8,6 @@ use crate::resolve::{
 
 use path_slash::PathBufExt;
 use rand::{distributions::Alphanumeric, Rng};
-use relative_path::RelativePath;
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use swc_common::{FileName, SourceMap, Spanned, DUMMY_SP};
 use swc_ecma_ast::*;
@@ -118,7 +117,8 @@ impl AlephJsxFold {
 
                         if should_replace {
                             let mut href_prop_index: i32 = -1;
-                            let mut resolved_prop_index: i32 = -1;
+                            let mut url_prop_index: i32 = -1;
+                            let mut base_prop_index: i32 = -1;
                             let mut href_prop_value = "";
 
                             for (i, attr) in el.attrs.iter().enumerate() {
@@ -132,8 +132,11 @@ impl AlephJsxFold {
                                             href_prop_index = i as i32;
                                             href_prop_value = value.as_ref();
                                         }
-                                        "__resolved" => {
-                                            resolved_prop_index = i as i32;
+                                        "__url" => {
+                                            url_prop_index = i as i32;
+                                        }
+                                        "__base" => {
+                                            base_prop_index = i as i32;
                                         }
                                         _ => {}
                                     },
@@ -143,17 +146,6 @@ impl AlephJsxFold {
 
                             let (resolved_path, fixed_url) =
                                 resolver.resolve(href_prop_value, true);
-                            let mut buf = PathBuf::from(
-                                resolver
-                                    .fix_import_url(resolver.specifier.as_str())
-                                    .as_str(),
-                            );
-                            buf.pop();
-                            buf.push(resolved_path);
-                            let path = "/".to_owned()
-                                + RelativePath::new(buf.to_slash().unwrap().as_str())
-                                    .normalize()
-                                    .as_str();
 
                             if href_prop_index >= 0 {
                                 el.attrs[href_prop_index as usize] =
@@ -162,25 +154,45 @@ impl AlephJsxFold {
                                         name: JSXAttrName::Ident(quote_ident!("href")),
                                         value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                                             span: DUMMY_SP,
-                                            value: fixed_url.into(),
+                                            value: resolved_path.into(),
                                             has_escape: false,
                                         }))),
                                     });
                             }
 
-                            let resolved_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
+                            let url_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
                                 span: DUMMY_SP,
-                                name: JSXAttrName::Ident(quote_ident!("__resolved")),
+                                name: JSXAttrName::Ident(quote_ident!("__url")),
                                 value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                                     span: DUMMY_SP,
-                                    value: path.into(),
+                                    value: fixed_url.into(),
                                     has_escape: false,
                                 }))),
                             });
-                            if resolved_prop_index >= 0 {
-                                el.attrs[resolved_prop_index as usize] = resolved_attr;
+                            let mut buf = PathBuf::from(
+                                resolver
+                                    .fix_import_url(resolver.specifier.as_str())
+                                    .as_str(),
+                            );
+                            buf.pop();
+                            let base_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                span: DUMMY_SP,
+                                name: JSXAttrName::Ident(quote_ident!("__base")),
+                                value: Some(JSXAttrValue::Lit(Lit::Str(Str {
+                                    span: DUMMY_SP,
+                                    value: buf.to_slash().unwrap().into(),
+                                    has_escape: false,
+                                }))),
+                            });
+                            if url_prop_index >= 0 {
+                                el.attrs[url_prop_index as usize] = url_attr;
                             } else {
-                                el.attrs.push(resolved_attr);
+                                el.attrs.push(url_attr);
+                            }
+                            if base_prop_index >= 0 {
+                                el.attrs[base_prop_index as usize] = base_attr;
+                            } else {
+                                el.attrs.push(base_attr);
                             }
 
                             if name.eq("link") {
