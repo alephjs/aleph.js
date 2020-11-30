@@ -79,6 +79,7 @@ export class Project {
     #cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
     #denoCacheDir = ''
     #reload = false
+    #swcReady = Promise.resolve()
 
     constructor(appDir: string, mode: 'development' | 'production', reload = false) {
         this.appRoot = path.resolve(appDir)
@@ -91,7 +92,7 @@ export class Project {
             env: {},
             locales: [],
             ssr: {
-                fallback: '_fallback.html'
+                fallback: '_fallback_spa.html'
             },
             buildTarget: 'es5',
             reactUrl: 'https://esm.sh/react@17.0.1',
@@ -104,15 +105,7 @@ export class Project {
             }
         }
         this.importMap = { imports: {}, scopes: {} }
-        this.ready = (async () => {
-            log.info(colors.bold(`Aleph.js v${version}`))
-            log.info(colors.bold('- Global'))
-            const t = performance.now()
-            await initSWC()
-            await this._loadConfig()
-            await this._init(reload)
-            log.debug('init project in ' + Math.round(performance.now() - t) + 'ms')
-        })()
+        this.ready = this._init(reload)
     }
 
     get isDev() {
@@ -346,7 +339,7 @@ export class Project {
                 if (n === 0) {
                     log.info(colors.bold('- Public Assets'))
                 }
-                log.info('  ✹', rp.split('\\').join('/'), colors.dim('•'), colorfulBytesString(fi.size))
+                log.info('  ∆', rp.split('\\').join('/'), colors.dim('•'), colorfulBytesString(fi.size))
                 n++
             }
         }
@@ -382,17 +375,6 @@ export class Project {
                 })
             }
             Object.assign(this.importMap, { imports, scopes })
-        }
-
-        const p = Deno.run({
-            cmd: ['deno', 'info'],
-            stdout: 'piped',
-            stderr: 'null'
-        })
-        this.#denoCacheDir = (new TextDecoder).decode(await p.output()).split('"')[1]
-        p.close()
-        if (!existsDirSync(this.#denoCacheDir)) {
-            throw new Error("invalid deno cache dir")
         }
 
         const config: Record<string, any> = {}
@@ -519,6 +501,7 @@ export class Project {
 
     /** initialize project */
     private async _init(reload: boolean) {
+        const t = performance.now()
         const walkOptions = { includeDirs: false, exts: ['.js', '.ts', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
@@ -526,6 +509,21 @@ export class Project {
         if (!(existsDirSync(pagesDir))) {
             log.fatal(`'pages' directory not found.`)
         }
+
+        const p = Deno.run({
+            cmd: ['deno', 'info'],
+            stdout: 'piped',
+            stderr: 'null'
+        })
+        this.#denoCacheDir = (new TextDecoder).decode(await p.output()).split('"')[1]
+        p.close()
+        if (!existsDirSync(this.#denoCacheDir)) {
+            log.fatal("invalid deno cache dir")
+        }
+
+        log.info(colors.bold(`Aleph.js v${version}`))
+        log.info(colors.bold('- Global'))
+        await this._loadConfig()
 
         if (reload) {
             this.#reload = true
@@ -679,6 +677,11 @@ export class Project {
                 log.info('  ○', path, isIndex ? colors.dim('(index)') : '')
             }
         }
+
+        log.debug('init project in ' + Math.round(performance.now() - t) + 'ms')
+
+        // init swc wasm asynchronously
+        this.#swcReady = initSWC(this.#denoCacheDir)
 
         if (this.isDev) {
             this._watch()
@@ -1055,6 +1058,7 @@ export class Project {
                     sourceType: loader,
                     sourceMap: true,
                 }
+                await this.#swcReady
                 const { code, map, deps, inlineStyles } = transpileSync(sourceCode, {
                     url,
                     importMap: this.importMap,
@@ -1373,6 +1377,7 @@ export class Project {
 
         // compile bundle code to `buildTarget`
         const sourceCode = await Deno.readTextFile(bundleFile)
+        await this.#swcReady
         let { code } = transpileSync(sourceCode, {
             url: '/bundle.js',
             swcOptions: {
@@ -1418,8 +1423,8 @@ export class Project {
                         const htmlFile = path.join(outputDir, pathname, 'index.html')
                         await ensureTextFile(htmlFile, html)
                         if (data) {
-                            const dataFile = path.join(outputDir, '_aleph/data', pathname, 'data.js')
-                            await ensureTextFile(dataFile, `export default ` + JSON.stringify(data))
+                            const dataFile = path.join(outputDir, '_aleph/data', pathname === '/' ? 'index' : pathname + '.json')
+                            await ensureTextFile(dataFile, JSON.stringify(data))
                         }
                         log.info('  ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
                     } else if (status == 404) {
@@ -1429,8 +1434,8 @@ export class Project {
                     }
                 }
             }))
-            const fbHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback.html')
-            await ensureTextFile(fbHtmlFile, await this.getSPAIndexHtml())
+            const fallbackSpaHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback_spa.html')
+            await ensureTextFile(fallbackSpaHtmlFile, await this.getSPAIndexHtml())
         } else {
             await ensureTextFile(path.join(outputDir, 'index.html'), await this.getSPAIndexHtml())
         }
