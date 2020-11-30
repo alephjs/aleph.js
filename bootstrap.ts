@@ -2,6 +2,7 @@ import React, { ComponentType } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { AlephRoot, importModule } from './aleph.ts'
 import { Route, RouteModule, Routing } from './routing.ts'
+import { reModuleExt } from './util.ts'
 
 export default async function bootstrap({
     baseUrl,
@@ -23,19 +24,19 @@ export default async function bootstrap({
     const routing = new Routing(routes, baseUrl, defaultLocale, locales)
     const [url, pageModuleTree] = routing.createRouter()
     const sysComponents: Record<string, ComponentType> = {}
-    const pageComponentTree: { id: string, Component?: ComponentType }[] = pageModuleTree.map(({ id }) => ({ id }))
+    const pageComponentTree: { url: string, Component?: ComponentType }[] = pageModuleTree.map(({ url }) => ({ url }))
 
     await Promise.all([...preloadModules, ...pageModuleTree].map(async mod => {
         const { default: C } = await importModule(baseUrl, mod)
-        switch (mod.id) {
-            case '/app.js':
-                sysComponents['App'] = C
-                break
-            case '/404.js':
+        switch (mod.url.replace(reModuleExt, '')) {
+            case '/404 ':
                 sysComponents['E404'] = C
                 break
+            case '/app ':
+                sysComponents['App'] = C
+                break
             default:
-                const pc = pageComponentTree.find(pc => pc.id === mod.id)
+                const pc = pageComponentTree.find(pc => pc.url === mod.url)
                 if (pc) {
                     pc.Component = C
                 }
