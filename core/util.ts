@@ -1,7 +1,19 @@
-import { colors, ensureDir, path, Sha1 } from '../deps.ts'
-import util, { MB, reHashJs, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from '../util.ts'
+import {
+    colors,
+    ensureDir,
+    path,
+    Sha1
+} from '../deps.ts'
+import util, {
+    MB,
+    reHashJs,
+    reHttp,
+    reMDExt,
+    reModuleExt,
+    reStyleModuleExt
+} from '../util.ts'
 import { version } from '../version.ts'
-import { ImportMap, Module } from './types.ts'
+import type { ImportMap, Module } from './types.ts'
 
 /* check whether or not the given path exists as a directory */
 export async function existsDir(path: string) {
@@ -75,10 +87,9 @@ export async function ensureTextFile(name: string, content: string) {
 }
 
 /** returns a module by given url. */
-export function moduleFromURL(url: string): Module {
-    const isRemote = reHttp.test(url)
+export function newModule(url: string): Module {
     const localUrl = fixImportUrl(url)
-    const id = (isRemote ? '//' + util.trimPrefix(localUrl, '/-/') : localUrl).replace(reModuleExt, '.js')
+    const isRemote = reHttp.test(url)
     let loader = ''
     if (reStyleModuleExt.test(url)) {
         loader = 'css'
@@ -93,11 +104,10 @@ export function moduleFromURL(url: string): Module {
         loader = 'js'
     }
     return {
-        id,
-        loader,
         url,
-        isRemote,
         localUrl,
+        isRemote,
+        loader,
         sourceHash: '',
         hash: '',
         deps: [],
@@ -105,11 +115,11 @@ export function moduleFromURL(url: string): Module {
         jsContent: '',
         jsSourceMap: null,
         error: null,
-    } as Module
+    }
 }
 
 /** inject HMR and React Fast Referesh helper code  */
-export function injectHmr({ id, localUrl, jsContent }: Module): string {
+export function injectHmr({ url, localUrl, jsContent }: Module): string {
     const alephModuleLocalUrlPreifx = getAlephModuleLocalUrlPreifx()
     let hmrImportPath = getRelativePath(
         path.dirname(localUrl),
@@ -121,16 +131,16 @@ export function injectHmr({ id, localUrl, jsContent }: Module): string {
 
     const lines = [
         `import { createHotContext, RefreshRuntime, performReactRefresh } from ${JSON.stringify(hmrImportPath)};`,
-        `import.meta.hot = createHotContext(${JSON.stringify(id)});`
+        `import.meta.hot = createHotContext(${JSON.stringify(url)});`
     ]
-    const reactRefresh = id.endsWith('.js') || id.endsWith('.md') || id.endsWith('.mdx')
+    const reactRefresh = reModuleExt.test(url) || reMDExt.test(url)
     if (reactRefresh) {
         lines.push('')
         lines.push(
             `const prevRefreshReg = window.$RefreshReg$;`,
             `const prevRefreshSig = window.$RefreshSig$;`,
             `Object.assign(window, {`,
-            `    $RefreshReg$: (type, id) => RefreshRuntime.register(type, ${JSON.stringify(id)} + " " + id),`,
+            `    $RefreshReg$: (type, id) => RefreshRuntime.register(type, ${JSON.stringify(url)} + " " + id),`,
             `    $RefreshSig$: RefreshRuntime.createSignatureFunctionForTransform`,
             `});`,
         )

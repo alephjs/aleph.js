@@ -19,7 +19,7 @@ export async function renderPage(
     url: RouterURL,
     App: ComponentType<any> | undefined,
     E404: ComponentType | undefined,
-    pageComponentTree: { id: string, Component?: any }[],
+    pageComponentTree: { url: string, Component?: any }[],
     styles?: { url: string, hash: string }[]
 ): Promise<RenderResult> {
     let el: ReactElement
@@ -64,11 +64,11 @@ export async function renderPage(
     }
     const buildMode = Deno.env.get('__buildMode')
     const data: Record<string, any> = {}
-    const useDenEvent = `useDeno://${url.pathname + '?' + url.query.toString()}`
+    const useDenUrl = `useDeno://${url.pathname}`
     const useDenoAsyncCalls: Array<Promise<any>> = []
 
     Object.assign(window, {
-        [`__asyncData_${useDenEvent}`]: {},
+        [`__asyncData_${useDenUrl}`]: {},
         location: {
             protocol: 'http:',
             host: 'localhost',
@@ -85,7 +85,7 @@ export async function renderPage(
         }
     })
 
-    events.on(useDenEvent, (id: string, ret: any, async: boolean) => {
+    events.on(useDenUrl, (id: string, ret: any, async: boolean) => {
         if (async) {
             useDenoAsyncCalls.push(ret)
         } else {
@@ -117,13 +117,13 @@ export async function renderPage(
                 continue
             }
             console.log(error)
-            Object.assign(window, { [`__asyncData_${useDenEvent}`]: null })
+            Object.assign(window, { [`__asyncData_${useDenUrl}`]: null })
             throw error
         }
     }
 
-    Object.assign(window, { [`__asyncData_${useDenEvent}`]: null })
-    events.removeAllListeners(useDenEvent)
+    Object.assign(window, { [`__asyncData_${useDenUrl}`]: null })
+    events.removeAllListeners(useDenUrl)
     if (Object.keys(data).length > 0) {
         ret.data = data
     }

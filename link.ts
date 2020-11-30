@@ -24,7 +24,7 @@ export default function Link({
 
     useEffect(() => {
         // todo: resolve baseUrl
-        let fixedHref = util.cleanPath('/_aleph/' + (__base||'') + '/' + href)
+        let fixedHref = util.cleanPath('/_aleph/' + (__base || '') + '/' + href)
         if (rel === 'component') {
             setMod({ Component: null })
             import(fixedHref)
@@ -41,7 +41,7 @@ export default function Link({
                 })
         } else if (rel === 'style' || rel === 'stylesheet') {
             import(fixedHref)
-            return () => __url  ? removeCSS(__url) : null
+            return () => __url ? removeCSS(__url) : void 0
         }
     }, [rel, href, exportName, __url, __base])
 

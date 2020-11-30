@@ -1,6 +1,6 @@
 import { Request } from '../api.ts'
 import { path, serve, ws } from '../deps.ts'
-import util, { hashShort } from '../util.ts'
+import util, { hashShort, reHashJs, reModuleExt } from '../util.ts'
 import log from './log.ts'
 import { getContentType } from './mime.ts'
 import { Project } from './project.ts'
@@ -25,30 +25,30 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                         const { conn, r: bufReader, w: bufWriter, headers } = req
                         ws.acceptWebSocket({ conn, bufReader, bufWriter, headers }).then(async socket => {
                             const watcher = project.createFSWatcher()
-                            watcher.on('add', (moduleId: string, hash: string) => socket.send(JSON.stringify({
+                            watcher.on('add', (url: string, hash: string) => socket.send(JSON.stringify({
                                 type: 'add',
-                                moduleId,
+                                url,
                                 hash
                             })))
-                            watcher.on('remove', (moduleId: string) => {
-                                watcher.removeAllListeners('modify-' + moduleId)
+                            watcher.on('remove', (url: string) => {
+                                watcher.removeAllListeners('modify-' + url)
                                 socket.send(JSON.stringify({
                                     type: 'remove',
-                                    moduleId
+                                    url
                                 }))
                             })
                             for await (const e of socket) {
                                 if (util.isNEString(e)) {
                                     try {
                                         const data = JSON.parse(e)
-                                        if (data.type === 'hotAccept' && util.isNEString(data.id)) {
-                                            const mod = project.getModule(data.id)
+                                        if (data.type === 'hotAccept' && util.isNEString(data.url)) {
+                                            const mod = project.getModule(data.url)
                                             if (mod) {
-                                                watcher.on('modify-' + mod.id, (hash: string) => socket.send(JSON.stringify({
+                                                watcher.on('modify-' + mod.url, (hash: string) => socket.send(JSON.stringify({
                                                     type: 'update',
-                                                    moduleId: mod.id,
+                                                    url: mod.url,
+                                                    updateUrl: util.cleanPath(`${project.config.baseUrl}/_aleph/${mod.url.replace(reModuleExt, '')}.${hash!.slice(0, hashShort)}.js`),
                                                     hash,
-                                                    updateUrl: util.cleanPath(`${project.config.baseUrl}/_aleph/${mod.id.replace(/\.js$/, '')}.${hash!.slice(0, hashShort)}.js`)
                                                 })))
                                             }
                                         }
@@ -86,44 +86,44 @@ export async function start(appDir: string, port: number, isDev = false, reload 
 
                     // serve dist files
                     if (pathname.startsWith('/_aleph/')) {
-                        if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('/data.js')) {
-                            const [p, s] = util.splitBy(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data'), '/data.js'), '@')
-                            const [status, data] = await project.getSSRData({ pathname: p, search: s })
+                        if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('.json')) {
+                            let p = util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data'), '.json')
+                            if (p === '/index') {
+                                p = '/'
+                            }
+                            const [status, data] = await project.getSSRData({ pathname: p })
                             if (status === 200) {
-                                resp.send(`export default ` + JSON.stringify(data), 'application/javascript; charset=utf-8')
+                                resp.send(JSON.stringify(data), 'application/json; charset=utf-8')
                             } else {
                                 resp.status(status).send('')
                             }
                             continue
-                        } else if (pathname.endsWith('.css')) {
-                            const filePath = path.join(project.buildDir, util.trimPrefix(pathname, '/_aleph/'))
-                            if (existsFileSync(filePath)) {
-                                const body = await Deno.readFile(filePath)
-                                resp.send(body, 'text/css; charset=utf-8')
-                                continue
-                            }
                         } else {
-                            const reqSourceMap = pathname.endsWith('.js.map')
-                            const mod = project.getModuleByPath(reqSourceMap ? pathname.slice(0, -4) : pathname)
-                            if (mod) {
-                                const etag = req.headers.get('If-None-Match')
-                                if (etag && etag === mod.hash) {
-                                    resp.status(304).send('')
+                            const reqMap = pathname.endsWith('.js.map')
+                            const fixedPath = util.trimPrefix(reqMap ? pathname.slice(0, -4) : pathname, '/_aleph/')
+                            const metaFile = path.join(project.buildDir, util.trimSuffix(fixedPath.replace(reHashJs, ''), '.js') + '.meta.json')
+                            if (existsFileSync(metaFile)) {
+                                const { url } = JSON.parse(await Deno.readTextFile(metaFile))
+                                const mod = project.getModule(url)
+                                if (mod) {
+                                    const etag = req.headers.get('If-None-Match')
+                                    if (etag && etag === mod.hash) {
+                                        resp.status(304).send('')
+                                        continue
+                                    }
+                                    let body = ''
+                                    if (reqMap) {
+                                        body = mod.jsSourceMap || ''
+                                    } else {
+                                        body = mod.jsContent
+                                        if (project.isHMRable(mod.url)) {
+                                            body = injectHmr({ ...mod, jsContent: body })
+                                        }
+                                    }
+                                    resp.setHeader('ETag', mod.hash)
+                                    resp.send(body, `application/${reqMap ? 'json' : 'javascript'}; charset=utf-8`)
                                     continue
                                 }
-
-                                let body = ''
-                                if (reqSourceMap) {
-                                    body = mod.jsSourceMap || ''
-                                } else {
-                                    body = mod.jsContent
-                                    if (project.isHMRable(mod.id)) {
-                                        body = injectHmr({ ...mod, jsContent: body })
-                                    }
-                                }
-                                resp.setHeader('ETag', mod.hash)
-                                resp.send(body, `application/${reqSourceMap ? 'json' : 'javascript'}; charset=utf-8`)
-                                continue
                             }
                         }
                     }

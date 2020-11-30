@@ -17,17 +17,17 @@ export const performReactRefresh = util.debounce(runtime.performReactRefresh, 30
 export const RefreshRuntime = runtime
 
 class Module {
-    private _id: string
+    private _url: string
     private _isLocked: boolean = false
     private _isAccepted: boolean = false
     private _acceptCallbacks: Callback[] = []
 
-    get id() {
-        return this._id
+    get url() {
+        return this._url
     }
 
-    constructor(id: string) {
-        this._id = id
+    constructor(url: string) {
+        this._url = url
     }
 
     lock(): void {
@@ -39,7 +39,7 @@ class Module {
             return
         }
         if (!this._isAccepted) {
-            sendMessage({ id: this.id, type: 'hotAccept' })
+            sendMessage({ url: this._url, type: 'hotAccept' })
             this._isAccepted = true
         }
         if (callback) {
@@ -76,25 +76,25 @@ socket.addEventListener('close', () => {
 socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
     if (rawData) {
         try {
-            const { type, moduleId, hash, updateUrl } = JSON.parse(rawData)
+            const { type, url, hash, updateUrl } = JSON.parse(rawData)
             switch (type) {
                 case 'add':
-                    events.emit('add-module', { id: moduleId, hash })
+                    events.emit('add-module', { url, hash })
                     break
                 case 'update':
-                    const mod = modules.get(moduleId)
+                    const mod = modules.get(url)
                     if (mod) {
                         mod.applyUpdate(updateUrl)
                     }
                     break
                 case 'remove':
-                    if (modules.has(moduleId)) {
-                        modules.delete(moduleId)
-                        events.emit('remove-module', moduleId)
+                    if (modules.has(url)) {
+                        modules.delete(url)
+                        events.emit('remove-module', url)
                     }
                     break
             }
-            console.log(`[HMR]${hash ? ' [' + hash.slice(0, hashShort) + ']' : ''} ${type} module '${moduleId}'`)
+            console.log(`[HMR]${hash ? ' [' + hash.slice(0, hashShort) + ']' : ''} ${type} module '${url}'`)
         } catch (err) {
             console.warn(err)
         }
@@ -109,14 +109,14 @@ function sendMessage(msg: any) {
     }
 }
 
-export function createHotContext(id: string) {
-    if (modules.has(id)) {
-        const mod = modules.get(id)!
+export function createHotContext(url: string) {
+    if (modules.has(url)) {
+        const mod = modules.get(url)!
         mod.lock()
         return mod
     }
 
-    const mod = new Module(id)
-    modules.set(id, mod)
+    const mod = new Module(url)
+    modules.set(url, mod)
     return mod
 }

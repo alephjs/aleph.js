@@ -1,11 +1,10 @@
 import type { RouterURL } from '../types.ts'
 
 export interface Module {
-    id: string
-    loader: string
     url: string
     localUrl: string
     isRemote: boolean
+    loader: string
     sourceHash: string
     hash: string
     deps: DependencyDescriptor[]

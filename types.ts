@@ -18,13 +18,13 @@ export interface Plugin {
  * The options for **SSR**.
  */
 export interface SSROptions {
-    /** The fallback html **dynamic routes** (default is '**_fallback.html**'). */
+    /** The fallback html **dynamic routes** (default is '**_fallback_spa.html**'). */
     fallback?: string
     /** A list of RegExp for paths to use **SSR**. */
     include?: RegExp[]
     /** A list of RegExp for paths to skip **SSR**. */
     exclude?: RegExp[]
-    /** A list of paths for **dynamic routes** in **SSR**. */
+    /** A list of paths for **dynamic routes** in **SSG**. */
     staticPaths?: string[]
 }
 

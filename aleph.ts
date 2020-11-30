@@ -1,22 +1,24 @@
-import React, { ComponentType, useCallback, useEffect, useRef, useState } from 'https://esm.sh/react'
+import React, { ComponentType, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { RouterContext } from './context.ts'
 import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
 import events from './events.ts'
 import { createPageProps, RouteModule, Routing } from './routing.ts'
 import type { RouterURL } from './types.ts'
-import util, { hashShort } from './util.ts'
+import util, { hashShort, reModuleExt } from './util.ts'
 
-export function ALEPH({ initial }: {
-    initial: {
-        routing: Routing
-        url: RouterURL
-        components: Record<string, ComponentType<any>>
-        pageComponentTree: { id: string, Component?: any }[]
-    }
+export function AlephRoot({
+    url,
+    routing,
+    sysComponents,
+    pageComponentTree,
+}: {
+    url: RouterURL
+    routing: Routing
+    sysComponents: Record<string, ComponentType<any>>
+    pageComponentTree: { url: string, Component?: any }[]
 }) {
-    const ref = useRef({ routing: initial.routing })
     const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
-        const { E404 } = initial.components
+        const { E404 } = sysComponents
         if (E404) {
             if (util.isLikelyReactComponent(E404)) {
                 return { Component: E404 }
@@ -26,7 +28,7 @@ export function ALEPH({ initial }: {
         return { Component: E404Page }
     })
     const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
-        const { App } = initial.components
+        const { App } = sysComponents
         if (App) {
             if (util.isLikelyReactComponent(App)) {
                 return { Component: App }
@@ -35,28 +37,24 @@ export function ALEPH({ initial }: {
         }
         return { Component: null }
     })
-    const [route, setRoute] = useState(() => {
-        const { url, pageComponentTree } = initial
-        return { ...createPageProps(pageComponentTree), url }
-    })
+    const [route, setRoute] = useState(() => ({ ...createPageProps(pageComponentTree), url }))
     const onpopstate = useCallback(async (e: any) => {
-        const { routing } = ref.current
         const { baseUrl } = routing
         const [url, pageModuleTree] = routing.createRouter()
         if (url.pagePath !== '') {
-            const ctree: { id: string, Component?: ComponentType<any> }[] = pageModuleTree.map(({ id }) => ({ id }))
+            const ctree: { url: string, Component?: ComponentType<any> }[] = pageModuleTree.map(({ url }) => ({ url }))
             const imports = pageModuleTree.map(async mod => {
-                const { default: C } = await import(getModuleImportUrl(baseUrl, mod, e.forceRefetch))
+                const { default: C } = await importModule(baseUrl, mod, e.forceRefetch)
                 if (mod.deps && mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno-')).length > 0) {
-                    const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js` + (e.forceRefetch ? `?t=${Date.now()}` : ''))
+                    const { default: data } = await fetch(`/_aleph/data${url.pathname === '/' ? '/index' : url.pathname}.json`).then(resp => resp.json())
                     if (util.isPlainObject(data)) {
                         for (const key in data) {
-                            const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
+                            const useDenoUrl = `useDeno://${url.pathname}#${key}`
                             Object.assign(window, { [useDenoUrl]: data[key] })
                         }
                     }
                 }
-                const pc = ctree.find(pc => pc.id === mod.id)
+                const pc = ctree.find(pc => pc.url === mod.url)
                 if (pc) {
                     pc.Component = C
                 }
@@ -69,7 +67,7 @@ export function ALEPH({ initial }: {
         } else {
             setRoute({ Page: null, pageProps: {}, url })
         }
-    }, [ref])
+    }, [])
 
     useEffect(() => {
         window.addEventListener('popstate', onpopstate)
@@ -82,12 +80,11 @@ export function ALEPH({ initial }: {
     }, [onpopstate])
 
     useEffect(() => {
-        const { routing } = ref.current
         const { baseUrl } = routing
         const onAddModule = async (mod: RouteModule) => {
-            switch (mod.id) {
+            switch (mod.url) {
                 case '/404.js': {
-                    const { default: Component } = await import(getModuleImportUrl(baseUrl, mod, true))
+                    const { default: Component } = await importModule(baseUrl, mod, true)
                     if (util.isLikelyReactComponent(Component)) {
                         setE404({ Component })
                     } else {
@@ -96,7 +93,7 @@ export function ALEPH({ initial }: {
                     break
                 }
                 case '/app.js': {
-                    const { default: Component } = await import(getModuleImportUrl(baseUrl, mod, true))
+                    const { default: Component } = await importModule(baseUrl, mod, true)
                     if (util.isLikelyReactComponent(Component)) {
                         setApp({ Component })
                     } else {
@@ -105,8 +102,7 @@ export function ALEPH({ initial }: {
                     break
                 }
                 default: {
-                    if (mod.id.startsWith('/pages/')) {
-                        const { routing } = ref.current
+                    if (mod.url.startsWith('/pages/')) {
                         routing.update(mod)
                         events.emit('popstate', { type: 'popstate', forceRefetch: true })
                     }
@@ -114,8 +110,8 @@ export function ALEPH({ initial }: {
                 }
             }
         }
-        const onRemoveModule = (moduleId: string) => {
-            switch (moduleId) {
+        const onRemoveModule = (url: string) => {
+            switch (url) {
                 case '/404.js':
                     setE404({ Component: E404Page })
                     break
@@ -123,9 +119,8 @@ export function ALEPH({ initial }: {
                     setApp({ Component: null })
                     break
                 default:
-                    if (moduleId.startsWith('/pages/')) {
-                        const { routing } = ref.current
-                        routing.removeRoute(moduleId)
+                    if (url.startsWith('/pages/')) {
+                        routing.removeRoute(url)
                         events.emit('popstate', { type: 'popstate' })
                     }
                     break
@@ -136,12 +131,12 @@ export function ALEPH({ initial }: {
             const [url, pageModuleTree] = routing.createRouter({ pathname, search })
             if (url.pagePath !== '') {
                 const imports = pageModuleTree.map(async mod => {
-                    await import(getModuleImportUrl(baseUrl, mod))
+                    await importModule(baseUrl, mod)
                     if (mod.deps && mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno-')).length > 0) {
-                        const { default: data } = await import(`/_aleph/data${[url.pathname, url.query.toString()].filter(Boolean).join('@')}/data.js`)
+                        const { default: data } = await fetch(`/_aleph/data${url.pathname === '/' ? '/index' : url.pathname}.json`).then(resp => resp.json())
                         if (util.isPlainObject(data)) {
                             for (const key in data) {
-                                const useDenoUrl = `useDeno://${url.pathname}?${url.query.toString()}#${key}`
+                                const useDenoUrl = `useDeno://${url.pathname}#${key}`
                                 Object.assign(window, { [useDenoUrl]: data[key] })
                             }
                         }
@@ -160,7 +155,7 @@ export function ALEPH({ initial }: {
             events.off('remove-module', onRemoveModule)
             events.off('fetch-page-module', onFetchPageModule)
         }
-    }, [ref])
+    }, [])
 
     useEffect(() => {
         const win = window as any
@@ -195,7 +190,22 @@ export function ALEPH({ initial }: {
     )
 }
 
-export function getModuleImportUrl(baseUrl: string, mod: RouteModule, forceRefetch = false) {
-    return util.cleanPath(baseUrl + '/_aleph/' + (mod.id.startsWith('/-/') ? mod.id : util.trimSuffix(mod.id, '.js') + `.${mod.hash.slice(0, hashShort)}.js`) + (forceRefetch ? `?t=${Date.now()}` : ''))
+export function importModule(baseUrl: string, mod: RouteModule, forceRefetch = false): Promise<any> {
+    const { __ALEPH, document } = window as any
+    const src = util.cleanPath(baseUrl + '/_aleph/' + mod.url.replace(reModuleExt, '') + `.${mod.hash.slice(0, hashShort)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
+    if (__ALEPH) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('src')
+            script.src = src
+            script.onload = () => {
+                resolve(__ALEPH.pack[mod.url])
+            }
+            script.onerror = (err: Error) => {
+                reject(err)
+            }
+            document.body.appendChild(script)
+        })
+    } else {
+        return import(src)
+    }
 }
-

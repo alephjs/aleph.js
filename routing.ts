@@ -11,7 +11,7 @@ export interface Route {
 }
 
 export interface RouteModule {
-    readonly id: string
+    readonly url: string
     readonly hash: string
     readonly deps?: DependencyDescriptor[]
 }
@@ -21,7 +21,7 @@ export interface PageProps {
     pageProps: Partial<PageProps> & { name?: string }
 }
 
-const ghostRoute: Route = { path: '', module: { id: '', hash: '' } }
+const ghostRoute: Route = { path: '', module: { url: '', hash: '' } }
 
 export class Routing {
     private _routes: Route[]
@@ -57,7 +57,7 @@ export class Routing {
     }
 
     update(module: RouteModule) {
-        const newRoute: Route = { path: getPagePath(module.id), module }
+        const newRoute: Route = { path: getPagePath(module.url), module }
         const dirtyRoutes: Set<Route[]> = new Set()
         let exists = false
         let targetRoutes = this._routes
@@ -65,7 +65,7 @@ export class Routing {
             const path = routePath.map(r => r.path).join('')
             const route = routePath[routePath.length - 1]
             const parentRoute = routePath[routePath.length - 2]
-            if (route.module.id === module.id) {
+            if (route.module.url === module.url) {
                 Object.assign(route.module, module)
                 exists = true
                 return false
@@ -96,10 +96,10 @@ export class Routing {
         targetRoutes.push(newRoute)
     }
 
-    removeRoute(moduleId: string) {
+    removeRoute(url: string) {
         this._lookup(path => {
             const route = path[path.length - 1]
-            if (route.module.id === moduleId) {
+            if (route.module.url === url) {
                 const parentRoute = path[path.length - 2]
                 const routes = parentRoute ? parentRoute.children! : this._routes
                 const index = routes.indexOf(route)
@@ -176,9 +176,9 @@ export class Routing {
     }
 }
 
-export function getPagePath(moduleId: string): string {
-    const id = util.trimSuffix(moduleId, '.js').replace(reMDExt, '').toLowerCase().replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
-    return id.startsWith('/api/') ? id : id.replace(/\s+/g, '-')
+export function getPagePath(url: string): string {
+    const pathname = url.replace(reModuleExt, '').replace(reMDExt, '').toLowerCase().replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
+    return pathname.startsWith('/api/') ? pathname : pathname.replace(/\s+/g, '-')
 }
 
 function matchPath(routePath: string, locPath: string): [Record<string, string>, boolean] {
@@ -212,7 +212,7 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
     return [params, true]
 }
 
-export function createPageProps(componentTree: { id: string, Component?: ComponentType<any> }[]): PageProps {
+export function createPageProps(componentTree: { url: string, Component?: ComponentType<any> }[]): PageProps {
     const pageProps: PageProps = {
         Page: null,
         pageProps: {}
@@ -230,7 +230,7 @@ export function createPageProps(componentTree: { id: string, Component?: Compone
     return pageProps
 }
 
-function _createPagePropsSegment(seg: { id: string, Component?: ComponentType<any> }): PageProps {
+function _createPagePropsSegment(seg: { url: string, Component?: ComponentType<any> }): PageProps {
     const pageProps: PageProps = {
         Page: null,
         pageProps: {}
@@ -240,7 +240,7 @@ function _createPagePropsSegment(seg: { id: string, Component?: ComponentType<an
             pageProps.Page = seg.Component
         } else {
             pageProps.Page = E400MissingDefaultExportAsComponent
-            pageProps.pageProps = { name: 'Page:' + seg.id.replace(reModuleExt, '') }
+            pageProps.pageProps = { name: 'Page: ' + seg.url.replace(reModuleExt, '') }
         }
     }
     return pageProps
