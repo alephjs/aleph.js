@@ -1190,7 +1190,7 @@ export class Project {
                             cleanupCompilation(mod.jsFile).then(() => {
                                 Promise.all([
                                     ensureTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
-                                        sourceFile: mod.url,
+                                        url: mod.url,
                                         sourceHash: mod.sourceHash,
                                         hash: mod.hash,
                                         deps: mod.deps,

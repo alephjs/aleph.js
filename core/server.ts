@@ -126,6 +126,8 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                                 }
                             }
                         }
+                        resp.status(404).send('file not found')
+                        continue
                     }
 
                     // ssr
