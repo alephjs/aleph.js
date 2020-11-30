@@ -1,9 +1,10 @@
 # Contributing to Aleph.js
 
-Welcome, and thank you for taking time in contributing to Aleph.js!
+Welcome, and thank you for taking time in contributing to Aleph.js! You can help us in different ways:
 
 - ∆ add new feature
 - ✘ bugfix
+- ✔︎ review code
 - ☇ write plugins
 - 𝔸 improve our [documentation](https://github.com/alephjs/alephjs.org)
 
