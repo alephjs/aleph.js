@@ -39,8 +39,8 @@ impl Default for EmitOptions {
       target: JscTarget::Es2020,
       jsx_factory: "React.createElement".into(),
       jsx_fragment_factory: "React.Fragment".into(),
-      is_dev: true,
-      source_map: true,
+      is_dev: false,
+      source_map: false,
     }
   }
 }
@@ -282,7 +282,21 @@ mod tests {
   use crate::aleph::VERSION;
   use crate::import_map::ImportHashMap;
   use crate::resolve::{DependencyDescriptor, Resolver, HASH_PLACEHOLDER};
-  use std::collections::HashMap;
+
+  fn t(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
+    let module = ParsedModule::parse(specifer, source, None).expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      specifer,
+      ImportHashMap::default(),
+      None,
+      bundling,
+      vec![],
+    )));
+    let (code, _) = module
+      .transpile(resolver.clone(), &EmitOptions::default())
+      .expect("could not transpile module");
+    (code, resolver)
+  }
 
   #[test]
   fn test_transpile_ts() {
@@ -315,79 +329,30 @@ mod tests {
       bar() {}
     }
     "#;
-    let module = ParsedModule::parse("https://deno.land/x/mod.ts", source, None)
-      .expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      "https://deno.land/x/mod.ts",
-      ImportHashMap::default(),
-      None,
-      false,
-      vec![],
-    )));
-    let (code, maybe_map) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
-      .expect("could not transpile module");
+    let (code, _) = t("https://deno.land/x/mod.ts", source, false);
     println!("{}", code);
     assert!(code.contains("var D;\n(function(D) {\n"));
     assert!(code.contains("_applyDecoratedDescriptor("));
-    assert!(!maybe_map.is_none());
   }
 
   #[test]
   fn test_transpile_jsx() {
     let source = r#"
     import React from "https://esm.sh/react"
-    import { Head } from 'https://deno.land/x/aleph/mod.ts'
     export default function Index() {
       return (
         <>
-          <Head>
-            <title>Hello World!</title>
-          </Head>
-          <h1>Hello World</h1>
+          <h1 className="title">Hello World</h1>
         </>
       )
     }
     "#;
-    let module =
-      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
-    let mut imports: HashMap<String, Vec<String>> = HashMap::new();
-    imports.insert(
-      "https://deno.land/x/aleph/".into(),
-      vec!["http://localhost:9006/".into()],
-    );
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/index.tsx",
-      ImportHashMap {
-        imports,
-        scopes: HashMap::new(),
-      },
-      None,
-      false,
-      vec![],
-    )));
-    let (code, _) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
-      .expect("could not transpile module");
+    let (code, _) = t("/pages/index.tsx", source, false);
     println!("{}", code);
-    assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("React.createElement(React.Fragment, null"));
-    assert!(code.contains("__source: {"));
+    assert!(code.contains("React.createElement(\"h1\", {"));
+    assert!(code.contains("className: \"title\""));
     assert!(code.contains("import React from \"../-/esm.sh/react.js\""));
-    let r = resolver.borrow_mut();
-    assert_eq!(
-      r.dep_graph,
-      vec![
-        DependencyDescriptor {
-          specifier: "https://esm.sh/react".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "http://localhost:9006/mod.ts".into(),
-          is_dynamic: false,
-        }
-      ]
-    );
   }
 
   #[test]
@@ -412,18 +377,7 @@ mod tests {
       )
     }
     "#;
-    let module =
-      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/index.tsx",
-      ImportHashMap::default(),
-      None,
-      false,
-      vec![],
-    )));
-    let (code, _) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
-      .expect("could not transpile module");
+    let (code, _) = t("/pages/index.tsx", source, false);
     println!("{}", code);
     assert!(code.contains(", false, \"useDeno-"));
     assert!(code.contains(", true, \"useDeno-"));
@@ -456,18 +410,7 @@ mod tests {
       )
     }
     "#;
-    let module =
-      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/index.tsx",
-      ImportHashMap::default(),
-      None,
-      false,
-      vec![],
-    )));
-    let (code, _) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
-      .expect("could not transpile module");
+    let (code, resolver) = t("/pages/index.tsx", source, false);
     println!("{}", code);
     assert!(code.contains(
       format!(
@@ -565,19 +508,7 @@ mod tests {
       )
     }
     "#;
-    let module =
-      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/index.tsx",
-      ImportHashMap::default(),
-      None,
-      false,
-      vec![],
-    )));
-    let (code, _) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
-      .expect("could not transpile module");
-    println!("{}", code);
+    let (code, resolver) = t("/pages/index.tsx", source, false);
     assert!(code.contains(
       format!(
         "import __ALEPH_Style from \"../-/deno.land/x/aleph@v{}/style.js\"",
@@ -646,25 +577,64 @@ mod tests {
       export {default as React, useState, useEffect as useEffect_ } from "https://esm.sh/react"
       export * as React_ from "https://esm.sh/react"
       export * from "https://esm.sh/react"
+      export const n = 123
+      export const f = () => {}
+      export function A() {}
+      export class B {}
+      export default function C() {}
     "#;
-    let module =
-      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/index.tsx",
-      ImportHashMap::default(),
-      None,
-      true,
-      vec![],
-    )));
-    let (code, _) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
-      .expect("could not transpile module");
+    let (code, _) = t("/pages/index.tsx", source, true);
     println!("{}", code);
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"https://esm.sh/react\", {"));
-    assert!(code.contains("__ALEPH.export_star(\"/pages/index.tsx\", \"https://esm.sh/react\")"));
+    assert!(code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", {"));
+    assert!(
+      code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", \"*\")")
+    );
+    assert!(code.contains("\nconst n = 123"));
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"n\", n)"));
+    assert!(code.contains("\nconst f = ()=>{"));
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"f\", f)"));
+    assert!(code.contains("\nfunction A() {"));
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"A\", A)"));
+    assert!(code.contains("\nclass B {"));
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"B\", B)"));
+    assert!(code.contains("\nfunction C() {"));
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", C)"));
     assert!(code.contains("\"default\": \"React\""));
     assert!(code.contains("\"useState\": \"useState\""));
     assert!(code.contains("\"useEffect\": \"useEffect_\""));
     assert!(code.contains("\"*\": \"React_\""));
+
+    let source = r#"
+    export default class C {}
+    "#;
+    let (code, _) = t("/pages/index.tsx", source, true);
+    println!("------");
+    println!("{}", code);
+    assert!(code.contains("class C {"));
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", C"));
+
+    let source = r#"
+      export default function () {}
+    "#;
+    let (code, _) = t("/pages/index.tsx", source, true);
+    println!("------");
+    println!("{}", code);
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", function() {"));
+
+    let source = r#"
+      export default class {}
+    "#;
+    let (code, _) = t("/pages/index.tsx", source, true);
+    println!("------");
+    println!("{}", code);
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", class {"));
+
+    let source = r#"
+      export default {}
+    "#;
+    let (code, _) = t("/pages/index.tsx", source, true);
+    println!("------");
+    println!("{}", code);
+    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", {"));
   }
 }

@@ -117,8 +117,8 @@ impl AlephJsxFold {
 
                         if should_replace {
                             let mut href_prop_index: i32 = -1;
-                            let mut url_prop_index: i32 = -1;
                             let mut base_prop_index: i32 = -1;
+                            let mut url_prop_index: i32 = -1;
                             let mut href_prop_value = "";
 
                             for (i, attr) in el.attrs.iter().enumerate() {
@@ -132,11 +132,11 @@ impl AlephJsxFold {
                                             href_prop_index = i as i32;
                                             href_prop_value = value.as_ref();
                                         }
-                                        "__url" => {
-                                            url_prop_index = i as i32;
-                                        }
                                         "__base" => {
                                             base_prop_index = i as i32;
+                                        }
+                                        "__url" => {
+                                            url_prop_index = i as i32;
                                         }
                                         _ => {}
                                     },
@@ -160,15 +160,6 @@ impl AlephJsxFold {
                                     });
                             }
 
-                            let url_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
-                                span: DUMMY_SP,
-                                name: JSXAttrName::Ident(quote_ident!("__url")),
-                                value: Some(JSXAttrValue::Lit(Lit::Str(Str {
-                                    span: DUMMY_SP,
-                                    value: fixed_url.into(),
-                                    has_escape: false,
-                                }))),
-                            });
                             let mut buf = PathBuf::from(
                                 resolver
                                     .fix_import_url(resolver.specifier.as_str())
@@ -184,15 +175,24 @@ impl AlephJsxFold {
                                     has_escape: false,
                                 }))),
                             });
-                            if url_prop_index >= 0 {
-                                el.attrs[url_prop_index as usize] = url_attr;
-                            } else {
-                                el.attrs.push(url_attr);
-                            }
+                            let url_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
+                                span: DUMMY_SP,
+                                name: JSXAttrName::Ident(quote_ident!("__url")),
+                                value: Some(JSXAttrValue::Lit(Lit::Str(Str {
+                                    span: DUMMY_SP,
+                                    value: fixed_url.into(),
+                                    has_escape: false,
+                                }))),
+                            });
                             if base_prop_index >= 0 {
                                 el.attrs[base_prop_index as usize] = base_attr;
                             } else {
                                 el.attrs.push(base_attr);
+                            }
+                            if url_prop_index >= 0 {
+                                el.attrs[url_prop_index as usize] = url_attr;
+                            } else {
+                                el.attrs.push(url_attr);
                             }
 
                             if name.eq("link") {
