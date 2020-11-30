@@ -2,9 +2,10 @@
 
 Welcome, and thank you for taking time in contributing to Aleph.js!
 
-## Code of Conduct
-
-All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+- ∆ add new feature
+- ✘ bugfix
+- ☇ write plugins
+- 𝔸 improve our [documentation](https://github.com/alephjs/alephjs.org)
 
 ## Development Setup
 
@@ -13,10 +14,13 @@ You will need [Deno](https://deno.land/) 1.5+ and [VS Code](https://code.visuals
 1. Fork this repository to your own GitHub account.
 2. Clone the repository to your local device.
 3. Create a new branch `git checkout -b BRANCH_NAME`.
-4. Change code then run examples.
+4. Change code then run our examples.
 
 ```bash
-deno run -A --unstable --import-map=import_map.json cli.ts ./examples/hello-world -L debug
+# ssr
+deno run -A --unstable --import-map=import_map.json cli.ts dev ./examples/hello-world -L debug
+# ssg
+deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
 ```
 
 ## Testing
@@ -24,9 +28,21 @@ deno run -A --unstable --import-map=import_map.json cli.ts ./examples/hello-worl
 Run all tests:
 
 ```bash
-deno test -A --unstable
+deno test -A
 ```
 
-## Contributing to Documentation
+## Project Structure
 
-You are welcome to improve our [documentation](https://alephjs.org/docs).
+- **/cli** command code
+- **/core** core code for project&server
+- **/design** design drawings and assets
+- **/examples** some examples
+- **/plugins** official plugins
+- **/swc** compiler in rust with swc
+- **/test** testings
+- **/vendor** packages from npm
+- **/*.ts** framework code
+
+## Code of Conduct
+
+All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
