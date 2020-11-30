@@ -1,4 +1,4 @@
-import type { ServerRequest } from './deps.ts';
+import type { AcceptedPlugin, ServerRequest } from './deps.ts';
 
 /**
  * A plugin for **Aleph.js** application.
@@ -51,7 +51,7 @@ export interface Config {
     /** A list of plugin. */
     plugins?: Plugin[]
     /** A list of plugin of PostCSS. */
-    postcss?: { plugins: (string | { name: string, options: Record<string, any> })[] }
+    postcss?: { plugins: (string | AcceptedPlugin | [string | ((options: Record<string, any>) => AcceptedPlugin), Record<string, any>])[] }
     /** `buildTarget` specifies the build target for **swc** in production mode (default is **es5**). */
     buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable) */

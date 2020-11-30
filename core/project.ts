@@ -1,23 +1,54 @@
 import { Request } from '../api.ts'
 import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
 import {
-    CleanCSS, colors, ensureDir, less, marked, minify,
-    path, postcss, readerFromStreamReader, safeLoadFront, Sha256, walk
+    CleanCSS,
+    colors,
+    ensureDir,
+    less,
+    marked,
+    minify,
+    path,
+    postcss,
+    readerFromStreamReader,
+    safeLoadFront,
+    Sha256,
+    walk
 } from '../deps.ts'
 import { EventEmitter } from '../events.ts'
 import { getPagePath, RouteModule, Routing } from '../routing.ts'
 import { initSWC, SWCOptions, transpileSync } from '../swc/mod.ts'
 import type { APIHandler, Config, RouterURL } from '../types.ts'
 import util, {
-    hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID,
-    reMDExt, reModuleExt, reStyleModuleExt
+    hashShort,
+    reFullVersion,
+    reHashJs,
+    reHashResolve,
+    reHttp,
+    reLocaleID,
+    reMDExt,
+    reModuleExt,
+    reStyleModuleExt
 } from '../util.ts'
 import { version } from '../version.ts'
 import log from './log.ts'
-import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
+import type {
+    DependencyDescriptor,
+    ImportMap,
+    Module,
+    RenderResult
+} from './types.ts'
 import {
-    cleanupCompilation, colorfulBytesString, createHtml, ensureTextFile, existsDirSync, existsFileSync,
-    fixImportMap, getAlephModuleLocalUrlPreifx, getHash, getRelativePath, moduleFromURL
+    cleanupCompilation,
+    colorfulBytesString,
+    createHtml,
+    ensureTextFile,
+    existsDirSync,
+    existsFileSync,
+    fixImportMap,
+    getAlephModuleLocalUrlPreifx,
+    getHash,
+    getRelativePath,
+    moduleFromURL
 } from './util.ts'
 
 /**
@@ -365,7 +396,8 @@ export class Project {
         }
 
         const config: Record<string, any> = {}
-        for (const name of Array.from(['aleph.config', 'config']).map(name => ['ts', 'js', 'mjs', 'json'].map(ext => `${name}.${ext}`)).flat()) {
+
+        for (const name of Array.from(['ts', 'js', 'mjs', 'json']).map(ext => `aleph.config.${ext}`)) {
             const p = path.join(this.appRoot, name)
             if (existsFileSync(p)) {
                 log.info('  ✓', name)
@@ -439,15 +471,27 @@ export class Project {
         }
         if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
             Object.assign(this.config, { postcss })
-        } else if (existsFileSync(path.join(this.appRoot, 'postcss.config.json'))) {
-            const text = await Deno.readTextFile(path.join(this.appRoot, 'postcss.config.json'))
-            try {
-                const postcss = JSON.parse(text)
-                if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
-                    Object.assign(this.config, { postcss })
+        } else {
+            for (const name of Array.from(['ts', 'js', 'mjs', 'json']).map(ext => `postcss.config.${ext}`)) {
+                const p = path.join(this.appRoot, name)
+                if (existsFileSync(p)) {
+                    log.info('  ✓', name)
+                    if (name.endsWith('.json')) {
+                        const postcss = JSON.parse(await Deno.readTextFile(p))
+                        if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
+                            Object.assign(this.config, { postcss })
+                        }
+                    } else {
+                        let { default: postcss } = await import('file://' + p)
+                        if (util.isFunction(postcss)) {
+                            postcss = await postcss()
+                        }
+                        if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
+                            Object.assign(this.config, { postcss })
+                        }
+                    }
+                    break
                 }
-            } catch (e) {
-                log.warn('bad postcss.config.json', e.message)
             }
         }
 
@@ -491,16 +535,18 @@ export class Project {
             await ensureDir(this.buildDir)
         }
 
-        // import postcss plugins
+        // import postcss plugins for esm.sh
         await Promise.all(this.config.postcss.plugins.map(async p => {
-            let name: string
-            if (typeof p === 'string') {
+            let name: string | null = null
+            if (util.isNEString(p)) {
                 name = p
-            } else {
-                name = p.name
+            } else if (Array.isArray(p) && util.isNEString(p[0])) {
+                name = p[0]
             }
-            const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.4&no-check`)
-            this.#postcssPlugins[name] = Plugin
+            if (name) {
+                const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.1.4&no-check`)
+                this.#postcssPlugins[name] = Plugin
+            }
         }))
 
         // inject virtual browser gloabl objects
@@ -812,9 +858,21 @@ export class Project {
         const plugins = this.config.postcss.plugins.map(p => {
             if (typeof p === 'string') {
                 return this.#postcssPlugins[p]
+            } else if (Array.isArray(p)) {
+                const [plugin, options] = p
+                if (util.isNEString(plugin)) {
+                    const _plugin = this.#postcssPlugins[plugin]
+                    if (util.isFunction(_plugin)) {
+                        let fn = _plugin as Function
+                        return fn(options)
+                    } else {
+                        return plugin
+                    }
+                } else {
+                    plugin(options)
+                }
             } else {
-                const Plugin = this.#postcssPlugins[p.name] as Function
-                return Plugin(p.options)
+                return p
             }
         })
         css = (await postcss(plugins).process(css).async()).content
