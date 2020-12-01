@@ -498,7 +498,7 @@ export class Project {
             const imports = {
                 'https://deno.land/x/aleph/': [alias],
                 [`https://deno.land/x/aleph@v${version}/`]: [alias],
-                'aleph': [`${alias}/mod.ts`],
+                'aleph': [`${alias}mod.ts`],
                 'aleph/': [alias],
             }
             Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
