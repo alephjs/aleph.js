@@ -1,10 +1,11 @@
 import React, { ComponentType, useCallback, useEffect, useState } from 'https://esm.sh/react'
+import { RouteModule, Routing } from '../../routing.ts'
+import events from '../../shared/events.ts'
+import util, { hashShort, reModuleExt } from '../../shared/util.ts'
+import type { RouterURL } from '../../types.ts'
 import { RouterContext } from './context.ts'
 import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
-import events from './events.ts'
-import { createPageProps, RouteModule, Routing } from './routing.ts'
-import type { RouterURL } from './types.ts'
-import util, { hashShort, reModuleExt } from './util.ts'
+import { createPageProps, isLikelyReactComponent } from './util.ts'
 
 export function AlephRoot({
     url,
@@ -20,7 +21,7 @@ export function AlephRoot({
     const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
         const { E404 } = sysComponents
         if (E404) {
-            if (util.isLikelyReactComponent(E404)) {
+            if (isLikelyReactComponent(E404)) {
                 return { Component: E404 }
             }
             return { Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom 404 Page' } }
@@ -30,7 +31,7 @@ export function AlephRoot({
     const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
         const { App } = sysComponents
         if (App) {
-            if (util.isLikelyReactComponent(App)) {
+            if (isLikelyReactComponent(App)) {
                 return { Component: App }
             }
             return { Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom App' } }
@@ -85,7 +86,7 @@ export function AlephRoot({
             switch (mod.url) {
                 case '/404.js': {
                     const { default: Component } = await importModule(baseUrl, mod, true)
-                    if (util.isLikelyReactComponent(Component)) {
+                    if (isLikelyReactComponent(Component)) {
                         setE404({ Component })
                     } else {
                         setE404({ Component: E404Page })
@@ -94,7 +95,7 @@ export function AlephRoot({
                 }
                 case '/app.js': {
                     const { default: Component } = await importModule(baseUrl, mod, true)
-                    if (util.isLikelyReactComponent(Component)) {
+                    if (isLikelyReactComponent(Component)) {
                         setApp({ Component })
                     } else {
                         setApp({ Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom App' } })

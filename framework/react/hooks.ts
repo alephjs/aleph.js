@@ -1,8 +1,8 @@
 import React, { useContext, useEffect, useState } from 'https://esm.sh/react'
+import events from '../../shared/events.ts'
+import type { RouterURL } from '../../types.ts'
 import { RouterContext } from './context.ts'
 import { AsyncUseDenoError } from './error.ts'
-import events from './events.ts'
-import type { RouterURL } from './types.ts'
 
 /**
  * `useRouter` allows you to use `RouterURL` obeject of routing

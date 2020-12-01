@@ -1,7 +1,7 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useContext, useEffect } from 'https://esm.sh/react'
+import util from '../../shared/util.ts'
 import { RendererContext } from './context.ts'
 import Script from './script.ts'
-import util from './util.ts'
 
 export default function Head(props: PropsWithChildren<{}>) {
     const renderer = useContext(RendererContext)

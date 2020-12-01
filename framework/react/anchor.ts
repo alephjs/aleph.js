@@ -1,7 +1,7 @@
 import React, { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren, useCallback, useEffect, useMemo } from 'https://esm.sh/react'
-import events from './events.ts'
+import events from '../../shared/events.ts'
+import util from '../../shared/util.ts'
 import { useRouter } from './hooks.ts'
-import util from './util.ts'
 
 const prefetchedPages = new Set<string>()
 

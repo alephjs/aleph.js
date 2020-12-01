@@ -25,14 +25,22 @@ use url::Url;
 
 lazy_static! {
   pub static ref HASH_PLACEHOLDER: String = "x".repeat(9);
-  pub static ref RE_ENDS_WITH_VERSION: Regex =
-    Regex::new(r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$").unwrap();
-  pub static ref RE_REACT_URL: Regex =
-    Regex::new(r"^https?://[a-z0-9\-.:]+/react(@[0-9a-z\.\-]+)?(/|\?|$)").unwrap();
-  pub static ref RE_REACT_DOM_URL: Regex =
-    Regex::new(r"^https?://[a-z0-9\-.:]+/react\-dom(@[0-9a-z\.\-]+)?(/|\?|$)").unwrap();
-  pub static ref RE_REACT_SERVER_URL: Regex =
-    Regex::new(r"^https?://[a-z0-9\-.:]+/react\-dom(@[0-9a-z\.\-]+)?/server(/|\?|$)").unwrap();
+  pub static ref RE_ENDS_WITH_VERSION: Regex = Regex::new(
+    r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$"
+  )
+  .unwrap();
+  pub static ref RE_REACT_URL: Regex = Regex::new(
+    r"^https?://([a-z0-9]+\.)?(esm.sh(/v\d+)?|unpkg.com|skypack.dev|jspm.dev|jsdelivr.net/npm)/react(@[0-9a-z\.\-]+)?(/|\?|$)"
+  )
+  .unwrap();
+  pub static ref RE_REACT_DOM_URL: Regex = Regex::new(
+    r"^https?://([a-z0-9]+\.)?(esm.sh(/v\d+)?|unpkg.com|skypack.dev|jspm.dev|jsdelivr.net/npm)/react\-dom(@[0-9a-z\.\-]+)?(/|\?|$)"
+  )
+  .unwrap();
+  pub static ref RE_REACT_SERVER_URL: Regex = Regex::new(
+    r"^https?://([a-z0-9]+\.)?(esm.sh(/v\d+)?|unpkg.com|skypack.dev|jspm.dev|jsdelivr.net/npm)/react\-dom(@[0-9a-z\.\-]+)?/server(/|\?|$)"
+  )
+  .unwrap();
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -1022,6 +1030,13 @@ mod tests {
       (
         "../-/esm.sh/react-refresh.js".into(),
         "https://esm.sh/react-refresh".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("https://deno.land/x/aleph/framework/react/link.ts", false),
+      (
+        "../-/http_localhost_9006/framework/react/link.js".into(),
+        "http://localhost:9006/framework/react/link.ts".into()
       )
     );
     assert_eq!(

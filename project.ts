@@ -1,5 +1,6 @@
-import { Request } from '../api.ts'
-import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
+import { Request } from './api.ts'
+import { initSWC, SWCOptions, transpileSync } from './compiler/mod.ts'
+import type { AcceptedPlugin, ECMA, ServerRequest } from './deps.ts'
 import {
     CleanCSS,
     colors,
@@ -11,13 +12,13 @@ import {
     postcss,
     readerFromStreamReader,
     safeLoadFront,
+    Sha1,
     Sha256,
     walk
-} from '../deps.ts'
-import { EventEmitter } from '../events.ts'
-import { getPagePath, RouteModule, Routing } from '../routing.ts'
-import { initSWC, SWCOptions, transpileSync } from '../swc/mod.ts'
-import type { APIHandler, Config, RouterURL } from '../types.ts'
+} from './deps.ts'
+import log from './log.ts'
+import { getPagePath, RouteModule, Routing } from './routing.ts'
+import { EventEmitter } from './shared/events.ts'
 import util, {
     hashShort,
     reFullVersion,
@@ -28,14 +29,14 @@ import util, {
     reMDExt,
     reModuleExt,
     reStyleModuleExt
-} from '../util.ts'
-import { version } from '../version.ts'
-import log from './log.ts'
+} from './shared/util.ts'
 import type {
+    APIHandler,
+    Config,
     DependencyDescriptor,
     ImportMap,
     Module,
-    RenderResult
+    RouterURL
 } from './types.ts'
 import {
     cleanupCompilation,
@@ -45,11 +46,20 @@ import {
     existsDirSync,
     existsFileSync,
     fixImportMap,
-    getAlephModuleLocalUrlPreifx,
-    getHash,
+    fixImportUrl,
     getRelativePath,
     newModule
 } from './util.ts'
+import { version } from './version.ts'
+
+interface RenderResult {
+    url: RouterURL
+    status: number
+    head: string[]
+    scripts: Record<string, any>[]
+    body: string
+    data: Record<string, string> | null
+}
 
 /**
  * A Project to manage the Aleph.js appliaction.
@@ -86,6 +96,7 @@ export class Project {
         this.appRoot = path.resolve(appDir)
         this.mode = mode
         this.config = {
+            framework: 'react',
             srcDir: existsDirSync(path.join(this.appRoot, '/src/pages')) ? '/src' : '/',
             outputDir: '/dist',
             baseUrl: '/',
@@ -260,7 +271,6 @@ export class Project {
             lang: defaultLocale,
             scripts: [
                 { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
-                { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true },
                 ...this._getPreloadScripts()
             ],
             head: customLoading?.head || [],
@@ -314,19 +324,56 @@ export class Project {
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
+    /** inject HMR helper code  */
+    injectHmr(url: string, content: string): string {
+        const { __ALEPH_DEV_PORT: devPort } = globalThis as any
+        const alephModuleLocalUrlPreifx = devPort ? `http_localhost_${devPort}` : `deno.land/x/aleph@v${version}`
+        const localUrl = fixImportUrl(url)
+        const hmrImportPath = getRelativePath(
+            path.dirname(localUrl),
+            `/-/${alephModuleLocalUrlPreifx}/hmr.js`
+        )
+        const lines = [
+            `import { createHotContext } from ${JSON.stringify(hmrImportPath)};`,
+            `import.meta.hot = createHotContext(${JSON.stringify(url)});`
+        ]
+        const reactRefresh = this.config.framework === 'react' && (reModuleExt.test(url) || reMDExt.test(url))
+        if (reactRefresh) {
+            const refreshImportPath = getRelativePath(
+                path.dirname(localUrl),
+                `/-/${alephModuleLocalUrlPreifx}/framework/react/refresh.js`
+            )
+            lines.push(`import { RefreshRuntime, performReactRefresh } from ${JSON.stringify(refreshImportPath)};`)
+            lines.push('')
+            lines.push(
+                `const prevRefreshReg = window.$RefreshReg$;`,
+                `const prevRefreshSig = window.$RefreshSig$;`,
+                `Object.assign(window, {`,
+                `    $RefreshReg$: (type, id) => RefreshRuntime.register(type, ${JSON.stringify(url)} + " " + id),`,
+                `    $RefreshSig$: RefreshRuntime.createSignatureFunctionForTransform`,
+                `});`,
+            )
+        }
+        lines.push('')
+        lines.push(content)
+        lines.push('')
+        if (reactRefresh) {
+            lines.push(
+                'window.$RefreshReg$ = prevRefreshReg;',
+                'window.$RefreshSig$ = prevRefreshSig;',
+                'import.meta.hot.accept(performReactRefresh);'
+            )
+        } else {
+            lines.push('import.meta.hot.accept();')
+        }
+        return lines.join('\n')
+    }
+
     private _getPreloadScripts() {
         const { baseUrl } = this.config
-        const amlUrlPreifx = getAlephModuleLocalUrlPreifx()
-        const scripts = [
-            `/-/${amlUrlPreifx}/aleph.js`,
-            `/-/${amlUrlPreifx}/bootstrap.js`,
-            `/-/${amlUrlPreifx}/context.js`,
-            `/-/${amlUrlPreifx}/error.js`,
-            `/-/${amlUrlPreifx}/events.js`,
-            `/-/${amlUrlPreifx}/routing.js`,
-            `/-/${amlUrlPreifx}/util.js`
+        return [
+            this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true } : {},
         ]
-        return scripts.map(src => ({ src: util.cleanPath(`${baseUrl}/_aleph/${src}`), type: 'module', preload: true }))
     }
 
     /** load config from `aleph.config.(json|mjs|js|ts)` */
@@ -447,11 +494,12 @@ export class Project {
         // update import map
         const { __ALEPH_DEV_PORT: devPort } = globalThis as any
         if (devPort) {
+            const alias = `http://localhost:${devPort}/`
             const imports = {
-                'https://deno.land/x/aleph/': [`http://localhost:${devPort}/`],
-                [`https://deno.land/x/aleph@v${version}/`]: [`http://localhost:${devPort}/`],
-                'aleph': [`http://localhost:${devPort}/mod.ts`],
-                'aleph/': [`http://localhost:${devPort}/`],
+                'https://deno.land/x/aleph/': [alias],
+                [`https://deno.land/x/aleph@v${version}/`]: [alias],
+                'aleph': [`${alias}/mod.ts`],
+                'aleph/': [alias],
             }
             Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
         }
@@ -472,6 +520,7 @@ export class Project {
         const walkOptions = { includeDirs: false, exts: ['.ts', '.js', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
+        const alephPkgUrl = this._getAlephPkgUrl()
 
         if (!(existsDirSync(pagesDir))) {
             log.fatal(`'pages' directory not found.`)
@@ -605,39 +654,29 @@ export class Project {
         }
 
         // pre-compile some modules
-        const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-
         if (this.isDev) {
             for (const mod of [
                 'hmr.ts',
+                'framework/react/refresh.ts',
                 'nomodule.ts',
             ]) {
-                if (devPort) {
-                    await this._compile(`http://localhost:${devPort}/${mod}`)
-                } else {
-                    await this._compile(`https://deno.land/x/aleph@v${version}/${mod}`)
-                }
+                await this._compile(`${alephPkgUrl}/${mod}`)
             }
         }
 
         // create main module
         await this._createMainModule()
 
+        // import renderer
+        const rendererUrl = `${alephPkgUrl}/framework/${this.config.framework}/renderer.ts`
+        await this._compile(rendererUrl)
+        const { renderPage } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
+        this.#renderer = { renderPage }
+
         // reload end
         if (reload) {
             this.#reloading = false
         }
-
-        // loading renderer
-        let rendererUrl: string
-        if (devPort) {
-            rendererUrl = `http://localhost:${devPort}/renderer.ts`
-        } else {
-            rendererUrl = `https://deno.land/x/aleph@v${version}/renderer.ts`
-        }
-        await this._compile(rendererUrl)
-        const { renderPage } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
-        this.#renderer = { renderPage }
 
         if (this.isDev) {
             if (this.#apiRouting.paths.length > 0) {
@@ -727,7 +766,7 @@ export class Project {
                                     mod = newModule(path)
                                 }
                                 Deno.readFile(p).then(content => {
-                                    mod.hash = getHash(content)
+                                    mod.hash = (new Sha1).update(content).hex()
                                     this.#apiRouting.update(this._getRouteModule(mod))
                                 })
                             } else {
@@ -785,6 +824,17 @@ export class Project {
         }
     }
 
+    private _getAlephPkgUrl() {
+        const { __ALEPH_DEV_PORT: devPort } = globalThis as any
+        let uri: string
+        if (devPort) {
+            uri = `http://localhost:${devPort}`
+        } else {
+            uri = `https://deno.land/x/aleph@v${version}`
+        }
+        return uri
+    }
+
     /** returns the route module by given module url and hash. */
     private _getRouteModule({ url, hash }: Module): RouteModule {
         const deps = this._lookupDeps(url).filter(({ isData }) => !!isData)
@@ -793,7 +843,7 @@ export class Project {
 
     /** create re-compiled main module. */
     private async _createMainModule(): Promise<Module> {
-        const { baseUrl, defaultLocale } = this.config
+        const { baseUrl, defaultLocale, framework } = this.config
         const config: Record<string, any> = {
             baseUrl,
             defaultLocale,
@@ -809,13 +859,12 @@ export class Project {
         }
 
         const sourceCode = [
-            this.isDev && `import "https://deno.land/x/aleph/hmr.ts"`,
-            `import bootstrap from "https://deno.land/x/aleph/bootstrap.ts"`,
+            this.isDev && `import "https://deno.land/x/aleph@v${version}/framework/${framework}/refresh.ts"`,
+            `import bootstrap from "https://deno.land/x/aleph@v${version}/framework/${framework}/bootstrap.ts"`,
             `bootstrap(${JSON.stringify(config)})`
         ].filter(Boolean).join('\n')
         const module = await this._compile('/main.ts', { sourceCode, bundleMode: !this.isDev })
         await cleanupCompilation(module.jsFile)
-        await ensureTextFile(module.jsFile, module.jsContent)
         this.#modules.set(module.url, module)
 
         return module
@@ -869,23 +918,21 @@ export class Project {
             return this.#modules.get(mod.url)!
         }
 
-        const name = path.basename(mod.localUrl).replace(reModuleExt, '')
-        const saveDir = path.join(this.buildDir, path.dirname(mod.localUrl))
+        const localUrl = fixImportUrl(url)
+        const isRemote = reHttp.test(url)
+        const name = path.basename(localUrl).replace(reModuleExt, '')
+        const saveDir = path.join(this.buildDir, path.dirname(localUrl))
         const metaFile = path.join(saveDir, `${name}.meta.json`)
 
         if (!bundleMode && existsFileSync(metaFile)) {
             const { sourceHash, hash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
-            const jsFile = path.join(saveDir, name + (mod.isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
+            const jsFile = path.join(saveDir, name + (isRemote ? '' : '.' + hash.slice(0, hashShort))) + '.js'
             if (util.isNEString(sourceHash) && util.isNEString(hash) && util.isArray(deps) && existsFileSync(jsFile)) {
                 try {
                     mod.sourceHash = sourceHash
                     mod.hash = hash
                     mod.deps = deps
                     mod.jsFile = jsFile
-                    mod.jsContent = await Deno.readTextFile(jsFile)
-                    if (existsFileSync(jsFile + '.map')) {
-                        mod.jsSourceMap = await Deno.readTextFile(jsFile + '.map')
-                    }
                 } catch (e) { }
             }
         }
@@ -893,15 +940,17 @@ export class Project {
         let sourceContent = new Uint8Array()
         let shouldCompile = false
         let fsync = false
+        let jsContent = ''
+        let jsSourceMap: string | null = null
 
         if (options?.sourceCode) {
             sourceContent = (new TextEncoder).encode(options.sourceCode)
-            const sourceHash = getHash(sourceContent)
+            const sourceHash = (new Sha1).update(sourceContent).hex()
             if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                 mod.sourceHash = sourceHash
                 shouldCompile = true
             }
-        } else if (mod.isRemote) {
+        } else if (isRemote) {
             let dlUrl = url
             if (dlUrl.startsWith('https://esm.sh/')) {
                 const u = new URL(dlUrl)
@@ -917,7 +966,7 @@ export class Project {
                         throw new Error(`${resp.status} - ${resp.statusText}`)
                     }
                     sourceContent = await Deno.readAll(readerFromStreamReader(resp.body!.getReader()))
-                    const sourceHash = getHash(sourceContent)
+                    const sourceHash = (new Sha1).update(sourceContent).hex()
                     if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
                         shouldCompile = true
@@ -928,7 +977,7 @@ export class Project {
             } else if (mod.sourceHash === '' || !reFullVersion.test(dlUrl)) {
                 try {
                     sourceContent = await this._loadDependency(dlUrl)
-                    const sourceHash = getHash(sourceContent)
+                    const sourceHash = (new Sha1).update(sourceContent).hex()
                     if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
                         shouldCompile = true
@@ -943,7 +992,7 @@ export class Project {
             const filepath = path.join(this.srcDir, url)
             try {
                 sourceContent = await Deno.readFile(filepath)
-                const sourceHash = getHash(sourceContent)
+                const sourceHash = (new Sha1).update(sourceContent).hex()
                 if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                     mod.sourceHash = sourceHash
                     shouldCompile = true
@@ -983,7 +1032,7 @@ export class Project {
                     ...options,
                     loader: 'js',
                     sourceCode: (`
-                        import { applyCSS } from "https://deno.land/x/aleph@v${version}/style.ts";\
+                        import { applyCSS } from "https://deno.land/x/aleph@v${version}/framework/${this.config.framework}/style.ts";\
                         applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css.trim()}\n` : css)});
                     `).replaceAll(' '.repeat(24), '').trim(),
                 })
@@ -995,7 +1044,7 @@ export class Project {
                     loader: 'js',
                     sourceCode: (`
                         import React, { useEffect, useRef } from ${JSON.stringify(this.config.reactUrl)};
-                        import { redirect } from "https://deno.land/x/aleph@v${version}/anchor.ts";
+                        import { redirect } from "https://deno.land/x/aleph@v${version}/framework/${this.config.framework}/anchor.ts";
                         export default function MarkdownPage() {
                             const ref = useRef(null);
                             useEffect(() => {
@@ -1041,8 +1090,8 @@ export class Project {
                     bundleMode,
                     bundleLocalPaths: options?.bundleLocalPaths
                 })
-                mod.jsContent = code
-                mod.jsSourceMap = map!
+                jsContent = code
+                jsSourceMap = map!
                 await Promise.all(Object.entries(inlineStyles).map(async ([key, style]) => {
                     let type = style.type
                     let tpl = style.quasis.reduce((css, quais, i, a) => {
@@ -1075,7 +1124,7 @@ export class Project {
                             /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
                             (_, id) => '${' + style.exprs[parseInt(id)] + '}'
                         )
-                        mod.jsContent = mod.jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
+                        jsContent = jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
                     }
                 }))
                 deps.forEach(({ specifier, isDynamic }) => {
@@ -1123,7 +1172,7 @@ export class Project {
                         path.dirname(url),
                         dep.url.replace(reModuleExt, '')
                     )
-                    mod.jsContent = mod.jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
+                    jsContent = jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
                         if (importPath.slice(0, - (hashShort + 4)) === depImportPath) {
                             if (bundleMode) {
                                 return `${key}${spaces}${ql}${depImportPath}.bundling.js${qr}`
@@ -1133,7 +1182,7 @@ export class Project {
                         }
                         return s
                     })
-                    mod.hash = getHash(mod.jsContent)
+                    mod.hash = (new Sha1).update(jsContent).hex()
                 }
                 if (!fsync) {
                     fsync = true
@@ -1143,8 +1192,8 @@ export class Project {
 
         if (!bundleMode) {
             if (fsync) {
-                mod.hash = getHash(mod.jsContent)
-                mod.jsFile = path.join(saveDir, name + (mod.isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + (bundleMode ? '.bundling' : '') + '.js'
+                mod.hash = (new Sha1).update(jsContent).hex()
+                mod.jsFile = path.join(saveDir, name + (isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`)) + (bundleMode ? '.bundling' : '') + '.js'
                 await cleanupCompilation(mod.jsFile)
                 await Promise.all([
                     ensureTextFile(metaFile, JSON.stringify({
@@ -1153,13 +1202,13 @@ export class Project {
                         hash: mod.hash,
                         deps: mod.deps,
                     }, undefined, 4)),
-                    ensureTextFile(mod.jsFile, mod.jsContent),
-                    mod.jsSourceMap ? ensureTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
+                    ensureTextFile(mod.jsFile, jsContent),
+                    jsSourceMap ? ensureTextFile(mod.jsFile + '.map', jsSourceMap) : Promise.resolve()
                 ])
             }
         } else {
             mod.jsFile = path.join(saveDir, name + '.bundling.js')
-            await ensureTextFile(mod.jsFile, mod.jsContent)
+            await ensureTextFile(mod.jsFile, jsContent)
         }
 
         return mod
@@ -1179,25 +1228,26 @@ export class Project {
                                 path.dirname(mod.url),
                                 dep.url.replace(reModuleExt, '')
                             )
-                            mod.jsContent = mod.jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
-                                if (importPath.slice(0, - (hashShort + 4)) === depImportPath) {
-                                    return `${key}${spaces}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}`
-                                }
-                                return s
-                            })
-                            mod.hash = getHash(mod.jsContent)
-                            mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
-                            cleanupCompilation(mod.jsFile).then(() => {
-                                Promise.all([
-                                    ensureTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
-                                        url: mod.url,
-                                        sourceHash: mod.sourceHash,
-                                        hash: mod.hash,
-                                        deps: mod.deps,
-                                    }, undefined, 4)),
-                                    ensureTextFile(mod.jsFile, mod.jsContent),
-                                    mod.jsSourceMap ? ensureTextFile(mod.jsFile + '.map', mod.jsSourceMap) : Promise.resolve()
-                                ])
+                            Deno.readTextFile(mod.jsFile).then(jsContent => {
+                                jsContent = jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
+                                    if (importPath.slice(0, - (hashShort + 4)) === depImportPath) {
+                                        return `${key}${spaces}${ql}${depImportPath}.${dep.hash.slice(0, hashShort)}.js${qr}`
+                                    }
+                                    return s
+                                })
+                                mod.hash = (new Sha1).update(jsContent).hex()
+                                mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
+                                cleanupCompilation(mod.jsFile).then(() => {
+                                    Promise.all([
+                                        ensureTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
+                                            url: mod.url,
+                                            sourceHash: mod.sourceHash,
+                                            hash: mod.hash,
+                                            deps: mod.deps,
+                                        }, undefined, 4)),
+                                        ensureTextFile(mod.jsFile, jsContent)
+                                    ])
+                                })
                             })
                         }
                         callback(mod)

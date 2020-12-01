@@ -1,10 +1,10 @@
-import { Request } from '../api.ts'
-import { path, serve, ws } from '../deps.ts'
-import util, { hashShort, reHashJs, reModuleExt } from '../util.ts'
+import { Request } from './api.ts'
+import { path, serve, ws } from './deps.ts'
 import log from './log.ts'
 import { getContentType } from './mime.ts'
 import { Project } from './project.ts'
-import { createHtml, existsFileSync, injectHmr } from './util.ts'
+import util, { hashShort, reHashJs, reModuleExt } from './shared/util.ts'
+import { createHtml, existsFileSync } from './util.ts'
 
 export async function start(appDir: string, port: number, isDev = false, reload = false) {
     const project = new Project(appDir, isDev ? 'development' : 'production', reload)
@@ -113,11 +113,16 @@ export async function start(appDir: string, port: number, isDev = false, reload 
                                     }
                                     let body = ''
                                     if (reqMap) {
-                                        body = mod.jsSourceMap || ''
+                                        if (existsFileSync(mod.jsFile + '.map')) {
+                                            body = await Deno.readTextFile(mod.jsFile + '.map')
+                                        } else {
+                                            resp.status(404).send('file not found')
+                                            continue
+                                        }
                                     } else {
-                                        body = mod.jsContent
+                                        body = await Deno.readTextFile(mod.jsFile)
                                         if (project.isHMRable(mod.url)) {
-                                            body = injectHmr({ ...mod, jsContent: body })
+                                            body = project.injectHmr(mod.url, body)
                                         }
                                     }
                                     resp.setHeader('ETag', mod.hash)

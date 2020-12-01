@@ -414,28 +414,28 @@ mod tests {
     println!("{}", code);
     assert!(code.contains(
       format!(
-        "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v{}/anchor.js\"",
+        "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v{}/framework/react/anchor.js\"",
         VERSION.as_str()
       )
       .as_str()
     ));
     assert!(code.contains(
       format!(
-        "import __ALEPH_Head from \"../-/deno.land/x/aleph@v{}/head.js\"",
+        "import __ALEPH_Head from \"../-/deno.land/x/aleph@v{}/framework/react/head.js\"",
         VERSION.as_str()
       )
       .as_str()
     ));
     assert!(code.contains(
       format!(
-        "import __ALEPH_Link from \"../-/deno.land/x/aleph@v{}/link.js\"",
+        "import __ALEPH_Link from \"../-/deno.land/x/aleph@v{}/framework/react/link.js\"",
         VERSION.as_str()
       )
       .as_str()
     ));
     assert!(code.contains(
       format!(
-        "import __ALEPH_Script from \"../-/deno.land/x/aleph@v{}/script.js\"",
+        "import __ALEPH_Script from \"../-/deno.land/x/aleph@v{}/framework/react/script.js\"",
         VERSION.as_str()
       )
       .as_str()
@@ -467,19 +467,31 @@ mod tests {
           is_dynamic: true,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/anchor.ts", VERSION.as_str()),
+          specifier: format!(
+            "https://deno.land/x/aleph@v{}/framework/react/anchor.ts",
+            VERSION.as_str()
+          ),
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/head.ts", VERSION.as_str()),
+          specifier: format!(
+            "https://deno.land/x/aleph@v{}/framework/react/head.ts",
+            VERSION.as_str()
+          ),
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/link.ts", VERSION.as_str()),
+          specifier: format!(
+            "https://deno.land/x/aleph@v{}/framework/react/link.ts",
+            VERSION.as_str()
+          ),
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: format!("https://deno.land/x/aleph@v{}/script.ts", VERSION.as_str()),
+          specifier: format!(
+            "https://deno.land/x/aleph@v{}/framework/react/script.ts",
+            VERSION.as_str()
+          ),
           is_dynamic: false,
         }
       ]
@@ -511,7 +523,7 @@ mod tests {
     let (code, resolver) = t("/pages/index.tsx", source, false);
     assert!(code.contains(
       format!(
-        "import __ALEPH_Style from \"../-/deno.land/x/aleph@v{}/style.js\"",
+        "import __ALEPH_Style from \"../-/deno.land/x/aleph@v{}/framework/react/style.js\"",
         VERSION.as_str()
       )
       .as_str()
@@ -564,7 +576,7 @@ mod tests {
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
     assert!(code.contains(
       format!(
-        "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph@v{}/head.ts\"].default",
+        "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph@v{}/framework/react/head.ts\"].default",
         VERSION.as_str()
       )
       .as_str()

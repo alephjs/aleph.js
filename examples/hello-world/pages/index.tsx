@@ -1,6 +1,6 @@
-import { useDeno } from 'aleph/hooks.ts'
-import React, { useState } from 'react'
-import Logo from '../components/logo.tsx'
+import { useDeno } from 'aleph';
+import React, { useState } from 'react';
+import Logo from '../components/logo.tsx';
 
 export default function Home() {
     const [count, setCount] = useState(0)

@@ -413,7 +413,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                     decls: vec![create_aleph_pack_var_decl(
                         id,
                         format!(
-                            "https://deno.land/x/aleph@v{}/{}.ts",
+                            "https://deno.land/x/aleph@v{}/framework/react/{}.ts",
                             VERSION.as_str(),
                             name
                         )
@@ -433,7 +433,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                         value: resolver
                             .resolve(
                                 format!(
-                                    "https://deno.land/x/aleph@v{}/{}.ts",
+                                    "https://deno.land/x/aleph@v{}/framework/react/{}.ts",
                                     VERSION.as_str(),
                                     name
                                 )

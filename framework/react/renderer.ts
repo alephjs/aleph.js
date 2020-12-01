@@ -1,12 +1,12 @@
 import React, { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
+import events from '../../shared/events.ts'
+import util, { hashShort, reHttp } from '../../shared/util.ts'
+import type { RouterURL } from '../../types.ts'
 import { RendererContext, RouterContext } from './context.ts'
 import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page } from './error.ts'
-import events from './events.ts'
-import { createPageProps } from './routing.ts'
 import { serverStyles } from './style.ts'
-import type { RouterURL } from './types.ts'
-import util, { hashShort, reHttp } from './util.ts'
+import { createPageProps, isLikelyReactComponent } from './util.ts'
 
 interface RenderResult {
     head: string[]
@@ -25,7 +25,7 @@ export async function renderPage(
     let el: ReactElement
     const pageProps = createPageProps(pageComponentTree)
     if (App) {
-        if (util.isLikelyReactComponent(App)) {
+        if (isLikelyReactComponent(App)) {
             el = React.createElement(App, pageProps)
         } else {
             el = React.createElement(
@@ -36,7 +36,7 @@ export async function renderPage(
     } else {
         if (pageProps.Page == null) {
             if (E404) {
-                if (util.isLikelyReactComponent(E404)) {
+                if (isLikelyReactComponent(E404)) {
                     el = React.createElement(E404)
                 } else {
                     el = React.createElement(

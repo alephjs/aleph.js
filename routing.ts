@@ -1,8 +1,5 @@
-import type { ComponentType } from 'https://esm.sh/react'
-import { DependencyDescriptor } from './core/types.ts'
-import { E400MissingDefaultExportAsComponent } from './error.ts'
-import type { RouterURL } from './types.ts'
-import util, { reMDExt, reModuleExt } from './util.ts'
+import util, { reMDExt, reModuleExt } from './shared/util.ts'
+import type { DependencyDescriptor, RouterURL } from './types.ts'
 
 export interface Route {
     path: string
@@ -14,11 +11,6 @@ export interface RouteModule {
     readonly url: string
     readonly hash: string
     readonly deps?: DependencyDescriptor[]
-}
-
-export interface PageProps {
-    Page: ComponentType<any> | null
-    pageProps: Partial<PageProps> & { name?: string }
 }
 
 const ghostRoute: Route = { path: '', module: { url: '', hash: '' } }
@@ -212,36 +204,36 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
     return [params, true]
 }
 
-export function createPageProps(componentTree: { url: string, Component?: ComponentType<any> }[]): PageProps {
-    const pageProps: PageProps = {
-        Page: null,
-        pageProps: {}
-    }
-    if (componentTree.length > 0) {
-        Object.assign(pageProps, _createPagePropsSegment(componentTree[0]))
-    }
-    if (componentTree.length > 1) {
-        componentTree.slice(1).reduce((p, seg) => {
-            const c = _createPagePropsSegment(seg)
-            p.pageProps = c
-            return c
-        }, pageProps)
-    }
-    return pageProps
-}
+// export function createPageProps(componentTree: { url: string, Component?: ComponentType<any> }[]): PageProps {
+//     const pageProps: PageProps = {
+//         Page: null,
+//         pageProps: {}
+//     }
+//     if (componentTree.length > 0) {
+//         Object.assign(pageProps, _createPagePropsSegment(componentTree[0]))
+//     }
+//     if (componentTree.length > 1) {
+//         componentTree.slice(1).reduce((p, seg) => {
+//             const c = _createPagePropsSegment(seg)
+//             p.pageProps = c
+//             return c
+//         }, pageProps)
+//     }
+//     return pageProps
+// }
 
-function _createPagePropsSegment(seg: { url: string, Component?: ComponentType<any> }): PageProps {
-    const pageProps: PageProps = {
-        Page: null,
-        pageProps: {}
-    }
-    if (seg.Component) {
-        if (util.isLikelyReactComponent(seg.Component)) {
-            pageProps.Page = seg.Component
-        } else {
-            pageProps.Page = E400MissingDefaultExportAsComponent
-            pageProps.pageProps = { name: 'Page: ' + seg.url.replace(reModuleExt, '') }
-        }
-    }
-    return pageProps
-}
+// function _createPagePropsSegment(seg: { url: string, Component?: ComponentType<any> }): PageProps {
+//     const pageProps: PageProps = {
+//         Page: null,
+//         pageProps: {}
+//     }
+//     if (seg.Component) {
+//         if (util.isLikelyReactComponent(seg.Component)) {
+//             pageProps.Page = seg.Component
+//         } else {
+//             pageProps.Page = E400MissingDefaultExportAsComponent
+//             pageProps.pageProps = { name: 'Page: ' + seg.url.replace(reModuleExt, '') }
+//         }
+//     }
+//     return pageProps
+// }

@@ -1,6 +1,7 @@
 import React, { ComponentType, LinkHTMLAttributes, useEffect, useState } from 'https://esm.sh/react'
+import util from '../../shared/util.ts'
 import { removeCSS } from './style.ts'
-import util from './util.ts'
+import { isLikelyReactComponent } from './util.ts'
 
 type LinkProps = LinkHTMLAttributes<{}> & {
     ['data-fallback']?: JSX.Element
@@ -30,7 +31,7 @@ export default function Link({
             import(fixedHref)
                 .then(mod => {
                     const Component = mod[exportName || 'default']
-                    if (util.isLikelyReactComponent(Component)) {
+                    if (isLikelyReactComponent(Component)) {
                         setMod({ Component })
                     } else {
                         setError(`component${exportName ? ` '${exportName}'` : ''} not found`)

@@ -1,164 +1,275 @@
-const symbolFor = typeof Symbol === 'function' && Symbol.for
-const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
-const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
+import { colors, ensureDir, path } from './deps.ts'
+import util, {
+    MB,
+    reHashJs,
+    reHttp,
+    reMDExt,
+    reModuleExt,
+    reStyleModuleExt
+} from './shared/util.ts'
+import { ImportMap, Module } from './types.ts'
 
-export const hashShort = 9
-export const reHttp = /^https?:\/\//i
-export const reModuleExt = /\.(js|jsx|mjs|ts|tsx)$/i
-export const reStyleModuleExt = /\.(css|less)$/i
-export const reMDExt = /\.(md|markdown)$/i
-export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
-export const reFullVersion = /@v?\d+\.\d+\.\d+/i
-export const reHashJs = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
-export const reHashResolve = new RegExp(`(import|import\\s*\\(|from|href\\s*:)(\\s*)("|')([^'"]+.[0-9a-fx]{${hashShort}}\\.js)("|')`, 'g')
-
-export const KB = 1024
-export const MB = KB ** 2
-export const GB = KB ** 3
-export const TB = KB ** 4
-export const PB = KB ** 5
-
-export default {
-    isNumber(a: any): a is number {
-        return typeof a === 'number' && !Number.isNaN(a)
-    },
-    isUNumber(a: any): a is number {
-        return this.isNumber(a) && a >= 0
-    },
-    isInt(a: any): a is number {
-        return this.isNumber(a) && Number.isInteger(a)
-    },
-    isUInt(a: any): a is number {
-        return this.isInt(a) && a >= 0
-    },
-    isString(a: any): a is string {
-        return typeof a === 'string'
-    },
-    isNEString(a: any): a is string {
-        return typeof a === 'string' && a.length > 0
-    },
-    isArray(a: any): a is Array<any> {
-        return Array.isArray(a)
-    },
-    isNEArray(a: any): a is Array<any> {
-        return Array.isArray(a) && a.length > 0
-    },
-    isPlainObject(a: any): a is Record<string, any> {
-        return typeof a === 'object' && a !== null && !this.isArray(a) && Object.getPrototypeOf(a) == Object.prototype
-    },
-    isFunction(a: any): a is Function {
-        return typeof a === 'function'
-    },
-    isLikelyReactComponent(type: any): Boolean {
-        switch (typeof type) {
-            case 'function':
-                if (type.prototype != null) {
-                    if (type.prototype.isReactComponent) {
-                        return true
-                    }
-                    const ownNames = Object.getOwnPropertyNames(type.prototype);
-                    if (ownNames.length > 1 || ownNames[0] !== 'constructor') {
-                        return false
-                    }
-                }
-                const name = type.name || type.displayName
-                return typeof name === 'string' && /^[A-Z]/.test(name)
-            case 'object':
-                if (type != null) {
-                    switch (type.$$typeof) {
-                        case REACT_FORWARD_REF_TYPE:
-                        case REACT_MEMO_TYPE:
-                            return true
-                        default:
-                            return false
-                    }
-                }
-                return false
-            default:
-                return false
+/* check whether or not the given path exists as a directory */
+export async function existsDir(path: string) {
+    try {
+        const fi = await Deno.lstat(path)
+        if (fi.isDirectory) {
+            return true
         }
-    },
-    trimPrefix(s: string, prefix: string): string {
-        if (prefix !== '' && s.startsWith(prefix)) {
-            return s.slice(prefix.length)
+        return false
+    } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
+            return false
         }
-        return s
-    },
-    trimSuffix(s: string, suffix: string): string {
-        if (suffix !== '' && s.endsWith(suffix)) {
-            return s.slice(0, -suffix.length)
-        }
-        return s
-    },
-    ensureExt(s: string, ext: string): string {
-        if (s.endsWith(ext)) {
-            return s
-        }
-        return s + ext
-    },
-    splitBy(s: string, searchString: string): [string, string] {
-        const i = s.indexOf(searchString)
-        if (i >= 0) {
-            return [s.slice(0, i), s.slice(i + 1)]
-        }
-        return [s, '']
-    },
-    bytesString(bytes: number) {
-        if (bytes < KB) {
-            return bytes.toString() + 'B'
-        }
-        if (bytes < MB) {
-            return Math.ceil(bytes / KB) + 'KB'
-        }
-        if (bytes < GB) {
-            return (bytes / MB).toFixed(1).replace(/\.0$/, '') + 'MB'
-        }
-        if (bytes < TB) {
-            return (bytes / GB).toFixed(1).replace(/\.0$/, '') + 'GB'
-        }
-        if (bytes < PB) {
-            return (bytes / TB).toFixed(1).replace(/\.0$/, '') + 'TB'
-        }
-        return (bytes / PB).toFixed(1).replace(/\.0$/, '') + 'PB'
-    },
-    splitPath(path: string): string[] {
-        return path
-            .split(/[\/\\]+/g)
-            .map(p => p.trim())
-            .filter(p => p !== '' && p !== '.')
-            .reduce((path, p) => {
-                if (p === '..') {
-                    path.pop()
-                } else {
-                    path.push(p)
-                }
-                return path
-            }, [] as Array<string>)
-    },
-    cleanPath(path: string): string {
-        return '/' + this.splitPath(path).join('/')
-    },
-    debounce<T extends Function>(callback: T, delay: number): T {
-        let timer: number | null = null
-        return ((...args: any[]) => {
-            if (timer != null) {
-                clearTimeout(timer)
-            }
-            timer = setTimeout(() => {
-                timer = null
-                callback(...args)
-            }, delay)
-        }) as any
-    },
-    debounceX(id: string, callback: () => void, delay: number) {
-        const self = this as any
-        const timers: Map<string, number> = self.__debounce_timers || (self.__debounce_timers = new Map())
-        if (timers.has(id)) {
-            clearTimeout(timers.get(id)!)
-        }
-        timers.set(id, setTimeout(() => {
-            timers.delete(id)
-            callback()
-        }, delay))
+        throw err
     }
+}
+
+/* check whether or not the given path exists as a directory */
+export function existsDirSync(path: string) {
+    try {
+        const fi = Deno.lstatSync(path)
+        if (fi.isDirectory) {
+            return true
+        }
+        return false
+    } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
+            return false
+        }
+        throw err
+    }
+}
+
+/* check whether or not the given path exists as regular file */
+export async function existsFile(path: string) {
+    try {
+        const fi = await Deno.lstat(path)
+        if (fi.isFile) {
+            return true
+        }
+        return false
+    } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
+            return false
+        }
+        throw err
+    }
+}
+
+/* check whether or not the given path exists as regular file */
+export function existsFileSync(path: string) {
+    try {
+        const fi = Deno.lstatSync(path)
+        if (fi.isFile) {
+            return true
+        }
+        return false
+    } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
+            return false
+        }
+        throw err
+    }
+}
+
+/** ensure and write a text file */
+export async function ensureTextFile(name: string, content: string) {
+    const dir = path.dirname(name)
+    await ensureDir(dir)
+    await Deno.writeTextFile(name, content)
+}
+
+
+/** returns a module by given url. */
+export function newModule(url: string): Module {
+    const isRemote = reHttp.test(url)
+    let loader = ''
+    if (reStyleModuleExt.test(url)) {
+        loader = 'css'
+    } else if (reMDExt.test(url)) {
+        loader = 'markdown'
+    } else if (reModuleExt.test(url)) {
+        loader = url.split('.').pop()!
+        if (loader === 'mjs') {
+            loader = 'js'
+        }
+    } else if (isRemote) {
+        loader = 'js'
+    }
+    return {
+        url,
+        loader,
+        sourceHash: '',
+        hash: '',
+        deps: [],
+        jsFile: '',
+        error: null,
+    }
+}
+
+/** fix import map */
+export function fixImportMap(v: any) {
+    const imports: ImportMap = {}
+    if (util.isPlainObject(v)) {
+        Object.entries(v).forEach(([key, value]) => {
+            if (key == "" || key == "/") {
+                return
+            }
+            const isPrefix = key.endsWith('/')
+            const tmp: string[] = []
+            if (util.isNEString(value)) {
+                if (isPrefix && !value.endsWith('/')) {
+                    return
+                }
+                tmp.push(value)
+            } else if (util.isNEArray(value)) {
+                value.forEach(v => {
+                    if (util.isNEString(v)) {
+                        if (isPrefix && !v.endsWith('/')) {
+                            return
+                        }
+                        tmp.push(v)
+                    }
+                })
+            }
+            imports[key] = tmp
+        })
+    }
+    return imports
+}
+
+/** get relative the path of `to` to `from` */
+export function getRelativePath(from: string, to: string): string {
+    let r = path.relative(from, to).split('\\').join('/')
+    if (!r.startsWith('.') && !r.startsWith('/')) {
+        r = './' + r
+    }
+    return r
+}
+
+/** fix import url */
+export function fixImportUrl(importUrl: string): string {
+    const isRemote = reHttp.test(importUrl)
+    const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
+    let ext = path.extname(path.basename(url.pathname)) || '.js'
+    if (isRemote && !reModuleExt.test(ext) && !reStyleModuleExt.test(ext) && !reMDExt.test(ext)) {
+        ext = '.js'
+    }
+    let pathname = util.trimSuffix(url.pathname, ext)
+    let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
+    if (search.length > 0) {
+        pathname += '_' + search.join(',')
+    }
+    if (isRemote) {
+        return [
+            '/-/',
+            (url.protocol === 'http:' ? 'http_' : ''),
+            url.hostname,
+            (url.port ? '_' + url.port : ''),
+            pathname,
+            ext
+        ].join('')
+    }
+    const result = pathname + ext
+    return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result;
+}
+
+/**
+ * colorful the bytes string
+ * - dim: 0 - 1MB
+ * - yellow: 1MB - 10MB
+ * - red: > 10MB
+ */
+export function colorfulBytesString(bytes: number) {
+    let cf = colors.dim
+    if (bytes > 10 * MB) {
+        cf = colors.red
+    } else if (bytes > MB) {
+        cf = colors.yellow
+    }
+    return cf(util.bytesString(bytes))
+}
+
+/** cleanup the previous compilation cache */
+export async function cleanupCompilation(jsFile: string) {
+    const dir = path.dirname(jsFile)
+    const jsFileName = path.basename(jsFile)
+    if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {
+        return
+    }
+    const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'
+    for await (const entry of Deno.readDir(dir)) {
+        if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
+            const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
+            if (_jsName === jsName && jsFileName !== entry.name) {
+                await Deno.remove(path.join(dir, entry.name))
+            }
+        }
+    }
+}
+
+/** crate html content by given arguments */
+export function createHtml({
+    lang = 'en',
+    head = [],
+    scripts = [],
+    body,
+    minify = false
+}: {
+    lang?: string,
+    head?: string[],
+    scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean, preload?: boolean })[],
+    body: string,
+    minify?: boolean
+}) {
+    const eol = minify ? '' : '\n'
+    const indent = minify ? '' : ' '.repeat(4)
+    const headTags = head.map(tag => tag.trim())
+        .concat(scripts.map(v => {
+            if (!util.isString(v) && util.isNEString(v.src)) {
+                if (v.type === 'module') {
+                    return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
+                } else if (v.async === true) {
+                    return `<link rel="preload" href=${JSON.stringify(v.src)} as="script" />`
+                }
+            }
+            return ''
+        })).filter(Boolean)
+    const scriptTags = scripts.map(v => {
+        if (util.isString(v)) {
+            return `<script>${v}</script>`
+        } else if (util.isNEString(v.innerText)) {
+            const { innerText, ...rest } = v
+            return `<script${attrString(rest)}>${eol}${innerText}${eol}${indent}</script>`
+        } else if (util.isNEString(v.src) && !v.preload) {
+            return `<script${attrString(v)}></script>`
+        } else {
+            return ''
+        }
+    }).filter(Boolean)
+
+    return [
+        '<!DOCTYPE html>',
+        `<html lang="${lang}">`,
+        '<head>',
+        indent + '<meta charSet="utf-8" />',
+        ...headTags.map(tag => indent + tag),
+        '</head>',
+        '<body>',
+        indent + body,
+        ...scriptTags.map(tag => indent + tag),
+        '</body>',
+        '</html>'
+    ].join(eol)
+}
+
+function attrString(v: any): string {
+    return Object.keys(v).map(k => {
+        if (v[k] === true) {
+            return ` ${k}`
+        } else {
+            return ` ${k}=${JSON.stringify(String(v[k]))}`
+        }
+    }).join('')
 }

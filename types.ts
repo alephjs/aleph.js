@@ -32,6 +32,8 @@ export interface SSROptions {
  * Config for Aleph.js application.
  */
 export interface Config {
+    /** `framework` to run your application (default is 'react'). */
+    framework?: 'alef' | 'react'
     /** `srcDir` to put your application source code (default is '/'). */
     srcDir?: string
     /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
@@ -124,3 +126,23 @@ export interface FormFile {
     filename: string
     originalName: string
 }
+
+export interface Module {
+    url: string
+    loader: string
+    sourceHash: string
+    hash: string
+    deps: DependencyDescriptor[]
+    jsFile: string
+    error: Error | null
+}
+
+export interface DependencyDescriptor {
+    url: string
+    hash: string
+    isDynamic?: boolean
+    isStyle?: boolean
+    isData?: boolean
+}
+
+export type ImportMap = Record<string, ReadonlyArray<string>>

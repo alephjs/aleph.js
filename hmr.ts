@@ -1,20 +1,9 @@
-import runtime from 'https://esm.sh/react-refresh@0.8.3/runtime'
-import events from './events.ts'
-import util, { hashShort } from './util.ts'
+import events from './shared/events.ts'
+import { hashShort } from './shared/util.ts'
 
 interface Callback {
     (...args: any[]): void
 }
-
-// react-refresh
-// @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
-runtime.injectIntoGlobalHook(window)
-Object.assign(window, {
-    $RefreshReg$: () => { },
-    $RefreshSig$: () => (type: any) => type
-})
-export const performReactRefresh = util.debounce(runtime.performReactRefresh, 30)
-export const RefreshRuntime = runtime
 
 class Module {
     private _url: string

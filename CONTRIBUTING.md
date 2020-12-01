@@ -35,14 +35,13 @@ deno test -A
 ## Project Structure
 
 - **/cli** command code
+- **/compiler** compiler in rust with swc
 - **/core** core code for project&server
 - **/design** design drawings and assets
 - **/examples** some examples
 - **/plugins** official plugins
-- **/swc** compiler in rust with swc
 - **/test** testings
 - **/vendor** packages from npm
-- **/*.ts** framework code
 
 ## Code of Conduct
 

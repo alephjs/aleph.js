@@ -1,6 +1,6 @@
-import log from '../core/log.ts';
-import { existsFileSync } from '../core/util.ts';
 import { path } from '../deps.ts';
+import log from '../log.ts';
+import { existsFileSync } from '../util.ts';
 import { default as init_wasm, transformSync } from './aleph_swc.js';
 import { checksum } from './aleph_swc_wasm_checksum.js';
 
