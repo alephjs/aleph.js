@@ -8,6 +8,9 @@ import util, {
     reStyleModuleExt
 } from './shared/util.ts'
 import { ImportMap, Module } from './types.ts'
+import { version } from './version.ts'
+
+export const alephPkgUrl = `https://deno.land/x/aleph@v${version}`
 
 /* check whether or not the given path exists as a directory */
 export async function existsDir(path: string) {
@@ -104,6 +107,7 @@ export function newModule(url: string): Module {
         hash: '',
         deps: [],
         jsFile: '',
+        bundlingFile: '',
         error: null,
     }
 }
@@ -265,7 +269,7 @@ export function createHtml({
 }
 
 function attrString(v: any): string {
-    return Object.keys(v).map(k => {
+    return Object.keys(v).filter(k => !!v[k]).map(k => {
         if (v[k] === true) {
             return ` ${k}`
         } else {

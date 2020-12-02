@@ -134,6 +134,7 @@ export interface Module {
     hash: string
     deps: DependencyDescriptor[]
     jsFile: string
+    bundlingFile: string
     error: Error | null
 }
 
