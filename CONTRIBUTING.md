@@ -36,10 +36,11 @@ deno test -A
 
 - **/cli** command code
 - **/compiler** compiler in rust with swc
-- **/core** core code for project&server
+- **/framework** framework code
 - **/design** design drawings and assets
 - **/examples** some examples
 - **/plugins** official plugins
+- **/shared** shared code
 - **/test** testings
 - **/vendor** packages from npm
 
