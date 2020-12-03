@@ -405,6 +405,15 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                 name = "anchor".to_owned()
             }
             let id = quote_ident!(rename_builtin_tag(name.as_str()));
+            let (resolved_path, fixed_url) = resolver.resolve(
+                format!(
+                    "https://deno.land/x/aleph@v{}/framework/react/{}.ts",
+                    VERSION.as_str(),
+                    name
+                )
+                .as_str(),
+                false,
+            );
             if resolver.bundle_mode {
                 items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
                     span: DUMMY_SP,
@@ -412,12 +421,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                     declare: false,
                     decls: vec![create_aleph_pack_var_decl(
                         id,
-                        format!(
-                            "https://deno.land/x/aleph@v{}/framework/react/{}.ts",
-                            VERSION.as_str(),
-                            name
-                        )
-                        .as_str(),
+                        fixed_url.as_str(),
                         Some("default"),
                     )],
                 }))));
@@ -430,18 +434,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                     })],
                     src: Str {
                         span: DUMMY_SP,
-                        value: resolver
-                            .resolve(
-                                format!(
-                                    "https://deno.land/x/aleph@v{}/framework/react/{}.ts",
-                                    VERSION.as_str(),
-                                    name
-                                )
-                                .as_str(),
-                                false,
-                            )
-                            .0
-                            .into(),
+                        value: resolved_path.into(),
                         has_escape: false,
                     },
                     type_only: false,
