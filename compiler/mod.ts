@@ -1,8 +1,8 @@
 import { path } from '../deps.ts';
 import log from '../log.ts';
 import { existsFileSync } from '../util.ts';
-import { default as init_wasm, transformSync } from './aleph_swc.js';
-import { checksum } from './aleph_swc_wasm_checksum.js';
+import { checksum } from './wasm-checksum.js';
+import { default as init_wasm, transformSync } from './wasm-pack.js';
 
 type ImportMap = Record<string, ReadonlyArray<string>>
 
@@ -64,12 +64,12 @@ export function transpileSync(code: string, opts?: TransformOptions): TransformR
  */
 export const initSWC = async (denoCacheDir: string) => {
     const t = performance.now()
-    const cachePath = path.join(denoCacheDir, `deps/https/deno.land/aleph_swc.${checksum}.wasm`)
+    const cachePath = path.join(denoCacheDir, `deps/https/deno.land/aleph_compiler.${checksum}.wasm`)
     if (existsFileSync(cachePath)) {
         const wasmData = await Deno.readFile(cachePath)
         await init_wasm(wasmData)
     } else {
-        const { default: getWasmData } = await import('./aleph_swc_wasm.js')
+        const { default: getWasmData } = await import('./wasm.js')
         const wasmData = getWasmData()
         await Promise.all([
             init_wasm(wasmData),

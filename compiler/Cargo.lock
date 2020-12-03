@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aleph-swc"
+name = "aleph-compiler"
 version = "0.3.0-alpha"
 dependencies = [
  "anyhow",

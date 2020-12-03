@@ -1,5 +1,5 @@
 [package]
-name = "aleph-swc"
+name = "aleph-compiler"
 version = "0.3.0-alpha"
 authors = ["The Aleph.js authors"]
 edition = "2018"
