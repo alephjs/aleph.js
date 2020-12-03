@@ -62,7 +62,7 @@ export function transpileSync(code: string, opts?: TransformOptions): TransformR
 /**
  * load and initiate compiler wasm.
  */
-export const initSWC = async (denoCacheDir: string) => {
+export const initWasm = async (denoCacheDir: string) => {
     const t = performance.now()
     const cachePath = path.join(denoCacheDir, `deps/https/deno.land/aleph_compiler.${checksum}.wasm`)
     if (existsFileSync(cachePath)) {
@@ -76,5 +76,5 @@ export const initSWC = async (denoCacheDir: string) => {
             Deno.writeFile(cachePath, wasmData)
         ])
     }
-    log.debug('init swc wasm in ' + Math.round(performance.now() - t) + 'ms')
+    log.debug('init compiler wasm in ' + Math.round(performance.now() - t) + 'ms')
 }
