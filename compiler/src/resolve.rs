@@ -374,14 +374,9 @@ impl Fold for AlephResolveFold {
   //   - `export React, {useState} from "https://esm.sh/react"` -> `__ALEPH.exportFrom("/pages/index.tsx", "https://esm.sh/react", {"default": "React", "useState": "useState'})`
   //   - `export * as React from "https://esm.sh/react"` -> `__ALEPH.exportFrom("/pages/index.tsx", "https://esm.sh/react", {"*": "React"})`
   //   - `export * from "https://esm.sh/react"` -> `__ALEPH.exportFrom("/pages/index.tsx", "https://esm.sh/react", "*")`
-  //   - `export default function App{}` -> `__ALEPH.export("/pages/index.tsx", "default", function App{})`
-  //   - `export function App{}` -> `__ALEPH.export("/pages/index.tsx", "App", function App{})`
-  //   - `export const App = () => {}` -> `__ALEPH.export("/pages/index.tsx", "App", () => {})`
-  //   - remove `import "../shared/iife.ts" (add into dep_graph)
+  //   - remove `import "../shared/iife.ts"` (push to dep_graph)
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
-    let mut bundling_exports = Vec::<Ident>::new();
-    let mut bundling_export_default: Option<Ident> = None;
 
     for item in module_items {
       match item {
@@ -648,92 +643,7 @@ impl Fold for AlephResolveFold {
                 }))
               }
             }
-            _ => {
-              let resolver = self.resolver.borrow_mut();
-              let specifier = resolver.specifier.as_str();
-              if resolver.bundle_mode {
-                match decl {
-                  // export class C {...}
-                  // export function C() {...}
-                  // export const C = () => {...}
-                  ModuleDecl::ExportDecl(ExportDecl { decl, .. }) => match &decl {
-                    Decl::Class(decl) => {
-                      bundling_exports.push(decl.ident.clone());
-                      ModuleItem::Stmt(Stmt::Decl(Decl::Class(decl.clone())))
-                    }
-                    Decl::Fn(decl) => {
-                      bundling_exports.push(decl.ident.clone());
-                      ModuleItem::Stmt(Stmt::Decl(Decl::Fn(decl.clone())))
-                    }
-                    Decl::Var(decl) => {
-                      for decl in decl.decls.clone() {
-                        match decl.name {
-                          Pat::Ident(ident) => {
-                            bundling_exports.push(ident.clone());
-                          }
-                          _ => {}
-                        }
-                      }
-                      ModuleItem::Stmt(Stmt::Decl(Decl::Var(decl.clone())))
-                    }
-                    _ => ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                      span: DUMMY_SP,
-                      decl,
-                    })),
-                  },
-                  // export default class C {...}
-                  // export default function C() {...}
-                  ModuleDecl::ExportDefaultDecl(ExportDefaultDecl { decl, .. }) => match decl {
-                    DefaultDecl::Class(ClassExpr { ident, class }) => {
-                      if let Some(ident) = ident {
-                        bundling_export_default = Some(ident.clone());
-                        ModuleItem::Stmt(Stmt::Decl(Decl::Class(ClassDecl {
-                          ident,
-                          declare: false,
-                          class,
-                        })))
-                      } else {
-                        create_aleph_export_module_item(
-                          specifier,
-                          "default",
-                          Expr::Class(ClassExpr { ident: None, class }),
-                        )
-                      }
-                    }
-                    DefaultDecl::Fn(FnExpr { ident, function }) => {
-                      if let Some(ident) = ident {
-                        bundling_export_default = Some(ident.clone());
-                        ModuleItem::Stmt(Stmt::Decl(Decl::Fn(FnDecl {
-                          ident,
-                          declare: false,
-                          function,
-                        })))
-                      } else {
-                        create_aleph_export_module_item(
-                          specifier,
-                          "default",
-                          Expr::Fn(FnExpr {
-                            ident: None,
-                            function,
-                          }),
-                        )
-                      }
-                    }
-                    _ => ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(ExportDefaultDecl {
-                      span: DUMMY_SP,
-                      decl,
-                    })),
-                  },
-                  // export default {}
-                  ModuleDecl::ExportDefaultExpr(ExportDefaultExpr { expr, .. }) => {
-                    create_aleph_export_module_item(specifier, "default", expr.as_ref().clone())
-                  }
-                  _ => ModuleItem::ModuleDecl(decl),
-                }
-              } else {
-                ModuleItem::ModuleDecl(decl)
-              }
-            }
+            _ => ModuleItem::ModuleDecl(decl),
           };
           items.push(item.fold_children_with(self));
         }
@@ -741,25 +651,6 @@ impl Fold for AlephResolveFold {
           items.push(item.fold_children_with(self));
         }
       };
-    }
-
-    {
-      let resolver = self.resolver.borrow_mut();
-      for ident in bundling_exports {
-        items.push(create_aleph_export_module_item(
-          resolver.specifier.as_str(),
-          ident.sym.as_ref(),
-          Expr::Ident(ident.clone()),
-        ));
-      }
-
-      if let Some(ident) = bundling_export_default {
-        items.push(create_aleph_export_module_item(
-          resolver.specifier.as_str(),
-          "default",
-          Expr::Ident(ident),
-        ));
-      }
     }
 
     items
@@ -862,49 +753,6 @@ fn new_use_deno_hook_ident() -> String {
     .collect::<String>();
   ident.push_str(rand_id.as_str());
   ident
-}
-
-pub fn create_aleph_export_module_item(
-  specifier: &str,
-  export_name: &str,
-  expr: Expr,
-) -> ModuleItem {
-  let call = CallExpr {
-    span: DUMMY_SP,
-    callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("export")))),
-    args: vec![
-      ExprOrSpread {
-        spread: None,
-        expr: Box::new(Expr::Lit(Lit::Str(Str {
-          span: DUMMY_SP,
-          value: specifier.into(),
-          has_escape: false,
-        }))),
-      },
-      ExprOrSpread {
-        spread: None,
-        expr: Box::new(Expr::Lit(Lit::Str(Str {
-          span: DUMMY_SP,
-          value: export_name.into(),
-          has_escape: false,
-        }))),
-      },
-      ExprOrSpread {
-        spread: None,
-        expr: Box::new(expr),
-      },
-    ],
-    type_args: None,
-  };
-  ModuleItem::Stmt(Stmt::Expr(ExprStmt {
-    span: DUMMY_SP,
-    expr: Box::new(Expr::Member(MemberExpr {
-      span: DUMMY_SP,
-      obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH")))),
-      prop: Box::new(Expr::Call(call)),
-      computed: false,
-    })),
-  }))
 }
 
 pub fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -> VarDeclarator {

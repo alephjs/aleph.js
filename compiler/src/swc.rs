@@ -301,33 +301,33 @@ mod tests {
   #[test]
   fn test_transpile_ts() {
     let source = r#"
-    enum D {
-      A,
-      B,
-      C,
-    }
-
-    function enumerable(value: boolean) {
-      return function (
-        _target: any,
-        _propertyKey: string,
-        descriptor: PropertyDescriptor,
-      ) {
-        descriptor.enumerable = value;
-      };
-    }
-
-    export class A {
-      private b: string;
-      protected c: number = 1;
-      e: "foo";
-      constructor (public d = D.A) {
-        const e = "foo" as const;
-        this.e = e;
+      enum D {
+        A,
+        B,
+        C,
       }
-      @enumerable(false)
-      bar() {}
-    }
+
+      function enumerable(value: boolean) {
+        return function (
+          _target: any,
+          _propertyKey: string,
+          descriptor: PropertyDescriptor,
+        ) {
+          descriptor.enumerable = value;
+        };
+      }
+
+      export class A {
+        private b: string;
+        protected c: number = 1;
+        e: "foo";
+        constructor (public d = D.A) {
+          const e = "foo" as const;
+          this.e = e;
+        }
+        @enumerable(false)
+        bar() {}
+      }
     "#;
     let (code, _) = t("https://deno.land/x/mod.ts", source, false);
     println!("{}", code);
@@ -338,14 +338,14 @@ mod tests {
   #[test]
   fn test_transpile_jsx() {
     let source = r#"
-    import React from "https://esm.sh/react"
-    export default function Index() {
-      return (
-        <>
-          <h1 className="title">Hello World</h1>
-        </>
-      )
-    }
+      import React from "https://esm.sh/react"
+      export default function Index() {
+        return (
+          <>
+            <h1 className="title">Hello World</h1>
+          </>
+        )
+      }
     "#;
     let (code, _) = t("/pages/index.tsx", source, false);
     println!("{}", code);
@@ -358,24 +358,24 @@ mod tests {
   #[test]
   fn test_transpile_use_deno() {
     let source = r#"
-    export default function Index() {
-      const verison = useDeno(() => Deno.version)
-      const V8 = () => {
-        const verison = useDeno(() => Deno.version, true)
-        return <p>v8 v{version.v8}</p>
+      export default function Index() {
+        const verison = useDeno(() => Deno.version)
+        const V8 = () => {
+          const verison = useDeno(() => Deno.version, true)
+          return <p>v8 v{version.v8}</p>
+        }
+        const TS = () => {
+          const verison = useDeno(() => Deno.version, 1)
+          return <p>typescript v{version.typescript}</p>
+        }
+        return (
+          <>
+            <p>Deno v{version.deno}</p>
+            <V8 />
+            <TS />
+          </>
+        )
       }
-      const TS = () => {
-        const verison = useDeno(() => Deno.version, 1)
-        return <p>typescript v{version.typescript}</p>
-      }
-      return (
-        <>
-          <p>Deno v{version.deno}</p>
-          <V8 />
-          <TS />
-        </>
-      )
-    }
     "#;
     let (code, _) = t("/pages/index.tsx", source, false);
     println!("{}", code);
@@ -387,28 +387,28 @@ mod tests {
   #[test]
   fn test_transpile_jsx_builtin_tags() {
     let source = r#"
-    import React from "https://esm.sh/react"
-    export default function Index() {
-      return (
-        <>
-          <a href="/about">About</a>
-          <a href="https://github.com">About</a>
-          <a href="/about" target="_blank">About</a>
-          <head>
-            <link rel="stylesheet" href="../style/index.css" />
-          </head>
-          <script src="ga.js"></script>
-          <script>{`
-            function gtag() {
-              dataLayer.push(arguments)
-            }
-            window.dataLayer = window.dataLayer || [];
-            gtag("js", new Date());
-            gtag("config", "G-1234567890");
-          `}</script>
-        </>
-      )
-    }
+      import React from "https://esm.sh/react"
+      export default function Index() {
+        return (
+          <>
+            <a href="/about">About</a>
+            <a href="https://github.com">About</a>
+            <a href="/about" target="_blank">About</a>
+            <head>
+              <link rel="stylesheet" href="../style/index.css" />
+            </head>
+            <script src="ga.js"></script>
+            <script>{`
+              function gtag() {
+                dataLayer.push(arguments)
+              }
+              window.dataLayer = window.dataLayer || [];
+              gtag("js", new Date());
+              gtag("config", "G-1234567890");
+            `}</script>
+          </>
+        )
+      }
     "#;
     let (code, resolver) = t("/pages/index.tsx", source, false);
     println!("{}", code);
@@ -501,24 +501,24 @@ mod tests {
   #[test]
   fn test_transpile_inlie_style() {
     let source = r#"
-    export default function Index() {
-      const [color, setColor] = useState('white');
+      export default function Index() {
+        const [color, setColor] = useState('white');
 
-      return (
-        <>
-          <style>{`
-            :root {
-              --color: ${color};
-            }
-          `}</style>
-          <style>{`
-            h1 {
-              font-size: 12px;
-            }
-          `}</style>
-        </>
-      )
-    }
+        return (
+          <>
+            <style>{`
+              :root {
+                --color: ${color};
+              }
+            `}</style>
+            <style>{`
+              h1 {
+                font-size: 12px;
+              }
+            `}</style>
+          </>
+        )
+      }
     "#;
     let (code, resolver) = t("/pages/index.tsx", source, false);
     assert!(code.contains(
@@ -537,21 +537,21 @@ mod tests {
   #[test]
   fn test_transpile_bundling_import() {
     let source = r#"
-    import React, { useState, useEffect as useEffect_ } from "https://esm.sh/react"
-    import * as React_ from "https://esm.sh/react"
-    import Logo from '../components/logo.ts'
-    import Nav from '../components/nav.ts'
-    import '../shared/iife.ts'
-    export default function Index() {
-      return (
-        <>
-          <head></head>
-          <Logo />
-          <Nav />
-          <h1>Hello World</h1>
-        </>
-      )
-    }
+      import React, { useState, useEffect as useEffect_ } from "https://esm.sh/react"
+      import * as React_ from "https://esm.sh/react"
+      import Logo from '../components/logo.ts'
+      import Nav from '../components/nav.ts'
+      import '../shared/iife.ts'
+      export default function Index() {
+        return (
+          <>
+            <head></head>
+            <Logo />
+            <Nav />
+            <h1>Hello World</h1>
+          </>
+        )
+      }
     "#;
     let module =
       ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
@@ -589,11 +589,6 @@ mod tests {
       export {default as React, useState, useEffect as useEffect_ } from "https://esm.sh/react"
       export * as React_ from "https://esm.sh/react"
       export * from "https://esm.sh/react"
-      export const n = 123
-      export const f = () => {}
-      export function A() {}
-      export class B {}
-      export default function C() {}
     "#;
     let (code, _) = t("/pages/index.tsx", source, true);
     println!("{}", code);
@@ -601,52 +596,9 @@ mod tests {
     assert!(
       code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", \"*\")")
     );
-    assert!(code.contains("\nconst n = 123"));
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"n\", n)"));
-    assert!(code.contains("\nconst f = ()=>{"));
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"f\", f)"));
-    assert!(code.contains("\nfunction A() {"));
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"A\", A)"));
-    assert!(code.contains("\nclass B {"));
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"B\", B)"));
-    assert!(code.contains("\nfunction C() {"));
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", C)"));
     assert!(code.contains("\"default\": \"React\""));
     assert!(code.contains("\"useState\": \"useState\""));
     assert!(code.contains("\"useEffect\": \"useEffect_\""));
     assert!(code.contains("\"*\": \"React_\""));
-
-    let source = r#"
-    export default class C {}
-    "#;
-    let (code, _) = t("/pages/index.tsx", source, true);
-    println!("------");
-    println!("{}", code);
-    assert!(code.contains("class C {"));
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", C"));
-
-    let source = r#"
-      export default function () {}
-    "#;
-    let (code, _) = t("/pages/index.tsx", source, true);
-    println!("------");
-    println!("{}", code);
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", function() {"));
-
-    let source = r#"
-      export default class {}
-    "#;
-    let (code, _) = t("/pages/index.tsx", source, true);
-    println!("------");
-    println!("{}", code);
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", class {"));
-
-    let source = r#"
-      export default {}
-    "#;
-    let (code, _) = t("/pages/index.tsx", source, true);
-    println!("------");
-    println!("{}", code);
-    assert!(code.contains("__ALEPH.export(\"/pages/index.tsx\", \"default\", {"));
   }
 }
