@@ -1,5 +1,10 @@
 import { Request } from './api.ts'
-import { initSWC, SWCOptions, TransformOptions, transpileSync } from './compiler/mod.ts'
+import {
+    initWasm,
+    SWCOptions,
+    TransformOptions,
+    transpileSync
+} from './compiler/mod.ts'
 import type { AcceptedPlugin, ECMA, ServerRequest } from './deps.ts'
 import {
     CleanCSS,
@@ -133,6 +138,10 @@ export class Project {
         return path.join(this.appRoot, '.aleph', this.mode)
     }
 
+    get outputDir() {
+        return path.join(this.appRoot, this.config.outputDir)
+    }
+
     isHMRable(url: string) {
         if (reStyleModuleExt.test(url)) {
             return true
@@ -197,7 +206,10 @@ export class Project {
     }
 
     async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandler | null> {
-        const [url, chain] = this.#apiRouting.createRouter({ ...loc, pathname: decodeURI(loc.pathname) })
+        const [url, chain] = this.#apiRouting.createRouter({
+            ...loc,
+            pathname: decodeURI(loc.pathname)
+        })
         if (url.pagePath != '') {
             const { url: moduleUrl } = chain[chain.length - 1]
             if (this.#modules.has(moduleUrl)) {
@@ -279,7 +291,7 @@ export class Project {
     /** build the application to a static site(SSG) */
     async build() {
         const start = performance.now()
-        const outputDir = path.join(this.srcDir, this.config.outputDir)
+        const outputDir = this.outputDir
         const distDir = path.join(outputDir, '_aleph')
 
         // wait for project ready
@@ -290,8 +302,7 @@ export class Project {
             await Deno.remove(outputDir, { recursive: true })
         }
 
-        // ensure output dirs
-        await ensureDir(outputDir)
+        // ensure output dir
         await ensureDir(distDir)
 
         // ssg, bundle & optimizing
@@ -813,7 +824,7 @@ export class Project {
     }
 
     /** create re-compiled main module. */
-    private async _createMainModule(): Promise<Module> {
+    private async _createMainModule(): Promise<void> {
         const { baseUrl, defaultLocale, framework } = this.config
         const config: Record<string, any> = {
             baseUrl,
@@ -833,10 +844,13 @@ export class Project {
             `import bootstrap from "${alephPkgUrl}/framework/${framework}/bootstrap.ts"`,
             `bootstrap(${JSON.stringify(config)})`
         ].filter(Boolean).join('\n')
-        return await this._compile('/main.ts', { sourceCode, bundleMode: !this.isDev })
+        await this._compile('/main.ts', { sourceCode })
+        if (!this.isDev) {
+            await this._compile('/main.ts', { sourceCode, bundleMode: true })
+        }
     }
 
-    /** preprocess css with postcss pluings */
+    /** preprocess css with postcss plugins */
     private async _preprocessCSS(sourceCode: string, isLess: boolean) {
         let css: string = sourceCode
         if (isLess) {
@@ -891,9 +905,10 @@ export class Project {
         return css
     }
 
+    /** transpile code no types checking. */
     private async _transpile(sourceCode: string, options: TransformOptions) {
         if (this.#swcReady === null) {
-            this.#swcReady = initSWC(this.#denoCacheDir)
+            this.#swcReady = initWasm(this.#denoCacheDir)
         }
         await this.#swcReady
         return transpileSync(sourceCode, options)
@@ -1353,15 +1368,16 @@ export class Project {
             lookup(e404Module.url)
         }
         this.#pageRouting.lookup(routes => routes.forEach(({ module: { url } }) => {
-            lookup(url)
             const mod = this.getModule(url)
             if (mod) {
+                lookup(url)
                 pageModules.push(mod)
             }
         }))
 
         const remoteDepList: string[] = []
         const localDepList: string[] = []
+        console.log(refCounter)
         Array.from(refCounter.entries()).forEach(([url, count]) => {
             if (reHttp.test(url)) {
                 remoteDepList.push(url)
@@ -1377,35 +1393,22 @@ export class Project {
         }
 
         log.info('- Bundle')
-        await this._createBundle('deps', remoteDepList)
+        await this._createChunkBundle('deps', remoteDepList)
         if (localDepList.length > 0) {
-            await this._createBundle('shared', localDepList)
+            await this._createChunkBundle('shared', localDepList)
         }
 
-        await Promise.all(pageModules.map(async mod => {
-            const { bundlingFile, sourceHash } = await this._compile(mod.url, { bundleMode: true, bundledPaths: localDepList })
-            const bundleFile = util.trimSuffix(bundlingFile.replace(reHashJs, ''), '.bundling') + `.bundle.${sourceHash.slice(0, hashShort)}.js`
-            const ok = await this._runDenoBundle(bundlingFile, bundleFile)
-            if (!ok) {
-                return
-            }
-        }))
+        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localDepList)))
     }
 
-    private async _createBundle(name: string, list: string[]) {
+    /** create chunk bundle. */
+    private async _createChunkBundle(name: string, list: string[]) {
         const header = `
             const __ALEPH = window.__ALEPH || (window.__ALEPH = {
                 pack: {},
-                export: (specifier, name, v) => {
-                    if (!(specifier in this.pack)) {
-                        this.pack[specifier] = {}
-                    }
-                    this.pack[specifier][name] = v
-                    return v
-                },
-                exportFrom: (specifier, url, exports) => {
+                exportFrom(specifier, url, exports) {
                     if (url in this.pack) {
-                        let mod = this.pack[url]
+                        const mod = this.pack[url]
                         if (!(specifier in this.pack)) {
                             this.pack[specifier] = {}
                         }
@@ -1421,45 +1424,69 @@ export class Project {
                     }
                 }
             });
-        `.replaceAll(' '.repeat(12), '').trim()
+        `
         const imports = list.map((url, i) => {
             const mod = this.#modules.get(url)
             if (mod) {
-                const jsFile = reHttp.test(mod.url) ? mod.jsFile : mod.bundlingFile
                 return [
-                    `import * as mod${i} from ${JSON.stringify(jsFile)}`,
+                    `import * as mod${i} from ${JSON.stringify(reHttp.test(mod.url) ? mod.jsFile : mod.bundlingFile)}`,
                     `__ALEPH.pack[${JSON.stringify(url)}] = mod${i}`
                 ]
             }
         }).flat().join('\n')
-        const bundlingCode = header + '\n' + imports
+        const bundlingCode = imports
         const mod = newModule(`/${name}.bundling.js`)
-        mod.hash = (new Sha1).update(bundlingCode).hex().slice(0, hashShort)
+        mod.hash = (new Sha1).update(header).update(bundlingCode).hex()
         const bundlingFile = path.join(this.buildDir, mod.url)
-        const bundleFile = path.join(this.buildDir, `${name}.bundle.${mod.hash}.js`)
+        const bundleFile = path.join(this.buildDir, `${name}.bundle.${mod.hash.slice(0, hashShort)}.js`)
+        const saveAs = path.join(this.outputDir, `_aleph/${name}.${mod.hash.slice(0, hashShort)}.js`)
 
         if (existsFileSync(bundleFile)) {
             this.#modules.set(mod.url, mod)
+            await Deno.copyFile(bundleFile, saveAs)
             return
         }
 
         await Deno.writeTextFile(bundlingFile, bundlingCode)
-        const n = await this._runDenoBundle(bundlingFile, bundleFile)
-        if (!n) {
-            return
+        const n = await this._runDenoBundle(bundlingFile, bundleFile, header)
+        if (n > 0) {
+            log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(n))}`)
         }
 
         this.#modules.set(mod.url, mod)
-        log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(n))}`)
+        await Deno.copyFile(bundleFile, saveAs)
+        Deno.remove(bundlingFile)
     }
 
-    private async _runDenoBundle(entryFile: string, bundleFile: string) {
+    /** create page bundle. */
+    private async _createPageBundle(mod: Module, bundledPaths: string[]) {
+        const { bundlingFile, sourceHash } = await this._compile(mod.url, { bundleMode: true, bundledPaths })
+        const _tmp = util.trimSuffix(bundlingFile.replace(reHashJs, ''), '.bundling')
+        const _tmp_bundlingFile = _tmp + `.bundling.js`
+        const bundleFile = _tmp + `.bundle.${sourceHash.slice(0, hashShort)}.js`
+        const saveAs = path.join(this.outputDir, `/_aleph/`, util.trimPrefix(_tmp, this.buildDir) + `.${sourceHash.slice(0, hashShort)}.js`)
+
         if (existsFileSync(bundleFile)) {
-            return 0
+            await ensureDir(path.dirname(saveAs))
+            await Deno.copyFile(bundleFile, saveAs)
+            return
         }
 
+        const bundlingCode = [
+            `import * as mod from ${JSON.stringify(bundlingFile)}`,
+            `__ALEPH.pack[${JSON.stringify(mod.url)}] = mod`
+        ].join('\n')
+        await Deno.writeTextFile(_tmp_bundlingFile, bundlingCode)
+        await this._runDenoBundle(_tmp_bundlingFile, bundleFile)
+        await ensureDir(path.dirname(saveAs))
+        await Deno.copyFile(bundleFile, saveAs)
+        Deno.remove(_tmp_bundlingFile)
+    }
+
+    /** run deno bundle and compess the output with terser. */
+    private async _runDenoBundle(bundlingFile: string, bundleFile: string, header = '') {
         const p = Deno.run({
-            cmd: ['deno', 'bundle', '--no-check', entryFile, bundleFile],
+            cmd: ['deno', 'bundle', '--no-check', bundlingFile, bundleFile],
             stdout: 'null',
             stderr: 'piped'
         })
@@ -1468,12 +1495,12 @@ export class Project {
         if (!existsFileSync(bundleFile)) {
             const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.buildDir, '/aleph.js')
             await Deno.stderr.write((new TextEncoder).encode(msg))
-            return 0
+            Deno.exit(1)
         }
 
         // compile bundle code to `buildTarget`
         const sourceCode = await Deno.readTextFile(bundleFile)
-        let { code } = await this._transpile(sourceCode, {
+        let { code } = await this._transpile(header + sourceCode, {
             url: '/bundle.js',
             swcOptions: {
                 target: this.config.buildTarget
@@ -1504,7 +1531,7 @@ export class Project {
     /** render all pages in routing. */
     private async _ssg() {
         const { ssr } = this.config
-        const outputDir = path.join(this.srcDir, this.config.outputDir)
+        const outputDir = this.outputDir
 
         if (ssr) {
             log.info(colors.bold('- Pages (SSG)'))
