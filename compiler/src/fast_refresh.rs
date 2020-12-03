@@ -1027,20 +1027,24 @@ mod tests {
   use super::*;
   use crate::swc::ParsedModule;
   use std::cmp::min;
+  use swc_common::Globals;
 
   fn t(specifier: &str, source: &str, expect: &str) -> bool {
     let module = ParsedModule::parse(specifier, source, None).expect("could not parse module");
-    let (code, _) = module
-      .apply_transform(
-        fast_refresh_fold(
-          "$RefreshReg$",
-          "$RefreshSig$",
-          true,
-          module.source_map.clone(),
-        ),
-        false,
-      )
-      .expect("could not transpile module");
+    let (code, _) = swc_common::GLOBALS.set(&Globals::new(), || {
+      module
+        .apply_transform(
+          fast_refresh_fold(
+            "$RefreshReg$",
+            "$RefreshSig$",
+            true,
+            module.source_map.clone(),
+          ),
+          false,
+        )
+        .expect("could not transpile module")
+    });
+
     if code != expect {
       let mut p: usize = 0;
       for i in 0..min(code.len(), expect.len()) {

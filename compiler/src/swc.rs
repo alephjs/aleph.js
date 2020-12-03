@@ -19,7 +19,12 @@ use swc_ecmascript::{
   codegen::{text_writer::JsWriter, Node},
   parser::lexer::Lexer,
   parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig},
-  transforms::{compat::*, fixer, helpers, hygiene, pass::Optional, proposals, react, typescript},
+  transforms::{
+    compat::{es2015, es2016, es2017, es2018, es2020},
+    fixer, helpers, hygiene,
+    pass::Optional,
+    proposals, react, typescript,
+  },
   visit::{Fold, FoldWith},
 };
 
@@ -180,9 +185,11 @@ impl ParsedModule {
           es2015(root_mark, Default::default()),
           options.target < JscTarget::Es2015
         ),
-        reserved_words::reserved_words(),
-        helpers::inject_helpers(),
-        hygiene(),
+        Optional::new(
+          helpers::inject_helpers(),
+          options.target < JscTarget::Es2020
+        ),
+        Optional::new(hygiene(), options.target < JscTarget::Es2020),
         fixer(Some(&self.comments)),
       );
 
@@ -197,9 +204,8 @@ impl ParsedModule {
     source_map: bool,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module.clone());
-    let program = swc_common::GLOBALS.set(&Globals::new(), || {
-      helpers::HELPERS.set(&helpers::Helpers::new(false), || program.fold_with(&mut tr))
-    });
+    let program =
+      helpers::HELPERS.set(&helpers::Helpers::new(false), || program.fold_with(&mut tr));
     let mut buf = Vec::new();
     let mut src_map_buf = Vec::new();
     let src_map = if source_map {
