@@ -246,15 +246,12 @@ export class Project {
             return [url.pagePath === '' ? 404 : 200, await this.getSPAIndexHtml(), null]
         }
 
-        const { baseUrl } = this.config
         const { url, status, head, scripts, body, data } = await this._renderPage(loc)
-        const mainModule = this.#modules.get('/main.ts')!
         const html = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: this.isDev ? 'module' : undefined },
                 ...this._getPreloadScripts(),
                 ...scripts
             ],
@@ -265,13 +262,11 @@ export class Project {
     }
 
     async getSPAIndexHtml() {
-        const { baseUrl, defaultLocale } = this.config
-        const mainModule = this.#modules.get('/main.ts')!
+        const { defaultLocale } = this.config
         const customLoading = await this._renderLoadingPage()
         const html = createHtml({
             lang: defaultLocale,
             scripts: [
-                { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 ...this._getPreloadScripts()
             ],
             head: customLoading?.head || [],
@@ -300,9 +295,9 @@ export class Project {
         await ensureDir(distDir)
 
         // ssg, bundle & optimizing
-        await this._ssg()
         await this._bundle()
         await this._optimize()
+        await this._ssg()
 
         // copy public assets
         const publicDir = path.join(this.appRoot, 'public')
@@ -372,7 +367,15 @@ export class Project {
 
     private _getPreloadScripts() {
         const { baseUrl } = this.config
+        const mainModule = this.#modules.get('/main.ts')!
+        const depsModule = this.#modules.get('/deps.bundling.js')!
+        const sharedModule = this.#modules.get('/shared.bundling.js')!
+
         return [
+            depsModule ? { src: util.cleanPath(`${baseUrl}/_aleph/deps.${depsModule.hash.slice(0, hashShort)}.js`), async: true } : {},
+            sharedModule ? { src: util.cleanPath(`${baseUrl}/_aleph/shared.${sharedModule.hash.slice(0, hashShort)}.js`), async: true } : {},
+            !this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.sourceHash.slice(0, hashShort)}.js`), async: true } : {},
+            this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' } : {},
             this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true } : {},
         ]
     }
@@ -1332,39 +1335,55 @@ export class Project {
                 })
             }
         }
+        const appModule = Array.from(this.#modules.keys())
+            .filter(url => url.replace(reModuleExt, '') === '/app')
+            .map(url => this.#modules.get(url))[0]
+        const e404Module = Array.from(this.#modules.keys())
+            .filter(url => url.replace(reModuleExt, '') === '/404')
+            .map(url => this.#modules.get(url))[0]
+        const pageModules: Module[] = []
 
         lookup('/main.ts')
-        Array.from(['tsx', 'jsx', 'ts', 'js', 'mjs']).forEach(ext => {
-            lookup(`/404.${ext}`)
-            lookup(`/app.${ext}`)
-        })
-        this.#pageRouting.lookup(routes => routes.forEach(r => lookup(r.module.url)))
-
-        const remoteList: string[] = []
-        const localList: string[] = []
-        Array.from(refCounter.entries()).forEach(([url, count]) => {
-            if (reHttp.test(url)) {
-                remoteList.push(url)
-            } else if (!url.startsWith('#') && !url.startsWith('/pages/') && count > 1) {
-                localList.push(url)
-            }
-        })
-
-        log.info('- Bundle')
-        await this._createBundle('deps', remoteList)
-        if (localList.length > 0) {
-            await this._createBundle('shared', localList)
+        if (appModule) {
+            await this._compile(appModule.url, { bundleMode: true })
+            lookup(appModule.url)
         }
-
-        const pageModules: Module[] = []
+        if (e404Module) {
+            await this._compile(e404Module.url, { bundleMode: true })
+            lookup(e404Module.url)
+        }
         this.#pageRouting.lookup(routes => routes.forEach(({ module: { url } }) => {
+            lookup(url)
             const mod = this.getModule(url)
             if (mod) {
                 pageModules.push(mod)
             }
         }))
+
+        const remoteDepList: string[] = []
+        const localDepList: string[] = []
+        Array.from(refCounter.entries()).forEach(([url, count]) => {
+            if (reHttp.test(url)) {
+                remoteDepList.push(url)
+            } else if (!url.startsWith('#') && !url.startsWith('/pages/') && count > 1) {
+                localDepList.push(url)
+            }
+        })
+        if (appModule) {
+            localDepList.push(appModule.url)
+        }
+        if (e404Module) {
+            localDepList.push(e404Module.url)
+        }
+
+        log.info('- Bundle')
+        await this._createBundle('deps', remoteDepList)
+        if (localDepList.length > 0) {
+            await this._createBundle('shared', localDepList)
+        }
+
         await Promise.all(pageModules.map(async mod => {
-            const { bundlingFile, sourceHash } = await this._compile(mod.url, { bundleMode: true })
+            const { bundlingFile, sourceHash } = await this._compile(mod.url, { bundleMode: true, bundledPaths: localDepList })
             const bundleFile = util.trimSuffix(bundlingFile.replace(reHashJs, ''), '.bundling') + `.bundle.${sourceHash.slice(0, hashShort)}.js`
             const ok = await this._runDenoBundle(bundlingFile, bundleFile)
             if (!ok) {
@@ -1377,34 +1396,60 @@ export class Project {
         const header = `
             const __ALEPH = window.__ALEPH || (window.__ALEPH = {
                 pack: {},
-                export: (specifier, name, expr) => {
-
+                export: (specifier, name, v) => {
+                    if (!(specifier in this.pack)) {
+                        this.pack[specifier] = {}
+                    }
+                    this.pack[specifier][name] = v
+                    return v
                 },
                 exportFrom: (specifier, url, exports) => {
-
+                    if (url in this.pack) {
+                        let mod = this.pack[url]
+                        if (!(specifier in this.pack)) {
+                            this.pack[specifier] = {}
+                        }
+                        if (exports === '*') {
+                            for (const k in mod) {
+                                this.pack[specifier][k] = mod[k]
+                            }
+                        } else if (typeof exports === 'object' && exports !== null) {
+                            for (const k in exports) {
+                                this.pack[specifier][exports[k]] = mod[k]
+                            }
+                        }
+                    }
                 }
             });
         `.replaceAll(' '.repeat(12), '').trim()
-        const imports = list.map((url, i) => [
-            `import * as mod${i} from ${JSON.stringify(url)}`,
-            `__ALEPH.pack[${JSON.stringify(url)}] = mod${i}`
-        ]).flat().join('\n')
-        const entryCode = header + '\n' + imports
-        const entryFile = path.join(this.buildDir, `${name}_bundling.js`)
-        const bundleFile = path.join(this.buildDir, `${name}.${(new Sha1).update(entryCode).hex().slice(0, hashShort)}.js`)
+        const imports = list.map((url, i) => {
+            const mod = this.#modules.get(url)
+            if (mod) {
+                const jsFile = reHttp.test(mod.url) ? mod.jsFile : mod.bundlingFile
+                return [
+                    `import * as mod${i} from ${JSON.stringify(jsFile)}`,
+                    `__ALEPH.pack[${JSON.stringify(url)}] = mod${i}`
+                ]
+            }
+        }).flat().join('\n')
+        const bundlingCode = header + '\n' + imports
+        const mod = newModule(`/${name}.bundling.js`)
+        mod.hash = (new Sha1).update(bundlingCode).hex().slice(0, hashShort)
+        const bundlingFile = path.join(this.buildDir, mod.url)
+        const bundleFile = path.join(this.buildDir, `${name}.bundle.${mod.hash}.js`)
 
         if (existsFileSync(bundleFile)) {
+            this.#modules.set(mod.url, mod)
             return
         }
 
-        await Deno.writeTextFile(entryFile, entryCode)
-
-        // run deno bundle
-        const n = await this._runDenoBundle(entryFile, bundleFile)
+        await Deno.writeTextFile(bundlingFile, bundlingCode)
+        const n = await this._runDenoBundle(bundlingFile, bundleFile)
         if (!n) {
             return
         }
 
+        this.#modules.set(mod.url, mod)
         log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(n))}`)
     }
 
@@ -1492,15 +1537,12 @@ export class Project {
         }
 
         // write 404 page
-        const { baseUrl } = this.config
         const { url, head, scripts, body, data } = await this._render404Page()
-        const mainModule = this.#modules.get('/main.ts')!
         const e404PageHtml = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' },
                 ...this._getPreloadScripts(),
                 ...scripts
             ],
