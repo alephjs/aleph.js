@@ -8,7 +8,7 @@ import util from './util.ts'
 import { version } from './version.ts'
 
 const commands = {
-    'init': 'Create a new appliaction',
+    'init': 'Create a new application',
     'dev': 'Start the app in development mode',
     'start': 'Start the app in production mode',
     'build': 'Build the app to a static site (SSG)',
