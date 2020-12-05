@@ -1454,8 +1454,8 @@ export class Project {
             const mod = this.#modules.get(url)
             if (mod) {
                 return [
-                    `import * as mod${i} from ${JSON.stringify(reHttp.test(mod.url) ? mod.jsFile : mod.bundlingFile)}`,
-                    `__ALEPH.pack[${JSON.stringify(url)}] = mod${i}`
+                    `import * as ${name}_mod_${i} from ${JSON.stringify(reHttp.test(mod.url) ? mod.jsFile : mod.bundlingFile)}`,
+                    `__ALEPH.pack[${JSON.stringify(url)}] = ${name}_mod_${i}`
                 ]
             }
         }).flat().join('\n')
@@ -1523,9 +1523,14 @@ export class Project {
             Deno.exit(1)
         }
 
-        // compile bundle code to `buildTarget`
-        const sourceCode = await Deno.readTextFile(bundleFile)
-        let { code } = await this._transpile(header + sourceCode, {
+        // transpile bundle code to `buildTarget`
+        const sourceCode = [
+            '(() => {',
+            header,
+            await Deno.readTextFile(bundleFile),
+            '})()'
+        ].join('\n')
+        let { code } = await this._transpile(sourceCode, {
             url: '/bundle.js',
             swcOptions: {
                 target: this.config.buildTarget
