@@ -1,3 +1,4 @@
+import events from './shared/events.ts'
 import util, { reMDExt, reModuleExt } from './shared/util.ts'
 import type { DependencyDescriptor, RouterURL } from './types.ts'
 
@@ -204,36 +205,32 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
     return [params, true]
 }
 
-// export function createPageProps(componentTree: { url: string, Component?: ComponentType<any> }[]): PageProps {
-//     const pageProps: PageProps = {
-//         Page: null,
-//         pageProps: {}
-//     }
-//     if (componentTree.length > 0) {
-//         Object.assign(pageProps, _createPagePropsSegment(componentTree[0]))
-//     }
-//     if (componentTree.length > 1) {
-//         componentTree.slice(1).reduce((p, seg) => {
-//             const c = _createPagePropsSegment(seg)
-//             p.pageProps = c
-//             return c
-//         }, pageProps)
-//     }
-//     return pageProps
-// }
+export async function redirect(url: string, replace?: boolean) {
+    const { location, history } = window as any
 
-// function _createPagePropsSegment(seg: { url: string, Component?: ComponentType<any> }): PageProps {
-//     const pageProps: PageProps = {
-//         Page: null,
-//         pageProps: {}
-//     }
-//     if (seg.Component) {
-//         if (util.isLikelyReactComponent(seg.Component)) {
-//             pageProps.Page = seg.Component
-//         } else {
-//             pageProps.Page = E400MissingDefaultExportAsComponent
-//             pageProps.pageProps = { name: 'Page: ' + seg.url.replace(reModuleExt, '') }
-//         }
-//     }
-//     return pageProps
-// }
+    if (!util.isNEString(url)) {
+        return
+    }
+
+    if (isHttpUrl(url)) {
+        location.href = url
+        return
+    }
+
+    url = util.cleanPath(url)
+    if (replace) {
+        history.replaceState(null, '', url)
+    } else {
+        history.pushState(null, '', url)
+    }
+    events.emit('popstate', { type: 'popstate', resetScroll: true })
+}
+
+export function isHttpUrl(url: string) {
+    try {
+        const { protocol } = new URL(url)
+        return protocol === 'https:' || protocol === 'http:'
+    } catch (error) {
+        return false
+    }
+}
