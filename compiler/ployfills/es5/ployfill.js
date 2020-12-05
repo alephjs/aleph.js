@@ -1,9 +1,11 @@
-import * as regenerator_runtime from "https://esm.sh/regenerator-runtime@0.13.7"
-__ALEPH.pack["regenerator-runtime"] = regenerator_runtime
+import { mark, wrap } from 'https://esm.sh/regenerator-runtime@0.13.7'
 
-window.require = function(name) {
-  if (name === "regenerator-runtime") {
-    return __ALEPH.pack["regenerator-runtime"]
+window.require = function (name) {
+  if (name === 'regenerator-runtime') {
+    if ('regeneratorRuntime' in window) {
+      return regeneratorRuntime
+    }
+    return { mark, wrap }
   } else {
     throw new Error(`module ${name} undefined`)
   }

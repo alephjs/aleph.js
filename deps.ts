@@ -1,5 +1,6 @@
 // deno.land/std
 export { Untar } from 'https://deno.land/std@0.79.0/archive/tar.ts'
+export * as bytes from 'https://deno.land/std@0.79.0/bytes/mod.ts'
 export * as base64 from 'https://deno.land/std@0.79.0/encoding/base64.ts'
 export * as colors from 'https://deno.land/std@0.79.0/fmt/colors.ts'
 export { ensureDir } from 'https://deno.land/std@0.79.0/fs/ensure_dir.ts'
