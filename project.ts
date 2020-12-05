@@ -229,14 +229,14 @@ export class Project {
                             status: 500,
                             headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
                             body: JSON.stringify({ error: { status: 404, message: "handle not found" } })
-                        }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                        }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
                     }
                 } catch (err) {
                     req.respond({
                         status: 500,
                         headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
                         body: JSON.stringify({ error: { status: 500, message: err.message } })
-                    }).catch(err => log.warn('ServerRequest.respond:', err.message))
+                    }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
                     log.error('callAPI:', err)
                 }
             }
@@ -245,7 +245,7 @@ export class Project {
                 status: 404,
                 headers: new Headers({ 'Content-Type': 'application/javascript; charset=utf-8' }),
                 body: JSON.stringify({ error: { status: 404, message: 'page not found' } })
-            }).catch(err => log.warn('ServerRequest.respond:', err.message))
+            }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
         }
         return null
     }
@@ -648,9 +648,6 @@ export class Project {
             }
         }
 
-        // create main module
-        await this._createMainModule()
-
         // create api routing
         if (existsDirSync(apiDir)) {
             for await (const { path: p } of walk(apiDir, walkOptions)) {
@@ -664,6 +661,9 @@ export class Project {
             const mod = await this._compile(util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir)))
             this.#pageRouting.update(this._getRouteModule(mod))
         }
+
+        // create main module
+        await this._createMainModule()
 
         // pre-compile some modules
         if (this.isDev) {
@@ -1316,6 +1316,7 @@ export class Project {
             if (this.isDev && !u.searchParams.has('dev')) {
                 u.searchParams.set('dev', '')
             }
+            u.search = u.search.replace(/\=(&|$)/, '$1')
         }
 
         const { protocol, hostname, port, pathname, search } = u
@@ -1328,7 +1329,12 @@ export class Project {
         }
 
         const p = Deno.run({
-            cmd: ['deno', 'cache', this.#reloading || !versioned ? '--reload' : '', url].filter(Boolean),
+            cmd: [
+                'deno',
+                'cache',
+                this.#reloading || !versioned ? '--reload' : '',
+                u.toString()
+            ].filter(Boolean),
             stdout: 'inherit',
             stderr: 'inherit'
         })
@@ -1345,27 +1351,27 @@ export class Project {
     /** bundle modules for production. */
     private async _bundle() {
         const header = `
-            const __ALEPH = window.__ALEPH || (window.__ALEPH = {
+            var __ALEPH = window.__ALEPH || (window.__ALEPH = {
                 pack: {},
-                exportFrom(specifier, url, exports) {
+                exportFrom: function(specifier, url, exports) {
                     if (url in this.pack) {
-                        const mod = this.pack[url]
+                        var mod = this.pack[url]
                         if (!(specifier in this.pack)) {
                             this.pack[specifier] = {}
                         }
                         if (exports === '*') {
-                            for (const k in mod) {
+                            for (var k in mod) {
                                 this.pack[specifier][k] = mod[k]
                             }
                         } else if (typeof exports === 'object' && exports !== null) {
-                            for (const k in exports) {
+                            for (var k in exports) {
                                 this.pack[specifier][exports[k]] = mod[k]
                             }
                         }
                     }
                 }
             });
-        `
+        `.replaceAll(' '.repeat(12), '')
         const alephPkgUrl = getAlephPkgUrl()
         const refCounter = new Map<string, number>()
         const lookup = (url: string) => {
@@ -1439,7 +1445,7 @@ export class Project {
         const ployfillFile = path.join(this.buildDir, `ployfill.${ployfillMode.hash.slice(0, hashShort)}.js`)
         if (!existsFileSync(ployfillFile)) {
             const rawPloyfillFile = `${alephPkgUrl}/compiler/ployfills/${this.config.buildTarget}/ployfill.js`
-            await this._runDenoBundle(rawPloyfillFile, ployfillFile, header)
+            await this._runDenoBundle(rawPloyfillFile, ployfillFile, header, true)
         }
         Deno.copyFile(ployfillFile, path.join(this.outputDir, '_aleph', `ployfill.${ployfillMode.hash.slice(0, hashShort)}.js`))
         this.#modules.set(ployfillMode.url, ployfillMode)
@@ -1509,9 +1515,9 @@ export class Project {
     }
 
     /** run deno bundle and compess the output with terser. */
-    private async _runDenoBundle(bundlingFile: string, bundleFile: string, header = '') {
+    private async _runDenoBundle(bundlingFile: string, bundleFile: string, header = '', reload = false) {
         const p = Deno.run({
-            cmd: ['deno', 'bundle', '--no-check', bundlingFile, bundleFile],
+            cmd: ['deno', 'bundle', '--no-check', reload ? '--reload' : '', bundlingFile, bundleFile].filter(Boolean),
             stdout: 'null',
             stderr: 'piped'
         })
@@ -1524,18 +1530,20 @@ export class Project {
         }
 
         // transpile bundle code to `buildTarget`
-        const sourceCode = [
-            '(() => {',
-            header,
-            await Deno.readTextFile(bundleFile),
-            '})()'
-        ].join('\n')
-        let { code } = await this._transpile(sourceCode, {
+        let { code } = await this._transpile(await Deno.readTextFile(bundleFile), {
             url: '/bundle.js',
             swcOptions: {
                 target: this.config.buildTarget
             },
         })
+
+        // IIFEify
+        code = [
+            '(() => {',
+            header,
+            code,
+            '})()'
+        ].join('\n')
 
         // minify code
         // const ret = await minify(code, {
