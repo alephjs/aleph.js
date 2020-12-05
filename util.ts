@@ -10,7 +10,14 @@ import util, {
 import { ImportMap, Module } from './types.ts'
 import { version } from './version.ts'
 
-export const alephPkgUrl = `https://deno.land/x/aleph@v${version}`
+export function getAlephPkgUrl() {
+    let url = `https://deno.land/x/aleph@v${version}`
+    const { __ALEPH_DEV_PORT: devPort } = globalThis as any
+    if (devPort) {
+        url = `http://localhost:${devPort}`
+    }
+    return url
+}
 
 /* check whether or not the given path exists as a directory */
 export async function existsDir(path: string) {

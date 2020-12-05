@@ -5,7 +5,7 @@ import {
     TransformOptions,
     transpileSync
 } from './compiler/mod.ts'
-import type { AcceptedPlugin, ECMA, ServerRequest } from './deps.ts'
+import type { AcceptedPlugin, ServerRequest } from './deps.ts'
 import {
     CleanCSS,
     colors,
@@ -44,7 +44,6 @@ import type {
     RouterURL
 } from './types.ts'
 import {
-    alephPkgUrl,
     cleanupCompilation,
     colorfulBytesString,
     createHtml,
@@ -52,7 +51,15 @@ import {
     existsDirSync,
     existsFileSync,
     fixImportMap,
-    fixImportUrl,
+    fixImportUrl, getAlephPkgUrl,
+
+
+
+
+
+
+
+
     getRelativePath,
     newModule
 } from './util.ts'
@@ -299,7 +306,9 @@ export class Project {
 
         // clean old build
         if (existsDirSync(outputDir)) {
-            await Deno.remove(outputDir, { recursive: true })
+            for await (const entry of Deno.readDir(outputDir)) {
+                await Deno.remove(path.join(outputDir, entry.name), { recursive: entry.isDirectory })
+            }
         }
 
         // ensure output dir
@@ -379,13 +388,15 @@ export class Project {
     private _getPreloadScripts() {
         const { baseUrl } = this.config
         const mainModule = this.#modules.get('/main.ts')!
-        const depsModule = this.#modules.get('/deps.bundling.js')!
-        const sharedModule = this.#modules.get('/shared.bundling.js')!
+        const depsModule = this.#modules.get('/deps.bundling.js')
+        const sharedModule = this.#modules.get('/shared.bundling.js')
+        const ployfillModule = this.#modules.get('/ployfill.js')
 
         return [
-            depsModule ? { src: util.cleanPath(`${baseUrl}/_aleph/deps.${depsModule.hash.slice(0, hashShort)}.js`), async: true } : {},
-            sharedModule ? { src: util.cleanPath(`${baseUrl}/_aleph/shared.${sharedModule.hash.slice(0, hashShort)}.js`), async: true } : {},
-            !this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.sourceHash.slice(0, hashShort)}.js`), async: true } : {},
+            ployfillModule ? { src: util.cleanPath(`${baseUrl}/_aleph/ployfill.${ployfillModule.hash.slice(0, hashShort)}.js`) } : {},
+            depsModule ? { src: util.cleanPath(`${baseUrl}/_aleph/deps.${depsModule.hash.slice(0, hashShort)}.js`), } : {},
+            sharedModule ? { src: util.cleanPath(`${baseUrl}/_aleph/shared.${sharedModule.hash.slice(0, hashShort)}.js`), } : {},
+            !this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.sourceHash.slice(0, hashShort)}.js`), } : {},
             this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' } : {},
             this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true } : {},
         ]
@@ -532,6 +543,7 @@ export class Project {
     /** initialize project */
     private async _init(reload: boolean) {
         const t = performance.now()
+        const alephPkgUrl = getAlephPkgUrl()
         const walkOptions = { includeDirs: false, exts: ['.ts', '.js', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
@@ -653,25 +665,18 @@ export class Project {
             this.#pageRouting.update(this._getRouteModule(mod))
         }
 
-
-        let _alephPkgUrl = alephPkgUrl
-        const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-        if (devPort) {
-            _alephPkgUrl = `http://localhost:${devPort}`
-        }
-
         // pre-compile some modules
         if (this.isDev) {
             for (const mod of [
                 'hmr.ts',
                 'nomodule.ts',
             ]) {
-                await this._compile(`${_alephPkgUrl}/${mod}`)
+                await this._compile(`${alephPkgUrl}/${mod}`)
             }
         }
 
         // import renderer
-        const rendererUrl = `${_alephPkgUrl}/framework/${this.config.framework}/renderer.ts`
+        const rendererUrl = `${alephPkgUrl}/framework/${this.config.framework}/renderer.ts`
         await this._compile(rendererUrl)
         const { renderPage } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
         this.#renderer = { renderPage }
@@ -825,6 +830,7 @@ export class Project {
 
     /** create re-compiled main module. */
     private async _createMainModule(): Promise<void> {
+        const alephPkgUrl = getAlephPkgUrl()
         const { baseUrl, defaultLocale, framework } = this.config
         const config: Record<string, any> = {
             baseUrl,
@@ -926,6 +932,7 @@ export class Project {
             bundledPaths?: string[]
         }
     ): Promise<Module> {
+        const alephPkgUrl = getAlephPkgUrl()
         const isRemote = reHttp.test(url)
         const localUrl = fixImportUrl(url)
         const name = path.basename(localUrl).replace(reModuleExt, '')
@@ -1337,6 +1344,29 @@ export class Project {
 
     /** bundle modules for production. */
     private async _bundle() {
+        const header = `
+            const __ALEPH = window.__ALEPH || (window.__ALEPH = {
+                pack: {},
+                exportFrom(specifier, url, exports) {
+                    if (url in this.pack) {
+                        const mod = this.pack[url]
+                        if (!(specifier in this.pack)) {
+                            this.pack[specifier] = {}
+                        }
+                        if (exports === '*') {
+                            for (const k in mod) {
+                                this.pack[specifier][k] = mod[k]
+                            }
+                        } else if (typeof exports === 'object' && exports !== null) {
+                            for (const k in exports) {
+                                this.pack[specifier][exports[k]] = mod[k]
+                            }
+                        }
+                    }
+                }
+            });
+        `
+        const alephPkgUrl = getAlephPkgUrl()
         const refCounter = new Map<string, number>()
         const lookup = (url: string) => {
             if (this.#modules.has(url)) {
@@ -1377,7 +1407,6 @@ export class Project {
 
         const remoteDepList: string[] = []
         const localDepList: string[] = []
-        console.log(refCounter)
         Array.from(refCounter.entries()).forEach(([url, count]) => {
             if (reHttp.test(url)) {
                 remoteDepList.push(url)
@@ -1393,38 +1422,34 @@ export class Project {
         }
 
         log.info('- Bundle')
-        await this._createChunkBundle('deps', remoteDepList)
+        await this._createChunkBundle('deps', remoteDepList, header)
         if (localDepList.length > 0) {
-            await this._createChunkBundle('shared', localDepList)
+            await this._createChunkBundle('shared', localDepList, header)
         }
 
-        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localDepList)))
+        // copy main module
+        const mainModule = this.getModule('/main.ts')!
+        const mainJSFile = path.join(this.outputDir, '_aleph', `main.${mainModule.sourceHash.slice(0, hashShort)}.js`)
+        const mainJSConent = await Deno.readTextFile(mainModule.bundlingFile)
+        await Deno.writeTextFile(mainJSFile, mainJSConent)
+
+        // create and copy ployfill
+        const ployfillMode = newModule('/ployfill.js')
+        ployfillMode.hash = ployfillMode.sourceHash = (new Sha1).update(header).update(`${this.config.buildTarget}-${version}`).hex()
+        const ployfillFile = path.join(this.buildDir, `ployfill.${ployfillMode.hash.slice(0, hashShort)}.js`)
+        if (!existsFileSync(ployfillFile)) {
+            const rawPloyfillFile = `${alephPkgUrl}/compiler/ployfills/${this.config.buildTarget}/ployfill.js`
+            await this._runDenoBundle(rawPloyfillFile, ployfillFile, header)
+        }
+        Deno.copyFile(ployfillFile, path.join(this.outputDir, '_aleph', `ployfill.${ployfillMode.hash.slice(0, hashShort)}.js`))
+        this.#modules.set(ployfillMode.url, ployfillMode)
+
+        // bundle and copy page moudles
+        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localDepList, header)))
     }
 
     /** create chunk bundle. */
-    private async _createChunkBundle(name: string, list: string[]) {
-        const header = `
-            const __ALEPH = window.__ALEPH || (window.__ALEPH = {
-                pack: {},
-                exportFrom(specifier, url, exports) {
-                    if (url in this.pack) {
-                        const mod = this.pack[url]
-                        if (!(specifier in this.pack)) {
-                            this.pack[specifier] = {}
-                        }
-                        if (exports === '*') {
-                            for (const k in mod) {
-                                this.pack[specifier][k] = mod[k]
-                            }
-                        } else if (typeof exports === 'object' && exports !== null) {
-                            for (const k in exports) {
-                                this.pack[specifier][exports[k]] = mod[k]
-                            }
-                        }
-                    }
-                }
-            });
-        `
+    private async _createChunkBundle(name: string, list: string[], header = '') {
         const imports = list.map((url, i) => {
             const mod = this.#modules.get(url)
             if (mod) {
@@ -1459,7 +1484,7 @@ export class Project {
     }
 
     /** create page bundle. */
-    private async _createPageBundle(mod: Module, bundledPaths: string[]) {
+    private async _createPageBundle(mod: Module, bundledPaths: string[], header = '') {
         const { bundlingFile, sourceHash } = await this._compile(mod.url, { bundleMode: true, bundledPaths })
         const _tmp = util.trimSuffix(bundlingFile.replace(reHashJs, ''), '.bundling')
         const _tmp_bundlingFile = _tmp + `.bundling.js`
@@ -1477,7 +1502,7 @@ export class Project {
             `__ALEPH.pack[${JSON.stringify(mod.url)}] = mod`
         ].join('\n')
         await Deno.writeTextFile(_tmp_bundlingFile, bundlingCode)
-        await this._runDenoBundle(_tmp_bundlingFile, bundleFile)
+        await this._runDenoBundle(_tmp_bundlingFile, bundleFile, header)
         await ensureDir(path.dirname(saveAs))
         await Deno.copyFile(bundleFile, saveAs)
         Deno.remove(_tmp_bundlingFile)
@@ -1508,15 +1533,15 @@ export class Project {
         })
 
         // minify code
-        const ret = await minify(code, {
-            compress: true,
-            mangle: true,
-            ecma: parseInt(util.trimPrefix(this.config.buildTarget, 'es')) as ECMA,
-            sourceMap: false
-        })
-        if (ret.code) {
-            code = ret.code
-        }
+        // const ret = await minify(code, {
+        //     compress: true,
+        //     mangle: true,
+        //     ecma: parseInt(util.trimPrefix(this.config.buildTarget, 'es')) as ECMA,
+        //     sourceMap: false
+        // })
+        // if (ret.code) {
+        //     code = ret.code
+        // }
 
         await cleanupCompilation(bundleFile)
         await Deno.writeTextFile(bundleFile, code)
