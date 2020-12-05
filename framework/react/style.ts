@@ -1,4 +1,5 @@
-import { StyleHTMLAttributes, useEffect } from 'https://esm.sh/react'
+import type { StyleHTMLAttributes } from 'https://esm.sh/react'
+import { useEffect } from 'https://esm.sh/react'
 
 export const serverStyles: Map<string, { css: string, asLink?: boolean }> = new Map()
 
@@ -36,7 +37,6 @@ export default function Style({ children, __styleId: id }: StyleProps) {
 
     return null
 }
-
 
 const removeTimers = new Map<string, number>()
 

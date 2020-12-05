@@ -1,4 +1,5 @@
-import React, { ComponentType, LinkHTMLAttributes, useEffect, useState } from 'https://esm.sh/react'
+import type { ComponentType, LinkHTMLAttributes } from 'https://esm.sh/react'
+import { createElement, useEffect, useState } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import { removeCSS } from './style.ts'
 import { isLikelyReactComponent } from './util.ts'
@@ -47,11 +48,11 @@ export default function Link({
     }, [rel, href, exportName, __url, __base])
 
     if (error) {
-        return React.createElement('div', { style: { color: 'red' } }, error)
+        return createElement('div', { style: { color: 'red' } }, error)
     }
 
     if (mod.Component) {
-        return React.createElement(mod.Component, compProps)
+        return createElement(mod.Component, compProps)
     }
 
     if (rel === 'component' && fallback) {

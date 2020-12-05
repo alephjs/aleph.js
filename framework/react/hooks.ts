@@ -1,4 +1,5 @@
-import React, { useContext, useEffect, useState } from 'https://esm.sh/react'
+import type { ComponentType } from 'https://esm.sh/react'
+import { createElement, useContext, useEffect, useState } from 'https://esm.sh/react'
 import events from '../../shared/events.ts'
 import type { RouterURL } from '../../types.ts'
 import { RouterContext } from './context.ts'
@@ -30,10 +31,10 @@ export function useRouter(): RouterURL {
  * export default withRouter(MyComponent)
  * ```
  */
-export function withRouter<P>(Component: React.ComponentType<P>) {
+export function withRouter<P>(Component: ComponentType<P>) {
     return function WithRouter(props: P) {
         const router = useRouter()
-        return React.createElement(Component, { ...props, ...router })
+        return createElement(Component, { ...props, ...router })
     }
 }
 
@@ -98,13 +99,13 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>)): T {
  * ```
  */
 export function withDeno<T>(callback: () => (T | Promise<T>)) {
-    return function <P extends T>(Component: React.ComponentType<P>): React.ComponentType<Exclude<P, keyof T>> {
+    return function <P extends T>(Component: ComponentType<P>): ComponentType<Exclude<P, keyof T>> {
         return function WithDeno(props: Exclude<P, keyof T>) {
             const denoProps = useDeno(callback)
             if (typeof denoProps === 'object') {
-                return React.createElement(Component, { ...props, ...denoProps })
+                return createElement(Component, { ...props, ...denoProps })
             }
-            return React.createElement(Component, props)
+            return createElement(Component, props)
         }
     }
 }

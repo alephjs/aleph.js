@@ -1,4 +1,6 @@
-import React, { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren, useCallback, useEffect, useMemo } from 'https://esm.sh/react'
+import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren } from 'https://esm.sh/react'
+import { createElement, useCallback, useEffect, useMemo } from 'https://esm.sh/react'
+import { isHttpUrl, redirect } from '../../routing.ts'
 import events from '../../shared/events.ts'
 import util from '../../shared/util.ts'
 import { useRouter } from './hooks.ts'
@@ -105,7 +107,7 @@ export default function Anchor(props: AnchorProps) {
         }
     }, [prefetching, prefetch])
 
-    return React.createElement(
+    return createElement(
         'a',
         {
             ...rest,
@@ -118,34 +120,4 @@ export default function Anchor(props: AnchorProps) {
         },
         children
     )
-}
-
-export async function redirect(url: string, replace?: boolean) {
-    const { location, history } = window as any
-
-    if (!util.isNEString(url)) {
-        return
-    }
-
-    if (isHttpUrl(url)) {
-        location.href = url
-        return
-    }
-
-    url = util.cleanPath(url)
-    if (replace) {
-        history.replaceState(null, '', url)
-    } else {
-        history.pushState(null, '', url)
-    }
-    events.emit('popstate', { type: 'popstate', resetScroll: true })
-}
-
-function isHttpUrl(url: string) {
-    try {
-        const { protocol } = new URL(url)
-        return protocol === 'https:' || protocol === 'http:'
-    } catch (error) {
-        return false
-    }
 }

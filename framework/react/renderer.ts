@@ -1,4 +1,5 @@
-import React, { ComponentType, ReactElement } from 'https://esm.sh/react'
+import type { ComponentType, ReactElement } from 'https://esm.sh/react'
+import { createElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import events from '../../shared/events.ts'
 import util, { hashShort, reHttp } from '../../shared/util.ts'
@@ -26,9 +27,9 @@ export async function renderPage(
     const pageProps = createPageProps(pageComponentTree)
     if (App) {
         if (isLikelyReactComponent(App)) {
-            el = React.createElement(App, pageProps)
+            el = createElement(App, pageProps)
         } else {
-            el = React.createElement(
+            el = createElement(
                 E400MissingDefaultExportAsComponent,
                 { name: 'Custom App' }
             )
@@ -37,18 +38,18 @@ export async function renderPage(
         if (pageProps.Page == null) {
             if (E404) {
                 if (isLikelyReactComponent(E404)) {
-                    el = React.createElement(E404)
+                    el = createElement(E404)
                 } else {
-                    el = React.createElement(
+                    el = createElement(
                         E400MissingDefaultExportAsComponent,
                         { name: 'Custom 404' }
                     )
                 }
             } else {
-                el = React.createElement(E404Page)
+                el = createElement(E404Page)
             }
         } else {
-            el = React.createElement(pageProps.Page, pageProps.pageProps)
+            el = createElement(pageProps.Page, pageProps.pageProps)
         }
     }
 
@@ -101,10 +102,10 @@ export async function renderPage(
                 await Promise.all(iter)
             }
             ret.body = renderToString(
-                React.createElement(
+                createElement(
                     RendererContext.Provider,
                     { value: { cache: rendererCache } },
-                    React.createElement(
+                    createElement(
                         RouterContext.Provider,
                         { value: url },
                         el

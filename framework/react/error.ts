@@ -1,6 +1,6 @@
-import React from 'https://esm.sh/react'
+import { Component, createElement, Fragment } from 'https://esm.sh/react'
 
-export class ErrorBoundary extends React.Component {
+export class ErrorBoundary extends Component {
     state: { stack: string | null }
 
     constructor(props: any) {
@@ -20,7 +20,7 @@ export class ErrorBoundary extends React.Component {
     render() {
         if (this.state.stack) {
             return (
-                React.createElement(
+                createElement(
                     'pre',
                     null,
                     this.state.stack
@@ -34,7 +34,7 @@ export class ErrorBoundary extends React.Component {
 
 
 export function E404Page() {
-    return React.createElement(
+    return createElement(
         StatusError,
         {
             status: 404,
@@ -44,7 +44,7 @@ export function E404Page() {
 }
 
 export function E400MissingDefaultExportAsComponent({ name }: { name: string }) {
-    return React.createElement(
+    return createElement(
         StatusError,
         {
             status: 400,
@@ -56,36 +56,36 @@ export function E400MissingDefaultExportAsComponent({ name }: { name: string }) 
 
 export function StatusError({ status, message, showRefreshButton }: { status: number, message: string, showRefreshButton?: boolean }) {
     return (
-        React.createElement(
-            React.Fragment,
+        createElement(
+            Fragment,
             null,
-            React.createElement(
+            createElement(
                 'p',
                 null,
-                React.createElement(
+                createElement(
                     'strong',
                     null,
-                    React.createElement(
+                    createElement(
                         'code',
                         null,
                         status
                     )
                 ),
-                React.createElement(
+                createElement(
                     'small',
                     null,
                     ' - '
                 ),
-                React.createElement(
+                createElement(
                     'span',
                     null,
                     message
                 )
             ),
-            showRefreshButton && React.createElement(
+            showRefreshButton && createElement(
                 'p',
                 null,
-                React.createElement(
+                createElement(
                     'button',
                     {
                         onClick() {

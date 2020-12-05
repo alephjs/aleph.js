@@ -1,4 +1,5 @@
-import { PropsWithChildren, ScriptHTMLAttributes, useContext } from 'https://esm.sh/react'
+import type { PropsWithChildren, ScriptHTMLAttributes } from 'https://esm.sh/react'
+import { useContext } from 'https://esm.sh/react'
 import { RendererContext } from './context.ts'
 
 export default function Script(props: PropsWithChildren<ScriptHTMLAttributes<{}>>) {

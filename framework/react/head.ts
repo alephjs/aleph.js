@@ -1,4 +1,5 @@
-import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useContext, useEffect } from 'https://esm.sh/react'
+import type { PropsWithChildren, ReactElement, ReactNode } from 'https://esm.sh/react'
+import { Children, createElement, Fragment, isValidElement, useContext, useEffect } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import { RendererContext } from './context.ts'
 import Script from './script.ts'
@@ -127,7 +128,7 @@ function parse(node: ReactNode, els: Map<string, { type: string, props: Record<s
 
         let { type, props } = child
         switch (type) {
-            case React.Fragment:
+            case Fragment:
                 parse(props.children, els)
                 break
             case SEO:
@@ -176,4 +177,3 @@ function parse(node: ReactNode, els: Map<string, { type: string, props: Record<s
 
     return els
 }
-

@@ -1,4 +1,5 @@
-import React, { ComponentType } from 'https://esm.sh/react'
+import type { ComponentType } from 'https://esm.sh/react'
+import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { Route, RouteModule, Routing } from '../../routing.ts'
 import { reModuleExt } from '../../shared/util.ts'
@@ -51,7 +52,7 @@ export default async function bootstrap({
         }
     }
 
-    const rootEl = React.createElement(
+    const rootEl = createElement(
         AlephRoot,
         {
             url,

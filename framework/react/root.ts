@@ -1,4 +1,5 @@
-import React, { ComponentType, useCallback, useEffect, useState } from 'https://esm.sh/react'
+import type { ComponentType } from 'https://esm.sh/react'
+import { createElement, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import { RouteModule, Routing } from '../../routing.ts'
 import events from '../../shared/events.ts'
 import util, { hashShort, reModuleExt } from '../../shared/util.ts'
@@ -175,16 +176,16 @@ export function AlephRoot({
     }, [route])
 
     return (
-        React.createElement(
+        createElement(
             ErrorBoundary,
             null,
-            React.createElement(
+            createElement(
                 RouterContext.Provider,
                 { value: route.url },
                 ...[
-                    (route.Page && app.Component) && React.createElement(app.Component, Object.assign({}, app.props, { Page: route.Page, pageProps: route.pageProps })),
-                    (route.Page && !app.Component) && React.createElement(route.Page, route.pageProps),
-                    !route.Page && React.createElement(e404.Component, e404.props)
+                    (route.Page && app.Component) && createElement(app.Component, Object.assign({}, app.props, { Page: route.Page, pageProps: route.pageProps })),
+                    (route.Page && !app.Component) && createElement(route.Page, route.pageProps),
+                    !route.Page && createElement(e404.Component, e404.props)
                 ].filter(Boolean),
             )
         )
