@@ -1,5 +1,5 @@
-import reactRefreshTS from 'https://esm.sh/react-refresh-typescript@1.0.4'
-import ts from 'https://esm.sh/typescript@4.0.5'
+import reactRefreshTS from 'https://esm.sh/react-refresh-typescript@1.1.0?external=typescript@4.1.2'
+import ts from 'https://esm.sh/typescript@4.1.2'
 import transformImportPathRewrite from './transform-import-path-rewrite.ts'
 import transformReactJsx from './transform-react-jsx.ts'
 import transformReactUseDenoHook from './transform-react-use-deno-hook.ts'

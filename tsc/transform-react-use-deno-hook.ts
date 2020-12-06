@@ -2,11 +2,11 @@
  * TypeScript AST Transformer for useDeno hook.
  */
 
-import ts from 'https://esm.sh/typescript@4.0.5'
+import ts from 'https://esm.sh/typescript@4.1.2'
 
 const f = ts.factory
 
-export default function transformReactUseDenoHook(sf: ts.SourceFile, node: ts.Node, options:{index:number, signUseDeno: (id: string) => string}): ts.VisitResult<ts.Node> {
+export default function transformReactUseDenoHook(sf: ts.SourceFile, node: ts.Node, options: { index: number, signUseDeno: (id: string) => string }): ts.VisitResult<ts.Node> {
     if (isUseDenoHookCallExpr(node)) {
         const args = node.arguments as unknown as Array<any>
         const id = options.signUseDeno(`${sf.fileName}:useDeno#${options.index++}`)
