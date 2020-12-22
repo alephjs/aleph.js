@@ -9,11 +9,18 @@ Options:
     -L, --log-level  Set log level [possible values: debug, info]
     -r, --reload     Reload source code cache
     -h, --help       Prints help message
-`
+`;
 
-export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const { Project } = await import('../project.ts')
-    const project = new Project(appDir, 'production', Boolean(options.r || options.reload))
-    await project.build()
-    Deno.exit(0)
+export default async function (
+  appDir: string,
+  options: Record<string, string | boolean>,
+) {
+  const { Project } = await import("../project.ts");
+  const project = new Project(
+    appDir,
+    "production",
+    Boolean(options.r || options.reload),
+  );
+  await project.build();
+  Deno.exit(0);
 }

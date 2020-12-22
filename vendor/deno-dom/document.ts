@@ -20,7 +20,7 @@ export function createHTMLDocument(titleStr?: string): Document {
   const body = new Element("body", html, []);
 
   const title = new Element("title", head, []);
-  const titleText = new Text(titleStr || '');
+  const titleText = new Text(titleStr || "");
   title.appendChild(titleText);
 
   doc.head = head;
@@ -43,7 +43,7 @@ export class DocumentType extends Node {
     super(
       "html",
       NodeType.DOCUMENT_TYPE_NODE,
-      null
+      null,
     );
 
     this.#qualifiedName = name;
@@ -69,11 +69,14 @@ export interface ElementCreationOptions {
 }
 
 export type VisibilityState = "visible" | "hidden" | "prerender";
-export type NamespaceURI = "http://www.w3.org/1999/xhtml" | "http://www.w3.org/2000/svg" | "http://www.w3.org/1998/Math/MathML";
+export type NamespaceURI =
+  | "http://www.w3.org/1999/xhtml"
+  | "http://www.w3.org/2000/svg"
+  | "http://www.w3.org/1998/Math/MathML";
 
 export class Document extends Node {
-  public head: Element = <Element><unknown>null;
-  public body: Element = <Element><unknown>null;
+  public head: Element = <Element> <unknown> null;
+  public body: Element = <Element> <unknown> null;
 
   #documentURI = "about:blank"; // TODO
   #nwapi = NWAPI(this);
@@ -129,7 +132,7 @@ export class Document extends Node {
   get documentElement(): Element | null {
     for (const node of this.childNodes) {
       if (node.nodeType === NodeType.ELEMENT_NODE) {
-        return <Element>node;
+        return <Element> node;
       }
     }
 
@@ -160,7 +163,9 @@ export class Document extends Node {
     if (namespace === "http://www.w3.org/1999/xhtml") {
       return this.createElement(qualifiedName, options);
     } else {
-      throw new Error(`createElementNS: "${namespace}" namespace unimplemented`); // TODO
+      throw new Error(
+        `createElementNS: "${namespace}" namespace unimplemented`,
+      ); // TODO
     }
   }
 
@@ -179,7 +184,7 @@ export class Document extends Node {
   querySelectorAll(selectors: string): NodeList {
     const nodeList = new NodeList();
     const mutator = nodeList[nodeListMutatorSym]();
-    mutator.push(...this.#nwapi.select(selectors, this))
+    mutator.push(...this.#nwapi.select(selectors, this));
 
     return nodeList;
   }
@@ -188,11 +193,11 @@ export class Document extends Node {
   getElementById(id: string): Element | null {
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
-        if ((<Element>child).id === id) {
-          return <Element>child;
+        if ((<Element> child).id === id) {
+          return <Element> child;
         }
 
-        const search = (<Element>child).getElementById(id);
+        const search = (<Element> child).getElementById(id);
         if (search) {
           return search;
         }
@@ -205,10 +210,13 @@ export class Document extends Node {
   getElementsByTagName(tagName: string): Element[] {
     if (tagName === "*") {
       return this.documentElement
-        ? <Element[]>this._getElementsByTagNameWildcard(this.documentElement, [])
+        ? <Element[]> this._getElementsByTagNameWildcard(
+          this.documentElement,
+          [],
+        )
         : [];
     } else {
-      return <Element[]>this._getElementsByTagName(tagName.toUpperCase(), []);
+      return <Element[]> this._getElementsByTagName(tagName.toUpperCase(), []);
     }
   }
 
@@ -216,7 +224,7 @@ export class Document extends Node {
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
         search.push(child);
-        (<any>child)._getElementsByTagNameWildcard(search);
+        (<any> child)._getElementsByTagNameWildcard(search);
       }
     }
 
@@ -226,11 +234,11 @@ export class Document extends Node {
   private _getElementsByTagName(tagName: string, search: Node[]): Node[] {
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
-        if ((<Element>child).tagName === tagName) {
+        if ((<Element> child).tagName === tagName) {
           search.push(child);
         }
 
-        (<any>child)._getElementsByTagName(tagName, search);
+        (<any> child)._getElementsByTagName(tagName, search);
       }
     }
 
@@ -242,17 +250,17 @@ export class Document extends Node {
   }
 
   getElementsByClassName(className: string): Element[] {
-    return <Element[]>this._getElementsByClassName(className, []);
+    return <Element[]> this._getElementsByClassName(className, []);
   }
 
   private _getElementsByClassName(className: string, search: Node[]): Node[] {
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
-        if ((<Element>child).classList.contains(className)) {
+        if ((<Element> child).classList.contains(className)) {
           search.push(child);
         }
 
-        (<any>child)._getElementsByClassName(className, search);
+        (<any> child)._getElementsByClassName(className, search);
       }
     }
 

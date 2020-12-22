@@ -29,7 +29,9 @@ export class Attr {
   }
 
   get value() {
-    return (<{ [attribute: string]: string }><unknown>this.#namedNodeMap)[this.#name];
+    return (<{ [attribute: string]: string }> <unknown> this.#namedNodeMap)[
+      this.#name
+    ];
   }
 }
 
@@ -46,7 +48,8 @@ export class NamedNodeMap {
   }
 
   getNamedItem(attribute: string) {
-    return this.#attrObjCache[attribute] ?? (this.#attrObjCache[attribute] = this.newAttr(attribute));
+    return this.#attrObjCache[attribute] ??
+      (this.#attrObjCache[attribute] = this.newAttr(attribute));
   }
 
   setNamedItem(...args: any) {
@@ -56,7 +59,8 @@ export class NamedNodeMap {
 
 export class Element extends Node {
   public classList = new DOMTokenList();
-  public attributes: NamedNodeMap & { [attribute: string]: string } = <any>new NamedNodeMap();
+  public attributes: NamedNodeMap & { [attribute: string]: string } =
+    <any> new NamedNodeMap();
 
   #currentId = "";
 
@@ -109,11 +113,12 @@ export class Element extends Node {
 
       // escaping: https://www.w3.org/TR/2009/WD-html5-20090212/serializing-html-fragments.html#escapingString
       if (attributes[attribute] != null) {
-        out += `="${attributes[attribute]
-          .replace(/&/g, "&amp;")
-          .replace(/\xA0/g, "&nbsp;")
-          .replace(/"/g, "&quot;")
-          }"`;
+        out += `="${
+          attributes[attribute]
+            .replace(/&/g, "&amp;")
+            .replace(/\xA0/g, "&nbsp;")
+            .replace(/"/g, "&quot;")
+        }"`;
       }
     }
 
@@ -154,11 +159,11 @@ export class Element extends Node {
     for (const child of this.childNodes) {
       switch (child.nodeType) {
         case NodeType.ELEMENT_NODE:
-          out += (<Element>child).outerHTML;
+          out += (<Element> child).outerHTML;
           break;
         case NodeType.TEXT_NODE:
           // escaping: https://www.w3.org/TR/2009/WD-html5-20090212/serializing-html-fragments.html#escapingString
-          out += (<Text>child).data
+          out += (<Text> child).data
             .replace(/&/g, "&amp;")
             .replace(/\xA0/g, "&nbsp;")
             .replace(/</g, "&lt;")
@@ -238,7 +243,7 @@ export class Element extends Node {
       const sibling = childNodes[i];
 
       if (sibling.nodeType === NodeType.ELEMENT_NODE) {
-        next = <Element>sibling;
+        next = <Element> sibling;
         break;
       }
     }
@@ -261,7 +266,7 @@ export class Element extends Node {
       const sibling = childNodes[i];
 
       if (sibling.nodeType === NodeType.ELEMENT_NODE) {
-        prev = <Element>sibling;
+        prev = <Element> sibling;
         break;
       }
     }
@@ -284,7 +289,7 @@ export class Element extends Node {
 
     const nodeList = new NodeList();
     const mutator = nodeList[nodeListMutatorSym]();
-    mutator.push(...this.ownerDocument!._nwapi.select(selectors, this))
+    mutator.push(...this.ownerDocument!._nwapi.select(selectors, this));
 
     return nodeList;
   }
@@ -293,11 +298,11 @@ export class Element extends Node {
   getElementById(id: string): Element | null {
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
-        if ((<Element>child).id === id) {
-          return <Element>child;
+        if ((<Element> child).id === id) {
+          return <Element> child;
         }
 
-        const search = (<Element>child).getElementById(id);
+        const search = (<Element> child).getElementById(id);
         if (search) {
           return search;
         }
@@ -308,14 +313,14 @@ export class Element extends Node {
   }
 
   getElementsByTagName(tagName: string): Element[] {
-    return <Element[]>this._getElementsByTagName(tagName.toUpperCase(), []);
+    return <Element[]> this._getElementsByTagName(tagName.toUpperCase(), []);
   }
 
   private _getElementsByTagNameWildcard(search: Node[]): Node[] {
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
         search.push(child);
-        (<Element>child)._getElementsByTagNameWildcard(search);
+        (<Element> child)._getElementsByTagNameWildcard(search);
       }
     }
 
@@ -325,11 +330,11 @@ export class Element extends Node {
   private _getElementsByTagName(tagName: string, search: Node[]): Node[] {
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
-        if ((<Element>child).tagName === tagName) {
+        if ((<Element> child).tagName === tagName) {
           search.push(child);
         }
 
-        (<Element>child)._getElementsByTagName(tagName, search);
+        (<Element> child)._getElementsByTagName(tagName, search);
       }
     }
 
@@ -337,7 +342,7 @@ export class Element extends Node {
   }
 
   getElementsByClassName(className: string): Element[] {
-    return <Element[]>this._getElementsByClassName(className, []);
+    return <Element[]> this._getElementsByClassName(className, []);
   }
 
   getElementsByTagNameNS(_namespace: string, localName: string): Element[] {
@@ -348,11 +353,11 @@ export class Element extends Node {
   private _getElementsByClassName(className: string, search: Node[]): Node[] {
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
-        if ((<Element>child).classList.contains(className)) {
+        if ((<Element> child).classList.contains(className)) {
           search.push(child);
         }
 
-        (<Element>child)._getElementsByClassName(className, search);
+        (<Element> child)._getElementsByClassName(className, search);
       }
     }
 
@@ -360,14 +365,14 @@ export class Element extends Node {
   }
 
   get style(): Record<string, string> {
-    return {}
+    return {};
   }
 
   getContext(type: string) {
-    const isCanvas = this.tagName === "CANVAS"
+    const isCanvas = this.tagName === "CANVAS";
     if (isCanvas && type === "2d") {
-      return new CanvasContext2D()
+      return new CanvasContext2D();
     }
-    return null
+    return null;
   }
 }

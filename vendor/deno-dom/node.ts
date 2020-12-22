@@ -34,7 +34,7 @@ export enum NodeType {
 }
 
 const nodesAndTextNodes = (nodes: (Node | any)[], parentNode: Node) => {
-  return nodes.map(n => {
+  return nodes.map((n) => {
     let node = n;
 
     if (!(n instanceof Node)) {
@@ -44,7 +44,7 @@ const nodesAndTextNodes = (nodes: (Node | any)[], parentNode: Node) => {
     node.parentNode = node.parentElement = parentNode;
     return node;
   });
-}
+};
 
 export class Node extends EventTarget {
   public nodeValue: string | null;
@@ -66,7 +66,7 @@ export class Node extends EventTarget {
     this.nodeValue = null;
     this.childNodes = new NodeList();
     this.#childNodesMutator = this.childNodes[nodeListMutatorSym]();
-    this.parentElement = <Element>parentNode;
+    this.parentElement = <Element> parentNode;
 
     if (parentNode) {
       parentNode.appendChild(this);
@@ -149,7 +149,7 @@ export class Node extends EventTarget {
     // If this a document node or another non-element node
     // then parentElement should be set to null
     if (this.nodeType === NodeType.ELEMENT_NODE) {
-      child.parentElement = <Element><unknown>this;
+      child.parentElement = <Element> <unknown> this;
     } else {
       child.parentElement = null;
     }
@@ -178,7 +178,7 @@ export class Node extends EventTarget {
     const index = mutator.indexOf(this);
     nodes = nodesAndTextNodes(nodes, parentNode);
 
-    mutator.splice(index + side, 0, ...(<Node[]>nodes));
+    mutator.splice(index + side, 0, ...(<Node[]> nodes));
   }
 
   before(...nodes: (Node | string)[]) {
@@ -200,7 +200,7 @@ export class Node extends EventTarget {
       const index = mutator.indexOf(this);
       nodes = nodesAndTextNodes(nodes, parentNode);
 
-      mutator.splice(index, 1, ...(<Node[]>nodes));
+      mutator.splice(index, 1, ...(<Node[]> nodes));
       this.parentNode = this.parentElement = null;
     }
   }
@@ -211,7 +211,7 @@ export class Node extends EventTarget {
 
     for (const child of this.childNodes) {
       if (child.nodeType === NodeType.ELEMENT_NODE) {
-        mutator.push(<Element>child);
+        mutator.push(<Element> child);
       }
     }
 
@@ -290,7 +290,7 @@ export class Text extends CharacterData {
   }
 
   get textContent(): string {
-    return <string>this.nodeValue;
+    return <string> this.nodeValue;
   }
 }
 
@@ -312,6 +312,6 @@ export class Comment extends CharacterData {
   }
 
   get textContent(): string {
-    return <string>this.nodeValue;
+    return <string> this.nodeValue;
   }
 }

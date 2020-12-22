@@ -4,14 +4,17 @@ import { DocumentType, HTMLDocument } from "./document.ts";
 import type { Element } from "./element.ts";
 
 export type DOMParserMimeType =
-  "text/html"
+  | "text/html"
   | "text/xml"
   | "application/xml"
   | "application/xhtml+xml"
   | "image/svg+xml";
 
 export class DOMParser {
-  parseFromString(source: string, mimeType: DOMParserMimeType): HTMLDocument | null {
+  parseFromString(
+    source: string,
+    mimeType: DOMParserMimeType,
+  ): HTMLDocument | null {
     if (mimeType !== "text/html") {
       throw new Error(`DOMParser: "${mimeType}" unimplemented`); // TODO
     }
@@ -30,7 +33,7 @@ export class DOMParser {
       doc.appendChild(child);
 
       if (child.nodeName === "HTML") {
-        htmlNode = <Element>child;
+        htmlNode = <Element> child;
       }
     }
 
@@ -38,12 +41,12 @@ export class DOMParser {
 
     if (htmlNode) {
       for (const child of htmlNode.childNodes) {
-        switch ((<Element>child).tagName) {
+        switch ((<Element> child).tagName) {
           case "HEAD":
-            doc.head = <Element>child;
+            doc.head = <Element> child;
             break;
           case "BODY":
-            doc.body = <Element>child;
+            doc.body = <Element> child;
             break;
         }
       }
@@ -52,4 +55,3 @@ export class DOMParser {
     return doc;
   }
 }
-

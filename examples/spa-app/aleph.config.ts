@@ -1,7 +1,7 @@
-import { Config } from 'https://deno.land/x/aleph/types.ts'
+import { Config } from "https://deno.land/x/aleph/types.ts";
 
 const config: Config = {
-    ssr: false
-}
+  ssr: false,
+};
 
-export default config
+export default config;

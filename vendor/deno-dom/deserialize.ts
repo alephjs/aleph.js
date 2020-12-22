@@ -33,13 +33,13 @@ function nodeFromArray(data: any, parentNode: Node | null): Node {
     switch (child[0]) {
       case NodeType.TEXT_NODE:
         childNode = new Text(child[1]);
-        childNode.parentNode = childNode.parentElement = <Element>elm;
+        childNode.parentNode = childNode.parentElement = <Element> elm;
         childNodes.push(childNode);
         break;
 
       case NodeType.COMMENT_NODE:
         childNode = new Comment(child[1]);
-        childNode.parentNode = childNode.parentElement = <Element>elm;
+        childNode.parentNode = childNode.parentElement = <Element> elm;
         childNodes.push(childNode);
         break;
 
@@ -52,4 +52,3 @@ function nodeFromArray(data: any, parentNode: Node | null): Node {
 
   return elm;
 }
-

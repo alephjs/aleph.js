@@ -10,4 +10,3 @@ export function setLock(value: boolean) {
 export function getLock(): boolean {
   return lock;
 }
-
