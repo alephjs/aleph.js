@@ -28,6 +28,10 @@ jobs:
         with:
           deno-version: v1.x
 
+      - name: check format
+        if: matrix.os == 'ubuntu-latest'
+        run: deno fmt --check
+
       - name: Cache std modules
         run: deno cache std.ts
 
