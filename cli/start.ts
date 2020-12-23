@@ -8,6 +8,7 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
+    --host           The address at which the server is to be started.
     -p, --port       A port number to start the aleph.js app, default is 8080
     -L, --log-level  Set log level [possible values: debug, info]
     -r, --reload     Reload source code cache
@@ -16,10 +17,11 @@ Options:
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
     const { start } = await import('../server.ts')
+    const host = String(options.h || options.host || 'localhost')
     const port = parseInt(String(options.p || options.port || '8080'))
     if (isNaN(port) || port <= 0 || !Number.isInteger(port)) {
         log.error(`invalid port '${options.port || options.p}'`)
         Deno.exit(1)
     }
-    start(appDir, port, false, Boolean(options.r || options.reload))
+    start(appDir, host, port, false, Boolean(options.r || options.reload))
 }
