@@ -40,9 +40,9 @@ export interface Config {
     outputDir?: string
     /** `baseUrl` specifies the path prefix for the application (default is '/'). */
     baseUrl?: string
-    /** `reactUrl` specifies the **react** download URL (default is 'https://esm.sh/react@16.14.0'). */
+    /** `reactUrl` specifies the **react** download URL (default is 'https://esm.sh/react@17.0.1'). */
     reactUrl?: string
-    /** `reactDomUrl` specifies the **react-dom** download URL (default is 'https://esm.sh/react-dom@16.14.0'). */
+    /** `reactDomUrl` specifies the **react-dom** download URL (default is 'https://esm.sh/react-dom@17.0.1'). */
     reactDomUrl?: string
     /** `defaultLocale` specifies the default locale of the application (default is '**en**'). */
     defaultLocale?: string
