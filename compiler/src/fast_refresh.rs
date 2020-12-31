@@ -578,6 +578,7 @@ impl FastRefreshFold {
         span: DUMMY_SP,
         value: key.into(),
         has_escape: false,
+        kind: Default::default(),
       }))),
     });
     if force_reset || custom_hooks_in_scope.len() > 0 {
@@ -960,6 +961,7 @@ impl Fold for FastRefreshFold {
                 span: DUMMY_SP,
                 value: fc_name.into(),
                 has_escape: false,
+                kind: Default::default(),
               }))),
             },
           ],

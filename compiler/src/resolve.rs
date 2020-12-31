@@ -441,11 +441,7 @@ impl Fold for AlephResolveFold {
                   }
                 } else {
                   ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-                    src: Str {
-                      span: DUMMY_SP,
-                      value: resolved_path.into(),
-                      has_escape: false,
-                    },
+                    src: new_js_str(resolved_path),
                     ..import_decl
                   }))
                 }
@@ -479,19 +475,11 @@ impl Fold for AlephResolveFold {
                     args: vec![
                       ExprOrSpread {
                         spread: None,
-                        expr: Box::new(Expr::Lit(Lit::Str(Str {
-                          span: DUMMY_SP,
-                          value: resolver.specifier.clone().into(),
-                          has_escape: false,
-                        }))),
+                        expr: Box::new(Expr::Lit(Lit::Str(new_js_str(resolver.specifier.clone())))),
                       },
                       ExprOrSpread {
                         spread: None,
-                        expr: Box::new(Expr::Lit(Lit::Str(Str {
-                          span: DUMMY_SP,
-                          value: fixed_url.into(),
-                          has_escape: false,
-                        }))),
+                        expr: Box::new(Expr::Lit(Lit::Str(new_js_str(fixed_url)))),
                       },
                       ExprOrSpread {
                         spread: None,
@@ -504,16 +492,10 @@ impl Fold for AlephResolveFold {
                               // export Foo from ".."
                               ExportSpecifier::Default(ExportDefaultSpecifier { exported }) => {
                                 PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                  key: PropName::Str(Str {
-                                    span: DUMMY_SP,
-                                    value: "default".into(),
-                                    has_escape: false,
-                                  }),
-                                  value: Box::new(Expr::Lit(Lit::Str(Str {
-                                    span: DUMMY_SP,
-                                    value: exported.sym.as_ref().into(),
-                                    has_escape: false,
-                                  }))),
+                                  key: PropName::Str(new_js_str("default".into())),
+                                  value: Box::new(Expr::Lit(Lit::Str(new_js_str(
+                                    exported.sym.as_ref().into(),
+                                  )))),
                                 })))
                               }
                               // export {Foo, bar: Bar} from ".."
@@ -522,36 +504,24 @@ impl Fold for AlephResolveFold {
                                 exported,
                                 ..
                               }) => PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                key: PropName::Str(Str {
-                                  span: DUMMY_SP,
-                                  value: orig.as_ref().into(),
-                                  has_escape: false,
-                                }),
-                                value: Box::new(Expr::Lit(Lit::Str(Str {
-                                  span: DUMMY_SP,
-                                  value: (match exported {
+                                key: PropName::Str(new_js_str(orig.as_ref().into())),
+                                value: Box::new(Expr::Lit(Lit::Str(new_js_str(
+                                  (match exported {
                                     Some(name) => name,
                                     None => orig,
                                   })
                                   .as_ref()
                                   .into(),
-                                  has_escape: false,
-                                }))),
+                                )))),
                               }))),
                               // export * as Foo from ".."
                               ExportSpecifier::Namespace(ExportNamespaceSpecifier {
                                 name, ..
                               }) => PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                key: PropName::Str(Str {
-                                  span: DUMMY_SP,
-                                  value: "*".into(),
-                                  has_escape: false,
-                                }),
-                                value: Box::new(Expr::Lit(Lit::Str(Str {
-                                  span: DUMMY_SP,
-                                  value: name.sym.as_ref().into(),
-                                  has_escape: false,
-                                }))),
+                                key: PropName::Str(new_js_str("*".into())),
+                                value: Box::new(Expr::Lit(Lit::Str(new_js_str(
+                                  name.sym.as_ref().into(),
+                                )))),
                               }))),
                             })
                             .collect::<Vec<PropOrSpread>>(),
@@ -573,11 +543,7 @@ impl Fold for AlephResolveFold {
                   ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(NamedExport {
                     span: DUMMY_SP,
                     specifiers,
-                    src: Some(Str {
-                      span: DUMMY_SP,
-                      value: resolved_path.into(),
-                      has_escape: false,
-                    }),
+                    src: Some(new_js_str(resolved_path)),
                     type_only: false,
                   }))
                 }
@@ -598,27 +564,15 @@ impl Fold for AlephResolveFold {
                   args: vec![
                     ExprOrSpread {
                       spread: None,
-                      expr: Box::new(Expr::Lit(Lit::Str(Str {
-                        span: DUMMY_SP,
-                        value: resolver.specifier.clone().into(),
-                        has_escape: false,
-                      }))),
+                      expr: Box::new(Expr::Lit(Lit::Str(new_js_str(resolver.specifier.clone())))),
                     },
                     ExprOrSpread {
                       spread: None,
-                      expr: Box::new(Expr::Lit(Lit::Str(Str {
-                        span: DUMMY_SP,
-                        value: fixed_url.into(),
-                        has_escape: false,
-                      }))),
+                      expr: Box::new(Expr::Lit(Lit::Str(new_js_str(fixed_url)))),
                     },
                     ExprOrSpread {
                       spread: None,
-                      expr: Box::new(Expr::Lit(Lit::Str(Str {
-                        span: DUMMY_SP,
-                        value: "*".into(),
-                        has_escape: false,
-                      }))),
+                      expr: Box::new(Expr::Lit(Lit::Str(new_js_str("*".into())))),
                     },
                   ],
                   type_args: None,
@@ -635,11 +589,7 @@ impl Fold for AlephResolveFold {
               } else {
                 ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
                   span: DUMMY_SP,
-                  src: Str {
-                    span: DUMMY_SP,
-                    value: resolved_path.into(),
-                    has_escape: false,
-                  },
+                  src: new_js_str(resolved_path.into()),
                 }))
               }
             }
@@ -674,11 +624,9 @@ impl Fold for AlephResolveFold {
       };
       call.args = vec![ExprOrSpread {
         spread: None,
-        expr: Box::new(Expr::Lit(Lit::Str(Str {
-          span: DUMMY_SP,
-          value: resolver.resolve(url, true).0.into(),
-          has_escape: false,
-        }))),
+        expr: Box::new(Expr::Lit(Lit::Str(new_js_str(
+          resolver.resolve(url, true).0,
+        )))),
       }];
     } else if is_call_expr_by_name(&call, "useDeno") {
       let has_callback = match call.args.first() {
@@ -703,20 +651,12 @@ impl Fold for AlephResolveFold {
         if call.args.len() > 2 {
           call.args[2] = ExprOrSpread {
             spread: None,
-            expr: Box::new(Expr::Lit(Lit::Str(Str {
-              span: DUMMY_SP,
-              value: id.clone().into(),
-              has_escape: false,
-            }))),
+            expr: Box::new(Expr::Lit(Lit::Str(new_js_str(id.clone())))),
           };
         } else {
           call.args.push(ExprOrSpread {
             spread: None,
-            expr: Box::new(Expr::Lit(Lit::Str(Str {
-              span: DUMMY_SP,
-              value: id.clone().into(),
-              has_escape: false,
-            }))),
+            expr: Box::new(Expr::Lit(Lit::Str(new_js_str(id.clone())))),
           });
         }
         resolver.dep_graph.push(DependencyDescriptor {
@@ -750,6 +690,7 @@ fn new_use_deno_hook_ident() -> String {
   let rand_id = rand::thread_rng()
     .sample_iter(&Alphanumeric)
     .take(9)
+    .map(char::from)
     .collect::<String>();
   ident.push_str(rand_id.as_str());
   ident
@@ -766,6 +707,7 @@ pub fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -
         span: DUMMY_SP,
         value: url.into(),
         has_escape: false,
+        kind: Default::default(),
       }))),
       computed: true,
     })),
@@ -790,6 +732,15 @@ pub fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -
       init: Some(Box::new(m)),
       definite: false,
     },
+  }
+}
+
+fn new_js_str(str: String) -> Str {
+  Str {
+    span: DUMMY_SP,
+    value: str.into(),
+    has_escape: false,
+    kind: Default::default(),
   }
 }
 

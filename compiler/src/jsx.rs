@@ -155,6 +155,7 @@ impl AlephJsxFold {
                                             span: DUMMY_SP,
                                             value: resolved_path.into(),
                                             has_escape: false,
+                                            kind: Default::default(),
                                         }))),
                                     });
                             }
@@ -172,6 +173,7 @@ impl AlephJsxFold {
                                     span: DUMMY_SP,
                                     value: buf.to_slash().unwrap().into(),
                                     has_escape: false,
+                                    kind: Default::default(),
                                 }))),
                             });
                             let url_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
@@ -181,6 +183,7 @@ impl AlephJsxFold {
                                     span: DUMMY_SP,
                                     value: fixed_url.into(),
                                     has_escape: false,
+                                    kind: Default::default(),
                                 }))),
                             });
                             if base_prop_index >= 0 {
@@ -234,6 +237,7 @@ impl AlephJsxFold {
                                 span: DUMMY_SP,
                                 value: id.clone().into(),
                                 has_escape: false,
+                                kind: Default::default(),
                             }))),
                         });
                         if id_prop_index >= 0 {
@@ -286,6 +290,7 @@ impl AlephJsxFold {
                                                     span: DUMMY_SP,
                                                     value: file_name.clone().into(),
                                                     has_escape: false,
+                                                    kind: Default::default(),
                                                 }))),
                                             },
                                         ))),
@@ -364,6 +369,7 @@ impl Fold for AlephJsxFold {
                                             span: DUMMY_SP,
                                             value: format!("%%{}-placeholder%%", id).into(),
                                             has_escape: false,
+                                            kind: Default::default(),
                                         })))),
                                     })];
                             }
@@ -435,6 +441,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                         span: DUMMY_SP,
                         value: resolved_path.into(),
                         has_escape: false,
+                        kind: Default::default(),
                     },
                     type_only: false,
                     asserts: None,
@@ -466,6 +473,7 @@ fn new_inline_style_ident() -> String {
     let rand_id = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(9)
+        .map(char::from)
         .collect::<String>();
     ident.push_str(rand_id.as_str());
     return ident;
