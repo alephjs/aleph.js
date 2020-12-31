@@ -1,4 +1,4 @@
-import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.25/tsc/compile.ts';
+import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.27/tsc/compile.ts';
 import { colors, path, Sha1, walk } from '../deps.ts';
 import { initWasm, transpileSync } from './mod.ts';
 
