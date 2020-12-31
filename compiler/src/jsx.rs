@@ -1,5 +1,4 @@
-// Copyright 2017-2020 The swc Project Developers. All rights reserved. MIT license.
-// Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
+// Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
 use crate::aleph::VERSION;
 use crate::resolve::{

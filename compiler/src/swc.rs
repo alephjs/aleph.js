@@ -1,5 +1,5 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
-// Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
+// Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::fast_refresh::fast_refresh_fold;

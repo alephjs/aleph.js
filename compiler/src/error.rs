@@ -1,7 +1,6 @@
-// Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
-// Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
+// Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
-use std::{error::Error, fmt, sync::Arc, sync::RwLock};
+use std::{fmt, sync::Arc, sync::RwLock};
 use swc_common::{
     errors::{Diagnostic, DiagnosticBuilder, Emitter},
     FileName, Loc, Span,
@@ -11,12 +10,9 @@ use swc_common::{
 #[derive(Debug)]
 pub struct DiagnosticBuffer(Vec<String>);
 
-impl Error for DiagnosticBuffer {}
-
 impl fmt::Display for DiagnosticBuffer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = self.0.join(",");
-        f.pad(&s)
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.pad(&self.0.join(","))
     }
 }
 
@@ -25,11 +21,11 @@ impl DiagnosticBuffer {
     where
         F: Fn(Span) -> Loc,
     {
-        let s = error_buffer.0.read().unwrap().clone();
-        let diagnostics = s
+        let diagnostics = error_buffer.0.read().unwrap().clone();
+        let diagnostics = diagnostics
             .iter()
             .map(|d| {
-                let mut msg = d.message();
+                let mut message = d.message();
 
                 if let Some(span) = d.span.primary_span() {
                     let loc = get_loc(span);
@@ -37,12 +33,15 @@ impl DiagnosticBuffer {
                         FileName::Real(p) => p.display(),
                         _ => unreachable!(),
                     };
-                    msg = format!("{} at {}:{}:{}", msg, file_name, loc.line, loc.col_display);
+                    message = format!(
+                        "{} at {}:{}:{}",
+                        message, file_name, loc.line, loc.col_display
+                    );
                 }
 
-                msg
+                message
             })
-            .collect::<Vec<String>>();
+            .collect();
 
         Self(diagnostics)
     }
@@ -59,7 +58,7 @@ impl ErrorBuffer {
 }
 
 impl Emitter for ErrorBuffer {
-    fn emit(&mut self, db: &DiagnosticBuilder) {
-        self.0.write().unwrap().push((**db).clone());
+    fn emit(&mut self, diagnostic_builder: &DiagnosticBuilder) {
+        self.0.write().unwrap().push((**diagnostic_builder).clone());
     }
 }
