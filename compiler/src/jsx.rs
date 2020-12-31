@@ -8,7 +8,7 @@ use crate::resolve::{
 use path_slash::PathBufExt;
 use rand::{distributions::Alphanumeric, Rng};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
-use swc_common::{FileName, SourceMap, Spanned, DUMMY_SP};
+use swc_common::{SourceMap, Spanned, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
@@ -270,10 +270,6 @@ impl AlephJsxFold {
         if self.is_dev {
             match self.source.span_to_lines(el.span) {
                 Ok(file_lines) => {
-                    let file_name = match &file_lines.file.name {
-                        FileName::Real(p) => p.display().to_string(),
-                        _ => unimplemented!("file name for other than real files"),
-                    };
                     el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
                         span: DUMMY_SP,
                         name: JSXAttrName::Ident(quote_ident!("__source")),
@@ -288,7 +284,7 @@ impl AlephJsxFold {
                                                 key: PropName::Ident(quote_ident!("fileName")),
                                                 value: Box::new(Expr::Lit(Lit::Str(Str {
                                                     span: DUMMY_SP,
-                                                    value: file_name.clone().into(),
+                                                    value: resolver.specifier.as_str().into(),
                                                     has_escape: false,
                                                     kind: Default::default(),
                                                 }))),
