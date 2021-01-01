@@ -376,6 +376,8 @@ export class Element extends Node {
 
     if (existingNode == undefined) {
       throw new TypeError("Failed to executed 'insertBefore' on 'Node': 2 arguments required, but only 1 present.")
+    } else if (!(newNode instanceof Node)) {
+      throw new TypeError("Failed to execute 'insertBefore' on 'Node': parameter 1 is not of type 'Node'.")
     } else if (!(existingNode instanceof Node)) {
       throw new TypeError("Failed to execute 'insertBefore' on 'Node': parameter 2 is not of type 'Node'.")
     }
