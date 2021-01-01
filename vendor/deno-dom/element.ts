@@ -372,14 +372,17 @@ export class Element extends Node {
   }
 
   insertBefore(newNode: Node, existingNode: Node | null) {
-    if (existingNode == null) {
-      return this.appendChild(newNode)
-    } else if (existingNode == undefined) {
+    // error handling
+
+    if (existingNode == undefined) {
       throw new TypeError("Failed to executed 'insertBefore' on 'Node': 2 arguments required, but only 1 present.")
     } else if (!(existingNode instanceof Node)) {
       throw new TypeError("Failed to execute 'insertBefore' on 'Node': parameter 2 is not of type 'Node'.")
     }
-    else {
+
+    if (existingNode == null) {
+      return this.appendChild(newNode)
+    } else {
       for (let i = 0; i < this.childNodes.length; i++) {
         //TODO: use deep equal or something
         if (this.childNodes[i] === existingNode) {
