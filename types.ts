@@ -1,4 +1,4 @@
-import type { AcceptedPlugin, ServerRequest } from './deps.ts';
+import type { AcceptedPlugin, bufio, Response } from './deps.ts';
 
 /**
  * A plugin for **Aleph.js** application.
@@ -70,7 +70,27 @@ export interface APIHandler {
 }
 
 /**
- * The request object from api requests.
+ * The raw request object of http request.
+ */
+export interface ServerRequest {
+    readonly url: string
+    readonly method: string
+    readonly proto: string
+    readonly protoMinor: number
+    readonly protoMajor: number
+    readonly headers: Headers
+    readonly conn: Deno.Conn
+    readonly r: bufio.BufReader
+    readonly w: bufio.BufWriter
+    readonly done: Promise<Error | undefined>
+    readonly contentLength: number | null
+    readonly body: Deno.Reader
+    respond(r: Response): Promise<void>
+    finalize(): Promise<void>
+}
+
+/**
+ * The request object of api request.
  */
 export interface APIRequest extends ServerRequest {
     readonly pathname: string
@@ -79,11 +99,15 @@ export interface APIRequest extends ServerRequest {
     readonly cookies: ReadonlyMap<string, string>
     /** `status` sets response status of the request. */
     status(code: number): this
-    /** `addHeader` adds a new value onto an existing response header of the request, or
-     * adds the header if it does not already exist. */
+    /**
+     * `addHeader` adds a new value onto an existing response header of the request, or
+     * adds the header if it does not already exist.
+     */
     addHeader(key: string, value: string): this
-    /** `setHeader` sets a new value for an existing response header of the request, or adds
-     * the header if it does not already exist. */
+    /**
+     * `setHeader` sets a new value for an existing response header of the request, or adds
+     * the header if it does not already exist.
+     */
     setHeader(key: string, value: string): this
     /** `removeHeader` removes the value for an existing response header of the request.  */
     removeHeader(key: string): this
@@ -98,7 +122,7 @@ export interface APIRequest extends ServerRequest {
 }
 
 /**
- * The Router object of the application routing, you can access it with `useRouter()`.
+ * The Router object of the routing, you can access it with `useRouter()` hook.
  */
 export interface RouterURL {
     readonly locale: string

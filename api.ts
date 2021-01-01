@@ -1,9 +1,10 @@
-import { brotli, gzipEncode, ServerRequest } from './deps.ts'
+import { brotli, bufio, gzipEncode, Response, ServerRequest } from './deps.ts'
 import log from './log.ts'
 import { multiParser } from './multiparser.ts'
 import type { APIRequest, FormDataBody } from './types.ts'
 
-export class Request extends ServerRequest implements APIRequest {
+export class Request implements APIRequest {
+    #req: ServerRequest
     #pathname: string
     #params: Record<string, string>
     #query: URLSearchParams
@@ -18,17 +19,7 @@ export class Request extends ServerRequest implements APIRequest {
     }
 
     constructor(req: ServerRequest, pathname: string, params: Record<string, string>, query: URLSearchParams) {
-        super()
-        this.conn = req.conn
-        this.r = req.r
-        this.w = req.w
-        this.method = req.method
-        this.url = req.url
-        this.proto = req.proto
-        this.protoMinor = req.protoMinor
-        this.protoMajor = req.protoMajor
-        this.headers = req.headers
-        this.done = req.done
+        this.#req = req
         this.#pathname = pathname
         this.#params = params
         this.#query = query
@@ -40,6 +31,62 @@ export class Request extends ServerRequest implements APIRequest {
             }
         })
         this.#cookies = cookies
+    }
+
+    get url(): string {
+        return this.#req.url
+    }
+
+    get method(): string {
+        return this.#req.method
+    }
+
+    get proto(): string {
+        return this.#req.proto
+    }
+
+    get protoMinor(): number {
+        return this.#req.protoMinor
+    }
+
+    get protoMajor(): number {
+        return this.#req.protoMajor
+    }
+
+    get headers(): Headers {
+        return this.#req.headers
+    }
+
+    get conn(): Deno.Conn {
+        return this.#req.conn
+    }
+
+    get r(): bufio.BufReader {
+        return this.#req.r
+    }
+
+    get w(): bufio.BufWriter {
+        return this.#req.w
+    }
+
+    get done(): Promise<Error | undefined> {
+        return this.#req.done
+    }
+
+    get contentLength(): number | null {
+        return this.#req.contentLength
+    }
+
+    get body(): Deno.Reader {
+        return this.#req.body
+    }
+
+    async respond(r: Response): Promise<void> {
+        return this.#req.respond(r)
+    }
+
+    async finalize(): Promise<void> {
+        return this.#req.finalize()
     }
 
     get pathname(): string {
