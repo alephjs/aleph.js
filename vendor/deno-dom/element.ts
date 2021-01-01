@@ -370,4 +370,18 @@ export class Element extends Node {
     }
     return null
   }
+
+  insertBefore(newNode: Node, existingNode: Node | null) {
+    if (!existingNode) {
+      return this.appendChild(newNode);
+    } else {
+      for (let i = 0; i < this.childNodes.length; i++) {
+        //TODO: use deep equal or something
+        if (this.childNodes[i] === existingNode) {
+          this.childNodes[i].before(newNode);
+          return newNode;
+        }
+      }
+    }
+  }
 }
