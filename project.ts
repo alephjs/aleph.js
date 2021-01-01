@@ -15,7 +15,7 @@ import {
     minify,
     path,
     postcss,
-    readerFromStreamReader,
+
     safeLoadFront,
     Sha1,
     Sha256,
@@ -51,15 +51,8 @@ import {
     existsDirSync,
     existsFileSync,
     fixImportMap,
-    fixImportUrl, getAlephPkgUrl,
-
-
-
-
-
-
-
-
+    fixImportUrl,
+    getAlephPkgUrl,
     getRelativePath,
     newModule
 } from './util.ts'
@@ -978,11 +971,8 @@ export class Project {
         } else if (isRemote) {
             if (/^https?:\/\/localhost(:\d+)?\//.test(url)) {
                 try {
-                    const resp = await fetch(url)
-                    if (resp.status != 200) {
-                        throw new Error(`${resp.status} - ${resp.statusText}`)
-                    }
-                    sourceContent = await Deno.readAll(readerFromStreamReader(resp.body!.getReader()))
+                    const content = await fetch(url).then(resp => resp.text())
+                    sourceContent = (new TextEncoder).encode(content)
                     const sourceHash = (new Sha1).update(sourceContent).hex()
                     if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
@@ -1192,9 +1182,10 @@ export class Project {
         }
 
         // compile deps
-        for (const dep of mod.deps.filter(({ url }) => {
+        const deps = mod.deps.filter(({ url }) => {
             return !url.startsWith('#') && (!options?.bundleMode || (!reHttp.test(url) && !options?.bundledPaths?.includes(url)))
-        })) {
+        })
+        for (const dep of deps) {
             const depMod = await this._compile(dep.url, { bundleMode: options?.bundleMode, bundledPaths: options?.bundledPaths })
             if (depMod.loader === 'css' && !dep.isStyle) {
                 dep.isStyle = true
