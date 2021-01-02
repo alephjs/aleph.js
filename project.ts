@@ -1326,10 +1326,11 @@ export class Project {
                 this.#reloading || !versioned ? '--reload' : '',
                 u.toString()
             ].filter(Boolean),
-            stdout: 'inherit',
-            stderr: 'inherit'
+            stdout: 'piped',
+            stderr: 'piped'
         })
-        await p.status()
+        await Deno.stderr.write(await p.output())
+        await Deno.stderr.write(await p.stderrOutput())
         p.close()
 
         if (existsFileSync(filename)) {
@@ -1517,6 +1518,7 @@ export class Project {
         if (!existsFileSync(bundleFile)) {
             const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.buildDir, '/aleph.js')
             await Deno.stderr.write((new TextEncoder).encode(msg))
+            console.log(['deno', 'bundle', '--no-check', reload ? '--reload' : '', bundlingFile, bundleFile].filter(Boolean).join(' '))
             Deno.exit(1)
         }
 
