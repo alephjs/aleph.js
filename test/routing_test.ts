@@ -4,18 +4,18 @@ import { Routing } from '../routing.ts'
 const routing = new Routing([], '/', 'en', ['en', 'zh-CN'])
 
 Deno.test(`router #01`, () => {
-    routing.update({ id: '/pages/index.js', hash: '' })
-    routing.update({ id: '/pages/blog/index.js', hash: '' })
-    routing.update({ id: '/pages/blog/[slug].js', hash: '' })
-    routing.update({ id: '/pages/user/index.js', hash: '' })
-    routing.update({ id: '/pages/user/[...all].js', hash: '' })
-    routing.update({ id: '/pages/blog.js', hash: '' })
-    routing.update({ id: '/pages/user.js', hash: '' })
-    routing.update({ id: '/pages/blog/[slug]/subpage.js', hash: '' })
-    routing.update({ id: '/pages/docs.js', hash: '' })
-    routing.update({ id: '/pages/docs/get-started.md', hash: '' })
-    routing.update({ id: '/pages/docs/installation.md', hash: '' })
-    routing.update({ id: '/pages/index.js', hash: 'hsidfshy3yhfya49848' })
+    routing.update({ url: '/pages/index.js', hash: '' })
+    routing.update({ url: '/pages/blog/index.js', hash: '' })
+    routing.update({ url: '/pages/blog/[slug].js', hash: '' })
+    routing.update({ url: '/pages/user/index.js', hash: '' })
+    routing.update({ url: '/pages/user/[...all].js', hash: '' })
+    routing.update({ url: '/pages/blog.js', hash: '' })
+    routing.update({ url: '/pages/user.js', hash: '' })
+    routing.update({ url: '/pages/blog/[slug]/subpage.js', hash: '' })
+    routing.update({ url: '/pages/docs.js', hash: '' })
+    routing.update({ url: '/pages/docs/get-started.md', hash: '' })
+    routing.update({ url: '/pages/docs/installation.md', hash: '' })
+    routing.update({ url: '/pages/index.js', hash: 'hsidfshy3yhfya49848' })
     assertEquals(routing.paths, [
         '/',
         '/blog',
@@ -34,7 +34,7 @@ Deno.test(`router #02`, () => {
     assertEquals(router.locale, 'en')
     assertEquals(router.pathname, '/')
     assertEquals(router.pagePath, '/')
-    assertEquals(tree, [{ id: '/pages/index.js', hash: 'hsidfshy3yhfya49848' }])
+    assertEquals(tree, [{ url: '/pages/index.js', hash: 'hsidfshy3yhfya49848' }])
 })
 
 Deno.test(`router #03`, () => {
@@ -42,7 +42,7 @@ Deno.test(`router #03`, () => {
     assertEquals(router.locale, 'zh-CN')
     assertEquals(router.pathname, '/')
     assertEquals(router.pagePath, '/')
-    assertEquals(tree, [{ id: '/pages/index.js', hash: 'hsidfshy3yhfya49848' }])
+    assertEquals(tree, [{ url: '/pages/index.js', hash: 'hsidfshy3yhfya49848' }])
 })
 
 Deno.test(`router #04`, () => {
@@ -50,7 +50,7 @@ Deno.test(`router #04`, () => {
     assertEquals(router.locale, 'en')
     assertEquals(router.pathname, '/blog')
     assertEquals(router.pagePath, '/blog')
-    assertEquals(tree.map(({ id }) => id), ['/pages/blog.js', '/pages/blog/index.js'])
+    assertEquals(tree.map(({ url }) => url), ['/pages/blog.js', '/pages/blog/index.js'])
 })
 
 Deno.test(`router #05`, () => {
@@ -58,7 +58,7 @@ Deno.test(`router #05`, () => {
     assertEquals(router.locale, 'zh-CN')
     assertEquals(router.pathname, '/blog')
     assertEquals(router.pagePath, '/blog')
-    assertEquals(tree.map(({ id }) => id), ['/pages/blog.js', '/pages/blog/index.js'])
+    assertEquals(tree.map(({ url }) => url), ['/pages/blog.js', '/pages/blog/index.js'])
 })
 
 Deno.test(`router #06`, () => {
@@ -66,7 +66,7 @@ Deno.test(`router #06`, () => {
     assertEquals(router.pathname, '/blog/hello-world')
     assertEquals(router.pagePath, '/blog/[slug]')
     assertEquals(router.params, { slug: 'hello-world' })
-    assertEquals(tree.map(({ id }) => id), ['/pages/blog.js', '/pages/blog/[slug].js'])
+    assertEquals(tree.map(({ url }) => url), ['/pages/blog.js', '/pages/blog/[slug].js'])
 })
 
 Deno.test(`router #07`, () => {
@@ -74,7 +74,7 @@ Deno.test(`router #07`, () => {
     assertEquals(router.pathname, '/user')
     assertEquals(router.pagePath, '/user')
     assertEquals(router.params, {})
-    assertEquals(tree.map(({ id }) => id), ['/pages/user.js', '/pages/user/index.js'])
+    assertEquals(tree.map(({ url }) => url), ['/pages/user.js', '/pages/user/index.js'])
 })
 
 Deno.test(`router #08`, () => {
@@ -82,7 +82,7 @@ Deno.test(`router #08`, () => {
     assertEquals(router.pathname, '/user/projects')
     assertEquals(router.pagePath, '/user/[...all]')
     assertEquals(router.params, { all: 'projects' })
-    assertEquals(tree.map(({ id }) => id), ['/pages/user.js', '/pages/user/[...all].js'])
+    assertEquals(tree.map(({ url }) => url), ['/pages/user.js', '/pages/user/[...all].js'])
 })
 
 Deno.test(`router #09`, () => {
@@ -90,7 +90,7 @@ Deno.test(`router #09`, () => {
     assertEquals(router.pathname, '/user/settings/profile')
     assertEquals(router.pagePath, '/user/[...all]')
     assertEquals(router.params, { all: 'settings/profile' })
-    assertEquals(tree.map(({ id }) => id), ['/pages/user.js', '/pages/user/[...all].js'])
+    assertEquals(tree.map(({ url }) => url), ['/pages/user.js', '/pages/user/[...all].js'])
 })
 
 Deno.test(`router #10`, () => {
@@ -98,7 +98,7 @@ Deno.test(`router #10`, () => {
     assertEquals(router.pathname, '/user/settings/security')
     assertEquals(router.pagePath, '/user/[...all]')
     assertEquals(router.params, { all: 'settings/security' })
-    assertEquals(tree.map(({ id }) => id), ['/pages/user.js', '/pages/user/[...all].js'])
+    assertEquals(tree.map(({ url }) => url), ['/pages/user.js', '/pages/user/[...all].js'])
 })
 
 Deno.test(`router #11`, () => {
