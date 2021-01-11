@@ -143,6 +143,9 @@ export class Project {
     }
 
     isHMRable(url: string) {
+        if (!this.isDev) {
+            return false
+        }
         if (reStyleModuleExt.test(url)) {
             return true
         }
