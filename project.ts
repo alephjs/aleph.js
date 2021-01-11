@@ -121,6 +121,9 @@ export class Project {
     }
 
     isHMRable(moduleID: string) {
+        if (!this.isDev) {
+            return false
+        }
         if (reHttp.test(moduleID)) {
             return false
         }
