@@ -15,7 +15,7 @@ import type { APIHandler, Config, RouterURL } from './types.ts'
 import util, { hashShort, MB, reHashJs, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from './util.ts'
 import { createHTMLDocument } from './vendor/deno-dom/document.ts'
 import less from './vendor/less/less.js'
-import { version } from './version.ts'
+import { VERSION } from './version.ts'
 
 interface Module {
     id: string
@@ -641,7 +641,7 @@ export class Project {
         // inject env variables
         Object.entries({
             ...this.config.env,
-            __version: version,
+            __version: VERSION,
             __buildMode: this.mode,
             __buildTarget: this.config.buildTarget,
         }).forEach(([key, value]) => Deno.env.set(key, value))
@@ -690,7 +690,7 @@ export class Project {
         const { renderPage } = await import('file://' + this.#modules.get('//deno.land/x/aleph/renderer.js')!.jsFile)
         this.#renderer = { renderPage }
 
-        log.info(colors.bold(`Aleph.js v${version}`))
+        log.info(colors.bold(`Aleph.js v${VERSION}`))
         if (this.config.__file) {
             log.info(colors.bold('- Config'))
             log.info('  ▲', this.config.__file)
@@ -986,7 +986,7 @@ export class Project {
                 }
                 dlUrl = u.toString().replace(/=(&|$)/, '$1')
             } else if (dlUrl.startsWith('https://deno.land/x/aleph/')) {
-                dlUrl = `https://deno.land/x/aleph@v${version}/` + util.trimPrefix(dlUrl, 'https://deno.land/x/aleph/')
+                dlUrl = `https://deno.land/x/aleph@v${VERSION}/` + util.trimPrefix(dlUrl, 'https://deno.land/x/aleph/')
             }
             if (mod.sourceHash === '') {
                 log.info('Download', url, dlUrl != url ? colors.dim(`• ${dlUrl}`) : '')
@@ -1117,7 +1117,7 @@ export class Project {
                     reactRefresh: this.isDev && !mod.isRemote,
                     rewriteImportPath: (path: string) => this._resolveImportURL(mod, path),
                     signUseDeno: (id: string) => {
-                        const sig = 'useDeno.' + (new Sha1()).update(id).update(version).update(Date.now().toString()).hex().slice(0, hashShort)
+                        const sig = 'useDeno.' + (new Sha1()).update(id).update(VERSION).update(Date.now().toString()).hex().slice(0, hashShort)
                         useDenos.push(sig)
                         return sig
                     }
@@ -1567,7 +1567,7 @@ function getHash(content: string | Uint8Array, checkVersion = false) {
     const sha1 = new Sha1()
     sha1.update(content)
     if (checkVersion) {
-        sha1.update(version)
+        sha1.update(VERSION)
     }
     return sha1.hex()
 }
