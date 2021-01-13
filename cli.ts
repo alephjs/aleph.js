@@ -5,7 +5,7 @@ import log from './log.ts'
 import { getContentType } from './mime.ts'
 import { listenAndServe, path, ServerRequest, walk } from './std.ts'
 import util from './util.ts'
-import { version } from './version.ts'
+import { VERSION } from './version.ts'
 
 const commands = {
     'init': 'Create a new application',
@@ -15,7 +15,7 @@ const commands = {
     'upgrade': 'Upgrade Aleph.js command'
 }
 
-const helpMessage = `Aleph.js v${version}
+const helpMessage = `Aleph.js v${VERSION}
 The React Framework in deno.
 
 Docs: https://alephjs.org/docs
@@ -63,14 +63,14 @@ async function main() {
 
     // prints aleph.js version
     if (argOptions.v && command != 'upgrade') {
-        console.log(`aleph.js v${version}`)
+        console.log(`aleph.js v${VERSION}`)
         Deno.exit(0)
     }
 
     // prints aleph.js and deno version
     if (argOptions.version && command != 'upgrade') {
         const { deno, v8, typescript } = Deno.version
-        console.log(`aleph.js ${version}`)
+        console.log(`aleph.js ${VERSION}`)
         console.log(`deno ${deno}`)
         console.log(`v8 ${v8}`)
         console.log(`typescript ${typescript}`)
