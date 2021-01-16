@@ -1,12 +1,13 @@
 import { colors, ensureDir, path } from '../deps.ts'
-import util, {
+import {
     MB,
     reHashJs,
     reHttp,
     reMDExt,
     reModuleExt,
     reStyleModuleExt
-} from '../shared/util.ts'
+} from '../shared/constants.ts'
+import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 import { ImportMap, Module } from './types.ts'
 

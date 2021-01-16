@@ -28,7 +28,7 @@ import {
     RouteModule,
     Routing
 } from '../framework/core/routing.ts'
-import util, {
+import {
     hashShort,
     reFullVersion,
     reHashJs,
@@ -38,7 +38,8 @@ import util, {
     reMDExt,
     reModuleExt,
     reStyleModuleExt
-} from '../shared/util.ts'
+} from '../shared/constants.ts'
+import util from '../shared/util.ts'
 import type {
     APIHandler,
     Config,

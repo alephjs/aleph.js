@@ -1,5 +1,6 @@
 import type { ComponentType } from 'https://esm.sh/react'
-import util, { reModuleExt } from '../../shared/util.ts'
+import { reModuleExt } from '../../shared/constants.ts'
+import util from '../../shared/util.ts'
 import { E400MissingDefaultExportAsComponent } from './error.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for

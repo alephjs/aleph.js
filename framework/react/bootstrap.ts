@@ -1,7 +1,7 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import { reModuleExt } from '../../shared/util.ts'
+import { reModuleExt } from '../../shared/constants.ts'
 import { Route, RouteModule, Routing } from '../core/routing.ts'
 import { AlephRoot, importModule } from './root.ts'
 

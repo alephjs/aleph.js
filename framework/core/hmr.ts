@@ -1,4 +1,4 @@
-import { hashShort } from '../../shared/util.ts'
+import { hashShort } from '../../shared/constants.ts'
 import events from './events.ts'
 
 interface Callback {

@@ -1,6 +1,7 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement, useCallback, useEffect, useState } from 'https://esm.sh/react'
-import util, { hashShort, reModuleExt } from '../../shared/util.ts'
+import { hashShort, reModuleExt } from '../../shared/constants.ts'
+import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
