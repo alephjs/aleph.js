@@ -1,8 +1,8 @@
 # Contributing to Aleph.js
 
-Welcome, and thank you for taking time in contributing to Aleph.js! You can help us in different ways:
+Welcome, and thank you for taking time in contributing to Aleph.js! You can improve Aleph.js in different ways:
 
-- ∆ add new feature
+- ∆ add new features
 - ✘ bugfix
 - ✔︎ review code
 - ☇ write plugins
@@ -10,7 +10,7 @@ Welcome, and thank you for taking time in contributing to Aleph.js! You can help
 
 ## Development Setup
 
-You will need [Deno](https://deno.land/) 1.5+ and [VS Code](https://code.visualstudio.com/) with [deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno).
+You will need [Deno](https://deno.land/) 1.7+.
 
 1. Fork this repository to your own GitHub account.
 2. Clone the repository to your local device.
@@ -38,8 +38,9 @@ deno test -A
 - **/compiler** compiler in rust with swc
 - **/framework** framework code
 - **/design** design drawings and assets
-- **/examples** some examples
+- **/examples** examples
 - **/plugins** official plugins
+- **/server** server code
 - **/shared** shared code
 - **/test** testings
 - **/vendor** packages from npm
