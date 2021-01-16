@@ -40,10 +40,8 @@ export interface Config {
     outputDir?: string
     /** `baseUrl` specifies the path prefix for the application (default is '/'). */
     baseUrl?: string
-    /** `reactUrl` specifies the **react** download URL (default is 'https://esm.sh/react@17.0.1'). */
-    reactUrl?: string
-    /** `reactDomUrl` specifies the **react-dom** download URL (default is 'https://esm.sh/react-dom@17.0.1'). */
-    reactDomUrl?: string
+    /** `reactVersion` specifies the **react version** (default is '17.0.1'). */
+    reactVersion?: string
     /** `defaultLocale` specifies the default locale of the application (default is '**en**'). */
     defaultLocale?: string
     /** A list of locales. */
@@ -152,24 +150,3 @@ export interface FormFile {
     filename: string
     size: number
 }
-
-export interface Module {
-    url: string
-    loader: string
-    sourceHash: string
-    hash: string
-    deps: DependencyDescriptor[]
-    jsFile: string
-    bundlingFile: string
-    error: Error | null
-}
-
-export interface DependencyDescriptor {
-    url: string
-    hash: string
-    isDynamic?: boolean
-    isStyle?: boolean
-    isData?: boolean
-}
-
-export type ImportMap = Record<string, ReadonlyArray<string>>

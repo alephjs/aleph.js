@@ -1,9 +1,9 @@
+import { path, serve, ws } from '../deps.ts'
+import util, { hashShort, reHashJs, reModuleExt } from '../shared/util.ts'
 import { Request } from './api.ts'
-import { path, serve, ws } from './deps.ts'
 import log from './log.ts'
 import { getContentType } from './mime.ts'
 import { Project } from './project.ts'
-import util, { hashShort, reHashJs, reModuleExt } from './shared/util.ts'
 import { createHtml, existsFileSync } from './util.ts'
 
 export async function start(appDir: string, port: number, isDev = false, reload = false) {

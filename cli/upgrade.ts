@@ -1,5 +1,5 @@
 import { colors } from '../deps.ts'
-import { version as currentVersion } from '../version.ts'
+import { VERSION as currentVersion } from '../version.ts'
 
 export const helpMessage = `
 Usage:

@@ -1,8 +1,8 @@
-import { colors, ensureDir, gzipDecode, path, readerFromStreamReader, Untar } from '../deps.ts'
-import log from '../log.ts'
+import { colors, ensureDir, gzipDecode, path, Untar } from '../deps.ts'
+import log from '../server/log.ts'
+import { ensureTextFile } from '../server/util.ts'
 import util from '../shared/util.ts'
-import { ensureTextFile } from '../util.ts'
-import { version } from '../version.ts'
+import { VERSION } from '../version.ts'
 
 const gitignore = [
     '.DS_Store',
@@ -46,7 +46,7 @@ export default async function (appDir: string, options: Record<string, string | 
     const rev = 'master'
     log.info('Downloading template...')
     const resp = await fetch('https://codeload.github.com/alephjs/alephjs-templates/tar.gz/' + rev)
-    const gzData = await Deno.readAll(readerFromStreamReader(resp.body!.getReader()))
+    const gzData = await Deno.readAll(new Deno.Buffer(await resp.arrayBuffer()))
     log.info('Saving template...')
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))
@@ -72,8 +72,9 @@ export default async function (appDir: string, options: Record<string, string | 
     await Deno.writeTextFile(path.join(appDir, '.gitignore'), gitignore.join('\n'))
     await Deno.writeTextFile(path.join(appDir, 'import_map.json'), JSON.stringify({
         imports: {
-            'aleph': `https://deno.land/x/aleph@v${version}/mod.ts`,
-            'aleph/': `https://deno.land/x/aleph@v${version}/`,
+            'aleph': `https://deno.land/x/aleph@v${VERSION}/mod.ts`,
+            'aleph/react': `https://deno.land/x/aleph@v${VERSION}/react.ts`,
+            'aleph/': `https://deno.land/x/aleph@v${VERSION}/`,
             'react': 'https://esm.sh/react@17.0.1',
             'react-dom': 'https://esm.sh/react-dom@17.0.1',
         },

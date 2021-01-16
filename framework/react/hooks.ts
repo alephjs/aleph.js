@@ -1,7 +1,7 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement, useContext, useEffect, useState } from 'https://esm.sh/react'
-import events from '../../shared/events.ts'
 import type { RouterURL } from '../../types.ts'
+import events from '../core/events.ts'
 import { RouterContext } from './context.ts'
 import { AsyncUseDenoError } from './error.ts'
 

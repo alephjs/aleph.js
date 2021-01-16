@@ -1,5 +1,5 @@
-import events from './shared/events.ts'
-import { hashShort } from './shared/util.ts'
+import { hashShort } from '../../shared/util.ts'
+import events from './events.ts'
 
 interface Callback {
     (...args: any[]): void

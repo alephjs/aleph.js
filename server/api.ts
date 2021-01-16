@@ -1,7 +1,7 @@
-import { brotli, bufio, gzipEncode, Response, ServerRequest } from './deps.ts'
+import { brotli, bufio, gzipEncode, Response, ServerRequest } from '../deps.ts'
+import type { APIRequest, FormDataBody } from '../types.ts'
 import log from './log.ts'
 import { multiParser } from './multiparser.ts'
-import type { APIRequest, FormDataBody } from './types.ts'
 
 export class Request implements APIRequest {
     #req: ServerRequest

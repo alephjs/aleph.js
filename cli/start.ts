@@ -1,5 +1,5 @@
-import log from '../log.ts'
-import { start } from '../server.ts'
+import log from '../server/log.ts'
+import { start } from '../server/server.ts'
 
 export const helpMessage = `
 Usage:

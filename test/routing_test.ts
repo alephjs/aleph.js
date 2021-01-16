@@ -1,5 +1,5 @@
-import { assertEquals } from 'https://deno.land/std@0.79.0/testing/asserts.ts'
-import { Routing } from '../routing.ts'
+import { assertEquals } from 'https://deno.land/std@0.83.0/testing/asserts.ts'
+import { Routing } from '../framework/core/routing.ts'
 
 const routing = new Routing([], '/', 'en', ['en', 'zh-CN'])
 

@@ -4,6 +4,7 @@ export * as bytes from 'https://deno.land/std@0.83.0/bytes/mod.ts'
 export * as base64 from 'https://deno.land/std@0.83.0/encoding/base64.ts'
 export * as colors from 'https://deno.land/std@0.83.0/fmt/colors.ts'
 export { ensureDir } from 'https://deno.land/std@0.83.0/fs/ensure_dir.ts'
+export { exists, existsSync } from 'https://deno.land/std@0.83.0/fs/exists.ts'
 export { walk } from 'https://deno.land/std@0.83.0/fs/walk.ts'
 export { Sha1 } from 'https://deno.land/std@0.83.0/hash/sha1.ts'
 export { Sha256 } from 'https://deno.land/std@0.83.0/hash/sha256.ts'
@@ -25,4 +26,3 @@ export type { ECMA } from 'https://esm.sh/terser@5.3.2'
 export { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.0'
 // verdor/
 export { default as less } from './vendor/less/less.js'
-

@@ -1,11 +1,13 @@
-import { Request } from './api.ts'
 import {
     initWasm,
     SWCOptions,
     TransformOptions,
     transpileSync
-} from './compiler/mod.ts'
-import type { AcceptedPlugin, ServerRequest } from './deps.ts'
+} from '../compiler/mod.ts'
+import type {
+    AcceptedPlugin,
+    ServerRequest
+} from '../deps.ts'
 import {
     CleanCSS,
     colors,
@@ -15,15 +17,17 @@ import {
     minify,
     path,
     postcss,
-
     safeLoadFront,
     Sha1,
     Sha256,
     walk
-} from './deps.ts'
-import log from './log.ts'
-import { getPagePath, RouteModule, Routing } from './routing.ts'
-import { EventEmitter } from './shared/events.ts'
+} from '../deps.ts'
+import { EventEmitter } from '../framework/core/events.ts'
+import {
+    getPagePath,
+    RouteModule,
+    Routing
+} from '../framework/core/routing.ts'
 import util, {
     hashShort,
     reFullVersion,
@@ -34,14 +38,19 @@ import util, {
     reMDExt,
     reModuleExt,
     reStyleModuleExt
-} from './shared/util.ts'
+} from '../shared/util.ts'
 import type {
     APIHandler,
     Config,
+    RouterURL
+} from '../types.ts'
+import { VERSION } from '../version.ts'
+import { Request } from './api.ts'
+import log from './log.ts'
+import type {
     DependencyDescriptor,
     ImportMap,
-    Module,
-    RouterURL
+    Module
 } from './types.ts'
 import {
     cleanupCompilation,
@@ -56,7 +65,6 @@ import {
     getRelativePath,
     newModule
 } from './util.ts'
-import { version } from './version.ts'
 
 interface RenderResult {
     url: RouterURL
@@ -113,8 +121,7 @@ export class Project {
                 fallback: '_fallback_spa.html'
             },
             buildTarget: 'es5',
-            reactUrl: 'https://esm.sh/react@17.0.1',
-            reactDomUrl: 'https://esm.sh/react-dom@17.0.1',
+            reactVersion: '17.0.1',
             plugins: [],
             postcss: {
                 plugins: [
@@ -339,11 +346,11 @@ export class Project {
     /** inject HMR helper code  */
     injectHmr(url: string, content: string): string {
         const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-        const alephModuleLocalUrlPreifx = devPort ? `http_localhost_${devPort}` : `deno.land/x/aleph@v${version}`
+        const alephModuleLocalUrlPreifx = devPort ? `http_localhost_${devPort}` : `deno.land/x/aleph@v${VERSION}`
         const localUrl = fixImportUrl(url)
         const hmrImportPath = getRelativePath(
             path.dirname(localUrl),
-            `/-/${alephModuleLocalUrlPreifx}/hmr.js`
+            `/-/${alephModuleLocalUrlPreifx}/framework/core/hmr.js`
         )
         const lines = [
             `import { createHotContext } from ${JSON.stringify(hmrImportPath)};`,
@@ -519,7 +526,7 @@ export class Project {
             const alias = `http://localhost:${devPort}/`
             const imports = {
                 'https://deno.land/x/aleph/': [alias],
-                [`https://deno.land/x/aleph@v${version}/`]: [alias],
+                [`https://deno.land/x/aleph@v${VERSION}/`]: [alias],
                 'aleph': [`${alias}mod.ts`],
                 'aleph/': [alias],
             }
@@ -527,8 +534,8 @@ export class Project {
         }
         Object.assign(this.importMap, {
             imports: Object.assign({}, {
-                'react': [this.config.reactUrl],
-                'react-dom': [this.config.reactDomUrl],
+                'react': [`https://esm.sh/react@${this.config.reactVersion}`],
+                'react-dom': [`https://esm.sh/react-dom@${this.config.reactVersion}`],
             }, this.importMap.imports)
         })
 
@@ -567,7 +574,7 @@ export class Project {
             await ensureDir(this.buildDir)
         }
 
-        log.info(colors.bold(`Aleph.js v${version}`))
+        log.info(colors.bold(`Aleph.js v${VERSION}`))
         log.info(colors.bold('- Global'))
         await this._loadConfig()
 
@@ -614,7 +621,7 @@ export class Project {
         // inject env variables
         Object.entries({
             ...this.config.env,
-            __version: version,
+            __version: VERSION,
             __buildMode: this.mode,
         }).forEach(([key, value]) => Deno.env.set(key, value))
 
@@ -667,7 +674,7 @@ export class Project {
                 'hmr.ts',
                 'nomodule.ts',
             ]) {
-                await this._compile(`${alephPkgUrl}/${mod}`)
+                await this._compile(`${alephPkgUrl}/framework/core/${mod}`)
             }
         }
 
@@ -907,12 +914,18 @@ export class Project {
         return css
     }
 
-    /** transpile code no types checking. */
+    /** transpile code without types checking. */
     private async _transpile(sourceCode: string, options: TransformOptions) {
+        let t: number | null = null
         if (this.#swcReady === null) {
+            t = performance.now()
             this.#swcReady = initWasm(this.#denoCacheDir)
         }
         await this.#swcReady
+        if (t) {
+            log.debug('init compiler wasm in ' + Math.round(performance.now() - t) + 'ms')
+        }
+
         return transpileSync(sourceCode, options)
     }
 
@@ -1063,7 +1076,7 @@ export class Project {
                         import { applyCSS } from "${alephPkgUrl}/framework/${this.config.framework}/style.ts";\
                         applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css.trim()}\n` : css)});
                     `).replaceAll(' '.repeat(24), '').trim(),
-                    sourceHash: mod.sourceHash
+                    sourceHash: ''
                 })
             } else if (loader === 'markdown') {
                 const { __content, ...props } = safeLoadFront(sourceCode)
@@ -1072,7 +1085,7 @@ export class Project {
                     ...options,
                     loader: 'js',
                     sourceCode: (`
-                        import React, { useEffect, useRef } from ${JSON.stringify(this.config.reactUrl)};
+                        import React, { useEffect, useRef } from "https://esm.sh/react@${JSON.stringify(this.config.reactVersion)}";
                         import { redirect } from "${alephPkgUrl}/framework/${this.config.framework}/anchor.ts";
                         export default function MarkdownPage() {
                             const ref = useRef(null);
@@ -1101,7 +1114,7 @@ export class Project {
                         }
                         MarkdownPage.meta = ${JSON.stringify(props, undefined, 4)};
                     `).replaceAll(' '.repeat(24), '').trim(),
-                    sourceHash: mod.sourceHash
+                    sourceHash: ''
                 })
             } else if (loader === 'js' || loader === 'ts' || loader === 'jsx' || loader === 'tsx') {
                 const t = performance.now()
@@ -1114,8 +1127,7 @@ export class Project {
                     url,
                     swcOptions,
                     importMap: this.importMap,
-                    reactUrl: this.config.reactUrl,
-                    reactDomUrl: this.config.reactDomUrl,
+                    reactVersion: this.config.reactVersion,
                     isDev: this.isDev,
                     bundleMode: options?.bundleMode,
                     bundledPaths: options?.bundledPaths
@@ -1436,7 +1448,7 @@ export class Project {
 
         // create and copy ployfill
         const ployfillMode = newModule('/ployfill.js')
-        ployfillMode.hash = ployfillMode.sourceHash = (new Sha1).update(header).update(`${this.config.buildTarget}-${version}`).hex()
+        ployfillMode.hash = ployfillMode.sourceHash = (new Sha1).update(header).update(`${this.config.buildTarget}-${VERSION}`).hex()
         const ployfillFile = path.join(this.buildDir, `ployfill.${ployfillMode.hash.slice(0, hashShort)}.js`)
         if (!existsFileSync(ployfillFile)) {
             const rawPloyfillFile = `${alephPkgUrl}/compiler/ployfills/${this.config.buildTarget}/ployfill.js`

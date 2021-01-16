@@ -1,4 +1,4 @@
-import { colors, ensureDir, path } from './deps.ts'
+import { colors, ensureDir, path } from '../deps.ts'
 import util, {
     MB,
     reHashJs,
@@ -6,12 +6,12 @@ import util, {
     reMDExt,
     reModuleExt,
     reStyleModuleExt
-} from './shared/util.ts'
+} from '../shared/util.ts'
+import { VERSION } from '../version.ts'
 import { ImportMap, Module } from './types.ts'
-import { version } from './version.ts'
 
 export function getAlephPkgUrl() {
-    let url = `https://deno.land/x/aleph@v${version}`
+    let url = `https://deno.land/x/aleph@v${VERSION}`
     const { __ALEPH_DEV_PORT: devPort } = globalThis as any
     if (devPort) {
         url = `http://localhost:${devPort}`

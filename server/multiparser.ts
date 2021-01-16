@@ -1,5 +1,5 @@
-import { bytes } from "./deps.ts";
-import { FormDataBody, FormFile } from "./types.ts";
+import { bytes } from "../deps.ts";
+import { FormDataBody, FormFile } from "../types.ts";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
