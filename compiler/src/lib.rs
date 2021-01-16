@@ -30,11 +30,8 @@ pub struct Options {
     #[serde(default)]
     pub import_map: ImportHashMap,
 
-    #[serde(default = "default_react_url")]
-    pub react_url: String,
-
-    #[serde(default = "default_react_dom_url")]
-    pub react_dom_url: String,
+    #[serde(default = "default_react_version")]
+    pub react_version: String,
 
     #[serde(default)]
     pub swc_options: SWCOptions,
@@ -92,12 +89,8 @@ fn default_pragma_frag() -> String {
     "React.Fragment".into()
 }
 
-fn default_react_url() -> String {
-    "https://esm.sh/react@17.0.1".into()
-}
-
-fn default_react_dom_url() -> String {
-    "https://esm.sh/react-dom@17.0.1".into()
+fn default_react_version() -> String {
+    "17.0.1".into()
 }
 
 #[derive(Debug, Serialize)]
@@ -121,7 +114,7 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
     let resolver = Rc::new(RefCell::new(Resolver::new(
         opts.url.as_str(),
         opts.import_map,
-        Some((opts.react_url, opts.react_dom_url)),
+        Some(opts.react_version),
         opts.bundle_mode,
         opts.bundled_paths,
     )));

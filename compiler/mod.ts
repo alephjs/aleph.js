@@ -1,6 +1,6 @@
-import { path } from '../deps.ts';
-import log from '../log.ts';
-import { existsFileSync } from '../util.ts';
+import { ensureDir } from "https://deno.land/std@0.83.0/fs/ensure_dir.ts";
+import { existsSync, path } from '../deps.ts';
+import { VERSION } from "../version.ts";
 import { checksum } from './wasm-checksum.js';
 import { default as init_wasm, transformSync } from './wasm-pack.js';
 
@@ -17,8 +17,7 @@ export interface SWCOptions {
 export interface TransformOptions {
     url: string
     importMap?: { imports: ImportMap, scopes: Record<string, ImportMap> }
-    reactUrl?: string,
-    reactDomUrl?: string,
+    reactVersion?: string,
     swcOptions?: SWCOptions
     isDev?: boolean,
     bundleMode?: boolean,
@@ -63,18 +62,16 @@ export function transpileSync(code: string, opts?: TransformOptions): TransformR
  * load and initiate compiler wasm.
  */
 export const initWasm = async (denoCacheDir: string) => {
-    const t = performance.now()
-    const cachePath = path.join(denoCacheDir, `deps/https/deno.land/aleph_compiler.${checksum}.wasm`)
-    if (existsFileSync(cachePath)) {
+    const cacheDir = path.join(denoCacheDir, `deps/https/deno.land/aleph@v${VERSION}`)
+    const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
+    if (existsSync(cachePath)) {
         const wasmData = await Deno.readFile(cachePath)
         await init_wasm(wasmData)
     } else {
         const { default: getWasmData } = await import('./wasm.js')
         const wasmData = getWasmData()
-        await Promise.all([
-            init_wasm(wasmData),
-            Deno.writeFile(cachePath, wasmData)
-        ])
+        await init_wasm(wasmData)
+        await ensureDir(cacheDir)
+        await Deno.writeFile(cachePath, wasmData)
     }
-    log.debug('init compiler wasm in ' + Math.round(performance.now() - t) + 'ms')
 }

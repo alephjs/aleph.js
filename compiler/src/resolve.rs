@@ -10,9 +10,9 @@ use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use relative_path::RelativePath;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::{
   cell::RefCell,
+  collections::HashMap,
   path::{Path, PathBuf},
   rc::Rc,
   str::FromStr,
@@ -30,15 +30,7 @@ lazy_static! {
   )
   .unwrap();
   pub static ref RE_REACT_URL: Regex = Regex::new(
-    r"^https?://([a-z0-9]+\.)?(esm.sh(/v\d+)?|unpkg.com|skypack.dev|jspm.dev|jsdelivr.net/npm)/react(@[0-9a-z\.\-]+)?(/|\?|$)"
-  )
-  .unwrap();
-  pub static ref RE_REACT_DOM_URL: Regex = Regex::new(
-    r"^https?://([a-z0-9]+\.)?(esm.sh(/v\d+)?|unpkg.com|skypack.dev|jspm.dev|jsdelivr.net/npm)/react\-dom(@[0-9a-z\.\-]+)?(/|\?|$)"
-  )
-  .unwrap();
-  pub static ref RE_REACT_SERVER_URL: Regex = Regex::new(
-    r"^https?://([a-z0-9]+\.)?(esm.sh(/v\d+)?|unpkg.com|skypack.dev|jspm.dev|jsdelivr.net/npm)/react\-dom(@[0-9a-z\.\-]+)?/server(/|\?|$)"
+    r"^https?://(esm.sh/|cdn.esm.sh/v\d+/|esm.x-static.io/v\d+/|jspm.dev/|cdn.skypack.dev/|jspm.dev/npm:|esm.run/)react(\-dom)?(@[\^|~]{0,1}[0-9a-z\.\-]+)?([/|\?].*)?$"
   )
   .unwrap();
 }
@@ -77,14 +69,14 @@ pub struct Resolver {
   pub bundle_mode: bool,
   bundled_paths: IndexSet<String>,
   import_map: ImportMap,
-  react_url: Option<(String, String)>,
+  react_version: Option<String>,
 }
 
 impl Resolver {
   pub fn new(
     specifier: &str,
     import_map: ImportHashMap,
-    react_url: Option<(String, String)>,
+    react_version: Option<String>,
     bundle_mode: bool,
     bundled_paths: Vec<String>,
   ) -> Self {
@@ -99,7 +91,7 @@ impl Resolver {
       dep_graph: Vec::new(),
       inline_styles: HashMap::new(),
       import_map: ImportMap::from_hashmap(import_map),
-      react_url,
+      react_version,
       bundle_mode,
       bundled_paths: set,
     }
@@ -111,6 +103,7 @@ impl Resolver {
   //  - `http://localhost:8080/mod` -> `/-/http_localhost_8080/mod.js`
   //  - `/components/logo.tsx` -> `/components/logo.tsx`
   //  - `@/components/logo.tsx` -> `/components/logo.tsx`
+  //  - `~/components/logo.tsx` -> `~/components/logo.tsx`
   //  - `../components/logo.tsx` -> `../components/logo.tsx`
   //  - `./button.tsx` -> `./button.tsx`
   //  - `/components/foo/./logo.tsx` -> `/components/foo/logo.tsx`
@@ -128,6 +121,8 @@ impl Resolver {
         root = Path::new("..");
       } else if url.starts_with("@/") {
         url = url.trim_start_matches("@");
+      } else if url.starts_with("~/") {
+        url = url.trim_start_matches("~");
       }
       return RelativePath::new(url)
         .normalize()
@@ -190,53 +185,106 @@ impl Resolver {
   /// resolve import/export url.
   // [/pages/index.tsx]
   // - `https://esm.sh/swr` -> `/-/esm.sh/swr.js`
-  // - `https://esm.sh/react` -> `/-/esm.sh/react${REACT_VERSION}.js`
-  // - `https://deno.land/x/aleph/mod.ts` -> `https://deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
-  // - `../components/logo.tsx` -> `/components/logo.{HASH_PLACEHOLDER}.js`
-  // - `@/components/logo.tsx` -> `import Logo from "/components/logo.{HASH_PLACEHOLDER}.js`
-  // - `@/styles/app.css` -> `import Logo from "/styles/app.css.{HASH_PLACEHOLDER}.js`
+  // - `https://esm.sh/react` -> `/-/esm.sh/react@${REACT_VERSION}.js`
+  // - `https://deno.land/x/aleph/mod.ts` -> `/-/deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
+  // - `../components/logo.tsx` -> `/components/logo.{HASH}.js`
+  // - `../styles/app.css` -> `/styles/app.css.{HASH}.js`
+  // - `@/components/logo.tsx` -> `/components/logo.{HASH}.js`
+  // - `~/components/logo.tsx` -> `/components/logo.{HASH}.js`
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> (String, String) {
     // apply import map
-    let mut url = self.import_map.resolve(self.specifier.as_str(), url);
-    // fix deno.land/x/aleph url
-    if url.starts_with("https://deno.land/x/aleph/") {
-      url = format!(
-        "https://deno.land/x/aleph@v{}/{}",
-        VERSION.as_str(),
-        url.trim_start_matches("https://deno.land/x/aleph/")
-      );
-    }
-    // fix react/react-dom url
-    if let Some((react_url, react_dom_url)) = &self.react_url {
-      if RE_REACT_SERVER_URL.is_match(url.as_str()) {
-        url = react_dom_url.clone() + "/server";
-      } else if RE_REACT_DOM_URL.is_match(url.as_str()) {
-        url = react_dom_url.clone();
-      } else if RE_REACT_URL.is_match(url.as_str()) {
-        url = react_url.clone();
-      }
-    }
-    let url = url.as_str();
-    let is_remote = is_remote_url(url);
-    let mut resolved_path = if is_remote {
-      if self.specifier_is_remote {
-        let mut buf = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
-        buf.pop();
-        diff_paths(self.fix_import_url(url), buf.to_slash().unwrap()).unwrap()
-      } else {
-        let mut buf = PathBuf::from(self.specifier.as_str());
-        buf.pop();
-        diff_paths(self.fix_import_url(url), buf.to_slash().unwrap()).unwrap()
-      }
+    let url = self.import_map.resolve(self.specifier.as_str(), url);
+    let mut fixed_url: String = if is_remote_url(url.as_str()) {
+      url.into()
     } else {
       if self.specifier_is_remote {
         let mut new_url = Url::from_str(self.specifier.as_str()).unwrap();
         if url.starts_with("/") {
-          new_url.set_path(url);
+          new_url.set_path(url.as_str());
         } else {
           let mut buf = PathBuf::from(new_url.path());
           buf.pop();
           buf.push(url);
+          let path = "/".to_owned()
+            + RelativePath::new(buf.to_slash().unwrap().as_str())
+              .normalize()
+              .as_str();
+          new_url.set_path(path.as_str());
+        }
+        new_url.as_str().into()
+      } else {
+        if url.starts_with("/") {
+          url.into()
+        } else if url.starts_with("@/") {
+          url.trim_start_matches("@").into()
+        } else if url.starts_with("~/") {
+          url.trim_start_matches("~").into()
+        } else {
+          let mut buf = PathBuf::from(self.specifier.as_str());
+          buf.pop();
+          buf.push(url);
+          "/".to_owned()
+            + RelativePath::new(buf.to_slash().unwrap().as_str())
+              .normalize()
+              .as_str()
+        }
+      }
+    };
+    // fix deno.land/x/aleph url
+    if fixed_url.starts_with("https://deno.land/x/aleph/") {
+      fixed_url = format!(
+        "https://deno.land/x/aleph@v{}/{}",
+        VERSION.as_str(),
+        fixed_url.trim_start_matches("https://deno.land/x/aleph/")
+      );
+    }
+    // fix react/react-dom url
+    if let Some(version) = &self.react_version {
+      if RE_REACT_URL.is_match(fixed_url.as_str()) {
+        let caps = RE_REACT_URL.captures(fixed_url.as_str()).unwrap();
+        let mut host = caps.get(1).map_or("", |m| m.as_str());
+        let other_host = !host.starts_with("esm.sh/")
+          && !host.starts_with("cdn.esm.sh/")
+          && !host.starts_with("esm.x-static.io/");
+        if other_host {
+          host = "esm.sh/"
+        }
+        let pkg = caps.get(2).map_or("", |m| m.as_str());
+        let ver = caps.get(3).map_or("", |m| m.as_str());
+        let path = caps.get(4).map_or("", |m| m.as_str());
+        if other_host || ver != version {
+          fixed_url = format!("https://{}react{}@{}{}", host, pkg, version, path);
+        }
+      }
+    }
+    let is_remote = is_remote_url(fixed_url.as_str());
+    let mut resolved_path = if is_remote {
+      if self.specifier_is_remote {
+        let mut buf = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
+        buf.pop();
+        diff_paths(
+          self.fix_import_url(fixed_url.as_str()),
+          buf.to_slash().unwrap(),
+        )
+        .unwrap()
+      } else {
+        let mut buf = PathBuf::from(self.specifier.as_str());
+        buf.pop();
+        diff_paths(
+          self.fix_import_url(fixed_url.as_str()),
+          buf.to_slash().unwrap(),
+        )
+        .unwrap()
+      }
+    } else {
+      if self.specifier_is_remote {
+        let mut new_url = Url::from_str(self.specifier.as_str()).unwrap();
+        if fixed_url.starts_with("/") {
+          new_url.set_path(fixed_url.as_str());
+        } else {
+          let mut buf = PathBuf::from(new_url.path());
+          buf.pop();
+          buf.push(fixed_url.as_str());
           let path = "/".to_owned()
             + RelativePath::new(buf.to_slash().unwrap().as_str())
               .normalize()
@@ -251,12 +299,12 @@ impl Resolver {
         )
         .unwrap()
       } else {
-        if url.starts_with("/") || url.starts_with("@/") {
+        if fixed_url.starts_with("/") {
           let mut buf = PathBuf::from(self.specifier.as_str());
           buf.pop();
-          diff_paths(url.trim_start_matches("@"), buf.to_slash().unwrap()).unwrap()
+          diff_paths(fixed_url.clone(), buf.to_slash().unwrap()).unwrap()
         } else {
-          PathBuf::from(url)
+          PathBuf::from(fixed_url.clone())
         }
       }
     };
@@ -274,10 +322,9 @@ impl Resolver {
               .to_owned();
             if !is_remote && !self.specifier_is_remote {
               filename.push_str(HASH_PLACEHOLDER.as_str());
-              filename.push_str(".js");
-            } else {
-              filename.push_str("js");
+              filename.push('.');
             }
+            filename.push_str("js");
             resolved_path.set_file_name(filename);
           }
           _ => {
@@ -298,40 +345,6 @@ impl Resolver {
         None => {}
       },
       None => {}
-    };
-    let fixed_url: String = if is_remote {
-      url.into()
-    } else {
-      if self.specifier_is_remote {
-        let mut new_url = Url::from_str(self.specifier.as_str()).unwrap();
-        if url.starts_with("/") {
-          new_url.set_path(url);
-        } else {
-          let mut buf = PathBuf::from(new_url.path());
-          buf.pop();
-          buf.push(url);
-          let path = "/".to_owned()
-            + RelativePath::new(buf.to_slash().unwrap().as_str())
-              .normalize()
-              .as_str();
-          new_url.set_path(path.as_str());
-        }
-        new_url.as_str().into()
-      } else {
-        if url.starts_with("/") {
-          url.into()
-        } else if url.starts_with("@/") {
-          url.trim_start_matches("@").into()
-        } else {
-          let mut buf = PathBuf::from(self.specifier.as_str());
-          buf.pop();
-          buf.push(url);
-          "/".to_owned()
-            + RelativePath::new(buf.to_slash().unwrap().as_str())
-              .normalize()
-              .as_str()
-        }
-      }
     };
     self.dep_graph.push(DependencyDescriptor {
       specifier: fixed_url.clone(),
@@ -793,7 +806,7 @@ mod tests {
   }
 
   #[test]
-  fn test_resolver_resolve() {
+  fn test_resolve_local() {
     let mut imports: HashMap<String, Vec<String>> = HashMap::new();
     imports.insert("react".into(), vec!["https://esm.sh/react".into()]);
     imports.insert(
@@ -810,10 +823,7 @@ mod tests {
         imports,
         scopes: HashMap::new(),
       },
-      Some((
-        "https://esm.sh/react@17.0.1".into(),
-        "https://esm.sh/react-dom@17.0.1".into(),
-      )),
+      Some("17.0.1".into()),
       false,
       vec![],
     );
@@ -902,6 +912,13 @@ mod tests {
       )
     );
     assert_eq!(
+      resolver.resolve("../styles/app.css", false),
+      (
+        format!("../styles/app.css.{}.js", HASH_PLACEHOLDER.as_str()),
+        "/styles/app.css".into()
+      )
+    );
+    assert_eq!(
       resolver.resolve("@/components/logo.tsx", false),
       (
         format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
@@ -909,17 +926,20 @@ mod tests {
       )
     );
     assert_eq!(
-      resolver.resolve("@/styles/app.css", false),
+      resolver.resolve("~/components/logo.tsx", false),
       (
-        format!("../styles/app.css.{}.js", HASH_PLACEHOLDER.as_str()),
-        "/styles/app.css".into()
+        format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
+        "/components/logo.tsx".into()
       )
     );
+  }
 
+  #[test]
+  fn test_resolve_remote_1() {
     let mut resolver = Resolver::new(
       "https://esm.sh/react-dom",
       ImportHashMap::default(),
-      None,
+      Some("17.0.1".into()),
       false,
       vec![],
     );
@@ -932,13 +952,22 @@ mod tests {
     );
     assert_eq!(
       resolver.resolve("./react", false),
-      ("./react.js".into(), "https://esm.sh/react".into())
+      (
+        "./react@17.0.1.js".into(),
+        "https://esm.sh/react@17.0.1".into()
+      )
     );
     assert_eq!(
       resolver.resolve("/react", false),
-      ("./react.js".into(), "https://esm.sh/react".into())
+      (
+        "./react@17.0.1.js".into(),
+        "https://esm.sh/react@17.0.1".into()
+      )
     );
+  }
 
+  #[test]
+  fn test_resolve_remote_2() {
     let mut resolver = Resolver::new(
       "https://esm.sh/preact/hooks",
       ImportHashMap::default(),
