@@ -5,7 +5,7 @@ import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
-import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
+import { E400MissingComponent, E404Page, ErrorBoundary } from './error.ts'
 import { createPageProps, importModule, isLikelyReactComponent } from './util.ts'
 
 export default function AlephAppRoot({
@@ -25,7 +25,7 @@ export default function AlephAppRoot({
             if (isLikelyReactComponent(E404)) {
                 return { Component: E404 }
             }
-            return { Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom 404 Page' } }
+            return { Component: E400MissingComponent, props: { name: 'Custom 404 Page' } }
         }
         return { Component: E404Page }
     })
@@ -35,7 +35,7 @@ export default function AlephAppRoot({
             if (isLikelyReactComponent(App)) {
                 return { Component: App }
             }
-            return { Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom App' } }
+            return { Component: E400MissingComponent, props: { name: 'Custom App' } }
         }
         return { Component: null }
     })
@@ -99,7 +99,7 @@ export default function AlephAppRoot({
                     if (isLikelyReactComponent(Component)) {
                         setApp({ Component })
                     } else {
-                        setApp({ Component: E400MissingDefaultExportAsComponent, props: { name: 'Custom App' } })
+                        setApp({ Component: E400MissingComponent, props: { name: 'Custom App' } })
                     }
                     break
                 }

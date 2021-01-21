@@ -1,4 +1,4 @@
-import { Component, createElement, Fragment } from 'https://esm.sh/react'
+import { Component, createElement, CSSProperties } from 'https://esm.sh/react'
 
 export class ErrorBoundary extends Component {
     state: { stack: string | null }
@@ -43,7 +43,7 @@ export function E404Page() {
     )
 }
 
-export function E400MissingDefaultExportAsComponent({ name }: { name: string }) {
+export function E400MissingComponent({ name }: { name: string }) {
     return createElement(
         StatusError,
         {
@@ -54,46 +54,63 @@ export function E400MissingDefaultExportAsComponent({ name }: { name: string }) 
     )
 }
 
-export function StatusError({ status, message, showRefreshButton }: { status: number, message: string, showRefreshButton?: boolean }) {
+const resetStyle: CSSProperties = {
+    padding: 0,
+    margin: 0,
+    lineHeight: 1.5,
+    fontSize: 15,
+    fontWeight: 400,
+    color: '#333',
+}
+
+export function StatusError({ status, message }: { status: number, message: string }) {
     return (
         createElement(
-            Fragment,
-            null,
+            'div',
+            {
+                style: {
+                    ...resetStyle,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'column',
+                    width: '100vm',
+                    height: '100vh',
+                }
+            },
             createElement(
                 'p',
-                null,
+                {
+                    style: {
+                        ...resetStyle,
+                        fontWeight: 500,
+                    }
+                },
                 createElement(
-                    'strong',
-                    null,
-                    createElement(
-                        'code',
-                        null,
-                        status
-                    )
+                    'code',
+                    {
+                        style: {
+                            ...resetStyle,
+                            fontWeight: 700,
+                        }
+                    },
+                    status
                 ),
                 createElement(
                     'small',
-                    null,
+                    {
+                        style: {
+                            ...resetStyle,
+                            fontSize: 4,
+                            color: '#999'
+                        }
+                    },
                     ' - '
                 ),
                 createElement(
                     'span',
                     null,
                     message
-                )
-            ),
-            showRefreshButton && createElement(
-                'p',
-                null,
-                createElement(
-                    'button',
-                    {
-                        onClick() {
-                            const { location } = window as any
-                            location.reload()
-                        }
-                    },
-                    'Refresh'
                 )
             )
         )

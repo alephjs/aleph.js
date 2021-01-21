@@ -6,7 +6,7 @@ import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RendererContext, RouterContext } from './context.ts'
-import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page } from './error.ts'
+import { AsyncUseDenoError, E400MissingComponent, E404Page } from './error.ts'
 import { serverStyles } from './style.ts'
 import { createPageProps, isLikelyReactComponent } from './util.ts'
 
@@ -30,10 +30,7 @@ export async function renderPage(
         if (isLikelyReactComponent(App)) {
             el = createElement(App, pageProps)
         } else {
-            el = createElement(
-                E400MissingDefaultExportAsComponent,
-                { name: 'Custom App' }
-            )
+            el = createElement(E400MissingComponent, { name: 'Custom App' })
         }
     } else {
         if (pageProps.Page == null) {
@@ -41,10 +38,7 @@ export async function renderPage(
                 if (isLikelyReactComponent(E404)) {
                     el = createElement(E404)
                 } else {
-                    el = createElement(
-                        E400MissingDefaultExportAsComponent,
-                        { name: 'Custom 404' }
-                    )
+                    el = createElement(E400MissingComponent, { name: 'Custom 404' })
                 }
             } else {
                 el = createElement(E404Page)

@@ -2,7 +2,7 @@ import type { ComponentType } from 'https://esm.sh/react'
 import { hashShort, reModuleExt } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
 import { RouteModule } from '../core/routing.ts'
-import { E400MissingDefaultExportAsComponent } from './error.ts'
+import { E400MissingComponent } from './error.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for
 const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
@@ -51,6 +51,11 @@ export function isLikelyReactComponent(type: any): Boolean {
                     return false
                 }
             }
+            const { __ALEPH } = window as any
+            if (__ALEPH) {
+                // in bundle mode, component name will be compressed
+                return true
+            }
             const name = type.name || type.displayName
             return typeof name === 'string' && /^[A-Z]/.test(name)
         case 'object':
@@ -96,7 +101,7 @@ function _createPagePropsSegment(seg: { url: string, Component?: ComponentType<a
         if (isLikelyReactComponent(seg.Component)) {
             pageProps.Page = seg.Component
         } else {
-            pageProps.Page = E400MissingDefaultExportAsComponent
+            pageProps.Page = E400MissingComponent
             pageProps.pageProps = { name: 'Page: ' + util.trimPrefix(seg.url, '/pages').replace(reModuleExt, '') }
         }
     }
