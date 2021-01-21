@@ -14,17 +14,14 @@ use swc_common::{
   errors::{Handler, HandlerFlags},
   FileName, Globals, Mark, SourceMap,
 };
+use swc_ecma_transforms_compat::{es2015, es2016, es2017, es2018, es2020};
+use swc_ecma_transforms_proposal::decorators;
+use swc_ecma_transforms_typescript::strip;
 use swc_ecmascript::{
   ast::{Module, Program},
   codegen::{text_writer::JsWriter, Node},
-  parser::lexer::Lexer,
-  parser::{EsConfig, JscTarget, StringInput, Syntax, TsConfig},
-  transforms::{
-    compat::{es2015, es2016, es2017, es2018, es2020},
-    fixer, helpers, hygiene,
-    pass::Optional,
-    proposals, react, typescript,
-  },
+  parser::{lexer::Lexer, EsConfig, JscTarget, StringInput, Syntax, TsConfig},
+  transforms::{fixer, helpers, hygiene, pass::Optional, react},
   visit::{Fold, FoldWith},
 };
 
@@ -172,12 +169,12 @@ impl ParsedModule {
           ),
           jsx
         ),
-        proposals::decorators::decorators(proposals::decorators::Config {
+        decorators::decorators(decorators::Config {
           legacy: true,
           emit_metadata: false
         }),
         Optional::new(es2020(), options.target < JscTarget::Es2020),
-        Optional::new(typescript::strip(), ts),
+        Optional::new(strip(), ts),
         Optional::new(es2018(), options.target < JscTarget::Es2018),
         Optional::new(es2017(), options.target < JscTarget::Es2017),
         Optional::new(es2016(), options.target < JscTarget::Es2016),
