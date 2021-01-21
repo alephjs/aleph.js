@@ -1,7 +1,7 @@
 import { compress as brotli } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
-import log from './log.ts'
 import { multiParser } from './multiparser.ts'
+import log from './src/helpers/log.ts'
 import { ServerRequest } from './std.ts'
 import type { APIRequest, FormDataBody } from './types.ts'
 

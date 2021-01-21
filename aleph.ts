@@ -3,8 +3,8 @@ import { RouterContext } from './context.ts'
 import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
 import events from './events.ts'
 import { createPageProps, RouteModule, Routing } from './routing.ts'
+import util, { hashShort, reHttp } from './src/helpers/util.ts'
 import type { RouterURL } from './types.ts'
-import util, { hashShort, reHttp } from './util.ts'
 
 export function ALEPH({ initial }: {
     initial: {

@@ -1,8 +1,8 @@
 import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
-import { ensureTextFile } from '../fs.ts'
-import log from '../log.ts'
-import { colors, ensureDir, fromStreamReader, path, Untar } from '../std.ts'
-import util from '../util.ts'
+import { ensureTextFile } from '../../fs.ts'
+import { colors, ensureDir, fromStreamReader, path, Untar } from '../../std.ts'
+import log from '../helpers/log.ts'
+import util from '../helpers/util.ts'
 
 const gitignore = [
     '.DS_Store',

@@ -1,6 +1,6 @@
 import React, { Children, createElement, isValidElement, PropsWithChildren, ReactElement, ReactNode, useContext, useEffect } from 'https://esm.sh/react'
 import { RendererContext } from './context.ts'
-import util from './util.ts'
+import util from './src/helpers/util.ts'
 
 export const serverStyles: Map<string, { css: string, asLink: boolean }> = new Map()
 

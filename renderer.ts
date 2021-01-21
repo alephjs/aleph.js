@@ -5,8 +5,8 @@ import { AsyncUseDenoError, E400MissingDefaultExportAsComponent, E404Page } from
 import events from './events.ts'
 import { serverStyles } from './head.ts'
 import { createPageProps } from './routing.ts'
+import util, { hashShort, reHttp } from './src/helpers/util.ts'
 import type { RouterURL } from './types.ts'
-import util, { hashShort, reHttp } from './util.ts'
 
 interface RenderResult {
     head: string[]
