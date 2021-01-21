@@ -69,22 +69,8 @@ export async function renderPage(
     const useDenUrl = `useDeno://${url.pathname}`
     const useDenoAsyncCalls: Array<Promise<any>> = []
 
-    Object.assign(window, {
+    Object.assign(globalThis, {
         [`__asyncData_${useDenUrl}`]: {},
-        location: {
-            protocol: 'http:',
-            host: 'localhost',
-            hostname: 'localhost',
-            port: '',
-            href: 'https://localhost' + url.pathname + url.query.toString(),
-            origin: 'https://localhost',
-            pathname: url.pathname,
-            search: url.query.toString(),
-            hash: '',
-            reload() { },
-            replace() { },
-            toString() { return this.href },
-        }
     })
 
     events.on(useDenUrl, (id: string, ret: any, async: boolean) => {

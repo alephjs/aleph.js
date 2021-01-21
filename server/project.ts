@@ -579,45 +579,8 @@ export class Project {
         log.info(colors.bold('- Global'))
         await this._loadConfig()
 
-        // inject virtual browser gloabl objects
-        Object.assign(globalThis, {
-            navigator: {
-                connection: {
-                    downlink: 1.5,
-                    effectiveType: "3g",
-                    onchange: null,
-                    rtt: 300,
-                    saveData: false,
-                },
-                cookieEnabled: false,
-                deviceMemory: 0,
-                hardwareConcurrency: 0,
-                language: this.config.defaultLocale,
-                maxTouchPoints: 0,
-                onLine: true,
-                userAgent: `Deno/${Deno.version.deno}`,
-                vendor: "Deno Land",
-            },
-            location: {
-                protocol: 'http:',
-                host: 'localhost',
-                hostname: 'localhost',
-                port: '',
-                href: 'https://localhost/',
-                origin: 'https://localhost',
-                pathname: '/',
-                search: '',
-                hash: '',
-                reload() { },
-                replace() { },
-                toString() { return this.href },
-            },
-            innerWidth: 1920,
-            innerHeight: 1080,
-            devicePixelRatio: 1,
-            $RefreshReg$: () => { },
-            $RefreshSig$: () => (type: any) => type,
-        })
+        // change current work dir to appDoot
+        Deno.chdir(this.appRoot)
 
         // inject env variables
         Object.entries({
@@ -626,8 +589,13 @@ export class Project {
             __buildMode: this.mode,
         }).forEach(([key, value]) => Deno.env.set(key, value))
 
-        // change current work dir to appDoot
-        Deno.chdir(this.appRoot)
+        // add react refresh helpers for ssr
+        if (this.isDev) {
+            Object.assign(globalThis, {
+                $RefreshReg$: () => { },
+                $RefreshSig$: () => (type: any) => type,
+            })
+        }
 
         // check custom components
         for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.tsx', '.jsx'] })) {
