@@ -243,16 +243,16 @@ impl Resolver {
       if RE_REACT_URL.is_match(fixed_url.as_str()) {
         let caps = RE_REACT_URL.captures(fixed_url.as_str()).unwrap();
         let mut host = caps.get(1).map_or("", |m| m.as_str());
-        let other_host = !host.starts_with("esm.sh/")
+        let non_esm_sh_cdn = !host.starts_with("esm.sh/")
           && !host.starts_with("cdn.esm.sh/")
           && !host.starts_with("esm.x-static.io/");
-        if other_host {
+        if non_esm_sh_cdn {
           host = "esm.sh/"
         }
         let pkg = caps.get(2).map_or("", |m| m.as_str());
         let ver = caps.get(3).map_or("", |m| m.as_str());
         let path = caps.get(4).map_or("", |m| m.as_str());
-        if other_host || ver != version {
+        if non_esm_sh_cdn || ver != version {
           fixed_url = format!("https://{}react{}@{}{}", host, pkg, version, path);
         }
       }
@@ -411,7 +411,7 @@ impl Fold for AlephResolveFold {
                     .specifiers
                     .into_iter()
                     .for_each(|specifier| match specifier {
-                      // import { useState, useEffect as useEffect_ } from "https://esm.sh/react"
+                      // import { default as React, useState } from "https://esm.sh/react"
                       ImportSpecifier::Named(ImportNamedSpecifier {
                         local, imported, ..
                       }) => {
