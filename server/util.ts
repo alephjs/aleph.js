@@ -1,15 +1,39 @@
 import { colors, ensureDir, path } from '../deps.ts'
-import {
-    MB,
-    reHashJs,
-    reHttp,
-    reMDExt,
-    reModuleExt,
-    reStyleModuleExt
-} from '../shared/constants.ts'
+import { MB, reHashJs, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 import { ImportMap, Module } from './types.ts'
+
+export const AlephRuntimeCode = `
+var __ALEPH = window.__ALEPH || (window.__ALEPH = {
+    pack: {},
+    exportFrom: function(specifier, url, exports) {
+        if (url in this.pack) {
+            var mod = this.pack[url]
+            if (!(specifier in this.pack)) {
+                this.pack[specifier] = {}
+            }
+            if (exports === '*') {
+                for (var k in mod) {
+                    this.pack[specifier][k] = mod[k]
+                }
+            } else if (typeof exports === 'object' && exports !== null) {
+                for (var k in exports) {
+                    this.pack[specifier][exports[k]] = mod[k]
+                }
+            }
+        }
+    },
+    require: function(name) {
+        switch (name) {
+            case 'regenerator-runtime':
+                return regeneratorRuntime
+            default:
+                throw new Error("module name is undefined")
+        }
+    },
+});
+`.replaceAll(' '.repeat(12), '')
 
 export function getAlephPkgUrl() {
     let url = `https://deno.land/x/aleph@v${VERSION}`
@@ -184,7 +208,7 @@ export function fixImportUrl(importUrl: string): string {
         ].join('')
     }
     const result = pathname + ext
-    return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result;
+    return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result
 }
 
 /**

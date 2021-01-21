@@ -10,7 +10,7 @@ import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
 import log from './log.ts'
 import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
-import { cleanupCompilation, colorfulBytesString, createHtml, ensureTextFile, existsDirSync, existsFileSync, fixImportMap, fixImportUrl, getAlephPkgUrl, getRelativePath, newModule } from './util.ts'
+import { AlephRuntimeCode, cleanupCompilation, colorfulBytesString, createHtml, ensureTextFile, existsDirSync, existsFileSync, fixImportMap, fixImportUrl, getAlephPkgUrl, getRelativePath, newModule } from './util.ts'
 
 /**
  * A Project to manage the Aleph.js appliaction.
@@ -1262,28 +1262,6 @@ export class Project {
 
     /** bundle modules for production. */
     private async _bundle() {
-        const header = `
-            var __ALEPH = window.__ALEPH || (window.__ALEPH = {
-                pack: {},
-                exportFrom: function(specifier, url, exports) {
-                    if (url in this.pack) {
-                        var mod = this.pack[url]
-                        if (!(specifier in this.pack)) {
-                            this.pack[specifier] = {}
-                        }
-                        if (exports === '*') {
-                            for (var k in mod) {
-                                this.pack[specifier][k] = mod[k]
-                            }
-                        } else if (typeof exports === 'object' && exports !== null) {
-                            for (var k in exports) {
-                                this.pack[specifier][exports[k]] = mod[k]
-                            }
-                        }
-                    }
-                }
-            });
-        `.replaceAll(' '.repeat(12), '')
         const alephPkgUrl = getAlephPkgUrl()
         const refCounter = new Map<string, number>()
         const lookup = (url: string) => {
@@ -1340,9 +1318,9 @@ export class Project {
         }
 
         log.info('- Bundle')
-        await this._createChunkBundle('deps', remoteDepList, header)
+        await this._createChunkBundle('deps', remoteDepList)
         if (localDepList.length > 0) {
-            await this._createChunkBundle('shared', localDepList, header)
+            await this._createChunkBundle('shared', localDepList)
         }
 
         // copy main module
@@ -1353,17 +1331,17 @@ export class Project {
 
         // create and copy polyfill
         const polyfillMode = newModule('/polyfill.js')
-        polyfillMode.hash = polyfillMode.sourceHash = (new Sha1).update(header).update(`${this.config.buildTarget}-${VERSION}`).hex()
+        polyfillMode.hash = polyfillMode.sourceHash = (new Sha1).update(AlephRuntimeCode).update(`${this.config.buildTarget}-${VERSION}`).hex()
         const polyfillFile = path.join(this.buildDir, `polyfill.${polyfillMode.hash.slice(0, hashShort)}.js`)
         if (!existsFileSync(polyfillFile)) {
             const rawPolyfillFile = `${alephPkgUrl}/compiler/polyfills/${this.config.buildTarget}/polyfill.js`
-            await this._runDenoBundle(rawPolyfillFile, polyfillFile, header, true)
+            await this._runDenoBundle(rawPolyfillFile, polyfillFile, AlephRuntimeCode, true)
         }
         Deno.copyFile(polyfillFile, path.join(this.outputDir, '_aleph', `polyfill.${polyfillMode.hash.slice(0, hashShort)}.js`))
         this.#modules.set(polyfillMode.url, polyfillMode)
 
         // bundle and copy page moudles
-        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localDepList, header)))
+        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localDepList, AlephRuntimeCode)))
     }
 
     /** create chunk bundle. */
@@ -1403,11 +1381,11 @@ export class Project {
 
     /** create page bundle. */
     private async _createPageBundle(mod: Module, bundledPaths: string[], header = '') {
-        const { bundlingFile, sourceHash } = await this._compile(mod.url, { bundleMode: true, bundledPaths })
+        const { bundlingFile, hash } = await this._compile(mod.url, { bundleMode: true, bundledPaths })
         const _tmp = util.trimSuffix(bundlingFile.replace(reHashJs, ''), '.bundling')
         const _tmp_bundlingFile = _tmp + `.bundling.js`
-        const bundleFile = _tmp + `.bundle.${sourceHash.slice(0, hashShort)}.js`
-        const saveAs = path.join(this.outputDir, `/_aleph/`, util.trimPrefix(_tmp, this.buildDir) + `.${sourceHash.slice(0, hashShort)}.js`)
+        const bundleFile = _tmp + `.bundle.${hash.slice(0, hashShort)}.js`
+        const saveAs = path.join(this.outputDir, `/_aleph/`, util.trimPrefix(_tmp, this.buildDir) + `.${hash.slice(0, hashShort)}.js`)
 
         if (existsFileSync(bundleFile)) {
             await ensureDir(path.dirname(saveAs))
