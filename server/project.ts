@@ -330,10 +330,10 @@ export class Project {
         const mainModule = this.#modules.get('/main.ts')!
         const depsModule = this.#modules.get('/deps.bundling.js')
         const sharedModule = this.#modules.get('/shared.bundling.js')
-        const ployfillModule = this.#modules.get('/ployfill.js')
+        const polyfillModule = this.#modules.get('/polyfill.js')
 
         return [
-            ployfillModule ? { src: util.cleanPath(`${baseUrl}/_aleph/ployfill.${ployfillModule.hash.slice(0, hashShort)}.js`) } : {},
+            polyfillModule ? { src: util.cleanPath(`${baseUrl}/_aleph/polyfill.${polyfillModule.hash.slice(0, hashShort)}.js`) } : {},
             depsModule ? { src: util.cleanPath(`${baseUrl}/_aleph/deps.${depsModule.hash.slice(0, hashShort)}.js`), } : {},
             sharedModule ? { src: util.cleanPath(`${baseUrl}/_aleph/shared.${sharedModule.hash.slice(0, hashShort)}.js`), } : {},
             !this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.sourceHash.slice(0, hashShort)}.js`), } : {},
@@ -1351,16 +1351,16 @@ export class Project {
         const mainJSConent = await Deno.readTextFile(mainModule.bundlingFile)
         await Deno.writeTextFile(mainJSFile, mainJSConent)
 
-        // create and copy ployfill
-        const ployfillMode = newModule('/ployfill.js')
-        ployfillMode.hash = ployfillMode.sourceHash = (new Sha1).update(header).update(`${this.config.buildTarget}-${VERSION}`).hex()
-        const ployfillFile = path.join(this.buildDir, `ployfill.${ployfillMode.hash.slice(0, hashShort)}.js`)
-        if (!existsFileSync(ployfillFile)) {
-            const rawPloyfillFile = `${alephPkgUrl}/compiler/ployfills/${this.config.buildTarget}/ployfill.js`
-            await this._runDenoBundle(rawPloyfillFile, ployfillFile, header, true)
+        // create and copy polyfill
+        const polyfillMode = newModule('/polyfill.js')
+        polyfillMode.hash = polyfillMode.sourceHash = (new Sha1).update(header).update(`${this.config.buildTarget}-${VERSION}`).hex()
+        const polyfillFile = path.join(this.buildDir, `polyfill.${polyfillMode.hash.slice(0, hashShort)}.js`)
+        if (!existsFileSync(polyfillFile)) {
+            const rawPolyfillFile = `${alephPkgUrl}/compiler/polyfills/${this.config.buildTarget}/polyfill.js`
+            await this._runDenoBundle(rawPolyfillFile, polyfillFile, header, true)
         }
-        Deno.copyFile(ployfillFile, path.join(this.outputDir, '_aleph', `ployfill.${ployfillMode.hash.slice(0, hashShort)}.js`))
-        this.#modules.set(ployfillMode.url, ployfillMode)
+        Deno.copyFile(polyfillFile, path.join(this.outputDir, '_aleph', `polyfill.${polyfillMode.hash.slice(0, hashShort)}.js`))
+        this.#modules.set(polyfillMode.url, polyfillMode)
 
         // bundle and copy page moudles
         await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localDepList, header)))
