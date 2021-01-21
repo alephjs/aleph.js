@@ -1,5 +1,5 @@
 import { initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
-import type { AcceptedPlugin, ServerRequest } from '../deps.ts'
+import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
 import { CleanCSS, colors, ensureDir, less, marked, minify, path, postcss, safeLoadFront, Sha1, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { getPagePath, RouteModule, Routing } from '../framework/core/routing.ts'
@@ -1416,7 +1416,6 @@ export class Project {
         if (!existsFileSync(bundleFile)) {
             const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.buildDir, '/aleph.js')
             await Deno.stderr.write((new TextEncoder).encode(msg))
-            console.log(['deno', 'bundle', '--no-check', reload ? '--reload' : '', bundlingFile, bundleFile].filter(Boolean).join(' '))
             Deno.exit(1)
         }
 
@@ -1428,6 +1427,9 @@ export class Project {
             },
         })
 
+        // workaround for https://github.com/denoland/deno/issues/9212
+        code = code.replace(' _ = l.baseState, ', ' var _ = l.baseState, ')
+
         // IIFEify
         code = [
             '(() => {',
@@ -1437,15 +1439,15 @@ export class Project {
         ].join('\n')
 
         // minify code
-        // const ret = await minify(code, {
-        //     compress: true,
-        //     mangle: true,
-        //     ecma: parseInt(util.trimPrefix(this.config.buildTarget, 'es')) as ECMA,
-        //     sourceMap: false
-        // })
-        // if (ret.code) {
-        //     code = ret.code
-        // }
+        const ret = await minify(code, {
+            compress: true,
+            mangle: true,
+            ecma: parseInt(util.trimPrefix(this.config.buildTarget, 'es')) as ECMA,
+            sourceMap: false
+        })
+        if (ret.code) {
+            code = ret.code
+        }
 
         await cleanupCompilation(bundleFile)
         await Deno.writeTextFile(bundleFile, code)
