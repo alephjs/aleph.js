@@ -3,7 +3,7 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: swc
+name: compiler
 
 on:
   push:
@@ -34,4 +34,4 @@ jobs:
           version: latest
 
       - name: Run tests
-        run: cd swc && cargo test --all
+        run: cd compiler && cargo test --all
