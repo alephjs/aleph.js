@@ -103,7 +103,7 @@ impl Resolver {
   //  - `http://localhost:8080/mod` -> `/-/http_localhost_8080/mod.js`
   //  - `/components/logo.tsx` -> `/components/logo.tsx`
   //  - `@/components/logo.tsx` -> `/components/logo.tsx`
-  //  - `~/components/logo.tsx` -> `~/components/logo.tsx`
+  //  - `~/components/logo.tsx` -> `/components/logo.tsx`
   //  - `../components/logo.tsx` -> `../components/logo.tsx`
   //  - `./button.tsx` -> `./button.tsx`
   //  - `/components/foo/./logo.tsx` -> `/components/foo/logo.tsx`
