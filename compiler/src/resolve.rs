@@ -686,7 +686,7 @@ pub fn is_remote_url(url: &str) -> bool {
   return url.starts_with("https://") || url.starts_with("http://");
 }
 
-fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
+pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
   let callee = match &call.callee {
     ExprOrSuper::Super(_) => return false,
     ExprOrSuper::Expr(callee) => callee.as_ref(),

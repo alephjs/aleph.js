@@ -1,6 +1,7 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
 // Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
+use crate::compat_fixer::compat_fixer_fold;
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::fast_refresh::fast_refresh_fold;
 use crate::jsx::aleph_jsx_fold;
@@ -126,12 +127,12 @@ impl ParsedModule {
   ) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
       let specifier_is_remote = resolver.borrow_mut().specifier_is_remote;
-      let ts = match self.source_type {
+      let is_ts = match self.source_type {
         SourceType::TypeScript => true,
         SourceType::TSX => true,
         _ => false,
       };
-      let jsx = match self.source_type {
+      let is_jsx = match self.source_type {
         SourceType::JSX => true,
         SourceType::TSX => true,
         _ => false,
@@ -144,8 +145,8 @@ impl ParsedModule {
       let root_mark = Mark::fresh(Mark::root());
       let mut passes = chain!(
         aleph_resolve_fold(resolver.clone()),
-        Optional::new(aleph_jsx_fold, jsx),
-        Optional::new(aleph_jsx_builtin_resolve_fold, jsx),
+        Optional::new(aleph_jsx_fold, is_jsx),
+        Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
         Optional::new(
           fast_refresh_fold(
             "$RefreshReg$",
@@ -167,14 +168,14 @@ impl ParsedModule {
               ..Default::default()
             },
           ),
-          jsx
+          is_jsx
         ),
         decorators::decorators(decorators::Config {
           legacy: true,
           emit_metadata: false
         }),
         Optional::new(es2020(), options.target < JscTarget::Es2020),
-        Optional::new(strip(), ts),
+        Optional::new(strip(), is_ts),
         Optional::new(es2018(), options.target < JscTarget::Es2018),
         Optional::new(es2017(), options.target < JscTarget::Es2017),
         Optional::new(es2016(), options.target < JscTarget::Es2016),
@@ -182,6 +183,7 @@ impl ParsedModule {
           es2015(root_mark, Default::default()),
           options.target < JscTarget::Es2015
         ),
+        Optional::new(compat_fixer_fold(), options.target < JscTarget::Es2015),
         Optional::new(
           helpers::inject_helpers(),
           options.target < JscTarget::Es2020

@@ -4,6 +4,7 @@
 extern crate lazy_static;
 
 mod aleph;
+mod compat_fixer;
 mod error;
 mod fast_refresh;
 mod import_map;
