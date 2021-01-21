@@ -1,4 +1,4 @@
-import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.27/tsc/compile.ts';
+import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts';
 import { colors, path, Sha1, walk } from '../deps.ts';
 import { initWasm, transpileSync } from './mod.ts';
 
@@ -41,10 +41,10 @@ async function benchmark(sourceFiles: Array<{ code: string, filename: string }>,
     const d1 = { d: 0, min: 0, max: 0, }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 5; i++) {
             tsc(code, { filename, isDev })
         }
-        const d = (performance.now() - t) / 2
+        const d = (performance.now() - t) / 5
         if (d1.min === 0 || d < d1.min) {
             d1.min = d
         }
@@ -57,10 +57,10 @@ async function benchmark(sourceFiles: Array<{ code: string, filename: string }>,
     const d2 = { d: 0, min: 0, max: 0, }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 5; i++) {
             transpileSync(code, { url: filename, swcOptions: {}, isDev })
         }
-        const d = (performance.now() - t) / 2
+        const d = (performance.now() - t) / 5
         if (d2.min === 0 || d < d2.min) {
             d2.min = d
         }
@@ -90,7 +90,7 @@ if (import.meta.main) {
             sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
         }
 
-        benchmark(sourceFiles, false)
-        benchmark(sourceFiles, true)
+        await benchmark(sourceFiles, true)
+        await benchmark(sourceFiles, false)
     })()
 }
