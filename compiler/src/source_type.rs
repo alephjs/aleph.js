@@ -82,14 +82,14 @@ impl Serialize for SourceType {
     S: Serializer,
   {
     let value = match self {
-      SourceType::JavaScript => 0 as i32,
-      SourceType::JSX => 1 as i32,
-      SourceType::TypeScript => 2 as i32,
-      SourceType::TSX => 3 as i32,
-      SourceType::Json => 4 as i32,
-      SourceType::Wasm => 5 as i32,
-      SourceType::Unknown => 9 as i32,
-    };
+      SourceType::JavaScript => 0,
+      SourceType::JSX => 1,
+      SourceType::TypeScript => 2,
+      SourceType::TSX => 3,
+      SourceType::Json => 4,
+      SourceType::Wasm => 5,
+      SourceType::Unknown => 9,
+    } as i32;
     Serialize::serialize(&value, serializer)
   }
 }
