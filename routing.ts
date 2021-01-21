@@ -1,7 +1,7 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { E400MissingDefaultExportAsComponent } from './error.ts'
+import util, { reMDExt, reModuleExt } from './src/helpers/util.ts'
 import type { RouterURL } from './types.ts'
-import util, { reMDExt, reModuleExt } from './util.ts'
 
 export interface Route {
     path: string
