@@ -20,17 +20,17 @@ export default async function bootstrap({ baseUrl, defaultLocale, locales, route
     const ssrDataEl = document.querySelector('#ssr-data')
     const routing = new Routing(routes, baseUrl, defaultLocale, locales)
     const [url, pageModuleTree] = routing.createRouter()
-    const sysComponents: Record<string, ComponentType> = {}
+    const customComponents: Record<string, ComponentType> = {}
     const pageComponentTree: { url: string, Component?: ComponentType }[] = pageModuleTree.map(({ url }) => ({ url }))
 
     await Promise.all([...preloadModules, ...pageModuleTree].map(async mod => {
         const { default: C } = await importModule(baseUrl, mod)
         switch (mod.url.replace(reModuleExt, '')) {
-            case '/404 ':
-                sysComponents['E404'] = C
+            case '/404':
+                customComponents['E404'] = C
                 break
-            case '/app ':
-                sysComponents['App'] = C
+            case '/app':
+                customComponents['App'] = C
                 break
             default:
                 const pc = pageComponentTree.find(pc => pc.url === mod.url)
@@ -53,7 +53,7 @@ export default async function bootstrap({ baseUrl, defaultLocale, locales, route
         {
             url,
             routing,
-            sysComponents,
+            customComponents,
             pageComponentTree
         }
     )

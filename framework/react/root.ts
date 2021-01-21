@@ -11,16 +11,16 @@ import { createPageProps, importModule, isLikelyReactComponent } from './util.ts
 export default function AlephAppRoot({
     url,
     routing,
-    sysComponents,
+    customComponents,
     pageComponentTree,
 }: {
     url: RouterURL
     routing: Routing
-    sysComponents: Record<string, ComponentType<any>>
+    customComponents: Record<'E404' | 'App', ComponentType<any>>
     pageComponentTree: { url: string, Component?: any }[]
 }) {
     const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
-        const { E404 } = sysComponents
+        const { E404 } = customComponents
         if (E404) {
             if (isLikelyReactComponent(E404)) {
                 return { Component: E404 }
@@ -30,7 +30,7 @@ export default function AlephAppRoot({
         return { Component: E404Page }
     })
     const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
-        const { App } = sysComponents
+        const { App } = customComponents
         if (App) {
             if (isLikelyReactComponent(App)) {
                 return { Component: App }
