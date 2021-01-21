@@ -6,7 +6,7 @@ use crate::resolve::{
 };
 
 use path_slash::PathBufExt;
-use rand::{distributions::Alphanumeric, Rng};
+use sha1::{Digest, Sha1};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use swc_common::{SourceMap, Spanned, DUMMY_SP};
 use swc_ecma_ast::*;
@@ -22,6 +22,7 @@ pub fn aleph_jsx_fold(
         AlephJsxFold {
             resolver: resolver.clone(),
             source,
+            inline_style_idx: 0,
             is_dev,
         },
         AlephJsxBuiltinModuleResolveFold {
@@ -42,15 +43,27 @@ pub fn aleph_jsx_fold(
 struct AlephJsxFold {
     resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
+    inline_style_idx: i32,
     is_dev: bool,
 }
 
 impl AlephJsxFold {
+    fn new_inline_style_ident(&mut self) -> String {
+        let resolver = self.resolver.borrow_mut();
+        self.inline_style_idx = self.inline_style_idx + 1;
+        let path = format!("{}-{}", resolver.specifier, self.inline_style_idx);
+        let mut ident: String = "inline-style-".to_owned();
+        let mut hasher = Sha1::new();
+        hasher.update(path.as_bytes());
+        let hash = hasher.finalize();
+        ident.push_str(format!("{:x}", hash).as_str());
+        ident
+    }
+
     fn fold_jsx_opening_element(
         &mut self,
         mut el: JSXOpeningElement,
     ) -> (JSXOpeningElement, Option<(String, String)>) {
-        let mut resolver = self.resolver.borrow_mut();
         let mut inline_style: Option<(String, String)> = None;
 
         match &el.name {
@@ -58,11 +71,13 @@ impl AlephJsxFold {
                 let name = id.sym.as_ref();
                 match name {
                     "head" | "script" => {
+                        let mut resolver = self.resolver.borrow_mut();
                         resolver.builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                     }
 
                     "a" => {
+                        let mut resolver = self.resolver.borrow_mut();
                         let mut should_replace = true;
 
                         for attr in &el.attrs {
@@ -143,6 +158,7 @@ impl AlephJsxFold {
                                 };
                             }
 
+                            let mut resolver = self.resolver.borrow_mut();
                             let (resolved_path, fixed_url) =
                                 resolver.resolve(href_prop_value, true);
 
@@ -229,7 +245,7 @@ impl AlephJsxFold {
                             };
                         }
 
-                        let id = new_inline_style_ident();
+                        let id = self.new_inline_style_ident();
                         let id_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
                             span: DUMMY_SP,
                             name: JSXAttrName::Ident(quote_ident!("__styleId")),
@@ -246,11 +262,11 @@ impl AlephJsxFold {
                             el.attrs.push(id_attr);
                         }
 
+                        let mut resolver = self.resolver.borrow_mut();
                         resolver.dep_graph.push(DependencyDescriptor {
                             specifier: "#".to_owned() + id.as_str(),
                             is_dynamic: false,
                         });
-
                         resolver.builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                         inline_style = Some((type_prop_value, id.into()));
@@ -268,6 +284,7 @@ impl AlephJsxFold {
 
         // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
         if self.is_dev {
+            let resolver = self.resolver.borrow_mut();
             match self.source.span_to_lines(el.span) {
                 Ok(file_lines) => {
                     el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
@@ -462,15 +479,4 @@ fn rename_builtin_tag(name: &str) -> String {
         name = "Anchor".into();
     }
     "__ALEPH_".to_owned() + name.as_str()
-}
-
-fn new_inline_style_ident() -> String {
-    let mut ident: String = "inline-style-".to_owned();
-    let rand_id = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(9)
-        .map(char::from)
-        .collect::<String>();
-    ident.push_str(rand_id.as_str());
-    return ident;
 }

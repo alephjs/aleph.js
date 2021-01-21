@@ -6,10 +6,10 @@ use crate::import_map::{ImportHashMap, ImportMap};
 use indexmap::IndexSet;
 use path_slash::PathBufExt;
 use pathdiff::diff_paths;
-use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use relative_path::RelativePath;
 use serde::Serialize;
+use sha1::{Digest, Sha1};
 use std::{
   cell::RefCell,
   collections::HashMap,
@@ -359,11 +359,29 @@ impl Resolver {
 }
 
 pub fn aleph_resolve_fold(resolver: Rc<RefCell<Resolver>>) -> impl Fold {
-  AlephResolveFold { resolver }
+  AlephResolveFold {
+    deno_hooks_idx: 0,
+    resolver,
+  }
 }
 
 pub struct AlephResolveFold {
+  deno_hooks_idx: i32,
   resolver: Rc<RefCell<Resolver>>,
+}
+
+impl AlephResolveFold {
+  fn new_use_deno_hook_ident(&mut self) -> String {
+    let resolver = self.resolver.borrow_mut();
+    self.deno_hooks_idx = self.deno_hooks_idx + 1;
+    let path = format!("{}-{}", resolver.specifier, self.deno_hooks_idx);
+    let mut ident: String = "useDeno-".to_owned();
+    let mut hasher = Sha1::new();
+    hasher.update(path.as_bytes());
+    let hash = hasher.finalize();
+    ident.push_str(format!("{:x}", hash).as_str());
+    ident
+  }
 }
 
 impl Fold for AlephResolveFold {
@@ -623,7 +641,6 @@ impl Fold for AlephResolveFold {
   // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
   // - `useDeno(() => {})` -> `useDeno(() => {}, false, "useDeno.RANDOM_KEY")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
-    let mut resolver = self.resolver.borrow_mut();
     if is_call_expr_by_name(&call, "import") {
       let url = match call.args.first() {
         Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
@@ -635,6 +652,7 @@ impl Fold for AlephResolveFold {
         },
         _ => return call,
       };
+      let mut resolver = self.resolver.borrow_mut();
       call.args = vec![ExprOrSpread {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(new_js_str(
@@ -651,7 +669,7 @@ impl Fold for AlephResolveFold {
         _ => false,
       };
       if has_callback {
-        let id = new_use_deno_hook_ident();
+        let id = self.new_use_deno_hook_ident();
         if call.args.len() == 1 {
           call.args.push(ExprOrSpread {
             spread: None,
@@ -672,6 +690,7 @@ impl Fold for AlephResolveFold {
             expr: Box::new(Expr::Lit(Lit::Str(new_js_str(id.clone())))),
           });
         }
+        let mut resolver = self.resolver.borrow_mut();
         resolver.dep_graph.push(DependencyDescriptor {
           specifier: "#".to_owned() + id.clone().as_str(),
           is_dynamic: false,
@@ -696,17 +715,6 @@ pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
     Expr::Ident(id) => id.sym.as_ref().eq(name),
     _ => false,
   }
-}
-
-fn new_use_deno_hook_ident() -> String {
-  let mut ident: String = "useDeno-".to_owned();
-  let rand_id = rand::thread_rng()
-    .sample_iter(&Alphanumeric)
-    .take(9)
-    .map(char::from)
-    .collect::<String>();
-  ident.push_str(rand_id.as_str());
-  ident
 }
 
 pub fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -> VarDeclarator {
