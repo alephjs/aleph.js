@@ -1,6 +1,7 @@
 import type { ComponentType } from 'https://esm.sh/react'
-import { reModuleExt } from '../../shared/constants.ts'
+import { hashShort, reModuleExt } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
+import { RouteModule } from '../core/routing.ts'
 import { E400MissingDefaultExportAsComponent } from './error.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for
@@ -12,6 +13,32 @@ export interface PageProps {
     pageProps: Partial<PageProps> & { name?: string }
 }
 
+export function importModule(baseUrl: string, mod: RouteModule, forceRefetch = false): Promise<any> {
+    const { __ALEPH, document } = window as any
+    if (!__ALEPH || mod.url.startsWith('/pages/')) {
+        const src = util.cleanPath(baseUrl + '/_aleph/' + mod.url.replace(reModuleExt, '') + `.${mod.hash.slice(0, hashShort)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
+        if (__ALEPH) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script')
+                script.onload = () => {
+                    resolve(__ALEPH.pack[mod.url])
+                }
+                script.onerror = (err: Error) => {
+                    reject(err)
+                }
+                script.src = src
+                document.body.appendChild(script)
+            })
+        } else {
+            return import(src)
+        }
+    } else if (__ALEPH && mod.url in __ALEPH.pack) {
+        return Promise.resolve(__ALEPH.pack[mod.url])
+    } else {
+        return Promise.reject(new Error(`Module '${mod.url}' not found`))
+    }
+}
+
 export function isLikelyReactComponent(type: any): Boolean {
     switch (typeof type) {
         case 'function':
@@ -19,7 +46,7 @@ export function isLikelyReactComponent(type: any): Boolean {
                 if (type.prototype.isReactComponent) {
                     return true
                 }
-                const ownNames = Object.getOwnPropertyNames(type.prototype);
+                const ownNames = Object.getOwnPropertyNames(type.prototype)
                 if (ownNames.length > 1 || ownNames[0] !== 'constructor') {
                     return false
                 }

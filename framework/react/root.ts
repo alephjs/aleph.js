@@ -1,15 +1,14 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement, useCallback, useEffect, useState } from 'https://esm.sh/react'
-import { hashShort, reModuleExt } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
 import { E400MissingDefaultExportAsComponent, E404Page, ErrorBoundary } from './error.ts'
-import { createPageProps, isLikelyReactComponent } from './util.ts'
+import { createPageProps, importModule, isLikelyReactComponent } from './util.ts'
 
-export function AlephRoot({
+export default function AlephAppRoot({
     url,
     routing,
     sysComponents,
@@ -191,24 +190,4 @@ export function AlephRoot({
             )
         )
     )
-}
-
-export function importModule(baseUrl: string, mod: RouteModule, forceRefetch = false): Promise<any> {
-    const { __ALEPH, document } = window as any
-    const src = util.cleanPath(baseUrl + '/_aleph/' + mod.url.replace(reModuleExt, '') + `.${mod.hash.slice(0, hashShort)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
-    if (__ALEPH) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('src')
-            script.src = src
-            script.onload = () => {
-                resolve(__ALEPH.pack[mod.url])
-            }
-            script.onerror = (err: Error) => {
-                reject(err)
-            }
-            document.body.appendChild(script)
-        })
-    } else {
-        return import(src)
-    }
 }

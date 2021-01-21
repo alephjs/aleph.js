@@ -3,23 +3,19 @@ import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { reModuleExt } from '../../shared/constants.ts'
 import { Route, RouteModule, Routing } from '../core/routing.ts'
-import { AlephRoot, importModule } from './root.ts'
+import AlephAppRoot from './root.ts'
+import { importModule } from './util.ts'
 
-export default async function bootstrap({
-    baseUrl,
-    defaultLocale,
-    locales,
-    routes,
-    preloadModules,
-    renderMode
-}: {
+type BootstrapConfig = {
     baseUrl: string
     defaultLocale: string
     locales: string[]
     routes: Route[]
     preloadModules: RouteModule[],
     renderMode: 'ssr' | 'spa'
-}) {
+}
+
+export default async function bootstrap({ baseUrl, defaultLocale, locales, routes, preloadModules, renderMode }: BootstrapConfig) {
     const { document } = window as any
     const ssrDataEl = document.querySelector('#ssr-data')
     const routing = new Routing(routes, baseUrl, defaultLocale, locales)
@@ -53,7 +49,7 @@ export default async function bootstrap({
     }
 
     const rootEl = createElement(
-        AlephRoot,
+        AlephAppRoot,
         {
             url,
             routing,
