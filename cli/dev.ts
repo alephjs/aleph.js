@@ -21,5 +21,5 @@ export default async function (appDir: string, options: Record<string, string | 
         log.error(`invalid port '${options.port || options.p}'`)
         Deno.exit(1)
     }
-    start(appDir, port, true, Boolean(options.r || options.reload))
+    start(appDir, 'localhost', port, true, Boolean(options.r || options.reload))
 }

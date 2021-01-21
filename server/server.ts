@@ -7,14 +7,14 @@ import { getContentType } from './mime.ts'
 import { Project } from './project.ts'
 import { createHtml, existsFileSync } from './util.ts'
 
-export async function start(appDir: string, port: number, isDev = false, reload = false) {
+export async function start(appDir: string, hostname: string, port: number, isDev = false, reload = false) {
     const project = new Project(appDir, isDev ? 'development' : 'production', reload)
     await project.ready
 
     while (true) {
         try {
-            const s = serve({ port })
-            log.info(`Server ready on http://localhost:${port}`)
+            const s = serve({ hostname, port })
+            log.info(`Server ready on http://${hostname}:${port}`)
             for await (const req of s) {
                 const url = new URL('http://localhost/' + req.url)
                 const pathname = util.cleanPath(url.pathname)

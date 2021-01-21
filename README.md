@@ -30,6 +30,7 @@ export default function App() {
 ```
 
 ### Features
+
 - Zero Config
 - Typescript in Deno
 - High Performance Comilper
@@ -43,11 +44,13 @@ export default function App() {
 - SSR/SSG
 
 ### Installation
+
 ```bash
-deno install -A -f -n aleph https://deno.land/x/aleph@v0.2.26/cli.ts
+deno install -A -f -n aleph https://deno.land/x/aleph@v0.2.28/cli.ts
 ```
 
 ### Usage
+
 ```bash
 # create a new app
 aleph init hello
@@ -67,7 +70,9 @@ aleph -h
 ```
 
 ### Documentation
+
 Please visit https://alephjs.org/docs to view the documentation.
 
 ### Contributing
+
 Please read the [contributing.md](CONTRIBUTING.md).
