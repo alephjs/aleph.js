@@ -17,8 +17,8 @@ deno run -A build.ts
 cargo test --all
 ```
 
-## Banchmark
+## Benchmark
 
 ```bash
-deno run -A build.ts && deno run -A banchmark.ts
+deno run -A build.ts && deno run -A benchmark.ts
 ```

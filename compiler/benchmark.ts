@@ -35,8 +35,8 @@ function coloredDiff(d: number) {
     return cf(d.toFixed(2) + 'x')
 }
 
-async function banchmark(sourceFiles: Array<{ code: string, filename: string }>, isDev: boolean) {
-    console.log(`[banchmark] ${sourceFiles.length} files ${isDev ? '(development mode)' : ''}`)
+async function benchmark(sourceFiles: Array<{ code: string, filename: string }>, isDev: boolean) {
+    console.log(`[benchmark] ${sourceFiles.length} files ${isDev ? '(development mode)' : ''}`)
 
     const d1 = { d: 0, min: 0, max: 0, }
     for (const { code, filename } of sourceFiles) {
@@ -90,7 +90,7 @@ if (import.meta.main) {
             sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
         }
 
-        banchmark(sourceFiles, false)
-        banchmark(sourceFiles, true)
+        benchmark(sourceFiles, false)
+        benchmark(sourceFiles, true)
     })()
 }
