@@ -1,80 +1,16 @@
-import {
-    initWasm,
-    SWCOptions,
-    TransformOptions,
-    transpileSync
-} from '../compiler/mod.ts'
-import type {
-    AcceptedPlugin,
-    ServerRequest
-} from '../deps.ts'
-import {
-    CleanCSS,
-    colors,
-    ensureDir,
-    less,
-    marked,
-    minify,
-    path,
-    postcss,
-    safeLoadFront,
-    Sha1,
-    Sha256,
-    walk
-} from '../deps.ts'
+import { initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
+import type { AcceptedPlugin, ServerRequest } from '../deps.ts'
+import { CleanCSS, colors, ensureDir, less, marked, minify, path, postcss, safeLoadFront, Sha1, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
-import {
-    getPagePath,
-    RouteModule,
-    Routing
-} from '../framework/core/routing.ts'
-import {
-    hashShort,
-    reFullVersion,
-    reHashJs,
-    reHashResolve,
-    reHttp,
-    reLocaleID,
-    reMDExt,
-    reModuleExt,
-    reStyleModuleExt
-} from '../shared/constants.ts'
+import { getPagePath, RouteModule, Routing } from '../framework/core/routing.ts'
+import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
 import util from '../shared/util.ts'
-import type {
-    APIHandler,
-    Config,
-    RouterURL
-} from '../types.ts'
+import type { APIHandler, Config, RouterURL } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
 import log from './log.ts'
-import type {
-    DependencyDescriptor,
-    ImportMap,
-    Module
-} from './types.ts'
-import {
-    cleanupCompilation,
-    colorfulBytesString,
-    createHtml,
-    ensureTextFile,
-    existsDirSync,
-    existsFileSync,
-    fixImportMap,
-    fixImportUrl,
-    getAlephPkgUrl,
-    getRelativePath,
-    newModule
-} from './util.ts'
-
-interface RenderResult {
-    url: RouterURL
-    status: number
-    head: string[]
-    scripts: Record<string, any>[]
-    body: string
-    data: Record<string, string> | null
-}
+import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
+import { cleanupCompilation, colorfulBytesString, createHtml, ensureTextFile, existsDirSync, existsFileSync, fixImportMap, fixImportUrl, getAlephPkgUrl, getRelativePath, newModule } from './util.ts'
 
 /**
  * A Project to manage the Aleph.js appliaction.
@@ -836,7 +772,7 @@ export class Project {
                 const output = await less.render(sourceCode || '/* empty content */')
                 css = output.css
             } catch (error) {
-                throw new Error(`less: ${error}`);
+                throw new Error(`less: ${error}`)
             }
         }
 

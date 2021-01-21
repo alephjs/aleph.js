@@ -1,3 +1,5 @@
+import type { RouterURL } from '../types.ts'
+
 export interface Module {
     url: string
     loader: string
@@ -18,3 +20,12 @@ export interface DependencyDescriptor {
 }
 
 export type ImportMap = Record<string, ReadonlyArray<string>>
+
+export interface RenderResult {
+    url: RouterURL
+    status: number
+    head: string[]
+    scripts: Record<string, any>[]
+    body: string
+    data: Record<string, string> | null
+}
