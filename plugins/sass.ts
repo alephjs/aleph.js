@@ -1,4 +1,4 @@
-import { Options, renderSync } from 'https://esm.sh/sass@1.29.0'
+import { Options, renderSync } from 'https://esm.sh/sass@1.32.5'
 
 const pluginFactory = (opts: Options = {}) => ({
     name: 'sass-loader',
