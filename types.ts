@@ -1,9 +1,9 @@
-import type { AcceptedPlugin, bufio, Response } from './deps.ts';
+import type { AcceptedPlugin, bufio, Response } from './deps.ts'
 
 /**
  * A plugin for **Aleph.js** application.
  */
-export interface Plugin {
+export type Plugin = {
     /** `name` gives the plugin a name. */
     name?: string
     /** `test` matches the import url. */
@@ -17,7 +17,7 @@ export interface Plugin {
 /**
  * The options for **SSR**.
  */
-export interface SSROptions {
+export type SSROptions = {
     /** The fallback html **dynamic routes** (default is '**_fallback_spa.html**'). */
     fallback?: string
     /** A list of RegExp for paths to use **SSR**. */
@@ -29,9 +29,9 @@ export interface SSROptions {
 }
 
 /**
- * Config for Aleph.js application.
+ * The Config for Aleph.js application.
  */
-export interface Config {
+export type Config = {
     /** `framework` to run your application (default is 'react'). */
     framework?: 'alef' | 'react'
     /** `srcDir` to put your application source code (default is '/'). */
@@ -54,7 +54,7 @@ export interface Config {
     postcss?: { plugins: (string | AcceptedPlugin | [string | ((options: Record<string, any>) => AcceptedPlugin), Record<string, any>])[] }
     /** `buildTarget` specifies the build target for **swc** in production mode (default is **es5**). */
     buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
-    /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable) */
+    /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable). */
     env?: Record<string, string>
 }
 
@@ -63,7 +63,7 @@ export interface Config {
  *
  * @param req APIRequest object
  */
-export interface APIHandler {
+export type APIHandler = {
     (req: APIRequest): void
 }
 
@@ -107,22 +107,22 @@ export interface APIRequest extends ServerRequest {
      * the header if it does not already exist.
      */
     setHeader(key: string, value: string): this
-    /** `removeHeader` removes the value for an existing response header of the request.  */
+    /** `removeHeader` removes the value for an existing response header of the request. */
     removeHeader(key: string): this
-    /** `send` replies to the request with any content with type */
+    /** `send` replies to the request with any content with type. */
     send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
-    /** `json` replies to the request with a json content */
+    /** `json` replies to the request with a json content. */
     json(data: any): Promise<void>
-    /** `decodeBody` will return a string, a form-data or any json object  */
-    decodeBody(type: "text"): Promise<string>
-    decodeBody(type: "json"): Promise<any>
-    decodeBody(type: "form-data"): Promise<FormDataBody>
+    /** `decodeBody` will return a string, form-data, or json object. */
+    decodeBody(type: 'form-data'): Promise<FormDataBody>
+    decodeBody(type: 'text'): Promise<string>
+    decodeBody(type: 'json'): Promise<any>
 }
 
 /**
  * The Router object of the routing, you can access it with `useRouter()` hook.
  */
-export interface RouterURL {
+export type RouterURL = {
     readonly locale: string
     readonly pathname: string
     readonly pagePath: string
@@ -131,19 +131,19 @@ export interface RouterURL {
 }
 
 /**
- * The form data body
+ * The form data body.
  */
-export interface FormDataBody {
-    fields: Record<string, string>;
-    files: FormFile[];
-    get(key: string): string | undefined;
-    getFile(key: string): FormFile | undefined;
+export type FormDataBody = {
+    fields: Record<string, string>
+    files: FormFile[]
+    get(key: string): string | undefined
+    getFile(key: string): FormFile | undefined
 }
 
 /**
- * The form file data
+ * The form file.
  */
-export interface FormFile {
+export type FormFile = {
     name: string
     content: Uint8Array
     contentType: string
