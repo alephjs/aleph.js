@@ -67,7 +67,7 @@ pub struct Resolver {
   pub inline_styles: HashMap<String, InlineStyle>,
   /// bundle mode
   pub bundle_mode: bool,
-  bundled_paths: IndexSet<String>,
+  bundled_modules: IndexSet<String>,
   import_map: ImportMap,
   react_version: Option<String>,
 }
@@ -78,10 +78,10 @@ impl Resolver {
     import_map: ImportHashMap,
     react_version: Option<String>,
     bundle_mode: bool,
-    bundled_paths: Vec<String>,
+    bundled_modules: Vec<String>,
   ) -> Self {
     let mut set = IndexSet::<String>::new();
-    for url in bundled_paths {
+    for url in bundled_modules {
       set.insert(url);
     }
     Resolver {
@@ -93,7 +93,7 @@ impl Resolver {
       import_map: ImportMap::from_hashmap(import_map),
       react_version,
       bundle_mode,
-      bundled_paths: set,
+      bundled_modules: set,
     }
   }
 
@@ -421,7 +421,7 @@ impl Fold for AlephResolveFold {
                   resolver.resolve(import_decl.src.value.as_ref(), false);
                 if resolver.bundle_mode
                   && (is_remote_url(fixed_url.as_str())
-                    || resolver.bundled_paths.contains(fixed_url.as_str()))
+                    || resolver.bundled_modules.contains(fixed_url.as_str()))
                 {
                   let mut var_decls: Vec<VarDeclarator> = vec![];
                   import_decl
@@ -496,7 +496,7 @@ impl Fold for AlephResolveFold {
                 let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
                 if resolver.bundle_mode
                   && (is_remote_url(fixed_url.as_str())
-                    || resolver.bundled_paths.contains(fixed_url.as_str()))
+                    || resolver.bundled_modules.contains(fixed_url.as_str()))
                 {
                   // __ALEPH.exportFrom("/pages/index.tsx", "https://esm.sh/react", {"default": "React", "useState": "useState'})
                   let call = CallExpr {
@@ -585,7 +585,7 @@ impl Fold for AlephResolveFold {
               let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
               if resolver.bundle_mode
                 && (is_remote_url(fixed_url.as_str())
-                  || resolver.bundled_paths.contains(fixed_url.as_str()))
+                  || resolver.bundled_modules.contains(fixed_url.as_str()))
               {
                 // __ALEPH.exportFrom("/pages/index.tsx", "https://esm.sh/react", "*")
                 let call = CallExpr {

@@ -20,7 +20,7 @@ export interface TransformOptions {
     swcOptions?: SWCOptions
     isDev?: boolean,
     bundleMode?: boolean,
-    bundledPaths?: string[],
+    bundledModules?: string[],
 }
 
 interface DependencyDescriptor {
