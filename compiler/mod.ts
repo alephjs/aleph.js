@@ -25,6 +25,7 @@ export interface TransformOptions {
 
 interface DependencyDescriptor {
     specifier: string,
+    rel?: string
     isDynamic: boolean,
 }
 

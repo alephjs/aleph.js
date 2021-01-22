@@ -25,9 +25,7 @@ pub fn aleph_jsx_fold(
             inline_style_idx: 0,
             is_dev,
         },
-        AlephJsxBuiltinModuleResolveFold {
-            resolver: resolver.clone(),
-        },
+        AlephJsxBuiltinModuleResolveFold { resolver: resolver },
     )
 }
 
@@ -106,6 +104,7 @@ impl AlephJsxFold {
 
                     "link" | "Link" => {
                         let mut should_replace = false;
+                        let mut rel: Option<String> = None;
 
                         for attr in &el.attrs {
                             match &attr {
@@ -116,12 +115,14 @@ impl AlephJsxFold {
                                 }) => {
                                     let key = id.sym.as_ref();
                                     let value = value.as_ref();
-                                    if key == "rel"
-                                        && (value == "stylesheet"
-                                            || value == "style"
-                                            || value == "component")
-                                    {
-                                        should_replace = true
+                                    if key == "rel" {
+                                        rel = Some(value.into());
+                                        if value == "style"
+                                            || value == "stylesheet"
+                                            || value == "component"
+                                        {
+                                            should_replace = true
+                                        }
                                     }
                                 }
                                 _ => {}
@@ -159,7 +160,7 @@ impl AlephJsxFold {
 
                             let mut resolver = self.resolver.borrow_mut();
                             let (resolved_path, fixed_url) =
-                                resolver.resolve(href_prop_value, true);
+                                resolver.resolve(href_prop_value, true, rel);
 
                             if href_prop_index >= 0 {
                                 el.attrs[href_prop_index as usize] =
@@ -265,6 +266,7 @@ impl AlephJsxFold {
                         resolver.dep_graph.push(DependencyDescriptor {
                             specifier: "#".to_owned() + id.as_str(),
                             is_dynamic: false,
+                            rel: None,
                         });
                         resolver.builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
@@ -430,6 +432,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                 )
                 .as_str(),
                 false,
+                None,
             );
             if resolver.bundle_mode {
                 items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {

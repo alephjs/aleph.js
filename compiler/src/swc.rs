@@ -1,9 +1,9 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
 // Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
-use crate::compat_fixer::compat_fixer_fold;
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::fast_refresh::fast_refresh_fold;
+use crate::fixer::{compat_fixer_fold, jsx_link_fixer_fold};
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve::{aleph_resolve_fold, Resolver};
 use crate::source_type::SourceType;
@@ -126,7 +126,8 @@ impl ParsedModule {
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
-      let specifier_is_remote = resolver.borrow_mut().specifier_is_remote;
+      let specifier_is_remote = resolver.borrow().specifier_is_remote;
+      let bundle_mode = resolver.borrow().bundle_mode;
       let is_ts = match self.source_type {
         SourceType::TypeScript => true,
         SourceType::TSX => true,
@@ -147,6 +148,7 @@ impl ParsedModule {
         aleph_resolve_fold(resolver.clone()),
         Optional::new(aleph_jsx_fold, is_jsx),
         Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
+        Optional::new(jsx_link_fixer_fold(resolver.clone()), is_jsx && bundle_mode),
         Optional::new(
           fast_refresh_fold(
             "$RefreshReg$",
@@ -400,12 +402,13 @@ mod tests {
       export default function Index() {
         return (
           <>
+            <head>
+              <title>Hello World!</title>
+              <link rel="stylesheet" href="../style/index.css" />
+            </head>
             <a href="/about">About</a>
             <a href="https://github.com">About</a>
             <a href="/about" target="_blank">About</a>
-            <head>
-              <link rel="stylesheet" href="../style/index.css" />
-            </head>
             <script src="ga.js"></script>
             <script>{`
               function gtag() {
@@ -469,17 +472,12 @@ mod tests {
         DependencyDescriptor {
           specifier: "https://esm.sh/react".into(),
           is_dynamic: false,
+          rel: None,
         },
         DependencyDescriptor {
           specifier: "/style/index.css".into(),
           is_dynamic: true,
-        },
-        DependencyDescriptor {
-          specifier: format!(
-            "https://deno.land/x/aleph@v{}/framework/react/anchor.ts",
-            VERSION.as_str()
-          ),
-          is_dynamic: false,
+          rel: Some("stylesheet".into()),
         },
         DependencyDescriptor {
           specifier: format!(
@@ -487,6 +485,7 @@ mod tests {
             VERSION.as_str()
           ),
           is_dynamic: false,
+          rel: None,
         },
         DependencyDescriptor {
           specifier: format!(
@@ -494,6 +493,15 @@ mod tests {
             VERSION.as_str()
           ),
           is_dynamic: false,
+          rel: None,
+        },
+        DependencyDescriptor {
+          specifier: format!(
+            "https://deno.land/x/aleph@v{}/framework/react/anchor.ts",
+            VERSION.as_str()
+          ),
+          is_dynamic: false,
+          rel: None,
         },
         DependencyDescriptor {
           specifier: format!(
@@ -501,6 +509,7 @@ mod tests {
             VERSION.as_str()
           ),
           is_dynamic: false,
+          rel: None,
         }
       ]
     );
@@ -553,6 +562,7 @@ mod tests {
       export default function Index() {
         return (
           <>
+            <link rel="stylesheet" href="../style/index.css" />
             <head></head>
             <Logo />
             <Nav />
@@ -581,6 +591,7 @@ mod tests {
     assert!(code.contains("Logo = __ALEPH.pack[\"/components/logo.ts\"].default"));
     assert!(!code.contains("Nav = __ALEPH.pack[\"/components/nav.ts\"].default"));
     assert!(code.contains("import Nav from \""));
+    assert!(code.contains("import   \"../style/index.css.xxxxxxxxx.js\""));
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
     assert!(code.contains(
       format!(

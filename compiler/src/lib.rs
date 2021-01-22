@@ -4,9 +4,9 @@
 extern crate lazy_static;
 
 mod aleph;
-mod compat_fixer;
 mod error;
 mod fast_refresh;
+mod fixer;
 mod import_map;
 mod jsx;
 mod resolve;
