@@ -1,8 +1,7 @@
-import { ensureDir } from "https://deno.land/std@0.83.0/fs/ensure_dir.ts";
-import { existsSync, path } from '../deps.ts';
-import { VERSION } from "../version.ts";
-import { checksum } from './wasm-checksum.js';
-import { default as init_wasm, transformSync } from './wasm-pack.js';
+import { ensureDir, existsSync, path } from '../deps.ts'
+import { VERSION } from '../version.ts'
+import { checksum } from './wasm-checksum.js'
+import { default as init_wasm, transformSync } from './wasm-pack.js'
 
 type ImportMap = Record<string, ReadonlyArray<string>>
 
@@ -40,8 +39,7 @@ export interface TransformRet {
  * transpile code synchronously by swc.
  *
  * ```javascript
- * transpileSync(
- * `
+ * transpileSync(`
  *   export default App() {
  *     return <h1>Hello World</h1>
  *   }
@@ -59,7 +57,7 @@ export function transpileSync(code: string, opts?: TransformOptions): TransformR
 }
 
 /**
- * load and initiate compiler wasm.
+ * initiate the compiler wasm.
  */
 export const initWasm = async (denoCacheDir: string) => {
     const cacheDir = path.join(denoCacheDir, `deps/https/deno.land/aleph@v${VERSION}`)
