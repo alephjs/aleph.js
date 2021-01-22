@@ -47,7 +47,6 @@ export default function Link({
           if (url && url in A.pack) {
             const v = A.pack[url].default
             if (util.isFunction(v)) {
-              console.log(v)
               v()
             }
           }
