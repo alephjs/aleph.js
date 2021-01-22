@@ -17,7 +17,7 @@ export async function start(appDir: string, hostname: string, port: number, isDe
             log.info(`Server ready on http://${hostname}:${port}`)
             for await (const req of s) {
                 const url = new URL('http://localhost/' + req.url)
-                const pathname = util.cleanPath(url.pathname)
+                const pathname = util.cleanPath(decodeURI(url.pathname))
                 const resp = new Request(req, pathname, {}, url.searchParams)
 
                 try {
@@ -64,7 +64,7 @@ export async function start(appDir: string, hostname: string, port: number, isDe
                     }
 
                     // serve public files
-                    const filePath = path.join(project.appRoot, 'public', decodeURI(pathname))
+                    const filePath = path.join(project.appRoot, 'public', pathname)
                     if (existsFileSync(filePath)) {
                         const info = Deno.lstatSync(filePath)
                         const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
