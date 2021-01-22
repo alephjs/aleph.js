@@ -87,3 +87,9 @@ export function applyCSS(id: string, css: string, asLink: boolean = false) {
         }
     }
 }
+
+export function ssrCSS(id: string, css: string, asLink: boolean = false) {
+    if (window.Deno) {
+        serverStyles.set(id, { css, asLink })
+    }
+}

@@ -978,8 +978,8 @@ export class Project {
                     ...options,
                     loader: 'js',
                     sourceCode: (`
-                        import { applyCSS } from "${alephPkgUrl}/framework/${this.config.framework}/style.ts";\
-                        applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css.trim()}\n` : css)});
+                        import { ssrCSS } from "${alephPkgUrl}/framework/${this.config.framework}/style.ts";\
+                        ssrCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css.trim()}\n` : css)});
                     `).replaceAll(' '.repeat(24), '').trim(),
                     sourceHash: ''
                 })
