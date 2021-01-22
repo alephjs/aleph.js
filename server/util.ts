@@ -68,8 +68,6 @@ export function newModule(url: string): Module {
         }
     } else if (isRemote) {
         loader = 'js'
-    } else {
-        loader = path.extname(url).slice(1)
     }
     return {
         url,

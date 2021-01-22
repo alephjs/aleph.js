@@ -146,10 +146,11 @@ export async function renderPage(
     rendererCache.headElements.clear()
     rendererCache.scriptsElements.clear()
 
-    await Promise.all(styles?.filter(({ url }) => !url.startsWith("#inline-style-")).map(({ url, hash }) => {
+    const rets = await Promise.all(styles?.filter(({ url }) => !url.startsWith("#inline-style-")).map(({ url, hash }) => {
         const path = reHttp.test(url) ? url.replace(reHttp, '/-/') : `${url}.${hash.slice(0, hashShort)}`
         return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}/${path}.js`))
     }) || [])
+    rets.forEach(({ default: def }) => util.isFunction(def) && def())
     styles?.forEach(({ url }) => {
         if (serverStyles.has(url)) {
             const { css, asLink } = serverStyles.get(url)!

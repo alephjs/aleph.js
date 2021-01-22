@@ -124,7 +124,7 @@ export async function start(appDir: string, hostname: string, port: number, isDe
                                     } else {
                                         body = await Deno.readTextFile(mod.jsFile)
                                         if (project.isHMRable(mod.url)) {
-                                            body = project.injectHmr(mod.url, body)
+                                            body = project.injectHmr(mod, body)
                                         }
                                     }
                                     resp.setHeader('ETag', mod.hash)

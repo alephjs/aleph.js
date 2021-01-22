@@ -282,7 +282,7 @@ export class Project {
     }
 
     /** inject HMR helper code  */
-    injectHmr(url: string, content: string): string {
+    injectHmr({ url, loader }: Module, content: string): string {
         const { __ALEPH_DEV_PORT: devPort } = globalThis as any
         const alephModuleLocalUrlPreifx = devPort ? `http_localhost_${devPort}` : `deno.land/x/aleph@v${VERSION}`
         const localUrl = fixImportUrl(url)
@@ -321,6 +321,9 @@ export class Project {
                 'import.meta.hot.accept(performReactRefresh);'
             )
         } else {
+            if (loader === 'css') {
+                lines.push('__applyCSS();')
+            }
             lines.push('import.meta.hot.accept();')
         }
         return lines.join('\n')
@@ -829,7 +832,7 @@ export class Project {
         url: string,
         options?: {
             sourceCode?: string,
-            sourceHash?: string,
+            rawSourceHash?: string,
             loader?: string,
             forceCompile?: boolean,
             bundleMode?: boolean,
@@ -874,7 +877,7 @@ export class Project {
 
         if (options?.sourceCode) {
             sourceContent = (new TextEncoder).encode(options.sourceCode)
-            const sourceHash = options?.sourceHash || (new Sha1).update(sourceContent).hex()
+            const sourceHash = options?.rawSourceHash || (new Sha1).update(sourceContent).hex()
             if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                 mod.sourceHash = sourceHash
                 shouldCompile = true
@@ -953,34 +956,41 @@ export class Project {
             } else {
                 for (const plugin of this.config.plugins) {
                     if (plugin.test.test(url) && util.isFunction(plugin.transform)) {
-                        const { code, loader: pluginLodaer = 'js' } = await plugin.transform(sourceContent, url)
+                        const { code, loader: nextLoader = 'js' } = await plugin.transform(sourceContent, url)
                         sourceCode = code
-                        loader = pluginLodaer
-                        mod.loader = pluginLodaer
+                        loader = nextLoader
+                        mod.loader = nextLoader
                         break
                     }
                 }
             }
 
             if (loader === 'css') {
+                this.#modules.delete(url)
                 const css = await this._preprocessCSS(sourceCode)
-                return await this._compile(url, {
+                const cssMod = await this._compile(url, {
                     ...options,
                     loader: 'js',
-                    sourceCode: (`
-                        import { applyCSS } from "${alephPkgUrl}/framework/${this.config.framework}/style.ts";\
-                        applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css.trim()}\n` : css)});
-                    `).replaceAll(' '.repeat(24), '').trim(),
-                    sourceHash: ''
+                    sourceCode: [
+                        `import { applyCSS } from "${alephPkgUrl}/framework/${this.config.framework}/style.ts";`,
+                        `export default function __applyCSS() {`,
+                        `  applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css.trim()}\n` : css)});`,
+                        `}`,
+                        options?.bundleMode && `__ALEPH.pack[${JSON.stringify(url)}] = { default: __applyCSS };`
+                    ].filter(Boolean).join('\n'),
+                    rawSourceHash: (new Sha1).update(sourceCode).hex()
                 })
+                cssMod.loader = 'css'
+                return cssMod
             } else if (loader === 'markdown') {
+                this.#modules.delete(url)
                 const { __content, ...props } = safeLoadFront(sourceCode)
                 const html = marked.parse(__content)
-                return await this._compile(url, {
+                const mdMod = await this._compile(url, {
                     ...options,
                     loader: 'js',
                     sourceCode: (`
-                        import React, { useEffect, useRef } from "https://esm.sh/react@${JSON.stringify(this.config.reactVersion)}";
+                        import React, { useEffect, useRef } from "https://esm.sh/react@${this.config.reactVersion}";
                         import { redirect } from "${alephPkgUrl}/framework/${this.config.framework}/anchor.ts";
                         export default function MarkdownPage() {
                             const ref = useRef(null);
@@ -1009,8 +1019,10 @@ export class Project {
                         }
                         MarkdownPage.meta = ${JSON.stringify(props, undefined, 4)};
                     `).replaceAll(' '.repeat(24), '').trim(),
-                    sourceHash: ''
+                    rawSourceHash: (new Sha1).update(sourceCode).hex()
                 })
+                mdMod.loader = 'js'
+                return mdMod
             } else if (loader === 'js' || loader === 'ts' || loader === 'jsx' || loader === 'tsx') {
                 const t = performance.now()
                 const swcOptions: SWCOptions = {
@@ -1075,8 +1087,7 @@ export class Project {
                     if (dep.url.startsWith('#useDeno-')) {
                         dep.isData = true
                         dep.hash = util.trimPrefix(dep.url, '#useDeno-')
-                    }
-                    if (dep.url.startsWith('#inline-style-')) {
+                    } else if (dep.url.startsWith('#inline-style-')) {
                         dep.isStyle = true
                         dep.hash = util.trimPrefix(dep.url, '#inline-style-')
                     }
@@ -1087,7 +1098,7 @@ export class Project {
 
                 log.debug(`compile '${url}' in ${Math.round(performance.now() - t)}ms ${!!options?.bundleMode ? '(bundle mode)' : ''}`)
             } else {
-                throw new Error(`Unknown loader '${loader}'`)
+                throw new Error(`Unknown loader '${path.extname(url).slice(1)}'`)
             }
         }
 
