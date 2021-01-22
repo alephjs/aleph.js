@@ -1,6 +1,6 @@
 import { initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
 import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
-import { CleanCSS, colors, ensureDir, less, marked, minify, path, postcss, safeLoadFront, Sha1, Sha256, walk } from '../deps.ts'
+import { CleanCSS, colors, ensureDir, marked, minify, path, postcss, safeLoadFront, Sha1, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { getPagePath, RouteModule, Routing } from '../framework/core/routing.ts'
 import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
@@ -766,18 +766,7 @@ export class Project {
     }
 
     /** preprocess css with postcss plugins */
-    private async _preprocessCSS(sourceCode: string, isLess: boolean) {
-        let css: string = sourceCode
-        if (isLess) {
-            try {
-                const output = await less.render(sourceCode || '/* empty content */')
-                css = output.css
-            } catch (error) {
-                throw new Error(`less: ${error}`)
-            }
-        }
-
-
+    private async _preprocessCSS(sourceCode: string) {
         if (this.#postcssReady === null) {
             this.#postcssReady = Promise.all(this.config.postcss.plugins.map(async p => {
                 let name: string | null = null
@@ -793,7 +782,7 @@ export class Project {
             }))
         }
         await this.#postcssReady
-        css = (await postcss(this.config.postcss.plugins.map(p => {
+        const pcss = (await postcss(this.config.postcss.plugins.map(p => {
             if (typeof p === 'string') {
                 return this.#postcssPlugins[p]
             } else if (Array.isArray(p)) {
@@ -812,12 +801,12 @@ export class Project {
             } else {
                 return p
             }
-        })).process(css).async()).content
+        })).process(sourceCode).async()).content
         if (!this.isDev) {
-            const output = this.#cleanCSS.minify(css)
-            css = output.styles
+            return this.#cleanCSS.minify(pcss).styles
+        } else {
+            return pcss
         }
-        return css
     }
 
     /** transpile code without types checking. */
@@ -974,7 +963,7 @@ export class Project {
             }
 
             if (loader === 'css') {
-                const css = await this._preprocessCSS(sourceCode, url.endsWith('.less'))
+                const css = await this._preprocessCSS(sourceCode)
                 return await this._compile(url, {
                     ...options,
                     loader: 'js',
@@ -1053,7 +1042,7 @@ export class Project {
                     }, '')
                         .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
                         .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
-                    if (type !== 'css' && type !== 'less') {
+                    if (type !== 'css') {
                         for (const plugin of this.config.plugins) {
                             if (plugin.test.test(`${key}.${type}`) && util.isFunction(plugin.transform)) {
                                 const { code, loader } = await plugin.transform((new TextEncoder).encode(tpl), url)
@@ -1065,8 +1054,8 @@ export class Project {
                             }
                         }
                     }
-                    if (type === 'css' || type === 'less') {
-                        tpl = await this._preprocessCSS(tpl, type === 'less')
+                    if (type === 'css') {
+                        tpl = await this._preprocessCSS(tpl)
                         tpl = tpl.replace(
                             /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
                             (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'

@@ -24,6 +24,4 @@ export type { AcceptedPlugin } from 'https://esm.sh/postcss@8.2.4'
 export { minify } from 'https://esm.sh/terser@5.5.1'
 export type { ECMA } from 'https://esm.sh/terser@5.5.1'
 export { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.1'
-// verdor/
-export { default as less } from './vendor/less/less.js'
 
