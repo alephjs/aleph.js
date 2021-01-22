@@ -1,6 +1,6 @@
 import { colors, ensureDir, gzipDecode, path, Untar } from '../deps.ts'
-import log from '../server/log.ts'
-import { ensureTextFile } from '../server/util.ts'
+import { ensureTextFile } from '../shared/fs.ts'
+import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 

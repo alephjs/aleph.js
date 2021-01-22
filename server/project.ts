@@ -4,13 +4,14 @@ import { CleanCSS, colors, ensureDir, less, marked, minify, path, postcss, safeL
 import { EventEmitter } from '../framework/core/events.ts'
 import { getPagePath, RouteModule, Routing } from '../framework/core/routing.ts'
 import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import { cleanupCompilation, ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
+import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { APIHandler, Config, RouterURL } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
-import log from './log.ts'
 import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
-import { AlephRuntimeCode, cleanupCompilation, colorfulBytesString, createHtml, ensureTextFile, existsDirSync, existsFileSync, fixImportMap, fixImportUrl, getAlephPkgUrl, getRelativePath, newModule } from './util.ts'
+import { AlephRuntimeCode, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, newModule } from './util.ts'
 
 /**
  * A Project to manage the Aleph.js appliaction.
@@ -272,7 +273,7 @@ export class Project {
                 if (n === 0) {
                     log.info(colors.bold('- Public Assets'))
                 }
-                log.info('  ∆', rp.split('\\').join('/'), colors.dim('•'), colorfulBytesString(fi.size))
+                log.info('  ∆', rp.split('\\').join('/'), colors.dim('•'), formatBytesWithColor(fi.size))
                 n++
             }
         }
@@ -1301,26 +1302,26 @@ export class Project {
             }
         }))
 
-        const remoteDepList: string[] = []
-        const localDepList: string[] = []
+        const remoteDeps: string[] = []
+        const localSharedDeps: string[] = []
         Array.from(refCounter.entries()).forEach(([url, count]) => {
             if (reHttp.test(url)) {
-                remoteDepList.push(url)
+                remoteDeps.push(url)
             } else if (!url.startsWith('#') && !url.startsWith('/pages/') && count > 1) {
-                localDepList.push(url)
+                localSharedDeps.push(url)
             }
         })
         if (appModule) {
-            localDepList.push(appModule.url)
+            localSharedDeps.push(appModule.url)
         }
         if (e404Module) {
-            localDepList.push(e404Module.url)
+            localSharedDeps.push(e404Module.url)
         }
 
         log.info('- Bundle')
-        await this._createChunkBundle('deps', remoteDepList)
-        if (localDepList.length > 0) {
-            await this._createChunkBundle('shared', localDepList)
+        await this._createChunkBundle('deps', remoteDeps)
+        if (localSharedDeps.length > 0) {
+            await this._createChunkBundle('shared', localSharedDeps)
         }
 
         // copy main module
@@ -1341,7 +1342,7 @@ export class Project {
         this.#modules.set(polyfillMode.url, polyfillMode)
 
         // bundle and copy page moudles
-        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localDepList, AlephRuntimeCode)))
+        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localSharedDeps, AlephRuntimeCode)))
     }
 
     /** create chunk bundle. */
@@ -1371,7 +1372,7 @@ export class Project {
         await Deno.writeTextFile(bundlingFile, bundlingCode)
         const n = await this._runDenoBundle(bundlingFile, bundleFile, header)
         if (n > 0) {
-            log.info(`  {} ${name}.js ${colors.dim('• ' + util.bytesString(n))}`)
+            log.info(`  {} ${name}.js ${colors.dim('• ' + util.formatBytes(n))}`)
         }
 
         this.#modules.set(mod.url, mod)
@@ -1480,7 +1481,7 @@ export class Project {
                             const dataFile = path.join(outputDir, '_aleph/data', (pathname === '/' ? 'index' : pathname) + '.json')
                             await ensureTextFile(dataFile, JSON.stringify(data))
                         }
-                        log.info('  ○', pathname, colors.dim('• ' + util.bytesString(html.length)))
+                        log.info('  ○', pathname, colors.dim('• ' + util.formatBytes(html.length)))
                     } else if (status == 404) {
                         log.info('  ○', colors.dim(pathname), colors.red('Page not found'))
                     } else if (status == 500) {

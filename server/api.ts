@@ -1,6 +1,6 @@
 import { brotli, bufio, gzipEncode, Response, ServerRequest } from '../deps.ts'
+import log from '../shared/log.ts'
 import type { APIRequest, FormDataBody } from '../types.ts'
-import log from './log.ts'
 import { multiParser } from './multiparser.ts'
 
 export class Request implements APIRequest {
@@ -135,22 +135,22 @@ export class Request implements APIRequest {
     async decodeBody(type: "form-data"): Promise<FormDataBody>
     async decodeBody(type: string): Promise<any> {
         if (type === "text") {
-            const buff: Uint8Array = await Deno.readAll(this.body);
-            const encoded = new TextDecoder("utf-8").decode(buff);
-            return encoded;
+            const buff: Uint8Array = await Deno.readAll(this.body)
+            const encoded = new TextDecoder("utf-8").decode(buff)
+            return encoded
         }
 
         if (type === "json") {
-            const buff: Uint8Array = await Deno.readAll(this.body);
-            const encoded = new TextDecoder("utf-8").decode(buff);
-            const json = JSON.parse(encoded);
-            return json;
+            const buff: Uint8Array = await Deno.readAll(this.body)
+            const encoded = new TextDecoder("utf-8").decode(buff)
+            const json = JSON.parse(encoded)
+            return json
         }
 
         if (type === "form-data") {
             const contentType = this.headers.get("content-type") as string
-            const form = await multiParser(this.body, contentType);
-            return form;
+            const form = await multiParser(this.body, contentType)
+            return form
         }
     }
 

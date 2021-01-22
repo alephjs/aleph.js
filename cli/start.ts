@@ -1,4 +1,4 @@
-import log from '../server/log.ts'
+import log from '../shared/log.ts'
 
 export const helpMessage = `
 Usage:

@@ -1,11 +1,12 @@
 import { path, serve, ws } from '../deps.ts'
 import { hashShort, reHashJs, reModuleExt } from '../shared/constants.ts'
+import { existsFileSync } from '../shared/fs.ts'
+import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { Request } from './api.ts'
-import log from './log.ts'
 import { getContentType } from './mime.ts'
 import { Project } from './project.ts'
-import { createHtml, existsFileSync } from './util.ts'
+import { createHtml } from './util.ts'
 
 export async function start(appDir: string, hostname: string, port: number, isDev = false, reload = false) {
     const project = new Project(appDir, isDev ? 'development' : 'production', reload)

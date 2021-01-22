@@ -1,8 +1,9 @@
 import { listenAndServe, path, ServerRequest, walk } from './deps.ts'
 import { Request } from './server/api.ts'
-import log from './server/log.ts'
 import { getContentType } from './server/mime.ts'
-import { createHtml, existsDirSync, existsFileSync } from './server/util.ts'
+import { createHtml } from './server/util.ts'
+import { existsDirSync, existsFileSync } from './shared/fs.ts'
+import log from './shared/log.ts'
 import util from './shared/util.ts'
 import { VERSION } from './version.ts'
 

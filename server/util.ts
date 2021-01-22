@@ -1,39 +1,39 @@
-import { colors, ensureDir, path } from '../deps.ts'
-import { MB, reHashJs, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import { colors, path } from '../deps.ts'
+import { MB, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 import { ImportMap, Module } from './types.ts'
 
 export const AlephRuntimeCode = `
 var __ALEPH = window.__ALEPH || (window.__ALEPH = {
-    pack: {},
-    exportFrom: function(specifier, url, exports) {
-        if (url in this.pack) {
-            var mod = this.pack[url]
-            if (!(specifier in this.pack)) {
-                this.pack[specifier] = {}
-            }
-            if (exports === '*') {
-                for (var k in mod) {
-                    this.pack[specifier][k] = mod[k]
-                }
-            } else if (typeof exports === 'object' && exports !== null) {
-                for (var k in exports) {
-                    this.pack[specifier][exports[k]] = mod[k]
-                }
-            }
+  pack: {},
+  exportFrom: function(specifier, url, exports) {
+    if (url in this.pack) {
+      var mod = this.pack[url]
+      if (!(specifier in this.pack)) {
+        this.pack[specifier] = {}
+      }
+      if (exports === '*') {
+        for (var k in mod) {
+          this.pack[specifier][k] = mod[k]
         }
-    },
-    require: function(name) {
-        switch (name) {
-            case 'regenerator-runtime':
-                return regeneratorRuntime
-            default:
-                throw new Error("module name is undefined")
+      } else if (typeof exports === 'object' && exports !== null) {
+        for (var k in exports) {
+          this.pack[specifier][exports[k]] = mod[k]
         }
-    },
+      }
+    }
+  },
+  require: function(name) {
+    switch (name) {
+      case 'regenerator-runtime':
+        return regeneratorRuntime
+      default:
+        throw new Error("module name is undefined")
+    }
+  },
 });
-`.replaceAll(' '.repeat(12), '')
+`
 
 export function getAlephPkgUrl() {
     let url = `https://deno.land/x/aleph@v${VERSION}`
@@ -44,77 +44,14 @@ export function getAlephPkgUrl() {
     return url
 }
 
-/* check whether or not the given path exists as a directory */
-export async function existsDir(path: string) {
-    try {
-        const fi = await Deno.lstat(path)
-        if (fi.isDirectory) {
-            return true
-        }
-        return false
-    } catch (err) {
-        if (err instanceof Deno.errors.NotFound) {
-            return false
-        }
-        throw err
+/** get relative the path of `to` to `from` */
+export function getRelativePath(from: string, to: string): string {
+    let r = path.relative(from, to).split('\\').join('/')
+    if (!r.startsWith('.') && !r.startsWith('/')) {
+        r = './' + r
     }
+    return r
 }
-
-/* check whether or not the given path exists as a directory */
-export function existsDirSync(path: string) {
-    try {
-        const fi = Deno.lstatSync(path)
-        if (fi.isDirectory) {
-            return true
-        }
-        return false
-    } catch (err) {
-        if (err instanceof Deno.errors.NotFound) {
-            return false
-        }
-        throw err
-    }
-}
-
-/* check whether or not the given path exists as regular file */
-export async function existsFile(path: string) {
-    try {
-        const fi = await Deno.lstat(path)
-        if (fi.isFile) {
-            return true
-        }
-        return false
-    } catch (err) {
-        if (err instanceof Deno.errors.NotFound) {
-            return false
-        }
-        throw err
-    }
-}
-
-/* check whether or not the given path exists as regular file */
-export function existsFileSync(path: string) {
-    try {
-        const fi = Deno.lstatSync(path)
-        if (fi.isFile) {
-            return true
-        }
-        return false
-    } catch (err) {
-        if (err instanceof Deno.errors.NotFound) {
-            return false
-        }
-        throw err
-    }
-}
-
-/** ensure and write a text file */
-export async function ensureTextFile(name: string, content: string) {
-    const dir = path.dirname(name)
-    await ensureDir(dir)
-    await Deno.writeTextFile(name, content)
-}
-
 
 /** returns a module by given url. */
 export function newModule(url: string): Module {
@@ -175,15 +112,6 @@ export function fixImportMap(v: any) {
     return imports
 }
 
-/** get relative the path of `to` to `from` */
-export function getRelativePath(from: string, to: string): string {
-    let r = path.relative(from, to).split('\\').join('/')
-    if (!r.startsWith('.') && !r.startsWith('/')) {
-        r = './' + r
-    }
-    return r
-}
-
 /** fix import url */
 export function fixImportUrl(importUrl: string): string {
     const isRemote = reHttp.test(importUrl)
@@ -217,32 +145,14 @@ export function fixImportUrl(importUrl: string): string {
  * - yellow: 1MB - 10MB
  * - red: > 10MB
  */
-export function colorfulBytesString(bytes: number) {
+export function formatBytesWithColor(bytes: number) {
     let cf = colors.dim
     if (bytes > 10 * MB) {
         cf = colors.red
     } else if (bytes > MB) {
         cf = colors.yellow
     }
-    return cf(util.bytesString(bytes))
-}
-
-/** cleanup the previous compilation cache */
-export async function cleanupCompilation(jsFile: string) {
-    const dir = path.dirname(jsFile)
-    const jsFileName = path.basename(jsFile)
-    if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {
-        return
-    }
-    const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'
-    for await (const entry of Deno.readDir(dir)) {
-        if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
-            const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
-            if (_jsName === jsName && jsFileName !== entry.name) {
-                await Deno.remove(path.join(dir, entry.name))
-            }
-        }
-    }
+    return cf(util.formatBytes(bytes))
 }
 
 /** crate html content by given arguments */
@@ -277,9 +187,9 @@ export function createHtml({
             return `<script>${v}</script>`
         } else if (util.isNEString(v.innerText)) {
             const { innerText, ...rest } = v
-            return `<script${attrString(rest)}>${eol}${innerText}${eol}${indent}</script>`
+            return `<script${formatAttrs(rest)}>${eol}${innerText}${eol}${indent}</script>`
         } else if (util.isNEString(v.src) && !v.preload) {
-            return `<script${attrString(v)}></script>`
+            return `<script${formatAttrs(v)}></script>`
         } else {
             return ''
         }
@@ -300,7 +210,7 @@ export function createHtml({
     ].join(eol)
 }
 
-function attrString(v: any): string {
+function formatAttrs(v: any): string {
     return Object.keys(v).filter(k => !!v[k]).map(k => {
         if (v[k] === true) {
             return ` ${k}`

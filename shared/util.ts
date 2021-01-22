@@ -1,18 +1,6 @@
 import { GB, KB, MB, PB, TB } from './constants.ts'
 
 export default {
-    isNumber(a: any): a is number {
-        return typeof a === 'number' && !Number.isNaN(a)
-    },
-    isUNumber(a: any): a is number {
-        return this.isNumber(a) && a >= 0
-    },
-    isInt(a: any): a is number {
-        return this.isNumber(a) && Number.isInteger(a)
-    },
-    isUInt(a: any): a is number {
-        return this.isInt(a) && a >= 0
-    },
     isString(a: any): a is string {
         return typeof a === 'string'
     },
@@ -56,7 +44,7 @@ export default {
         }
         return [s, '']
     },
-    bytesString(bytes: number) {
+    formatBytes(bytes: number) {
         if (bytes < KB) {
             return bytes.toString() + 'B'
         }
