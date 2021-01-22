@@ -1,4 +1,4 @@
-![Aleph.js: The Full-stack Framework in Deno.](./design/poster.svg)
+[![Aleph.js: The Full-stack Framework in Deno.](./design/poster.svg)](https://alephjs.org)
 
 <p>
   <span>&nbsp;&nbsp;&nbsp;<span>
