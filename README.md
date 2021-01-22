@@ -6,7 +6,7 @@
     &nbsp;&nbsp;&nbsp;
     <a href="https://alephjs.org">Website</a> |
     <a href="https://alephjs.org/docs/get-started">Get Started</a> |
-    <a href="https://alephjs.org/docs">Documentation</a> |
+    <a href="https://alephjs.org/docs">Docs</a> |
     <a href="https://esm.sh">ESM.sh</a> |
     <a href="./CONTRIBUTING.md">Contributing</a>
 </p>
