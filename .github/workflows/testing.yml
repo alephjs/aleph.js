@@ -1,9 +1,4 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-name: compiler
+name: Aleph.js Testing
 
 on:
   push:
@@ -13,15 +8,20 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }} # runs a test on macOS, Windows and Ubuntu
+    runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
         os: [macOS-latest, windows-latest, ubuntu-latest]
 
     steps:
-      - name: Setup repo
+      - name: Checkout
         uses: actions/checkout@v2
+
+      - name: Setup deno
+        uses: denolib/setup-deno@v2
+        with:
+          deno-version: v1.x
 
       - name: Setup rust
         uses: hecrj/setup-rust-action@v1
@@ -33,5 +33,11 @@ jobs:
         with:
           version: latest
 
-      - name: Run tests
+      - name: Cache deps
+        run: deno cache deps.ts
+
+      - name: Deno test
+        run: deno test -A --unstable --location "http://localhost/"
+
+      - name: Cargo test
         run: cd compiler && cargo test --all
