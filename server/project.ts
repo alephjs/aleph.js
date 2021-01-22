@@ -68,7 +68,7 @@ export class Project {
             }
         }
         this.importMap = { imports: {}, scopes: {} }
-        this.ready = this._init(reload)
+        this.ready = this.init(reload)
     }
 
     get isDev() {
@@ -196,7 +196,7 @@ export class Project {
             return [404, null]
         }
 
-        const { status, data } = await this._renderPage(loc)
+        const { status, data } = await this.renderPage(loc)
         return [status, data]
     }
 
@@ -206,13 +206,13 @@ export class Project {
             return [url.pagePath === '' ? 404 : 200, await this.getSPAIndexHtml(), null]
         }
 
-        const { url, status, head, scripts, body, data } = await this._renderPage(loc)
+        const { url, status, head, scripts, body, data } = await this.renderPage(loc)
         const html = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                ...this._getPreloadScripts(),
+                ...this.getPreloadScripts(),
                 ...scripts
             ],
             body,
@@ -223,11 +223,11 @@ export class Project {
 
     async getSPAIndexHtml() {
         const { defaultLocale } = this.config
-        const customLoading = await this._renderLoadingPage()
+        const customLoading = await this.renderLoadingPage()
         const html = createHtml({
             lang: defaultLocale,
             scripts: [
-                ...this._getPreloadScripts()
+                ...this.getPreloadScripts()
             ],
             head: customLoading?.head || [],
             body: `<main>${customLoading?.body || ''}</main>`,
@@ -256,9 +256,9 @@ export class Project {
         await ensureDir(distDir)
 
         // ssg, bundle & optimizing
-        await this._bundle()
-        await this._optimize()
-        await this._ssg()
+        await this.bundle()
+        await this.optimize()
+        await this.ssg()
 
         // copy public assets
         const publicDir = path.join(this.appRoot, 'public')
@@ -329,7 +329,7 @@ export class Project {
         return lines.join('\n')
     }
 
-    private _getPreloadScripts() {
+    private getPreloadScripts() {
         const { baseUrl } = this.config
         const mainModule = this.#modules.get('/main.ts')!
         const depsModule = this.#modules.get('/deps.bundling.js')
@@ -347,7 +347,7 @@ export class Project {
     }
 
     /** load config from `aleph.config.(json|mjs|js|ts)` */
-    private async _loadConfig() {
+    private async loadConfig() {
         const importMapFile = path.join(this.appRoot, 'import_map.json')
         if (existsFileSync(importMapFile)) {
             const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
@@ -485,7 +485,7 @@ export class Project {
     }
 
     /** initialize project */
-    private async _init(reload: boolean) {
+    private async init(reload: boolean) {
         const t = performance.now()
         const alephPkgUrl = getAlephPkgUrl()
         const walkOptions = { includeDirs: false, exts: ['.ts', '.js', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
@@ -517,7 +517,7 @@ export class Project {
 
         log.info(colors.bold(`Aleph.js v${VERSION}`))
         log.info(colors.bold('- Global'))
-        await this._loadConfig()
+        await this.loadConfig()
 
         // change current work dir to appDoot
         Deno.chdir(this.appRoot)
@@ -556,26 +556,26 @@ export class Project {
                     break
             }
             if (isCustom) {
-                await this._compile('/' + name)
+                await this.compile('/' + name)
             }
         }
 
         // create api routing
         if (existsDirSync(apiDir)) {
             for await (const { path: p } of walk(apiDir, walkOptions)) {
-                const mod = await this._compile(util.cleanPath('/api/' + util.trimPrefix(p, apiDir)))
-                this.#apiRouting.update(this._getRouteModule(mod))
+                const mod = await this.compile(util.cleanPath('/api/' + util.trimPrefix(p, apiDir)))
+                this.#apiRouting.update(this.getRouteModule(mod))
             }
         }
 
         // create page routing
         for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.tsx', '.jsx', '.md'] })) {
-            const mod = await this._compile(util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir)))
-            this.#pageRouting.update(this._getRouteModule(mod))
+            const mod = await this.compile(util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir)))
+            this.#pageRouting.update(this.getRouteModule(mod))
         }
 
         // create main module
-        await this._createMainModule()
+        await this.createMainModule()
 
         // pre-compile some modules
         if (this.isDev) {
@@ -583,13 +583,13 @@ export class Project {
                 'hmr.ts',
                 'nomodule.ts',
             ]) {
-                await this._compile(`${alephPkgUrl}/framework/core/${mod}`)
+                await this.compile(`${alephPkgUrl}/framework/core/${mod}`)
             }
         }
 
         // import renderer
         const rendererUrl = `${alephPkgUrl}/framework/${this.config.framework}/renderer.ts`
-        await this._compile(rendererUrl)
+        await this.compile(rendererUrl)
         const { renderPage } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
         this.#renderer = { renderPage }
 
@@ -616,12 +616,12 @@ export class Project {
         log.debug('init project in ' + Math.round(performance.now() - t) + 'ms')
 
         if (this.isDev) {
-            this._watch()
+            this.watch()
         }
     }
 
     /** watch file changes, re-compile modules and send HMR signal. */
-    private async _watch() {
+    private async watch() {
         const w = Deno.watchFs(this.srcDir, { recursive: true })
         log.info('Start watching code changes...')
         for await (const event of w) {
@@ -679,7 +679,7 @@ export class Project {
                                 type = 'add'
                             }
                             log.info(type, path)
-                            this._compile(path, { forceCompile: true }).then(mod => {
+                            this.compile(path, { forceCompile: true }).then(mod => {
                                 const hmrable = this.isHMRable(mod.url)
                                 if (hmrable) {
                                     if (type === 'add') {
@@ -692,14 +692,14 @@ export class Project {
                                     this.#rendered.clear()
                                 } else if (path.startsWith('/pages/')) {
                                     this.#rendered.delete(getPagePath(path))
-                                    this.#pageRouting.update(this._getRouteModule(mod))
+                                    this.#pageRouting.update(this.getRouteModule(mod))
                                 } else if (path.startsWith('/api/')) {
-                                    this.#apiRouting.update(this._getRouteModule(mod))
+                                    this.#apiRouting.update(this.getRouteModule(mod))
                                 }
                                 if (shouldUpdateMainModule) {
-                                    this._createMainModule()
+                                    this.createMainModule()
                                 }
-                                this._updateHash(path, mod.hash, ({ url, hash }) => {
+                                this.updateHash(path, mod.hash, ({ url, hash }) => {
                                     if (url.startsWith('/pages/')) {
                                         this.#rendered.delete(getPagePath(url))
                                     }
@@ -720,7 +720,7 @@ export class Project {
                                 this.#apiRouting.removeRoute(path)
                             }
                             if (shouldUpdateMainModule) {
-                                this._createMainModule()
+                                this.createMainModule()
                             }
                             this.#modules.delete(path)
                             if (this.isHMRable(path)) {
@@ -735,13 +735,13 @@ export class Project {
     }
 
     /** returns the route module by given module url and hash. */
-    private _getRouteModule({ url, hash }: Module): RouteModule {
-        const deps = this._lookupDeps(url).filter(({ isData }) => !!isData)
+    private getRouteModule({ url, hash }: Module): RouteModule {
+        const deps = this.lookupDeps(url).filter(({ isData }) => !!isData)
         return { url, hash, deps: deps.length > 0 ? deps : undefined }
     }
 
     /** create re-compiled main module. */
-    private async _createMainModule(): Promise<void> {
+    private async createMainModule(): Promise<void> {
         const alephPkgUrl = getAlephPkgUrl()
         const { baseUrl, defaultLocale, framework } = this.config
         const config: Record<string, any> = {
@@ -754,7 +754,7 @@ export class Project {
                     const name = url.replace(reModuleExt, '')
                     return name == '/404' || name == '/app'
                 })
-                .map(url => this._getRouteModule(this.#modules.get(url)!)),
+                .map(url => this.getRouteModule(this.#modules.get(url)!)),
             renderMode: this.config.ssr ? 'ssr' : 'spa'
         }
         const sourceCode = [
@@ -762,14 +762,14 @@ export class Project {
             `import bootstrap from "${alephPkgUrl}/framework/${framework}/bootstrap.ts"`,
             `bootstrap(${JSON.stringify(config)})`
         ].filter(Boolean).join('\n')
-        await this._compile('/main.ts', { sourceCode })
+        await this.compile('/main.ts', { sourceCode })
         if (!this.isDev) {
-            await this._compile('/main.ts', { sourceCode, bundleMode: true })
+            await this.compile('/main.ts', { sourceCode, bundleMode: true })
         }
     }
 
     /** preprocess css with postcss plugins */
-    private async _preprocessCSS(sourceCode: string) {
+    private async preprocessCSS(sourceCode: string) {
         if (this.#postcssReady === null) {
             this.#postcssReady = Promise.all(this.config.postcss.plugins.map(async p => {
                 let name: string | null = null
@@ -813,7 +813,7 @@ export class Project {
     }
 
     /** transpile code without types checking. */
-    private async _transpile(sourceCode: string, options: TransformOptions) {
+    private async transpile(sourceCode: string, options: TransformOptions) {
         let t: number | null = null
         if (this.#swcReady === null) {
             t = performance.now()
@@ -828,7 +828,7 @@ export class Project {
     }
 
     /** download and compile a moudle by given url, then cache on the disk. */
-    private async _compile(
+    private async compile(
         url: string,
         options?: {
             sourceCode?: string,
@@ -897,7 +897,7 @@ export class Project {
                 }
             } else {
                 try {
-                    sourceContent = await this._loadDependency(url)
+                    sourceContent = await this.loadDependency(url)
                     const sourceHash = (new Sha1).update(sourceContent).hex()
                     if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
@@ -967,14 +967,14 @@ export class Project {
 
             if (loader === 'css') {
                 this.#modules.delete(url)
-                const css = await this._preprocessCSS(sourceCode)
-                const cssMod = await this._compile(url, {
+                const css = await this.preprocessCSS(sourceCode)
+                const cssMod = await this.compile(url, {
                     ...options,
                     loader: 'js',
                     sourceCode: [
                         `import { applyCSS } from "${alephPkgUrl}/framework/${this.config.framework}/style.ts";`,
                         `export default function __applyCSS() {`,
-                        `  applyCSS(${JSON.stringify(url)}, ${JSON.stringify(this.isDev ? `\n${css.trim()}\n` : css)});`,
+                        `  applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)});`,
                         `}`,
                         options?.bundleMode && `__ALEPH.pack[${JSON.stringify(url)}] = { default: __applyCSS };`
                     ].filter(Boolean).join('\n'),
@@ -986,7 +986,7 @@ export class Project {
                 this.#modules.delete(url)
                 const { __content, ...props } = safeLoadFront(sourceCode)
                 const html = marked.parse(__content)
-                const mdMod = await this._compile(url, {
+                const mdMod = await this.compile(url, {
                     ...options,
                     loader: 'js',
                     sourceCode: (`
@@ -1030,7 +1030,7 @@ export class Project {
                     sourceType: loader,
                     sourceMap: true,
                 }
-                const { code, map, deps, inlineStyles } = await this._transpile(sourceCode, {
+                const { code, map, deps, inlineStyles } = await this.transpile(sourceCode, {
                     url,
                     swcOptions,
                     importMap: this.importMap,
@@ -1067,7 +1067,7 @@ export class Project {
                         }
                     }
                     if (type === 'css') {
-                        tpl = await this._preprocessCSS(tpl)
+                        tpl = await this.preprocessCSS(tpl)
                         tpl = tpl.replace(
                             /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
                             (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'
@@ -1107,7 +1107,7 @@ export class Project {
             return !url.startsWith('#') && (!options?.bundleMode || (!reHttp.test(url) && !options?.bundledModules?.includes(url)))
         })
         for (const dep of deps) {
-            const depMod = await this._compile(dep.url, { bundleMode: options?.bundleMode, bundledModules: options?.bundledModules })
+            const depMod = await this.compile(dep.url, { bundleMode: options?.bundleMode, bundledModules: options?.bundledModules })
             if (depMod.loader === 'css' && !dep.isStyle) {
                 dep.isStyle = true
             }
@@ -1176,14 +1176,14 @@ export class Project {
     }
 
     /** update module hash since the dependency changed. */
-    private _updateHash(depUrl: string, depHash: string, callback: (mod: Module) => void) {
+    private updateHash(depUrl: string, depHash: string, callback: (mod: Module) => void) {
         this.#modules.forEach(mod => {
             for (const dep of mod.deps) {
                 if (dep.url === depUrl) {
                     if (dep.hash !== depHash) {
                         dep.hash = depHash
                         if (mod.url === '/main.ts') {
-                            this._createMainModule()
+                            this.createMainModule()
                         } else {
                             const depImportPath = getRelativePath(
                                 path.dirname(mod.url),
@@ -1213,7 +1213,7 @@ export class Project {
                         }
                         callback(mod)
                         log.debug('update dependency:', mod.url, '<-', depUrl)
-                        this._updateHash(mod.url, mod.hash, callback)
+                        this.updateHash(mod.url, mod.hash, callback)
                     }
                     break
                 }
@@ -1222,7 +1222,7 @@ export class Project {
     }
 
     /** load dependency conentent, use deno builtin cache system */
-    private async _loadDependency(url: string): Promise<Uint8Array> {
+    private async loadDependency(url: string): Promise<Uint8Array> {
         const u = new URL(url)
         if (url.startsWith('https://esm.sh/')) {
             if (this.isDev && !u.searchParams.has('dev')) {
@@ -1262,7 +1262,7 @@ export class Project {
     }
 
     /** bundle modules for production. */
-    private async _bundle() {
+    private async bundle() {
         const alephPkgUrl = getAlephPkgUrl()
         const refCounter = new Map<string, number>()
         const lookup = (url: string) => {
@@ -1287,11 +1287,11 @@ export class Project {
 
         lookup('/main.ts')
         if (appModule) {
-            await this._compile(appModule.url, { bundleMode: true })
+            await this.compile(appModule.url, { bundleMode: true })
             lookup(appModule.url)
         }
         if (e404Module) {
-            await this._compile(e404Module.url, { bundleMode: true })
+            await this.compile(e404Module.url, { bundleMode: true })
             lookup(e404Module.url)
         }
         this.#pageRouting.lookup(routes => routes.forEach(({ module: { url } }) => {
@@ -1324,9 +1324,9 @@ export class Project {
         }
 
         log.info('- Bundle')
-        await this._createChunkBundle('deps', remoteDeps)
+        await this.createChunkBundle('deps', remoteDeps)
         if (localSharedDeps.length > 0) {
-            await this._createChunkBundle('shared', localSharedDeps)
+            await this.createChunkBundle('shared', localSharedDeps)
         }
 
         // copy main module
@@ -1341,17 +1341,17 @@ export class Project {
         const polyfillFile = path.join(this.buildDir, `polyfill.${polyfillMode.hash.slice(0, hashShort)}.js`)
         if (!existsFileSync(polyfillFile)) {
             const rawPolyfillFile = `${alephPkgUrl}/compiler/polyfills/${this.config.buildTarget}/polyfill.js`
-            await this._runDenoBundle(rawPolyfillFile, polyfillFile, AlephRuntimeCode, true)
+            await this.runDenoBundle(rawPolyfillFile, polyfillFile, AlephRuntimeCode, true)
         }
         Deno.copyFile(polyfillFile, path.join(this.outputDir, '_aleph', `polyfill.${polyfillMode.hash.slice(0, hashShort)}.js`))
         this.#modules.set(polyfillMode.url, polyfillMode)
 
         // bundle and copy page moudles
-        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localSharedDeps)))
+        await Promise.all(pageModules.map(async mod => this.createPageBundle(mod, localSharedDeps)))
     }
 
     /** create chunk bundle. */
-    private async _createChunkBundle(name: string, list: string[], header = '') {
+    private async createChunkBundle(name: string, list: string[], header = '') {
         const imports = list.map((url, i) => {
             const mod = this.#modules.get(url)
             if (mod) {
@@ -1375,7 +1375,7 @@ export class Project {
         }
 
         await Deno.writeTextFile(bundlingFile, bundlingCode)
-        const n = await this._runDenoBundle(bundlingFile, bundleFile, header)
+        const n = await this.runDenoBundle(bundlingFile, bundleFile, header)
         if (n > 0) {
             log.info(`  {} ${name}.js ${colors.dim('• ' + util.formatBytes(n))}`)
         }
@@ -1386,8 +1386,8 @@ export class Project {
     }
 
     /** create page bundle. */
-    private async _createPageBundle(mod: Module, bundledModules: string[], header = '') {
-        const { bundlingFile, hash } = await this._compile(mod.url, { bundleMode: true, bundledModules })
+    private async createPageBundle(mod: Module, bundledModules: string[], header = '') {
+        const { bundlingFile, hash } = await this.compile(mod.url, { bundleMode: true, bundledModules })
         const _tmp = util.trimSuffix(bundlingFile.replace(reHashJs, ''), '.bundling')
         const _tmp_bundlingFile = _tmp + `.bundling.js`
         const bundleFile = _tmp + `.bundle.${hash.slice(0, hashShort)}.js`
@@ -1404,14 +1404,14 @@ export class Project {
             `__ALEPH.pack[${JSON.stringify(mod.url)}] = mod`
         ].join('\n')
         await Deno.writeTextFile(_tmp_bundlingFile, bundlingCode)
-        await this._runDenoBundle(_tmp_bundlingFile, bundleFile, header)
+        await this.runDenoBundle(_tmp_bundlingFile, bundleFile, header)
         await ensureDir(path.dirname(saveAs))
         await Deno.copyFile(bundleFile, saveAs)
         Deno.remove(_tmp_bundlingFile)
     }
 
     /** run deno bundle and compess the output with terser. */
-    private async _runDenoBundle(bundlingFile: string, bundleFile: string, header = '', reload = false) {
+    private async runDenoBundle(bundlingFile: string, bundleFile: string, header = '', reload = false) {
         const p = Deno.run({
             cmd: ['deno', 'bundle', '--no-check', reload ? '--reload' : '', bundlingFile, bundleFile].filter(Boolean),
             stdout: 'null',
@@ -1426,7 +1426,7 @@ export class Project {
         }
 
         // transpile bundle code to `buildTarget`
-        let { code } = await this._transpile(await Deno.readTextFile(bundleFile), {
+        let { code } = await this.transpile(await Deno.readTextFile(bundleFile), {
             url: '/bundle.js',
             swcOptions: {
                 target: this.config.buildTarget
@@ -1461,12 +1461,12 @@ export class Project {
     }
 
     /** optimize images for production. */
-    private async _optimize() {
+    private async optimize() {
 
     }
 
     /** render all pages in routing. */
-    private async _ssg() {
+    private async ssg() {
         const { ssr } = this.config
         const outputDir = this.outputDir
 
@@ -1501,13 +1501,13 @@ export class Project {
         }
 
         // write 404 page
-        const { url, head, scripts, body, data } = await this._render404Page()
+        const { url, head, scripts, body, data } = await this.render404Page()
         const e404PageHtml = createHtml({
             lang: url.locale,
             head: head,
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                ...this._getPreloadScripts(),
+                ...this.getPreloadScripts(),
                 ...scripts
             ],
             body,
@@ -1521,7 +1521,7 @@ export class Project {
     }
 
     /** render page base the given location. */
-    private async _renderPage(loc: { pathname: string, search?: string }) {
+    private async renderPage(loc: { pathname: string, search?: string }) {
         const start = performance.now()
         const [url, pageModuleTree] = this.#pageRouting.createRouter(loc)
         const key = [url.pathname, url.query.toString()].filter(Boolean).join('?')
@@ -1547,7 +1547,7 @@ export class Project {
             if (this.isDev) {
                 log.warn(`page '${url.pathname}' not found`)
             }
-            return await this._render404Page(url)
+            return await this.render404Page(url)
         }
         try {
             const appModule = Array.from(this.#modules.keys())
@@ -1575,8 +1575,8 @@ export class Project {
                 undefined,
                 pageComponentTree,
                 [
-                    appModule ? this._lookupDeps(appModule.url).filter(dep => !!dep.isStyle) : [],
-                    ...pageModuleTree.map(({ url }) => this._lookupDeps(url).filter(dep => !!dep.isStyle)).flat()
+                    appModule ? this.lookupDeps(appModule.url).filter(dep => !!dep.isStyle) : [],
+                    ...pageModuleTree.map(({ url }) => this.lookupDeps(url).filter(dep => !!dep.isStyle)).flat()
                 ].flat()
             )
             ret.head = head
@@ -1602,7 +1602,7 @@ export class Project {
     }
 
     /** render custom 404 page. */
-    private async _render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
+    private async render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
         const ret: RenderResult = { url, status: 404, head: [], scripts: [], body: '<main></main>', data: null }
         try {
             const e404Module = Array.from(this.#modules.keys())
@@ -1614,7 +1614,7 @@ export class Project {
                 undefined,
                 E404,
                 [],
-                e404Module ? this._lookupDeps(e404Module.url).filter(dep => !!dep.isStyle) : []
+                e404Module ? this.lookupDeps(e404Module.url).filter(dep => !!dep.isStyle) : []
             )
             ret.head = head
             ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
@@ -1635,7 +1635,7 @@ export class Project {
     }
 
     /** render custom loading page for SPA mode. */
-    private async _renderLoadingPage() {
+    private async renderLoadingPage() {
         const loadingModule = Array.from(this.#modules.keys())
             .filter(url => url.replace(reModuleExt, '') == '/loading')
             .map(url => this.#modules.get(url))[0]
@@ -1656,7 +1656,7 @@ export class Project {
                 undefined,
                 undefined,
                 [{ url: loadingModule.url, Component: Loading }],
-                this._lookupDeps(loadingModule.url).filter(dep => !!dep.isStyle)
+                this.lookupDeps(loadingModule.url).filter(dep => !!dep.isStyle)
             )
             return {
                 head,
@@ -1666,7 +1666,7 @@ export class Project {
         return null
     }
 
-    private _lookupDeps(url: string, __deps: DependencyDescriptor[] = [], __tracing: Set<string> = new Set()) {
+    private lookupDeps(url: string, __deps: DependencyDescriptor[] = [], __tracing: Set<string> = new Set()) {
         const mod = this.getModule(url)
         if (!mod) {
             return __deps
@@ -1678,7 +1678,7 @@ export class Project {
         __deps.push(...mod.deps.filter(({ url }) => __deps.findIndex(i => i.url === url) === -1))
         mod.deps.forEach(({ url }) => {
             if (reModuleExt.test(url) && !reHttp.test(url)) {
-                this._lookupDeps(url, __deps, __tracing)
+                this.lookupDeps(url, __deps, __tracing)
             }
         })
         return __deps
