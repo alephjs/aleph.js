@@ -1,10 +1,7 @@
-import React, { useState } from 'https://esm.sh/react'
+import React from 'react'
 
-export default function Logo({ width = 75 }: { width?: number }) {
-   const [height, setHeight] =  useState(width)
-
-
+export default function Logo({ size = 75 }: { size?: number }) {
     return (
-        <img src="/logo.svg" width={width} height={height} title="Aleph.js" />
+        <img src="/logo.svg" height={size} title="Aleph.js" />
     )
 }

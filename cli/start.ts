@@ -1,4 +1,4 @@
-import log from '../log.ts'
+import log from '../server/log.ts'
 
 export const helpMessage = `
 Usage:
@@ -16,7 +16,7 @@ Options:
 `
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const { start } = await import('../server.ts')
+    const { start } = await import('../server/server.ts')
     const host = String(options.hn || options.hostname || 'localhost')
     const port = parseInt(String(options.p || options.port || '8080'))
     if (isNaN(port) || port <= 0 || !Number.isInteger(port)) {

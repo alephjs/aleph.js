@@ -1,8 +1,8 @@
-import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
-import { ensureTextFile } from '../fs.ts'
-import log from '../log.ts'
-import { colors, ensureDir, fromStreamReader, path, Untar } from '../std.ts'
-import util from '../util.ts'
+import { colors, ensureDir, gzipDecode, path, Untar } from '../deps.ts'
+import log from '../server/log.ts'
+import { ensureTextFile } from '../server/util.ts'
+import util from '../shared/util.ts'
+import { VERSION } from '../version.ts'
 
 const gitignore = [
     '.DS_Store',
@@ -46,7 +46,7 @@ export default async function (appDir: string, options: Record<string, string | 
     const rev = 'master'
     log.info('Downloading template...')
     const resp = await fetch('https://codeload.github.com/alephjs/alephjs-templates/tar.gz/' + rev)
-    const gzData = await Deno.readAll(fromStreamReader(resp.body!.getReader()))
+    const gzData = await Deno.readAll(new Deno.Buffer(await resp.arrayBuffer()))
     log.info('Saving template...')
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))
@@ -70,7 +70,16 @@ export default async function (appDir: string, options: Record<string, string | 
     await Deno.writeTextFile(path.join(appDir, '.vscode', 'extensions.json'), JSON.stringify(vscExtensions, undefined, 4))
     await Deno.writeTextFile(path.join(appDir, '.vscode', 'settings.json'), JSON.stringify(vscSettings, undefined, 4))
     await Deno.writeTextFile(path.join(appDir, '.gitignore'), gitignore.join('\n'))
-    await Deno.writeTextFile(path.join(appDir, 'import_map.json'), JSON.stringify({ imports: {} }, undefined, 4))
+    await Deno.writeTextFile(path.join(appDir, 'import_map.json'), JSON.stringify({
+        imports: {
+            'aleph': `https://deno.land/x/aleph@v${VERSION}/mod.ts`,
+            'aleph/react': `https://deno.land/x/aleph@v${VERSION}/react.ts`,
+            'aleph/': `https://deno.land/x/aleph@v${VERSION}/`,
+            'react': 'https://esm.sh/react@17.0.1',
+            'react-dom': 'https://esm.sh/react-dom@17.0.1',
+        },
+        scopes: {}
+    }, undefined, 4))
 
     log.info('Done')
     log.info('---')

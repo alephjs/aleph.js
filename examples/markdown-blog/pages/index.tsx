@@ -1,16 +1,15 @@
-import { Head, Link } from 'https://deno.land/x/aleph/mod.ts'
-import React from 'https://esm.sh/react'
+import React from 'react'
 
 export default function Home() {
     return (
         <>
-            <Head>
+            <head>
                 <title>Me.</title>
-            </Head>
+            </head>
             <h1>Me.</h1>
             <ul>
-                <li><Link to="/about">About Me</Link></li>
-                <li><Link to="/blog">My Blog</Link></li>
+                <li><a href="/about">About Me</a></li>
+                <li><a href="/blog">My Blog</a></li>
             </ul>
         </>
     )

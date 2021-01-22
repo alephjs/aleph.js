@@ -1,6 +1,7 @@
 {
     "files.eol": "\n",
     "files.trimTrailingWhitespace": true,
+    "typescript.format.semicolons": "remove",
     "[javascript]": {
         "editor.defaultFormatter": "vscode.typescript-language-features"
     },

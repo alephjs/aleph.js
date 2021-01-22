@@ -1,4 +1,5 @@
-import log from '../log.ts'
+import log from '../server/log.ts'
+import { start } from '../server/server.ts'
 
 export const helpMessage = `
 Usage:
@@ -15,7 +16,6 @@ Options:
 `
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const { start } = await import('../server.ts')
     const port = parseInt(String(options.p || options.port || '8080'))
     if (isNaN(port) || port <= 0 || !Number.isInteger(port)) {
         log.error(`invalid port '${options.port || options.p}'`)
