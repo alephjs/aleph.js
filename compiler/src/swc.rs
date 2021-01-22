@@ -287,6 +287,7 @@ mod tests {
   use crate::aleph::VERSION;
   use crate::import_map::ImportHashMap;
   use crate::resolve::{DependencyDescriptor, Resolver, HASH_PLACEHOLDER};
+  use sha1::{Digest, Sha1};
 
   fn t(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
     let module = ParsedModule::parse(specifer, source, None).expect("could not parse module");
@@ -335,7 +336,6 @@ mod tests {
       }
     "#;
     let (code, _) = t("https://deno.land/x/mod.ts", source, false);
-    println!("{}", code);
     assert!(code.contains("var D;\n(function(D) {\n"));
     assert!(code.contains("_applyDecoratedDescriptor("));
   }
@@ -353,7 +353,6 @@ mod tests {
       }
     "#;
     let (code, _) = t("/pages/index.tsx", source, false);
-    println!("{}", code);
     assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("className: \"title\""));
@@ -362,17 +361,11 @@ mod tests {
 
   #[test]
   fn test_transpile_use_deno() {
+    let specifer = "/pages/index.tsx";
     let source = r#"
       export default function Index() {
         const verison = useDeno(() => Deno.version)
-        const V8 = () => {
-          const verison = useDeno(() => Deno.version, true)
-          return <p>v8 v{version.v8}</p>
-        }
-        const TS = () => {
-          const verison = useDeno(() => Deno.version, 1)
-          return <p>typescript v{version.typescript}</p>
-        }
+        const verison = useDeno(async () => await readJson("data.json"))
         return (
           <>
             <p>Deno v{version.deno}</p>
@@ -382,11 +375,22 @@ mod tests {
         )
       }
     "#;
-    let (code, _) = t("/pages/index.tsx", source, false);
-    println!("{}", code);
-    assert!(code.contains(", false, \"useDeno-"));
-    assert!(code.contains(", true, \"useDeno-"));
-    assert!(code.contains(", 1, \"useDeno-"));
+
+    let mut hasher = Sha1::new();
+    hasher.update(specifer.clone());
+    hasher.update("1");
+    let id_1 = base64::encode(hasher.finalize());
+
+    let mut hasher = Sha1::new();
+    hasher.update(specifer.clone());
+    hasher.update("2");
+    let id_2 = base64::encode(hasher.finalize());
+
+    for _ in 0..3 {
+      let (code, _) = t(specifer, source, false);
+      assert!(code.contains(format!(", \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!(", \"useDeno-{}\"", id_2).as_str()));
+    }
   }
 
   #[test]
@@ -416,7 +420,6 @@ mod tests {
       }
     "#;
     let (code, resolver) = t("/pages/index.tsx", source, false);
-    println!("{}", code);
     assert!(code.contains(
       format!(
         "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v{}/framework/react/anchor.js\"",
@@ -596,7 +599,6 @@ mod tests {
       export * from "https://esm.sh/react"
     "#;
     let (code, _) = t("/pages/index.tsx", source, true);
-    println!("{}", code);
     assert!(code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", {"));
     assert!(
       code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", \"*\")")

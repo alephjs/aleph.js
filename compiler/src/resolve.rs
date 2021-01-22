@@ -374,12 +374,11 @@ impl AlephResolveFold {
   fn new_use_deno_hook_ident(&mut self) -> String {
     let resolver = self.resolver.borrow_mut();
     self.deno_hooks_idx = self.deno_hooks_idx + 1;
-    let path = format!("{}-{}", resolver.specifier, self.deno_hooks_idx);
     let mut ident: String = "useDeno-".to_owned();
     let mut hasher = Sha1::new();
-    hasher.update(path.as_bytes());
-    let hash = hasher.finalize();
-    ident.push_str(format!("{:x}", hash).as_str());
+    hasher.update(resolver.specifier.clone());
+    hasher.update(self.deno_hooks_idx.to_string());
+    ident.push_str(base64::encode(hasher.finalize()).as_str());
     ident
   }
 }
@@ -670,17 +669,8 @@ impl Fold for AlephResolveFold {
       };
       if has_callback {
         let id = self.new_use_deno_hook_ident();
-        if call.args.len() == 1 {
-          call.args.push(ExprOrSpread {
-            spread: None,
-            expr: Box::new(Expr::Lit(Lit::Bool(Bool {
-              span: DUMMY_SP,
-              value: false,
-            }))),
-          });
-        }
-        if call.args.len() > 2 {
-          call.args[2] = ExprOrSpread {
+        if call.args.len() > 1 {
+          call.args[1] = ExprOrSpread {
             spread: None,
             expr: Box::new(Expr::Lit(Lit::Str(new_js_str(id.clone())))),
           };
