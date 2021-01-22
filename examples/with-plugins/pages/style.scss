@@ -1,4 +1,5 @@
-$head: 300px;
+$head: 200px;
+
 body {
     display: flex;
     justify-content: center;
@@ -7,4 +8,7 @@ body {
     height: 100vh;
     overflow: hidden;
 }
-h1 { font-size: $head; }
+
+h1 {
+    font-size: $head;
+}
