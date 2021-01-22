@@ -833,7 +833,7 @@ export class Project {
             loader?: string,
             forceCompile?: boolean,
             bundleMode?: boolean,
-            bundledPaths?: string[]
+            bundledModules?: string[]
         }
     ): Promise<Module> {
         const alephPkgUrl = getAlephPkgUrl()
@@ -1025,7 +1025,7 @@ export class Project {
                     reactVersion: this.config.reactVersion,
                     isDev: this.isDev,
                     bundleMode: options?.bundleMode,
-                    bundledPaths: options?.bundledPaths
+                    bundledModules: options?.bundledModules
                 })
 
                 jsContent = code
@@ -1093,10 +1093,10 @@ export class Project {
 
         // compile deps
         const deps = mod.deps.filter(({ url }) => {
-            return !url.startsWith('#') && (!options?.bundleMode || (!reHttp.test(url) && !options?.bundledPaths?.includes(url)))
+            return !url.startsWith('#') && (!options?.bundleMode || (!reHttp.test(url) && !options?.bundledModules?.includes(url)))
         })
         for (const dep of deps) {
-            const depMod = await this._compile(dep.url, { bundleMode: options?.bundleMode, bundledPaths: options?.bundledPaths })
+            const depMod = await this._compile(dep.url, { bundleMode: options?.bundleMode, bundledModules: options?.bundledModules })
             if (depMod.loader === 'css' && !dep.isStyle) {
                 dep.isStyle = true
             }
@@ -1287,6 +1287,11 @@ export class Project {
             const mod = this.getModule(url)
             if (mod) {
                 lookup(url)
+                mod.deps.forEach(dep => {
+                    if (dep.isStyle) {
+                        lookup(dep.url)
+                    }
+                })
                 pageModules.push(mod)
             }
         }))
@@ -1331,7 +1336,7 @@ export class Project {
         this.#modules.set(polyfillMode.url, polyfillMode)
 
         // bundle and copy page moudles
-        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localSharedDeps, AlephRuntimeCode)))
+        await Promise.all(pageModules.map(async mod => this._createPageBundle(mod, localSharedDeps)))
     }
 
     /** create chunk bundle. */
@@ -1370,8 +1375,8 @@ export class Project {
     }
 
     /** create page bundle. */
-    private async _createPageBundle(mod: Module, bundledPaths: string[], header = '') {
-        const { bundlingFile, hash } = await this._compile(mod.url, { bundleMode: true, bundledPaths })
+    private async _createPageBundle(mod: Module, bundledModules: string[], header = '') {
+        const { bundlingFile, hash } = await this._compile(mod.url, { bundleMode: true, bundledModules })
         const _tmp = util.trimSuffix(bundlingFile.replace(reHashJs, ''), '.bundling')
         const _tmp_bundlingFile = _tmp + `.bundling.js`
         const bundleFile = _tmp + `.bundle.${hash.slice(0, hashShort)}.js`
