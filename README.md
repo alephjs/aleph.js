@@ -13,7 +13,7 @@ Aleph.js (or **Aleph** or **א**, /ˈɑːlɛf/) is a full-stack framework in [De
 
 ### Supported Frameworks
 
-- React/Preact
+- React
 - Alef Component (WIP)
 - Vuejs (Coming)
 
