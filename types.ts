@@ -11,7 +11,7 @@ export type Plugin = {
     /** `acceptHMR` accepts the HMR. */
     acceptHMR?: boolean
     /** `transform` transforms the source content. */
-    transform?(content: Uint8Array, url: string): Promise<{ code: string, map?: string, loader?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' | 'markdown' }>
+    transform?(content: Uint8Array, url: string): Promise<{ code: string, map?: string, loader?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' }>
 }
 
 /**
