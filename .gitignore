@@ -1,6 +1,6 @@
 .DS_Store
 Thumbs.db
+compiler/target/
+compiler/pkg/
 .aleph/
 dist/
-swc/target/
-swc/pkg/

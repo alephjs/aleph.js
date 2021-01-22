@@ -1,12 +1,7 @@
-import { assertEquals } from 'https://deno.land/std/testing/asserts.ts';
+import { assertEquals } from 'https://deno.land/std@0.83.0/testing/asserts.ts';
 import plugin from './sass.ts';
 
 Deno.test('project scss loader plugin', () => {
-    Object.assign(window, {
-        location: {
-            href: 'https://localhost/'
-        }
-    })
     const { code, loader } = plugin.transform(
         (new TextEncoder).encode('$someVar: 123px; .some-selector { width: $someVar; }'),
         'test.scss'
@@ -19,11 +14,6 @@ Deno.test('project scss loader plugin', () => {
 })
 
 Deno.test('project sass loader plugin', () => {
-    Object.assign(window, {
-        location: {
-            href: 'https://localhost/'
-        }
-    })
     let ret = plugin.transform(
         (new TextEncoder).encode('$someVar: 123px\n.some-selector\n  width: 123px'),
         'test.sass'

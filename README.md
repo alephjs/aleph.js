@@ -19,7 +19,7 @@ Aleph.js works in **Deno**, a *simple*, *modern* and *secure* runtime for JavaSc
 import React from "https://esm.sh/react@17.0.1"
 import Logo from "../components/logo.tsx"
 
-export default function Home() {
+export default function App() {
     return (
       <div>
         <Logo />
@@ -33,6 +33,7 @@ export default function Home() {
 
 - Zero Config
 - Typescript in Deno
+- High Performance Comilper
 - ES Module Ready
 - Import Maps
 - HMR with Fast Refresh

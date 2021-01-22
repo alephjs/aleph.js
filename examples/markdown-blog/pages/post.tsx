@@ -1,5 +1,4 @@
-import { Head, Link } from 'https://deno.land/x/aleph/mod.ts'
-import React, { ComponentType } from 'https://esm.sh/react'
+import React, { ComponentType } from 'react'
 
 interface Metadata {
     title: string
@@ -10,12 +9,12 @@ interface Metadata {
 export default function Blog({ Page }: { Page: ComponentType & { meta: Metadata } }) {
     return (
         <>
-            <Head>
+            <head>
                 <title>{Page.meta.title}</title>
-            </Head>
+            </head>
             <Page />
             <p style={{ color: '#666' }}>created by <em style={{ color: '#000' }}>{Page.meta.author}</em> at <em style={{ color: '#000' }}>{Page.meta.date}</em></p>
-            <p><Link to="/blog">My Blog</Link></p>
+            <p><a href="/blog">My Blog</a></p>
         </>
     )
 }
