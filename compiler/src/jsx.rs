@@ -49,14 +49,13 @@ struct AlephJsxFold {
 
 impl AlephJsxFold {
     fn new_inline_style_ident(&mut self) -> String {
-        let resolver = self.resolver.borrow_mut();
+        let resolver = self.resolver.borrow();
         self.inline_style_idx = self.inline_style_idx + 1;
-        let path = format!("{}-{}", resolver.specifier, self.inline_style_idx);
         let mut ident: String = "inline-style-".to_owned();
         let mut hasher = Sha1::new();
-        hasher.update(path.as_bytes());
-        let hash = hasher.finalize();
-        ident.push_str(format!("{:x}", hash).as_str());
+        hasher.update(resolver.specifier.clone());
+        hasher.update(self.inline_style_idx.to_string());
+        ident.push_str(base64::encode(hasher.finalize()).as_str());
         ident
     }
 
