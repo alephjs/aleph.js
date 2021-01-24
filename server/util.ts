@@ -1,6 +1,8 @@
 import { colors, path } from '../deps.ts'
 import { MB, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import log from '../shared/log.ts'
 import util from '../shared/util.ts'
+import type { ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { ImportMap, Module } from './types.ts'
 
@@ -155,7 +157,16 @@ export function formatBytesWithColor(bytes: number) {
     return cf(util.formatBytes(bytes))
 }
 
-/** crate html content by given arguments */
+/** Reponse an error jons to the request */
+export function respondError(req: ServerRequest, status: number, message: string) {
+    req.respond({
+        status,
+        headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
+        body: JSON.stringify({ error: { status, message } })
+    }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
+}
+
+/** create html content by given arguments */
 export function createHtml({
     lang = 'en',
     head = [],

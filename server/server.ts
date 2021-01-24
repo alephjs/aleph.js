@@ -16,15 +16,15 @@ export async function start(appDir: string, hostname: string, port: number, isDe
         try {
             const s = serve({ hostname, port })
             log.info(`Server ready on http://${hostname}:${port}`)
-            for await (const req of s) {
-                const url = new URL('http://localhost/' + req.url)
+            for await (const r of s) {
+                const url = new URL('http://localhost/' + r.url)
                 const pathname = util.cleanPath(decodeURI(url.pathname))
-                const resp = new Request(req, pathname, {}, url.searchParams)
+                const req = new Request(r, pathname, {}, url.searchParams)
 
                 try {
                     // serve hmr ws
                     if (pathname === '/_hmr') {
-                        const { conn, r: bufReader, w: bufWriter, headers } = req
+                        const { conn, r: bufReader, w: bufWriter, headers } = r
                         ws.acceptWebSocket({ conn, bufReader, bufWriter, headers }).then(async socket => {
                             const watcher = project.createFSWatcher()
                             watcher.on('add', (url: string, hash: string) => socket.send(JSON.stringify({
@@ -69,20 +69,20 @@ export async function start(appDir: string, hostname: string, port: number, isDe
                     if (existsFileSync(filePath)) {
                         const info = Deno.lstatSync(filePath)
                         const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
-                        if (lastModified === req.headers.get('If-Modified-Since')) {
-                            resp.status(304).send('')
+                        if (lastModified === r.headers.get('If-Modified-Since')) {
+                            req.status(304).send('')
                             continue
                         }
 
                         const body = Deno.readFileSync(filePath)
-                        resp.setHeader('Last-Modified', lastModified)
-                        resp.send(body, getContentType(filePath))
+                        req.setHeader('Last-Modified', lastModified)
+                        req.send(body, getContentType(filePath))
                         continue
                     }
 
                     // serve APIs
                     if (pathname.startsWith('/api/')) {
-                        project.callAPI(req, { pathname, search: url.search })
+                        project.callAPI(r, { pathname, search: url.search })
                         continue
                     }
 
@@ -95,9 +95,9 @@ export async function start(appDir: string, hostname: string, port: number, isDe
                             }
                             const [status, data] = await project.getSSRData({ pathname: p })
                             if (status === 200) {
-                                resp.send(JSON.stringify(data), 'application/json; charset=utf-8')
+                                req.send(JSON.stringify(data), 'application/json; charset=utf-8')
                             } else {
-                                resp.status(status).send('')
+                                req.status(status).send('')
                             }
                             continue
                         } else {
@@ -110,7 +110,7 @@ export async function start(appDir: string, hostname: string, port: number, isDe
                                 if (mod) {
                                     const etag = req.headers.get('If-None-Match')
                                     if (etag && etag === mod.hash) {
-                                        resp.status(304).send('')
+                                        req.status(304).send('')
                                         continue
                                     }
                                     let body = ''
@@ -118,7 +118,7 @@ export async function start(appDir: string, hostname: string, port: number, isDe
                                         if (existsFileSync(mod.jsFile + '.map')) {
                                             body = await Deno.readTextFile(mod.jsFile + '.map')
                                         } else {
-                                            resp.status(404).send('file not found')
+                                            req.status(404).send('file not found')
                                             continue
                                         }
                                     } else {
@@ -127,21 +127,21 @@ export async function start(appDir: string, hostname: string, port: number, isDe
                                             body = project.injectHmr(mod, body)
                                         }
                                     }
-                                    resp.setHeader('ETag', mod.hash)
-                                    resp.send(body, `application/${reqMap ? 'json' : 'javascript'}; charset=utf-8`)
+                                    req.setHeader('ETag', mod.hash)
+                                    req.send(body, `application/${reqMap ? 'json' : 'javascript'}; charset=utf-8`)
                                     continue
                                 }
                             }
                         }
-                        resp.status(404).send('file not found')
+                        req.status(404).send('file not found')
                         continue
                     }
 
                     // ssr
                     const [status, html] = await project.getPageHtml({ pathname, search: url.search })
-                    resp.status(status).send(html, 'text/html; charset=utf-8')
+                    req.status(status).send(html, 'text/html; charset=utf-8')
                 } catch (err) {
-                    resp.status(500).send(createHtml({
+                    req.status(500).send(createHtml({
                         lang: 'en',
                         head: ['<title>500 - internal server error</title>'],
                         body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`

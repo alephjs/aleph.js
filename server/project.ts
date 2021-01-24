@@ -11,7 +11,7 @@ import type { APIHandler, Config, RouterURL } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
 import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
-import { AlephRuntimeCode, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, newModule } from './util.ts'
+import { AlephRuntimeCode, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, newModule, respondError } from './util.ts'
 
 /**
  * A Project to manage the Aleph.js appliaction.
@@ -56,7 +56,7 @@ export class Project {
             env: {},
             locales: [],
             ssr: {
-                fallback: '_fallback_spa.html'
+                fallback: '_fallback.html'
             },
             buildTarget: 'es5',
             reactVersion: '17.0.1',
@@ -80,7 +80,7 @@ export class Project {
     }
 
     get buildDir() {
-        return path.join(this.appRoot, '.aleph', this.mode)
+        return path.join(this.appRoot, '.aleph')
     }
 
     get outputDir() {
@@ -100,8 +100,8 @@ export class Project {
         if (reModuleExt.test(url)) {
             return url.startsWith('/pages/') ||
                 url.startsWith('/components/') ||
-                url.replace(reModuleExt, '') === "/app" ||
-                url.replace(reModuleExt, '') === "/404"
+                url.replace(reModuleExt, '') === '/app' ||
+                url.replace(reModuleExt, '') === '/404'
         }
         const plugin = this.config.plugins.find(p => p.test.test(url))
         if (plugin?.acceptHMR) {
@@ -166,27 +166,15 @@ export class Project {
                     if (util.isFunction(handle)) {
                         await handle(new Request(req, url.pathname, url.params, url.query))
                     } else {
-                        req.respond({
-                            status: 500,
-                            headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
-                            body: JSON.stringify({ error: { status: 404, message: "handle not found" } })
-                        }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
+                        respondError(req, 500, 'handle not found')
                     }
                 } catch (err) {
-                    req.respond({
-                        status: 500,
-                        headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
-                        body: JSON.stringify({ error: { status: 500, message: err.message } })
-                    }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
-                    log.error('callAPI:', err)
+                    respondError(req, 500, err.message)
+                    log.error('invoke API:', err)
                 }
             }
         } else {
-            req.respond({
-                status: 404,
-                headers: new Headers({ 'Content-Type': 'application/javascript; charset=utf-8' }),
-                body: JSON.stringify({ error: { status: 404, message: 'page not found' } })
-            }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
+            respondError(req, 404, 'page not found')
         }
         return null
     }
@@ -523,11 +511,8 @@ export class Project {
         Deno.chdir(this.appRoot)
 
         // inject env variables
-        Object.entries({
-            ...this.config.env,
-            __version: VERSION,
-            __buildMode: this.mode,
-        }).forEach(([key, value]) => Deno.env.set(key, value))
+        Object.entries(this.config.env).forEach(([key, value]) => Deno.env.set(key, value))
+        Deno.env.set('__version', VERSION)
 
         // add react refresh helpers for ssr
         if (this.isDev) {
@@ -1494,8 +1479,8 @@ export class Project {
                     }
                 }
             }))
-            const fallbackSpaHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback_spa.html')
-            await ensureTextFile(fallbackSpaHtmlFile, await this.getSPAIndexHtml())
+            const fallbackHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback.html')
+            await ensureTextFile(fallbackHtmlFile, await this.getSPAIndexHtml())
         } else {
             await ensureTextFile(path.join(outputDir, 'index.html'), await this.getSPAIndexHtml())
         }
