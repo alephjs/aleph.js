@@ -80,7 +80,7 @@ export class Project {
     }
 
     get buildDir() {
-        return path.join(this.appRoot, '.aleph')
+        return path.join(this.appRoot, '.aleph', this.mode)
     }
 
     get outputDir() {
@@ -513,6 +513,7 @@ export class Project {
         // inject env variables
         Object.entries(this.config.env).forEach(([key, value]) => Deno.env.set(key, value))
         Deno.env.set('__version', VERSION)
+        Deno.env.set('__buildMode', this.mode)
 
         // add react refresh helpers for ssr
         if (this.isDev) {
