@@ -18,7 +18,7 @@ export type Plugin = {
  * The options for **SSR**.
  */
 export type SSROptions = {
-    /** The fallback html **dynamic routes** (default is '**_fallback_spa.html**'). */
+    /** The fallback html **dynamic routes** (default is '**_fallback.html**'). */
     fallback?: string
     /** A list of RegExp for paths to use **SSR**. */
     include?: RegExp[]
@@ -34,6 +34,8 @@ export type SSROptions = {
 export type Config = {
     /** `framework` to run your application (default is 'react'). */
     framework?: 'alef' | 'react'
+    /** `buildTarget` specifies the build target in production mode (default is **es5** to be compatible with IE11). */
+    buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     /** `srcDir` to put your application source code (default is '/'). */
     srcDir?: string
     /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
@@ -52,8 +54,6 @@ export type Config = {
     plugins?: Plugin[]
     /** A list of plugin of PostCSS. */
     postcss?: { plugins: (string | AcceptedPlugin | [string | ((options: Record<string, any>) => AcceptedPlugin), Record<string, any>])[] }
-    /** `buildTarget` specifies the build target for **swc** in production mode (default is **es5**). */
-    buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable). */
     env?: Record<string, string>
 }
