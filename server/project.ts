@@ -55,9 +55,7 @@ export class Project {
             defaultLocale: 'en',
             env: {},
             locales: [],
-            ssr: {
-                fallback: '_fallback.html'
-            },
+            ssr: {},
             buildTarget: 'es5',
             reactVersion: '17.0.1',
             plugins: [],
@@ -372,6 +370,8 @@ export class Project {
                 break
             }
         }
+
+        // todo: load ssr.config.ts
 
         const {
             srcDir,
@@ -1456,35 +1456,36 @@ export class Project {
         const { ssr } = this.config
         const outputDir = this.outputDir
 
-        if (ssr) {
-            log.info(colors.bold('- Pages (SSG)'))
-            const paths = new Set(this.#pageRouting.paths)
-            if (typeof ssr === 'object' && ssr.staticPaths) {
-                ssr.staticPaths.forEach(path => paths.add(path))
-            }
-            await Promise.all(Array.from(paths).map(async pathname => {
-                if (this.isSSRable(pathname)) {
-                    const [status, html, data] = await this.getPageHtml({ pathname })
-                    if (status == 200) {
-                        const htmlFile = path.join(outputDir, pathname, 'index.html')
-                        await ensureTextFile(htmlFile, html)
-                        if (data) {
-                            const dataFile = path.join(outputDir, '_aleph/data', (pathname === '/' ? 'index' : pathname) + '.json')
-                            await ensureTextFile(dataFile, JSON.stringify(data))
-                        }
-                        log.info('  ○', pathname, colors.dim('• ' + util.formatBytes(html.length)))
-                    } else if (status == 404) {
-                        log.info('  ○', colors.dim(pathname), colors.red('Page not found'))
-                    } else if (status == 500) {
-                        log.info('  ○', colors.dim(pathname), colors.red('Error 500'))
-                    }
-                }
-            }))
-            const fallbackHtmlFile = path.join(outputDir, util.isPlainObject(ssr) && ssr.fallback ? ssr.fallback : '_fallback.html')
-            await ensureTextFile(fallbackHtmlFile, await this.getSPAIndexHtml())
-        } else {
-            await ensureTextFile(path.join(outputDir, 'index.html'), await this.getSPAIndexHtml())
+        if (!ssr) {
+            const html = await this.getSPAIndexHtml()
+            await ensureTextFile(path.join(outputDir, 'index.html'), html)
+            await ensureTextFile(path.join(outputDir, '404.html'), html)
+            return
         }
+
+        log.info(colors.bold('- Pages (SSG)'))
+        const paths = new Set(this.#pageRouting.paths)
+        if (typeof ssr === 'object' && ssr.staticPaths) {
+            ssr.staticPaths.forEach(path => paths.add(path))
+        }
+        await Promise.all(Array.from(paths).map(async pathname => {
+            if (this.isSSRable(pathname)) {
+                const [status, html, data] = await this.getPageHtml({ pathname })
+                if (status == 200) {
+                    const htmlFile = path.join(outputDir, pathname, 'index.html')
+                    await ensureTextFile(htmlFile, html)
+                    if (data) {
+                        const dataFile = path.join(outputDir, '_aleph/data', (pathname === '/' ? 'index' : pathname) + '.json')
+                        await ensureTextFile(dataFile, JSON.stringify(data))
+                    }
+                    log.info('  ○', pathname, colors.dim('• ' + util.formatBytes(html.length)))
+                } else if (status == 404) {
+                    log.info('  ○', colors.dim(pathname), colors.red('Page not found'))
+                } else if (status == 500) {
+                    log.info('  ○', colors.dim(pathname), colors.red('Error 500'))
+                }
+            }
+        }))
 
         // write 404 page
         const { url, head, scripts, body, data } = await this.render404Page()
