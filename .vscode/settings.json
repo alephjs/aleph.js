@@ -2,6 +2,7 @@
     "files.eol": "\n",
     "files.trimTrailingWhitespace": true,
     "typescript.format.semicolons": "remove",
+    "typescript.preferences.quoteStyle": "single",
     "[javascript]": {
         "editor.defaultFormatter": "vscode.typescript-language-features"
     },
