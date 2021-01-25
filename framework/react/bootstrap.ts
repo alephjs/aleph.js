@@ -57,7 +57,7 @@ export default async function bootstrap({ baseUrl, defaultLocale, locales, route
             pageComponentTree
         }
     )
-    const mountPoint = document.querySelector('main')
+    const mountPoint = document.getElementById('__aleph')
     if (renderMode === 'ssr') {
         hydrate(rootEl, mountPoint)
     } else {

@@ -229,7 +229,7 @@ export class Project {
                 ...this._getPreloadScripts()
             ],
             head: customLoading?.head || [],
-            body: `<main>${customLoading?.body || ''}</main>`,
+            body: `<div id="__aleph">${customLoading?.body || ''}</div>`,
             minify: !this.isDev
         })
         return html
