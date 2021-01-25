@@ -19,7 +19,6 @@ Options:
 export default async function (appDir: string, options: Record<string, string | boolean>) {
     const host = String(options.hn || options.host || 'localhost')
     const port = parseInt(String(options.p || options.port || '8080'))
-    
     if (isNaN(port) || port <= 0 || !Number.isInteger(port)) {
         log.error(`invalid port '${options.port || options.p}'`)
         Deno.exit(1)
