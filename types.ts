@@ -1,18 +1,20 @@
 import type { AcceptedPlugin, bufio, Response } from './deps.ts'
 
+export type LoaderPlugin = {
+    /* `type` defines the plugin type */
+    type: 'loader'
+    /** `test` matches the import url. */
+    test: RegExp
+    /** `acceptHMR` enables the HMR. */
+    acceptHMR?: boolean
+    /** `transform` transforms the source content. */
+    transform(content: Uint8Array, url: string): Promise<{ code: string, map?: string, type?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' }>
+}
+
 /**
  * A plugin for **Aleph.js** application.
  */
-export type Plugin = {
-    /** `name` gives the plugin a name. */
-    name?: string
-    /** `test` matches the import url. */
-    test: RegExp
-    /** `acceptHMR` accepts the HMR. */
-    acceptHMR?: boolean
-    /** `transform` transforms the source content. */
-    transform?(content: Uint8Array, url: string): Promise<{ code: string, map?: string, loader?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' }>
-}
+export type Plugin = LoaderPlugin
 
 /**
  * The options for **SSR**.

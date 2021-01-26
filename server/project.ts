@@ -98,9 +98,10 @@ export class Project {
                 url.replace(reModuleExt, '') === '/app' ||
                 url.replace(reModuleExt, '') === '/404'
         }
-        const plugin = this.config.plugins.find(p => p.test.test(url))
-        if (plugin?.acceptHMR) {
-            return true
+        for (const plugin of this.config.plugins) {
+            if (plugin.type === 'loader' && plugin.test.test(url)) {
+                return plugin.acceptHMR
+            }
         }
         return false
     }
@@ -640,7 +641,7 @@ export class Project {
                     if (isDep) {
                         return true
                     }
-                    return this.config.plugins.findIndex(p => p.test.test(path)) > -1
+                    return this.config.plugins.findIndex(p => p.type === 'loader' && p.test.test(path)) > -1
                 })()
                 if (validated) {
                     util.debounceX(path, () => {
@@ -938,11 +939,11 @@ export class Project {
                 loader = options.loader
             } else {
                 for (const plugin of this.config.plugins) {
-                    if (plugin.test.test(url) && util.isFunction(plugin.transform)) {
-                        const { code, loader: nextLoader = 'js' } = await plugin.transform(sourceContent, url)
+                    if (plugin.type === 'loader' && plugin.test.test(url)) {
+                        const { code, type = 'js' } = await plugin.transform(sourceContent, url)
                         sourceCode = code
-                        loader = nextLoader
-                        mod.loader = nextLoader
+                        loader = type
+                        mod.loader = type
                         break
                     }
                 }
@@ -998,9 +999,9 @@ export class Project {
                         .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
                     if (type !== 'css') {
                         for (const plugin of this.config.plugins) {
-                            if (plugin.test.test(`${key}.${type}`) && util.isFunction(plugin.transform)) {
-                                const { code, loader } = await plugin.transform((new TextEncoder).encode(tpl), url)
-                                if (loader === 'css') {
+                            if (plugin.type === 'loader' && plugin.test.test(`${key}.${type}`)) {
+                                const { code, type: _type } = await plugin.transform((new TextEncoder).encode(tpl), url)
+                                if (_type === 'css') {
                                     tpl = code
                                     type = 'css'
                                 }
