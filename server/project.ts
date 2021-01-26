@@ -1,9 +1,9 @@
 import { initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
 import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
-import { CleanCSS, colors, ensureDir, marked, minify, path, postcss, safeLoadFront, Sha1, Sha256, walk } from '../deps.ts'
+import { CleanCSS, colors, ensureDir, minify, path, postcss, Sha1, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { getPagePath, RouteModule, Routing } from '../framework/core/routing.ts'
-import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
 import { cleanupCompilation, ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -91,9 +91,6 @@ export class Project {
         }
         if (reStyleModuleExt.test(url)) {
             return true
-        }
-        if (reMDExt.test(url)) {
-            return url.startsWith('/pages/')
         }
         if (reModuleExt.test(url)) {
             return url.startsWith('/pages/') ||
@@ -280,7 +277,7 @@ export class Project {
             `import { createHotContext } from ${JSON.stringify(hmrImportPath)};`,
             `import.meta.hot = createHotContext(${JSON.stringify(url)});`
         ]
-        const reactRefresh = this.config.framework === 'react' && (reModuleExt.test(url) || reMDExt.test(url))
+        const reactRefresh = this.config.framework === 'react' && reModuleExt.test(url)
         if (reactRefresh) {
             const refreshImportPath = getRelativePath(
                 path.dirname(localUrl),
@@ -630,7 +627,7 @@ export class Project {
                                 }
                         }
                     }
-                    if (path.startsWith('/pages/') && (reModuleExt.test(path) || reMDExt.test(path))) {
+                    if (path.startsWith('/pages/') && reModuleExt.test(path)) {
                         return true
                     }
                     let isDep = false
@@ -968,47 +965,6 @@ export class Project {
                 })
                 cssMod.loader = 'css'
                 return cssMod
-            } else if (loader === 'markdown') {
-                this.#modules.delete(url)
-                const { __content, ...props } = safeLoadFront(sourceCode)
-                const html = marked.parse(__content)
-                const mdMod = await this.compile(url, {
-                    ...options,
-                    loader: 'js',
-                    sourceCode: (`
-                        import React, { useEffect, useRef } from "https://esm.sh/react@${this.config.reactVersion}";
-                        import { redirect } from "${alephPkgUrl}/framework/${this.config.framework}/anchor.ts";
-                        export default function MarkdownPage() {
-                            const ref = useRef(null);
-                            useEffect(() => {
-                                const anchors = [];
-                                const onClick = e => {
-                                    e.preventDefault();
-                                    redirect(e.currentTarget.getAttribute("href"));
-                                };
-                                if (ref.current) {
-                                    ref.current.querySelectorAll("a").forEach(a => {
-                                        const href = a.getAttribute("href");
-                                        if (href && !/^[a-z0-9]+:/i.test(href)) {
-                                            a.addEventListener("click", onClick, false);
-                                            anchors.push(a);
-                                        }
-                                    });
-                                }
-                                return () => anchors.forEach(a => a.removeEventListener("click", onClick));
-                            }, []);
-                            return React.createElement("div", {
-                                className: "markdown-page",
-                                ref,
-                                dangerouslySetInnerHTML: {__html: ${JSON.stringify(html)}}
-                            });
-                        }
-                        MarkdownPage.meta = ${JSON.stringify(props, undefined, 4)};
-                    `).replaceAll(' '.repeat(24), '').trim(),
-                    rawSourceHash: (new Sha1).update(sourceCode).hex()
-                })
-                mdMod.loader = 'js'
-                return mdMod
             } else if (loader === 'js' || loader === 'ts' || loader === 'jsx' || loader === 'tsx') {
                 const t = performance.now()
                 const swcOptions: SWCOptions = {

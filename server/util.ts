@@ -1,5 +1,5 @@
 import { colors, path } from '../deps.ts'
-import { MB, reHttp, reMDExt, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import { MB, reHttp, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
@@ -61,8 +61,6 @@ export function newModule(url: string): Module {
     let loader = ''
     if (reStyleModuleExt.test(url)) {
         loader = 'css'
-    } else if (reMDExt.test(url)) {
-        loader = 'markdown'
     } else if (reModuleExt.test(url)) {
         loader = url.split('.').pop()!
         if (loader === 'mjs') {
@@ -119,7 +117,7 @@ export function fixImportUrl(importUrl: string): string {
     const isRemote = reHttp.test(importUrl)
     const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
     let ext = path.extname(path.basename(url.pathname)) || '.js'
-    if (isRemote && !reModuleExt.test(ext) && !reStyleModuleExt.test(ext) && !reMDExt.test(ext)) {
+    if (isRemote && !reModuleExt.test(ext) && !reStyleModuleExt.test(ext)) {
         ext = '.js'
     }
     let pathname = util.trimSuffix(url.pathname, ext)

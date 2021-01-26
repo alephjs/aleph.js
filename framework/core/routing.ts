@@ -1,5 +1,5 @@
 import type { DependencyDescriptor } from '../../server/types.ts'
-import { reMDExt, reModuleExt } from '../../shared/constants.ts'
+import { reModuleExt } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
@@ -172,7 +172,7 @@ export class Routing {
 }
 
 export function getPagePath(url: string): string {
-    const pathname = url.replace(reModuleExt, '').replace(reMDExt, '').toLowerCase().replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
+    const pathname = url.replace(reModuleExt, '').toLowerCase().replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
     return pathname.startsWith('/api/') ? pathname : pathname.replace(/\s+/g, '-')
 }
 
