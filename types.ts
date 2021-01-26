@@ -18,8 +18,6 @@ export type Plugin = {
  * The options for **SSR**.
  */
 export type SSROptions = {
-    /** The fallback html **dynamic routes** (default is '**_fallback.html**'). */
-    fallback?: string
     /** A list of RegExp for paths to use **SSR**. */
     include?: RegExp[]
     /** A list of RegExp for paths to skip **SSR**. */
