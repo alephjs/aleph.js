@@ -18,10 +18,8 @@ export * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 export { gzipDecode, gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 // esm.sh
 export { default as CleanCSS } from 'https://esm.sh/clean-css@4.2.3?no-check'
-export { default as marked } from 'https://esm.sh/marked@1.2.7'
 export { default as postcss } from 'https://esm.sh/postcss@8.2.4'
 export type { AcceptedPlugin } from 'https://esm.sh/postcss@8.2.4'
 export { minify } from 'https://esm.sh/terser@5.5.1'
 export type { ECMA } from 'https://esm.sh/terser@5.5.1'
-export { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.1'
 
