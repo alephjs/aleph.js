@@ -29,14 +29,16 @@ deno run -A --unstable --import-map=import_map.json --location=http://localhost 
 Run all tests:
 
 ```bash
-deno test -A
+deno test -A --location=http://localhost
 ```
 
 ## Project Structure
 
-- **/cli** command code
-- **/compiler** compiler in rust with swc
-- **/framework** framework code
+- **/cli** commands code
+- **/compiler** compiler in rust powered by swc
+- **/framework**
+  - **core** framework core
+  - **react** react framework code
 - **/design** design drawings and assets
 - **/examples** examples
 - **/plugins** official plugins
