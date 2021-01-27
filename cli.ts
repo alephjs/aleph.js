@@ -16,7 +16,7 @@ const commands = {
 }
 
 const helpMessage = `Aleph.js v${VERSION}
-The React Framework in deno.
+The Full-stack Framework in Deno.
 
 Docs: https://alephjs.org/docs
 Bugs: https://github.com/alephjs/aleph.js/issues
@@ -28,8 +28,8 @@ Commands:
     ${Object.entries(commands).map(([name, desc]) => `${name.padEnd(15)}${desc}`).join('\n    ')}
 
 Options:
-    -h, --help     Prints help message
     -v, --version  Prints version number
+    -h, --help     Prints help message
 `
 
 async function main() {
@@ -162,14 +162,14 @@ async function main() {
 
     const { default: cmd } = await import(`./cli/${command}.ts`)
     if (command === 'upgrade') {
-        await cmd(argOptions.v || argOptions.version || 'latest')
-    } else {
-        const appDir = path.resolve(args[0] || '.')
-        if (command !== 'init' && !existsDirSync(appDir)) {
-            log.fatal('No such directory:', appDir)
-        }
-        await cmd(appDir, argOptions)
+        await cmd(argOptions.v || argOptions.version || args[0] || 'latest')
+        return
     }
+    const appDir = path.resolve(args[0] || '.')
+    if (command !== 'init' && !existsDirSync(appDir)) {
+        log.fatal('No such directory:', appDir)
+    }
+    await cmd(appDir, argOptions)
 }
 
 if (import.meta.main) {

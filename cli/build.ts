@@ -8,9 +8,9 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -L, --log-level  Set log level [possible values: debug, info]
-    -r, --reload     Reload source code cache
-    -h, --help       Prints help message
+    -L, --log-level <log-level>  Set log level [possible values: debug, info]
+    -r, --reload                 Reload source code cache
+    -h, --help                   Prints help message
 `
 
 export default async function (appDir: string, options: Record<string, string | boolean>) {

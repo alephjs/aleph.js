@@ -1,12 +1,12 @@
 import { colors } from '../deps.ts'
-import { VERSION as currentVersion } from '../version.ts'
+import { VERSION } from '../version.ts'
 
 export const helpMessage = `
 Usage:
     aleph upgrade
 
 Options:
-    -v, --version <version>  The version to upgrade to
+    -v, --version <version>  The upgrading version
     -h, --help               Prints help message
 `
 
@@ -32,7 +32,7 @@ export default async function (version: string) {
             Deno.exit(1)
         }
     }
-    if (version === 'v' + currentVersion) {
+    if (version === 'v' + VERSION) {
         console.log('Already up-to-date!')
         Deno.exit(0)
     }
