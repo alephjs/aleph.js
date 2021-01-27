@@ -1,5 +1,6 @@
 import { colors, path } from '../deps.ts'
-import { MB, reHttp, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import { MB, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
@@ -7,36 +8,37 @@ import { VERSION } from '../version.ts'
 import { ImportMap, Module } from './types.ts'
 
 export const AlephRuntimeCode = `
-var __ALEPH = window.__ALEPH || (window.__ALEPH = {
-  pack: {},
-  exportFrom: function(specifier, url, exports) {
-    if (url in this.pack) {
-      var mod = this.pack[url]
-      if (!(specifier in this.pack)) {
-        this.pack[specifier] = {}
-      }
-      if (exports === '*') {
-        for (var k in mod) {
-          this.pack[specifier][k] = mod[k]
+  var __ALEPH = window.__ALEPH || (window.__ALEPH = {
+    pack: {},
+    exportFrom: function(specifier, url, exports) {
+      if (url in this.pack) {
+        var mod = this.pack[url]
+        if (!(specifier in this.pack)) {
+          this.pack[specifier] = {}
         }
-      } else if (typeof exports === 'object' && exports !== null) {
-        for (var k in exports) {
-          this.pack[specifier][exports[k]] = mod[k]
+        if (exports === '*') {
+          for (var k in mod) {
+            this.pack[specifier][k] = mod[k]
+          }
+        } else if (typeof exports === 'object' && exports !== null) {
+          for (var k in exports) {
+            this.pack[specifier][exports[k]] = mod[k]
+          }
         }
       }
-    }
-  },
-  require: function(name) {
-    switch (name) {
+    },
+    require: function(name) {
+      switch (name) {
       case 'regenerator-runtime':
         return regeneratorRuntime
       default:
-        throw new Error("module name is undefined")
-    }
-  },
-});
+        throw new Error('module "' + name + '" is undefined')
+      }
+    },
+  });
 `
 
+/** get aleph pkg url. */
 export function getAlephPkgUrl() {
     let url = `https://deno.land/x/aleph@v${VERSION}`
     const { __ALEPH_DEV_PORT: devPort } = globalThis as any
@@ -46,7 +48,7 @@ export function getAlephPkgUrl() {
     return url
 }
 
-/** get relative the path of `to` to `from` */
+/** get relative the path of `to` to `from`. */
 export function getRelativePath(from: string, to: string): string {
     let r = path.relative(from, to).split('\\').join('/')
     if (!r.startsWith('.') && !r.startsWith('/')) {
@@ -78,6 +80,24 @@ export function newModule(url: string): Module {
         jsFile: '',
         bundlingFile: '',
         error: null,
+    }
+}
+
+/** cleanup the previous compilation cache */
+export async function cleanupCompilation(jsFile: string) {
+    const dir = path.dirname(jsFile)
+    const jsFileName = path.basename(jsFile)
+    if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {
+        return
+    }
+    const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'
+    for await (const entry of Deno.readDir(dir)) {
+        if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
+            const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
+            if (_jsName === jsName && jsFileName !== entry.name) {
+                await Deno.remove(path.join(dir, entry.name))
+            }
+        }
     }
 }
 
@@ -185,7 +205,7 @@ export function createHtml({
             if (!util.isString(v) && util.isNEString(v.src)) {
                 if (v.type === 'module') {
                     return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
-                } else if (v.async === true) {
+                } else {
                     return `<link rel="preload" href=${JSON.stringify(v.src)} as="script" />`
                 }
             }

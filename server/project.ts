@@ -1,17 +1,18 @@
 import { initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
+import { checksum as compilerChecksum } from '../compiler/wasm-checksum.js'
 import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
 import { CleanCSS, colors, ensureDir, minify, path, postcss, Sha1, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { getPagePath, RouteModule, Routing } from '../framework/core/routing.ts'
 import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
-import { cleanupCompilation, ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
+import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { APIHandler, Config, RouterURL } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
 import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
-import { AlephRuntimeCode, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, newModule, respondError } from './util.ts'
+import { AlephRuntimeCode, cleanupCompilation, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, newModule, respondError } from './util.ts'
 
 /**
  * A Project to manage the Aleph.js appliaction.
@@ -314,19 +315,19 @@ export class Project {
     }
 
     private getPreloadScripts() {
-        const { baseUrl } = this.config
+        const baseUrl = path.join(this.config.baseUrl, '/_aleph/')
         const mainModule = this.#modules.get('/main.ts')!
         const depsModule = this.#modules.get('/deps.bundling.js')
         const sharedModule = this.#modules.get('/shared.bundling.js')
         const polyfillModule = this.#modules.get('/polyfill.js')
 
         return [
-            polyfillModule ? { src: util.cleanPath(`${baseUrl}/_aleph/polyfill.${polyfillModule.hash.slice(0, hashShort)}.js`) } : {},
-            depsModule ? { src: util.cleanPath(`${baseUrl}/_aleph/deps.${depsModule.hash.slice(0, hashShort)}.js`), } : {},
-            sharedModule ? { src: util.cleanPath(`${baseUrl}/_aleph/shared.${sharedModule.hash.slice(0, hashShort)}.js`), } : {},
-            !this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.sourceHash.slice(0, hashShort)}.js`), } : {},
-            this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' } : {},
-            this.isDev ? { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true } : {},
+            polyfillModule ? { src: path.join(baseUrl, `polyfill.${polyfillModule.sourceHash.slice(0, hashShort)}.js`) } : {},
+            depsModule ? { src: path.join(baseUrl, `deps.${depsModule.sourceHash.slice(0, hashShort)}.js`), } : {},
+            sharedModule ? { src: path.join(baseUrl, `shared.${sharedModule.sourceHash.slice(0, hashShort)}.js`), } : {},
+            !this.isDev ? { src: path.join(baseUrl, `main.${mainModule.sourceHash.slice(0, hashShort)}.js`), } : {},
+            this.isDev ? { src: path.join(baseUrl, `main.${mainModule.hash.slice(0, hashShort)}.js`), type: 'module' } : {},
+            this.isDev ? { src: path.join(baseUrl, `-/deno.land/x/aleph/nomodule.js`), nomodule: true } : {},
         ]
     }
 
@@ -1083,7 +1084,7 @@ export class Project {
 
         if (fsync) {
             if (!options?.bundleMode) {
-                mod.hash = (new Sha1).update(jsContent).hex()
+                mod.hash = (new Sha1).update(compilerChecksum).update(jsContent).hex()
                 mod.jsFile = path.join(saveDir, name + (isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`) + '.js')
                 await cleanupCompilation(mod.jsFile)
                 await Promise.all([
@@ -1139,7 +1140,7 @@ export class Project {
                                     }
                                     return s
                                 })
-                                mod.hash = (new Sha1).update(jsContent).hex()
+                                mod.hash = (new Sha1).update(compilerChecksum).update(jsContent).hex()
                                 mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
                                 cleanupCompilation(mod.jsFile).then(() => {
                                     Promise.all([
@@ -1280,13 +1281,15 @@ export class Project {
 
         // create and copy polyfill
         const polyfillMode = newModule('/polyfill.js')
-        polyfillMode.hash = polyfillMode.sourceHash = (new Sha1).update(AlephRuntimeCode).update(`${this.config.buildTarget}-${VERSION}`).hex()
-        const polyfillFile = path.join(this.buildDir, `polyfill.${polyfillMode.hash.slice(0, hashShort)}.js`)
+        const hash = (new Sha1).update(compilerChecksum).update(AlephRuntimeCode).update(`${this.config.buildTarget}-${VERSION}`).hex()
+        const polyfillFile = path.join(this.buildDir, `polyfill.${hash.slice(0, hashShort)}.js`)
         if (!existsFileSync(polyfillFile)) {
             const rawPolyfillFile = `${alephPkgUrl}/compiler/polyfills/${this.config.buildTarget}/polyfill.js`
             await this.runDenoBundle(rawPolyfillFile, polyfillFile, AlephRuntimeCode, true)
         }
-        Deno.copyFile(polyfillFile, path.join(this.outputDir, '_aleph', `polyfill.${polyfillMode.hash.slice(0, hashShort)}.js`))
+        await Deno.copyFile(polyfillFile, path.join(this.outputDir, '_aleph', `polyfill.${hash.slice(0, hashShort)}.js`))
+
+        polyfillMode.hash = polyfillMode.sourceHash = hash
         this.#modules.set(polyfillMode.url, polyfillMode)
 
         // bundle and copy page moudles
@@ -1306,14 +1309,16 @@ export class Project {
         }).flat().join('\n')
         const bundlingCode = imports
         const mod = newModule(`/${name}.bundling.js`)
-        mod.hash = (new Sha1).update(header).update(bundlingCode).hex()
+        const hash = (new Sha1).update(compilerChecksum).update(header).update(bundlingCode).hex()
         const bundlingFile = path.join(this.buildDir, mod.url)
-        const bundleFile = path.join(this.buildDir, `${name}.bundle.${mod.hash.slice(0, hashShort)}.js`)
-        const saveAs = path.join(this.outputDir, `_aleph/${name}.${mod.hash.slice(0, hashShort)}.js`)
+        const bundleFile = path.join(this.buildDir, `${name}.bundle.${hash.slice(0, hashShort)}.js`)
+        const saveAs = path.join(this.outputDir, `_aleph/${name}.${hash.slice(0, hashShort)}.js`)
+
+        mod.hash = mod.sourceHash = hash
 
         if (existsFileSync(bundleFile)) {
             this.#modules.set(mod.url, mod)
-            await Deno.copyFile(bundleFile, saveAs)
+            await Deno.rename(bundleFile, saveAs)
             return
         }
 
@@ -1324,7 +1329,7 @@ export class Project {
         }
 
         this.#modules.set(mod.url, mod)
-        await Deno.copyFile(bundleFile, saveAs)
+        await Deno.rename(bundleFile, saveAs)
         Deno.remove(bundlingFile)
     }
 
@@ -1332,13 +1337,13 @@ export class Project {
     private async createPageBundle(mod: Module, bundledModules: string[], header = '') {
         const { bundlingFile, hash } = await this.compile(mod.url, { bundleMode: true, bundledModules })
         const _tmp = util.trimSuffix(bundlingFile.replace(reHashJs, ''), '.bundling')
-        const _tmp_bundlingFile = _tmp + `.bundling.js`
+        const _bundlingFile = _tmp + `.bundling.js`
         const bundleFile = _tmp + `.bundle.${hash.slice(0, hashShort)}.js`
         const saveAs = path.join(this.outputDir, `/_aleph/`, util.trimPrefix(_tmp, this.buildDir) + `.${hash.slice(0, hashShort)}.js`)
 
         if (existsFileSync(bundleFile)) {
             await ensureDir(path.dirname(saveAs))
-            await Deno.copyFile(bundleFile, saveAs)
+            await Deno.rename(bundleFile, saveAs)
             return
         }
 
@@ -1346,11 +1351,11 @@ export class Project {
             `import * as mod from ${JSON.stringify(bundlingFile)}`,
             `__ALEPH.pack[${JSON.stringify(mod.url)}] = mod`
         ].join('\n')
-        await Deno.writeTextFile(_tmp_bundlingFile, bundlingCode)
-        await this.runDenoBundle(_tmp_bundlingFile, bundleFile, header)
+        await Deno.writeTextFile(_bundlingFile, bundlingCode)
+        await this.runDenoBundle(_bundlingFile, bundleFile, header)
         await ensureDir(path.dirname(saveAs))
-        await Deno.copyFile(bundleFile, saveAs)
-        Deno.remove(_tmp_bundlingFile)
+        await Deno.rename(bundleFile, saveAs)
+        Deno.remove(_bundlingFile)
     }
 
     /** run deno bundle and compess the output with terser. */
