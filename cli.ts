@@ -117,7 +117,7 @@ async function main() {
         }
     }
 
-    // proxy https://deno.land/x/aleph for framework dev
+    // proxy https://deno.land/x/aleph for aleph.js dev
     if (['dev', 'start', 'build'].includes(command) && existsFileSync('./import_map.json')) {
         const { imports } = JSON.parse(Deno.readTextFileSync('./import_map.json'))
         if (imports['https://deno.land/x/aleph/']) {
