@@ -745,7 +745,7 @@ export class Project {
         const sourceCode = [
             (this.config.framework === 'react' && this.isDev) && `import "${alephPkgUrl}/framework/react/refresh.ts"`,
             `import bootstrap from "${alephPkgUrl}/framework/${framework}/bootstrap.ts"`,
-            `bootstrap(${JSON.stringify(config)})`
+            `bootstrap(${JSON.stringify(config, undefined, 4)})`
         ].filter(Boolean).join('\n')
         await this.compile('/main.ts', { sourceCode })
         if (!this.isDev) {
@@ -972,7 +972,7 @@ export class Project {
                 const swcOptions: SWCOptions = {
                     target: 'es2020',
                     sourceType: loader,
-                    sourceMap: true,
+                    sourceMap: this.isDev,
                 }
                 const { code, map, deps, inlineStyles } = await this.transpile(sourceCode, {
                     url,
@@ -985,7 +985,9 @@ export class Project {
                 })
 
                 jsContent = code
-                jsMap = map!
+                if (map) {
+                    jsMap = map
+                }
 
                 await Promise.all(Object.entries(inlineStyles).map(async ([key, style]) => {
                     let type = style.type
@@ -1088,7 +1090,7 @@ export class Project {
                 mod.jsFile = path.join(saveDir, name + (isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`) + '.js')
                 await cleanupCompilation(mod.jsFile)
                 await Promise.all([
-                    ensureTextFile(mod.jsFile, jsContent),
+                    ensureTextFile(mod.jsFile, jsContent + (jsMap ? '//# sourceMappingURL=' + path.basename(mod.jsFile) + '.map' : '')),
                     jsMap ? ensureTextFile(mod.jsFile + '.map', jsMap) : Promise.resolve(),
                     ensureTextFile(metaFile, JSON.stringify({
                         url,
