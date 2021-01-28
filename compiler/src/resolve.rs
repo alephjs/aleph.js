@@ -670,9 +670,25 @@ impl Fold for AlephResolveFold {
         _ => false,
       };
       if has_callback {
+        let bundle_mode = self.resolver.borrow().bundle_mode;
         let id = self.new_use_deno_hook_ident();
-        if call.args.len() > 1 {
-          call.args[1] = ExprOrSpread {
+        if bundle_mode {
+          call.args[0] = ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
+          };
+        }
+        if call.args.len() == 1 {
+          call.args.push(ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Lit(Lit::Num(Number {
+              span: DUMMY_SP,
+              value: 0 as f64,
+            }))),
+          });
+        }
+        if call.args.len() > 2 {
+          call.args[2] = ExprOrSpread {
             spread: None,
             expr: Box::new(Expr::Lit(Lit::Str(new_js_str(id.clone())))),
           };

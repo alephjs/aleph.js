@@ -303,6 +303,7 @@ mod tests {
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
+    println!("{}", code);
     (code, resolver)
   }
 
@@ -362,12 +363,12 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_use_deno() {
+  fn test_sign_use_deno() {
     let specifer = "/pages/index.tsx";
     let source = r#"
       export default function Index() {
         const verison = useDeno(() => Deno.version)
-        const verison = useDeno(async () => await readJson("data.json"))
+        const verison = useDeno(async () => await readJson("data.json"), 1000)
         return (
           <>
             <p>Deno v{version.deno}</p>
@@ -390,8 +391,11 @@ mod tests {
 
     for _ in 0..3 {
       let (code, _) = t(specifer, source, false);
-      assert!(code.contains(format!(", \"useDeno-{}\"", id_1).as_str()));
-      assert!(code.contains(format!(", \"useDeno-{}\"", id_2).as_str()));
+      assert!(code.contains(format!("0, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!("1000, \"useDeno-{}\"", id_2).as_str()));
+      let (code, _) = t(specifer, source, true);
+      assert!(code.contains(format!("null, 0, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_2).as_str()));
     }
   }
 
