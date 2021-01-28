@@ -7,25 +7,23 @@ import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, 
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { APIHandler, Config, RouterURL, ServerRequest } from '../types.ts'
+import type { Config, RouterURL, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
-import type { DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
+import type { AppliactionOptions, DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
 import { AlephRuntimeCode, cleanupCompilation, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, newModule, respondError } from './util.ts'
 
+const defaultOptions: Required<AppliactionOptions> = {
+    workingDir: '.',
+    mode: 'production',
+    reload: false
+}
+
 /**
- * A Project to manage the Aleph.js appliaction.
- * core functions include:
- * - manage deps
- * - compile & bundle
- * - apply plugins
- * - map page/API routes
- * - watch file changes
- * - call APIs
- * - SSR/SSG
+ * The Alep Appliaction class.
  */
-export class Project {
-    readonly appRoot: string
+export class Appliaction {
+    readonly workingDir: string
     readonly mode: 'development' | 'production'
     readonly config: Readonly<Required<Config>>
     readonly importMap: Readonly<{ imports: ImportMap, scopes: Record<string, ImportMap> }>
@@ -44,12 +42,13 @@ export class Project {
     #postcssReady: Promise<void[]> | null = null
     #reloading = false
 
-    constructor(appDir: string, mode: 'development' | 'production', reload = false) {
-        this.appRoot = path.resolve(appDir)
+    constructor(options: AppliactionOptions = defaultOptions) {
+        const { workingDir, mode, reload } = Object.assign({}, defaultOptions, options)
+        this.workingDir = path.resolve(workingDir)
         this.mode = mode
         this.config = {
             framework: 'react',
-            srcDir: existsDirSync(path.join(this.appRoot, '/src/pages')) ? '/src' : '/',
+            srcDir: existsDirSync(path.join(this.workingDir, '/src/pages')) ? '/src' : '/',
             outputDir: '/dist',
             baseUrl: '/',
             defaultLocale: 'en',
@@ -74,15 +73,15 @@ export class Project {
     }
 
     get srcDir() {
-        return path.join(this.appRoot, this.config.srcDir)
+        return path.join(this.workingDir, this.config.srcDir)
     }
 
     get buildDir() {
-        return path.join(this.appRoot, '.aleph', this.mode)
+        return path.join(this.workingDir, '.aleph', this.mode)
     }
 
     get outputDir() {
-        return path.join(this.appRoot, this.config.outputDir)
+        return path.join(this.workingDir, this.config.outputDir)
     }
 
     isHMRable(url: string) {
@@ -149,7 +148,7 @@ export class Project {
         }
     }
 
-    async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }): Promise<APIHandler | null> {
+    async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }) {
         const [url, chain] = this.#apiRouting.createRouter({
             ...loc,
             pathname: decodeURI(loc.pathname)
@@ -172,7 +171,6 @@ export class Project {
         } else {
             respondError(req, 404, 'page not found')
         }
-        return null
     }
 
     async getSSRData(loc: { pathname: string, search?: string }): Promise<[number, any]> {
@@ -245,7 +243,7 @@ export class Project {
         await this.ssg()
 
         // copy public assets
-        const publicDir = path.join(this.appRoot, 'public')
+        const publicDir = path.join(this.workingDir, 'public')
         if (existsDirSync(publicDir)) {
             let n = 0
             for await (const { path: p } of walk(publicDir, { includeDirs: false, skip: [/(^|\/)\.DS_Store$/] })) {
@@ -332,7 +330,7 @@ export class Project {
 
     /** load config from `aleph.config.(json|mjs|js|ts)` */
     private async loadConfig() {
-        const importMapFile = path.join(this.appRoot, 'import_map.json')
+        const importMapFile = path.join(this.workingDir, 'import_map.json')
         if (existsFileSync(importMapFile)) {
             const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
             const imports: ImportMap = fixImportMap(importMap.imports)
@@ -348,7 +346,7 @@ export class Project {
         const config: Record<string, any> = {}
 
         for (const name of Array.from(['ts', 'js', 'mjs', 'json']).map(ext => `aleph.config.${ext}`)) {
-            const p = path.join(this.appRoot, name)
+            const p = path.join(this.workingDir, name)
             if (existsFileSync(p)) {
                 log.info('  ✓', name)
                 if (name.endsWith('.json')) {
@@ -425,7 +423,7 @@ export class Project {
             Object.assign(this.config, { postcss })
         } else {
             for (const name of Array.from(['ts', 'js', 'mjs', 'json']).map(ext => `postcss.config.${ext}`)) {
-                const p = path.join(this.appRoot, name)
+                const p = path.join(this.workingDir, name)
                 if (existsFileSync(p)) {
                     log.info('  ✓', name)
                     if (name.endsWith('.json')) {
@@ -506,7 +504,7 @@ export class Project {
         await this.loadConfig()
 
         // change current work dir to appDoot
-        Deno.chdir(this.appRoot)
+        Deno.chdir(this.workingDir)
 
         // inject env variables
         Object.entries(this.config.env).forEach(([key, value]) => Deno.env.set(key, value))

@@ -101,6 +101,16 @@ export async function cleanupCompilation(jsFile: string) {
     }
 }
 
+/** parse port number */
+export function parsePortNumber(v: string): number {
+    const num = parseInt(v)
+    if (isNaN(num) || num <= 0 || num > 1 << 16 || !Number.isInteger(num)) {
+        log.error(`invalid port 'v'`)
+        Deno.exit(1)
+    }
+    return num
+}
+
 /** fix import map */
 export function fixImportMap(v: any) {
     const imports: ImportMap = {}

@@ -1,5 +1,6 @@
-import { start } from '../server/server.ts'
-import log from '../shared/log.ts'
+import { Appliaction } from '../server/app.ts'
+import { start } from '../server/mod.ts'
+import { parsePortNumber } from '../server/util.ts'
 
 export const helpMessage = `
 Usage:
@@ -15,11 +16,12 @@ Options:
     -h, --help                   Prints help message
 `
 
-export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const port = parseInt(String(options.p || options.port || '8080'))
-    if (isNaN(port) || port <= 0 || !Number.isInteger(port)) {
-        log.error(`invalid port '${options.port || options.p}'`)
-        Deno.exit(1)
-    }
-    start(appDir, 'localhost', port, true, Boolean(options.r || options.reload))
+export default async function (workingDir: string, options: Record<string, string | boolean>) {
+    const port = parsePortNumber(String(options.p || options.port || '8080'))
+    const app = new Appliaction({
+        workingDir,
+        mode: 'development',
+        reload: Boolean(options.r || options.reload)
+    })
+    start('localhost', port, app)
 }

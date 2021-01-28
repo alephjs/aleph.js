@@ -1,4 +1,4 @@
-import { Project } from '../server/project.ts'
+import { Appliaction } from '../server/app.ts'
 
 export const helpMessage = `
 Usage:
@@ -13,8 +13,12 @@ Options:
     -h, --help                   Prints help message
 `
 
-export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const project = new Project(appDir, 'production', Boolean(options.r || options.reload))
-    await project.build()
+export default async function (workingDir: string, options: Record<string, string | boolean>) {
+    const app = new Appliaction({
+        workingDir,
+        mode: 'production',
+        reload: Boolean(options.r || options.reload)
+    })
+    await app.build()
     Deno.exit(0)
 }
