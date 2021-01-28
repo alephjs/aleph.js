@@ -1,13 +1,19 @@
 import type { AcceptedPlugin, bufio } from './deps.ts'
 
-type TransformRet = {
+/**
+ * The loader plugin transform result.
+ */
+type TransformResult = {
+    loader: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' // default is 'js'
     code: string,
     map?: string,
-    loader?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' // default is 'js'
 }
 
+/**
+ * A loader plugin to transform the source media.
+ */
 export type LoaderPlugin = {
-    /* `type` defines the plugin type */
+    /** `type` defines the plugin type. */
     type: 'loader'
     /** `name` gives the plugin a name. */
     name: string
@@ -16,7 +22,7 @@ export type LoaderPlugin = {
     /** `acceptHMR` enables the HMR. */
     acceptHMR?: boolean
     /** `transform` transforms the source content. */
-    transform(content: Uint8Array, url: string): TransformRet | Promise<TransformRet>
+    transform(content: Uint8Array, url: string): TransformResult | Promise<TransformResult>
 }
 
 /**

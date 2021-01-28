@@ -1,4 +1,4 @@
-// deno.land/std
+// std
 export { Untar } from 'https://deno.land/std@0.84.0/archive/tar.ts'
 export * as bytes from 'https://deno.land/std@0.84.0/bytes/mod.ts'
 export * as base64 from 'https://deno.land/std@0.84.0/encoding/base64.ts'

@@ -36,21 +36,21 @@ Options:
 async function main() {
     // parse deno args
     const args: Array<string> = []
-    const argOptions: Record<string, string | boolean> = {}
+    const flags: Record<string, string | boolean> = {}
     for (let i = 0; i < Deno.args.length; i++) {
         const arg = Deno.args[i]
         if (arg.startsWith('-')) {
             if (arg.includes('=')) {
                 const [key, value] = arg.replace(/^-+/, '').split('=', 2)
-                argOptions[key] = value
+                flags[key] = value
             } else {
                 const key = arg.replace(/^-+/, '')
                 const nextArg = Deno.args[i + 1]
                 if (nextArg && !nextArg.startsWith('-')) {
-                    argOptions[key] = nextArg
+                    flags[key] = nextArg
                     i++
                 } else {
-                    argOptions[key] = true
+                    flags[key] = true
                 }
             }
         } else {
@@ -58,18 +58,17 @@ async function main() {
         }
     }
 
-    // get command, default is 'dev'
     const hasCommand = args.length > 0 && args[0] in commands
     const command = (hasCommand ? String(args.shift()) : 'dev') as keyof typeof commands
 
     // prints aleph.js version
-    if (argOptions.v && command != 'upgrade') {
+    if (flags.v && command != 'upgrade') {
         console.log(`aleph.js v${VERSION}`)
         Deno.exit(0)
     }
 
     // prints aleph.js and deno version
-    if (argOptions.version && command != 'upgrade') {
+    if (flags.version && command != 'upgrade') {
         const { deno, v8, typescript } = Deno.version
         console.log(`aleph.js ${VERSION}`)
         console.log(`deno ${deno}`)
@@ -79,7 +78,7 @@ async function main() {
     }
 
     // prints help message
-    if (argOptions.h || argOptions.help) {
+    if (flags.h || flags.help) {
         if (hasCommand) {
             import(`./cli/${command}.ts`).then(({ helpMessage }) => {
                 console.log(commands[command])
@@ -96,7 +95,7 @@ async function main() {
     }
 
     // sets log level
-    const l = argOptions.L || argOptions['log-level']
+    const l = flags.L || flags['log-level']
     if (util.isNEString(l)) {
         log.setLevel(l)
     }
@@ -163,14 +162,14 @@ async function main() {
 
     const { default: cmd } = await import(`./cli/${command}.ts`)
     if (command === 'upgrade') {
-        await cmd(argOptions.v || argOptions.version || args[0] || 'latest')
+        await cmd(flags.v || flags.version || args[0] || 'latest')
         return
     }
     const appDir = path.resolve(args[0] || '.')
     if (command !== 'init' && !existsDirSync(appDir)) {
         log.fatal('No such directory:', appDir)
     }
-    await cmd(appDir, argOptions)
+    await cmd(appDir, flags)
 }
 
 if (import.meta.main) {

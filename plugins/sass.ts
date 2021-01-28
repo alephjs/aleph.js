@@ -1,7 +1,7 @@
 import { Options, renderSync } from 'https://esm.sh/sass@1.32.5'
-import type { Plugin } from '../types.ts'
+import type { LoaderPlugin } from '../types.ts'
 
-const pluginFactory = (opts: Options = {}): Plugin => ({
+const pluginFactory = (opts: Options = {}): LoaderPlugin => ({
     type: 'loader',
     name: 'sass-loader',
     test: /.(sass|scss)$/,
