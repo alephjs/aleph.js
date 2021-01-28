@@ -1,18 +1,16 @@
 import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts'
 import { colors, path, Sha1, walk } from '../deps.ts'
+import { hashShort } from '../shared/constants.ts'
 import { initWasm, transpileSync } from './mod.ts'
-
-const hashShort = 9
-const reHttp = /^https?:\/\//i
 
 function tsc(source: string, opts: any) {
     const compileOptions: CompileOptions = {
         mode: opts.isDev ? 'development' : 'production',
         target: 'es2020',
         reactRefresh: opts.isDev,
-        rewriteImportPath: (path: string) => path.replace(reHttp, '/-/'),
+        rewriteImportPath: (path: string) => path.replace('https://', '/-/'),
         signUseDeno: (id: string) => {
-            const sig = 'useDeno.' + (new Sha1()).update(id).update("0.2.25").update(Date.now().toString()).hex().slice(0, hashShort)
+            const sig = 'useDeno.' + (new Sha1()).update(id).update('0.2.25').update(Date.now().toString()).hex().slice(0, hashShort)
             return sig
         }
     }
@@ -43,10 +41,10 @@ async function benchmark(sourceFiles: Array<{ code: string, filename: string }>,
 
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 2; i++) {
             tsc(code, { filename, isDev })
         }
-        const d = (performance.now() - t) / 5
+        const d = (performance.now() - t) / 2
         if (d1.min === 0 || d < d1.min) {
             d1.min = d
         }
@@ -57,10 +55,14 @@ async function benchmark(sourceFiles: Array<{ code: string, filename: string }>,
     }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
-        for (let i = 0; i < 5; i++) {
-            transpileSync(code, { url: filename, swcOptions: {}, isDev })
+        for (let i = 0; i < 2; i++) {
+            transpileSync(code, {
+                url: filename,
+                swcOptions: { target: 'es2020' },
+                isDev
+            })
         }
-        const d = (performance.now() - t) / 5
+        const d = (performance.now() - t) / 2
         if (d2.min === 0 || d < d2.min) {
             d2.min = d
         }
@@ -75,23 +77,25 @@ async function benchmark(sourceFiles: Array<{ code: string, filename: string }>,
     console.log(`swc is ${coloredDiff(d1.d / d2.d)} ${d1.d > d2.d ? 'faster' : 'slower'} than tsc`)
 }
 
+async function main() {
+    const p = Deno.run({
+        cmd: ['deno', 'info'],
+        stdout: 'piped',
+        stderr: 'null'
+    })
+    await initWasm((new TextDecoder).decode(await p.output()).split('"')[1])
+    p.close()
+
+    const sourceFiles: Array<{ code: string, filename: string }> = []
+    const walkOptions = { includeDirs: false, exts: ['ts', '.tsx'], skip: [/[\._](test|d)\.tsx?$/i, /\/compiler\//] }
+    for await (const { path: filename } of walk(path.resolve('..'), walkOptions)) {
+        sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
+    }
+
+    await benchmark(sourceFiles, true)
+    await benchmark(sourceFiles, false)
+}
+
 if (import.meta.main) {
-    (async () => {
-        const p = Deno.run({
-            cmd: ['deno', 'info'],
-            stdout: 'piped',
-            stderr: 'null'
-        })
-        await initWasm((new TextDecoder).decode(await p.output()).split('"')[1])
-        p.close()
-
-        const sourceFiles: Array<{ code: string, filename: string }> = []
-        const walkOptions = { includeDirs: false, exts: ['.tsx'], skip: [/[\._]test\.tsx?$/i] }
-        for await (const { path: filename } of walk(path.resolve('..'), walkOptions)) {
-            sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
-        }
-
-        await benchmark(sourceFiles, true)
-        await benchmark(sourceFiles, false)
-    })()
+    main()
 }
