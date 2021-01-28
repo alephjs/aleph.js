@@ -1,7 +1,5 @@
 import type { RouterURL } from '../types.ts'
 
-export type ImportMap = Record<string, ReadonlyArray<string>>
-
 export type AppliactionOptions = {
     workingDir?: string
     mode?: 'development' | 'production'

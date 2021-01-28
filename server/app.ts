@@ -7,10 +7,10 @@ import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, 
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, RouterURL, ServerRequest } from '../types.ts'
+import type { Config, ImportMap, RouterURL, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
-import type { AppliactionOptions, DependencyDescriptor, ImportMap, Module, RenderResult } from './types.ts'
+import type { AppliactionOptions, DependencyDescriptor, Module, RenderResult } from './types.ts'
 import { AlephRuntimeCode, cleanupCompilation, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, newModule, respondError } from './util.ts'
 
 const defaultOptions: Required<AppliactionOptions> = {

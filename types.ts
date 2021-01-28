@@ -153,3 +153,8 @@ export type FormFile = {
     filename: string
     size: number
 }
+
+/**
+ * ES Import map.
+ */
+export type ImportMap = Record<string, ReadonlyArray<string>>

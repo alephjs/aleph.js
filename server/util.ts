@@ -3,9 +3,9 @@ import { MB, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from '../shared/c
 import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { ServerRequest } from '../types.ts'
+import type { ImportMap, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { ImportMap, Module } from './types.ts'
+import type { Module } from './types.ts'
 
 export const AlephRuntimeCode = `
   var __ALEPH = window.__ALEPH || (window.__ALEPH = {
