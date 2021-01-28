@@ -1,5 +1,4 @@
-import { initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
-import { checksum as compilerChecksum } from '../compiler/wasm-checksum.js'
+import { buildChecksum, initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
 import type { AcceptedPlugin, ECMA, ServerRequest } from '../deps.ts'
 import { CleanCSS, colors, ensureDir, minify, path, postcss, Sha1, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
@@ -1086,7 +1085,7 @@ export class Project {
 
         if (fsync) {
             if (!options?.bundleMode) {
-                mod.hash = (new Sha1).update(compilerChecksum).update(jsContent).hex()
+                mod.hash = (new Sha1).update(buildChecksum).update(jsContent).hex()
                 mod.jsFile = path.join(saveDir, name + (isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`) + '.js')
                 await cleanupCompilation(mod.jsFile)
                 await Promise.all([
@@ -1142,7 +1141,7 @@ export class Project {
                                     }
                                     return s
                                 })
-                                mod.hash = (new Sha1).update(compilerChecksum).update(jsContent).hex()
+                                mod.hash = (new Sha1).update(buildChecksum).update(jsContent).hex()
                                 mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
                                 cleanupCompilation(mod.jsFile).then(() => {
                                     Promise.all([
@@ -1283,7 +1282,7 @@ export class Project {
 
         // create and copy polyfill
         const polyfillMode = newModule('/polyfill.js')
-        const hash = (new Sha1).update(compilerChecksum).update(AlephRuntimeCode).update(`${this.config.buildTarget}-${VERSION}`).hex()
+        const hash = (new Sha1).update(buildChecksum).update(AlephRuntimeCode).update(`${this.config.buildTarget}-${VERSION}`).hex()
         const polyfillFile = path.join(this.buildDir, `polyfill.${hash.slice(0, hashShort)}.js`)
         if (!existsFileSync(polyfillFile)) {
             const rawPolyfillFile = `${alephPkgUrl}/compiler/polyfills/${this.config.buildTarget}/polyfill.js`
@@ -1311,7 +1310,7 @@ export class Project {
         }).flat().join('\n')
         const bundlingCode = imports
         const mod = newModule(`/${name}.bundling.js`)
-        const hash = (new Sha1).update(compilerChecksum).update(header).update(bundlingCode).hex()
+        const hash = (new Sha1).update(buildChecksum).update(header).update(bundlingCode).hex()
         const bundlingFile = path.join(this.buildDir, mod.url)
         const bundleFile = path.join(this.buildDir, `${name}.bundle.${hash.slice(0, hashShort)}.js`)
         const saveAs = path.join(this.outputDir, `_aleph/${name}.${hash.slice(0, hashShort)}.js`)

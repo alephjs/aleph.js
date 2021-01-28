@@ -1,7 +1,9 @@
 import { ensureDir, existsSync, path } from '../deps.ts'
 import { VERSION } from '../version.ts'
-import { checksum } from './wasm-checksum.js'
-import { default as init_wasm, transformSync } from './wasm-pack.js'
+import { checksum } from './dist/wasm-checksum.js'
+import { default as init_wasm, transformSync } from './dist/wasm-pack.js'
+
+export const buildChecksum = checksum
 
 type ImportMap = Record<string, ReadonlyArray<string>>
 
@@ -67,7 +69,7 @@ export const initWasm = async (denoCacheDir: string) => {
         const wasmData = await Deno.readFile(cachePath)
         await init_wasm(wasmData)
     } else {
-        const { default: getWasmData } = await import('./wasm.js')
+        const { default: getWasmData } = await import('./dist/wasm.js')
         const wasmData = getWasmData()
         await init_wasm(wasmData)
         await ensureDir(cacheDir)
