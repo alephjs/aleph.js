@@ -1,4 +1,4 @@
-import { path, serve, ws } from '../deps.ts'
+import { path, serve as stdServe, ws } from '../deps.ts'
 import { hashShort, reHashJs, reModuleExt } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -25,7 +25,7 @@ export class Server {
         }
 
         const app = this.#app
-        const url = new URL('http://localhost/' + r.url)
+        const url = new URL('http://localhost' + r.url)
         const pathname = util.cleanPath(decodeURI(url.pathname))
         const req = new Request(r, pathname, {}, url.searchParams)
 
@@ -158,12 +158,11 @@ export class Server {
     }
 }
 
-export async function start(hostname: string, port: number, app: Appliaction) {
+export async function serve(hostname: string, port: number, app: Appliaction) {
     const server = new Server(app)
-
     while (true) {
         try {
-            const s = serve({ hostname, port })
+            const s = stdServe({ hostname, port })
             log.info(`Server ready on http://${hostname}:${port}`)
             for await (const r of s) {
                 server.handle(r)
