@@ -1,6 +1,6 @@
-import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts';
-import { colors, path, Sha1, walk } from '../deps.ts';
-import { initWasm, transpileSync } from './mod.ts';
+import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts'
+import { colors, path, Sha1, walk } from '../deps.ts'
+import { initWasm, transpileSync } from './mod.ts'
 
 const hashShort = 9
 const reHttp = /^https?:\/\//i
@@ -39,6 +39,8 @@ async function benchmark(sourceFiles: Array<{ code: string, filename: string }>,
     console.log(`[benchmark] ${sourceFiles.length} files ${isDev ? '(development mode)' : ''}`)
 
     const d1 = { d: 0, min: 0, max: 0, }
+    const d2 = { d: 0, min: 0, max: 0, }
+
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
         for (let i = 0; i < 5; i++) {
@@ -53,8 +55,6 @@ async function benchmark(sourceFiles: Array<{ code: string, filename: string }>,
         }
         d1.d += d
     }
-
-    const d2 = { d: 0, min: 0, max: 0, }
     for (const { code, filename } of sourceFiles) {
         const t = performance.now()
         for (let i = 0; i < 5; i++) {
@@ -83,6 +83,7 @@ if (import.meta.main) {
             stderr: 'null'
         })
         await initWasm((new TextDecoder).decode(await p.output()).split('"')[1])
+        p.close()
 
         const sourceFiles: Array<{ code: string, filename: string }> = []
         const walkOptions = { includeDirs: false, exts: ['.tsx'], skip: [/[\._]test\.tsx?$/i] }
