@@ -1,14 +1,22 @@
 import type { AcceptedPlugin, bufio } from './deps.ts'
 
+type TransformRet = {
+    code: string,
+    map?: string,
+    loader?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' // default is 'js'
+}
+
 export type LoaderPlugin = {
     /* `type` defines the plugin type */
     type: 'loader'
+    /** `name` gives the plugin a name. */
+    name: string
     /** `test` matches the import url. */
     test: RegExp
     /** `acceptHMR` enables the HMR. */
     acceptHMR?: boolean
     /** `transform` transforms the source content. */
-    transform(content: Uint8Array, url: string): Promise<{ code: string, map?: string, type?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' }>
+    transform(content: Uint8Array, url: string): TransformRet | Promise<TransformRet>
 }
 
 /**
@@ -29,7 +37,7 @@ export type SSROptions = {
 }
 
 /**
- * The Config for Aleph.js application.
+ * The Config for **Aleph.js** application.
  */
 export type Config = {
     /** `framework` to run your application (default is 'react'). */
@@ -155,6 +163,6 @@ export type FormFile = {
 }
 
 /**
- * ES Import map.
+ * The ES Import maps.
  */
 export type ImportMap = Record<string, ReadonlyArray<string>>

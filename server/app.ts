@@ -938,10 +938,10 @@ export class Appliaction {
             } else {
                 for (const plugin of this.config.plugins) {
                     if (plugin.type === 'loader' && plugin.test.test(url)) {
-                        const { code, type = 'js' } = await plugin.transform(sourceContent, url)
+                        const { code, loader: pLoader = 'js' } = await plugin.transform(sourceContent, url)
                         sourceCode = code
-                        loader = type
-                        mod.loader = type
+                        loader = pLoader
+                        mod.loader = pLoader
                         break
                     }
                 }
@@ -1000,8 +1000,8 @@ export class Appliaction {
                     if (type !== 'css') {
                         for (const plugin of this.config.plugins) {
                             if (plugin.type === 'loader' && plugin.test.test(`${key}.${type}`)) {
-                                const { code, type: _type } = await plugin.transform((new TextEncoder).encode(tpl), url)
-                                if (_type === 'css') {
+                                const { code, loader } = await plugin.transform((new TextEncoder).encode(tpl), url)
+                                if (loader === 'css') {
                                     tpl = code
                                     type = 'css'
                                 }

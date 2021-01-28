@@ -1,6 +1,8 @@
 import { Options, renderSync } from 'https://esm.sh/sass@1.32.5'
+import type { Plugin } from '../types.ts'
 
-const pluginFactory = (opts: Options = {}) => ({
+const pluginFactory = (opts: Options = {}): Plugin => ({
+    type: 'loader',
     name: 'sass-loader',
     test: /.(sass|scss)$/,
     acceptHMR: true,
@@ -19,10 +21,10 @@ const pluginFactory = (opts: Options = {}) => ({
         }
     }
 })
-
 const defaultPlugin = pluginFactory()
 
-pluginFactory.displayName = defaultPlugin.name
+// make the `pluginFactory` as a plugin
+pluginFactory.type = defaultPlugin.type
 pluginFactory.test = defaultPlugin.test
 pluginFactory.acceptHMR = defaultPlugin.acceptHMR
 pluginFactory.transform = defaultPlugin.transform

@@ -1,4 +1,7 @@
-export default {
+import type { Plugin } from '../types.ts'
+
+const wasmLoader: Plugin = {
+    type: 'loader',
     name: 'wasm-loader',
     test: /.wasm$/,
     transform(content: Uint8Array, path: string) {
@@ -13,3 +16,5 @@ export default {
         }
     }
 }
+
+export default wasmLoader
