@@ -10,19 +10,10 @@ Options:
     -h, --help               Prints help message
 `
 
-async function run(...cmd: string[]) {
-    const p = Deno.run({
-        cmd,
-        stdout: 'null',
-        stderr: 'piped'
-    })
-    Deno.stderr.write(await p.stderrOutput())
-    p.close()
-}
-
 export default async function (version: string) {
     console.log('Looking up latest version...')
-    const { latest, versions } = await (await fetch('https://cdn.deno.land/aleph/meta/versions.json')).json()
+    const metaUrl = 'https://cdn.deno.land/aleph/meta/versions.json'
+    const { latest, versions } = await (await fetch(metaUrl)).json()
     if (version === 'latest') {
         version = latest
     } else if (!versions.includes(version)) {
@@ -36,7 +27,13 @@ export default async function (version: string) {
         console.log('Already up-to-date!')
         Deno.exit(0)
     }
-    await run('deno', 'install', '-A', '-f', '-n', 'aleph', `https://deno.land/x/aleph@${version}/cli.ts`)
+    const p = Deno.run({
+        cmd: ['deno', 'install', '-A', '-f', '-n', 'aleph', `https://deno.land/x/aleph@${version}/cli.ts`],
+        stdout: 'null',
+        stderr: 'piped'
+    })
+    Deno.stderr.write(await p.stderrOutput())
     console.log(`Aleph.js is up to ${version}!`)
+    p.close()
     Deno.exit(0)
 }

@@ -1,5 +1,5 @@
 import { Appliaction } from '../server/app.ts'
-import { start } from '../server/mod.ts'
+import { serve } from '../server/mod.ts'
 import { parsePortNumber } from '../server/util.ts'
 
 export const helpMessage = `
@@ -25,5 +25,5 @@ export default async function (workingDir: string, options: Record<string, strin
         mode: 'production',
         reload: Boolean(options.r || options.reload)
     })
-    start(host, port, app)
+    serve(host, port, app)
 }
