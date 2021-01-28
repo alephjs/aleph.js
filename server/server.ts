@@ -8,6 +8,14 @@ import { getContentType } from './mime.ts'
 import { Project } from './project.ts'
 import { createHtml } from './util.ts'
 
+export class Server {
+
+}
+
+export function createServer(): Server {
+    return new Server()
+}
+
 export async function start(appDir: string, hostname: string, port: number, isDev = false, reload = false) {
     const project = new Project(appDir, isDev ? 'development' : 'production', reload)
     await project.ready

@@ -1,4 +1,4 @@
-import type { AcceptedPlugin, bufio, Response } from './deps.ts'
+import type { AcceptedPlugin, bufio } from './deps.ts'
 
 export type LoaderPlugin = {
     /* `type` defines the plugin type */
@@ -68,23 +68,26 @@ export type APIHandler = {
 }
 
 /**
- * The raw request object of http request.
+ * An interface that aligns to the parts of std http srever's `ServerRequest`.
  */
 export interface ServerRequest {
     readonly url: string
     readonly method: string
-    readonly proto: string
-    readonly protoMinor: number
-    readonly protoMajor: number
     readonly headers: Headers
     readonly conn: Deno.Conn
     readonly r: bufio.BufReader
     readonly w: bufio.BufWriter
-    readonly done: Promise<Error | undefined>
-    readonly contentLength: number | null
     readonly body: Deno.Reader
-    respond(r: Response): Promise<void>
-    finalize(): Promise<void>
+    respond(r: ServerResponse): Promise<void>
+}
+
+/**
+ * An interface is compatible with std http srever's `request.respond()`.
+ */
+export interface ServerResponse {
+    status?: number
+    headers?: Headers
+    body?: Uint8Array | Deno.Reader | string
 }
 
 /**

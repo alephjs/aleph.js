@@ -1,6 +1,6 @@
-import { brotli, bufio, gzipEncode, Response, ServerRequest } from '../deps.ts'
+import { brotli, bufio, gzipEncode } from '../deps.ts'
 import log from '../shared/log.ts'
-import type { APIRequest, FormDataBody } from '../types.ts'
+import type { APIRequest, FormDataBody, ServerRequest, ServerResponse } from '../types.ts'
 import { multiParser } from './multiparser.ts'
 
 export class Request implements APIRequest {
@@ -41,18 +41,6 @@ export class Request implements APIRequest {
         return this.#req.method
     }
 
-    get proto(): string {
-        return this.#req.proto
-    }
-
-    get protoMinor(): number {
-        return this.#req.protoMinor
-    }
-
-    get protoMajor(): number {
-        return this.#req.protoMajor
-    }
-
     get headers(): Headers {
         return this.#req.headers
     }
@@ -69,24 +57,12 @@ export class Request implements APIRequest {
         return this.#req.w
     }
 
-    get done(): Promise<Error | undefined> {
-        return this.#req.done
-    }
-
-    get contentLength(): number | null {
-        return this.#req.contentLength
-    }
-
     get body(): Deno.Reader {
         return this.#req.body
     }
 
-    async respond(r: Response): Promise<void> {
+    async respond(r: ServerResponse): Promise<void> {
         return this.#req.respond(r)
-    }
-
-    async finalize(): Promise<void> {
-        return this.#req.finalize()
     }
 
     get pathname(): string {

@@ -1,10 +1,11 @@
-import { listenAndServe, path, ServerRequest, walk } from './deps.ts'
+import { listenAndServe, path, walk } from './deps.ts'
 import { Request } from './server/api.ts'
 import { getContentType } from './server/mime.ts'
 import { createHtml } from './server/util.ts'
 import { existsDirSync, existsFileSync } from './shared/fs.ts'
 import log from './shared/log.ts'
 import util from './shared/util.ts'
+import { ServerRequest } from './types.ts'
 import { VERSION } from './version.ts'
 
 const commands = {
