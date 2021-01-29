@@ -186,7 +186,7 @@ export class Appliaction {
                 ...this.getScripts()
             ],
             head: customLoading?.head || [],
-            body: `<main>${customLoading?.body || ''}</main>`,
+            body: `<div id="__aleph">${customLoading?.body || ''}</div>`,
             minify: !this.isDev
         })
         return html
@@ -1450,7 +1450,7 @@ export class Appliaction {
             status: url.pagePath === '' ? 404 : 200,
             head: [],
             scripts: [],
-            body: '<main></main>',
+            body: '<div id="__aleph"></div>',
             data: null,
         }
         if (ret.status === 404) {
@@ -1496,7 +1496,7 @@ export class Appliaction {
                 }
                 return script
             }))
-            ret.body = `<main>${body}</main>`
+            ret.body = `<div id="__aleph">${body}</div>`
             ret.data = data
             this.#renderCache.get(url.pagePath)!.set(key, ret)
             if (this.isDev) {
@@ -1505,7 +1505,7 @@ export class Appliaction {
         } catch (err) {
             ret.status = 500
             ret.head = ['<title>Error 500 - Aleph.js</title>']
-            ret.body = `<main><pre>${colors.stripColor(err.stack)}</pre></main>`
+            ret.body = `<div id="__aleph"><pre>${colors.stripColor(err.stack)}</pre></div>`
             log.error(err)
         }
         return ret
@@ -1535,7 +1535,7 @@ export class Appliaction {
 
     /** render custom 404 page. */
     private async render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
-        const ret: RenderResult = { url, status: 404, head: [], scripts: [], body: '<main></main>', data: null }
+        const ret: RenderResult = { url, status: 404, head: [], scripts: [], body: '<div id="__aleph"></div>', data: null }
         try {
             const e404Module = Array.from(this.#modules.keys())
                 .filter(url => url.replace(reModuleExt, '') == '/404')
@@ -1555,12 +1555,12 @@ export class Appliaction {
                 }
                 return script
             }))
-            ret.body = `<main>${body}</main>`
+            ret.body = `<div id="__aleph">${body}</div>`
             ret.data = data
         } catch (err) {
             ret.status = 500
             ret.head = ['<title>Error 500 - Aleph.js</title>']
-            ret.body = `<main><pre>${colors.stripColor(err.stack)}</pre></main>`
+            ret.body = `<div id="__aleph"><pre>${colors.stripColor(err.stack)}</pre></div>`
             log.error(err)
         }
         return ret
@@ -1592,7 +1592,7 @@ export class Appliaction {
             )
             return {
                 head,
-                body: `<main>${body}</main>`
+                body: `<div id="__aleph">${body}</div>`
             } as Pick<RenderResult, 'head' | 'body'>
         }
         return null
