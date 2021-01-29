@@ -3,27 +3,20 @@ import { createElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import { hashShort, reHttp } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
+import type { RenderResult, RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RendererContext, RouterContext } from './context.ts'
 import { AsyncUseDenoError, E400MissingComponent, E404Page } from './error.ts'
 import { serverStyles } from './style.ts'
 import { createPageProps, isLikelyReactComponent } from './util.ts'
 
-interface RenderResult {
-    head: string[]
-    body: string
-    data: Record<string, any> | null
-    scripts: Record<string, any>[]
-}
-
-export async function renderPage(
+export async function render(
     url: RouterURL,
     App: ComponentType<any> | undefined,
     E404: ComponentType | undefined,
     pageComponentTree: { url: string, Component?: any }[],
     styles?: { url: string, hash: string }[]
-): Promise<RenderResult> {
+) {
     let el: ReactElement
     const pageProps = createPageProps(pageComponentTree)
     if (App) {
@@ -48,7 +41,7 @@ export async function renderPage(
         }
     }
 
-    const ret: RenderResult = {
+    const ret: Omit<RenderResult, 'url' | 'status'> = {
         head: [],
         body: '',
         data: null,
@@ -58,7 +51,7 @@ export async function renderPage(
         headElements: new Map(),
         scriptsElements: new Map()
     }
-    const buildMode = Deno.env.get('__buildMode')
+    const buildMode = Deno.env.get('BUILD_MODE')
     const data: Record<string, any> = {}
     const useDenUrl = `useDeno://${url.pathname}`
     const useDenoAsyncCalls: Array<Promise<any>> = []
@@ -98,7 +91,6 @@ export async function renderPage(
             if (error instanceof AsyncUseDenoError) {
                 continue
             }
-            console.log(error)
             Object.assign(window, { [`__asyncData_${useDenUrl}`]: null })
             throw error
         }

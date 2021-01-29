@@ -7,20 +7,13 @@ import { hashShort, reFullVersion, reHashJs, reHashResolve, reHttp, reLocaleID, 
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, ImportMap, RouterURL, ServerRequest } from '../types.ts'
+import type { Config, DependencyDescriptor, ImportMap, Module, RenderResult, RouterURL, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
-import type { AppliactionOptions, DependencyDescriptor, Module, RenderResult } from './types.ts'
 import { AlephRuntimeCode, cleanupCompilation, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, newModule, respondError } from './util.ts'
 
-const defaultOptions: Required<AppliactionOptions> = {
-    workingDir: '.',
-    mode: 'production',
-    reload: false
-}
-
 /**
- * The Alep Appliaction class.
+ * The Aleph Server Appliaction class.
  */
 export class Appliaction {
     readonly workingDir: string
@@ -34,16 +27,15 @@ export class Appliaction {
     #pageRouting: Routing = new Routing()
     #apiRouting: Routing = new Routing()
     #fsWatchListeners: Array<EventEmitter> = []
-    #renderer: { renderPage: CallableFunction } = { renderPage: () => { } }
-    #rendered: Map<string, Map<string, RenderResult>> = new Map()
+    #renderer: { render: CallableFunction } = { render: () => { } }
+    #renderCache: Map<string, Map<string, RenderResult>> = new Map()
     #postcssPlugins: Record<string, AcceptedPlugin> = {}
     #cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
     #swcReady: Promise<void> | null = null
     #postcssReady: Promise<void[]> | null = null
     #reloading = false
 
-    constructor(options: AppliactionOptions = defaultOptions) {
-        const { workingDir, mode, reload } = Object.assign({}, defaultOptions, options)
+    constructor(workingDir = '.', mode: 'development' | 'production' = 'production', reload = false) {
         this.workingDir = path.resolve(workingDir)
         this.mode = mode
         this.config = {
@@ -76,12 +68,12 @@ export class Appliaction {
         return path.join(this.workingDir, this.config.srcDir)
     }
 
-    get buildDir() {
-        return path.join(this.workingDir, '.aleph', this.mode)
-    }
-
     get outputDir() {
         return path.join(this.workingDir, this.config.outputDir)
+    }
+
+    get buildDir() {
+        return path.join(this.workingDir, '.aleph', this.mode)
     }
 
     isHMRable(url: string) {
@@ -105,33 +97,15 @@ export class Appliaction {
         return false
     }
 
-    isSSRable(pathname: string): boolean {
-        const { ssr } = this.config
-        if (util.isPlainObject(ssr)) {
-            if (ssr.include) {
-                for (let r of ssr.include) {
-                    if (!r.test(pathname)) {
-                        return false
-                    }
-                }
-            }
-            if (ssr.exclude) {
-                for (let r of ssr.exclude) {
-                    if (r.test(pathname)) {
-                        return false
-                    }
-                }
-            }
-            return true
-        }
-        return ssr
-    }
-
     getModule(url: string): Module | null {
         if (this.#modules.has(url)) {
             return this.#modules.get(url)!
         }
         return null
+    }
+
+    async addModule(source: { url: string, code: string }): Promise<Module> {
+        return await this.compile(source.url, { sourceCode: source.code })
     }
 
     createFSWatcher(): EventEmitter {
@@ -148,7 +122,7 @@ export class Appliaction {
         }
     }
 
-    async callAPI(req: ServerRequest, loc: { pathname: string, search?: string }) {
+    async handleAPI(req: ServerRequest, loc: { pathname: string, search?: string }) {
         const [url, chain] = this.#apiRouting.createRouter({
             ...loc,
             pathname: decodeURI(loc.pathname)
@@ -194,7 +168,7 @@ export class Appliaction {
             head: head,
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                ...this.getPreloadScripts(),
+                ...this.getScripts(),
                 ...scripts
             ],
             body,
@@ -209,7 +183,7 @@ export class Appliaction {
         const html = createHtml({
             lang: defaultLocale,
             scripts: [
-                ...this.getPreloadScripts()
+                ...this.getScripts()
             ],
             head: customLoading?.head || [],
             body: `<main>${customLoading?.body || ''}</main>`,
@@ -263,8 +237,8 @@ export class Appliaction {
         log.info(`Done in ${Math.round(performance.now() - start)}ms`)
     }
 
-    /** inject HMR helper code  */
-    injectHmr({ url, loader }: Module, content: string): string {
+    /** inject HMR code  */
+    injectHMRCode({ url, loader }: Module, content: string): string {
         const { __ALEPH_DEV_PORT: devPort } = globalThis as any
         const alephModuleLocalUrlPreifx = devPort ? `http_localhost_${devPort}` : `deno.land/x/aleph@v${VERSION}`
         const localUrl = fixImportUrl(url)
@@ -311,7 +285,7 @@ export class Appliaction {
         return lines.join('\n')
     }
 
-    private getPreloadScripts() {
+    private getScripts() {
         const baseUrl = path.join(this.config.baseUrl, '/_aleph/')
         const mainModule = this.#modules.get('/main.ts')!
         const depsModule = this.#modules.get('/deps.bundling.js')
@@ -348,7 +322,7 @@ export class Appliaction {
         for (const name of Array.from(['ts', 'js', 'mjs', 'json']).map(ext => `aleph.config.${ext}`)) {
             const p = path.join(this.workingDir, name)
             if (existsFileSync(p)) {
-                log.info('  ✓', name)
+                log.info('config loaded from', name)
                 if (name.endsWith('.json')) {
                     const conf = JSON.parse(await Deno.readTextFile(p))
                     if (util.isPlainObject(conf)) {
@@ -464,7 +438,7 @@ export class Appliaction {
             }, this.importMap.imports)
         })
 
-        // update routing
+        // create page routing
         this.#pageRouting = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
     }
 
@@ -499,8 +473,6 @@ export class Appliaction {
             await ensureDir(this.buildDir)
         }
 
-        log.info(colors.bold(`Aleph.js v${VERSION}`))
-        log.info(colors.bold('- Global'))
         await this.loadConfig()
 
         // change current work dir to appDoot
@@ -508,11 +480,11 @@ export class Appliaction {
 
         // inject env variables
         Object.entries(this.config.env).forEach(([key, value]) => Deno.env.set(key, value))
-        Deno.env.set('__version', VERSION)
-        Deno.env.set('__buildMode', this.mode)
+        Deno.env.set('ALEPH_VERSION', VERSION)
+        Deno.env.set('BUILD_MODE', this.mode)
 
         // add react refresh helpers for ssr
-        if (this.isDev) {
+        if (this.config.framework == "react" && this.isDev) {
             Object.assign(globalThis, {
                 $RefreshReg$: () => { },
                 $RefreshSig$: () => (type: any) => type,
@@ -525,13 +497,8 @@ export class Appliaction {
             let isCustom = true
             switch (name.replace(reModuleExt, '')) {
                 case 'app':
-                    log.info('  ✓', 'Custom App')
-                    break
                 case '404':
-                    log.info('  ✓', 'Custom 404 Page')
-                    break
                 case 'loading':
-                    log.info('  ✓', 'Custom Loading Page')
                     break
                 default:
                     isCustom = false
@@ -559,40 +526,30 @@ export class Appliaction {
         // create main module
         await this.createMainModule()
 
-        // pre-compile some modules
+        // pre-compile framework modules
+        const rendererUrl = `${alephPkgUrl}/framework/${this.config.framework}/renderer.ts`
+        await this.compile(rendererUrl)
         if (this.isDev) {
-            for (const mod of [
-                'hmr.ts',
-                'nomodule.ts',
-            ]) {
+            const mods = ['hmr.ts', 'nomodule.ts']
+            for (const mod of mods) {
                 await this.compile(`${alephPkgUrl}/framework/core/${mod}`)
             }
         }
 
-        // import renderer
-        const rendererUrl = `${alephPkgUrl}/framework/${this.config.framework}/renderer.ts`
-        await this.compile(rendererUrl)
-        const { renderPage } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
-        this.#renderer = { renderPage }
+        // import framework renderer
+        const { render } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
+        this.#renderer = { render }
 
+        // load plugins
+        for (const plugin of this.config.plugins) {
+            if (plugin.type === 'server') {
+                await plugin.onInit(this)
+            }
+        }
 
         // reload end
         if (reload) {
             this.#reloading = false
-        }
-
-        if (this.isDev) {
-            if (this.#apiRouting.paths.length > 0) {
-                log.info(colors.bold('- APIs'))
-            }
-            for (const path of this.#apiRouting.paths) {
-                log.info('  λ', path)
-            }
-            log.info(colors.bold('- Pages'))
-            for (const path of this.#pageRouting.paths) {
-                const isIndex = path == '/'
-                log.info('  ○', path, isIndex ? colors.dim('(index)') : '')
-            }
         }
 
         log.debug('init project in ' + Math.round(performance.now() - t) + 'ms')
@@ -671,9 +628,9 @@ export class Appliaction {
                                     }
                                 }
                                 if (path.replace(reModuleExt, '') === '/app') {
-                                    this.#rendered.clear()
+                                    this.#renderCache.clear()
                                 } else if (path.startsWith('/pages/')) {
-                                    this.#rendered.delete(getPagePath(path))
+                                    this.#renderCache.delete(getPagePath(path))
                                     this.#pageRouting.update(this.getRouteModule(mod))
                                 } else if (path.startsWith('/api/')) {
                                     this.#apiRouting.update(this.getRouteModule(mod))
@@ -683,7 +640,7 @@ export class Appliaction {
                                 }
                                 this.updateHash(path, mod.hash, ({ url, hash }) => {
                                     if (url.startsWith('/pages/')) {
-                                        this.#rendered.delete(getPagePath(url))
+                                        this.#renderCache.delete(getPagePath(url))
                                     }
                                     if (!hmrable && this.isHMRable(url)) {
                                         this.#fsWatchListeners.forEach(e => e.emit('modify-' + url, hash))
@@ -694,9 +651,9 @@ export class Appliaction {
                             })
                         } else if (this.#modules.has(path)) {
                             if (path.replace(reModuleExt, '') === '/app') {
-                                this.#rendered.clear()
+                                this.#renderCache.clear()
                             } else if (path.startsWith('/pages/')) {
-                                this.#rendered.delete(getPagePath(path))
+                                this.#renderCache.delete(getPagePath(path))
                                 this.#pageRouting.removeRoute(path)
                             } else if (path.startsWith('/api/')) {
                                 this.#apiRouting.removeRoute(path)
@@ -716,7 +673,7 @@ export class Appliaction {
         }
     }
 
-    /** returns the route module by given module url and hash. */
+    /** returns the route module by given module. */
     private getRouteModule({ url, hash }: Module): RouteModule {
         const deps = this.lookupDeps(url).filter(({ isData }) => !!isData)
         return { url, hash, deps: deps.length > 0 ? deps : undefined }
@@ -855,7 +812,7 @@ export class Appliaction {
         let shouldCompile = false
         let fsync = false
         let jsContent = ''
-        let jsMap: string | null = null
+        let jsSourceMap: string | null = null
 
         if (options?.sourceCode) {
             sourceContent = (new TextEncoder).encode(options.sourceCode)
@@ -938,10 +895,12 @@ export class Appliaction {
             } else {
                 for (const plugin of this.config.plugins) {
                     if (plugin.type === 'loader' && plugin.test.test(url)) {
-                        const { code, loader: pLoader = 'js' } = await plugin.transform(sourceContent, url)
-                        sourceCode = code
-                        loader = pLoader
-                        mod.loader = pLoader
+                        if (plugin.precompile) {
+                            const { code } = await plugin.precompile(sourceContent, url)
+                            sourceCode = code
+                        }
+                        loader = plugin.loader
+                        mod.loader = plugin.loader
                         break
                     }
                 }
@@ -983,7 +942,7 @@ export class Appliaction {
 
                 jsContent = code
                 if (map) {
-                    jsMap = map
+                    jsSourceMap = map
                 }
 
                 await Promise.all(Object.entries(inlineStyles).map(async ([key, style]) => {
@@ -999,12 +958,10 @@ export class Appliaction {
                         .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
                     if (type !== 'css') {
                         for (const plugin of this.config.plugins) {
-                            if (plugin.type === 'loader' && plugin.test.test(`${key}.${type}`)) {
-                                const { code, loader } = await plugin.transform((new TextEncoder).encode(tpl), url)
-                                if (loader === 'css') {
-                                    tpl = code
-                                    type = 'css'
-                                }
+                            if (plugin.type === 'loader' && plugin.loader === 'css' && plugin.precompile && plugin.test.test(`${key}.${type}`)) {
+                                const { code } = await plugin.precompile((new TextEncoder).encode(tpl), url)
+                                tpl = code
+                                type = 'css'
                                 break
                             }
                         }
@@ -1087,8 +1044,8 @@ export class Appliaction {
                 mod.jsFile = path.join(saveDir, name + (isRemote ? '' : `.${mod.hash.slice(0, hashShort)}`) + '.js')
                 await cleanupCompilation(mod.jsFile)
                 await Promise.all([
-                    ensureTextFile(mod.jsFile, jsContent + (jsMap ? '//# sourceMappingURL=' + path.basename(mod.jsFile) + '.map' : '')),
-                    jsMap ? ensureTextFile(mod.jsFile + '.map', jsMap) : Promise.resolve(),
+                    ensureTextFile(mod.jsFile, jsContent + (jsSourceMap ? '//# sourceMappingURL=' + path.basename(mod.jsFile) + '.map' : '')),
+                    jsSourceMap ? ensureTextFile(mod.jsFile + '.map', jsSourceMap) : Promise.resolve(),
                     ensureTextFile(metaFile, JSON.stringify({
                         url,
                         sourceHash: mod.sourceHash,
@@ -1139,6 +1096,10 @@ export class Appliaction {
                                     }
                                     return s
                                 })
+                                let prevSourceMap: string | null = null
+                                if (existsFileSync(mod.jsFile + '.map')) {
+                                    prevSourceMap = Deno.readTextFileSync(mod.jsFile + '.map')
+                                }
                                 mod.hash = (new Sha1).update(buildChecksum).update(jsContent).hex()
                                 mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${mod.hash.slice(0, hashShort)}.js`
                                 cleanupCompilation(mod.jsFile).then(() => {
@@ -1149,13 +1110,14 @@ export class Appliaction {
                                             hash: mod.hash,
                                             deps: mod.deps,
                                         }, undefined, 4)),
-                                        ensureTextFile(mod.jsFile, jsContent)
+                                        ensureTextFile(mod.jsFile, jsContent),
+                                        prevSourceMap ? ensureTextFile(mod.jsFile + '.map', prevSourceMap) : Promise.resolve()
                                     ])
                                 })
                             })
                         }
                         callback(mod)
-                        log.debug('update dependency:', mod.url, '<-', depUrl)
+                        log.debug('update dependency:', mod.url, colors.dim('<-'), depUrl)
                         this.updateHash(mod.url, mod.hash, callback)
                     }
                     break
@@ -1164,7 +1126,7 @@ export class Appliaction {
         })
     }
 
-    /** load dependency conentent, use deno builtin cache system */
+    /** load dependency content, use deno builtin cache system */
     private async loadDependency(url: string): Promise<Uint8Array> {
         const u = new URL(url)
         if (url.startsWith('https://esm.sh/')) {
@@ -1455,7 +1417,7 @@ export class Appliaction {
             head: head,
             scripts: [
                 data ? { type: 'application/json', innerText: JSON.stringify(data), id: 'ssr-data' } : '',
-                ...this.getPreloadScripts(),
+                ...this.getScripts(),
                 ...scripts
             ],
             body,
@@ -1474,13 +1436,13 @@ export class Appliaction {
         const [url, pageModuleTree] = this.#pageRouting.createRouter(loc)
         const key = [url.pathname, url.query.toString()].filter(Boolean).join('?')
         if (url.pagePath !== '') {
-            if (this.#rendered.has(url.pagePath)) {
-                const cache = this.#rendered.get(url.pagePath)!
+            if (this.#renderCache.has(url.pagePath)) {
+                const cache = this.#renderCache.get(url.pagePath)!
                 if (cache.has(key)) {
                     return cache.get(key)!
                 }
             } else {
-                this.#rendered.set(url.pagePath, new Map())
+                this.#renderCache.set(url.pagePath, new Map())
             }
         }
         const ret: RenderResult = {
@@ -1517,7 +1479,7 @@ export class Appliaction {
                 body,
                 data,
                 scripts
-            } = await this.#renderer.renderPage(
+            } = await this.#renderer.render(
                 url,
                 App,
                 undefined,
@@ -1536,7 +1498,7 @@ export class Appliaction {
             }))
             ret.body = `<main>${body}</main>`
             ret.data = data
-            this.#rendered.get(url.pagePath)!.set(key, ret)
+            this.#renderCache.get(url.pagePath)!.set(key, ret)
             if (this.isDev) {
                 log.debug(`render '${url.pathname}' in ${Math.round(performance.now() - start)}ms`)
             }
@@ -1549,6 +1511,28 @@ export class Appliaction {
         return ret
     }
 
+    private isSSRable(pathname: string): boolean {
+        const { ssr } = this.config
+        if (util.isPlainObject(ssr)) {
+            if (ssr.include) {
+                for (let r of ssr.include) {
+                    if (!r.test(pathname)) {
+                        return false
+                    }
+                }
+            }
+            if (ssr.exclude) {
+                for (let r of ssr.exclude) {
+                    if (r.test(pathname)) {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
+        return ssr
+    }
+
     /** render custom 404 page. */
     private async render404Page(url: RouterURL = { locale: this.config.defaultLocale, pagePath: '', pathname: '/', params: {}, query: new URLSearchParams() }) {
         const ret: RenderResult = { url, status: 404, head: [], scripts: [], body: '<main></main>', data: null }
@@ -1557,7 +1541,7 @@ export class Appliaction {
                 .filter(url => url.replace(reModuleExt, '') == '/404')
                 .map(url => this.#modules.get(url))[0]
             const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
-            const { head, body, data, scripts } = await this.#renderer.renderPage(
+            const { head, body, data, scripts } = await this.#renderer.render(
                 url,
                 undefined,
                 E404,
@@ -1599,7 +1583,7 @@ export class Appliaction {
             const {
                 head,
                 body
-            } = await this.#renderer.renderPage(
+            } = await this.#renderer.render(
                 router,
                 undefined,
                 undefined,

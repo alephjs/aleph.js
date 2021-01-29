@@ -3,9 +3,8 @@ import { MB, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from '../shared/c
 import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { ImportMap, ServerRequest } from '../types.ts'
+import type { ImportMap, Module, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
-import type { Module } from './types.ts'
 
 export const AlephRuntimeCode = `
   var __ALEPH = window.__ALEPH || (window.__ALEPH = {
@@ -99,16 +98,6 @@ export async function cleanupCompilation(jsFile: string) {
             }
         }
     }
-}
-
-/** parse port number */
-export function parsePortNumber(v: string): number {
-    const num = parseInt(v)
-    if (isNaN(num) || num <= 0 || num > 1 << 16 || !Number.isInteger(num)) {
-        log.error(`invalid port 'v'`)
-        Deno.exit(1)
-    }
-    return num
 }
 
 /** fix import map */

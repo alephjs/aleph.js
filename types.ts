@@ -1,34 +1,43 @@
 import type { AcceptedPlugin, bufio } from './deps.ts'
 
 /**
- * The loader plugin transform result.
+ * The transform result of compiler.
  */
-type TransformResult = {
-    loader: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' // default is 'js'
+export type TransformResult = {
     code: string,
     map?: string,
 }
 
 /**
- * A loader plugin to transform the source media.
+ * A loader plugin to load source media.
  */
 export type LoaderPlugin = {
-    /** `type` defines the plugin type. */
+    /** `type` specifies the plugin type. */
     type: 'loader'
-    /** `name` gives the plugin a name. */
-    name: string
+    /** `loader` specifies the loader. */
+    loader: 'js' | 'ts' | 'jsx' | 'tsx' | 'css'
     /** `test` matches the import url. */
     test: RegExp
     /** `acceptHMR` enables the HMR. */
     acceptHMR?: boolean
     /** `transform` transforms the source content. */
-    transform(content: Uint8Array, url: string): TransformResult | Promise<TransformResult>
+    precompile?(content: Uint8Array, url: string): TransformResult | Promise<TransformResult>
 }
 
 /**
- * A plugin for **Aleph.js** application.
+ * A server plugin to enhance the aleph server application.
  */
-export type Plugin = LoaderPlugin
+export type ServerPlugin = {
+    /** `type` specifies the plugin type. */
+    type: 'server'
+    /** `onInit` adds an `init` event to the server. */
+    onInit(app: ServerApplication): Promise<void> | void
+}
+
+/**
+ * A plugin for the aleph server application.
+ */
+export type Plugin = LoaderPlugin | ServerPlugin
 
 /**
  * The options for **SSR**.
@@ -43,11 +52,11 @@ export type SSROptions = {
 }
 
 /**
- * The Config for **Aleph.js** application.
+ * The config for the aleph server application.
  */
 export type Config = {
     /** `framework` to run your application (default is 'react'). */
-    framework?: 'alef' | 'react'
+    framework?: 'react'
     /** `buildTarget` specifies the build target in production mode (default is **es5** to be compatible with IE11). */
     buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     /** `srcDir` to put your application source code (default is '/'). */
@@ -73,12 +82,11 @@ export type Config = {
 }
 
 /**
- * A handler to handle api requests.
- *
- * @param req APIRequest object
+ * An interface that aligns to the parts of the aleph server's `Application`.
  */
-export type APIHandler = {
-    (req: APIRequest): void
+interface ServerApplication {
+    getModule(url: string): Module | null
+    addModule(source: { url: string, code: string }): Module | Promise<Module>
 }
 
 /**
@@ -105,7 +113,7 @@ export interface ServerResponse {
 }
 
 /**
- * The request object of api request.
+ * An interface extends the `ServerRequest` for API requests.
  */
 export interface APIRequest extends ServerRequest {
     readonly pathname: string
@@ -137,7 +145,16 @@ export interface APIRequest extends ServerRequest {
 }
 
 /**
- * The Router object of the routing, you can access it with `useRouter()` hook.
+ * A handler to handle api requests.
+ *
+ * @param req APIRequest object
+ */
+export type APIHandler = {
+    (req: APIRequest): void
+}
+
+/**
+ * The router url object of the routing, you can access it with `useRouter()` hook.
  */
 export type RouterURL = {
     readonly locale: string
@@ -145,6 +162,43 @@ export type RouterURL = {
     readonly pagePath: string
     readonly params: Record<string, string>
     readonly query: URLSearchParams
+}
+
+/**
+ * A module includes compilation details.
+ */
+export type Module = {
+    url: string
+    loader: string
+    sourceHash: string
+    hash: string
+    deps: DependencyDescriptor[]
+    jsFile: string
+    bundlingFile: string
+    error: Error | null
+}
+
+/**
+ * The dependency descriptor.
+ */
+export type DependencyDescriptor = {
+    url: string
+    hash: string
+    isDynamic?: boolean
+    isStyle?: boolean
+    isData?: boolean
+}
+
+/**
+ * The render result of SSR.
+ */
+export type RenderResult = {
+    url: RouterURL
+    status: number
+    head: string[]
+    body: string
+    scripts: Record<string, any>[]
+    data: Record<string, string> | null
 }
 
 /**

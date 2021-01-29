@@ -3,10 +3,10 @@ import type { LoaderPlugin } from '../types.ts'
 
 const pluginFactory = (opts: Options = {}): LoaderPlugin => ({
     type: 'loader',
-    name: 'sass-loader',
+    loader: 'css',
     test: /.(sass|scss)$/,
     acceptHMR: true,
-    transform(content: Uint8Array, path: string) {
+    precompile(content: Uint8Array, path: string) {
         const ret = renderSync({
             indentedSyntax: path.endsWith('.sass'),
             ...opts,
@@ -17,16 +17,15 @@ const pluginFactory = (opts: Options = {}): LoaderPlugin => ({
         return {
             code: (new TextDecoder).decode(ret.css),
             map: ret.map ? (new TextDecoder).decode(ret.map) : undefined,
-            loader: 'css'
         }
     }
 })
-const defaultPlugin = pluginFactory()
 
-// make the `pluginFactory` as a plugin
-pluginFactory.type = defaultPlugin.type
+// make the `pluginFactory` function as a plugin
+const defaultPlugin = pluginFactory()
+pluginFactory.loader = defaultPlugin.loader
 pluginFactory.test = defaultPlugin.test
 pluginFactory.acceptHMR = defaultPlugin.acceptHMR
-pluginFactory.transform = defaultPlugin.transform
+pluginFactory.precompile = defaultPlugin.precompile
 
 export default pluginFactory

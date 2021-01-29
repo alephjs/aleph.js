@@ -10,11 +10,11 @@ Deno.test('project wasm loader plugin', async () => {
         105, 110, 0, 0, 10, 138, 128, 128, 128, 0, 1, 132, 128, 128, 128, 0, 0,
         65, 42, 11
     ])
-    const { code, loader } = await plugin.transform(wasmBytes, '42.wasm')
+    const { code } = await plugin.precompile!(wasmBytes, '42.wasm')
     const jsfile = (await Deno.makeTempFile()) + '.js'
     await Deno.writeTextFile(jsfile, code)
     const { default: wasm } = await import('file://' + jsfile)
     assertEquals(plugin.test.test('test.wasm'), true)
+    assertEquals(plugin.loader, 'js')
     assertEquals(wasm.main(), 42)
-    assertEquals(loader, 'js')
 })

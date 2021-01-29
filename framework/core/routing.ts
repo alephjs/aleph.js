@@ -1,7 +1,6 @@
-import type { DependencyDescriptor } from '../../server/types.ts'
 import { reModuleExt } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
+import type { DependencyDescriptor, RouterURL } from '../../types.ts'
 import events from './events.ts'
 
 export interface Route {
