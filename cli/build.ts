@@ -1,4 +1,4 @@
-import { Appliaction } from '../server/app.ts'
+import { Appliaction } from '../server/mod.ts'
 
 export const helpMessage = `
 Usage:
@@ -14,11 +14,7 @@ Options:
 `
 
 export default async function (workingDir: string, options: Record<string, string | boolean>) {
-    const app = new Appliaction({
-        workingDir,
-        mode: 'production',
-        reload: Boolean(options.r || options.reload)
-    })
+    const app = new Appliaction(workingDir, 'production', Boolean(options.r || options.reload))
     await app.build()
     Deno.exit(0)
 }
