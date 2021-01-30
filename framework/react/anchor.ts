@@ -7,12 +7,10 @@ import { useRouter } from './hooks.ts'
 
 const prefetchedPages = new Set<string>()
 
-interface AnchorDataProps {
+type AnchorProps = PropsWithChildren<AnchorHTMLAttributes<{}> & {
     'data-active-className'?: string
     'data-active-style'?: CSSProperties
-}
-
-type AnchorProps = PropsWithChildren<AnchorHTMLAttributes<{}> & AnchorDataProps>
+}>
 
 /**
  * Anchor Component to link between pages.

@@ -6,8 +6,8 @@ export default function Script(props: PropsWithChildren<ScriptHTMLAttributes<{}>
     const renderer = useContext(RendererContext)
 
     if (window.Deno) {
-        const key = 'script-' + (renderer.cache.scriptsElements.size + 1)
-        renderer.cache.scriptsElements.set(key, { type: 'script', props })
+        const key = 'script-' + (renderer.storage.scriptsElements.size + 1)
+        renderer.storage.scriptsElements.set(key, { type: 'script', props })
     }
 
     // todo: insert page scripts in browser

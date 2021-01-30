@@ -1,6 +1,7 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { hashShort, reModuleExt } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
+import type { RouterURL } from '../../types.ts'
 import { RouteModule } from '../core/routing.ts'
 import { E400MissingComponent } from './error.ts'
 
@@ -39,6 +40,16 @@ export function importModule(baseUrl: string, mod: RouteModule, forceRefetch = f
     }
 }
 
+export async function loadPageData({ pathname }: RouterURL): Promise<void> {
+    const url = `/_aleph/data${pathname === '/' ? '/index' : pathname}.json`
+    const data = await fetch(url).then(resp => resp.json())
+    if (util.isPlainObject(data)) {
+        for (const key in data) {
+            Object.assign(window, { [`data://${pathname}#${key}`]: data[key] })
+        }
+    }
+}
+
 export function isLikelyReactComponent(type: any): Boolean {
     switch (typeof type) {
         case 'function':
@@ -53,10 +64,10 @@ export function isLikelyReactComponent(type: any): Boolean {
             }
             const { __ALEPH } = window as any
             if (__ALEPH) {
-                // in bundle mode, component name will be compressed
+                // in bundle mode, the component name will be compressed.
                 return true
             }
-            const name = type.name || type.displayName
+            const name = type.displayName || type.name
             return typeof name === 'string' && /^[A-Z]/.test(name)
         case 'object':
             if (type != null) {

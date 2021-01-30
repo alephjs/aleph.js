@@ -10,13 +10,13 @@ export const RouterContext = createContext<RouterURL>({
 })
 RouterContext.displayName = 'RouterContext'
 
-interface RendererCache {
+interface RenderStorage {
     headElements: Map<string, { type: string, props: Record<string, any> }>
     scriptsElements: Map<string, { type: string, props: Record<string, any> }>
 }
 
-export const RendererContext = createContext<{ cache: RendererCache }>({
-    cache: {
+export const RendererContext = createContext<{ storage: RenderStorage }>({
+    storage: {
         headElements: new Map(),
         scriptsElements: new Map()
     }
