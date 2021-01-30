@@ -17,7 +17,7 @@ use std::{
   rc::Rc,
   str::FromStr,
 };
-use swc_common::DUMMY_SP;
+use swc_common::{SourceMap, Span, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
@@ -53,14 +53,13 @@ pub struct InlineStyle {
 }
 
 /// A Resolver to resolve aleph.js import/export URL.
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolver {
   /// The text specifier associated with the import/export statement.
   pub specifier: String,
   /// A flag indicating if the specifier is remote url or not.
   pub specifier_is_remote: bool,
   ///  builtin jsx tags like `a`, `link`, `head`, etc
-  pub builtin_jsx_tags: IndexSet<String>,
+  pub used_builtin_jsx_tags: IndexSet<String>,
   /// dependency graph
   pub dep_graph: Vec<DependencyDescriptor>,
   /// inline styles
@@ -88,7 +87,7 @@ impl Resolver {
     Resolver {
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
-      builtin_jsx_tags: IndexSet::new(),
+      used_builtin_jsx_tags: IndexSet::new(),
       dep_graph: Vec::new(),
       inline_styles: HashMap::new(),
       import_map: ImportMap::from_hashmap(import_map),
@@ -360,27 +359,38 @@ impl Resolver {
   }
 }
 
-pub fn aleph_resolve_fold(resolver: Rc<RefCell<Resolver>>) -> impl Fold {
+pub fn aleph_resolve_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
   AlephResolveFold {
     deno_hooks_idx: 0,
     resolver,
+    source,
   }
 }
 
 pub struct AlephResolveFold {
   deno_hooks_idx: i32,
   resolver: Rc<RefCell<Resolver>>,
+  source: Rc<SourceMap>,
 }
 
 impl AlephResolveFold {
-  fn new_use_deno_hook_ident(&mut self) -> String {
+  fn new_use_deno_hook_ident(&mut self, callback_span: &Span) -> String {
     let resolver = self.resolver.borrow_mut();
     self.deno_hooks_idx = self.deno_hooks_idx + 1;
     let mut ident: String = "useDeno-".to_owned();
     let mut hasher = Sha1::new();
+    let callback_code = self.source.span_to_snippet(callback_span.clone()).unwrap();
     hasher.update(resolver.specifier.clone());
     hasher.update(self.deno_hooks_idx.to_string());
-    ident.push_str(base64::encode(hasher.finalize()).as_str());
+    hasher.update(callback_code.clone());
+    println!("---{}---", callback_code);
+    ident.push_str(
+      base64::encode(hasher.finalize())
+        .replace("/", "")
+        .replace("+", "")
+        .as_str()
+        .trim_end_matches("="),
+    );
     ident
   }
 }
@@ -661,17 +671,20 @@ impl Fold for AlephResolveFold {
         )))),
       }];
     } else if is_call_expr_by_name(&call, "useDeno") {
-      let has_callback = match call.args.first() {
+      let callback_span = match call.args.first() {
         Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
-          Expr::Fn(_) => true,
-          Expr::Arrow(_) => true,
-          _ => false,
+          Expr::Fn(FnExpr {
+            function: Function { span, .. },
+            ..
+          }) => Some(span),
+          Expr::Arrow(ArrowExpr { span, .. }) => Some(span),
+          _ => None,
         },
-        _ => false,
+        _ => None,
       };
-      if has_callback {
+      if let Some(span) = callback_span {
         let bundle_mode = self.resolver.borrow().bundle_mode;
-        let id = self.new_use_deno_hook_ident();
+        let id = self.new_use_deno_hook_ident(span);
         if bundle_mode {
           call.args[0] = ExprOrSpread {
             spread: None,

@@ -53,7 +53,13 @@ impl AlephJsxFold {
         let mut hasher = Sha1::new();
         hasher.update(resolver.specifier.clone());
         hasher.update(self.inline_style_idx.to_string());
-        ident.push_str(base64::encode(hasher.finalize()).as_str());
+        ident.push_str(
+            base64::encode(hasher.finalize())
+                .replace("/", "")
+                .replace("+", "")
+                .as_str()
+                .trim_end_matches("="),
+        );
         ident
     }
 
@@ -69,7 +75,7 @@ impl AlephJsxFold {
                 match name {
                     "head" | "script" => {
                         let mut resolver = self.resolver.borrow_mut();
-                        resolver.builtin_jsx_tags.insert(name.into());
+                        resolver.used_builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                     }
 
@@ -97,7 +103,7 @@ impl AlephJsxFold {
                         }
 
                         if should_replace {
-                            resolver.builtin_jsx_tags.insert(name.into());
+                            resolver.used_builtin_jsx_tags.insert(name.into());
                             el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                         }
                     }
@@ -214,7 +220,7 @@ impl AlephJsxFold {
                             }
 
                             if name.eq("link") {
-                                resolver.builtin_jsx_tags.insert(name.into());
+                                resolver.used_builtin_jsx_tags.insert(name.into());
                                 el.name =
                                     JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                             }
@@ -268,7 +274,7 @@ impl AlephJsxFold {
                             is_dynamic: false,
                             rel: None,
                         });
-                        resolver.builtin_jsx_tags.insert(name.into());
+                        resolver.used_builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                         inline_style = Some((type_prop_value, id.into()));
                     }
@@ -419,7 +425,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
         let mut items = Vec::<ModuleItem>::new();
         let mut resolver = self.resolver.borrow_mut();
 
-        for mut name in resolver.builtin_jsx_tags.clone() {
+        for mut name in resolver.used_builtin_jsx_tags.clone() {
             if name.eq("a") {
                 name = "anchor".to_owned()
             }

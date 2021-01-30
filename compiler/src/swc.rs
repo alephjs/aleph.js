@@ -145,7 +145,7 @@ impl ParsedModule {
       );
       let root_mark = Mark::fresh(Mark::root());
       let mut passes = chain!(
-        aleph_resolve_fold(resolver.clone()),
+        aleph_resolve_fold(resolver.clone(), self.source_map.clone()),
         Optional::new(aleph_jsx_fold, is_jsx),
         Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
         Optional::new(jsx_link_fixer_fold(resolver.clone()), is_jsx && bundle_mode),
@@ -368,7 +368,9 @@ mod tests {
     let source = r#"
       export default function Index() {
         const verison = useDeno(() => Deno.version)
-        const verison = useDeno(async () => await readJson("data.json"), 1000)
+        const verison = useDeno(async function() {
+          return await readJson("./data.json")
+        }, 1000)
         return (
           <>
             <p>Deno v{version.deno}</p>
@@ -382,12 +384,24 @@ mod tests {
     let mut hasher = Sha1::new();
     hasher.update(specifer.clone());
     hasher.update("1");
-    let id_1 = base64::encode(hasher.finalize());
+    hasher.update("() => Deno.version");
+    let id_1 = base64::encode(hasher.finalize())
+      .replace("/", "")
+      .replace("+", "");
+    let id_1 = id_1.trim_end_matches("=");
 
     let mut hasher = Sha1::new();
     hasher.update(specifer.clone());
     hasher.update("2");
-    let id_2 = base64::encode(hasher.finalize());
+    hasher.update(
+      r#"async function() {
+          return await readJson("./data.json")
+        }"#,
+    );
+    let id_2 = base64::encode(hasher.finalize())
+      .replace("/", "")
+      .replace("+", "");
+    let id_2 = id_2.trim_end_matches("=");
 
     for _ in 0..3 {
       let (code, _) = t(specifer, source, false);
