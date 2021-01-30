@@ -6,6 +6,7 @@ import type { AcceptedPlugin, bufio } from './deps.ts'
 export type TransformResult = {
     code: string,
     map?: string,
+    format?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css',
 }
 
 /**
@@ -14,14 +15,12 @@ export type TransformResult = {
 export type LoaderPlugin = {
     /** `type` specifies the plugin type. */
     type: 'loader'
-    /** `loader` specifies the loader. */
-    loader: 'js' | 'ts' | 'jsx' | 'tsx' | 'css'
     /** `test` matches the import url. */
     test: RegExp
     /** `acceptHMR` enables the HMR. */
     acceptHMR?: boolean
     /** `transform` transforms the source content. */
-    precompile?(content: Uint8Array, url: string): TransformResult | Promise<TransformResult>
+    transform(content: Uint8Array, url: string): TransformResult | Promise<TransformResult>
 }
 
 /**
