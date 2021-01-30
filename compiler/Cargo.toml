@@ -21,25 +21,25 @@ pathdiff = "0.2.0"
 regex = "1.4.3"
 relative-path = "1.3.2"
 sha-1 = "0.9.2"
-serde = { version = "1.0.120", features = ["derive"] }
+serde = { version = "1.0.123", features = ["derive"] }
 url = "2.2.0"
 
 # swc
 # docs: https://swc.rs
 swc_common = { version = "0.10.9", features = ["sourcemap"] }
-swc_ecmascript = { version = "0.18.1", features = ["codegen", "parser", "react", "transforms", "visit"] }
-swc_ecma_transforms_typescript = "0.3.1"
-swc_ecma_transforms_compat = "0.3.0"
-swc_ecma_transforms_proposal = "0.3.0"
-swc_ecma_ast = "0.37.0"
-swc_ecma_visit = "0.23.0"
-swc_ecma_utils = "0.27.0"
+swc_ecmascript = { version = "0.18.8", features = ["codegen", "parser", "react", "transforms", "visit"] }
+swc_ecma_transforms_typescript = "0.3.9"
+swc_ecma_transforms_compat = "0.3.7"
+swc_ecma_transforms_proposal = "0.3.7"
+swc_ecma_ast = "0.37.3"
+swc_ecma_visit = "0.23.3"
+swc_ecma_utils = "0.27.3"
 
 # wasm-bindgen
 # docs: https://rustwasm.github.io/docs/wasm-bindgen
-wasm-bindgen = {version = "0.2.69", features = ["serde-serialize"]}
+wasm-bindgen = {version = "0.2.70", features = ["serde-serialize"]}
 console_error_panic_hook = { version = "0.1.6", optional = true }
 
 [profile.release]
-# Tell `rustc` to optimize for speed
+# Tell `rustc` to optimize for speed and size
 lto = true
