@@ -10,6 +10,7 @@ if (import.meta.main) {
     p.close()
 
     const wasmData = await Deno.readFile('./pkg/aleph_compiler_bg.wasm')
+    const wpjsContent = await Deno.readTextFile('./pkg/aleph_compiler.js')
     const data = brotli.compress(wasmData)
     const data64 = base64.encode(data)
     const hash = (new Sha1).update(data).hex()
@@ -26,5 +27,16 @@ if (import.meta.main) {
         './dist/wasm-checksum.js',
         `export const checksum = ${JSON.stringify(hash)}`
     )
-    await Deno.copyFile('./pkg/aleph_compiler.js', './dist/wasm-pack.js')
+    await Deno.writeTextFile(
+        './dist/wasm-pack.js',
+        `import log from "../../shared/log.ts";` + wpjsContent.replace('console.error(getStringFromWasm0(arg0, arg1));', `
+            const msg = getStringFromWasm0(arg0, arg1);
+            if (msg.includes("DiagnosticBuffer")) {
+                const diagnostic = msg.split('DiagnosticBuffer(["')[1].split('"])')[0]
+                log.error("swc:", diagnostic)
+            } else {
+                log.error(msg)
+            }
+        ` )
+    )
 }
