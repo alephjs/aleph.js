@@ -1,4 +1,4 @@
-
+import log from "../../shared/log.ts";
 let wasm;
 
 const heap = new Array(32).fill(undefined);
@@ -187,7 +187,15 @@ async function init(input) {
     };
     imports.wbg.__wbg_error_4bb6c2a97407129a = function(arg0, arg1) {
         try {
-            console.error(getStringFromWasm0(arg0, arg1));
+            
+            const msg = getStringFromWasm0(arg0, arg1);
+            if (msg.includes("DiagnosticBuffer")) {
+                const diagnostic = msg.split('DiagnosticBuffer(["')[1].split('"])')[0]
+                log.error("swc:", diagnostic)
+            } else {
+                log.error(msg)
+            }
+        
         } finally {
             wasm.__wbindgen_free(arg0, arg1);
         }
