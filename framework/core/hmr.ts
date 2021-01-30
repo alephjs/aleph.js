@@ -50,7 +50,7 @@ const { location } = window as any
 const { protocol, host } = location
 const modules: Map<string, Module> = new Map()
 const messageQueue: any[] = []
-const socket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr', /*  'aleph-hmr' */)
+const socket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr')
 
 socket.addEventListener('open', () => {
     messageQueue.forEach(msg => socket.send(JSON.stringify(msg)))

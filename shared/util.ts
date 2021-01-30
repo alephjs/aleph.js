@@ -19,6 +19,10 @@ export default {
     isFunction(a: any): a is Function {
         return typeof a === 'function'
     },
+    isLikelyURL(s: string): boolean {
+        const p = s.slice(0, 8).toLowerCase()
+        return p === 'https://' || p.slice(0, 7) === 'http://'
+    },
     trimPrefix(s: string, prefix: string): string {
         if (prefix !== '' && s.startsWith(prefix)) {
             return s.slice(prefix.length)

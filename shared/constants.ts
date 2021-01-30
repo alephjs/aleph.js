@@ -4,7 +4,6 @@ export const GB = KB ** 3
 export const TB = KB ** 4
 export const PB = KB ** 5
 export const hashShort = 9
-export const reHttp = /^https?:\/\//i
 export const reModuleExt = /\.(jsx?|tsx?|mjs)$/i
 export const reStyleModuleExt = /\.p?css$/i
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/

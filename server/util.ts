@@ -1,9 +1,9 @@
 import { colors, path } from '../deps.ts'
-import { MB, reHashJs, reHttp, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import { MB, reHashJs, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { ImportMap, Module, ServerRequest } from '../types.ts'
+import type { ImportMap, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 
 export const AlephRuntimeCode = `
@@ -54,32 +54,6 @@ export function getRelativePath(from: string, to: string): string {
         r = './' + r
     }
     return r
-}
-
-/** returns a module by given url. */
-export function newModule(url: string): Module {
-    const isRemote = reHttp.test(url)
-    let loader = ''
-    if (reStyleModuleExt.test(url)) {
-        loader = 'css'
-    } else if (reModuleExt.test(url)) {
-        loader = url.split('.').pop()!
-        if (loader === 'mjs') {
-            loader = 'js'
-        }
-    } else if (isRemote) {
-        loader = 'js'
-    }
-    return {
-        url,
-        loader,
-        sourceHash: '',
-        hash: '',
-        deps: [],
-        jsFile: '',
-        bundlingFile: '',
-        error: null,
-    }
 }
 
 /** cleanup the previous compilation cache */
@@ -133,7 +107,7 @@ export function fixImportMap(v: any) {
 
 /** fix import url */
 export function fixImportUrl(importUrl: string): string {
-    const isRemote = reHttp.test(importUrl)
+    const isRemote = util.isLikelyURL(importUrl)
     const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
     let ext = path.extname(path.basename(url.pathname)) || '.js'
     if (isRemote && !reModuleExt.test(ext) && !reStyleModuleExt.test(ext)) {

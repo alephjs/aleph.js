@@ -1,6 +1,6 @@
 import { reModuleExt } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
-import type { DependencyDescriptor, RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
 
 export interface Route {
@@ -12,7 +12,7 @@ export interface Route {
 export interface RouteModule {
     readonly url: string
     readonly hash: string
-    readonly deps?: DependencyDescriptor[]
+    readonly asyncDeps?: { data?: boolean, style?: boolean }
 }
 
 const ghostRoute: Route = { path: '', module: { url: '', hash: '' } }
