@@ -58,7 +58,7 @@ impl AlephJsxFold {
                 .replace("/", "")
                 .replace("+", "")
                 .as_str()
-                .trim_end_matches("="),
+                .trim_end_matches('='),
         );
         ident
     }

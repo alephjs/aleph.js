@@ -388,7 +388,7 @@ mod tests {
     let id_1 = base64::encode(hasher.finalize())
       .replace("/", "")
       .replace("+", "");
-    let id_1 = id_1.trim_end_matches("=");
+    let id_1 = id_1.trim_end_matches('=');
 
     let mut hasher = Sha1::new();
     hasher.update(specifer.clone());
@@ -401,7 +401,7 @@ mod tests {
     let id_2 = base64::encode(hasher.finalize())
       .replace("/", "")
       .replace("+", "");
-    let id_2 = id_2.trim_end_matches("=");
+    let id_2 = id_2.trim_end_matches('=');
 
     for _ in 0..3 {
       let (code, _) = t(specifer, source, false);

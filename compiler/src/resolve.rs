@@ -383,13 +383,12 @@ impl AlephResolveFold {
     hasher.update(resolver.specifier.clone());
     hasher.update(self.deno_hooks_idx.to_string());
     hasher.update(callback_code.clone());
-    println!("---{}---", callback_code);
     ident.push_str(
       base64::encode(hasher.finalize())
         .replace("/", "")
         .replace("+", "")
         .as_str()
-        .trim_end_matches("="),
+        .trim_end_matches('='),
     );
     ident
   }
