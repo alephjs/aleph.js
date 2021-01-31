@@ -1,4 +1,4 @@
-import { hashShort } from '../../shared/constants.ts'
+import util from '../../shared/util.ts'
 import events from './events.ts'
 
 interface Callback {
@@ -83,7 +83,7 @@ socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
                     }
                     break
             }
-            console.log(`[HMR]${hash ? ' [' + hash.slice(0, hashShort) + ']' : ''} ${type} module '${url}'`)
+            console.log(`[HMR]${hash ? ' [' + util.shortHash(hash) + ']' : ''} ${type} module '${url}'`)
         } catch (err) {
             console.warn(err)
         }

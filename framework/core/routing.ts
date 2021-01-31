@@ -1,4 +1,4 @@
-import { reModuleExt } from '../../shared/constants.ts'
+import { pageModuleExts } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
@@ -51,7 +51,7 @@ export class Routing {
     }
 
     update(module: RouteModule) {
-        const newRoute: Route = { path: getPagePath(module.url), module }
+        const newRoute: Route = { path: getPagePathname(module.url), module }
         const dirtyRoutes: Set<Route[]> = new Set()
         let exists = false
         let targetRoutes = this._routes
@@ -170,11 +170,6 @@ export class Routing {
     }
 }
 
-export function getPagePath(url: string): string {
-    const pathname = url.replace(reModuleExt, '').toLowerCase().replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
-    return pathname.startsWith('/api/') ? pathname : pathname.replace(/\s+/g, '-')
-}
-
 function matchPath(routePath: string, locPath: string): [Record<string, string>, boolean] {
     const params: Record<string, string> = {}
     const routeSegments = util.splitPath(routePath)
@@ -234,4 +229,18 @@ export function isHttpUrl(url: string) {
     } catch (error) {
         return false
     }
+}
+
+export function getPagePathname(url: string): string {
+    const pathname = trimPageModuleExt(url).replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
+    return pathname
+}
+
+export function trimPageModuleExt(url: string) {
+    for (const ext of pageModuleExts) {
+        if (url.endsWith('.' + ext)) {
+            return url.slice(0, -(ext.length + 1))
+        }
+    }
+    return url
 }

@@ -1,10 +1,14 @@
 import { colors, path } from '../deps.ts'
-import { reHashJs, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
+
+export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
+export const reFullVersion = /@v?\d+\.\d+\.\d+/i
+export const reHashJs = /\.[0-9a-fx]{9}\.js$/i
+export const reHashResolve = /(import|import\s*\(|from|href\s*:)(\s*)("|')([^'"]+\.[0-9a-fx]{9}\.js)("|')/g
 
 export const AlephRuntimeCode = `
   var __ALEPH = window.__ALEPH || (window.__ALEPH = {
@@ -98,33 +102,6 @@ export function fixImportMap(v: any) {
         })
     }
     return imports
-}
-
-/** fix import url */
-export function fixImportUrl(importUrl: string): string {
-    const isRemote = util.isLikelyURL(importUrl)
-    const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
-    let ext = path.extname(path.basename(url.pathname)) || '.js'
-    if (isRemote && !reModuleExt.test(ext) && !reStyleModuleExt.test(ext)) {
-        ext = '.js'
-    }
-    let pathname = util.trimSuffix(url.pathname, ext)
-    let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
-    if (search.length > 0) {
-        pathname += '_' + search.join(',')
-    }
-    if (isRemote) {
-        return [
-            '/-/',
-            (url.protocol === 'http:' ? 'http_' : ''),
-            url.hostname,
-            (url.port ? '_' + url.port : ''),
-            pathname,
-            ext
-        ].join('')
-    }
-    const result = pathname + ext
-    return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result
 }
 
 /**

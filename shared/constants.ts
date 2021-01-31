@@ -1,12 +1,2 @@
-export const KB = 1024
-export const MB = KB ** 2
-export const GB = KB ** 3
-export const TB = KB ** 4
-export const PB = KB ** 5
-export const hashShort = 9
-export const reModuleExt = /\.(jsx?|tsx?|mjs)$/i
-export const reStyleModuleExt = /\.p?css$/i
-export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
-export const reFullVersion = /@v?\d+\.\d+\.\d+/i
-export const reHashJs = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
-export const reHashResolve = new RegExp(`(import|import\\s*\\(|from|href\\s*:)(\\s*)("|')([^'"]+.[0-9a-fx]{${hashShort}}\\.js)("|')`, 'g')
+export const pageModuleExts = ['tsx', 'jsx', 'ts', 'js', 'mjs']
+export const defaultReactVersion = '17.0.1'

@@ -1,7 +1,6 @@
 import type { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { createElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
-import { hashShort } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
 import type { RenderResult, RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
@@ -143,7 +142,7 @@ export async function render(
 
     // get inline-styles
     const rets = await Promise.all(styles?.filter(({ url }) => !url.startsWith('#inline-style-')).map(({ url, hash }) => {
-        const path = util.isLikelyURL(url) ? '/-/' + url.split('://')[1] : `${url}.${hash.slice(0, hashShort)}`
+        const path = util.isLikelyHttpURL(url) ? '/-/' + url.split('://')[1] : `${url}.${util.shortHash(hash)}`
         return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}/${path}.js`))
     }) || [])
     rets.forEach(({ default: def }) => util.isFunction(def) && def())

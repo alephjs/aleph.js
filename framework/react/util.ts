@@ -1,8 +1,7 @@
 import type { ComponentType } from 'https://esm.sh/react'
-import { hashShort, reModuleExt } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
-import { RouteModule } from '../core/routing.ts'
+import { getPagePathname, RouteModule, trimPageModuleExt } from '../core/routing.ts'
 import { E400MissingComponent } from './error.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for
@@ -17,7 +16,7 @@ export interface PageProps {
 export function importModule(baseUrl: string, mod: RouteModule, forceRefetch = false): Promise<any> {
     const { __ALEPH, document } = window as any
     if (!__ALEPH || mod.url.startsWith('/pages/')) {
-        const src = util.cleanPath(baseUrl + '/_aleph/' + mod.url.replace(reModuleExt, '') + `.${mod.hash.slice(0, hashShort)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
+        const src = util.cleanPath(baseUrl + '/_aleph/' + trimPageModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
         if (__ALEPH) {
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script')
@@ -91,11 +90,11 @@ export function createPageProps(componentTree: { url: string, Component?: Compon
         pageProps: {}
     }
     if (componentTree.length > 0) {
-        Object.assign(pageProps, _createPagePropsSegment(componentTree[0]))
+        Object.assign(pageProps, createPagePropsSegment(componentTree[0]))
     }
     if (componentTree.length > 1) {
         componentTree.slice(1).reduce((p, seg) => {
-            const c = _createPagePropsSegment(seg)
+            const c = createPagePropsSegment(seg)
             p.pageProps = c
             return c
         }, pageProps)
@@ -103,7 +102,7 @@ export function createPageProps(componentTree: { url: string, Component?: Compon
     return pageProps
 }
 
-function _createPagePropsSegment(seg: { url: string, Component?: ComponentType<any> }): PageProps {
+function createPagePropsSegment(seg: { url: string, Component?: ComponentType<any> }): PageProps {
     const pageProps: PageProps = {
         Page: null,
         pageProps: {}
@@ -113,7 +112,7 @@ function _createPagePropsSegment(seg: { url: string, Component?: ComponentType<a
             pageProps.Page = seg.Component
         } else {
             pageProps.Page = E400MissingComponent
-            pageProps.pageProps = { name: 'Page: ' + util.trimPrefix(seg.url, '/pages').replace(reModuleExt, '') }
+            pageProps.pageProps = { name: 'Page: ' + getPagePathname(seg.url) }
         }
     }
     return pageProps
