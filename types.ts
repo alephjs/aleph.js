@@ -224,4 +224,7 @@ export type FormFile = {
 /**
  * The ES Import maps.
  */
-export type ImportMap = Record<string, ReadonlyArray<string>>
+export type ImportMap = {
+    imports: Record<string, string>,
+    scopes: Record<string, Record<string, string>>
+}

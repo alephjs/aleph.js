@@ -4,8 +4,8 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-type SpecifierHashMap = HashMap<String, Vec<String>>;
-type SpecifierMap = IndexMap<String, Vec<String>>;
+type SpecifierHashMap = HashMap<String, String>;
+type SpecifierMap = IndexMap<String, String>;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -36,14 +36,14 @@ impl ImportMap {
         let mut imports: SpecifierMap = IndexMap::new();
         let mut scopes = IndexMap::new();
         for (k, v) in map.imports.iter() {
-            imports.insert(k.into(), v.to_vec());
+            imports.insert(k.into(), v.into());
         }
         for (k, v) in map.scopes.iter() {
-            let mut imports_: SpecifierMap = IndexMap::new();
-            for (k_, v_) in v.iter() {
-                imports_.insert(k_.into(), v_.to_vec());
+            let mut map: SpecifierMap = IndexMap::new();
+            for (k, v) in v.iter() {
+                map.insert(k.into(), v.into());
             }
-            scopes.insert(k.into(), imports_);
+            scopes.insert(k.into(), map);
         }
         ImportMap { imports, scopes }
     }
@@ -53,42 +53,30 @@ impl ImportMap {
             if prefix.ends_with("/") && specifier.starts_with(prefix) {
                 match scope_imports.get(url) {
                     Some(alias) => {
-                        let n = alias.len();
-                        if n > 0 {
-                            return alias[n - 1].to_owned();
-                        }
+                        return alias.to_owned();
                     }
                     _ => {}
                 };
                 for (k, alias) in scope_imports.iter() {
                     if k.ends_with("/") && url.starts_with(k) {
-                        let n = alias.len();
-                        if n > 0 {
-                            let mut alias = alias[n - 1].to_owned();
-                            alias.push_str(url[k.len()..].into());
-                            return alias;
-                        }
+                        let mut alias = alias.to_owned();
+                        alias.push_str(url[k.len()..].into());
+                        return alias;
                     }
                 }
             }
         }
         match self.imports.get(url) {
             Some(alias) => {
-                let n = alias.len();
-                if n > 0 {
-                    return alias[n - 1].to_owned();
-                }
+                return alias.to_owned();
             }
             _ => {}
         };
         for (k, alias) in self.imports.iter() {
             if k.ends_with("/") && url.starts_with(k) {
-                let n = alias.len();
-                if n > 0 {
-                    let mut alias = alias[n - 1].to_owned();
-                    alias.push_str(url[k.len()..].into());
-                    return alias;
-                }
+                let mut alias = alias.to_owned();
+                alias.push_str(url[k.len()..].into());
+                return alias;
             }
         }
         url.into()
@@ -104,16 +92,13 @@ mod tests {
         let mut imports: SpecifierHashMap = HashMap::new();
         let mut scopes: HashMap<String, SpecifierHashMap> = HashMap::new();
         let mut scope_imports: SpecifierHashMap = HashMap::new();
-        imports.insert("react".into(), vec!["https://esm.sh/react".into()]);
-        imports.insert(
-            "react-dom/".into(),
-            vec!["https://esm.sh/react-dom/".into()],
-        );
+        imports.insert("react".into(), "https://esm.sh/react".into());
+        imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
         imports.insert(
             "https://deno.land/x/aleph/".into(),
-            vec!["http://localhost:9006/".into()],
+            "http://localhost:9006/".into(),
         );
-        scope_imports.insert("react".into(), vec!["https://esm.sh/react@16.4.0".into()]);
+        scope_imports.insert("react".into(), "https://esm.sh/react@16.4.0".into());
         scopes.insert("/scope/".into(), scope_imports);
         let import_map = ImportMap::from_hashmap(ImportHashMap { imports, scopes });
         assert_eq!(

@@ -836,15 +836,12 @@ mod tests {
 
   #[test]
   fn test_resolve_local() {
-    let mut imports: HashMap<String, Vec<String>> = HashMap::new();
-    imports.insert("react".into(), vec!["https://esm.sh/react".into()]);
-    imports.insert(
-      "react-dom/".into(),
-      vec!["https://esm.sh/react-dom/".into()],
-    );
+    let mut imports: HashMap<String, String> = HashMap::new();
+    imports.insert("react".into(), "https://esm.sh/react".into());
+    imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
     imports.insert(
       "https://deno.land/x/aleph/".into(),
-      vec!["http://localhost:9006/".into()],
+      "http://localhost:9006/".into(),
     );
     let mut resolver = Resolver::new(
       "/pages/index.tsx",

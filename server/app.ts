@@ -11,7 +11,7 @@ import util from '../shared/util.ts'
 import type { Config, DependencyDescriptor, ImportMap, Module, RenderResult, RouterURL, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
-import { AlephRuntimeCode, cleanupCompilation, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, respondError } from './util.ts'
+import { AlephRuntimeCode, cleanupCompilation, createHtml, fixImportMap, fixImportUrl, formatBytesWithColor, getAlephPkgUrl, getRelativePath, respondErrorJSON } from './util.ts'
 
 /**
  * The Aleph Server Appliaction class.
@@ -20,7 +20,7 @@ export class Appliaction {
     readonly workingDir: string
     readonly mode: 'development' | 'production'
     readonly config: Readonly<Required<Config>>
-    readonly importMap: Readonly<{ imports: ImportMap, scopes: Record<string, ImportMap> }>
+    readonly importMap: ImportMap
     readonly ready: Promise<void>
 
     #denoCacheDir = ''
@@ -171,15 +171,15 @@ export class Appliaction {
                     if (util.isFunction(handle)) {
                         await handle(new Request(req, url.pathname, url.params, url.query))
                     } else {
-                        respondError(req, 500, 'handle not found')
+                        respondErrorJSON(req, 500, 'handle not found')
                     }
                 } catch (err) {
-                    respondError(req, 500, err.message)
+                    respondErrorJSON(req, 500, err.message)
                     log.error('invoke API:', err)
                 }
             }
         } else {
-            respondError(req, 404, 'page not found')
+            respondErrorJSON(req, 404, 'page not found')
         }
     }
 
@@ -340,22 +340,26 @@ export class Appliaction {
 
     /** load config from `aleph.config.(json|mjs|js|ts)` */
     private async loadConfig() {
-        const importMapFile = path.join(this.workingDir, 'import_map.json')
-        if (existsFileSync(importMapFile)) {
-            const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
-            const imports: ImportMap = fixImportMap(importMap.imports)
-            const scopes: Record<string, ImportMap> = {}
-            if (util.isPlainObject(importMap.scopes)) {
-                Object.entries(importMap.scopes).forEach(([key, imports]) => {
-                    scopes[key] = fixImportMap(imports)
-                })
+        // load import maps
+        for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
+            const importMapFile = path.join(this.workingDir, filename)
+            if (existsFileSync(importMapFile)) {
+                const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
+                const imports: Record<string, string> = fixImportMap(importMap.imports)
+                const scopes: Record<string, Record<string, string>> = {}
+                if (util.isPlainObject(importMap.scopes)) {
+                    Object.entries(importMap.scopes).forEach(([key, imports]) => {
+                        scopes[key] = fixImportMap(imports)
+                    })
+                }
+                Object.assign(this.importMap, { imports, scopes })
+                break
             }
-            Object.assign(this.importMap, { imports, scopes })
         }
 
         const config: Record<string, any> = {}
 
-        for (const name of Array.from(['ts', 'js', 'mjs', 'json']).map(ext => `aleph.config.${ext}`)) {
+        for (const name of Array.from(['ts', 'js', 'json']).map(ext => 'aleph.config.' + ext)) {
             const p = path.join(this.workingDir, name)
             if (existsFileSync(p)) {
                 log.info('config loaded from', name)
@@ -455,24 +459,20 @@ export class Appliaction {
             }
         }
 
-        // update import map
+        // update import map for alephjs dev env
         const { __ALEPH_DEV_PORT: devPort } = globalThis as any
         if (devPort) {
             const alias = `http://localhost:${devPort}/`
             const imports = {
-                'https://deno.land/x/aleph/': [alias],
-                [`https://deno.land/x/aleph@v${VERSION}/`]: [alias],
-                'aleph': [`${alias}mod.ts`],
-                'aleph/': [alias],
+                'https://deno.land/x/aleph/': alias,
+                [`https://deno.land/x/aleph@v${VERSION}/`]: alias,
+                'aleph': `${alias}mod.ts`,
+                'aleph/': alias,
+                'react': `https://esm.sh/react@${this.config.reactVersion}`,
+                'react-dom': `https://esm.sh/react-dom@${this.config.reactVersion}`,
             }
-            Object.assign(this.importMap, { imports: Object.assign({}, this.importMap.imports, imports) })
+            Object.assign(this.importMap.imports, imports)
         }
-        Object.assign(this.importMap, {
-            imports: Object.assign({}, {
-                'react': [`https://esm.sh/react@${this.config.reactVersion}`],
-                'react-dom': [`https://esm.sh/react-dom@${this.config.reactVersion}`],
-            }, this.importMap.imports)
-        })
 
         // create page routing
         this.#pageRouting = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)

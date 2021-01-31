@@ -1,9 +1,9 @@
 import { colors, path } from '../deps.ts'
-import { MB, reHashJs, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
+import { reHashJs, reModuleExt, reStyleModuleExt } from '../shared/constants.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { ImportMap, ServerRequest } from '../types.ts'
+import type { ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 
 export const AlephRuntimeCode = `
@@ -76,30 +76,25 @@ export async function cleanupCompilation(jsFile: string) {
 
 /** fix import map */
 export function fixImportMap(v: any) {
-    const imports: ImportMap = {}
+    const imports: Record<string, string> = {}
     if (util.isPlainObject(v)) {
         Object.entries(v).forEach(([key, value]) => {
-            if (key == "" || key == "/") {
+            if (key == '' || key == '/') {
                 return
             }
             const isPrefix = key.endsWith('/')
-            const tmp: string[] = []
-            if (util.isNEString(value)) {
-                if (isPrefix && !value.endsWith('/')) {
-                    return
-                }
-                tmp.push(value)
+            const y = (v: string) => util.isNEString(v) && (!isPrefix || v.endsWith('/'))
+            if (y(value)) {
+                imports[key] = value
+                return
             } else if (util.isNEArray(value)) {
-                value.forEach(v => {
-                    if (util.isNEString(v)) {
-                        if (isPrefix && !v.endsWith('/')) {
-                            return
-                        }
-                        tmp.push(v)
+                for (const v of value) {
+                    if (y(v)) {
+                        imports[key] = v
+                        return
                     }
-                })
+                }
             }
-            imports[key] = tmp
         })
     }
     return imports
@@ -140,16 +135,16 @@ export function fixImportUrl(importUrl: string): string {
  */
 export function formatBytesWithColor(bytes: number) {
     let cf = colors.dim
-    if (bytes > 10 * MB) {
+    if (bytes > 10 << 20) { // 10MB
         cf = colors.red
-    } else if (bytes > MB) {
+    } else if (bytes > 1 << 20) { // 1MB
         cf = colors.yellow
     }
     return cf(util.formatBytes(bytes))
 }
 
 /** Reponse an error jons to the request */
-export function respondError(req: ServerRequest, status: number, message: string) {
+export function respondErrorJSON(req: ServerRequest, status: number, message: string) {
     req.respond({
         status,
         headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
