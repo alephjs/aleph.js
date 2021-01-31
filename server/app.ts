@@ -993,6 +993,7 @@ export class Appliaction {
         if (shouldCompile) {
             let sourceCode = (new TextDecoder).decode(sourceContent)
             let loader = mod.loader
+
             for (const plugin of this.config.plugins) {
                 if (plugin.type === 'loader' && plugin.test.test(url)) {
                     const { code, format = 'js' } = await plugin.transform(sourceContent, url)
@@ -1017,7 +1018,9 @@ export class Appliaction {
             }
 
             if (loader !== 'js' && loader !== 'ts' && loader !== 'jsx' && loader !== 'tsx') {
-                throw new Error(`Unknown loader '${path.extname(url).slice(1)}'`)
+                log.error(`Unknown loader '${path.extname(url).slice(1)}'`)
+                mod.error = new Error('unknown loader')
+                return mod
             }
 
             try {
