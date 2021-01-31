@@ -52,7 +52,6 @@ export class Appliaction {
             plugins: [],
             postcss: {
                 plugins: [
-                    'postcss-nested',
                     'autoprefixer'
                 ]
             }
@@ -581,8 +580,6 @@ export class Appliaction {
         await this.createMainModule()
 
         // pre-compile framework modules
-        const rendererUrl = `${alephPkgUrl}/framework/${this.config.framework}/renderer.ts`
-        await this.compile(rendererUrl)
         if (this.isDev) {
             const mods = ['hmr.ts', 'nomodule.ts']
             for (const mod of mods) {
@@ -590,11 +587,15 @@ export class Appliaction {
             }
         }
 
-        // import framework renderer
-        const { render } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
-        this.#renderer = { render }
+        // compile and import framework renderer when ssr is enable
+        if (this.config.ssr) {
+            const rendererUrl = `${alephPkgUrl}/framework/${this.config.framework}/renderer.ts`
+            await this.compile(rendererUrl)
+            const { render } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
+            this.#renderer = { render }
+        }
 
-        // apply plugins
+        // apply server plugins
         for (const plugin of this.config.plugins) {
             if (plugin.type === 'server') {
                 await plugin.onInit(this)
@@ -764,39 +765,34 @@ export class Appliaction {
     /** fix import url */
     private fixImportUrl(importUrl: string): string {
         const isRemote = util.isLikelyHttpURL(importUrl)
-        const url = new URL(isRemote ? importUrl : 'file://' + importUrl)
-        let ext = path.extname(url.pathname) || '.js'
-        let pathname = util.trimSuffix(url.pathname, ext)
         if (isRemote) {
-            let ok = [...pageModuleExts, 'css', 'pcss'].includes(ext)
-            if (!ok) {
+            const url = new URL(importUrl)
+            let pathname = url.pathname
+            let ok = [...pageModuleExts, 'css', 'pcss'].includes(path.extname(pathname).slice(1))
+            if (ok) {
                 for (const plugin of this.config.plugins) {
-                    if (plugin.type === 'loader' && plugin.test.test(url.pathname)) {
+                    if (plugin.type === 'loader' && plugin.test.test(pathname)) {
                         ok = true
                         break
                     }
                 }
             }
             if (!ok) {
-                ext = '.js'
+                pathname += '.js'
             }
-        }
-        let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
-        if (search.length > 0) {
-            pathname += '_' + search.join(',')
-        }
-        if (isRemote) {
+            let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
+            if (search.length > 0) {
+                pathname += '_' + search.join(',')
+            }
             return [
                 '/-/',
                 (url.protocol === 'http:' ? 'http_' : ''),
                 url.hostname,
                 (url.port ? '_' + url.port : ''),
-                pathname,
-                ext
+                pathname
             ].join('')
         }
-        const result = pathname + ext
-        return !isRemote && importUrl.startsWith('/api/') ? decodeURI(result) : result
+        return importUrl
     }
 
     /** preprocess css with postcss plugins */
@@ -822,7 +818,7 @@ export class Appliaction {
             this.#postcssReady = true
         }
         if (t !== null) {
-            log.debug(`load ${this.config.postcss.plugins.length} plugins of postcss in ${Math.round(performance.now() - t)}ms`)
+            log.debug(`${this.config.postcss.plugins.length} postcss plugins loaded in ${Math.round(performance.now() - t)}ms`)
         }
         const pcss = (await postcss(this.config.postcss.plugins.map(p => {
             if (typeof p === 'string') {
