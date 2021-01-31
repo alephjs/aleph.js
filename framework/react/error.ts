@@ -101,7 +101,7 @@ export function StatusError({ status, message }: { status: number, message: stri
                     {
                         style: {
                             ...resetStyle,
-                            fontSize: 4,
+                            fontSize: 14,
                             color: '#999'
                         }
                     },

@@ -1,22 +1,21 @@
-import type { DependencyDescriptor } from '../../server/types.ts'
-import { reMDExt, reModuleExt } from '../../shared/constants.ts'
+import { pageModuleExts } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
+import type { DependencyDescriptor, RouterURL } from '../../types.ts'
 import events from './events.ts'
 
-export interface Route {
+const ghostRoute: Route = { path: '', module: { url: '', hash: '' } }
+
+export type Route = {
     path: string
     module: RouteModule
     children?: Route[]
 }
 
-export interface RouteModule {
+export type RouteModule = {
     readonly url: string
     readonly hash: string
-    readonly deps?: DependencyDescriptor[]
+    readonly asyncDeps?: DependencyDescriptor[]
 }
-
-const ghostRoute: Route = { path: '', module: { url: '', hash: '' } }
 
 export class Routing {
     private _routes: Route[]
@@ -52,7 +51,7 @@ export class Routing {
     }
 
     update(module: RouteModule) {
-        const newRoute: Route = { path: getPagePath(module.url), module }
+        const newRoute: Route = { path: getPagePathname(module.url), module }
         const dirtyRoutes: Set<Route[]> = new Set()
         let exists = false
         let targetRoutes = this._routes
@@ -114,7 +113,7 @@ export class Routing {
         let pathname = util.cleanPath(util.trimPrefix(loc.pathname, this._baseUrl))
         let pagePath = ''
         let params: Record<string, string> = {}
-        let tree: RouteModule[] = []
+        let chain: RouteModule[] = []
 
         if (pathname !== '/' && this._locales.length > 0) {
             const a = pathname.split('/')
@@ -129,10 +128,10 @@ export class Routing {
             const path = routePath.map(r => r.path).join('')
             const [p, ok] = matchPath(path, pathname)
             if (ok) {
-                tree = routePath.map(r => r.module)
+                chain = routePath.map(r => r.module)
                 const c = routePath[routePath.length - 1].children?.find(c => c.path === '/')
                 if (c) {
-                    tree.push(c.module)
+                    chain.push(c.module)
                 }
                 pagePath = path
                 params = p
@@ -140,7 +139,7 @@ export class Routing {
             }
         }, true)
 
-        return [{ locale, pathname, pagePath, params, query }, tree]
+        return [{ locale, pathname, pagePath, params, query }, chain]
     }
 
     lookup(callback: (path: Route[]) => Boolean | void) {
@@ -169,11 +168,6 @@ export class Routing {
             }
         }
     }
-}
-
-export function getPagePath(url: string): string {
-    const pathname = url.replace(reModuleExt, '').replace(reMDExt, '').toLowerCase().replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
-    return pathname.startsWith('/api/') ? pathname : pathname.replace(/\s+/g, '-')
 }
 
 function matchPath(routePath: string, locPath: string): [Record<string, string>, boolean] {
@@ -235,4 +229,27 @@ export function isHttpUrl(url: string) {
     } catch (error) {
         return false
     }
+}
+
+export function isPageModule(url: string) {
+    for (const ext of pageModuleExts) {
+        if (url.endsWith('.' + ext)) {
+            return true
+        }
+    }
+    return false
+}
+
+export function getPagePathname(url: string): string {
+    const pathname = trimPageModuleExt(url).replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
+    return pathname
+}
+
+export function trimPageModuleExt(url: string) {
+    for (const ext of pageModuleExts) {
+        if (url.endsWith('.' + ext)) {
+            return url.slice(0, -(ext.length + 1))
+        }
+    }
+    return url
 }

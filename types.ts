@@ -1,25 +1,47 @@
-import type { AcceptedPlugin, bufio, Response } from './deps.ts';
+import type { AcceptedPlugin, bufio } from './deps.ts'
 
 /**
- * A plugin for **Aleph.js** application.
+ * The transform result of compiler.
  */
-export interface Plugin {
-    /** `name` gives the plugin a name. */
-    name?: string
+export type TransformResult = {
+    code: string,
+    map?: string,
+    format?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css',
+}
+
+/**
+ * A loader plugin to load source media.
+ */
+export type LoaderPlugin = {
+    /** `type` specifies the plugin type. */
+    type: 'loader'
     /** `test` matches the import url. */
     test: RegExp
-    /** `acceptHMR` accepts the HMR. */
+    /** `acceptHMR` enables the HMR. */
     acceptHMR?: boolean
     /** `transform` transforms the source content. */
-    transform?(content: Uint8Array, url: string): Promise<{ code: string, map?: string, loader?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css' | 'markdown' }>
+    transform(content: Uint8Array, url: string): TransformResult | Promise<TransformResult>
 }
+
+/**
+ * A server plugin to enhance the aleph server application.
+ */
+export type ServerPlugin = {
+    /** `type` specifies the plugin type. */
+    type: 'server'
+    /** `onInit` adds an `init` event to the server. */
+    onInit(app: ServerApplication): Promise<void> | void
+}
+
+/**
+ * A plugin for the aleph server application.
+ */
+export type Plugin = LoaderPlugin | ServerPlugin
 
 /**
  * The options for **SSR**.
  */
-export interface SSROptions {
-    /** The fallback html **dynamic routes** (default is '**_fallback_spa.html**'). */
-    fallback?: string
+export type SSROptions = {
     /** A list of RegExp for paths to use **SSR**. */
     include?: RegExp[]
     /** A list of RegExp for paths to skip **SSR**. */
@@ -29,11 +51,13 @@ export interface SSROptions {
 }
 
 /**
- * Config for Aleph.js application.
+ * The config for the aleph server application.
  */
-export interface Config {
+export type Config = {
     /** `framework` to run your application (default is 'react'). */
-    framework?: 'alef' | 'react'
+    framework?: 'react'
+    /** `buildTarget` specifies the build target in production mode (default is **es5** to be compatible with IE11). */
+    buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
     /** `srcDir` to put your application source code (default is '/'). */
     srcDir?: string
     /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
@@ -52,43 +76,45 @@ export interface Config {
     plugins?: Plugin[]
     /** A list of plugin of PostCSS. */
     postcss?: { plugins: (string | AcceptedPlugin | [string | ((options: Record<string, any>) => AcceptedPlugin), Record<string, any>])[] }
-    /** `buildTarget` specifies the build target for **swc** in production mode (default is **es5**). */
-    buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
-    /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable) */
+    /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable). */
     env?: Record<string, string>
 }
 
 /**
- * A handler to handle api requests.
- *
- * @param req APIRequest object
+ * An interface that aligns to the parts of the aleph server's `Application`.
  */
-export interface APIHandler {
-    (req: APIRequest): void
+interface ServerApplication {
+    readonly workingDir: string
+    readonly mode: 'development' | 'production'
+    addPageModule(pathname: string, code: string): Promise<void>
+    removePageModule(pathname: string): Promise<void>
 }
 
 /**
- * The raw request object of http request.
+ * An interface that aligns to the parts of std http srever's `ServerRequest`.
  */
 export interface ServerRequest {
     readonly url: string
     readonly method: string
-    readonly proto: string
-    readonly protoMinor: number
-    readonly protoMajor: number
     readonly headers: Headers
     readonly conn: Deno.Conn
     readonly r: bufio.BufReader
     readonly w: bufio.BufWriter
-    readonly done: Promise<Error | undefined>
-    readonly contentLength: number | null
     readonly body: Deno.Reader
-    respond(r: Response): Promise<void>
-    finalize(): Promise<void>
+    respond(r: ServerResponse): Promise<void>
 }
 
 /**
- * The request object of api request.
+ * An interface is compatible with std http srever's `request.respond()`.
+ */
+export interface ServerResponse {
+    status?: number
+    headers?: Headers
+    body?: Uint8Array | Deno.Reader | string
+}
+
+/**
+ * An interface extends the `ServerRequest` for API requests.
  */
 export interface APIRequest extends ServerRequest {
     readonly pathname: string
@@ -107,22 +133,31 @@ export interface APIRequest extends ServerRequest {
      * the header if it does not already exist.
      */
     setHeader(key: string, value: string): this
-    /** `removeHeader` removes the value for an existing response header of the request.  */
+    /** `removeHeader` removes the value for an existing response header of the request. */
     removeHeader(key: string): this
-    /** `send` replies to the request with any content with type */
+    /** `send` replies to the request with any content with type. */
     send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
-    /** `json` replies to the request with a json content */
+    /** `json` replies to the request with a json content. */
     json(data: any): Promise<void>
-    /** `decodeBody` will return a string, a form-data or any json object  */
-    decodeBody(type: "text"): Promise<string>
-    decodeBody(type: "json"): Promise<any>
-    decodeBody(type: "form-data"): Promise<FormDataBody>
+    /** `decodeBody` will return a string, form-data, or json object. */
+    decodeBody(type: 'form-data'): Promise<FormDataBody>
+    decodeBody(type: 'text'): Promise<string>
+    decodeBody(type: 'json'): Promise<any>
 }
 
 /**
- * The Router object of the routing, you can access it with `useRouter()` hook.
+ * A handler to handle api requests.
+ *
+ * @param req APIRequest object
  */
-export interface RouterURL {
+export type APIHandler = {
+    (req: APIRequest): void
+}
+
+/**
+ * The router url object of the routing, you can access it with `useRouter()` hook.
+ */
+export type RouterURL = {
     readonly locale: string
     readonly pathname: string
     readonly pagePath: string
@@ -131,22 +166,67 @@ export interface RouterURL {
 }
 
 /**
- * The form data body
+ * A module includes compilation details.
  */
-export interface FormDataBody {
-    fields: Record<string, string>;
-    files: FormFile[];
-    get(key: string): string | undefined;
-    getFile(key: string): FormFile | undefined;
+export type Module = {
+    url: string
+    loader: string
+    sourceHash: string
+    hash: string
+    deps: DependencyDescriptor[]
+    jsFile: string
+    bundlingFile: string
+    error: Error | null
 }
 
 /**
- * The form file data
+ * The dependency descriptor.
  */
-export interface FormFile {
+export type DependencyDescriptor = {
+    url: string
+    hash: string
+    isDynamic?: boolean
+    isStyle?: boolean
+    isData?: boolean
+}
+
+/**
+ * The render result of SSR.
+ */
+export type RenderResult = {
+    url: RouterURL
+    status: number
+    head: string[]
+    body: string
+    scripts: Record<string, any>[]
+    data: Record<string, string> | null
+}
+
+/**
+ * The form data body.
+ */
+export type FormDataBody = {
+    fields: Record<string, string>
+    files: FormFile[]
+    get(key: string): string | undefined
+    getFile(key: string): FormFile | undefined
+}
+
+/**
+ * The form file.
+ */
+export type FormFile = {
     name: string
     content: Uint8Array
     contentType: string
     filename: string
     size: number
+}
+
+/**
+ * The ES Import maps.
+ */
+export type ImportMap = {
+    imports: Record<string, string>,
+    scopes: Record<string, Record<string, string>>
 }

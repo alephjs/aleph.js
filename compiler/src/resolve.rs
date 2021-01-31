@@ -17,7 +17,7 @@ use std::{
   rc::Rc,
   str::FromStr,
 };
-use swc_common::DUMMY_SP;
+use swc_common::{SourceMap, Span, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
@@ -38,10 +38,10 @@ lazy_static! {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DependencyDescriptor {
-  /// The text specifier associated with the import/export statement.
   pub specifier: String,
-  /// A flag indicating if the import is dynamic or not.
   pub is_dynamic: bool,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub rel: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -53,21 +53,21 @@ pub struct InlineStyle {
 }
 
 /// A Resolver to resolve aleph.js import/export URL.
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolver {
   /// The text specifier associated with the import/export statement.
   pub specifier: String,
   /// A flag indicating if the specifier is remote url or not.
   pub specifier_is_remote: bool,
   ///  builtin jsx tags like `a`, `link`, `head`, etc
-  pub builtin_jsx_tags: IndexSet<String>,
+  pub used_builtin_jsx_tags: IndexSet<String>,
   /// dependency graph
   pub dep_graph: Vec<DependencyDescriptor>,
   /// inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
   /// bundle mode
   pub bundle_mode: bool,
-  bundled_paths: IndexSet<String>,
+  /// bundled modules
+  pub bundled_modules: IndexSet<String>,
   import_map: ImportMap,
   react_version: Option<String>,
 }
@@ -78,22 +78,22 @@ impl Resolver {
     import_map: ImportHashMap,
     react_version: Option<String>,
     bundle_mode: bool,
-    bundled_paths: Vec<String>,
+    bundled_modules: Vec<String>,
   ) -> Self {
     let mut set = IndexSet::<String>::new();
-    for url in bundled_paths {
+    for url in bundled_modules {
       set.insert(url);
     }
     Resolver {
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
-      builtin_jsx_tags: IndexSet::new(),
+      used_builtin_jsx_tags: IndexSet::new(),
       dep_graph: Vec::new(),
       inline_styles: HashMap::new(),
       import_map: ImportMap::from_hashmap(import_map),
       react_version,
       bundle_mode,
-      bundled_paths: set,
+      bundled_modules: set,
     }
   }
 
@@ -191,7 +191,7 @@ impl Resolver {
   // - `../styles/app.css` -> `/styles/app.css.{HASH}.js`
   // - `@/components/logo.tsx` -> `/components/logo.{HASH}.js`
   // - `~/components/logo.tsx` -> `/components/logo.{HASH}.js`
-  pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> (String, String) {
+  pub fn resolve(&mut self, url: &str, is_dynamic: bool, rel: Option<String>) -> (String, String) {
     // apply import map
     let url = self.import_map.resolve(self.specifier.as_str(), url);
     let mut fixed_url: String = if is_remote_url(url.as_str()) {
@@ -349,6 +349,7 @@ impl Resolver {
     self.dep_graph.push(DependencyDescriptor {
       specifier: fixed_url.clone(),
       is_dynamic,
+      rel,
     });
     let path = resolved_path.to_slash().unwrap();
     if !path.starts_with("./") && !path.starts_with("../") && !path.starts_with("/") {
@@ -358,28 +359,37 @@ impl Resolver {
   }
 }
 
-pub fn aleph_resolve_fold(resolver: Rc<RefCell<Resolver>>) -> impl Fold {
+pub fn aleph_resolve_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
   AlephResolveFold {
     deno_hooks_idx: 0,
     resolver,
+    source,
   }
 }
 
 pub struct AlephResolveFold {
   deno_hooks_idx: i32,
   resolver: Rc<RefCell<Resolver>>,
+  source: Rc<SourceMap>,
 }
 
 impl AlephResolveFold {
-  fn new_use_deno_hook_ident(&mut self) -> String {
+  fn new_use_deno_hook_ident(&mut self, callback_span: &Span) -> String {
     let resolver = self.resolver.borrow_mut();
     self.deno_hooks_idx = self.deno_hooks_idx + 1;
-    let path = format!("{}-{}", resolver.specifier, self.deno_hooks_idx);
     let mut ident: String = "useDeno-".to_owned();
     let mut hasher = Sha1::new();
-    hasher.update(path.as_bytes());
-    let hash = hasher.finalize();
-    ident.push_str(format!("{:x}", hash).as_str());
+    let callback_code = self.source.span_to_snippet(callback_span.clone()).unwrap();
+    hasher.update(resolver.specifier.clone());
+    hasher.update(self.deno_hooks_idx.to_string());
+    hasher.update(callback_code.clone());
+    ident.push_str(
+      base64::encode(hasher.finalize())
+        .replace("/", "")
+        .replace("+", "")
+        .as_str()
+        .trim_end_matches('='),
+    );
     ident
   }
 }
@@ -419,10 +429,10 @@ impl Fold for AlephResolveFold {
               } else {
                 let mut resolver = self.resolver.borrow_mut();
                 let (resolved_path, fixed_url) =
-                  resolver.resolve(import_decl.src.value.as_ref(), false);
+                  resolver.resolve(import_decl.src.value.as_ref(), false, None);
                 if resolver.bundle_mode
                   && (is_remote_url(fixed_url.as_str())
-                    || resolver.bundled_paths.contains(fixed_url.as_str()))
+                    || resolver.bundled_modules.contains(fixed_url.as_str()))
                 {
                   let mut var_decls: Vec<VarDeclarator> = vec![];
                   import_decl
@@ -494,10 +504,10 @@ impl Fold for AlephResolveFold {
                 }))
               } else {
                 let mut resolver = self.resolver.borrow_mut();
-                let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
+                let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false, None);
                 if resolver.bundle_mode
                   && (is_remote_url(fixed_url.as_str())
-                    || resolver.bundled_paths.contains(fixed_url.as_str()))
+                    || resolver.bundled_modules.contains(fixed_url.as_str()))
                 {
                   // __ALEPH.exportFrom("/pages/index.tsx", "https://esm.sh/react", {"default": "React", "useState": "useState'})
                   let call = CallExpr {
@@ -583,10 +593,10 @@ impl Fold for AlephResolveFold {
             // export * from "https://esm.sh/react"
             ModuleDecl::ExportAll(ExportAll { src, .. }) => {
               let mut resolver = self.resolver.borrow_mut();
-              let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
+              let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false, None);
               if resolver.bundle_mode
                 && (is_remote_url(fixed_url.as_str())
-                  || resolver.bundled_paths.contains(fixed_url.as_str()))
+                  || resolver.bundled_modules.contains(fixed_url.as_str()))
               {
                 // __ALEPH.exportFrom("/pages/index.tsx", "https://esm.sh/react", "*")
                 let call = CallExpr {
@@ -656,26 +666,36 @@ impl Fold for AlephResolveFold {
       call.args = vec![ExprOrSpread {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(new_js_str(
-          resolver.resolve(url, true).0,
+          resolver.resolve(url, true, Some("import".into())).0,
         )))),
       }];
     } else if is_call_expr_by_name(&call, "useDeno") {
-      let has_callback = match call.args.first() {
+      let callback_span = match call.args.first() {
         Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
-          Expr::Fn(_) => true,
-          Expr::Arrow(_) => true,
-          _ => false,
+          Expr::Fn(FnExpr {
+            function: Function { span, .. },
+            ..
+          }) => Some(span),
+          Expr::Arrow(ArrowExpr { span, .. }) => Some(span),
+          _ => None,
         },
-        _ => false,
+        _ => None,
       };
-      if has_callback {
-        let id = self.new_use_deno_hook_ident();
+      if let Some(span) = callback_span {
+        let bundle_mode = self.resolver.borrow().bundle_mode;
+        let id = self.new_use_deno_hook_ident(span);
+        if bundle_mode {
+          call.args[0] = ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
+          };
+        }
         if call.args.len() == 1 {
           call.args.push(ExprOrSpread {
             spread: None,
-            expr: Box::new(Expr::Lit(Lit::Bool(Bool {
+            expr: Box::new(Expr::Lit(Lit::Num(Number {
               span: DUMMY_SP,
-              value: false,
+              value: 0 as f64,
             }))),
           });
         }
@@ -694,6 +714,7 @@ impl Fold for AlephResolveFold {
         resolver.dep_graph.push(DependencyDescriptor {
           specifier: "#".to_owned() + id.clone().as_str(),
           is_dynamic: false,
+          rel: None,
         });
       }
     }
@@ -815,15 +836,12 @@ mod tests {
 
   #[test]
   fn test_resolve_local() {
-    let mut imports: HashMap<String, Vec<String>> = HashMap::new();
-    imports.insert("react".into(), vec!["https://esm.sh/react".into()]);
-    imports.insert(
-      "react-dom/".into(),
-      vec!["https://esm.sh/react-dom/".into()],
-    );
+    let mut imports: HashMap<String, String> = HashMap::new();
+    imports.insert("react".into(), "https://esm.sh/react".into());
+    imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
     imports.insert(
       "https://deno.land/x/aleph/".into(),
-      vec!["http://localhost:9006/".into()],
+      "http://localhost:9006/".into(),
     );
     let mut resolver = Resolver::new(
       "/pages/index.tsx",
@@ -836,105 +854,109 @@ mod tests {
       vec![],
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react", false),
+      resolver.resolve("https://esm.sh/react", false, None),
       (
         "../-/esm.sh/react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-refresh", false),
+      resolver.resolve("https://esm.sh/react-refresh", false, None),
       (
         "../-/esm.sh/react-refresh.js".into(),
         "https://esm.sh/react-refresh".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://deno.land/x/aleph/framework/react/link.ts", false),
+      resolver.resolve(
+        "https://deno.land/x/aleph/framework/react/link.ts",
+        false,
+        None
+      ),
       (
         "../-/http_localhost_9006/framework/react/link.js".into(),
         "http://localhost:9006/framework/react/link.ts".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react@16", false),
+      resolver.resolve("https://esm.sh/react@16", false, None),
       (
         "../-/esm.sh/react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-dom", false),
+      resolver.resolve("https://esm.sh/react-dom", false, None),
       (
         "../-/esm.sh/react-dom@17.0.1.js".into(),
         "https://esm.sh/react-dom@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-dom@16.14.0", false),
+      resolver.resolve("https://esm.sh/react-dom@16.14.0", false, None),
       (
         "../-/esm.sh/react-dom@17.0.1.js".into(),
         "https://esm.sh/react-dom@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-dom/server", false),
+      resolver.resolve("https://esm.sh/react-dom/server", false, None),
       (
         "../-/esm.sh/react-dom@17.0.1/server.js".into(),
         "https://esm.sh/react-dom@17.0.1/server".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-dom@16.13.1/server", false),
+      resolver.resolve("https://esm.sh/react-dom@16.13.1/server", false, None),
       (
         "../-/esm.sh/react-dom@17.0.1/server.js".into(),
         "https://esm.sh/react-dom@17.0.1/server".into()
       )
     );
     assert_eq!(
-      resolver.resolve("react-dom/server", false),
+      resolver.resolve("react-dom/server", false, None),
       (
         "../-/esm.sh/react-dom@17.0.1/server.js".into(),
         "https://esm.sh/react-dom@17.0.1/server".into()
       )
     );
     assert_eq!(
-      resolver.resolve("react", false),
+      resolver.resolve("react", false, None),
       (
         "../-/esm.sh/react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://deno.land/x/aleph/mod.ts", false),
+      resolver.resolve("https://deno.land/x/aleph/mod.ts", false, None),
       (
         "../-/http_localhost_9006/mod.js".into(),
         "http://localhost:9006/mod.ts".into()
       )
     );
     assert_eq!(
-      resolver.resolve("../components/logo.tsx", false),
+      resolver.resolve("../components/logo.tsx", false, None),
       (
         format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
-      resolver.resolve("../styles/app.css", false),
+      resolver.resolve("../styles/app.css", false, None),
       (
         format!("../styles/app.css.{}.js", HASH_PLACEHOLDER.as_str()),
         "/styles/app.css".into()
       )
     );
     assert_eq!(
-      resolver.resolve("@/components/logo.tsx", false),
+      resolver.resolve("@/components/logo.tsx", false, None),
       (
         format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
-      resolver.resolve("~/components/logo.tsx", false),
+      resolver.resolve("~/components/logo.tsx", false, None),
       (
         format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
         "/components/logo.tsx".into()
@@ -952,21 +974,25 @@ mod tests {
       vec![],
     );
     assert_eq!(
-      resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js", false),
+      resolver.resolve(
+        "https://cdn.esm.sh/react@17.0.1/es2020/react.js",
+        false,
+        None
+      ),
       (
         "../cdn.esm.sh/react@17.0.1/es2020/react.js".into(),
         "https://cdn.esm.sh/react@17.0.1/es2020/react.js".into()
       )
     );
     assert_eq!(
-      resolver.resolve("./react", false),
+      resolver.resolve("./react", false, None),
       (
         "./react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("/react", false),
+      resolver.resolve("/react", false, None),
       (
         "./react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
@@ -984,18 +1010,22 @@ mod tests {
       vec![],
     );
     assert_eq!(
-      resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js", false),
+      resolver.resolve(
+        "https://cdn.esm.sh/preact@10.5.7/es2020/preact.js",
+        false,
+        None
+      ),
       (
         "../../cdn.esm.sh/preact@10.5.7/es2020/preact.js".into(),
         "https://cdn.esm.sh/preact@10.5.7/es2020/preact.js".into()
       )
     );
     assert_eq!(
-      resolver.resolve("../preact", false),
+      resolver.resolve("../preact", false, None),
       ("../preact.js".into(), "https://esm.sh/preact".into())
     );
     assert_eq!(
-      resolver.resolve("/preact", false),
+      resolver.resolve("/preact", false, None),
       ("../preact.js".into(), "https://esm.sh/preact".into())
     );
   }

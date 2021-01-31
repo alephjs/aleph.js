@@ -1,89 +1,54 @@
 import type { StyleHTMLAttributes } from 'https://esm.sh/react'
 import { useEffect } from 'https://esm.sh/react'
+import util from '../../shared/util.ts'
 
-export const serverStyles: Map<string, { css: string, asLink?: boolean }> = new Map()
+export const serverStyles: Map<string, string> = new Map()
 
-type StyleProps = StyleHTMLAttributes<{}> & { __styleId?: string }
-
-export default function Style({ children, __styleId: id }: StyleProps) {
+export default function Style({ children, ...rest }: StyleHTMLAttributes<{}>) {
     const css = children?.toLocaleString()
+    const { __styleId: id } = rest as any
 
-    if (window.Deno) {
-        if (css && id) {
-            serverStyles.set('#' + id, { css })
-        }
+    if (id && css) {
+        applyCSS('#' + id, css)
     }
 
-    useEffect(() => {
-        const { document } = (window as any)
-        const styleEl = document.createElement('style')
-        const ssrStyleEls = Array.from(document.head.children).filter((el: any) => {
-            return el.getAttribute('data-module-id') === '#' + id && el.hasAttribute('ssr')
-        })
-        styleEl.type = 'text/css'
-        styleEl.setAttribute('data-module-id', '#' + id)
-        styleEl.appendChild(document.createTextNode(css))
-        document.head.appendChild(styleEl)
-        if (ssrStyleEls.length > 0) {
-            setTimeout(() => {
-                ssrStyleEls.forEach(el => document.head.removeChild(el))
-            }, 0)
-        }
-        return () => {
-            document.head.removeChild(styleEl)
-            console.log('remove', id)
-        }
-    }, [css])
+    useEffect(() => () => id && removeCSS('#' + id), [])
 
     return null
 }
 
-const removeTimers = new Map<string, number>()
-
 export function removeCSS(id: string) {
-    const { document } = (window as any)
-    const styleEls = Array.from(document.head.children).filter((el: any) => {
-        return el.getAttribute('data-module-id') === id
+    const { document } = window as any
+    Array.from(document.head.children).forEach((el: any) => {
+        if (el.getAttribute('data-module-id') === id) {
+            document.head.removeChild(el)
+        }
     })
-
-    removeTimers.set(id, setTimeout(() => {
-        removeTimers.delete(id)
-        styleEls.forEach(el => document.head.removeChild(el))
-    }, 500))
 }
 
-export function applyCSS(id: string, css: string, asLink: boolean = false) {
-    if (window.Deno) {
-        serverStyles.set(id, { css, asLink })
+export function applyCSS(id: string, css: string) {
+    if (util.inDeno()) {
+        serverStyles.set(id, css)
     } else {
-        if (removeTimers.has(id)) {
-            clearTimeout(removeTimers.get(id))
-            removeTimers.delete(id)
-        }
-        const { document } = (window as any)
-        const styleEl = document.createElement(asLink ? 'link' : 'style')
-        const prevStyleEls = Array.from(document.head.children).filter((el: any) => {
-            return el.getAttribute('data-module-id') === id
+        const { document } = window as any
+        const ssrStyle = Array.from<any>(document.head.children).find((el: any) => {
+            return el.getAttribute('data-module-id') === id && el.hasAttribute('ssr')
         })
-        if (asLink) {
-            styleEl.rel = 'stylesheet'
-            styleEl.href = css
+        if (ssrStyle) {
+            ssrStyle.removeAttribute('ssr')
         } else {
+            const prevStyleEls = Array.from(document.head.children).filter((el: any) => {
+                return el.getAttribute('data-module-id') === id
+            })
+            const styleEl = document.createElement('style')
             styleEl.type = 'text/css'
             styleEl.appendChild(document.createTextNode(css))
-        }
-        styleEl.setAttribute('data-module-id', id)
-        document.head.appendChild(styleEl)
-        if (prevStyleEls.length > 0) {
-            if (asLink) {
-                styleEl.addEventListener('load', () => {
-                    prevStyleEls.forEach(el => document.head.removeChild(el))
-                })
-            } else {
-                setTimeout(() => {
-                    prevStyleEls.forEach(el => document.head.removeChild(el))
-                }, 0)
+            styleEl.setAttribute('data-module-id', id)
+            document.head.appendChild(styleEl)
+            if (prevStyleEls.length > 0) {
+                prevStyleEls.forEach(el => document.head.removeChild(el))
             }
+            return styleEl
         }
     }
 }

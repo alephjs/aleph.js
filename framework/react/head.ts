@@ -1,5 +1,5 @@
-import type { PropsWithChildren, ReactElement, ReactNode } from 'https://esm.sh/react'
-import { Children, createElement, Fragment, isValidElement, useContext, useEffect } from 'https://esm.sh/react'
+import type { PropsWithChildren, ReactNode } from 'https://esm.sh/react'
+import { Children, Fragment, isValidElement, useContext, useEffect } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import { RendererContext } from './context.ts'
 import Script from './script.ts'
@@ -7,8 +7,8 @@ import Script from './script.ts'
 export default function Head(props: PropsWithChildren<{}>) {
     const renderer = useContext(RendererContext)
 
-    if (window.Deno) {
-        parse(props.children).forEach(({ type, props }, key) => renderer.cache.headElements.set(key, { type, props }))
+    if (util.inDeno()) {
+        parse(props.children).forEach(({ type, props }, key) => renderer.headElements.set(key, { type, props }))
     }
 
     useEffect(() => {
@@ -62,64 +62,6 @@ export default function Head(props: PropsWithChildren<{}>) {
     return null
 }
 
-interface SEOProps {
-    title?: string
-    description?: string
-    keywords?: string | string[]
-    url?: string
-    image?: string
-    twitter?: {
-        card?: 'summary' | 'summary_large_image' | 'app' | 'player'
-        site?: string
-        creator?: string
-    }
-}
-
-export function SEO(props: SEOProps) {
-    const { title, description, keywords, url, image, twitter } = props
-    return createElement(
-        Head,
-        undefined,
-        title && createElement('title', undefined, title),
-        description && createElement('meta', { name: 'description', content: description }),
-        keywords && createElement('meta', { name: 'keywords', content: util.isArray(keywords) ? keywords.join(',') : keywords }),
-        title && createElement('meta', { name: 'og:title', content: title }),
-        description && createElement('meta', { name: 'og:description', content: description }),
-        title && createElement('meta', { name: 'twitter:title', content: title }),
-        description && createElement('meta', { name: 'twitter:description', content: description }),
-        url && createElement('meta', { name: 'og:url', content: url }),
-        image && createElement('meta', { name: 'og:image', content: image }),
-        image && createElement('meta', { name: 'twitter:image', content: image }),
-        image && createElement('meta', { name: 'twitter:card', content: twitter?.card || 'summary_large_image' }),
-        twitter?.site && createElement('meta', { name: 'twitter:site', content: twitter.site }),
-        twitter?.creator && createElement('meta', { name: 'twitter:creator', content: twitter.creator }),
-    )
-}
-
-interface ViewportProps {
-    width?: number | 'device-width'
-    height?: number | 'device-height'
-    initialScale?: number
-    minimumScale?: number
-    maximumScale?: number
-    userScalable?: 'yes' | 'no'
-    targetDensitydpi?: number | 'device-dpi' | 'low-dpi' | 'medium-dpi' | 'high-dpi'
-}
-
-export function Viewport(props: ViewportProps) {
-    const content = Object.entries(props)
-        .map(([key, value]) => {
-            key = key.replace(/[A-Z]/g, c => '-' + c.toLowerCase())
-            return `${key}=${value}`
-        })
-        .join(',')
-    return createElement(
-        Head,
-        undefined,
-        content && createElement('meta', { name: 'viewport', content })
-    )
-}
-
 function parse(node: ReactNode, els: Map<string, { type: string, props: Record<string, any> }> = new Map()) {
     Children.forEach(node, child => {
         if (!isValidElement(child)) {
@@ -131,10 +73,6 @@ function parse(node: ReactNode, els: Map<string, { type: string, props: Record<s
             case Fragment:
                 parse(props.children, els)
                 break
-            case SEO:
-            case Viewport:
-                parse((type(props) as ReactElement).props.children, els)
-                break
             case Script:
                 type = "script"
             case 'base':
@@ -144,32 +82,30 @@ function parse(node: ReactNode, els: Map<string, { type: string, props: Record<s
             case 'style':
             case 'script':
             case 'no-script':
-                {
-                    let key = type
-                    if (type === 'meta') {
-                        const propKeys = Object.keys(props).map(k => k.toLowerCase())
-                        if (propKeys.includes('charset')) {
-                            return // ignore charset, always use utf-8
-                        }
-                        if (propKeys.includes('name')) {
-                            key += `[name=${JSON.stringify(props['name'])}]`
-                        } else if (propKeys.includes('property')) {
-                            key += `[property=${JSON.stringify(props['property'])}]`
-                        } else if (propKeys.includes('http-equiv')) {
-                            key += `[http-equiv=${JSON.stringify(props['http-equiv'])}]`
-                        } else {
-                            key += Object.keys(props).filter(k => !(/^content|children$/i.test(k))).map(k => `[${k.toLowerCase()}=${JSON.stringify(props[k])}]`).join('')
-                        }
-                    } else if (type !== 'title') {
-                        key += '-' + (els.size + 1)
+                let key = type
+                if (type === 'meta') {
+                    const propKeys = Object.keys(props).map(k => k.toLowerCase())
+                    if (propKeys.includes('charset')) {
+                        return // ignore charset, always use utf-8
                     }
-                    // remove the children prop of base/meta/link
-                    if (['base', 'meta', 'link'].includes(type) && 'children' in props) {
-                        const { children, ...rest } = props
-                        els.set(key, { type, props: rest })
+                    if (propKeys.includes('name')) {
+                        key += `[name=${JSON.stringify(props['name'])}]`
+                    } else if (propKeys.includes('property')) {
+                        key += `[property=${JSON.stringify(props['property'])}]`
+                    } else if (propKeys.includes('http-equiv')) {
+                        key += `[http-equiv=${JSON.stringify(props['http-equiv'])}]`
                     } else {
-                        els.set(key, { type, props })
+                        key += Object.keys(props).filter(k => !(/^content|children$/i.test(k))).map(k => `[${k.toLowerCase()}=${JSON.stringify(props[k])}]`).join('')
                     }
+                } else if (type !== 'title') {
+                    key += '-' + (els.size + 1)
+                }
+                // remove the children prop of base/meta/link
+                if (['base', 'meta', 'link'].includes(type) && 'children' in props) {
+                    const { children, ...rest } = props
+                    els.set(key, { type, props: rest })
+                } else {
+                    els.set(key, { type, props })
                 }
                 break
         }

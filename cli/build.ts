@@ -1,4 +1,4 @@
-import { Project } from '../server/project.ts'
+import { Appliaction } from '../server/mod.ts'
 
 export const helpMessage = `
 Usage:
@@ -8,13 +8,13 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -L, --log-level  Set log level [possible values: debug, info]
-    -r, --reload     Reload source code cache
-    -h, --help       Prints help message
+    -L, --log-level <log-level>  Set log level [possible values: debug, info]
+    -r, --reload                 Reload source code cache
+    -h, --help                   Prints help message
 `
 
-export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const project = new Project(appDir, 'production', Boolean(options.r || options.reload))
-    await project.build()
+export default async function (workingDir: string, options: Record<string, string | boolean>) {
+    const app = new Appliaction(workingDir, 'production', Boolean(options.r || options.reload))
+    await app.build()
     Deno.exit(0)
 }

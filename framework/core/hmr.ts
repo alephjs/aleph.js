@@ -1,4 +1,4 @@
-import { hashShort } from '../../shared/constants.ts'
+import util from '../../shared/util.ts'
 import events from './events.ts'
 
 interface Callback {
@@ -50,7 +50,7 @@ const { location } = window as any
 const { protocol, host } = location
 const modules: Map<string, Module> = new Map()
 const messageQueue: any[] = []
-const socket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr', /*  'aleph-hmr' */)
+const socket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr')
 
 socket.addEventListener('open', () => {
     messageQueue.forEach(msg => socket.send(JSON.stringify(msg)))
@@ -65,10 +65,10 @@ socket.addEventListener('close', () => {
 socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
     if (rawData) {
         try {
-            const { type, url, hash, updateUrl } = JSON.parse(rawData)
+            const { type, url, hash, asyncDeps, updateUrl } = JSON.parse(rawData)
             switch (type) {
                 case 'add':
-                    events.emit('add-module', { url, hash })
+                    events.emit('add-module', { url, hash, asyncDeps })
                     break
                 case 'update':
                     const mod = modules.get(url)
@@ -83,7 +83,7 @@ socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
                     }
                     break
             }
-            console.log(`[HMR]${hash ? ' [' + hash.slice(0, hashShort) + ']' : ''} ${type} module '${url}'`)
+            console.log(`[HMR]${hash ? ' [' + util.shortHash(hash) + ']' : ''} ${type} module '${url}'`)
         } catch (err) {
             console.warn(err)
         }

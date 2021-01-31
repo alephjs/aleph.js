@@ -25,9 +25,7 @@ pub fn aleph_jsx_fold(
             inline_style_idx: 0,
             is_dev,
         },
-        AlephJsxBuiltinModuleResolveFold {
-            resolver: resolver.clone(),
-        },
+        AlephJsxBuiltinModuleResolveFold { resolver: resolver },
     )
 }
 
@@ -49,14 +47,19 @@ struct AlephJsxFold {
 
 impl AlephJsxFold {
     fn new_inline_style_ident(&mut self) -> String {
-        let resolver = self.resolver.borrow_mut();
+        let resolver = self.resolver.borrow();
         self.inline_style_idx = self.inline_style_idx + 1;
-        let path = format!("{}-{}", resolver.specifier, self.inline_style_idx);
         let mut ident: String = "inline-style-".to_owned();
         let mut hasher = Sha1::new();
-        hasher.update(path.as_bytes());
-        let hash = hasher.finalize();
-        ident.push_str(format!("{:x}", hash).as_str());
+        hasher.update(resolver.specifier.clone());
+        hasher.update(self.inline_style_idx.to_string());
+        ident.push_str(
+            base64::encode(hasher.finalize())
+                .replace("/", "")
+                .replace("+", "")
+                .as_str()
+                .trim_end_matches('='),
+        );
         ident
     }
 
@@ -72,7 +75,7 @@ impl AlephJsxFold {
                 match name {
                     "head" | "script" => {
                         let mut resolver = self.resolver.borrow_mut();
-                        resolver.builtin_jsx_tags.insert(name.into());
+                        resolver.used_builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                     }
 
@@ -100,13 +103,14 @@ impl AlephJsxFold {
                         }
 
                         if should_replace {
-                            resolver.builtin_jsx_tags.insert(name.into());
+                            resolver.used_builtin_jsx_tags.insert(name.into());
                             el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                         }
                     }
 
                     "link" | "Link" => {
                         let mut should_replace = false;
+                        let mut rel: Option<String> = None;
 
                         for attr in &el.attrs {
                             match &attr {
@@ -117,12 +121,14 @@ impl AlephJsxFold {
                                 }) => {
                                     let key = id.sym.as_ref();
                                     let value = value.as_ref();
-                                    if key == "rel"
-                                        && (value == "stylesheet"
-                                            || value == "style"
-                                            || value == "component")
-                                    {
-                                        should_replace = true
+                                    if key == "rel" {
+                                        rel = Some(value.into());
+                                        if value == "style"
+                                            || value == "stylesheet"
+                                            || value == "component"
+                                        {
+                                            should_replace = true
+                                        }
                                     }
                                 }
                                 _ => {}
@@ -160,7 +166,7 @@ impl AlephJsxFold {
 
                             let mut resolver = self.resolver.borrow_mut();
                             let (resolved_path, fixed_url) =
-                                resolver.resolve(href_prop_value, true);
+                                resolver.resolve(href_prop_value, true, rel);
 
                             if href_prop_index >= 0 {
                                 el.attrs[href_prop_index as usize] =
@@ -214,7 +220,7 @@ impl AlephJsxFold {
                             }
 
                             if name.eq("link") {
-                                resolver.builtin_jsx_tags.insert(name.into());
+                                resolver.used_builtin_jsx_tags.insert(name.into());
                                 el.name =
                                     JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                             }
@@ -266,8 +272,9 @@ impl AlephJsxFold {
                         resolver.dep_graph.push(DependencyDescriptor {
                             specifier: "#".to_owned() + id.as_str(),
                             is_dynamic: false,
+                            rel: None,
                         });
-                        resolver.builtin_jsx_tags.insert(name.into());
+                        resolver.used_builtin_jsx_tags.insert(name.into());
                         el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
                         inline_style = Some((type_prop_value, id.into()));
                     }
@@ -418,7 +425,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
         let mut items = Vec::<ModuleItem>::new();
         let mut resolver = self.resolver.borrow_mut();
 
-        for mut name in resolver.builtin_jsx_tags.clone() {
+        for mut name in resolver.used_builtin_jsx_tags.clone() {
             if name.eq("a") {
                 name = "anchor".to_owned()
             }
@@ -431,6 +438,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
                 )
                 .as_str(),
                 false,
+                None,
             );
             if resolver.bundle_mode {
                 items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {

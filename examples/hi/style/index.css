@@ -1,0 +1,68 @@
+.index-page .name-input {
+    margin-top: 30px;
+}
+
+.index-page .name-input input {
+    width: 300px;
+    text-align: center;
+    padding: 7px 0;
+    outline: 0;
+    line-height: 1.5;
+    font-size: 15px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.index-page .go-button {
+    margin-top: 15px;
+}
+
+.index-page .go-button button {
+    display: inline-block;
+    padding: 3px 15px;
+    background-color: #008181;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+}
+
+.index-page .go-button button[disabled] {
+    background-color: #aaa;
+    cursor: disable;
+}
+
+.index-page .links {
+    margin-top: 30px;
+}
+
+.index-page .links span,
+.index-page .links a {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.index-page .links span {
+    color: #999;
+}
+
+.index-page .links span::after {
+    content: '·';
+}
+
+.index-page .links a {
+    margin: 0 9px;
+    color: #777;
+    text-decoration: none;
+    border-bottom: 1px dashed #ccc;
+}
+
+.index-page .links a:hover {
+    color: #333;
+    border-bottom-color: transparent;
+}
+
+.index-page .copyinfo {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #999;
+}

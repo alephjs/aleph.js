@@ -1,8 +1,8 @@
-import { assertEquals } from 'https://deno.land/std@0.83.0/testing/asserts.ts';
-import plugin from './wasm.ts';
+import { assertEquals } from 'https://deno.land/std@0.83.0/testing/asserts.ts'
+import plugin from './wasm.ts'
 
 Deno.test('project wasm loader plugin', async () => {
-    const wasmCode = new Uint8Array([
+    const wasmBytes = new Uint8Array([
         0, 97, 115, 109, 1, 0, 0, 0, 1, 133, 128, 128, 128, 0, 1, 96, 0, 1, 127,
         3, 130, 128, 128, 128, 0, 1, 0, 4, 132, 128, 128, 128, 0, 1, 112, 0, 0,
         5, 131, 128, 128, 128, 0, 1, 0, 1, 6, 129, 128, 128, 128, 0, 0, 7, 145,
@@ -10,11 +10,11 @@ Deno.test('project wasm loader plugin', async () => {
         105, 110, 0, 0, 10, 138, 128, 128, 128, 0, 1, 132, 128, 128, 128, 0, 0,
         65, 42, 11
     ])
-    const { code, loader } = plugin.transform(wasmCode, '42.wasm')
+    const { code, format } = await plugin.transform!(wasmBytes, '42.wasm')
     const jsfile = (await Deno.makeTempFile()) + '.js'
     await Deno.writeTextFile(jsfile, code)
     const { default: wasm } = await import('file://' + jsfile)
     assertEquals(plugin.test.test('test.wasm'), true)
+    assertEquals(format, 'js')
     assertEquals(wasm.main(), 42)
-    assertEquals(loader, 'js')
 })

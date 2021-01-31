@@ -1,23 +1,21 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement, useCallback, useEffect, useState } from 'https://esm.sh/react'
-import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './error.ts'
-import { createPageProps, importModule, isLikelyReactComponent } from './util.ts'
+import type { PageRoute } from './pageprops.ts'
+import { createPageProps } from './pageprops.ts'
+import { importModule, isLikelyReactComponent, loadPageData } from './util.ts'
 
-export default function AlephAppRoot({
-    url,
-    routing,
+export default function Router({
     customComponents,
-    pageComponentTree,
+    pageRoute,
+    routing,
 }: {
-    url: RouterURL
-    routing: Routing
     customComponents: Record<'E404' | 'App', ComponentType<any>>
-    pageComponentTree: { url: string, Component?: any }[]
+    pageRoute: PageRoute,
+    routing: Routing
 }) {
     const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
         const { E404 } = customComponents
@@ -39,35 +37,28 @@ export default function AlephAppRoot({
         }
         return { Component: null }
     })
-    const [route, setRoute] = useState(() => ({ ...createPageProps(pageComponentTree), url }))
+    const [route, setRoute] = useState<PageRoute>(pageRoute)
     const onpopstate = useCallback(async (e: any) => {
         const { baseUrl } = routing
-        const [url, pageModuleTree] = routing.createRouter()
+        const [url, pageModuleChain] = routing.createRouter()
         if (url.pagePath !== '') {
-            const ctree: { url: string, Component?: ComponentType<any> }[] = pageModuleTree.map(({ url }) => ({ url }))
-            const imports = pageModuleTree.map(async mod => {
-                const { default: C } = await importModule(baseUrl, mod, e.forceRefetch)
-                if (mod.deps && mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno-')).length > 0) {
-                    const { default: data } = await fetch(`/_aleph/data${url.pathname === '/' ? '/index' : url.pathname}.json`).then(resp => resp.json())
-                    if (util.isPlainObject(data)) {
-                        for (const key in data) {
-                            const useDenoUrl = `useDeno://${url.pathname}#${key}`
-                            Object.assign(window, { [useDenoUrl]: data[key] })
-                        }
-                    }
-                }
-                const pc = ctree.find(pc => pc.url === mod.url)
-                if (pc) {
-                    pc.Component = C
+            const imports = pageModuleChain.map(async mod => {
+                const [{ default: Component }] = await Promise.all([
+                    importModule(baseUrl, mod, e.forceRefetch),
+                    mod.asyncDeps?.filter(({ isData }) => !!isData).length ? loadPageData(url) : Promise.resolve(),
+                    mod.asyncDeps?.filter(({ isStyle }) => !!isStyle).map(dep => importModule(baseUrl, dep)) || Promise.resolve()
+                ])
+                return {
+                    url: mod.url,
+                    Component
                 }
             })
-            await Promise.all(imports)
-            setRoute({ ...createPageProps(ctree), url })
+            setRoute({ ...createPageProps(await Promise.all(imports)), url })
             if (e.resetScroll) {
                 (window as any).scrollTo(0, 0)
             }
         } else {
-            setRoute({ Page: null, pageProps: {}, url })
+            setRoute({ Page: null, pageProps: null, url })
         }
     }, [])
 
@@ -79,9 +70,10 @@ export default function AlephAppRoot({
             window.removeEventListener('popstate', onpopstate)
             events.off('popstate', onpopstate)
         }
-    }, [onpopstate])
+    }, [])
 
     useEffect(() => {
+        const isDev = !('__ALEPH' in window)
         const { baseUrl } = routing
         const onAddModule = async (mod: RouteModule) => {
             switch (mod.url) {
@@ -130,46 +122,43 @@ export default function AlephAppRoot({
         }
         const onFetchPageModule = async ({ href }: { href: string }) => {
             const [pathname, search] = href.split('?')
-            const [url, pageModuleTree] = routing.createRouter({ pathname, search })
+            const [url, pageModuleChain] = routing.createRouter({ pathname, search })
             if (url.pagePath !== '') {
-                const imports = pageModuleTree.map(async mod => {
-                    await importModule(baseUrl, mod)
-                    if (mod.deps && mod.deps.filter(({ isData, url }) => !!isData && url.startsWith('#useDeno-')).length > 0) {
-                        const { default: data } = await fetch(`/_aleph/data${url.pathname === '/' ? '/index' : url.pathname}.json`).then(resp => resp.json())
-                        if (util.isPlainObject(data)) {
-                            for (const key in data) {
-                                const useDenoUrl = `useDeno://${url.pathname}#${key}`
-                                Object.assign(window, { [useDenoUrl]: data[key] })
-                            }
-                        }
+                pageModuleChain.map(mod => {
+                    if (mod.asyncDeps?.filter(({ isData }) => !!isData).length) {
+                        loadPageData(url)
                     }
+                    importModule(baseUrl, mod)
                 })
-                await Promise.all(imports)
             }
         }
 
-        events.on('add-module', onAddModule)
-        events.on('remove-module', onRemoveModule)
-        events.on('fetch-page-module', onFetchPageModule)
+        if (isDev) {
+            events.on('add-module', onAddModule)
+            events.on('remove-module', onRemoveModule)
+            events.on('fetch-page-module', onFetchPageModule)
+        }
 
         return () => {
-            events.off('add-module', onAddModule)
-            events.off('remove-module', onRemoveModule)
-            events.off('fetch-page-module', onFetchPageModule)
+            if (isDev) {
+                events.off('add-module', onAddModule)
+                events.off('remove-module', onRemoveModule)
+                events.off('fetch-page-module', onFetchPageModule)
+            }
         }
     }, [])
 
     useEffect(() => {
         const win = window as any
-        const { location, document, scrollX, scrollY, hashAnchorScroll } = win
+        const { location, document, scrollX, scrollY, scrollFixer } = win
         if (location.hash) {
             const anchor = document.getElementById(location.hash.slice(1))
             if (anchor) {
                 const { left, top } = anchor.getBoundingClientRect()
                 win.scroll({
-                    top: top + scrollY - (hashAnchorScroll?.offset?.top || 0),
-                    left: left + scrollX - (hashAnchorScroll?.offset?.left || 0),
-                    behavior: hashAnchorScroll?.behavior
+                    top: top + scrollY - (scrollFixer?.offset?.top || 0),
+                    left: left + scrollX - (scrollFixer?.offset?.left || 0),
+                    behavior: scrollFixer?.behavior
                 })
             }
         }
@@ -191,3 +180,5 @@ export default function AlephAppRoot({
         )
     )
 }
+
+Router.displayName = 'ALEPH' // show in devTools

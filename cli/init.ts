@@ -1,35 +1,8 @@
 import { colors, ensureDir, gzipDecode, path, Untar } from '../deps.ts'
-import log from '../server/log.ts'
-import { ensureTextFile } from '../server/util.ts'
+import { ensureTextFile } from '../shared/fs.ts'
+import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
-
-const gitignore = [
-    '.DS_Store',
-    'Thumbs.db',
-    '.aleph/',
-    'dist/',
-]
-
-const vscExtensions = {
-    'recommendations': [
-        'denoland.vscode-deno'
-    ]
-}
-
-const vscSettings = {
-    'files.eol': '\n',
-    'files.trimTrailingWhitespace': true,
-    'files.exclude': {
-        '**/.git': true,
-        '**/.DS_Store': true,
-        '**/Thumbs.db': true,
-        '**/.aleph': true
-    },
-    'deno.enable': true,
-    'deno.unstable': true,
-    'deno.import_map': './import_map.json'
-}
 
 export const helpMessage = `
 Usage:
@@ -50,6 +23,12 @@ export default async function (appDir: string, options: Record<string, string | 
     log.info('Saving template...')
     const tarData = gzipDecode(gzData)
     const entryList = new Untar(new Deno.Buffer(tarData))
+    const gitignore = [
+        '.DS_Store',
+        'Thumbs.db',
+        '.aleph/',
+        'dist/',
+    ]
 
     // todo: add template select ui
     let template = 'hello-world'
@@ -65,21 +44,32 @@ export default async function (appDir: string, options: Record<string, string | 
             await Deno.copy(entry, file)
         }
     }
-
-    await ensureDir(path.join(appDir, '.vscode'))
-    await Deno.writeTextFile(path.join(appDir, '.vscode', 'extensions.json'), JSON.stringify(vscExtensions, undefined, 4))
-    await Deno.writeTextFile(path.join(appDir, '.vscode', 'settings.json'), JSON.stringify(vscSettings, undefined, 4))
     await Deno.writeTextFile(path.join(appDir, '.gitignore'), gitignore.join('\n'))
     await Deno.writeTextFile(path.join(appDir, 'import_map.json'), JSON.stringify({
         imports: {
             'aleph': `https://deno.land/x/aleph@v${VERSION}/mod.ts`,
-            'aleph/react': `https://deno.land/x/aleph@v${VERSION}/react.ts`,
             'aleph/': `https://deno.land/x/aleph@v${VERSION}/`,
             'react': 'https://esm.sh/react@17.0.1',
             'react-dom': 'https://esm.sh/react-dom@17.0.1',
         },
         scopes: {}
     }, undefined, 4))
+
+    if (await confirm(`Add VS Code workspace settings?`)) {
+        const extensions = {
+            'recommendations': [
+                'denoland.vscode-deno'
+            ]
+        }
+        const settigns = {
+            'deno.enable': true,
+            'deno.unstable': true,
+            'deno.import_map': './import_map.json'
+        }
+        await ensureDir(path.join(appDir, '.vscode'))
+        await Deno.writeTextFile(path.join(appDir, '.vscode', 'extensions.json'), JSON.stringify(extensions, undefined, 4))
+        await Deno.writeTextFile(path.join(appDir, '.vscode', 'settings.json'), JSON.stringify(settigns, undefined, 4))
+    }
 
     log.info('Done')
     log.info('---')
@@ -90,4 +80,18 @@ export default async function (appDir: string, options: Record<string, string | 
     log.info(`${colors.dim('$')} aleph ${colors.bold('build')}  ${colors.dim('# build the app to a static site (SSG)')}`)
     log.info('---')
     Deno.exit(0)
+}
+
+async function ask(question: string = ':', stdin = Deno.stdin, stdout = Deno.stdout) {
+    await stdout.write(new TextEncoder().encode(question + ' '))
+    const buf = new Uint8Array(1024)
+    const n = <number>await stdin.read(buf)
+    const answer = new TextDecoder().decode(buf.subarray(0, n))
+    return answer.trim()
+}
+
+async function confirm(question: string = 'are you sure?') {
+    let a: string
+    while (!/^(y(es)?|no?)$/i.test(a = (await ask(question + ' [y/n]')).trim())) { }
+    return a.charAt(0).toLowerCase() === 'y'
 }

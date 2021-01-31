@@ -1,9 +1,9 @@
 // Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
 // Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
-use crate::compat_fixer::compat_fixer_fold;
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::fast_refresh::fast_refresh_fold;
+use crate::fixer::{compat_fixer_fold, jsx_link_fixer_fold};
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve::{aleph_resolve_fold, Resolver};
 use crate::source_type::SourceType;
@@ -126,7 +126,8 @@ impl ParsedModule {
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
-      let specifier_is_remote = resolver.borrow_mut().specifier_is_remote;
+      let specifier_is_remote = resolver.borrow().specifier_is_remote;
+      let bundle_mode = resolver.borrow().bundle_mode;
       let is_ts = match self.source_type {
         SourceType::TypeScript => true,
         SourceType::TSX => true,
@@ -144,9 +145,10 @@ impl ParsedModule {
       );
       let root_mark = Mark::fresh(Mark::root());
       let mut passes = chain!(
-        aleph_resolve_fold(resolver.clone()),
+        aleph_resolve_fold(resolver.clone(), self.source_map.clone()),
         Optional::new(aleph_jsx_fold, is_jsx),
         Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
+        Optional::new(jsx_link_fixer_fold(resolver.clone()), is_jsx && bundle_mode),
         Optional::new(
           fast_refresh_fold(
             "$RefreshReg$",
@@ -287,6 +289,7 @@ mod tests {
   use crate::aleph::VERSION;
   use crate::import_map::ImportHashMap;
   use crate::resolve::{DependencyDescriptor, Resolver, HASH_PLACEHOLDER};
+  use sha1::{Digest, Sha1};
 
   fn t(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
     let module = ParsedModule::parse(specifer, source, None).expect("could not parse module");
@@ -300,6 +303,7 @@ mod tests {
     let (code, _) = module
       .transpile(resolver.clone(), &EmitOptions::default())
       .expect("could not transpile module");
+    println!("{}", code);
     (code, resolver)
   }
 
@@ -335,7 +339,6 @@ mod tests {
       }
     "#;
     let (code, _) = t("https://deno.land/x/mod.ts", source, false);
-    println!("{}", code);
     assert!(code.contains("var D;\n(function(D) {\n"));
     assert!(code.contains("_applyDecoratedDescriptor("));
   }
@@ -353,7 +356,6 @@ mod tests {
       }
     "#;
     let (code, _) = t("/pages/index.tsx", source, false);
-    println!("{}", code);
     assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("className: \"title\""));
@@ -361,18 +363,14 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_use_deno() {
+  fn test_sign_use_deno() {
+    let specifer = "/pages/index.tsx";
     let source = r#"
       export default function Index() {
         const verison = useDeno(() => Deno.version)
-        const V8 = () => {
-          const verison = useDeno(() => Deno.version, true)
-          return <p>v8 v{version.v8}</p>
-        }
-        const TS = () => {
-          const verison = useDeno(() => Deno.version, 1)
-          return <p>typescript v{version.typescript}</p>
-        }
+        const verison = useDeno(async function() {
+          return await readJson("./data.json")
+        }, 1000)
         return (
           <>
             <p>Deno v{version.deno}</p>
@@ -382,11 +380,37 @@ mod tests {
         )
       }
     "#;
-    let (code, _) = t("/pages/index.tsx", source, false);
-    println!("{}", code);
-    assert!(code.contains(", false, \"useDeno-"));
-    assert!(code.contains(", true, \"useDeno-"));
-    assert!(code.contains(", 1, \"useDeno-"));
+
+    let mut hasher = Sha1::new();
+    hasher.update(specifer.clone());
+    hasher.update("1");
+    hasher.update("() => Deno.version");
+    let id_1 = base64::encode(hasher.finalize())
+      .replace("/", "")
+      .replace("+", "");
+    let id_1 = id_1.trim_end_matches('=');
+
+    let mut hasher = Sha1::new();
+    hasher.update(specifer.clone());
+    hasher.update("2");
+    hasher.update(
+      r#"async function() {
+          return await readJson("./data.json")
+        }"#,
+    );
+    let id_2 = base64::encode(hasher.finalize())
+      .replace("/", "")
+      .replace("+", "");
+    let id_2 = id_2.trim_end_matches('=');
+
+    for _ in 0..3 {
+      let (code, _) = t(specifer, source, false);
+      assert!(code.contains(format!("0, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!("1000, \"useDeno-{}\"", id_2).as_str()));
+      let (code, _) = t(specifer, source, true);
+      assert!(code.contains(format!("null, 0, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_2).as_str()));
+    }
   }
 
   #[test]
@@ -396,12 +420,13 @@ mod tests {
       export default function Index() {
         return (
           <>
+            <head>
+              <title>Hello World!</title>
+              <link rel="stylesheet" href="../style/index.css" />
+            </head>
             <a href="/about">About</a>
             <a href="https://github.com">About</a>
             <a href="/about" target="_blank">About</a>
-            <head>
-              <link rel="stylesheet" href="../style/index.css" />
-            </head>
             <script src="ga.js"></script>
             <script>{`
               function gtag() {
@@ -416,7 +441,6 @@ mod tests {
       }
     "#;
     let (code, resolver) = t("/pages/index.tsx", source, false);
-    println!("{}", code);
     assert!(code.contains(
       format!(
         "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v{}/framework/react/anchor.js\"",
@@ -466,17 +490,12 @@ mod tests {
         DependencyDescriptor {
           specifier: "https://esm.sh/react".into(),
           is_dynamic: false,
+          rel: None,
         },
         DependencyDescriptor {
           specifier: "/style/index.css".into(),
           is_dynamic: true,
-        },
-        DependencyDescriptor {
-          specifier: format!(
-            "https://deno.land/x/aleph@v{}/framework/react/anchor.ts",
-            VERSION.as_str()
-          ),
-          is_dynamic: false,
+          rel: Some("stylesheet".into()),
         },
         DependencyDescriptor {
           specifier: format!(
@@ -484,6 +503,7 @@ mod tests {
             VERSION.as_str()
           ),
           is_dynamic: false,
+          rel: None,
         },
         DependencyDescriptor {
           specifier: format!(
@@ -491,6 +511,15 @@ mod tests {
             VERSION.as_str()
           ),
           is_dynamic: false,
+          rel: None,
+        },
+        DependencyDescriptor {
+          specifier: format!(
+            "https://deno.land/x/aleph@v{}/framework/react/anchor.ts",
+            VERSION.as_str()
+          ),
+          is_dynamic: false,
+          rel: None,
         },
         DependencyDescriptor {
           specifier: format!(
@@ -498,6 +527,7 @@ mod tests {
             VERSION.as_str()
           ),
           is_dynamic: false,
+          rel: None,
         }
       ]
     );
@@ -550,6 +580,7 @@ mod tests {
       export default function Index() {
         return (
           <>
+            <link rel="stylesheet" href="../style/index.css" />
             <head></head>
             <Logo />
             <Nav />
@@ -578,6 +609,7 @@ mod tests {
     assert!(code.contains("Logo = __ALEPH.pack[\"/components/logo.ts\"].default"));
     assert!(!code.contains("Nav = __ALEPH.pack[\"/components/nav.ts\"].default"));
     assert!(code.contains("import Nav from \""));
+    assert!(code.contains("import   \"../style/index.css.xxxxxxxxx.js\""));
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
     assert!(code.contains(
       format!(
@@ -596,7 +628,6 @@ mod tests {
       export * from "https://esm.sh/react"
     "#;
     let (code, _) = t("/pages/index.tsx", source, true);
-    println!("{}", code);
     assert!(code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", {"));
     assert!(
       code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", \"*\")")

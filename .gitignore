@@ -2,5 +2,5 @@
 Thumbs.db
 compiler/target/
 compiler/pkg/
-.aleph/
-dist/
+examples/**/.aleph/
+examples/**/dist/

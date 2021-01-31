@@ -4,13 +4,11 @@ import Logo from '../components/logo.tsx'
 
 export default function Home() {
     const [count, setCount] = useState(0)
-    const version = useDeno(() => {
-        return Deno.version
-    })
+    const version = useDeno(() => Deno.version.deno)
 
     return (
         <div className="page">
-            <link rel="stylesheet" href="../style/index.less" />
+            <link rel="stylesheet" href="../style/index.css" />
             <p className="logo"><Logo /></p>
             <h1>Welcome to use <strong>Aleph.js</strong>!</h1>
             <p className="links">
@@ -22,13 +20,13 @@ export default function Home() {
                 <span></span>
                 <a href="https://github.com/alephjs/aleph.js" target="_blank">Github</a>
             </p>
-            <p className="counter">
+            <div className="counter">
                 <span>Counter:</span>
                 <strong>{count}</strong>
                 <button onClick={() => setCount(n => n - 1)}>-</button>
                 <button onClick={() => setCount(n => n + 1)}>+</button>
-            </p>
-            <p className="copyinfo">Built by Aleph.js in Deno v{version.deno}</p>
+            </div>
+            <p className="copyinfo">Built by Aleph.js in Deno {version}</p>
         </div>
     )
 }

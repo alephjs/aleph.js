@@ -1,43 +1,11 @@
-import type { ComponentType } from 'https://esm.sh/react'
-import { hashShort, reModuleExt } from '../../shared/constants.ts'
+import { createContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import { RouteModule } from '../core/routing.ts'
-import { E400MissingComponent } from './error.ts'
+import type { RouterURL } from '../../types.ts'
+import { trimPageModuleExt } from '../core/routing.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for
 const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
 const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
-
-export interface PageProps {
-    Page: ComponentType<any> | null
-    pageProps: Partial<PageProps> & { name?: string }
-}
-
-export function importModule(baseUrl: string, mod: RouteModule, forceRefetch = false): Promise<any> {
-    const { __ALEPH, document } = window as any
-    if (!__ALEPH || mod.url.startsWith('/pages/')) {
-        const src = util.cleanPath(baseUrl + '/_aleph/' + mod.url.replace(reModuleExt, '') + `.${mod.hash.slice(0, hashShort)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
-        if (__ALEPH) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script')
-                script.onload = () => {
-                    resolve(__ALEPH.pack[mod.url])
-                }
-                script.onerror = (err: Error) => {
-                    reject(err)
-                }
-                script.src = src
-                document.body.appendChild(script)
-            })
-        } else {
-            return import(src)
-        }
-    } else if (__ALEPH && mod.url in __ALEPH.pack) {
-        return Promise.resolve(__ALEPH.pack[mod.url])
-    } else {
-        return Promise.reject(new Error(`Module '${mod.url}' not found`))
-    }
-}
 
 export function isLikelyReactComponent(type: any): Boolean {
     switch (typeof type) {
@@ -51,12 +19,12 @@ export function isLikelyReactComponent(type: any): Boolean {
                     return false
                 }
             }
-            const { __ALEPH } = window as any
-            if (__ALEPH) {
-                // in bundle mode, component name will be compressed
+            const { __ALEPH: ALEPH } = window as any
+            if (ALEPH) {
+                // in bundle mode, the component names have been compressed.
                 return true
             }
-            const name = type.name || type.displayName
+            const name = type.displayName || type.name
             return typeof name === 'string' && /^[A-Z]/.test(name)
         case 'object':
             if (type != null) {
@@ -74,36 +42,59 @@ export function isLikelyReactComponent(type: any): Boolean {
     }
 }
 
-export function createPageProps(componentTree: { url: string, Component?: ComponentType<any> }[]): PageProps {
-    const pageProps: PageProps = {
-        Page: null,
-        pageProps: {}
+export function importModule(baseUrl: string, mod: { url: string, hash: string }, forceRefetch = false): Promise<any> {
+    const { __ALEPH: ALEPH, document } = window as any
+
+    if (ALEPH && mod.url in ALEPH.pack) {
+        return Promise.resolve(ALEPH.pack[mod.url])
     }
-    if (componentTree.length > 0) {
-        Object.assign(pageProps, _createPagePropsSegment(componentTree[0]))
+
+    if (ALEPH && mod.url.startsWith('/pages/')) {
+        const src = util.cleanPath(baseUrl + '/_aleph/' + trimPageModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`)
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script')
+            script.onload = () => {
+                resolve(ALEPH.pack[mod.url])
+            }
+            script.onerror = (err: Error) => {
+                reject(err)
+            }
+            script.src = src
+            document.body.appendChild(script)
+        })
     }
-    if (componentTree.length > 1) {
-        componentTree.slice(1).reduce((p, seg) => {
-            const c = _createPagePropsSegment(seg)
-            p.pageProps = c
-            return c
-        }, pageProps)
-    }
-    return pageProps
+
+    const src = util.cleanPath(baseUrl + '/_aleph/' + trimPageModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
+    return import(src)
 }
 
-function _createPagePropsSegment(seg: { url: string, Component?: ComponentType<any> }): PageProps {
-    const pageProps: PageProps = {
-        Page: null,
-        pageProps: {}
-    }
-    if (seg.Component) {
-        if (isLikelyReactComponent(seg.Component)) {
-            pageProps.Page = seg.Component
-        } else {
-            pageProps.Page = E400MissingComponent
-            pageProps.pageProps = { name: 'Page: ' + util.trimPrefix(seg.url, '/pages').replace(reModuleExt, '') }
+export async function loadPageData({ pathname }: RouterURL): Promise<void> {
+    const url = `/_aleph/data${pathname === '/' ? '/index' : pathname}.json`
+    const data = await fetch(url).then(resp => resp.json())
+    if (util.isPlainObject(data)) {
+        for (const key in data) {
+            Object.assign(window, { [`data://${pathname}#${key}`]: data[key] })
         }
     }
-    return pageProps
+}
+
+export async function loadPageDataFromTag(url: RouterURL) {
+    const { document } = window as any
+    const ssrDataEl = document.getElementById('ssr-data')
+    if (ssrDataEl) {
+        try {
+            const ssrData = JSON.parse(ssrDataEl.innerText)
+            for (const key in ssrData) {
+                Object.assign(window, { [`data://${url.pathname}#${key}`]: ssrData[key] })
+            }
+            return
+        } catch (e) { }
+    }
+    await loadPageData(url)
+}
+
+export function createNamedContext<T>(defaultValue: T, name: string) {
+    const ctx = createContext<T>(defaultValue)
+    ctx.displayName = name // show in devTools
+    return ctx
 }

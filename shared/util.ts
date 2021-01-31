@@ -1,17 +1,6 @@
-import { GB, KB, MB, PB, TB } from './constants.ts'
-
 export default {
-    isNumber(a: any): a is number {
-        return typeof a === 'number' && !Number.isNaN(a)
-    },
-    isUNumber(a: any): a is number {
-        return this.isNumber(a) && a >= 0
-    },
-    isInt(a: any): a is number {
-        return this.isNumber(a) && Number.isInteger(a)
-    },
-    isUInt(a: any): a is number {
-        return this.isInt(a) && a >= 0
+    inDeno(): boolean {
+        return typeof Deno !== 'undefined' && this.isNEString(Deno.version?.deno)
     },
     isString(a: any): a is string {
         return typeof a === 'string'
@@ -30,6 +19,13 @@ export default {
     },
     isFunction(a: any): a is Function {
         return typeof a === 'function'
+    },
+    isLikelyHttpURL(s: string): boolean {
+        const p = s.slice(0, 8).toLowerCase()
+        return p === 'https://' || p.slice(0, 7) === 'http://'
+    },
+    shortHash(hash: string): string {
+        return hash.slice(0, 9)
     },
     trimPrefix(s: string, prefix: string): string {
         if (prefix !== '' && s.startsWith(prefix)) {
@@ -56,23 +52,23 @@ export default {
         }
         return [s, '']
     },
-    bytesString(bytes: number) {
-        if (bytes < KB) {
+    formatBytes(bytes: number) {
+        if (bytes < 1 << 10) {
             return bytes.toString() + 'B'
         }
-        if (bytes < MB) {
-            return Math.ceil(bytes / KB) + 'KB'
+        if (bytes < 1 << 20) {
+            return Math.ceil(bytes / (1 << 10)) + 'KB'
         }
-        if (bytes < GB) {
-            return this.trimSuffix((bytes / MB).toFixed(1), '.0') + 'MB'
+        if (bytes < 1 << 30) {
+            return this.trimSuffix((bytes / (1 << 20)).toFixed(1), '.0') + 'MB'
         }
-        if (bytes < TB) {
-            return this.trimSuffix((bytes / GB).toFixed(1), '.0') + 'GB'
+        if (bytes < 1 << 40) {
+            return this.trimSuffix((bytes / (1 << 30)).toFixed(1), '.0') + 'GB'
         }
-        if (bytes < PB) {
-            return this.trimSuffix((bytes / TB).toFixed(1), '.0') + 'TB'
+        if (bytes < 1 << 50) {
+            return this.trimSuffix((bytes / (1 << 40)).toFixed(1), '.0') + 'TB'
         }
-        return this.trimSuffix((bytes / PB).toFixed(1), '.0') + 'PB'
+        return this.trimSuffix((bytes / (1 << 50)).toFixed(1), '.0') + 'PB'
     },
     splitPath(path: string): string[] {
         return path

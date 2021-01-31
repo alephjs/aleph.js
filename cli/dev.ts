@@ -1,5 +1,4 @@
-import log from '../server/log.ts'
-import { start } from '../server/server.ts'
+import { Appliaction, parsePortNumber, serve } from '../server/mod.ts'
 
 export const helpMessage = `
 Usage:
@@ -9,19 +8,14 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -hn, --host      A host to start the Aleph.js app, default is localhost
-    -p, --port       A port number to start the Aleph.js app, default is 8080
-    -L, --log-level  Set log level [possible values: debug, info]
-    -r, --reload     Reload source code cache
-    -h, --help       Prints help message
+    -p, --port      <port>       A port number to start the Aleph.js app, default is 8080
+    -L, --log-level <log-level>  Set log level [possible values: debug, info]
+    -r, --reload                 Reload source code cache
+    -h, --help                   Prints help message
 `
 
-export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const host = String(options.hn || options.host || 'localhost')
-    const port = parseInt(String(options.p || options.port || '8080'))
-    if (isNaN(port) || port <= 0 || !Number.isInteger(port)) {
-        log.error(`invalid port '${options.port || options.p}'`)
-        Deno.exit(1)
-    }
-    start(appDir, host, port, true, Boolean(options.r || options.reload))
+export default async function (workingDir: string, options: Record<string, string | boolean>) {
+    const port = parsePortNumber(String(options.p || options.port || '8080'))
+    const app = new Appliaction(workingDir, 'development', Boolean(options.r || options.reload))
+    serve('localhost', port, app)
 }

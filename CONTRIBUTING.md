@@ -19,9 +19,9 @@ You will need [Deno](https://deno.land/) 1.7+.
 
 ```bash
 # ssr
-deno run -A --unstable --import-map=import_map.json cli.ts dev ./examples/hello-world -L debug
+deno run -A --unstable --import-map=import_map.json --location=http://localhost cli.ts dev ./examples/hello-world -L debug
 # ssg
-deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
+deno run -A --unstable --import-map=import_map.json --location=http://localhost cli.ts build ./examples/hello-world -L debug
 ```
 
 ## Testing
@@ -29,21 +29,22 @@ deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hell
 Run all tests:
 
 ```bash
-deno test -A
+deno test -A --location=http://localhost
 ```
 
 ## Project Structure
 
-- **/cli** command code
-- **/compiler** compiler in rust with swc
-- **/framework** framework code
+- **/cli** commands code
+- **/compiler** compiler in rust powered by swc
+- **/framework**
+  - **core** framework core
+  - **react** react framework code
 - **/design** design drawings and assets
 - **/examples** examples
 - **/plugins** official plugins
 - **/server** server code
 - **/shared** shared code
 - **/test** testings
-- **/vendor** packages from npm
 
 ## Code of Conduct
 

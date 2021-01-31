@@ -1,67 +1,57 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import { reModuleExt } from '../../shared/constants.ts'
-import { Route, RouteModule, Routing } from '../core/routing.ts'
-import AlephAppRoot from './root.ts'
-import { importModule } from './util.ts'
+import { Route, RouteModule, Routing, trimPageModuleExt } from '../core/routing.ts'
+import type { PageRoute } from './pageprops.ts'
+import { createPageProps } from './pageprops.ts'
+import Router from './router.ts'
+import { importModule, loadPageDataFromTag } from './util.ts'
 
-type BootstrapConfig = {
+type Options = {
     baseUrl: string
     defaultLocale: string
     locales: string[]
     routes: Route[]
-    preloadModules: RouteModule[],
+    sharedModules: RouteModule[],
     renderMode: 'ssr' | 'spa'
 }
 
-export default async function bootstrap({ baseUrl, defaultLocale, locales, routes, preloadModules, renderMode }: BootstrapConfig) {
+export default async function bootstrap(options: Options) {
+    const { baseUrl, defaultLocale, locales, routes, sharedModules, renderMode } = options
     const { document } = window as any
-    const ssrDataEl = document.querySelector('#ssr-data')
-    const routing = new Routing(routes, baseUrl, defaultLocale, locales)
-    const [url, pageModuleTree] = routing.createRouter()
     const customComponents: Record<string, ComponentType> = {}
-    const pageComponentTree: { url: string, Component?: ComponentType }[] = pageModuleTree.map(({ url }) => ({ url }))
-
-    await Promise.all([...preloadModules, ...pageModuleTree].map(async mod => {
+    await Promise.all(sharedModules.map(async mod => {
         const { default: C } = await importModule(baseUrl, mod)
-        switch (mod.url.replace(reModuleExt, '')) {
+        switch (trimPageModuleExt(mod.url)) {
             case '/404':
                 customComponents['E404'] = C
                 break
             case '/app':
                 customComponents['App'] = C
                 break
-            default:
-                const pc = pageComponentTree.find(pc => pc.url === mod.url)
-                if (pc) {
-                    pc.Component = C
-                }
-                break
         }
     }))
-
-    if (ssrDataEl) {
-        const ssrData = JSON.parse(ssrDataEl.innerText)
-        for (const key in ssrData) {
-            Object.assign(window, { [`useDeno://${url.pathname}#${key}`]: ssrData[key] })
+    const routing = new Routing(routes, baseUrl, defaultLocale, locales)
+    const [url, pageModuleChain] = routing.createRouter()
+    const imports = await Promise.all(pageModuleChain.map(async mod => {
+        const [{ default: Component }] = await Promise.all([
+            importModule(baseUrl, mod),
+            mod.asyncDeps?.filter(({ isData }) => !!isData).length ? loadPageDataFromTag(url) : Promise.resolve(),
+            mod.asyncDeps?.filter(({ isStyle }) => !!isStyle).map(dep => importModule(baseUrl, dep)) || Promise.resolve()
+        ].flat())
+        return {
+            url: mod.url,
+            Component,
         }
-    }
-
-    const rootEl = createElement(
-        AlephAppRoot,
-        {
-            url,
-            routing,
-            customComponents,
-            pageComponentTree
-        }
-    )
+    }))
+    const pageRoute: PageRoute = { ...createPageProps(imports), url }
+    const routerEl = createElement(Router, { customComponents, pageRoute, routing })
     const mountPoint = document.getElementById('__aleph')
+
     if (renderMode === 'ssr') {
-        hydrate(rootEl, mountPoint)
+        hydrate(routerEl, mountPoint)
     } else {
-        render(rootEl, mountPoint)
+        render(routerEl, mountPoint)
     }
 
     // remove ssr head elements, set a timmer to avoid the tab title flash

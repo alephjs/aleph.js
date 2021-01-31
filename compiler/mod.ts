@@ -1,9 +1,9 @@
-import { ensureDir, existsSync, path } from '../deps.ts'
+import { ensureDir, path } from '../deps.ts'
+import { existsFileSync } from '../shared/fs.ts'
+import type { ImportMap } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { checksum } from './wasm-checksum.js'
-import { default as init_wasm, transformSync } from './wasm-pack.js'
-
-type ImportMap = Record<string, ReadonlyArray<string>>
+import { checksum } from './dist/wasm-checksum.js'
+import init, { transformSync } from './dist/wasm-pack.js'
 
 export interface SWCOptions {
     target?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
@@ -15,30 +15,31 @@ export interface SWCOptions {
 
 export interface TransformOptions {
     url: string
-    importMap?: { imports: ImportMap, scopes: Record<string, ImportMap> }
+    importMap?: ImportMap
     reactVersion?: string,
     swcOptions?: SWCOptions
     isDev?: boolean,
     bundleMode?: boolean,
-    bundledPaths?: string[],
+    bundledModules?: string[],
 }
 
 interface DependencyDescriptor {
     specifier: string,
+    rel?: string
     isDynamic: boolean,
 }
 
-export interface TransformRet {
+export interface TransformResult {
     code: string
-    map?: string
     deps: DependencyDescriptor[]
     inlineStyles: Record<string, { type: string, quasis: string[], exprs: string[] }>
+    map?: string
 }
 
 /**
  * transpile code synchronously by swc.
  *
- * ```javascript
+ * ```tsx
  * transpileSync(`
  *   export default App() {
  *     return <h1>Hello World</h1>
@@ -51,8 +52,11 @@ export interface TransformRet {
  *   }
  * })
  * ```
+ *
+ * @param {string} code - code string.
+ * @param {object} opts - transform options.
  */
-export function transpileSync(code: string, opts?: TransformOptions): TransformRet {
+export function transpileSync(code: string, opts?: TransformOptions): TransformResult {
     return transformSync(code, opts)
 }
 
@@ -62,14 +66,19 @@ export function transpileSync(code: string, opts?: TransformOptions): TransformR
 export const initWasm = async (denoCacheDir: string) => {
     const cacheDir = path.join(denoCacheDir, `deps/https/deno.land/aleph@v${VERSION}`)
     const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
-    if (existsSync(cachePath)) {
+    if (existsFileSync(cachePath)) {
         const wasmData = await Deno.readFile(cachePath)
-        await init_wasm(wasmData)
+        await init(wasmData)
     } else {
-        const { default: getWasmData } = await import('./wasm.js')
+        const { default: getWasmData } = await import('./dist/wasm.js')
         const wasmData = getWasmData()
-        await init_wasm(wasmData)
+        await init(wasmData)
         await ensureDir(cacheDir)
         await Deno.writeFile(cachePath, wasmData)
     }
 }
+
+/**
+ * The wasm build checksum.
+ */
+export const buildChecksum = checksum

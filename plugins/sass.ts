@@ -1,7 +1,8 @@
-import { Options, renderSync } from 'https://esm.sh/sass@1.29.0'
+import { Options, renderSync } from 'https://esm.sh/sass@1.32.5'
+import type { LoaderPlugin } from '../types.ts'
 
-const pluginFactory = (opts: Options = {}) => ({
-    name: 'sass-loader',
+const pluginFactory = (opts: Options = {}): LoaderPlugin => ({
+    type: 'loader',
     test: /.(sass|scss)$/,
     acceptHMR: true,
     transform(content: Uint8Array, path: string) {
@@ -15,14 +16,14 @@ const pluginFactory = (opts: Options = {}) => ({
         return {
             code: (new TextDecoder).decode(ret.css),
             map: ret.map ? (new TextDecoder).decode(ret.map) : undefined,
-            loader: 'css'
+            format: 'css',
         }
     }
 })
 
+// make the `pluginFactory` function as a plugin
 const defaultPlugin = pluginFactory()
-
-pluginFactory.displayName = defaultPlugin.name
+pluginFactory.type = defaultPlugin.type
 pluginFactory.test = defaultPlugin.test
 pluginFactory.acceptHMR = defaultPlugin.acceptHMR
 pluginFactory.transform = defaultPlugin.transform
