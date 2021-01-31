@@ -84,8 +84,10 @@ export type Config = {
  * An interface that aligns to the parts of the aleph server's `Application`.
  */
 interface ServerApplication {
-    getModule(url: string): Module | null
-    addModule(source: { url: string, code: string }): Module | Promise<Module>
+    readonly workingDir: string
+    readonly mode: 'development' | 'production'
+    addPageModule(pathname: string, code: string): Promise<void>
+    removePageModule(pathname: string): Promise<void>
 }
 
 /**

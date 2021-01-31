@@ -31,8 +31,8 @@ export class Appliaction {
     #renderCache: Map<string, Map<string, RenderResult>> = new Map()
     #postcssPlugins: Record<string, AcceptedPlugin> = {}
     #cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
-    #swcReady: Promise<void> | null = null
-    #postcssReady: Promise<void[]> | null = null
+    #compilerReady: Promise<void> | boolean = false
+    #postcssReady: Promise<void[]> | boolean = false
     #reloading = false
 
     constructor(workingDir = '.', mode: 'development' | 'production' = 'production', reload = false) {
@@ -52,6 +52,7 @@ export class Appliaction {
             plugins: [],
             postcss: {
                 plugins: [
+                    'postcss-nested',
                     'autoprefixer'
                 ]
             }
@@ -145,9 +146,21 @@ export class Appliaction {
         return null
     }
 
-    /** add a new module by given url and source code. */
-    async addModule(source: { url: string, code: string }): Promise<Module> {
-        return await this.compile(source.url, { sourceCode: source.code })
+    /** add a new page module by given path and source code. */
+    async addPageModule(pathname: string, code: string): Promise<void> {
+        const url = path.join('/pages/', util.cleanPath(pathname) + '.tsx')
+        const mod = await this.compile(url, { sourceCode: code })
+        this.#pageRouting.update(this.getRouteModule(mod))
+    }
+
+    /** add a new page module by given path and source code. */
+    async removePageModule(pathname: string): Promise<void> {
+        const url = path.join('/pages/', util.cleanPath(pathname) + '.tsx')
+        if (this.#modules.has(url)) {
+            await cleanupCompilation(this.#modules.get(url)!.jsFile)
+            this.#modules.delete(url)
+            this.#pageRouting.removeRoute(url)
+        }
     }
 
     createFSWatcher(): EventEmitter {
@@ -368,7 +381,7 @@ export class Appliaction {
         for (const name of Array.from(['ts', 'js', 'json']).map(ext => 'aleph.config.' + ext)) {
             const p = path.join(this.workingDir, name)
             if (existsFileSync(p)) {
-                log.info('config loaded from', name)
+                log.info('Aleph server config loaded from', name)
                 if (name.endsWith('.json')) {
                     const conf = JSON.parse(await Deno.readTextFile(p))
                     if (util.isPlainObject(conf)) {
@@ -442,10 +455,9 @@ export class Appliaction {
         if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
             Object.assign(this.config, { postcss })
         } else {
-            for (const name of Array.from(['ts', 'js', 'mjs', 'json']).map(ext => `postcss.config.${ext}`)) {
+            for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
                 const p = path.join(this.workingDir, name)
                 if (existsFileSync(p)) {
-                    log.info('  ✓', name)
                     if (name.endsWith('.json')) {
                         const postcss = JSON.parse(await Deno.readTextFile(p))
                         if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
@@ -582,7 +594,7 @@ export class Appliaction {
         const { render } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
         this.#renderer = { render }
 
-        // load plugins
+        // apply plugins
         for (const plugin of this.config.plugins) {
             if (plugin.type === 'server') {
                 await plugin.onInit(this)
@@ -791,7 +803,9 @@ export class Appliaction {
 
     /** preprocess css with postcss plugins */
     private async preprocessCSS(sourceCode: string) {
-        if (this.#postcssReady === null) {
+        let t: number | null = null
+        if (this.#postcssReady === false) {
+            t = performance.now()
             this.#postcssReady = Promise.all(this.config.postcss.plugins.map(async p => {
                 let name: string | null = null
                 if (util.isNEString(p)) {
@@ -805,7 +819,13 @@ export class Appliaction {
                 }
             }))
         }
-        await this.#postcssReady
+        if (this.#postcssReady instanceof Promise) {
+            await this.#postcssReady
+            this.#postcssReady = true
+        }
+        if (t !== null) {
+            log.debug(`load postcss plugins(${this.config.postcss.plugins.length}) in ${Math.round(performance.now() - t)}ms`)
+        }
         const pcss = (await postcss(this.config.postcss.plugins.map(p => {
             if (typeof p === 'string') {
                 return this.#postcssPlugins[p]
@@ -836,13 +856,16 @@ export class Appliaction {
     /** transpile code without types checking. */
     private async transpile(sourceCode: string, options: TransformOptions) {
         let t: number | null = null
-        if (this.#swcReady === null) {
+        if (this.#compilerReady === false) {
             t = performance.now()
-            this.#swcReady = initWasm(this.#denoCacheDir)
+            this.#compilerReady = initWasm(this.#denoCacheDir)
         }
-        await this.#swcReady
-        if (t) {
-            log.debug('init compiler wasm in ' + Math.round(performance.now() - t) + 'ms')
+        if (this.#compilerReady instanceof Promise) {
+            await this.#compilerReady
+            this.#compilerReady = true
+        }
+        if (t !== null) {
+            log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
         }
 
         return transpileSync(sourceCode, options)
