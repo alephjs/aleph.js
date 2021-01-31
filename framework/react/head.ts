@@ -7,8 +7,8 @@ import Script from './script.ts'
 export default function Head(props: PropsWithChildren<{}>) {
     const renderer = useContext(RendererContext)
 
-    if (window.Deno) {
-        parse(props.children).forEach(({ type, props }, key) => renderer.storage.headElements.set(key, { type, props }))
+    if (util.inDeno()) {
+        parse(props.children).forEach(({ type, props }, key) => renderer.headElements.set(key, { type, props }))
     }
 
     useEffect(() => {

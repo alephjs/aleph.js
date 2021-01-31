@@ -65,10 +65,10 @@ socket.addEventListener('close', () => {
 socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
     if (rawData) {
         try {
-            const { type, url, hash, updateUrl } = JSON.parse(rawData)
+            const { type, url, hash, asyncDeps, updateUrl } = JSON.parse(rawData)
             switch (type) {
                 case 'add':
-                    events.emit('add-module', { url, hash })
+                    events.emit('add-module', { url, hash, asyncDeps })
                     break
                 case 'update':
                     const mod = modules.get(url)

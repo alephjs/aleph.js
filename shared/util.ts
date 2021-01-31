@@ -1,4 +1,7 @@
 export default {
+    inDeno(): boolean {
+        return typeof Deno !== 'undefined' && this.isNEString(Deno.version?.deno)
+    },
     isString(a: any): a is string {
         return typeof a === 'string'
     },

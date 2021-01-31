@@ -2,10 +2,12 @@ import type { ComponentType } from 'https://esm.sh/react'
 import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import { Route, RouteModule, Routing, trimPageModuleExt } from '../core/routing.ts'
+import type { PageRoute } from './pageprops.ts'
+import { createPageProps } from './pageprops.ts'
 import Router from './router.ts'
-import { importModule } from './util.ts'
+import { importModule, loadPageDataFromTag } from './util.ts'
 
-type BootstrapOptions = {
+type Options = {
     baseUrl: string
     defaultLocale: string
     locales: string[]
@@ -14,15 +16,11 @@ type BootstrapOptions = {
     renderMode: 'ssr' | 'spa'
 }
 
-export default async function bootstrap({ baseUrl, defaultLocale, locales, routes, sharedModules, renderMode }: BootstrapOptions) {
+export default async function bootstrap(options: Options) {
+    const { baseUrl, defaultLocale, locales, routes, sharedModules, renderMode } = options
     const { document } = window as any
-    const ssrDataEl = document.querySelector('#ssr-data')
-    const routing = new Routing(routes, baseUrl, defaultLocale, locales)
-    const [url, pageModuleTree] = routing.createRouter()
-    const pageComponentTree: { url: string, Component?: ComponentType }[] = pageModuleTree.map(({ url }) => ({ url }))
     const customComponents: Record<string, ComponentType> = {}
-
-    await Promise.all([...sharedModules, ...pageModuleTree].map(async mod => {
+    await Promise.all(sharedModules.map(async mod => {
         const { default: C } = await importModule(baseUrl, mod)
         switch (trimPageModuleExt(mod.url)) {
             case '/404':
@@ -31,36 +29,29 @@ export default async function bootstrap({ baseUrl, defaultLocale, locales, route
             case '/app':
                 customComponents['App'] = C
                 break
-            default:
-                const pc = pageComponentTree.find(pc => pc.url === mod.url)
-                if (pc) {
-                    pc.Component = C
-                }
-                break
         }
     }))
-
-    if (ssrDataEl) {
-        const ssrData = JSON.parse(ssrDataEl.innerText)
-        for (const key in ssrData) {
-            Object.assign(window, { [`data://${url.pathname}#${key}`]: ssrData[key] })
+    const routing = new Routing(routes, baseUrl, defaultLocale, locales)
+    const [url, pageModuleChain] = routing.createRouter()
+    const imports = await Promise.all(pageModuleChain.map(async mod => {
+        const [{ default: Component }] = await Promise.all([
+            importModule(baseUrl, mod),
+            mod.asyncDeps?.filter(({ isData }) => !!isData).length ? loadPageDataFromTag(url) : Promise.resolve(),
+            mod.asyncDeps?.filter(({ isStyle }) => !!isStyle).map(dep => importModule(baseUrl, dep)) || Promise.resolve()
+        ].flat())
+        return {
+            url: mod.url,
+            Component,
         }
-    }
-
-    const rootEl = createElement(
-        Router,
-        {
-            url,
-            routing,
-            customComponents,
-            pageComponentTree
-        }
-    )
+    }))
+    const pageRoute: PageRoute = { ...createPageProps(imports), url }
+    const routerEl = createElement(Router, { customComponents, pageRoute, routing })
     const mountPoint = document.getElementById('__aleph')
+
     if (renderMode === 'ssr') {
-        hydrate(rootEl, mountPoint)
+        hydrate(routerEl, mountPoint)
     } else {
-        render(rootEl, mountPoint)
+        render(routerEl, mountPoint)
     }
 
     // remove ssr head elements, set a timmer to avoid the tab title flash

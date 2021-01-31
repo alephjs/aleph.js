@@ -1,5 +1,6 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement, useContext, useMemo } from 'https://esm.sh/react'
+import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouterContext } from './context.ts'
@@ -58,32 +59,32 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), revalidate?: 
         const global = window as any
         const dataUrl = 'data://' + pathname
         const eventName = 'useDeno-' + dataUrl
-        const { ['rendering-' + dataUrl]: renderingData } = global
         const key = dataUrl + '#' + id
         const expires = revalidate ? Date.now() + revalidate * 1000 : 0
-        if (renderingData && key in renderingData) {
-            return renderingData[key]
-        } else if (typeof Deno !== 'undefined' && Deno.version.deno) {
+        const renderingDataCache = global['rendering-' + dataUrl]
+        if (renderingDataCache && key in renderingDataCache) {
+            return renderingDataCache[key] // 2+ pass
+        } else if (util.inDeno()) {
             const v = callback()
             if (v instanceof Promise) {
                 events.emit(eventName, id, v.then(value => {
-                    if (renderingData) {
-                        renderingData[key] = value
+                    if (renderingDataCache) {
+                        renderingDataCache[key] = value
                     }
                     events.emit(eventName, id, { value, expires })
                 }))
                 // thow an `AsyncUseDenoError` to break current rendering, then re-render
                 throw new AsyncUseDenoError()
             } else {
-                if (renderingData) {
-                    renderingData[key] = v
+                if (renderingDataCache) {
+                    renderingDataCache[key] = v
                 }
                 events.emit(eventName, id, { value: v, expires })
                 return v
             }
         }
         return global[key].value || null
-    }, [pathname])
+    }, [id, pathname])
 }
 
 /**

@@ -1,5 +1,5 @@
 import { path, serve as stdServe, ws } from '../deps.ts'
-import { trimPageModuleExt } from '../framework/core/routing.ts'
+import { RouteModule, trimPageModuleExt } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -36,17 +36,10 @@ export class Server {
                 const { conn, r: bufReader, w: bufWriter, headers } = r
                 ws.acceptWebSocket({ conn, bufReader, bufWriter, headers }).then(async socket => {
                     const watcher = app.createFSWatcher()
-                    watcher.on('add', (url: string, hash: string) => socket.send(JSON.stringify({
-                        type: 'add',
-                        url,
-                        hash
-                    })))
+                    watcher.on('add', (mod: RouteModule) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
                     watcher.on('remove', (url: string) => {
                         watcher.removeAllListeners('modify-' + url)
-                        socket.send(JSON.stringify({
-                            type: 'remove',
-                            url
-                        }))
+                        socket.send(JSON.stringify({ type: 'remove', url }))
                     })
                     for await (const e of socket) {
                         if (util.isNEString(e)) {

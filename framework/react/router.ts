@@ -1,22 +1,21 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement, useCallback, useEffect, useState } from 'https://esm.sh/react'
-import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './error.ts'
-import { createPageProps, importModule, isLikelyReactComponent, loadPageData } from './util.ts'
+import type { PageRoute } from './pageprops.ts'
+import { createPageProps } from './pageprops.ts'
+import { importModule, isLikelyReactComponent, loadPageData } from './util.ts'
 
 export default function Router({
-    url,
-    routing,
     customComponents,
-    pageComponentTree,
+    pageRoute,
+    routing,
 }: {
-    url: RouterURL
-    routing: Routing
     customComponents: Record<'E404' | 'App', ComponentType<any>>
-    pageComponentTree: { url: string, Component?: any }[]
+    pageRoute: PageRoute,
+    routing: Routing
 }) {
     const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
         const { E404 } = customComponents
@@ -38,29 +37,28 @@ export default function Router({
         }
         return { Component: null }
     })
-    const [route, setRoute] = useState(() => ({ ...createPageProps(pageComponentTree), url }))
+    const [route, setRoute] = useState<PageRoute>(pageRoute)
     const onpopstate = useCallback(async (e: any) => {
         const { baseUrl } = routing
-        const [url, pageModuleTree] = routing.createRouter()
+        const [url, pageModuleChain] = routing.createRouter()
         if (url.pagePath !== '') {
-            const ctree: { url: string, Component?: ComponentType<any> }[] = pageModuleTree.map(({ url }) => ({ url }))
-            const imports = pageModuleTree.map(async mod => {
-                const [{ default: C }] = await Promise.all([
+            const imports = pageModuleChain.map(async mod => {
+                const [{ default: Component }] = await Promise.all([
                     importModule(baseUrl, mod, e.forceRefetch),
-                    mod.asyncDeps?.data ? loadPageData(url) : Promise.resolve()
+                    mod.asyncDeps?.filter(({ isData }) => !!isData).length ? loadPageData(url) : Promise.resolve(),
+                    mod.asyncDeps?.filter(({ isStyle }) => !!isStyle).map(dep => importModule(baseUrl, dep)) || Promise.resolve()
                 ])
-                const pc = ctree.find(pc => pc.url === mod.url)
-                if (pc) {
-                    pc.Component = C
+                return {
+                    url: mod.url,
+                    Component
                 }
             })
-            await Promise.all(imports)
-            setRoute({ ...createPageProps(ctree), url })
+            setRoute({ ...createPageProps(await Promise.all(imports)), url })
             if (e.resetScroll) {
                 (window as any).scrollTo(0, 0)
             }
         } else {
-            setRoute({ Page: null, pageProps: {}, url })
+            setRoute({ Page: null, pageProps: null, url })
         }
     }, [])
 
@@ -72,9 +70,10 @@ export default function Router({
             window.removeEventListener('popstate', onpopstate)
             events.off('popstate', onpopstate)
         }
-    }, [onpopstate])
+    }, [])
 
     useEffect(() => {
+        const isDev = !('__ALEPH' in window)
         const { baseUrl } = routing
         const onAddModule = async (mod: RouteModule) => {
             switch (mod.url) {
@@ -123,10 +122,10 @@ export default function Router({
         }
         const onFetchPageModule = async ({ href }: { href: string }) => {
             const [pathname, search] = href.split('?')
-            const [url, pageModuleTree] = routing.createRouter({ pathname, search })
+            const [url, pageModuleChain] = routing.createRouter({ pathname, search })
             if (url.pagePath !== '') {
-                pageModuleTree.map(mod => {
-                    if (mod.asyncDeps?.data) {
+                pageModuleChain.map(mod => {
+                    if (mod.asyncDeps?.filter(({ isData }) => !!isData).length) {
                         loadPageData(url)
                     }
                     importModule(baseUrl, mod)
@@ -134,14 +133,18 @@ export default function Router({
             }
         }
 
-        events.on('add-module', onAddModule)
-        events.on('remove-module', onRemoveModule)
-        events.on('fetch-page-module', onFetchPageModule)
+        if (isDev) {
+            events.on('add-module', onAddModule)
+            events.on('remove-module', onRemoveModule)
+            events.on('fetch-page-module', onFetchPageModule)
+        }
 
         return () => {
-            events.off('add-module', onAddModule)
-            events.off('remove-module', onRemoveModule)
-            events.off('fetch-page-module', onFetchPageModule)
+            if (isDev) {
+                events.off('add-module', onAddModule)
+                events.off('remove-module', onRemoveModule)
+                events.off('fetch-page-module', onFetchPageModule)
+            }
         }
     }, [])
 

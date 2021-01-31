@@ -6,14 +6,15 @@ import type { RenderResult, RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RendererContext, RouterContext } from './context.ts'
 import { AsyncUseDenoError, E400MissingComponent, E404Page } from './error.ts'
+import { createPageProps } from './pageprops.ts'
 import { serverStyles } from './style.ts'
-import { createPageProps, isLikelyReactComponent } from './util.ts'
+import { isLikelyReactComponent } from './util.ts'
 
 export async function render(
     url: RouterURL,
     App: ComponentType<any> | undefined,
     E404: ComponentType | undefined,
-    pageComponentTree: { url: string, Component?: any }[],
+    pageComponentChain: { url: string, Component?: any }[],
     styles?: { url: string, hash: string }[]
 ) {
     const global = globalThis as any
@@ -23,20 +24,19 @@ export async function render(
         scripts: [],
         data: null,
     }
-    const renderStorage = {
-        headElements: new Map(),
-        scriptsElements: new Map()
-    }
+    const headElements = new Map()
+    const scriptsElements = new Map()
     const buildMode = Deno.env.get('BUILD_MODE')
     const dataUrl = 'data://' + url.pathname
     const asyncCalls: Array<Promise<any>> = []
     const data: Record<string, any> = {}
-    const pageProps = createPageProps(pageComponentTree)
+    const pageProps = createPageProps(pageComponentChain)
     const defer = () => {
         delete global['rendering-' + dataUrl]
         events.removeAllListeners('useDeno-' + dataUrl)
     }
 
+    // rendering data cache
     global['rendering-' + dataUrl] = {}
 
     // listen `useDeno-*` events to get hooks callback result.
@@ -71,8 +71,7 @@ export async function render(
         }
     }
 
-    // `renderToString` might be invoked repeatedly when asyncchronous
-    // callbacks of the `useDeno` hook exist.
+    // `renderToString` might be invoked repeatedly when asyncchronous callbacks exist.
     while (true) {
         try {
             if (asyncCalls.length > 0) {
@@ -80,7 +79,7 @@ export async function render(
             }
             ret.body = renderToString(createElement(
                 RendererContext.Provider,
-                { value: { storage: renderStorage } },
+                { value: { headElements, scriptsElements } },
                 createElement(
                     RouterContext.Provider,
                     { value: url },
@@ -102,7 +101,7 @@ export async function render(
     }
 
     // get head child tags
-    renderStorage.headElements.forEach(({ type, props }) => {
+    headElements.forEach(({ type, props }) => {
         const { children, ...rest } = props
         if (type === 'title') {
             if (util.isNEString(children)) {
@@ -123,10 +122,10 @@ export async function render(
             }
         }
     })
-    renderStorage.headElements.clear()
+    headElements.clear()
 
     // get script tags
-    renderStorage.scriptsElements.forEach(({ props }) => {
+    scriptsElements.forEach(({ props }) => {
         const { children, dangerouslySetInnerHTML, ...attrs } = props
         if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
             ret.scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
@@ -138,7 +137,7 @@ export async function render(
             ret.scripts.push(props)
         }
     })
-    renderStorage.scriptsElements.clear()
+    scriptsElements.clear()
 
     // get inline-styles
     const rets = await Promise.all(styles?.filter(({ url }) => !url.startsWith('#inline-style-')).map(({ url, hash }) => {

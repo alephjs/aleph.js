@@ -2,7 +2,7 @@ import { buildChecksum, initWasm, SWCOptions, TransformOptions, transpileSync } 
 import type { AcceptedPlugin, ECMA } from '../deps.ts'
 import { CleanCSS, colors, ensureDir, minify, path, postcss, Sha1, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
-import { getPagePathname, RouteModule, Routing, trimPageModuleExt } from '../framework/core/routing.ts'
+import { getPagePathname, isPageModule, RouteModule, Routing, trimPageModuleExt } from '../framework/core/routing.ts'
 import { defaultReactVersion, pageModuleExts } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -305,7 +305,7 @@ export class Appliaction {
             `import { createHotContext } from ${JSON.stringify(hmrImportPath)};`,
             `import.meta.hot = createHotContext(${JSON.stringify(url)});`
         ]
-        const reactRefresh = this.config.framework === 'react' && pageModuleExts.includes(url)
+        const reactRefresh = this.config.framework === 'react' && isPageModule(url)
         if (reactRefresh) {
             const refreshImportPath = getRelativePath(
                 path.dirname(localUrl),
@@ -357,25 +357,8 @@ export class Appliaction {
         ]
     }
 
-    /** load config from `aleph.config.(json|mjs|js|ts)` */
+    /** load config from `aleph.config.(ts|js|json)` */
     private async loadConfig() {
-        // load import maps
-        for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
-            const importMapFile = path.join(this.workingDir, filename)
-            if (existsFileSync(importMapFile)) {
-                const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
-                const imports: Record<string, string> = fixImportMap(importMap.imports)
-                const scopes: Record<string, Record<string, string>> = {}
-                if (util.isPlainObject(importMap.scopes)) {
-                    Object.entries(importMap.scopes).forEach(([key, imports]) => {
-                        scopes[key] = fixImportMap(imports)
-                    })
-                }
-                Object.assign(this.importMap, { imports, scopes })
-                break
-            }
-        }
-
         const config: Record<string, any> = {}
 
         for (const name of Array.from(['ts', 'js', 'json']).map(ext => 'aleph.config.' + ext)) {
@@ -399,8 +382,6 @@ export class Appliaction {
                 break
             }
         }
-
-        // todo: load ssr.config.ts
 
         const {
             srcDir,
@@ -474,6 +455,25 @@ export class Appliaction {
                     }
                     break
                 }
+            }
+        }
+
+        // todo: load ssr.config.ts
+
+        // load import maps
+        for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
+            const importMapFile = path.join(this.workingDir, filename)
+            if (existsFileSync(importMapFile)) {
+                const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
+                const imports: Record<string, string> = fixImportMap(importMap.imports)
+                const scopes: Record<string, Record<string, string>> = {}
+                if (util.isPlainObject(importMap.scopes)) {
+                    Object.entries(importMap.scopes).forEach(([key, imports]) => {
+                        scopes[key] = fixImportMap(imports)
+                    })
+                }
+                Object.assign(this.importMap, { imports, scopes })
+                break
             }
         }
 
@@ -626,8 +626,8 @@ export class Appliaction {
                     if (path.startsWith('/.aleph/') || path.startsWith(this.config.outputDir)) {
                         return false
                     }
-                    if (pageModuleExts.includes(path)) {
-                        switch ((path)) {
+                    if (isPageModule(path)) {
+                        switch (trimPageModuleExt(path)) {
                             case '/404':
                             case '/app':
                                 return true
@@ -637,7 +637,7 @@ export class Appliaction {
                                 }
                         }
                     }
-                    if (path.startsWith('/pages/') && pageModuleExts.includes(path)) {
+                    if (path.startsWith('/pages/') && isPageModule(path)) {
                         return true
                     }
                     let isDep = false
@@ -676,7 +676,7 @@ export class Appliaction {
                                 const hmrable = this.isHMRable(mod.url)
                                 if (hmrable) {
                                     if (type === 'add') {
-                                        this.#fsWatchListeners.forEach(e => e.emit('add', mod.url, mod.hash))
+                                        this.#fsWatchListeners.forEach(e => e.emit('add', this.getRouteModule(mod)))
                                     } else {
                                         this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.url, mod.hash))
                                     }
@@ -729,10 +729,8 @@ export class Appliaction {
 
     /** returns the route module by given module. */
     private getRouteModule({ url, hash }: Module): RouteModule {
-        const deps = this.lookupDeps(url)
-        const data = deps.findIndex(({ isData }) => !!isData) > -1 || undefined
-        const style = deps.findIndex(({ isStyle, isDynamic }) => !!isStyle && !!isDynamic) > -1 || undefined
-        return { url, hash, asyncDeps: (data || style) ? { data, style } : undefined }
+        const deps = this.lookupDeps(url).filter(({ isData, isStyle, isDynamic }) => !!(isData || (isStyle && isDynamic)))
+        return { url, hash, asyncDeps: deps.length > 0 ? deps : undefined }
     }
 
     /** create re-compiled main module. */
@@ -824,7 +822,7 @@ export class Appliaction {
             this.#postcssReady = true
         }
         if (t !== null) {
-            log.debug(`load postcss plugins(${this.config.postcss.plugins.length}) in ${Math.round(performance.now() - t)}ms`)
+            log.debug(`load ${this.config.postcss.plugins.length} plugins of postcss in ${Math.round(performance.now() - t)}ms`)
         }
         const pcss = (await postcss(this.config.postcss.plugins.map(p => {
             if (typeof p === 'string') {
@@ -1524,7 +1522,11 @@ export class Appliaction {
             lang: url.locale,
             head: head,
             scripts: [
-                data ? { type: 'application/json', innerText: JSON.stringify(data, undefined, this.isDev ? 4 : 0), id: 'ssr-data' } : '',
+                data ? {
+                    type: 'application/json',
+                    innerText: JSON.stringify(data, undefined, this.isDev ? 4 : 0),
+                    id: 'ssr-data'
+                } : '',
                 ...this.getScripts(),
                 ...scripts
             ],
@@ -1541,7 +1543,7 @@ export class Appliaction {
     /** render page base the given location. */
     private async renderPage(loc: { pathname: string, search?: string }) {
         const start = performance.now()
-        const [url, pageModuleTree] = this.#pageRouting.createRouter(loc)
+        const [url, pageModuleChain] = this.#pageRouting.createRouter(loc)
         const key = [url.pathname, url.query.toString()].filter(Boolean).join('?')
         if (url.pagePath !== '') {
             if (this.#renderCache.has(url.pagePath)) {
@@ -1568,33 +1570,24 @@ export class Appliaction {
             return await this.render404Page(url)
         }
         try {
-            const appModule = Array.from(this.#modules.keys())
-                .filter(url => trimPageModuleExt(url) == '/app')
-                .map(url => this.#modules.get(url))[0]
+            const appModule = Array.from(this.#modules.values()).find(({ url }) => trimPageModuleExt(url) == '/app')
             const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
-            const pageComponentTree: { url: string, Component?: any }[] = pageModuleTree.map(({ url }) => ({ url }))
-            const imports = pageModuleTree.map(async ({ url }) => {
+            const imports = pageModuleChain.map(async ({ url }) => {
                 const mod = this.#modules.get(url)!
-                const { default: C } = await import('file://' + mod.jsFile)
-                const pc = pageComponentTree.find(pc => pc.url === mod.url)
-                if (pc) {
-                    pc.Component = C
+                const { default: Component } = await import('file://' + mod.jsFile)
+                return {
+                    url,
+                    Component
                 }
             })
-            await Promise.all(imports)
-            const {
-                head,
-                body,
-                data,
-                scripts
-            } = await this.#renderer.render(
+            const { head, body, data, scripts } = await this.#renderer.render(
                 url,
                 App,
                 undefined,
-                pageComponentTree,
+                await Promise.all(imports),
                 [
                     appModule ? this.lookupDeps(appModule.url).filter(dep => !!dep.isStyle) : [],
-                    ...pageModuleTree.map(({ url }) => this.lookupDeps(url).filter(dep => !!dep.isStyle)).flat()
+                    ...pageModuleChain.map(({ url }) => this.lookupDeps(url).filter(dep => !!dep.isStyle)).flat()
                 ].flat()
             )
             ret.head = head
@@ -1717,7 +1710,7 @@ export class Appliaction {
         __tracing.add(url)
         __deps.push(...mod.deps.filter(({ url }) => __deps.findIndex(i => i.url === url) === -1))
         mod.deps.forEach(({ url }) => {
-            if (pageModuleExts.includes(url) && !util.isLikelyHttpURL(url)) {
+            if (isPageModule(url) && !util.isLikelyHttpURL(url)) {
                 this.lookupDeps(url, __deps, __tracing)
             }
         })
