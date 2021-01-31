@@ -15,7 +15,7 @@ export interface SWCOptions {
 
 export interface TransformOptions {
     url: string
-    importMap?: { imports: ImportMap, scopes: Record<string, ImportMap> }
+    importMap?: ImportMap
     reactVersion?: string,
     swcOptions?: SWCOptions
     isDev?: boolean,
