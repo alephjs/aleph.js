@@ -23,6 +23,7 @@ const pluginFactory = (opts: Options = {}): LoaderPlugin => ({
 
 // make the `pluginFactory` function as a plugin
 const defaultPlugin = pluginFactory()
+pluginFactory.type = defaultPlugin.type
 pluginFactory.test = defaultPlugin.test
 pluginFactory.acceptHMR = defaultPlugin.acceptHMR
 pluginFactory.transform = defaultPlugin.transform
