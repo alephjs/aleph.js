@@ -1,6 +1,5 @@
 import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts'
 import { colors, path, Sha1, walk } from '../deps.ts'
-import { hashShort } from '../shared/constants.ts'
 import { initWasm, transpileSync } from './mod.ts'
 
 function tsc(source: string, opts: any) {
@@ -10,7 +9,7 @@ function tsc(source: string, opts: any) {
         reactRefresh: opts.isDev,
         rewriteImportPath: (path: string) => path.replace('https://', '/-/'),
         signUseDeno: (id: string) => {
-            const sig = 'useDeno.' + (new Sha1()).update(id).update('0.2.25').update(Date.now().toString()).hex().slice(0, hashShort)
+            const sig = 'useDeno.' + (new Sha1()).update(id).update('0.2.25').update(Date.now().toString()).hex().slice(0, 9)
             return sig
         }
     }
