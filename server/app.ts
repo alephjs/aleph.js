@@ -3,7 +3,7 @@ import type { AcceptedPlugin, ECMA } from '../deps.ts'
 import { CleanCSS, colors, ensureDir, minify, path, postcss, Sha1, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { getPagePathname, isPageModule, RouteModule, Routing, trimPageModuleExt } from '../framework/core/routing.ts'
-import { defaultReactVersion, pageModuleExts } from '../shared/constants.ts'
+import { defaultReactVersion, minDenoVersion, pageModuleExts } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -505,6 +505,10 @@ export class Appliaction {
 
         if (!(existsDirSync(pagesDir))) {
             log.fatal(`'pages' directory not found.`)
+        }
+
+        if (Deno.version.deno < minDenoVersion) {
+            log.fatal(`need Deno ${minDenoVersion}+, but got ${Deno.version.deno}`)
         }
 
         const p = Deno.run({
@@ -1449,7 +1453,7 @@ export class Appliaction {
         })
 
         // workaround for https://github.com/denoland/deno/issues/9212
-        if (Deno.version.deno === '1.7.0') {
+        if (Deno.version.deno === '1.7.0' && bundlingFile.endsWith('/deps.bundling.js')) {
             code = code.replace(' _ = l.baseState, ', ' var _ = l.baseState, ')
         }
 
