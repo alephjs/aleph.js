@@ -4,10 +4,10 @@ import { renderToString } from 'https://esm.sh/react-dom/server'
 import util from '../../shared/util.ts'
 import type { RenderResult, RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
+import { serverStyles } from "../core/style.ts"
 import { RendererContext, RouterContext } from './context.ts'
 import { AsyncUseDenoError, E400MissingComponent, E404Page } from './error.ts'
 import { createPageProps } from './pageprops.ts'
-import { serverStyles } from './style.ts'
 import { isLikelyReactComponent } from './util.ts'
 
 export async function render(

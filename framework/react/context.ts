@@ -10,13 +10,6 @@ export const RouterContext = createNamedContext<RouterURL>({
     query: new URLSearchParams(),
 }, 'RouterContext')
 
-type SuspenseContextProps = {
-    loading: boolean
-}
-export const SuspenseContext = createNamedContext<SuspenseContextProps>({
-    loading: false
-}, 'SuspenseContext')
-
 type RendererContextProps = {
     headElements: Map<string, { type: string, props: Record<string, any> }>
     scriptsElements: Map<string, { type: string, props: Record<string, any> }>

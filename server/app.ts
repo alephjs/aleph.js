@@ -1021,7 +1021,7 @@ export class Appliaction {
             if (loader === 'css') {
                 const css = await this.preprocessCSS(sourceCode)
                 sourceCode = [
-                    `import { applyCSS } from "${alephPkgUrl}/framework/${this.config.framework}/style.ts";`,
+                    `import { applyCSS } from "${alephPkgUrl}/framework/core/style.ts";`,
                     `export default function __applyCSS() {`,
                     `  applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)});`,
                     `}`,
