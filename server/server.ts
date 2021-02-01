@@ -103,38 +103,36 @@ export class Server {
                     }
                     return
                 } else {
-                    const reqMap = pathname.endsWith('.js.map')
-                    const fixedPath = util.trimPrefix(reqMap ? pathname.slice(0, -4) : pathname, '/_aleph/')
-                    const metaFile = path.join(app.buildDir, util.trimSuffix(fixedPath.replace(reHashJs, ''), '.js') + '.meta.json')
-                    if (existsFileSync(metaFile)) {
-                        const { url } = JSON.parse(await Deno.readTextFile(metaFile))
-                        const mod = app.getModule(url)
-                        if (mod) {
-                            const etag = req.headers.get('If-None-Match')
-                            if (etag && etag === mod.hash) {
-                                req.status(304).send('')
-                                return
-                            }
-                            let body = ''
-                            if (reqMap) {
-                                if (existsFileSync(mod.jsFile + '.map')) {
-                                    body = await Deno.readTextFile(mod.jsFile + '.map')
-                                } else {
-                                    req.status(404).send('file not found')
-                                    return
-                                }
-                            } else {
-                                body = await Deno.readTextFile(mod.jsFile)
-                                if (app.isHMRable(mod.url)) {
-                                    body = app.injectHMRCode(mod, body)
-                                }
-                            }
-                            req.setHeader('ETag', mod.hash)
-                            req.send(body, `application/${reqMap ? 'json' : 'javascript'}; charset=utf-8`)
+                    const filePath = path.join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
+                    if (existsFileSync(filePath)) {
+                        const info = Deno.lstatSync(filePath)
+                        const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
+                        if (lastModified === r.headers.get('If-Modified-Since')) {
+                            req.status(304).send('')
                             return
                         }
+
+                        let content = await Deno.readTextFile(filePath)
+
+                        if (reHashJs.test(filePath)) {
+                            const metaFile = filePath.replace(reHashJs, '') + '.meta.json'
+                            if (existsFileSync(metaFile)) {
+                                try {
+                                    const { url } = JSON.parse(await Deno.readTextFile(metaFile))
+                                    const mod = app.getModule(url)
+                                    if (mod && app.isHMRable(mod.url)) {
+                                        content = app.injectHMRCode(mod, content)
+                                    }
+                                } catch (e) { }
+                            }
+                        }
+
+                        req.setHeader('Last-Modified', lastModified)
+                        req.send(content, getContentType(filePath))
+                        return
                     }
                 }
+
                 req.status(404).send('file not found')
                 return
             }
@@ -155,6 +153,7 @@ export class Server {
 /** start a standard aleph server. */
 export async function serve(hostname: string, port: number, app: Appliaction) {
     const server = new Server(app)
+    await app.ready
     while (true) {
         try {
             const s = stdServe({ hostname, port })

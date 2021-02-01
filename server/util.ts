@@ -145,17 +145,16 @@ export function createHtml({
 }) {
     const eol = minify ? '' : '\n'
     const indent = minify ? '' : ' '.repeat(4)
-    const headTags = head.map(tag => tag.trim())
-        .concat(scripts.map(v => {
-            if (!util.isString(v) && util.isNEString(v.src)) {
-                if (v.type === 'module') {
-                    return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
-                } else if (!v.nomodule) {
-                    return `<link rel="preload" href=${JSON.stringify(v.src)} as="script" />`
-                }
+    const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
+        if (!util.isString(v) && util.isNEString(v.src)) {
+            if (v.type === 'module') {
+                return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
+            } else if (!v.nomodule) {
+                return `<link rel="preload" href=${JSON.stringify(v.src)} as="script" />`
             }
-            return ''
-        })).filter(Boolean)
+        }
+        return ''
+    })).filter(Boolean)
     const scriptTags = scripts.map(v => {
         if (util.isString(v)) {
             return `<script>${v}</script>`

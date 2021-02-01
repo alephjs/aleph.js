@@ -1,5 +1,7 @@
 import { colors } from '../deps.ts'
 
+export type LevelNames = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+
 export enum Level {
     Debug = 0,
     Info = 1,
@@ -11,8 +13,8 @@ export enum Level {
 export class Logger {
     #level: Level = Level.Info
 
-    setLevel(level: string) {
-        switch (level.toLowerCase()) {
+    setLevel(level: LevelNames) {
+        switch (level) {
             case 'debug':
                 this.#level = Level.Debug
                 break
@@ -33,38 +35,34 @@ export class Logger {
 
     debug(...args: unknown[]) {
         if (this.#level <= Level.Debug) {
-            console.log(colorfulTag('debug', colors.blue), ...args)
+            console.log(colors.blue('DEBUG'), ...args)
         }
     }
 
     info(...args: unknown[]) {
         if (this.#level <= Level.Info) {
-            console.log(colorfulTag('info', colors.green), ...args)
+            console.log(colors.green('INFO'), ...args)
         }
     }
 
     warn(...args: unknown[]) {
         if (this.#level <= Level.Warn) {
-            console.log(colorfulTag('warn', colors.yellow), ...args)
+            console.log(colors.yellow('WARN'), ...args)
         }
     }
 
     error(...args: unknown[]) {
         if (this.#level <= Level.Error) {
-            console.log(colorfulTag('error', colors.red), ...args)
+            console.log(colors.red('ERROR'), ...args)
         }
     }
 
     fatal(...args: unknown[]) {
         if (this.#level <= Level.Fatal) {
-            console.log(colorfulTag('fatal', colors.red), ...args)
+            console.log(colors.red('FATAL'), ...args)
             Deno.exit(1)
         }
     }
-}
-
-function colorfulTag(tag: string, colorful: (text: string) => string) {
-    return colorful(tag.toUpperCase())
 }
 
 export default new Logger()

@@ -1,7 +1,7 @@
 import { assertEquals } from 'https://deno.land/std@0.83.0/testing/asserts.ts'
 import plugin from './sass.ts'
 
-Deno.test('project scss loader plugin', async () => {
+Deno.test('scss loader plugin', async () => {
     const { code, format } = await plugin.transform(
         (new TextEncoder).encode('$someVar: 123px; .some-selector { width: $someVar; }'),
         'test.scss'
@@ -13,7 +13,7 @@ Deno.test('project scss loader plugin', async () => {
     assertEquals(format, 'css')
 })
 
-Deno.test('project sass loader plugin', async () => {
+Deno.test('sass loader plugin', async () => {
     let ret = await plugin.transform(
         (new TextEncoder).encode('$someVar: 123px\n.some-selector\n  width: 123px'),
         'test.sass'

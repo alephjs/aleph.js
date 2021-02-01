@@ -1,7 +1,7 @@
 import { assertEquals } from 'https://deno.land/std@0.83.0/testing/asserts.ts'
 import plugin from './wasm.ts'
 
-Deno.test('project wasm loader plugin', async () => {
+Deno.test('wasm loader plugin', async () => {
     const wasmBytes = new Uint8Array([
         0, 97, 115, 109, 1, 0, 0, 0, 1, 133, 128, 128, 128, 0, 1, 96, 0, 1, 127,
         3, 130, 128, 128, 128, 0, 1, 0, 4, 132, 128, 128, 128, 0, 1, 112, 0, 0,

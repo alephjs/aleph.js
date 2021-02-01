@@ -3,9 +3,10 @@ import { Request } from './server/api.ts'
 import { getContentType } from './server/mime.ts'
 import { createHtml } from './server/util.ts'
 import { existsDirSync, existsFileSync } from './shared/fs.ts'
+import type { LevelNames } from './shared/log.ts'
 import log from './shared/log.ts'
 import util from './shared/util.ts'
-import { ServerRequest } from './types.ts'
+import type { ServerRequest } from './types.ts'
 import { VERSION } from './version.ts'
 
 const commands = {
@@ -97,7 +98,7 @@ async function main() {
     // sets log level
     const l = flags.L || flags['log-level']
     if (util.isNEString(l)) {
-        log.setLevel(l)
+        log.setLevel(l.toLowerCase() as LevelNames)
     }
 
     if (!hasCommand && !args[0]) {

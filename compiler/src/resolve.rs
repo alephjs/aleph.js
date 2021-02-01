@@ -346,11 +346,17 @@ impl Resolver {
       },
       None => {}
     };
-    self.dep_graph.push(DependencyDescriptor {
-      specifier: fixed_url.clone(),
-      is_dynamic,
-      rel,
-    });
+    let update_dep_graph = match rel {
+      Some(ref rel) => !rel.eq("."),
+      None => true,
+    };
+    if update_dep_graph {
+      self.dep_graph.push(DependencyDescriptor {
+        specifier: fixed_url.clone(),
+        is_dynamic,
+        rel,
+      });
+    }
     let path = resolved_path.to_slash().unwrap();
     if !path.starts_with("./") && !path.starts_with("../") && !path.starts_with("/") {
       return (format!("./{}", path), fixed_url);
