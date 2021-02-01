@@ -1091,6 +1091,9 @@ export class Appliaction {
                     if (dep.url.startsWith('#useDeno-')) {
                         dep.isData = true
                         dep.hash = util.trimPrefix(dep.url, '#useDeno-')
+                        if (!this.config.ssr) {
+                            log.warn(`use 'useDeno' hook in SPA mode`)
+                        }
                     } else if (dep.url.startsWith('#inline-style-')) {
                         dep.isStyle = true
                         dep.hash = util.trimPrefix(dep.url, '#inline-style-')
@@ -1564,7 +1567,7 @@ export class Appliaction {
         }
         if (ret.status === 404) {
             if (this.isDev) {
-                log.warn(`page '${url.pathname}' not found`)
+                log.warn(`${colors.bold('404')} '${url.pathname}' not found`)
             }
             return await this.render404Page(url)
         }
