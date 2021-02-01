@@ -46,8 +46,8 @@ export default function Router({
                 const [{ default: Component }] = await Promise.all([
                     importModule(baseUrl, mod, e.forceRefetch),
                     mod.asyncDeps?.filter(({ isData }) => !!isData).length ? loadPageData(url) : Promise.resolve(),
-                    mod.asyncDeps?.filter(({ isStyle }) => !!isStyle).map(dep => importModule(baseUrl, dep)) || Promise.resolve()
                 ])
+                await Promise.all(mod.asyncDeps?.filter(({ isStyle }) => !!isStyle).map(dep => importModule(baseUrl, dep)) || [])
                 return {
                     url: mod.url,
                     Component

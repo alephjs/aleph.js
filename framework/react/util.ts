@@ -50,7 +50,7 @@ export function importModule(baseUrl: string, mod: { url: string, hash: string }
     }
 
     if (ALEPH && mod.url.startsWith('/pages/')) {
-        const src = util.cleanPath(baseUrl + '/_aleph/' + trimPageModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`)
+        const src = util.cleanPath(baseUrl + '/_aleph/' + trimPageModuleExt(mod.url) + `.bundle.${util.shortHash(mod.hash)}.js`)
         return new Promise((resolve, reject) => {
             const script = document.createElement('script')
             script.onload = () => {
