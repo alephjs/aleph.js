@@ -516,7 +516,7 @@ export class Appliaction {
         }
 
         const p = Deno.run({
-            cmd: ['deno', 'info'],
+            cmd: [Deno.execPath(), 'info'],
             stdout: 'piped',
             stderr: 'null'
         })
@@ -1267,7 +1267,7 @@ export class Appliaction {
 
         const p = Deno.run({
             cmd: [
-                'deno',
+                Deno.execPath(),
                 'cache',
                 this.#reloading || !versioned ? '--reload' : '',
                 u.toString()
@@ -1424,7 +1424,7 @@ export class Appliaction {
     /** run deno bundle and compess the output with terser. */
     private async runDenoBundle(bundlingFile: string, bundleFile: string, header = '', reload = false) {
         const p = Deno.run({
-            cmd: ['deno', 'bundle', '--no-check', reload ? '--reload' : '', bundlingFile, bundleFile].filter(Boolean),
+            cmd: [Deno.execPath(), 'bundle', '--no-check', reload ? '--reload' : '', bundlingFile, bundleFile].filter(Boolean),
             stdout: 'null',
             stderr: 'piped'
         })
