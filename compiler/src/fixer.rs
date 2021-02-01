@@ -36,7 +36,8 @@ impl Fold for JSXLinkFixer {
                     let rel = rel.as_str();
                     match rel {
                         "style" | "stylesheet" => {
-                            let (url, _) = resolver.resolve(dep.specifier.as_str(), false, None);
+                            let (url, _) =
+                                resolver.resolve(dep.specifier.as_str(), false, Some(".".into()));
                             items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
                                 span: DUMMY_SP,
                                 specifiers: vec![],
