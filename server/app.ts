@@ -516,11 +516,12 @@ export class Appliaction {
         }
 
         const p = Deno.run({
-            cmd: [Deno.execPath(), 'info'],
+            cmd: [Deno.execPath(), 'info', '--unstable', '--json'],
             stdout: 'piped',
             stderr: 'null'
         })
-        this.#denoCacheDir = (new TextDecoder).decode(await p.output()).split('"')[1]
+        const output = (new TextDecoder).decode(await p.output())
+        this.#denoCacheDir = JSON.parse(output).denoDir
         p.close()
         if (!existsDirSync(this.#denoCacheDir)) {
             log.fatal('invalid deno cache dir')
@@ -937,7 +938,7 @@ export class Appliaction {
             const isLocalhost = /^https?:\/\/localhost(:\d+)?\//.test(url)
             if (['js', 'ts', 'jsx', 'tsx'].includes(mod.loader) && !isLocalhost) {
                 try {
-                    sourceContent = await this.loadDependency(url)
+                    sourceContent = await this.fetchDependency(url)
                     const sourceHash = (new Sha1).update(sourceContent).hex()
                     if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
                         mod.sourceHash = sourceHash
@@ -949,7 +950,7 @@ export class Appliaction {
                     return mod
                 }
             } else {
-                // cache non-localhost file to local drive
+                // todo: cache non-localhost file to local drive
                 try {
                     if (!isLocalhost) {
                         log.info('Download', url)
@@ -1246,44 +1247,46 @@ export class Appliaction {
         })
     }
 
-    /** load dependency content, use deno builtin cache system */
-    private async loadDependency(url: string): Promise<Uint8Array> {
+    /** fetch dependency content, use deno builtin cache system */
+    private async fetchDependency(url: string): Promise<Uint8Array> {
         const u = new URL(url)
         if (url.startsWith('https://esm.sh/')) {
             if (this.isDev && !u.searchParams.has('dev')) {
                 u.searchParams.set('dev', '')
+                u.search = u.search.replace('dev=', 'dev')
             }
-            u.search = u.search.replace(/\=(&|$)/, '$1')
         }
 
         const { protocol, hostname, port, pathname, search } = u
         const versioned = reFullVersion.test(pathname)
-        const dir = path.join(this.#denoCacheDir, 'deps', util.trimSuffix(protocol, ':'), hostname + (port ? '_PORT' + port : ''))
-        const filename = path.join(dir, (new Sha256()).update(pathname + search).hex())
+        const reload = this.#reloading || !versioned
+        const cacheDir = path.join(this.#denoCacheDir, 'deps', util.trimSuffix(protocol, ':'), hostname + (port ? '_PORT' + port : ''))
+        const cacheFilename = path.join(cacheDir, (new Sha256()).update(pathname + search).hex())
 
-        if (versioned && !this.#reloading && existsFileSync(filename)) {
-            return await Deno.readFile(filename)
+        if (!reload && existsFileSync(cacheFilename)) {
+            return await Deno.readFile(cacheFilename)
         }
 
-        const p = Deno.run({
-            cmd: [
-                Deno.execPath(),
-                'cache',
-                this.#reloading || !versioned ? '--reload' : '',
-                u.toString()
-            ].filter(Boolean),
-            stdout: 'piped',
-            stderr: 'piped'
-        })
-        await Deno.stderr.write(await p.output())
-        await Deno.stderr.write(await p.stderrOutput())
-        p.close()
-
-        if (existsFileSync(filename)) {
-            return await Deno.readFile(filename)
-        } else {
-            throw new Error(`not found`)
+        try {
+            log.info('Download', url)
+            const p = Deno.run({
+                cmd: [Deno.execPath(), 'cache', reload ? '--reload' : '', u.toString()],
+                stdout: 'null',
+                stderr: 'null'
+            })
+            await p.status()
+            p.close()
+            if (existsFileSync(cacheFilename)) {
+                return await Deno.readFile(cacheFilename)
+            }
+        } catch (e) {
+            log.warn(e)
         }
+
+        // download dep when deno cache failed
+        log.info('Redownload', url)
+        const buffer = await fetch(u.toString()).then(resp => resp.arrayBuffer())
+        return await Deno.readAll(new Deno.Buffer(buffer))
     }
 
     /** bundle modules for production. */
@@ -1388,7 +1391,7 @@ export class Appliaction {
         }).flat().join('\n')
         const mod = this.newModule(`/${name}.js`)
         const hash = (new Sha1).update(buildChecksum).update(bundlingCode).hex()
-        const bundlingFile = path.join(this.buildDir, mod.url)
+        const bundlingFile = path.join(this.buildDir, `${name}.bundling.js`)
         const bundleFile = path.join(this.buildDir, `${name}.bundle.${util.shortHash(hash)}.js`)
 
         if (!existsFileSync(bundleFile)) {
@@ -1445,7 +1448,7 @@ export class Appliaction {
         })
 
         // workaround for https://github.com/denoland/deno/issues/9212
-        if (Deno.version.deno === '1.7.0' && bundlingFile.endsWith('/deps.bundling.js')) {
+        if (Deno.version.deno === '1.7.0' && bundlingFile.endsWith('deps.bundling.js')) {
             code = code.replace(' _ = l.baseState, ', ' var _ = l.baseState, ')
         }
 
