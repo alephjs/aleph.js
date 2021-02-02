@@ -134,6 +134,7 @@ export class Appliaction {
         } else if (isRemote) {
             mod.loader = 'js'
         }
+        this.#modules.set(url, mod)
         return mod
     }
 
@@ -1189,10 +1190,6 @@ export class Appliaction {
             }
         }
 
-        if (!this.#modules.has(url)) {
-            this.#modules.set(url, mod)
-        }
-
         return mod
     }
 
@@ -1357,24 +1354,23 @@ export class Appliaction {
         }
 
         // create and copy polyfill
-        const polyfillMod = this.newModule('/polyfill.js')
         const hash = (new Sha1).update(buildChecksum).update(AlephRuntimeCode).update(`${this.config.buildTarget}-${VERSION}`).hex()
         const polyfillFile = path.join(this.buildDir, `polyfill.bundle.${util.shortHash(hash)}.js`)
+        const polyfillMod = this.newModule('/polyfill.js')
+        polyfillMod.hash = polyfillMod.sourceHash = hash
         if (!existsFileSync(polyfillFile)) {
             const rawPolyfillFile = `${alephPkgUrl}/compiler/polyfills/${this.config.buildTarget}/polyfill.js`
             await this.runDenoBundle(rawPolyfillFile, polyfillFile, AlephRuntimeCode, true)
         }
-        polyfillMod.hash = polyfillMod.sourceHash = hash
-        this.#modules.set(polyfillMod.url, polyfillMod)
         log.info(`  {} polyfill (${this.config.buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(polyfillFile).size))}`)
-
-        // bundle and copy page moudles
-        await Promise.all(pageModules.map(async mod => this.createPageBundle(mod, localSharedDeps)))
 
         // create main.bundle.xxxxxxxxx.js
         const mainModule = this.getModule('/main.ts')!
         const bundleFile = path.join(this.buildDir, `main.bundle.${util.shortHash(mainModule.hash)}.js`)
         await Deno.copyFile(mainModule.bundlingFile, bundleFile)
+
+        // bundle and copy page moudles
+        await Promise.all(pageModules.map(async mod => this.createPageBundle(mod, localSharedDeps)))
     }
 
     /** create chunk bundle. */
@@ -1389,7 +1385,6 @@ export class Appliaction {
                 ] : []
             }
         }).flat().join('\n')
-        const mod = this.newModule(`/${name}.js`)
         const hash = (new Sha1).update(buildChecksum).update(bundlingCode).hex()
         const bundlingFile = path.join(this.buildDir, `${name}.bundling.js`)
         const bundleFile = path.join(this.buildDir, `${name}.bundle.${util.shortHash(hash)}.js`)
@@ -1400,8 +1395,8 @@ export class Appliaction {
             Deno.remove(bundlingFile)
         }
 
+        const mod = this.newModule(`/${name}.js`)
         mod.hash = mod.sourceHash = hash
-        this.#modules.set(mod.url, mod)
 
         log.info(`  {} ${name} ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
     }
