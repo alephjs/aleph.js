@@ -13,9 +13,9 @@ import { Request } from './api.ts'
 import { AlephRuntimeCode, cleanupCompilation, createHtml, fixImportMap, formatBytesWithColor, getAlephPkgUrl, getRelativePath, reFullVersion, reHashJs, reHashResolve, reLocaleID, respondErrorJSON } from './util.ts'
 
 /**
- * The Aleph Server Appliaction class.
+ * The Aleph Server Application class.
  */
-export class Appliaction {
+export class Application {
     readonly workingDir: string
     readonly mode: 'development' | 'production'
     readonly config: Readonly<Required<Config>>
