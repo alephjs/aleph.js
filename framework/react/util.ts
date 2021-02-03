@@ -1,7 +1,7 @@
 import { createContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
-import { trimPageModuleExt } from '../core/routing.ts'
+import { trimModuleExt } from '../core/routing.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for
 const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
@@ -50,7 +50,7 @@ export function importModule(baseUrl: string, mod: { url: string, hash: string }
     }
 
     if (ALEPH && mod.url.startsWith('/pages/')) {
-        const src = util.cleanPath(baseUrl + '/_aleph/' + trimPageModuleExt(mod.url) + `.bundle.${util.shortHash(mod.hash)}.js`)
+        const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.bundle.${util.shortHash(mod.hash)}.js`)
         return new Promise((resolve, reject) => {
             const script = document.createElement('script')
             script.onload = () => {
@@ -64,7 +64,7 @@ export function importModule(baseUrl: string, mod: { url: string, hash: string }
         })
     }
 
-    const src = util.cleanPath(baseUrl + '/_aleph/' + trimPageModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
+    const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
     return import(src)
 }
 

@@ -231,7 +231,7 @@ export function isHttpUrl(url: string) {
     }
 }
 
-export function isPageModule(url: string) {
+export function isModuleURL(url: string) {
     for (const ext of pageModuleExts) {
         if (url.endsWith('.' + ext)) {
             return true
@@ -241,11 +241,20 @@ export function isPageModule(url: string) {
 }
 
 export function getPagePathname(url: string): string {
-    const pathname = trimPageModuleExt(url).replace(/^\/pages\//, '/').replace(/\/?index$/, '/')
+    let pathname = trimModuleExt(url)
+    if (pathname.startsWith('/pages/')) {
+        pathname = util.trimPrefix(pathname, '/pages')
+    }
+    if (pathname.endsWith('/index')) {
+        pathname = util.trimSuffix(pathname, '/index')
+        if (pathname === '') {
+            pathname = '/'
+        }
+    }
     return pathname
 }
 
-export function trimPageModuleExt(url: string) {
+export function trimModuleExt(url: string) {
     for (const ext of pageModuleExts) {
         if (url.endsWith('.' + ext)) {
             return url.slice(0, -(ext.length + 1))
