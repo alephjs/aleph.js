@@ -51,7 +51,7 @@ export class Routing {
     }
 
     update(module: RouteModule) {
-        const newRoute: Route = { path: getPagePathname(module.url), module }
+        const newRoute: Route = { path: toPagePath(module.url), module }
         const dirtyRoutes: Set<Route[]> = new Set()
         let exists = false
         let targetRoutes = this._routes
@@ -240,7 +240,7 @@ export function isModuleURL(url: string) {
     return false
 }
 
-export function getPagePathname(url: string): string {
+export function toPagePath(url: string): string {
     let pathname = trimModuleExt(url)
     if (pathname.startsWith('/pages/')) {
         pathname = util.trimPrefix(pathname, '/pages')

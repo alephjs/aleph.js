@@ -1,6 +1,6 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { RouterURL } from '../../types.ts'
-import { getPagePathname } from '../core/routing.ts'
+import { toPagePath } from '../core/routing.ts'
 import { E400MissingComponent } from './error.ts'
 import { isLikelyReactComponent } from './util.ts'
 
@@ -41,7 +41,7 @@ function createPagePropsSegment(seg: { url: string, Component?: ComponentType<an
             pageProps.Page = seg.Component
         } else {
             pageProps.Page = E400MissingComponent
-            pageProps.pageProps = { name: 'Page: ' + getPagePathname(seg.url) }
+            pageProps.pageProps = { name: 'Page: ' + toPagePath(seg.url) }
         }
     }
     return pageProps
