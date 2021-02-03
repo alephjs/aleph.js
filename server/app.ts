@@ -23,7 +23,6 @@ export class Application {
     readonly ready: Promise<void>
 
     #denoCacheDir = ''
-    #mainJS = { code: '', hash: '' }
     #modules: Map<string, Module> = new Map()
     #pageRouting: Routing = new Routing()
     #apiRouting: Routing = new Routing()
@@ -645,19 +644,19 @@ export class Application {
         log.info('Start watching code changes...')
         for await (const event of w) {
             for (const p of event.paths) {
-                const path = util.cleanPath(util.trimPrefix(p, this.srcDir))
+                const url = util.cleanPath(util.trimPrefix(p, this.srcDir))
                 const validated = () => {
                     // ignore `.aleph` and output directories
-                    if (path.startsWith('/.aleph/') || path.startsWith(this.config.outputDir)) {
+                    if (url.startsWith('/.aleph/') || url.startsWith(this.config.outputDir)) {
                         return false
                     }
 
                     // is module
-                    if (isModuleURL(path)) {
-                        if (path.startsWith('/pages/') || path.startsWith('/api/')) {
+                    if (isModuleURL(url)) {
+                        if (url.startsWith('/pages/') || url.startsWith('/api/')) {
                             return true
                         }
-                        switch (trimModuleExt(path)) {
+                        switch (trimModuleExt(url)) {
                             case '/404':
                             case '/app':
                                 return true
@@ -666,25 +665,35 @@ export class Application {
 
                     // is dep
                     for (const { deps } of this.#modules.values()) {
-                        if (deps.findIndex(dep => dep.url === path) > -1) {
+                        if (deps.findIndex(dep => dep.url === url) > -1) {
                             return true
                         }
                     }
 
                     // is loaded by plugin
-                    return this.config.plugins.findIndex(p => p.type === 'loader' && p.test.test(path)) > -1
+                    return this.config.plugins.findIndex(p => p.type === 'loader' && p.test.test(url)) > -1
                 }
 
                 if (validated()) {
-                    util.debounceX(path, () => {
+                    util.debounceX(url, () => {
                         if (existsFileSync(p)) {
                             let type = 'modify'
-                            if (!this.#modules.has(path)) {
+                            if (!this.#modules.has(url)) {
                                 type = 'add'
                             }
-                            log.info(type, path)
-                            this.compile(path, { forceCompile: true }).then(mod => {
+                            log.info(type, url)
+                            this.compile(url, { forceCompile: true }).then(mod => {
                                 const hmrable = this.isHMRable(mod.url)
+                                const update = ({ url, hash }: Module) => {
+                                    if (trimModuleExt(url) === '/app') {
+                                        this.#renderCache.clear()
+                                    } else if (url.startsWith('/pages/')) {
+                                        this.#renderCache.delete(toPagePath(url))
+                                        this.#pageRouting.update(this.getRouteModule({ url, hash }))
+                                    } else if (url.startsWith('/api/')) {
+                                        this.#apiRouting.update(this.getRouteModule({ url, hash }))
+                                    }
+                                }
                                 if (hmrable) {
                                     if (type === 'add') {
                                         this.#fsWatchListeners.forEach(e => e.emit('add', this.getRouteModule(mod)))
@@ -692,39 +701,30 @@ export class Application {
                                         this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.url, mod.hash))
                                     }
                                 }
-                                if (trimModuleExt(path) === '/app') {
-                                    this.#renderCache.clear()
-                                } else if (path.startsWith('/pages/')) {
-                                    this.#renderCache.delete(toPagePath(path))
-                                    this.#pageRouting.update(this.getRouteModule(mod))
-                                } else if (path.startsWith('/api/')) {
-                                    this.#apiRouting.update(this.getRouteModule(mod))
-                                }
-                                this.checkCompilationSideEffect(path, ({ url, hash }) => {
-                                    if (url.startsWith('/pages/')) {
-                                        this.#renderCache.delete(toPagePath(url))
-                                    }
-                                    if (!hmrable && this.isHMRable(url)) {
-                                        this.#fsWatchListeners.forEach(w => w.emit('modify-' + url, hash))
+                                update(mod)
+                                this.checkCompilationSideEffect(url, (mod) => {
+                                    update(mod)
+                                    if (!hmrable && this.isHMRable(mod.url)) {
+                                        this.#fsWatchListeners.forEach(w => w.emit('modify-' + mod.url, mod.hash))
                                     }
                                 })
                             }).catch(err => {
-                                log.error(`compile(${path}):`, err.message)
+                                log.error(`compile(${url}):`, err.message)
                             })
-                        } else if (this.#modules.has(path)) {
-                            if (trimModuleExt(path) === '/app') {
+                        } else if (this.#modules.has(url)) {
+                            if (trimModuleExt(url) === '/app') {
                                 this.#renderCache.clear()
-                            } else if (path.startsWith('/pages/')) {
-                                this.#renderCache.delete(toPagePath(path))
-                                this.#pageRouting.removeRoute(toPagePath(path))
-                            } else if (path.startsWith('/api/')) {
-                                this.#apiRouting.removeRoute(toPagePath(path))
+                            } else if (url.startsWith('/pages/')) {
+                                this.#renderCache.delete(toPagePath(url))
+                                this.#pageRouting.removeRoute(toPagePath(url))
+                            } else if (url.startsWith('/api/')) {
+                                this.#apiRouting.removeRoute(toPagePath(url))
                             }
-                            this.#modules.delete(path)
-                            if (this.isHMRable(path)) {
-                                this.#fsWatchListeners.forEach(e => e.emit('remove', path))
+                            this.#modules.delete(url)
+                            if (this.isHMRable(url)) {
+                                this.#fsWatchListeners.forEach(e => e.emit('remove', url))
                             }
-                            log.info('remove', path)
+                            log.info('remove', url)
                         }
                     }, 150)
                 }
@@ -733,7 +733,7 @@ export class Application {
     }
 
     /** returns the route module by given module. */
-    private getRouteModule({ url, hash }: Module): RouteModule {
+    private getRouteModule({ url, hash }: Pick<Module, 'url' | 'hash'>): RouteModule {
         const deps = this.lookupDeps(url).filter(({ isData, isStyle, isDynamic }) => !!(isData || (isStyle && isDynamic)))
         return { url, hash, asyncDeps: deps.length > 0 ? deps : undefined }
     }
