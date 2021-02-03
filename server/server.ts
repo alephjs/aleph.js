@@ -5,16 +5,16 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
-import { Appliaction } from './app.ts'
+import { Application } from './app.ts'
 import { getContentType } from './mime.ts'
 import { createHtml, reHashJs } from './util.ts'
 
 /** The Aleph Server class. */
 export class Server {
-    #app: Appliaction
+    #app: Application
     #ready: boolean
 
-    constructor(app: Appliaction) {
+    constructor(app: Application) {
         this.#app = app
         this.#ready = false
     }
@@ -151,7 +151,7 @@ export class Server {
 }
 
 /** start a standard aleph server. */
-export async function serve(hostname: string, port: number, app: Appliaction) {
+export async function serve(hostname: string, port: number, app: Application) {
     const server = new Server(app)
     await app.ready
     while (true) {
