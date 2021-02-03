@@ -1,20 +1,20 @@
 import { path, serve as stdServe, ws } from '../deps.ts'
-import { RouteModule, trimPageModuleExt } from '../framework/core/routing.ts'
+import { RouteModule, trimModuleExt } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
-import { Appliaction } from './app.ts'
+import { Application } from './app.ts'
 import { getContentType } from './mime.ts'
 import { createHtml, reHashJs } from './util.ts'
 
 /** The Aleph Server class. */
 export class Server {
-    #app: Appliaction
+    #app: Application
     #ready: boolean
 
-    constructor(app: Appliaction) {
+    constructor(app: Application) {
         this.#app = app
         this.#ready = false
     }
@@ -51,7 +51,7 @@ export class Server {
                                         watcher.on('modify-' + mod.url, (hash: string) => socket.send(JSON.stringify({
                                             type: 'update',
                                             url: mod.url,
-                                            updateUrl: util.cleanPath(`${app.config.baseUrl}/_aleph/${trimPageModuleExt(mod.url)}.${util.shortHash(hash!)}.js`),
+                                            updateUrl: util.cleanPath(`${app.config.baseUrl}/_aleph/${trimModuleExt(mod.url)}.${util.shortHash(hash!)}.js`),
                                             hash,
                                         })))
                                     }
@@ -102,6 +102,9 @@ export class Server {
                         req.status(status).send('')
                     }
                     return
+                } else if (reHashJs.test(pathname) && ['main', 'main.bundle'].includes(util.trimPrefix(pathname, '/_aleph/').replace(reHashJs, ''))) {
+                    req.send(app.getMainJS(pathname.startsWith('/_aleph/main.bundle')), 'application/javascript; charset=utf-8')
+                    return
                 } else {
                     const filePath = path.join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
                     if (existsFileSync(filePath)) {
@@ -151,7 +154,7 @@ export class Server {
 }
 
 /** start a standard aleph server. */
-export async function serve(hostname: string, port: number, app: Appliaction) {
+export async function serve(hostname: string, port: number, app: Application) {
     const server = new Server(app)
     await app.ready
     while (true) {
@@ -170,14 +173,4 @@ export async function serve(hostname: string, port: number, app: Appliaction) {
             }
         }
     }
-}
-
-/** parse port number */
-export function parsePortNumber(v: string): number {
-    const num = parseInt(v)
-    if (isNaN(num) || num <= 0 || num > 1 << 16 || !Number.isInteger(num)) {
-        log.error(`invalid port 'v'`)
-        Deno.exit(1)
-    }
-    return num
 }

@@ -1,4 +1,4 @@
-import { colors, path } from '../deps.ts'
+import { colors, path, Sha1 } from '../deps.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -60,6 +60,11 @@ export function getRelativePath(from: string, to: string): string {
     return r
 }
 
+/** compute hash of the content */
+export function computeHash(content: string | Uint8Array): string {
+    return (new Sha1).update(content).hex()
+}
+
 /** cleanup the previous compilation cache */
 export async function cleanupCompilation(jsFile: string) {
     const dir = path.dirname(jsFile)
@@ -102,6 +107,16 @@ export function fixImportMap(v: any) {
         })
     }
     return imports
+}
+
+/** parse port number */
+export function parsePortNumber(v: string): number {
+    const num = parseInt(v)
+    if (isNaN(num) || num <= 0 || num > 1 << 16 || !Number.isInteger(num)) {
+        log.error(`invalid port 'v'`)
+        Deno.exit(1)
+    }
+    return num
 }
 
 /**
@@ -148,9 +163,9 @@ export function createHtml({
     const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
         if (!util.isString(v) && util.isNEString(v.src)) {
             if (v.type === 'module') {
-                return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
+                return `<link rel="modulepreload" href=${JSON.stringify(util.cleanPath(v.src))} />`
             } else if (!v.nomodule) {
-                return `<link rel="preload" href=${JSON.stringify(v.src)} as="script" />`
+                return `<link rel="preload" href=${JSON.stringify(util.cleanPath(v.src))} as="script" />`
             }
         }
         return ''
@@ -162,7 +177,7 @@ export function createHtml({
             const { innerText, ...rest } = v
             return `<script${formatAttrs(rest)}>${eol}${innerText}${eol}${indent}</script>`
         } else if (util.isNEString(v.src) && !v.preload) {
-            return `<script${formatAttrs(v)}></script>`
+            return `<script${formatAttrs({ ...v, src: util.cleanPath(v.src) })}></script>`
         } else {
             return ''
         }
