@@ -87,6 +87,14 @@ main {
     border-color: #ccc;
 }
 
+.counter em {
+    display: inline-block;
+    width: 48px;
+    font-weight: 400;
+    text-align: center;
+    color: #999;
+}
+
 .counter strong {
     display: inline-block;
     width: 48px;
