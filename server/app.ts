@@ -1290,7 +1290,7 @@ export class Application {
         }
 
         // download dep when deno cache failed
-        log.info('Redownload', url)
+        log.info('Force download from', url)
         const buffer = await fetch(u.toString()).then(resp => resp.arrayBuffer())
         return await Deno.readAll(new Deno.Buffer(buffer))
     }
@@ -1358,12 +1358,20 @@ export class Application {
         }
 
         log.info('- Bundling')
+        await this.createPolyfillBundle()
         await this.createChunkBundle('deps', remoteDeps)
         if (localSharedDeps.length > 0) {
             await this.createChunkBundle('shared', localSharedDeps)
         }
 
         // create and copy polyfill
+        // bundle and copy page moudles
+        await Promise.all(pageModules.map(async mod => this.createPageBundle(mod, localSharedDeps)))
+    }
+
+    /** create polyfill bundle. */
+    private async createPolyfillBundle() {
+        const alephPkgUrl = getAlephPkgUrl()
         const { buildTarget } = this.config
         const hash = computeHash(AlephRuntimeCode + buildTarget + buildChecksum + Deno.version.deno)
         const polyfillFile = path.join(this.buildDir, `polyfill.bundle.${util.shortHash(hash)}.js`)
@@ -1374,14 +1382,11 @@ export class Application {
             await this.runDenoBundle(rawPolyfillFile, polyfillFile, AlephRuntimeCode, true)
         }
         log.info(`  {} polyfill (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(polyfillFile).size))}`)
-
-        // bundle and copy page moudles
-        await Promise.all(pageModules.map(async mod => this.createPageBundle(mod, localSharedDeps)))
     }
 
     /** create chunk bundle. */
-    private async createChunkBundle(name: string, list: string[]) {
-        const bundlingCode = list.map((url, i) => {
+    private async createChunkBundle(name: string, deps: string[]) {
+        const bundlingCode = deps.map((url, i) => {
             const mod = this.#modules.get(url)
             if (mod) {
                 const importUrl = util.isLikelyHttpURL(mod.url) ? mod.jsFile : mod.bundlingFile
@@ -1394,16 +1399,13 @@ export class Application {
         const hash = computeHash(bundlingCode + buildChecksum + Deno.version.deno)
         const bundleEntryFile = path.join(this.buildDir, `${name}.bundle.entry.js`)
         const bundleFile = path.join(this.buildDir, `${name}.bundle.${util.shortHash(hash)}.js`)
-
+        const mod = this.newModule(`/${name}.js`)
+        mod.hash = mod.sourceHash = hash
         if (!existsFileSync(bundleFile)) {
             await Deno.writeTextFile(bundleEntryFile, bundlingCode)
             await this.runDenoBundle(bundleEntryFile, bundleFile)
             lazyRemove(bundleEntryFile)
         }
-
-        const mod = this.newModule(`/${name}.js`)
-        mod.hash = mod.sourceHash = hash
-
         log.info(`  {} ${name} ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
     }
 
@@ -1484,7 +1486,6 @@ export class Application {
                 pageModules.push(mod)
             }
         }))
-
         await Promise.all([
             (async () => {
                 const mainJS = this.getMainJS(true)
