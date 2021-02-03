@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
 export default function useCounter(): [number, boolean, () => void, () => void] {
-    const [isSyncing, setIsSyncing] = useState(true)
     const [count, setCount] = useState(0)
+    const [isSyncing, setIsSyncing] = useState(true)
     const increase = useCallback(() => {
         setCount(n => n + 1)
         fetch('/api/counter/increase').catch(e => console.error(e))
@@ -13,9 +13,9 @@ export default function useCounter(): [number, boolean, () => void, () => void] 
     }, [])
 
     useEffect(() => {
-        fetch('/api/counter').then(resp => resp.json().catch(() => ({ count: 0 })))
+        fetch('/api/counter').then(resp => resp.json().catch(() => ({})))
             .then(({ count }) => {
-                if (typeof count === 'number') {
+                if (typeof count === 'number' && !Number.isNaN(count)) {
                     setCount(count)
                 }
             })
