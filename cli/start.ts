@@ -1,4 +1,5 @@
-import { Appliaction, parsePortNumber, serve } from '../server/mod.ts'
+import { Application, serve } from '../server/mod.ts'
+import { parsePortNumber } from '../server/util.ts'
 
 export const helpMessage = `
 Usage:
@@ -18,6 +19,6 @@ Options:
 export default async function (workingDir: string, options: Record<string, string | boolean>) {
     const host = String(options.hn || options.hostname || 'localhost')
     const port = parsePortNumber(String(options.p || options.port || '8080'))
-    const app = new Appliaction(workingDir, 'production', Boolean(options.r || options.reload))
+    const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
     serve(host, port, app)
 }
