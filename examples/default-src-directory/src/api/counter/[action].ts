@@ -20,7 +20,7 @@ export default async function handler(req: APIRequest) {
       req.status(400).json({
         error: 'UnknownAction',
         status: 400,
-        message: `undefined acton '${req.params.action}'`
+        message: `undefined action '${req.params.action}'`
       })
       break
   }
