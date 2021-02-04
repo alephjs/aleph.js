@@ -43,80 +43,80 @@ export const AlephRuntimeCode = `
 
 /** get aleph pkg url. */
 export function getAlephPkgUrl() {
-    let url = `https://deno.land/x/aleph@v${VERSION}`
-    const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-    if (devPort) {
-        url = `http://localhost:${devPort}`
-    }
-    return url
+  let url = `https://deno.land/x/aleph@v${VERSION}`
+  const { __ALEPH_DEV_PORT: devPort } = globalThis as any
+  if (devPort) {
+    url = `http://localhost:${devPort}`
+  }
+  return url
 }
 
 /** get relative the path of `to` to `from`. */
 export function getRelativePath(from: string, to: string): string {
-    let r = path.relative(from, to).split('\\').join('/')
-    if (!r.startsWith('.') && !r.startsWith('/')) {
-        r = './' + r
-    }
-    return r
+  let r = path.relative(from, to).split('\\').join('/')
+  if (!r.startsWith('.') && !r.startsWith('/')) {
+    r = './' + r
+  }
+  return r
 }
 
 /** compute hash of the content */
 export function computeHash(content: string | Uint8Array): string {
-    return (new Sha1).update(content).hex()
+  return (new Sha1).update(content).hex()
 }
 
 /** cleanup the previous compilation cache */
 export async function cleanupCompilation(jsFile: string) {
-    const dir = path.dirname(jsFile)
-    const jsFileName = path.basename(jsFile)
-    if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {
-        return
+  const dir = path.dirname(jsFile)
+  const jsFileName = path.basename(jsFile)
+  if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {
+    return
+  }
+  const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
+      const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
+      if (_jsName === jsName && jsFileName !== entry.name) {
+        await Deno.remove(path.join(dir, entry.name))
+      }
     }
-    const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'
-    for await (const entry of Deno.readDir(dir)) {
-        if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
-            const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
-            if (_jsName === jsName && jsFileName !== entry.name) {
-                await Deno.remove(path.join(dir, entry.name))
-            }
-        }
-    }
+  }
 }
 
 /** fix import map */
 export function fixImportMap(v: any) {
-    const imports: Record<string, string> = {}
-    if (util.isPlainObject(v)) {
-        Object.entries(v).forEach(([key, value]) => {
-            if (key == '' || key == '/') {
-                return
-            }
-            const isPrefix = key.endsWith('/')
-            const y = (v: string) => util.isNEString(v) && (!isPrefix || v.endsWith('/'))
-            if (y(value)) {
-                imports[key] = value
-                return
-            } else if (util.isNEArray(value)) {
-                for (const v of value) {
-                    if (y(v)) {
-                        imports[key] = v
-                        return
-                    }
-                }
-            }
-        })
-    }
-    return imports
+  const imports: Record<string, string> = {}
+  if (util.isPlainObject(v)) {
+    Object.entries(v).forEach(([key, value]) => {
+      if (key == '' || key == '/') {
+        return
+      }
+      const isPrefix = key.endsWith('/')
+      const y = (v: string) => util.isNEString(v) && (!isPrefix || v.endsWith('/'))
+      if (y(value)) {
+        imports[key] = value
+        return
+      } else if (util.isNEArray(value)) {
+        for (const v of value) {
+          if (y(v)) {
+            imports[key] = v
+            return
+          }
+        }
+      }
+    })
+  }
+  return imports
 }
 
 /** parse port number */
 export function parsePortNumber(v: string): number {
-    const num = parseInt(v)
-    if (isNaN(num) || num <= 0 || num > 1 << 16 || !Number.isInteger(num)) {
-        log.error(`invalid port 'v'`)
-        Deno.exit(1)
-    }
-    return num
+  const num = parseInt(v)
+  if (isNaN(num) || num <= 0 || num > 1 << 16 || !Number.isInteger(num)) {
+    log.error(`invalid port 'v'`)
+    Deno.exit(1)
+  }
+  return num
 }
 
 /**
@@ -126,84 +126,84 @@ export function parsePortNumber(v: string): number {
  * - red: > 10MB
  */
 export function formatBytesWithColor(bytes: number) {
-    let cf = colors.dim
-    if (bytes > 10 << 20) { // 10MB
-        cf = colors.red
-    } else if (bytes > 1 << 20) { // 1MB
-        cf = colors.yellow
-    }
-    return cf(util.formatBytes(bytes))
+  let cf = colors.dim
+  if (bytes > 10 << 20) { // 10MB
+    cf = colors.red
+  } else if (bytes > 1 << 20) { // 1MB
+    cf = colors.yellow
+  }
+  return cf(util.formatBytes(bytes))
 }
 
 /** Reponse an error jons to the request */
 export function respondErrorJSON(req: ServerRequest, status: number, message: string) {
-    req.respond({
-        status,
-        headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
-        body: JSON.stringify({ error: { status, message } })
-    }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
+  req.respond({
+    status,
+    headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
+    body: JSON.stringify({ error: { status, message } })
+  }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
 }
 
 /** create html content by given arguments */
 export function createHtml({
-    lang = 'en',
-    head = [],
-    scripts = [],
-    body,
-    minify = false
+  lang = 'en',
+  head = [],
+  scripts = [],
+  body,
+  minify = false
 }: {
-    lang?: string,
-    head?: string[],
-    scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean, preload?: boolean })[],
-    body: string,
-    minify?: boolean
+  lang?: string,
+  head?: string[],
+  scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean, preload?: boolean })[],
+  body: string,
+  minify?: boolean
 }) {
-    const eol = minify ? '' : '\n'
-    const indent = minify ? '' : ' '.repeat(4)
-    const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
-        if (!util.isString(v) && util.isNEString(v.src)) {
-            if (v.type === 'module') {
-                return `<link rel="modulepreload" href=${JSON.stringify(util.cleanPath(v.src))} />`
-            } else if (!v.nomodule) {
-                return `<link rel="preload" href=${JSON.stringify(util.cleanPath(v.src))} as="script" />`
-            }
-        }
-        return ''
-    })).filter(Boolean)
-    const scriptTags = scripts.map(v => {
-        if (util.isString(v)) {
-            return `<script>${v}</script>`
-        } else if (util.isNEString(v.innerText)) {
-            const { innerText, ...rest } = v
-            return `<script${formatAttrs(rest)}>${eol}${innerText}${eol}${indent}</script>`
-        } else if (util.isNEString(v.src) && !v.preload) {
-            return `<script${formatAttrs({ ...v, src: util.cleanPath(v.src) })}></script>`
-        } else {
-            return ''
-        }
-    }).filter(Boolean)
+  const eol = minify ? '' : '\n'
+  const indent = minify ? '' : ' '.repeat(4)
+  const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
+    if (!util.isString(v) && util.isNEString(v.src)) {
+      if (v.type === 'module') {
+        return `<link rel="modulepreload" href=${JSON.stringify(util.cleanPath(v.src))} />`
+      } else if (!v.nomodule) {
+        return `<link rel="preload" href=${JSON.stringify(util.cleanPath(v.src))} as="script" />`
+      }
+    }
+    return ''
+  })).filter(Boolean)
+  const scriptTags = scripts.map(v => {
+    if (util.isString(v)) {
+      return `<script>${v}</script>`
+    } else if (util.isNEString(v.innerText)) {
+      const { innerText, ...rest } = v
+      return `<script${formatAttrs(rest)}>${eol}${innerText}${eol}${indent}</script>`
+    } else if (util.isNEString(v.src) && !v.preload) {
+      return `<script${formatAttrs({ ...v, src: util.cleanPath(v.src) })}></script>`
+    } else {
+      return ''
+    }
+  }).filter(Boolean)
 
-    return [
-        '<!DOCTYPE html>',
-        `<html lang="${lang}">`,
-        '<head>',
-        indent + '<meta charSet="utf-8" />',
-        ...headTags.map(tag => indent + tag),
-        '</head>',
-        '<body>',
-        indent + body,
-        ...scriptTags.map(tag => indent + tag),
-        '</body>',
-        '</html>'
-    ].join(eol)
+  return [
+    '<!DOCTYPE html>',
+    `<html lang="${lang}">`,
+    '<head>',
+    indent + '<meta charSet="utf-8" />',
+    ...headTags.map(tag => indent + tag),
+    '</head>',
+    '<body>',
+    indent + body,
+    ...scriptTags.map(tag => indent + tag),
+    '</body>',
+    '</html>'
+  ].join(eol)
 }
 
 function formatAttrs(v: any): string {
-    return Object.keys(v).filter(k => !!v[k]).map(k => {
-        if (v[k] === true) {
-            return ` ${k}`
-        } else {
-            return ` ${k}=${JSON.stringify(String(v[k]))}`
-        }
-    }).join('')
+  return Object.keys(v).filter(k => !!v[k]).map(k => {
+    if (v[k] === true) {
+      return ` ${k}`
+    } else {
+      return ` ${k}=${JSON.stringify(String(v[k]))}`
+    }
+  }).join('')
 }

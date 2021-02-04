@@ -17,8 +17,8 @@ Options:
 `
 
 export default async function (workingDir: string, options: Record<string, string | boolean>) {
-    const host = String(options.hn || options.hostname || 'localhost')
-    const port = parsePortNumber(String(options.p || options.port || '8080'))
-    const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
-    serve(host, port, app)
+  const host = String(options.hn || options.hostname || 'localhost')
+  const port = parsePortNumber(String(options.p || options.port || '8080'))
+  const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
+  serve(host, port, app)
 }

@@ -6,34 +6,34 @@ import { checksum } from './dist/wasm-checksum.js'
 import init, { transformSync } from './dist/wasm-pack.js'
 
 export interface SWCOptions {
-    target?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
-    jsxFactory?: string
-    jsxFragmentFactory?: string
-    sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
-    sourceMap?: boolean
+  target?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
+  jsxFactory?: string
+  jsxFragmentFactory?: string
+  sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
+  sourceMap?: boolean
 }
 
 export interface TransformOptions {
-    url: string
-    importMap?: ImportMap
-    reactVersion?: string,
-    swcOptions?: SWCOptions
-    isDev?: boolean,
-    bundleMode?: boolean,
-    bundledModules?: string[],
+  url: string
+  importMap?: ImportMap
+  reactVersion?: string,
+  swcOptions?: SWCOptions
+  isDev?: boolean,
+  bundleMode?: boolean,
+  bundledModules?: string[],
 }
 
 interface DependencyDescriptor {
-    specifier: string,
-    rel?: string
-    isDynamic: boolean,
+  specifier: string,
+  rel?: string
+  isDynamic: boolean,
 }
 
 export interface TransformResult {
-    code: string
-    deps: DependencyDescriptor[]
-    inlineStyles: Record<string, { type: string, quasis: string[], exprs: string[] }>
-    map?: string
+  code: string
+  deps: DependencyDescriptor[]
+  inlineStyles: Record<string, { type: string, quasis: string[], exprs: string[] }>
+  map?: string
 }
 
 /**
@@ -57,25 +57,25 @@ export interface TransformResult {
  * @param {object} opts - transform options.
  */
 export function transpileSync(code: string, opts?: TransformOptions): TransformResult {
-    return transformSync(code, opts)
+  return transformSync(code, opts)
 }
 
 /**
  * initiate the compiler wasm.
  */
 export const initWasm = async (denoCacheDir: string) => {
-    const cacheDir = path.join(denoCacheDir, `deps/https/deno.land/aleph@v${VERSION}`)
-    const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
-    if (existsFileSync(cachePath)) {
-        const wasmData = await Deno.readFile(cachePath)
-        await init(wasmData)
-    } else {
-        const { default: getWasmData } = await import('./dist/wasm.js')
-        const wasmData = getWasmData()
-        await init(wasmData)
-        await ensureDir(cacheDir)
-        await Deno.writeFile(cachePath, wasmData)
-    }
+  const cacheDir = path.join(denoCacheDir, `deps/https/deno.land/aleph@v${VERSION}`)
+  const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
+  if (existsFileSync(cachePath)) {
+    const wasmData = await Deno.readFile(cachePath)
+    await init(wasmData)
+  } else {
+    const { default: getWasmData } = await import('./dist/wasm.js')
+    const wasmData = getWasmData()
+    await init(wasmData)
+    await ensureDir(cacheDir)
+    await Deno.writeFile(cachePath, wasmData)
+  }
 }
 
 /**

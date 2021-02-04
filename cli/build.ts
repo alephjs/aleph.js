@@ -14,7 +14,7 @@ Options:
 `
 
 export default async function (workingDir: string, options: Record<string, string | boolean>) {
-    const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
-    await app.build()
-    Deno.exit(0)
+  const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
+  await app.build()
+  Deno.exit(0)
 }
