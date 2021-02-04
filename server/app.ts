@@ -1185,7 +1185,7 @@ export class Application {
 
   /** check compilation side-effect caused by dependency graph. */
   private async checkCompilationSideEffect(url: string, callback?: (mod: Module) => void) {
-    const { hash, sourceHash } = this.#modules.get(url)!
+    const { hash } = this.#modules.get(url)!
 
     for (const mod of this.#modules.values()) {
       for (const dep of mod.deps) {
@@ -1204,22 +1204,18 @@ export class Application {
               }
               return s
             })
-            let bundlingJS: string | null = null
-            if (mod.bundlingFile && existsFileSync(mod.bundlingFile)) {
-              bundlingJS = await Deno.readTextFile(mod.bundlingFile)
-              bundlingJS = bundlingJS.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
-                if (importPath.replace(reHashJs, '') === relativePath) {
-                  return `${key}${spaces}${ql}${relativePath}.${util.shortHash(sourceHash)}.js${qr}`
-                }
-                return s
-              })
-            }
             let sourceMap: string | null = null
             if (existsFileSync(mod.jsFile + '.map')) {
               sourceMap = Deno.readTextFileSync(mod.jsFile + '.map')
             }
             mod.hash = computeHash(jsContent + buildChecksum)
             mod.jsFile = `${mod.jsFile.replace(reHashJs, '')}.${util.shortHash(mod.hash)}.js`
+            jsContent = jsContent.split('\n').map(line => {
+              if (line.startsWith('//# sourceMappingURL=')) {
+                return `//# sourceMappingURL=${path.basename(mod.jsFile).replace(reHashJs, '')}.${util.shortHash(mod.hash)}.js.map`
+              }
+              return line
+            }).join('\n')
             await cleanupCompilation(mod.jsFile)
             await Promise.all([
               ensureTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
@@ -1229,7 +1225,6 @@ export class Application {
                 deps: mod.deps,
               }, undefined, 4)),
               ensureTextFile(mod.jsFile, jsContent),
-              bundlingJS ? ensureTextFile(mod.bundlingFile, bundlingJS) : Promise.resolve(),
               sourceMap ? ensureTextFile(mod.jsFile + '.map', sourceMap) : Promise.resolve(),
             ])
             callback && callback(mod)
