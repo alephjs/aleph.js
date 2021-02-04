@@ -1374,7 +1374,7 @@ export class Application {
       if (mod) {
         const importUrl = util.isLikelyHttpURL(mod.url) ? mod.jsFile : mod.bundlingFile
         return importUrl ? [
-          `import * as ${name}_mod_${i} from ${JSON.stringify(importUrl)}`,
+          `import * as ${name}_mod_${i} from ${JSON.stringify('file://' + importUrl)}`,
           `__ALEPH.pack[${JSON.stringify(url)}] = ${name}_mod_${i}`
         ] : []
       }
@@ -1401,7 +1401,7 @@ export class Application {
 
     if (!existsFileSync(bundleFile)) {
       const bundleEntryCode = [
-        `import * as mod from ${JSON.stringify(bundlingFile)}`,
+        `import * as mod from ${JSON.stringify('file://' + bundlingFile)}`,
         `__ALEPH.pack[${JSON.stringify(mod.url)}] = mod`
       ].join('\n')
       await Deno.writeTextFile(bundleEntryFile, bundleEntryCode)
