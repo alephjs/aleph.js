@@ -1257,24 +1257,27 @@ export class Application {
     }
 
     try {
-      log.info('Download', url)
       const p = Deno.run({
         cmd: [Deno.execPath(), 'cache', reload ? '--reload' : '', u.toString()],
-        stdout: 'null',
-        stderr: 'null'
+        stdout: 'inherit',
+        stderr: 'piped'
       })
+      await Deno.stderr.write(await p.stderrOutput())
       await p.status()
       p.close()
       if (existsFileSync(cacheFilename)) {
         return await Deno.readFile(cacheFilename)
       }
-    } catch (e) {
-      log.warn(e)
-    }
+    } catch (e) { }
 
     // download dep when deno cache failed
-    log.info('Force download from', url)
-    const buffer = await fetch(u.toString()).then(resp => resp.arrayBuffer())
+    console.log(colors.green('Force download'), url)
+    const buffer = await fetch(u.toString()).then(resp => {
+      if (resp.status !== 200) {
+        return Promise.reject(new Error(resp.statusText))
+      }
+      return resp.arrayBuffer()
+    })
     return await Deno.readAll(new Deno.Buffer(buffer))
   }
 
