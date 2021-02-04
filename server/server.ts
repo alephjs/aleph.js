@@ -166,7 +166,7 @@ export async function serve(hostname: string, port: number, app: Application) {
       }
     } catch (err) {
       if (err instanceof Deno.errors.AddrInUse) {
-        log.warn(`port ${port} already in use, try ${port + 1}`)
+        log.warn(`port ${port} already in use, try ${port + 1}...`)
         port++
       } else {
         log.fatal(err.message)
