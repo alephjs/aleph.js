@@ -678,10 +678,8 @@ export class Application {
                                         this.#renderCache.clear()
                                     } else if (url.startsWith('/pages/')) {
                                         this.#renderCache.delete(toPagePath(url))
-                                        if (type === 'add') {
-                                            this.#pageRouting.update(this.getRouteModule({ url, hash }))
-                                        }
-                                    } else if (url.startsWith('/api/') && type === 'add') {
+                                        this.#pageRouting.update(this.getRouteModule({ url, hash }))
+                                    } else if (url.startsWith('/api/')) {
                                         this.#apiRouting.update(this.getRouteModule({ url, hash }))
                                     }
                                 }
