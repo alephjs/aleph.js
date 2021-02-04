@@ -1,12 +1,12 @@
 .name-page .go-button {
-    margin-top: 15px;
+ margin-top: 15px;
 }
 
 .name-page .go-button button {
-    display: inline-block;
-    padding: 3px 15px;
-    background-color: #d63369;
-    border-radius: 6px;
-    color: #fff;
-    cursor: pointer;
+ display: inline-block;
+ padding: 3px 15px;
+ background-color: #d63369;
+ border-radius: 6px;
+ color: #fff;
+ cursor: pointer;
 }

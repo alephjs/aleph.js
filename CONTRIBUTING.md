@@ -16,12 +16,17 @@ You will need [Deno](https://deno.land/) 1.7+.
 2. Clone the repository to your local device.
 3. Create a new branch `git checkout -b BRANCH_NAME`.
 4. Change code then run our examples.
+5. Push your changes to Github.
+6. Make a [pull request](https://github.com/alephjs/aleph.js/pulls).
+8. Marge to master branch.
 
 ```bash
-# ssr
-deno run -A --unstable --import-map=import_map.json --location=http://localhost cli.ts dev ./examples/hello-world -L debug
+# ssr/development
+deno run -A --unstable --import-map=import_map.json cli.ts dev ./examples/hello-world -L debug
+# ssr/production
+deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
 # ssg
-deno run -A --unstable --import-map=import_map.json --location=http://localhost cli.ts build ./examples/hello-world -L debug
+deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
 ```
 
 ## Testing
@@ -37,14 +42,13 @@ deno test -A --location=http://localhost
 - **/cli** commands code
 - **/compiler** compiler in rust powered by swc
 - **/framework**
-  - **core** framework core
-  - **react** react framework code
+  - **core** framework core code
+  - **react** framework react code
 - **/design** design drawings and assets
 - **/examples** examples
 - **/plugins** official plugins
 - **/server** server code
 - **/shared** shared code
-- **/test** testings
 
 ## Code of Conduct
 
