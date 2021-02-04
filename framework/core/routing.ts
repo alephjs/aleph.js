@@ -1,4 +1,4 @@
-import { pageModuleExts } from '../../shared/constants.ts'
+import { moduleExts } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
 import type { DependencyDescriptor, RouterURL } from '../../types.ts'
 import events from './events.ts'
@@ -232,7 +232,7 @@ export function isHttpUrl(url: string) {
 }
 
 export function isModuleURL(url: string) {
-    for (const ext of pageModuleExts) {
+    for (const ext of moduleExts) {
         if (url.endsWith('.' + ext)) {
             return true
         }
@@ -241,7 +241,7 @@ export function isModuleURL(url: string) {
 }
 
 export function toPagePath(url: string): string {
-    let pathname = trimModuleExt(url)
+    let pathname = util.trimModuleExt(url)
     if (pathname.startsWith('/pages/')) {
         pathname = util.trimPrefix(pathname, '/pages')
     }
@@ -252,13 +252,4 @@ export function toPagePath(url: string): string {
         pathname = '/'
     }
     return pathname
-}
-
-export function trimModuleExt(url: string) {
-    for (const ext of pageModuleExts) {
-        if (url.endsWith('.' + ext)) {
-            return url.slice(0, -(ext.length + 1))
-        }
-    }
-    return url
 }

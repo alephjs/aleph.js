@@ -1,5 +1,5 @@
 import { path, serve as stdServe, ws } from '../deps.ts'
-import { RouteModule, trimModuleExt } from '../framework/core/routing.ts'
+import { RouteModule } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -51,7 +51,7 @@ export class Server {
                                         watcher.on('modify-' + mod.url, (hash: string) => socket.send(JSON.stringify({
                                             type: 'update',
                                             url: mod.url,
-                                            updateUrl: util.cleanPath(`${app.config.baseUrl}/_aleph/${trimModuleExt(mod.url)}.${util.shortHash(hash!)}.js`),
+                                            updateUrl: util.cleanPath(`${app.config.baseUrl}/_aleph/${util.trimModuleExt(mod.url)}.${util.shortHash(hash!)}.js`),
                                             hash,
                                         })))
                                     }

@@ -1,7 +1,8 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import { Route, RouteModule, Routing, trimModuleExt } from '../core/routing.ts'
+import util from "../../shared/util.ts"
+import { Route, RouteModule, Routing } from '../core/routing.ts'
 import type { PageRoute } from './pageprops.ts'
 import { createPageProps } from './pageprops.ts'
 import Router from './router.ts'
@@ -22,7 +23,7 @@ export default async function bootstrap(options: Options) {
     const customComponents: Record<string, ComponentType> = {}
     await Promise.all(sharedModules.map(async mod => {
         const { default: C } = await importModule(baseUrl, mod)
-        switch (trimModuleExt(mod.url)) {
+        switch (util.trimModuleExt(mod.url)) {
             case '/404':
                 customComponents['E404'] = C
                 break

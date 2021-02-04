@@ -2,8 +2,8 @@ import { buildChecksum, initWasm, SWCOptions, TransformOptions, transpileSync } 
 import type { AcceptedPlugin, ECMA } from '../deps.ts'
 import { CleanCSS, colors, ensureDir, minify, path, postcss, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
-import { isModuleURL, RouteModule, Routing, toPagePath, trimModuleExt } from '../framework/core/routing.ts'
-import { defaultReactVersion, minDenoVersion, pageModuleExts } from '../shared/constants.ts'
+import { isModuleURL, RouteModule, Routing, toPagePath } from '../framework/core/routing.ts'
+import { defaultReactVersion, minDenoVersion, moduleExts } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -87,8 +87,8 @@ export class Application {
             if (url.endsWith('.' + ext)) {
                 return url.startsWith('/pages/') ||
                     url.startsWith('/components/') ||
-                    trimModuleExt(url) === '/app' ||
-                    trimModuleExt(url) === '/404'
+                    util.trimModuleExt(url) === '/app' ||
+                    util.trimModuleExt(url) === '/404'
             }
         }
         for (const plugin of this.config.plugins) {
@@ -117,7 +117,7 @@ export class Application {
         if (/[a-z]/.test(ext)) {
             if (ext === 'css' || ext === 'pcss') {
                 mod.loader = 'css'
-            } else if (pageModuleExts.includes(ext)) {
+            } else if (moduleExts.includes(ext)) {
                 if (ext === 'mjs') {
                     mod.loader = 'js'
                 } else {
@@ -506,7 +506,7 @@ export class Application {
         const t = performance.now()
         const alephPkgUrl = getAlephPkgUrl()
         const { env, framework, plugins, ssr } = this.config
-        const walkOptions = { includeDirs: false, exts: ['.ts', '.js', '.mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
+        const walkOptions = { includeDirs: false, exts: moduleExts, skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
         const apiDir = path.join(this.srcDir, 'api')
         const pagesDir = path.join(this.srcDir, 'pages')
 
@@ -561,20 +561,14 @@ export class Application {
         }
 
         // check custom components
-        for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1, exts: [...walkOptions.exts, '.tsx', '.jsx'] })) {
+        for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1 })) {
             const name = path.basename(p)
-            let isCustom = true
-            switch (trimModuleExt(name)) {
+            switch (util.trimModuleExt(name)) {
                 case 'app':
                 case '404':
                 case 'loading':
+                    await this.compile('/' + name)
                     break
-                default:
-                    isCustom = false
-                    break
-            }
-            if (isCustom) {
-                await this.compile('/' + name)
             }
         }
 
@@ -587,7 +581,7 @@ export class Application {
         }
 
         // create page routing
-        for await (const { path: p } of walk(pagesDir, { ...walkOptions, exts: [...walkOptions.exts, '.tsx', '.jsx', '.md'] })) {
+        for await (const { path: p } of walk(pagesDir, { ...walkOptions })) {
             const mod = await this.compile(util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir)))
             this.#pageRouting.update(this.getRouteModule(mod))
         }
@@ -626,15 +620,10 @@ export class Application {
 
         log.debug(`init project in ${Math.round(performance.now() - t)}ms`)
 
-        if (this.isDev) {
-            this.watch()
-        } else {
-            this.#modules.forEach(({ url }) => {
-                if (!util.isLikelyHttpURL(url)) {
-                    this.checkCompilationSideEffect(url)
-                }
-            })
+        if (!this.isDev) {
             await this.bundle()
+        } else {
+            this.watch()
         }
     }
 
@@ -656,7 +645,7 @@ export class Application {
                         if (url.startsWith('/pages/') || url.startsWith('/api/')) {
                             return true
                         }
-                        switch (trimModuleExt(url)) {
+                        switch (util.trimModuleExt(url)) {
                             case '/404':
                             case '/app':
                                 return true
@@ -685,12 +674,14 @@ export class Application {
                             this.compile(url, { forceCompile: true }).then(mod => {
                                 const hmrable = this.isHMRable(mod.url)
                                 const update = ({ url, hash }: Module) => {
-                                    if (trimModuleExt(url) === '/app') {
+                                    if (util.trimModuleExt(url) === '/app') {
                                         this.#renderCache.clear()
                                     } else if (url.startsWith('/pages/')) {
                                         this.#renderCache.delete(toPagePath(url))
-                                        this.#pageRouting.update(this.getRouteModule({ url, hash }))
-                                    } else if (url.startsWith('/api/')) {
+                                        if (type === 'add') {
+                                            this.#pageRouting.update(this.getRouteModule({ url, hash }))
+                                        }
+                                    } else if (url.startsWith('/api/') && type === 'add') {
                                         this.#apiRouting.update(this.getRouteModule({ url, hash }))
                                     }
                                 }
@@ -712,7 +703,7 @@ export class Application {
                                 log.error(`compile(${url}):`, err.message)
                             })
                         } else if (this.#modules.has(url)) {
-                            if (trimModuleExt(url) === '/app') {
+                            if (util.trimModuleExt(url) === '/app') {
                                 this.#renderCache.clear()
                             } else if (url.startsWith('/pages/')) {
                                 this.#renderCache.delete(toPagePath(url))
@@ -748,7 +739,7 @@ export class Application {
             locales: [],
             routes: this.#pageRouting.routes,
             sharedModules: Array.from(this.#modules.values()).filter(({ url }) => {
-                switch (trimModuleExt(url)) {
+                switch (util.trimModuleExt(url)) {
                     case '/404':
                     case '/app':
                         return true
@@ -777,7 +768,7 @@ export class Application {
         if (isRemote) {
             const url = new URL(importUrl)
             let pathname = url.pathname
-            let ok = [...pageModuleExts, 'css', 'pcss'].includes(path.extname(pathname).slice(1))
+            let ok = [...moduleExts, 'css', 'pcss'].includes(path.extname(pathname).slice(1))
             if (ok) {
                 for (const plugin of this.config.plugins) {
                     if (plugin.type === 'loader' && plugin.test.test(pathname)) {
@@ -887,7 +878,7 @@ export class Application {
         const alephPkgUrl = getAlephPkgUrl()
         const isRemote = util.isLikelyHttpURL(url)
         const localUrl = this.fixImportUrl(url)
-        const name = trimModuleExt(path.basename(localUrl))
+        const name = util.trimModuleExt(path.basename(localUrl))
         const saveDir = path.join(this.buildDir, path.dirname(localUrl))
         const metaFile = path.join(saveDir, `${name}.meta.json`)
         const { sourceCode, forceCompile, bundleMode, bundledModules } = options ?? {}
@@ -1131,7 +1122,7 @@ export class Application {
                 if (!util.isLikelyHttpURL(dep.url)) {
                     const relativePathname = getRelativePath(
                         path.dirname(url),
-                        trimModuleExt(dep.url)
+                        util.trimModuleExt(dep.url)
                     )
                     if (!changed && jsContent === '') {
                         if (!bundleMode) {
@@ -1195,7 +1186,6 @@ export class Application {
     }
 
     /** check compilation side-effect caused by dependency graph. */
-    // use browser native import maps to hand changes in the future.
     private async checkCompilationSideEffect(url: string, callback?: (mod: Module) => void) {
         const { hash, sourceHash } = this.#modules.get(url)!
 
@@ -1207,7 +1197,7 @@ export class Application {
                         dep.hash = hash
                         const relativePath = getRelativePath(
                             path.dirname(mod.url),
-                            trimModuleExt(dep.url)
+                            util.trimModuleExt(dep.url)
                         )
                         let jsContent = await Deno.readTextFile(mod.jsFile)
                         jsContent = jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
@@ -1312,8 +1302,8 @@ export class Application {
             }
         }
         const mods = Array.from(this.#modules.values())
-        const appModule = mods.find(({ url }) => trimModuleExt(url) == '/app')
-        const e404Module = mods.find(({ url }) => trimModuleExt(url) == '/404')
+        const appModule = mods.find(({ url }) => util.trimModuleExt(url) == '/app')
+        const e404Module = mods.find(({ url }) => util.trimModuleExt(url) == '/404')
         const pageModules: Module[] = []
 
         // add framework bootstrap
@@ -1608,7 +1598,7 @@ export class Application {
             return await this.render404Page(url)
         }
         try {
-            const appModule = Array.from(this.#modules.values()).find(({ url }) => trimModuleExt(url) == '/app')
+            const appModule = Array.from(this.#modules.values()).find(({ url }) => util.trimModuleExt(url) == '/app')
             const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
             const imports = pageModuleChain.map(async ({ url }) => {
                 const mod = this.#modules.get(url)!
@@ -1678,7 +1668,7 @@ export class Application {
         const ret: RenderResult = { url, status: 404, head: [], scripts: [], body: '<div id="__aleph"></div>', data: null }
         try {
             const e404Module = Array.from(this.#modules.keys())
-                .filter(url => trimModuleExt(url) == '/404')
+                .filter(url => util.trimModuleExt(url) == '/404')
                 .map(url => this.#modules.get(url))[0]
             const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
             const { head, body, data, scripts } = await this.#renderer.render(
@@ -1708,9 +1698,7 @@ export class Application {
 
     /** render custom loading page for SPA mode. */
     private async renderLoadingPage() {
-        const loadingModule = Array.from(this.#modules.keys())
-            .filter(url => trimModuleExt(url) == '/loading')
-            .map(url => this.#modules.get(url))[0]
+        const loadingModule = Array.from(this.#modules.values()).find(({ url }) => util.trimModuleExt(url) === '/loading')
         if (loadingModule) {
             const { default: Loading } = await import('file://' + loadingModule.jsFile)
             const router = {

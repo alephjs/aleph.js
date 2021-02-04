@@ -1,3 +1,5 @@
+import { moduleExts } from './constants.ts'
+
 export default {
     inDeno(): boolean {
         return typeof Deno !== 'undefined' && this.isNEString(Deno.version?.deno)
@@ -38,6 +40,14 @@ export default {
             return s.slice(0, -suffix.length)
         }
         return s
+    },
+    trimModuleExt(url: string) {
+        for (const ext of moduleExts) {
+            if (url.endsWith('.' + ext)) {
+                return url.slice(0, -(ext.length + 1))
+            }
+        }
+        return url
     },
     ensureExt(s: string, ext: string): string {
         if (s.endsWith(ext)) {
