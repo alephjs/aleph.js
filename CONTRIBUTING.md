@@ -16,10 +16,9 @@ You will need [Deno](https://deno.land/) 1.7+.
 2. Clone the repository to your local device.
 3. Create a new branch `git checkout -b BRANCH_NAME`.
 4. Change code then run our examples.
-5. Run all tests.
-6. Push your changes to Github.
-7. Make a [pull request](https://github.com/alephjs/aleph.js/pulls).
-8. Marge to master branch.
+5. Push your branch to Github after all tests passed.
+6. Make a [pull request](https://github.com/alephjs/aleph.js/pulls).
+7. Marge to master branch by our maintainers.
 
 ```bash
 # set dev env
@@ -34,7 +33,7 @@ deno run -A cli.ts start ./examples/hello-world -L debug
 # ssg
 deno run -A cli.ts build ./examples/hello-world -L debug
 
-# run all tests:
+# run all tests
 deno test -A --location=http://localhost
 ```
 
