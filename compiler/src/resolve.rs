@@ -847,7 +847,7 @@ mod tests {
     imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
     imports.insert(
       "https://deno.land/x/aleph/".into(),
-      "http://localhost:9006/".into(),
+      "http://localhost:2020/".into(),
     );
     let mut resolver = Resolver::new(
       "/pages/index.tsx",
@@ -880,8 +880,8 @@ mod tests {
         None
       ),
       (
-        "../-/http_localhost_9006/framework/react/link.js".into(),
-        "http://localhost:9006/framework/react/link.ts".into()
+        "../-/http_localhost_2020/framework/react/link.js".into(),
+        "http://localhost:2020/framework/react/link.ts".into()
       )
     );
     assert_eq!(
@@ -936,8 +936,8 @@ mod tests {
     assert_eq!(
       resolver.resolve("https://deno.land/x/aleph/mod.ts", false, None),
       (
-        "../-/http_localhost_9006/mod.js".into(),
-        "http://localhost:9006/mod.ts".into()
+        "../-/http_localhost_2020/mod.js".into(),
+        "http://localhost:2020/mod.ts".into()
       )
     );
     assert_eq!(

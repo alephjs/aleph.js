@@ -96,7 +96,7 @@ mod tests {
     imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
     imports.insert(
       "https://deno.land/x/aleph/".into(),
-      "http://localhost:9006/".into(),
+      "http://localhost:2020/".into(),
     );
     scope_imports.insert("react".into(), "https://esm.sh/react@16.4.0".into());
     scopes.insert("/scope/".into(), scope_imports);
@@ -107,7 +107,7 @@ mod tests {
     );
     assert_eq!(
       import_map.resolve("./app.tsx", "https://deno.land/x/aleph/mod.ts"),
-      "http://localhost:9006/mod.ts"
+      "http://localhost:2020/mod.ts"
     );
     assert_eq!(
       import_map.resolve("./renderer.ts", "react-dom/server"),
