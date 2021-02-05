@@ -1,4 +1,4 @@
-import { path, serve as stdServe, ws } from '../deps.ts'
+import { path, serve as stdServe, serveTLS, ws } from '../deps.ts'
 import { RouteModule } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -153,19 +153,39 @@ export class Server {
   }
 }
 
+export type ServeOptions = {
+  /** The Application to serve. */
+  app: Application
+  /** The port to listen on. */
+  port: number
+  /** A literal IP address or host name that can be resolved to an IP address.
+   * If not specified, defaults to `0.0.0.0`. */
+  hostname?: string
+  /** Server certificate file. */
+  certFile?: string
+  /** Server public key file. */
+  keyFile?: string
+}
+
 /** start a standard aleph server. */
-export async function serve(hostname: string, port: number, app: Application) {
+export async function serve({ app, port, hostname, certFile, keyFile }: ServeOptions) {
   const server = new Server(app)
   await app.ready
+
   while (true) {
     try {
-      const s = stdServe({ hostname, port })
+      let s: AsyncIterable<ServerRequest>
+      if (certFile && keyFile) {
+        s = serveTLS({ port, hostname, certFile, keyFile })
+      } else {
+        s = stdServe({ port, hostname })
+      }
       log.info(`Aleph server ready on http://${hostname}:${port}`)
       for await (const r of s) {
         server.handle(r)
       }
     } catch (err) {
-      if (err instanceof Deno.errors.AddrInUse) {
+      if (err instanceof Deno.errors.AddrInUse && app.isDev) {
         log.warn(`port ${port} already in use, try ${port + 1}...`)
         port++
       } else {

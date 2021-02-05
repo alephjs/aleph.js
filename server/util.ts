@@ -112,11 +112,22 @@ export function fixImportMap(v: any) {
 /** parse port number */
 export function parsePortNumber(v: string): number {
   const num = parseInt(v)
-  if (isNaN(num) || num <= 0 || num > 1 << 16 || !Number.isInteger(num)) {
-    log.error(`invalid port 'v'`)
-    Deno.exit(1)
+  if (isNaN(num) || !Number.isInteger(num) || num <= 0 || num >= 1 << 16) {
+    log.fatal(`invalid port '${v}'`)
   }
   return num
+}
+
+/** get option value */
+export function getOptionValue(options: Record<string, string | boolean>, keys: string[], defaultValue?: string): string {
+  let value = defaultValue || ''
+  for (const key of keys) {
+    if (key in options && util.isNEString(options[key])) {
+      value = String(options[key])
+      break
+    }
+  }
+  return value
 }
 
 /**

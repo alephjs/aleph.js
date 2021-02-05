@@ -1,5 +1,5 @@
 import { Application, serve } from '../server/mod.ts'
-import { parsePortNumber } from '../server/util.ts'
+import { getOptionValue, parsePortNumber } from '../server/util.ts'
 
 export const helpMessage = `
 Usage:
@@ -16,7 +16,7 @@ Options:
 `
 
 export default async function (workingDir: string, options: Record<string, string | boolean>) {
-  const port = parsePortNumber(String(options.p || options.port || '8080'))
   const app = new Application(workingDir, 'development', Boolean(options.r || options.reload))
-  serve('localhost', port, app)
+  const port = parsePortNumber(getOptionValue(options, ['p', 'port'], '8080'))
+  await serve({ app, port, hostname: 'localhost' })
 }
