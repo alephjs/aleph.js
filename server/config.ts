@@ -28,7 +28,6 @@ export const defaultConfig: Readonly<Required<Config>> = {
   env: {},
 }
 
-
 /** load config from `aleph.config.(ts|js|json)` */
 export async function loadConfig(workingDir: string): Promise<[Config, ImportMap]> {
   let data: Config = {}
