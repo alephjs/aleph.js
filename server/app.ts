@@ -760,6 +760,13 @@ export class Application {
     ].filter(Boolean).join('\n')
   }
 
+  /** fix pathname */
+  fixPathname(pathname: string): string {
+    const { baseUrl } = this.config
+    pathname = util.cleanPath(decodeURI(pathname))
+    return baseUrl !== '/' ? util.trimPrefix(pathname, baseUrl) : pathname
+  }
+
   /** fix import url */
   private fixImportUrl(importUrl: string): string {
     const isRemote = util.isLikelyHttpURL(importUrl)

@@ -20,14 +20,14 @@ export class Server {
   }
 
   async handle(r: ServerRequest) {
+    const app = this.#app
     if (!this.#ready) {
-      await this.#app.ready
+      await app.ready
       this.#ready = true
     }
 
-    const app = this.#app
     const url = new URL('http://localhost' + r.url)
-    const pathname = util.cleanPath(decodeURI(url.pathname))
+    const pathname = app.fixPathname(url.pathname)
     const req = new Request(r, pathname, {}, url.searchParams)
 
     try {
@@ -48,12 +48,16 @@ export class Server {
                 if (data.type === 'hotAccept' && util.isNEString(data.url)) {
                   const mod = app.getModule(data.url)
                   if (mod) {
-                    watcher.on('modify-' + mod.url, (hash: string) => socket.send(JSON.stringify({
-                      type: 'update',
-                      url: mod.url,
-                      updateUrl: util.cleanPath(`${app.config.baseUrl}/_aleph/${util.trimModuleExt(mod.url)}.${util.shortHash(hash!)}.js`),
-                      hash,
-                    })))
+                    watcher.on('modify-' + mod.url, (hash: string) => {
+                      const { baseUrl } = app.config
+                      const updateUrl = `/_aleph/${util.trimModuleExt(mod.url)}.${util.shortHash(hash!)}.js`
+                      socket.send(JSON.stringify({
+                        type: 'update',
+                        url: mod.url,
+                        updateUrl: baseUrl !== '/' ? baseUrl + updateUrl : updateUrl,
+                        hash,
+                      }))
+                    })
                   }
                 }
               } catch (e) { }
@@ -180,7 +184,7 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
       } else {
         s = stdServe({ port, hostname })
       }
-      log.info(`Aleph server ready on http://${hostname}:${port}`)
+      log.info(`Aleph server ready on http://${hostname}:${port}${app.config.baseUrl}`)
       for await (const r of s) {
         server.handle(r)
       }
