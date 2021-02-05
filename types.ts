@@ -56,22 +56,24 @@ export type SSROptions = {
 export type Config = {
   /** `framework` to run your application (default is 'react'). */
   framework?: 'react'
+  /** `reactVersion` specifies the **react version** (default is '17.0.1'). */
+  reactVersion?: string
   /** `buildTarget` specifies the build target in production mode (default is **es5** to be compatible with IE11). */
   buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
+  /** `baseUrl` specifies the path prefix for the application (default is '/'). */
+  baseUrl?: string
   /** `srcDir` to put your application source code (default is '/'). */
   srcDir?: string
   /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
   outputDir?: string
-  /** `baseUrl` specifies the path prefix for the application (default is '/'). */
-  baseUrl?: string
-  /** `reactVersion` specifies the **react version** (default is '17.0.1'). */
-  reactVersion?: string
   /** `defaultLocale` specifies the default locale of the application (default is '**en**'). */
   defaultLocale?: string
   /** A list of locales. */
   locales?: string[]
   /** The options for **SSR**. */
   ssr?: boolean | SSROptions
+  /* The server path rewrite rules. */
+  rewrites?: Record<string, string>
   /** A list of plugin. */
   plugins?: Plugin[]
   /** A list of plugin of PostCSS. */

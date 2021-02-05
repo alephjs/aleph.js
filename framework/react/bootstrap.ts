@@ -1,24 +1,20 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import util from "../../shared/util.ts"
-import { Route, RouteModule, Routing } from '../core/routing.ts'
+import util from '../../shared/util.ts'
+import { RouteModule, Routing, RoutingOptions } from '../core/routing.ts'
 import type { PageRoute } from './pageprops.ts'
 import { createPageProps } from './pageprops.ts'
 import Router from './router.ts'
 import { importModule, loadPageDataFromTag } from './util.ts'
 
-type Options = {
-  baseUrl: string
-  defaultLocale: string
-  locales: string[]
-  routes: Route[]
+type BootstrapOptions = Required<RoutingOptions> & {
   sharedModules: RouteModule[],
   renderMode: 'ssr' | 'spa'
 }
 
-export default async function bootstrap(options: Options) {
-  const { baseUrl, defaultLocale, locales, routes, sharedModules, renderMode } = options
+export default async function bootstrap(options: BootstrapOptions) {
+  const { baseUrl, defaultLocale, locales, routes, rewrites, sharedModules, renderMode } = options
   const { document } = window as any
   const customComponents: Record<string, ComponentType> = {}
   await Promise.all(sharedModules.map(async mod => {
@@ -32,7 +28,7 @@ export default async function bootstrap(options: Options) {
         break
     }
   }))
-  const routing = new Routing(routes, baseUrl, defaultLocale, locales)
+  const routing = new Routing({ routes, rewrites, baseUrl, defaultLocale, locales })
   const [url, pageModuleChain] = routing.createRouter()
   const imports = await Promise.all(pageModuleChain.map(async mod => {
     const [{ default: Component }] = await Promise.all([

@@ -1,5 +1,5 @@
 import { path, serve as stdServe, serveTLS, ws } from '../deps.ts'
-import { RouteModule } from '../framework/core/routing.ts'
+import { rewriteURL, RouteModule } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -20,14 +20,15 @@ export class Server {
   }
 
   async handle(r: ServerRequest) {
-    const app = this.#app
     if (!this.#ready) {
-      await app.ready
+      await this.#app.ready
       this.#ready = true
     }
 
-    const url = new URL('http://localhost' + r.url)
-    const pathname = app.fixPathname(url.pathname)
+    const app = this.#app
+    const { baseUrl, rewrites } = app.config
+    const url = rewriteURL(r.url, baseUrl, rewrites)
+    const pathname = decodeURI(url.pathname)
     const req = new Request(r, pathname, {}, url.searchParams)
 
     try {
@@ -49,7 +50,6 @@ export class Server {
                   const mod = app.getModule(data.url)
                   if (mod) {
                     watcher.on('modify-' + mod.url, (hash: string) => {
-                      const { baseUrl } = app.config
                       const updateUrl = `/_aleph/${util.trimModuleExt(mod.url)}.${util.shortHash(hash!)}.js`
                       socket.send(JSON.stringify({
                         type: 'update',
@@ -67,28 +67,6 @@ export class Server {
           }
           app.removeFSWatcher(watcher)
         })
-        return
-      }
-
-      // serve public files
-      const filePath = path.join(app.workingDir, 'public', pathname)
-      if (existsFileSync(filePath)) {
-        const info = Deno.lstatSync(filePath)
-        const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
-        if (lastModified === r.headers.get('If-Modified-Since')) {
-          req.status(304).send('')
-          return
-        }
-
-        const body = Deno.readFileSync(filePath)
-        req.setHeader('Last-Modified', lastModified)
-        req.send(body, getContentType(filePath))
-        return
-      }
-
-      // serve APIs
-      if (pathname.startsWith('/api/')) {
-        app.handleAPI(r, { pathname, search: url.search })
         return
       }
 
@@ -144,8 +122,30 @@ export class Server {
         return
       }
 
+      // serve public files
+      const filePath = path.join(app.workingDir, 'public', pathname)
+      if (existsFileSync(filePath)) {
+        const info = Deno.lstatSync(filePath)
+        const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
+        if (lastModified === r.headers.get('If-Modified-Since')) {
+          req.status(304).send('')
+          return
+        }
+
+        const body = Deno.readFileSync(filePath)
+        req.setHeader('Last-Modified', lastModified)
+        req.send(body, getContentType(filePath))
+        return
+      }
+
+      // serve APIs
+      if (pathname.startsWith('/api/')) {
+        app.handleAPI(r, { pathname, search: url.searchParams.toString() })
+        return
+      }
+
       // ssr
-      const [status, html] = await app.getPageHtml({ pathname, search: url.search })
+      const [status, html] = await app.getPageHtml({ pathname, search: url.searchParams.toString() })
       req.status(status).send(html, 'text/html; charset=utf-8')
     } catch (err) {
       req.status(500).send(createHtml({

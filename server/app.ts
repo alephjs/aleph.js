@@ -3,14 +3,15 @@ import type { AcceptedPlugin, ECMA } from '../deps.ts'
 import { CleanCSS, colors, ensureDir, minify, path, postcss, Sha256, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { isModuleURL, RouteModule, Routing, toPagePath } from '../framework/core/routing.ts'
-import { defaultReactVersion, minDenoVersion, moduleExts } from '../shared/constants.ts'
+import { minDenoVersion, moduleExts } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Config, DependencyDescriptor, ImportMap, Module, RenderResult, RouterURL, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
-import { AlephRuntimeCode, cleanupCompilation, computeHash, createHtml, fixImportMap, formatBytesWithColor, getAlephPkgUrl, getRelativePath, reFullVersion, reHashJs, reHashResolve, reLocaleID, respondErrorJSON } from './util.ts'
+import { defaultConfig, loadConfig } from './config.ts'
+import { AlephRuntimeCode, cleanupCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUrl, getRelativePath, reFullVersion, reHashJs, reHashResolve, respondErrorJSON } from './util.ts'
 
 /**
  * The Aleph Server Application class.
@@ -24,8 +25,8 @@ export class Application {
 
   #denoCacheDir = ''
   #modules: Map<string, Module> = new Map()
-  #pageRouting: Routing = new Routing()
-  #apiRouting: Routing = new Routing()
+  #pageRouting: Routing = new Routing({})
+  #apiRouting: Routing = new Routing({})
   #fsWatchListeners: Array<EventEmitter> = []
   #renderer: { render: CallableFunction } = { render: () => { } }
   #renderCache: Map<string, Map<string, RenderResult>> = new Map()
@@ -38,24 +39,7 @@ export class Application {
   constructor(workingDir = '.', mode: 'development' | 'production' = 'production', reload = false) {
     this.workingDir = path.resolve(workingDir)
     this.mode = mode
-    this.config = {
-      framework: 'react',
-      srcDir: existsDirSync(path.join(this.workingDir, '/src/pages')) ? '/src' : '/',
-      outputDir: '/dist',
-      baseUrl: '/',
-      defaultLocale: 'en',
-      env: {},
-      locales: [],
-      ssr: {},
-      buildTarget: 'es5',
-      reactVersion: defaultReactVersion,
-      plugins: [],
-      postcss: {
-        plugins: [
-          'autoprefixer'
-        ]
-      }
-    }
+    this.config = { ...defaultConfig }
     this.importMap = { imports: {}, scopes: {} }
     this.ready = this.init(reload)
   }
@@ -362,145 +346,6 @@ export class Application {
     ])
   }
 
-  /** load config from `aleph.config.(ts|js|json)` */
-  private async loadConfig() {
-    const config: Record<string, any> = {}
-
-    for (const name of Array.from(['ts', 'js', 'json']).map(ext => 'aleph.config.' + ext)) {
-      const p = path.join(this.workingDir, name)
-      if (existsFileSync(p)) {
-        log.info('Aleph server config loaded from', name)
-        if (name.endsWith('.json')) {
-          const conf = JSON.parse(await Deno.readTextFile(p))
-          if (util.isPlainObject(conf)) {
-            Object.assign(config, conf)
-          }
-        } else {
-          let { default: conf } = await import('file://' + p)
-          if (util.isFunction(conf)) {
-            conf = await conf()
-          }
-          if (util.isPlainObject(conf)) {
-            Object.assign(config, conf)
-          }
-        }
-        break
-      }
-    }
-
-    const {
-      srcDir,
-      ouputDir,
-      baseUrl,
-      buildTarget,
-      sourceMap,
-      defaultLocale,
-      locales,
-      ssr,
-      env,
-      plugins,
-      postcss,
-    } = config
-    if (util.isNEString(srcDir)) {
-      Object.assign(this.config, { srcDir: util.cleanPath(srcDir) })
-    }
-    if (util.isNEString(ouputDir)) {
-      Object.assign(this.config, { ouputDir: util.cleanPath(ouputDir) })
-    }
-    if (util.isNEString(baseUrl)) {
-      Object.assign(this.config, { baseUrl: util.cleanPath(encodeURI(baseUrl)) })
-    }
-    if (/^es(20\d{2}|5)$/i.test(buildTarget)) {
-      Object.assign(this.config, { buildTarget: buildTarget.toLowerCase() })
-    }
-    if (typeof sourceMap === 'boolean') {
-      Object.assign(this.config, { sourceMap })
-    }
-    if (util.isNEString(defaultLocale)) {
-      Object.assign(this.config, { defaultLocale })
-    }
-    if (util.isArray(locales)) {
-      Object.assign(this.config, { locales: Array.from(new Set(locales.filter(l => reLocaleID.test(l)))) })
-      locales.filter(l => !reLocaleID.test(l)).forEach(l => log.warn(`invalid locale ID '${l}'`))
-    }
-    if (typeof ssr === 'boolean') {
-      Object.assign(this.config, { ssr })
-    } else if (util.isPlainObject(ssr)) {
-      const fallback = util.isNEString(ssr.fallback) ? util.ensureExt(ssr.fallback, '.html') : '404.html'
-      const include = util.isArray(ssr.include) ? ssr.include.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
-      const exclude = util.isArray(ssr.exclude) ? ssr.exclude.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
-      const staticPaths = util.isArray(ssr.staticPaths) ? ssr.staticPaths.map(v => util.cleanPath(v.split('?')[0])) : []
-      Object.assign(this.config, { ssr: { fallback, include, exclude, staticPaths } })
-    }
-    if (util.isPlainObject(env)) {
-      Object.assign(this.config, { env })
-    }
-    if (util.isNEArray(plugins)) {
-      Object.assign(this.config, { plugins })
-    }
-    if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
-      Object.assign(this.config, { postcss })
-    } else {
-      for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
-        const p = path.join(this.workingDir, name)
-        if (existsFileSync(p)) {
-          if (name.endsWith('.json')) {
-            const postcss = JSON.parse(await Deno.readTextFile(p))
-            if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
-              Object.assign(this.config, { postcss })
-            }
-          } else {
-            let { default: postcss } = await import('file://' + p)
-            if (util.isFunction(postcss)) {
-              postcss = await postcss()
-            }
-            if (util.isPlainObject(postcss) && util.isArray(postcss.plugins)) {
-              Object.assign(this.config, { postcss })
-            }
-          }
-          break
-        }
-      }
-    }
-
-    // todo: load ssr.config.ts
-
-    // load import maps
-    for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
-      const importMapFile = path.join(this.workingDir, filename)
-      if (existsFileSync(importMapFile)) {
-        const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
-        const imports: Record<string, string> = fixImportMap(importMap.imports)
-        const scopes: Record<string, Record<string, string>> = {}
-        if (util.isPlainObject(importMap.scopes)) {
-          Object.entries(importMap.scopes).forEach(([key, imports]) => {
-            scopes[key] = fixImportMap(imports)
-          })
-        }
-        Object.assign(this.importMap, { imports, scopes })
-        break
-      }
-    }
-
-    // update import map for alephjs dev env
-    const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-    if (devPort) {
-      const alias = `http://localhost:${devPort}/`
-      const imports = {
-        'https://deno.land/x/aleph/': alias,
-        [`https://deno.land/x/aleph@v${VERSION}/`]: alias,
-        'aleph': `${alias}mod.ts`,
-        'aleph/': alias,
-        'react': `https://esm.sh/react@${this.config.reactVersion}`,
-        'react-dom': `https://esm.sh/react-dom@${this.config.reactVersion}`,
-      }
-      Object.assign(this.importMap.imports, imports)
-    }
-
-    // create page routing
-    this.#pageRouting = new Routing([], this.config.baseUrl, this.config.defaultLocale, this.config.locales)
-  }
-
   /** initialize project */
   private async init(reload: boolean) {
     const t = performance.now()
@@ -538,7 +383,12 @@ export class Application {
       await ensureDir(this.buildDir)
     }
 
-    await this.loadConfig()
+    const [config, importMap] = await loadConfig(this.workingDir)
+    Object.assign(this.config, config)
+    Object.assign(this.importMap, importMap)
+
+    // create page routing
+    this.#pageRouting = new Routing(this.config)
 
     // change current work dir to appDoot
     Deno.chdir(this.workingDir)
@@ -736,6 +586,7 @@ export class Application {
       defaultLocale,
       locales: [],
       routes: this.#pageRouting.routes,
+      rewrites: this.config.rewrites,
       sharedModules: Array.from(this.#modules.values()).filter(({ url }) => {
         switch (util.trimModuleExt(url)) {
           case '/404':
@@ -758,13 +609,6 @@ export class Application {
       `import bootstrap from "./-/${prefix}/framework/${framework}/bootstrap.js"`,
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)})`
     ].filter(Boolean).join('\n')
-  }
-
-  /** fix pathname */
-  fixPathname(pathname: string): string {
-    const { baseUrl } = this.config
-    pathname = util.cleanPath(decodeURI(pathname))
-    return baseUrl !== '/' ? util.trimPrefix(pathname, baseUrl) : pathname
   }
 
   /** fix import url */
