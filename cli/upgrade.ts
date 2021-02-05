@@ -28,7 +28,7 @@ export default async function (version: string) {
     Deno.exit(0)
   }
   const p = Deno.run({
-    cmd: [Deno.execPath(), 'install', '-A', '-f', '-n', 'aleph', `https://deno.land/x/aleph@${version}/cli.ts`],
+    cmd: [Deno.execPath(), 'install', '-A', '-f', '--location', 'http://localhost', '-n', 'aleph', `https://deno.land/x/aleph@${version}/cli.ts`],
     stdout: 'null',
     stderr: 'piped'
   })
