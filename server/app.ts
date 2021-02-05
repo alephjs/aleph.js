@@ -280,12 +280,12 @@ export class Application {
 
   /** inject HMR code  */
   injectHMRCode({ url, loader }: Module, content: string): string {
-    const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-    const alephModuleLocalUrlPreifx = devPort ? `http_localhost_${devPort}` : `deno.land/x/aleph@v${VERSION}`
+    const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')
+    const alephModuleLocalUrlPrefix = DEV_PORT ? `http_localhost_${DEV_PORT}` : `deno.land/x/aleph@v${VERSION}`
     const localUrl = this.fixImportUrl(url)
     const hmrImportPath = getRelativePath(
       path.dirname(localUrl),
-      `/-/${alephModuleLocalUrlPreifx}/framework/core/hmr.js`
+      `/-/${alephModuleLocalUrlPrefix}/framework/core/hmr.js`
     )
     const lines = [
       `import { createHotContext } from ${JSON.stringify(hmrImportPath)};`,
@@ -295,7 +295,7 @@ export class Application {
     if (reactRefresh) {
       const refreshImportPath = getRelativePath(
         path.dirname(localUrl),
-        `/-/${alephModuleLocalUrlPreifx}/framework/react/refresh.js`
+        `/-/${alephModuleLocalUrlPrefix}/framework/react/refresh.js`
       )
       lines.push(`import { RefreshRuntime, performReactRefresh } from ${JSON.stringify(refreshImportPath)};`)
       lines.push('')

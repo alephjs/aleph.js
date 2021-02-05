@@ -43,12 +43,11 @@ export const AlephRuntimeCode = `
 
 /** get aleph pkg url. */
 export function getAlephPkgUrl() {
-  let url = `https://deno.land/x/aleph@v${VERSION}`
-  const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-  if (devPort) {
-    url = `http://localhost:${devPort}`
+  const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')
+  if (DEV_PORT) {
+    return `http://localhost:${DEV_PORT}`
   }
-  return url
+  return `https://deno.land/x/aleph@v${VERSION}`
 }
 
 /** get relative the path of `to` to `from`. */

@@ -157,9 +157,9 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
   }
 
   // update import map for alephjs dev env
-  const { __ALEPH_DEV_PORT: devPort } = globalThis as any
-  if (devPort) {
-    const alias = `http://localhost:${devPort}/`
+  const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')
+  if (DEV_PORT) {
+    const alias = `http://localhost:${DEV_PORT}/`
     const imports = {
       'https://deno.land/x/aleph/': alias,
       [`https://deno.land/x/aleph@v${VERSION}/`]: alias,
