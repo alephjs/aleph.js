@@ -22,14 +22,17 @@ You will need [Deno](https://deno.land/) 1.7+.
 8. Marge to master branch.
 
 ```bash
+# set dev env
+echo 'ALEPH_DEV_PORT=2021' > .local.env
+
 # ssr/development with HMR
-deno run -A --unstable --import-map=import_map.json cli.ts dev ./examples/hello-world -L debug
+deno run -A cli.ts dev ./examples/hello-world -L debug
 
 # ssr/production
-deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
+deno run -A cli.ts start ./examples/hello-world -L debug
 
 # ssg
-deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
+deno run -A cli.ts build ./examples/hello-world -L debug
 
 # run all tests:
 deno test -A --location=http://localhost
