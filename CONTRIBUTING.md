@@ -24,10 +24,13 @@ You will need [Deno](https://deno.land/) 1.7+.
 ```bash
 # ssr/development with HMR
 deno run -A --unstable --import-map=import_map.json cli.ts dev ./examples/hello-world -L debug
+
 # ssr/production
 deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
+
 # ssg
 deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
+
 # run all tests:
 deno test -A --location=http://localhost
 ```
