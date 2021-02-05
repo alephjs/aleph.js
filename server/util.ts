@@ -83,32 +83,6 @@ export async function cleanupCompilation(jsFile: string) {
   }
 }
 
-/** fix import map */
-export function fixImportMap(v: any) {
-  const imports: Record<string, string> = {}
-  if (util.isPlainObject(v)) {
-    Object.entries(v).forEach(([key, value]) => {
-      if (key == '' || key == '/') {
-        return
-      }
-      const isPrefix = key.endsWith('/')
-      const y = (v: string) => util.isNEString(v) && (!isPrefix || v.endsWith('/'))
-      if (y(value)) {
-        imports[key] = value
-        return
-      } else if (util.isNEArray(value)) {
-        for (const v of value) {
-          if (y(v)) {
-            imports[key] = v
-            return
-          }
-        }
-      }
-    })
-  }
-  return imports
-}
-
 /** parse port number */
 export function parsePortNumber(v: string): number {
   const num = parseInt(v)

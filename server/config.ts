@@ -6,7 +6,7 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Config, ImportMap } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { fixImportMap, reLocaleID } from './util.ts'
+import { reLocaleID } from './util.ts'
 
 export const defaultConfig: Readonly<Required<Config>> = {
   framework: 'react',
@@ -83,17 +83,17 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     config.outputDir = util.cleanPath(outputDir)
   }
   if (util.isNEString(baseUrl)) {
-    config.baseUrl = util.cleanPath(encodeURI(baseUrl))
+    config.baseUrl = util.cleanPath(baseUrl)
   }
-  if (isTarget(buildTarget)) {
+  if (isBuildTarget(buildTarget)) {
     config.buildTarget = buildTarget
   }
-  if (util.isNEString(defaultLocale)) {
+  if (isLocaleID(defaultLocale)) {
     config.defaultLocale = defaultLocale
   }
   if (util.isArray(locales)) {
-    locales.filter(l => !reLocaleID.test(l)).forEach(l => log.warn(`invalid locale ID '${l}'`))
-    config.locales = Array.from(new Set(locales.filter(l => reLocaleID.test(l))))
+    locales.filter(id => !isLocaleID(id)).forEach(id => log.warn(`invalid locale ID '${id}'`))
+    config.locales = Array.from(new Set(locales.filter(isLocaleID)))
   }
   if (typeof ssr === 'boolean') {
     config.ssr = ssr
@@ -144,12 +144,12 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
   for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
     const importMapFile = path.join(workingDir, filename)
     if (existsFileSync(importMapFile)) {
-      const importMap = JSON.parse(await Deno.readTextFile(importMapFile))
-      const imports: Record<string, string> = fixImportMap(importMap.imports)
+      const data = JSON.parse(await Deno.readTextFile(importMapFile))
+      const imports: Record<string, string> = fixImportMap(data.imports)
       const scopes: Record<string, Record<string, string>> = {}
-      if (util.isPlainObject(importMap.scopes)) {
-        Object.entries(importMap.scopes).forEach(([key, imports]) => {
-          scopes[key] = fixImportMap(imports)
+      if (util.isPlainObject(data.scopes)) {
+        Object.entries(data.scopes).forEach(([scope, imports]) => {
+          scopes[scope] = fixImportMap(imports)
         })
       }
       Object.assign(importMap, { imports, scopes })
@@ -184,7 +184,7 @@ function isFramework(v: any): v is 'react' {
   }
 }
 
-function isTarget(v: any): v is 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' {
+function isBuildTarget(v: any): v is 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' {
   switch (v) {
     case 'es5':
     case 'es2015':
@@ -199,6 +199,35 @@ function isTarget(v: any): v is 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018
   }
 }
 
+function isLocaleID(v: any): v is string {
+  return util.isNEString(v) && reLocaleID.test(v)
+}
+
 function isPostcssConfig(v: any): v is { plugins: (string | AcceptedPlugin | [string | ((options: Record<string, any>) => AcceptedPlugin), Record<string, any>])[] } {
   return util.isPlainObject(v) && util.isArray(v.plugins)
+}
+
+function fixImportMap(v: any) {
+  const imports: Record<string, string> = {}
+  if (util.isPlainObject(v)) {
+    Object.entries(v).forEach(([key, value]) => {
+      if (key == '' || key == '/') {
+        return
+      }
+      const isPrefix = key.endsWith('/')
+      const y = (v: string) => util.isNEString(v) && (!isPrefix || v.endsWith('/'))
+      if (y(value)) {
+        imports[key] = value
+        return
+      } else if (util.isNEArray(value)) {
+        for (const v of value) {
+          if (y(v)) {
+            imports[key] = v
+            return
+          }
+        }
+      }
+    })
+  }
+  return imports
 }
