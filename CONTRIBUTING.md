@@ -28,13 +28,7 @@ deno run -A --unstable --import-map=import_map.json cli.ts dev ./examples/hello-
 deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
 # ssg
 deno run -A --unstable --import-map=import_map.json cli.ts build ./examples/hello-world -L debug
-```
-
-## Testing
-
-Run all tests:
-
-```bash
+# run all tests:
 deno test -A --location=http://localhost
 ```
 
