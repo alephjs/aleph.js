@@ -2,7 +2,7 @@ import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren
 import { createElement, useCallback, useEffect, useMemo } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import events from '../core/events.ts'
-import { isHttpUrl, redirect } from '../core/routing.ts'
+import { redirect } from '../core/routing.ts'
 import { useRouter } from './hooks.ts'
 
 const prefetchedPages = new Set<string>()
@@ -39,7 +39,7 @@ export default function Anchor(props: AnchorProps) {
     if (!util.isNEString(propHref)) {
       return ''
     }
-    if (isHttpUrl(propHref)) {
+    if (util.isLikelyHttpURL(propHref)) {
       return propHref
     }
     let [pathname, search] = util.splitBy(propHref, '?')
@@ -72,7 +72,7 @@ export default function Anchor(props: AnchorProps) {
     return undefined
   }, [href, propAriaCurrent])
   const prefetch = useCallback(() => {
-    if (href && !isHttpUrl(href) && href !== currentHref && !prefetchedPages.has(href)) {
+    if (href && !util.isLikelyHttpURL(href) && href !== currentHref && !prefetchedPages.has(href)) {
       events.emit('fetch-page-module', { href })
       prefetchedPages.add(href)
     }

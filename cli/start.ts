@@ -1,5 +1,7 @@
+import type { ServeOptions } from '../server/mod.ts'
 import { Application, serve } from '../server/mod.ts'
-import { parsePortNumber } from '../server/util.ts'
+import { getOptionValue, parsePortNumber } from '../server/util.ts'
+import log from '../shared/log.ts'
 
 export const helpMessage = `
 Usage:
@@ -9,16 +11,29 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -hn, --hostname <hostname>   The address at which the server is to be started
     -p, --port      <port>       A port number to start the aleph.js app, default is 8080
+        --hostname  <hostname>   The address at which the server is to be started
+        --cert      <certFile>   The server certificate file
+        --key       <keyFile>    The server public key file
     -L, --log-level <log-level>  Set log level [possible values: debug, info]
     -r, --reload                 Reload source code cache
     -h, --help                   Prints help message
 `
 
 export default async function (workingDir: string, options: Record<string, string | boolean>) {
-  const host = String(options.hn || options.hostname || 'localhost')
-  const port = parsePortNumber(String(options.p || options.port || '8080'))
   const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
-  serve(host, port, app)
+  const port = parsePortNumber(getOptionValue(options, ['p', 'port'], '8080'))
+  const hostname = getOptionValue(options, ['hostname'], 'localhost')
+  const certFile = getOptionValue(options, ['cert'])
+  const keyFile = getOptionValue(options, ['key'])
+  const opts: ServeOptions = { app, port, hostname }
+  if (certFile && keyFile) {
+    opts.certFile = certFile
+    opts.keyFile = keyFile
+  } else if (certFile) {
+    log.fatal('missing `--key` option')
+  } else if (keyFile) {
+    log.fatal('missing `--cert` option')
+  }
+  await serve(opts)
 }

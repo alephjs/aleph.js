@@ -17,22 +17,33 @@ export type RouteModule = {
   readonly asyncDeps?: DependencyDescriptor[]
 }
 
+export type RoutingOptions = {
+  routes?: Route[]
+  rewrites?: Record<string, string>
+  baseUrl?: string
+  defaultLocale?: string
+  locales?: string[]
+}
+
 export class Routing {
-  private _routes: Route[]
   private _baseUrl: string
   private _defaultLocale: string
   private _locales: string[]
+  private _routes: Route[]
+  private _rewrites: Record<string, string>
 
-  constructor(
-    routes: Route[] = [],
-    baseUrl: string = '/',
-    defaultLocale: string = 'en',
-    locales: string[] = []
-  ) {
-    this._routes = routes
+  constructor({
+    baseUrl = '/',
+    defaultLocale = 'en',
+    locales = [],
+    routes = [],
+    rewrites = {},
+  }: RoutingOptions) {
     this._baseUrl = baseUrl
     this._defaultLocale = defaultLocale
     this._locales = locales
+    this._routes = routes
+    this._rewrites = rewrites
   }
 
   get baseUrl() {
@@ -107,10 +118,10 @@ export class Routing {
 
   createRouter(location?: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
     const loc = location || (window as any).location || { pathname: '/' }
-    const query = new URLSearchParams(loc.search)
+    const url = rewriteURL(loc.pathname + (loc.search || ''), this._baseUrl, this._rewrites)
 
     let locale = this._defaultLocale
-    let pathname = util.cleanPath(util.trimPrefix(loc.pathname, this._baseUrl))
+    let pathname = decodeURI(url.pathname)
     let pagePath = ''
     let params: Record<string, string> = {}
     let chain: RouteModule[] = []
@@ -139,7 +150,7 @@ export class Routing {
       }
     }, true)
 
-    return [{ locale, pathname, pagePath, params, query }, chain]
+    return [{ locale, pathname, pagePath, params, query: url.searchParams }, chain]
   }
 
   lookup(callback: (path: Route[]) => Boolean | void) {
@@ -149,20 +160,20 @@ export class Routing {
   private _lookup(
     callback: (path: Route[]) => Boolean | void,
     skipNestIndex = false,
-    __tracing: Route[] = [],
-    __routes = this._routes
+    _tracing: Route[] = [],
+    _routes = this._routes
   ) {
-    for (const route of __routes) {
-      if (skipNestIndex && __tracing.length > 0 && route.path === '/') {
+    for (const route of _routes) {
+      if (skipNestIndex && _tracing.length > 0 && route.path === '/') {
         continue
       }
-      if (callback([...__tracing, route]) === false) {
+      if (callback([..._tracing, route]) === false) {
         return false
       }
     }
-    for (const route of __routes) {
+    for (const route of _routes) {
       if (route.path !== '/' && route.children?.length) {
-        if (this._lookup(callback, skipNestIndex, [...__tracing, route], route.children) === false) {
+        if (this._lookup(callback, skipNestIndex, [..._tracing, route], route.children) === false) {
           return false
         }
       }
@@ -201,6 +212,33 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
   return [params, true]
 }
 
+/** `rewriteURL` returns a rewrited URL */
+export function rewriteURL(reqUrl: string, baseUrl: string, rewrites: Record<string, string>): URL {
+  const url = new URL('http://localhost' + reqUrl)
+  if (baseUrl !== '/') {
+    url.pathname = util.trimPrefix(decodeURI(url.pathname), baseUrl)
+  }
+  for (const path in rewrites) {
+    const to = rewrites[path]
+    const [params, ok] = matchPath(path, decodeURI(url.pathname))
+    if (ok) {
+      const { searchParams } = url
+      url.href = 'http://localhost' + util.cleanPath(to.replace(/:(.+)(\/|&|$)/g, (s, k, e) => {
+        if (k in params) {
+          return params[k] + e
+        }
+        return s
+      }))
+      for (const [key, value] of url.searchParams.entries()) {
+        searchParams.append(key, value)
+      }
+      url.search = searchParams.toString()
+      break
+    }
+  }
+  return url
+}
+
 export async function redirect(url: string, replace?: boolean) {
   const { location, history } = window as any
 
@@ -208,7 +246,7 @@ export async function redirect(url: string, replace?: boolean) {
     return
   }
 
-  if (isHttpUrl(url)) {
+  if (util.isLikelyHttpURL(url) || url.startsWith('file://') || url.startsWith('mailto:')) {
     location.href = url
     return
   }
@@ -220,15 +258,6 @@ export async function redirect(url: string, replace?: boolean) {
     history.pushState(null, '', url)
   }
   events.emit('popstate', { type: 'popstate', resetScroll: true })
-}
-
-export function isHttpUrl(url: string) {
-  try {
-    const { protocol } = new URL(url)
-    return protocol === 'https:' || protocol === 'http:'
-  } catch (error) {
-    return false
-  }
 }
 
 export function isModuleURL(url: string) {

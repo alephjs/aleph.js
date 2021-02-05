@@ -2,8 +2,15 @@ import { assertEquals } from 'https://deno.land/std@0.85.0/testing/asserts.ts'
 import { Routing } from './routing.ts'
 
 Deno.test(`routing`, () => {
-  const routing = new Routing([], '/', 'en', ['en', 'zh-CN'])
+  const routing = new Routing({
+    locales: ['en', 'zh-CN'],
+    rewrites: {
+      '/Hello World': '/hello-world',
+      '/你好世界': '/zh-CN/hello-world',
+    }
+  })
   routing.update({ url: '/pages/index.tsx', hash: '' })
+  routing.update({ url: '/pages/hello-world.tsx', hash: '' })
   routing.update({ url: '/pages/blog/index.tsx', hash: '' })
   routing.update({ url: '/pages/blog/[slug].tsx', hash: '' })
   routing.update({ url: '/pages/user/index.tsx', hash: '' })
@@ -18,6 +25,7 @@ Deno.test(`routing`, () => {
 
   assertEquals(routing.paths, [
     '/',
+    '/hello-world',
     '/blog',
     '/user',
     '/docs',
@@ -42,6 +50,22 @@ Deno.test(`routing`, () => {
     assertEquals(router.pathname, '/')
     assertEquals(router.pagePath, '/')
     assertEquals(chain, [{ url: '/pages/index.tsx', hash: 'hsidfshy3yhfya49848' }])
+  }
+
+  {
+    const [router, chain] = routing.createRouter({ pathname: '/Hello World' })
+    assertEquals(router.locale, 'en')
+    assertEquals(router.pathname, '/hello-world')
+    assertEquals(router.pagePath, '/hello-world')
+    assertEquals(chain, [{ url: '/pages/hello-world.tsx', hash: '' }])
+  }
+
+  {
+    const [router, chain] = routing.createRouter({ pathname: '/你好世界' })
+    assertEquals(router.locale, 'zh-CN')
+    assertEquals(router.pathname, '/hello-world')
+    assertEquals(router.pagePath, '/hello-world')
+    assertEquals(chain, [{ url: '/pages/hello-world.tsx', hash: '' }])
   }
 
   {

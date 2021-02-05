@@ -1,4 +1,4 @@
-import { assertEquals } from 'https://deno.land/std@0.83.0/testing/asserts.ts'
+import { assertEquals } from 'https://deno.land/std@0.85.0/testing/asserts.ts'
 import plugin from './sass.ts'
 
 Deno.test('scss loader plugin', async () => {
