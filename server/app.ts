@@ -406,6 +406,26 @@ export class Application {
       })
     }
 
+    // inject browser navigator polyfill
+    Object.assign(globalThis, {
+      navigator: {
+        connection: {
+          downlink: 10,
+          effectiveType: "4g",
+          onchange: null,
+          rtt: 50,
+          saveData: false,
+        },
+        cookieEnabled: false,
+        deviceMemory: 8,
+        hardwareConcurrency: 4,
+        language: 'en',
+        onLine: true,
+        userAgent: `Deno/${Deno.version.deno}`,
+        vendor: 'Deno Land',
+      }
+    })
+
     if (!this.isDev) {
       log.info('Building...')
     }
@@ -618,7 +638,7 @@ export class Application {
       const url = new URL(importUrl)
       let pathname = url.pathname
       let ok = [...moduleExts, 'css', 'pcss'].includes(path.extname(pathname).slice(1))
-      if (ok) {
+      if (!ok) {
         for (const plugin of this.config.plugins) {
           if (plugin.type === 'loader' && plugin.test.test(pathname)) {
             ok = true
@@ -626,12 +646,12 @@ export class Application {
           }
         }
       }
-      if (!ok) {
-        pathname += '.js'
-      }
       let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
       if (search.length > 0) {
         pathname += '_' + search.join(',')
+      }
+      if (!ok) {
+        pathname += '.js'
       }
       return [
         '/-/',
@@ -777,17 +797,11 @@ export class Application {
     } else if (isRemote) {
       const isLocalhost = /^https?:\/\/localhost(:\d+)?\//.test(url)
       if (['js', 'ts', 'jsx', 'tsx'].includes(mod.loader) && !isLocalhost) {
-        try {
-          sourceContent = await this.fetchDependency(url)
-          const sourceHash = computeHash(sourceContent)
-          if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
-            mod.sourceHash = sourceHash
-            changed = true
-          }
-        } catch (err) {
-          log.error(`dependency '${url}' not found`)
-          mod.error = err
-          return mod
+        sourceContent = await this.fetchDependency(url)
+        const sourceHash = computeHash(sourceContent)
+        if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
+          mod.sourceHash = sourceHash
+          changed = true
         }
       } else {
         // todo: cache non-localhost file to local drive
@@ -1112,16 +1126,31 @@ export class Application {
     }
 
     // download dep when deno cache failed
-    log.info('Download', url)
-    const buffer = await fetch(u.toString()).then(resp => {
-      if (resp.status !== 200) {
-        return Promise.reject(new Error(resp.statusText))
+    const retryTimes = 10
+    let err = new Error('Unknown')
+    for (let i = 0; i < retryTimes; i++) {
+      if (i === 0) {
+        log.info('Download', url)
+      } else {
+        log.debug('Download error:', err)
+        log.warn(`Download ${url} failed, retrying...`)
       }
-      return resp.arrayBuffer()
-    })
-    const content = await Deno.readAll(new Deno.Buffer(buffer))
-    await Deno.writeFile(cacheFilename, content)
-    return content
+      try {
+        const buffer = await fetch(u.toString()).then(resp => {
+          if (resp.status !== 200) {
+            return Promise.reject(new Error(resp.statusText))
+          }
+          return resp.arrayBuffer()
+        })
+        const content = await Deno.readAll(new Deno.Buffer(buffer))
+        await Deno.writeFile(cacheFilename, content)
+        return content
+      } catch (e) {
+        err = e
+      }
+    }
+
+    return Promise.reject(err)
   }
 
   /** bundle modules for production. */
