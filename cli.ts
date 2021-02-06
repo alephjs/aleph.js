@@ -172,15 +172,21 @@ async function main() {
   }
 
   const { default: cmd } = await import(`./cli/${command}.ts`)
-  if (command === 'upgrade') {
-    await cmd(flags.v || flags.version || args[0] || 'latest')
-    return
+  switch (command) {
+    case 'init':
+      await cmd(args[0])
+      break
+    case 'upgrade':
+      await cmd(flags.v || flags.version || args[0] || 'latest')
+      break
+    default:
+      const appDir = path.resolve(args[0] || '.')
+      if (!existsDirSync(appDir)) {
+        log.fatal('No such directory:', appDir)
+      }
+      await cmd(appDir, flags)
+      break
   }
-  const appDir = path.resolve(args[0] || '.')
-  if (command !== 'init' && !existsDirSync(appDir)) {
-    log.fatal('No such directory:', appDir)
-  }
-  await cmd(appDir, flags)
 }
 
 if (import.meta.main) {
