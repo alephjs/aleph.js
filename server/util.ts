@@ -41,8 +41,8 @@ export const AlephRuntimeCode = `
   });
 `
 
-/** get aleph pkg url. */
-export function getAlephPkgUrl() {
+/** get aleph module url. */
+export function getAlephModuleUrl() {
   const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')
   if (DEV_PORT) {
     return `http://localhost:${DEV_PORT}`

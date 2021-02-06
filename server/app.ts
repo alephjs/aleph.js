@@ -11,7 +11,7 @@ import type { Config, DependencyDescriptor, ImportMap, Module, RenderResult, Rou
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
 import { defaultConfig, loadConfig } from './config.ts'
-import { AlephRuntimeCode, cleanupCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUrl, getRelativePath, reFullVersion, reHashJs, reHashResolve, respondErrorJSON } from './util.ts'
+import { AlephRuntimeCode, cleanupCompilation, computeHash, createHtml, formatBytesWithColor, getAlephModuleUrl, getRelativePath, reFullVersion, reHashJs, reHashResolve, respondErrorJSON } from './util.ts'
 
 /**
  * The Aleph Server Application class.
@@ -349,7 +349,7 @@ export class Application {
   /** initialize project */
   private async init(reload: boolean) {
     const t = performance.now()
-    const alephPkgUrl = getAlephPkgUrl()
+    const alephModuleUrl = getAlephModuleUrl()
     const { env, framework, plugins, ssr } = this.config
     const walkOptions = { includeDirs: false, exts: moduleExts, skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
     const apiDir = path.join(this.srcDir, 'api')
@@ -437,20 +437,20 @@ export class Application {
     }
 
     // pre-compile framework modules
-    await this.compile(`${alephPkgUrl}/framework/${framework}/bootstrap.ts`)
+    await this.compile(`${alephModuleUrl}/framework/${framework}/bootstrap.ts`)
     if (this.isDev) {
       const mods = ['hmr.ts', 'nomodule.ts']
       for (const mod of mods) {
-        await this.compile(`${alephPkgUrl}/framework/core/${mod}`)
+        await this.compile(`${alephModuleUrl}/framework/core/${mod}`)
       }
       if (framework === 'react') {
-        await this.compile(`${alephPkgUrl}/framework/react/refresh.ts`)
+        await this.compile(`${alephModuleUrl}/framework/react/refresh.ts`)
       }
     }
 
     // compile and import framework renderer when ssr is enable
     if (ssr) {
-      const rendererUrl = `${alephPkgUrl}/framework/${framework}/renderer.ts`
+      const rendererUrl = `${alephModuleUrl}/framework/${framework}/renderer.ts`
       await this.compile(rendererUrl)
       const { render } = await import('file://' + this.#modules.get(rendererUrl)!.jsFile)
       this.#renderer = { render }
@@ -579,7 +579,7 @@ export class Application {
 
   /** get main js. */
   getMainJS(bundleMode = false): string {
-    const alephPkgUrl = getAlephPkgUrl()
+    const alephModuleUrl = getAlephModuleUrl()
     const { baseUrl, defaultLocale, framework } = this.config
     const config: Record<string, any> = {
       baseUrl,
@@ -600,10 +600,10 @@ export class Application {
     }
 
     if (bundleMode) {
-      return `var bootstrap=__ALEPH.pack["${alephPkgUrl}/framework/${framework}/bootstrap.ts"].default;bootstrap(${JSON.stringify(config)})`
+      return `var bootstrap=__ALEPH.pack["${alephModuleUrl}/framework/${framework}/bootstrap.ts"].default;bootstrap(${JSON.stringify(config)})`
     }
 
-    const prefix = alephPkgUrl.replace('https://', '').replace('http://localhost:', 'http_localhost_')
+    const prefix = alephModuleUrl.replace('https://', '').replace('http://localhost:', 'http_localhost_')
     return [
       (this.config.framework === 'react' && this.isDev) && `import "./-/${prefix}/framework/react/refresh.js"`,
       `import bootstrap from "./-/${prefix}/framework/${framework}/bootstrap.js"`,
@@ -711,7 +711,13 @@ export class Application {
       log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
     }
 
-    return transpileSync(sourceCode, options)
+    return transpileSync(sourceCode, {
+      ...options,
+      importMap: this.importMap,
+      alephModuleUrl: getAlephModuleUrl(),
+      reactVersion: this.config.reactVersion,
+      isDev: this.isDev,
+    })
   }
 
   /** download and compile a moudle by given url, then cache on the disk. */
@@ -724,7 +730,7 @@ export class Application {
       bundledModules?: string[]
     }
   ): Promise<Module> {
-    const alephPkgUrl = getAlephPkgUrl()
+    const alephModuleUrl = getAlephModuleUrl()
     const isRemote = util.isLikelyHttpURL(url)
     const localUrl = this.fixImportUrl(url)
     const name = util.trimModuleExt(path.basename(localUrl))
@@ -856,7 +862,7 @@ export class Application {
       if (loader === 'css') {
         const css = await this.preprocessCSS(sourceCode)
         sourceCode = [
-          `import { applyCSS } from "${alephPkgUrl}/framework/core/style.ts";`,
+          `import { applyCSS } from "${alephModuleUrl}/framework/core/style.ts";`,
           `export default function __applyCSS() {`,
           `  applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)});`,
           `}`,
@@ -879,14 +885,12 @@ export class Application {
           sourceType: loader,
           sourceMap: this.isDev,
         }
+        log.debug(url)
         const { code, map, deps, inlineStyles } = await this.transpile(sourceCode, {
           url,
           bundleMode,
           bundledModules,
-          swcOptions,
-          importMap: this.importMap,
-          reactVersion: this.config.reactVersion,
-          isDev: this.isDev,
+          swcOptions
         })
 
         fsync = true
@@ -1122,7 +1126,7 @@ export class Application {
 
   /** bundle modules for production. */
   private async bundle() {
-    const alephPkgUrl = getAlephPkgUrl()
+    const alephModuleUrl = getAlephModuleUrl()
     const refCounter = new Map<string, number>()
     const lookup = (url: string) => {
       if (this.#modules.has(url)) {
@@ -1142,7 +1146,7 @@ export class Application {
     const pageModules: Module[] = []
 
     // add framework bootstrap
-    refCounter.set(`${alephPkgUrl}/framework/${this.config.framework}/bootstrap.ts`, 1)
+    refCounter.set(`${alephModuleUrl}/framework/${this.config.framework}/bootstrap.ts`, 1)
     if (appModule) {
       await this.compile(appModule.url, { bundleMode: true })
       lookup(appModule.url)
@@ -1196,14 +1200,14 @@ export class Application {
 
   /** create polyfill bundle. */
   private async createPolyfillBundle() {
-    const alephPkgUrl = getAlephPkgUrl()
+    const alephModuleUrl = getAlephModuleUrl()
     const { buildTarget } = this.config
     const hash = computeHash(AlephRuntimeCode + buildTarget + buildChecksum + Deno.version.deno)
     const polyfillFile = path.join(this.buildDir, `polyfill.bundle.${util.shortHash(hash)}.js`)
     const polyfillMod = this.newModule('/polyfill.js')
     polyfillMod.hash = polyfillMod.sourceHash = hash
     if (!existsFileSync(polyfillFile)) {
-      const rawPolyfillFile = `${alephPkgUrl}/compiler/polyfills/${buildTarget}/polyfill.js`
+      const rawPolyfillFile = `${alephModuleUrl}/compiler/polyfills/${buildTarget}/polyfill.js`
       await this.runDenoBundle(rawPolyfillFile, polyfillFile, AlephRuntimeCode, true)
     }
     log.info(`  {} polyfill (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(polyfillFile).size))}`)
