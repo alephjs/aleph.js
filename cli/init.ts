@@ -5,20 +5,19 @@ import { VERSION } from '../version.ts'
 
 export const helpMessage = `
 Usage:
-    aleph init <dir> [...options]
+    aleph init <name> [...options]
 
-<dir> represents the directory of Aleph.js app,
-if the <dir> is empty, the current directory will be used.
+<name> represents the name of Aleph.js app.
 
 Options:
     -h, --help  Prints help message
 `
 
-export default async function (n?: string) {
+export default async function (nameArg?: string) {
   const cwd = Deno.cwd()
   const rev = 'master'
 
-  const name = n || (await ask('Name:')).trim()
+  const name = nameArg || (await ask('Name:')).trim()
   if (name === '') {
     return
   }

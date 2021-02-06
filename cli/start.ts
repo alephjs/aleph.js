@@ -1,6 +1,6 @@
 import type { ServeOptions } from '../server/mod.ts'
 import { Application, serve } from '../server/mod.ts'
-import { getOptionValue, parsePortNumber } from '../server/util.ts'
+import { getFlag, parsePortNumber } from '../server/util.ts'
 import log from '../shared/log.ts'
 
 export const helpMessage = `
@@ -20,12 +20,12 @@ Options:
     -h, --help                   Prints help message
 `
 
-export default async function (workingDir: string, options: Record<string, string | boolean>) {
-  const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
-  const port = parsePortNumber(getOptionValue(options, ['p', 'port'], '8080'))
-  const hostname = getOptionValue(options, ['hostname'], 'localhost')
-  const certFile = getOptionValue(options, ['cert'])
-  const keyFile = getOptionValue(options, ['key'])
+export default async function (workingDir: string, flags: Record<string, string | boolean>) {
+  const app = new Application(workingDir, 'production', Boolean(flags.r || flags.reload))
+  const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
+  const hostname = getFlag(flags, ['hostname'], 'localhost')
+  const certFile = getFlag(flags, ['cert'])
+  const keyFile = getFlag(flags, ['key'])
   const opts: ServeOptions = { app, port, hostname }
   if (certFile && keyFile) {
     opts.certFile = certFile

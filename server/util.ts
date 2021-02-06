@@ -91,12 +91,12 @@ export function parsePortNumber(v: string): number {
   return num
 }
 
-/** get option value */
-export function getOptionValue(options: Record<string, string | boolean>, keys: string[], defaultValue?: string): string {
+/** get flag */
+export function getFlag(flags: Record<string, string | boolean>, keys: string[], defaultValue?: string): string {
   let value = defaultValue || ''
   for (const key of keys) {
-    if (key in options && util.isNEString(options[key])) {
-      value = String(options[key])
+    if (key in flags && util.isNEString(flags[key])) {
+      value = String(flags[key])
       break
     }
   }

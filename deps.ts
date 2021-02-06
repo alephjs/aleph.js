@@ -2,6 +2,7 @@
 export { Untar } from 'https://deno.land/std@0.85.0/archive/tar.ts'
 export * as bytes from 'https://deno.land/std@0.85.0/bytes/mod.ts'
 export * as base64 from 'https://deno.land/std@0.85.0/encoding/base64.ts'
+export * as flags from 'https://deno.land/std@0.85.0/flags/mod.ts'
 export * as colors from 'https://deno.land/std@0.85.0/fmt/colors.ts'
 export { ensureDir } from 'https://deno.land/std@0.85.0/fs/ensure_dir.ts'
 export { walk } from 'https://deno.land/std@0.85.0/fs/walk.ts'

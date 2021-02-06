@@ -1,5 +1,5 @@
 import { Application, serve } from '../server/mod.ts'
-import { getOptionValue, parsePortNumber } from '../server/util.ts'
+import { getFlag, parsePortNumber } from '../server/util.ts'
 
 export const helpMessage = `
 Usage:
@@ -15,8 +15,8 @@ Options:
     -h, --help                   Prints help message
 `
 
-export default async function (workingDir: string, options: Record<string, string | boolean>) {
-  const app = new Application(workingDir, 'development', Boolean(options.r || options.reload))
-  const port = parsePortNumber(getOptionValue(options, ['p', 'port'], '8080'))
+export default async function (workingDir: string, flags: Record<string, string | boolean>) {
+  const app = new Application(workingDir, 'development', Boolean(flags.r || flags.reload))
+  const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
   await serve({ app, port, hostname: 'localhost' })
 }

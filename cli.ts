@@ -1,4 +1,4 @@
-import { path, walk } from './deps.ts'
+import { flags, path, walk } from './deps.ts'
 import { localProxy } from './server/localproxy.ts'
 import { existsDirSync } from './shared/fs.ts'
 import type { LevelNames } from './shared/log.ts'
@@ -15,7 +15,7 @@ const commands = {
 }
 
 const helpMessage = `Aleph.js v${VERSION}
-The Full-stack Framework in Deno.
+The Full-stack Framework for React and other in Deno.
 
 Docs: https://alephjs.org/docs
 Bugs: https://github.com/alephjs/aleph.js/issues
@@ -32,57 +32,33 @@ Options:
 `
 
 async function main() {
-  // parse deno args
-  const args: Array<string> = []
-  const flags: Record<string, string | boolean> = {}
-  for (let i = 0; i < Deno.args.length; i++) {
-    const arg = Deno.args[i]
-    if (arg.startsWith('-')) {
-      if (arg.includes('=')) {
-        const [key, value] = arg.replace(/^-+/, '').split('=', 2)
-        flags[key] = value
-      } else {
-        const key = arg.replace(/^-+/, '')
-        const nextArg = Deno.args[i + 1]
-        if (nextArg && !nextArg.startsWith('-')) {
-          flags[key] = nextArg
-          i++
-        } else {
-          flags[key] = true
-        }
-      }
-    } else {
-      args.push(arg)
-    }
-  }
-
+  const { _: args, ...options } = flags.parse(Deno.args)
   const hasCommand = args.length > 0 && args[0] in commands
   const command = (hasCommand ? String(args.shift()) : 'dev') as keyof typeof commands
 
   // prints aleph.js version
-  if (flags.v && command != 'upgrade') {
+  if (options.v && command != 'upgrade') {
     console.log(`aleph.js v${VERSION}`)
     Deno.exit(0)
   }
 
   // prints aleph.js and deno version
-  if (flags.version && command != 'upgrade') {
+  if (options.version && command != 'upgrade') {
     const { deno, v8, typescript } = Deno.version
-    console.log(`aleph.js ${VERSION}`)
-    console.log(`deno ${deno}`)
-    console.log(`v8 ${v8}`)
-    console.log(`typescript ${typescript}`)
+    console.log([
+      `aleph.js ${VERSION}`,
+      `deno ${deno}`,
+      `v8 ${v8}`,
+      `typescript ${typescript}`
+    ].join('\n'))
     Deno.exit(0)
   }
 
   // prints help message
-  if (flags.h || flags.help) {
+  if (options.h || options.help) {
     if (hasCommand) {
       import(`./cli/${command}.ts`).then(({ helpMessage }) => {
-        console.log(commands[command])
-        if (util.isNEString(helpMessage)) {
-          console.log(helpMessage)
-        }
+        console.log(commands[command] + '\n' + helpMessage)
         Deno.exit(0)
       })
       return
@@ -93,7 +69,7 @@ async function main() {
   }
 
   // sets log level
-  const l = flags.L || flags['log-level']
+  const l = options.L || options['log-level']
   if (util.isNEString(l)) {
     log.setLevel(l.toLowerCase() as LevelNames)
   }
@@ -137,14 +113,14 @@ async function main() {
       await cmd(args[0])
       break
     case 'upgrade':
-      await cmd(flags.v || flags.version || args[0] || 'latest')
+      await cmd(options.v || options.version || args[0] || 'latest')
       break
     default:
-      const appDir = path.resolve(args[0] || '.')
+      const appDir = path.resolve(String(args[0] || '.'))
       if (!existsDirSync(appDir)) {
         log.fatal('No such directory:', appDir)
       }
-      await cmd(appDir, flags)
+      await cmd(appDir, options)
       break
   }
 }
