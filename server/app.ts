@@ -864,7 +864,7 @@ export class Application {
         sourceCode = [
           `import { applyCSS } from "${alephModuleUrl}/framework/core/style.ts";`,
           `export default function __applyCSS() {`,
-          `  applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)});`,
+          `  return applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)});`,
           `}`,
           bundleMode && `__ALEPH.pack[${JSON.stringify(url)}] = { default: __applyCSS };`
         ].filter(Boolean).join('\n')
@@ -1566,21 +1566,21 @@ export class Application {
   }
 
   /** lookup deps recurively. */
-  private lookupDeps(url: string, __deps: DependencyDescriptor[] = [], __tracing: Set<string> = new Set()) {
+  private lookupDeps(url: string, deps: DependencyDescriptor[] = [], tracing: Set<string> = new Set()) {
     const mod = this.getModule(url)
     if (!mod) {
-      return __deps
+      return deps
     }
-    if (__tracing.has(url)) {
-      return __deps
+    if (tracing.has(url)) {
+      return deps
     }
-    __tracing.add(url)
-    __deps.push(...mod.deps.filter(({ url }) => __deps.findIndex(i => i.url === url) === -1))
+    tracing.add(url)
+    deps.push(...mod.deps.filter(({ url }) => deps.findIndex(i => i.url === url) === -1))
     mod.deps.forEach(({ url }) => {
       if (isModuleURL(url) && !util.isLikelyHttpURL(url)) {
-        this.lookupDeps(url, __deps, __tracing)
+        this.lookupDeps(url, deps, tracing)
       }
     })
-    return __deps
+    return deps
   }
 }

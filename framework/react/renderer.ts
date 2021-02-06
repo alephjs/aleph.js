@@ -4,7 +4,6 @@ import { renderToString } from 'https://esm.sh/react-dom/server'
 import util from '../../shared/util.ts'
 import type { RenderResult, RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
-import { serverStyles } from "../core/style.ts"
 import { RendererContext, RouterContext } from './context.ts'
 import { AsyncUseDenoError, E400MissingComponent, E404Page } from './error.ts'
 import { createPageProps } from './pageprops.ts'
@@ -15,7 +14,7 @@ export async function render(
   App: ComponentType<any> | undefined,
   E404: ComponentType | undefined,
   pageComponentChain: { url: string, Component?: any }[],
-  styles?: { url: string, hash: string }[]
+  styles: { url: string, hash: string }[]
 ) {
   const global = globalThis as any
   const ret: Omit<RenderResult, 'url' | 'status'> = {
@@ -139,18 +138,18 @@ export async function render(
   })
   scriptsElements.clear()
 
-  // get inline-styles
-  const rets = await Promise.all(styles?.filter(({ url }) => !url.startsWith('#inline-style-')).map(({ url, hash }) => {
-    const path = util.isLikelyHttpURL(url) ? '/-/' + url.split('://')[1] : `${url}.${util.shortHash(hash)}`
-    return import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}/${path}.js`))
-  }) || [])
-  rets.forEach(({ default: def }) => util.isFunction(def) && def())
-  styles?.forEach(({ url }) => {
-    if (serverStyles.has(url)) {
-      const css = serverStyles.get(url)!
-      ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
+  // apply styles
+  await Promise.all(styles.map(async ({ url, hash }) => {
+    if (!url.startsWith('#inline-style-')) {
+      const pathname = util.isLikelyHttpURL(url) ? '/-/' + url.split('://')[1] : `${url}.${util.shortHash(hash)}`
+      const importUrl = 'file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}/${pathname}.js`)
+      const { default: applyCSS } = await import(importUrl)
+      if (util.isFunction(applyCSS)) {
+        const { css } = applyCSS()
+        ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
+      }
     }
-  })
+  }))
 
   defer()
   return ret
