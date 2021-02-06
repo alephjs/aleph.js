@@ -286,7 +286,6 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::aleph::VERSION;
   use crate::import_map::ImportHashMap;
   use crate::resolve::{DependencyDescriptor, Resolver, HASH_PLACEHOLDER};
   use sha1::{Digest, Sha1};
@@ -296,6 +295,7 @@ mod tests {
     let resolver = Rc::new(RefCell::new(Resolver::new(
       specifer,
       ImportHashMap::default(),
+      Some("https://deno.land/x/aleph@v0.3.0".into()),
       None,
       bundling,
       vec![],
@@ -442,32 +442,16 @@ mod tests {
     "#;
     let (code, resolver) = t("/pages/index.tsx", source, false);
     assert!(code.contains(
-      format!(
-        "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v{}/framework/react/anchor.js\"",
-        VERSION.as_str()
-      )
-      .as_str()
+      "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/anchor.js\""
     ));
     assert!(code.contains(
-      format!(
-        "import __ALEPH_Head from \"../-/deno.land/x/aleph@v{}/framework/react/head.js\"",
-        VERSION.as_str()
-      )
-      .as_str()
+      "import __ALEPH_Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/head.js\""
     ));
     assert!(code.contains(
-      format!(
-        "import __ALEPH_Link from \"../-/deno.land/x/aleph@v{}/framework/react/link.js\"",
-        VERSION.as_str()
-      )
-      .as_str()
+      "import __ALEPH_Link from \"../-/deno.land/x/aleph@v0.3.0/framework/react/link.js\""
     ));
     assert!(code.contains(
-      format!(
-        "import __ALEPH_Script from \"../-/deno.land/x/aleph@v{}/framework/react/script.js\"",
-        VERSION.as_str()
-      )
-      .as_str()
+      "import __ALEPH_Script from \"../-/deno.land/x/aleph@v0.3.0/framework/react/script.js\""
     ));
     assert!(code.contains("React.createElement(\"a\","));
     assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
@@ -498,34 +482,22 @@ mod tests {
           rel: Some("stylesheet".into()),
         },
         DependencyDescriptor {
-          specifier: format!(
-            "https://deno.land/x/aleph@v{}/framework/react/head.ts",
-            VERSION.as_str()
-          ),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/head.ts".into(),
           is_dynamic: false,
           rel: None,
         },
         DependencyDescriptor {
-          specifier: format!(
-            "https://deno.land/x/aleph@v{}/framework/react/link.ts",
-            VERSION.as_str()
-          ),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/link.ts".into(),
           is_dynamic: false,
           rel: None,
         },
         DependencyDescriptor {
-          specifier: format!(
-            "https://deno.land/x/aleph@v{}/framework/react/anchor.ts",
-            VERSION.as_str()
-          ),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/anchor.ts".into(),
           is_dynamic: false,
           rel: None,
         },
         DependencyDescriptor {
-          specifier: format!(
-            "https://deno.land/x/aleph@v{}/framework/react/script.ts",
-            VERSION.as_str()
-          ),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/script.ts".into(),
           is_dynamic: false,
           rel: None,
         }
@@ -557,11 +529,7 @@ mod tests {
     "#;
     let (code, resolver) = t("/pages/index.tsx", source, false);
     assert!(code.contains(
-      format!(
-        "import __ALEPH_Style from \"../-/deno.land/x/aleph@v{}/framework/react/style.js\"",
-        VERSION.as_str()
-      )
-      .as_str()
+      "import __ALEPH_Style from \"../-/deno.land/x/aleph@v0.3.0/framework/react/style.js\""
     ));
     assert!(code.contains("React.createElement(__ALEPH_Style,"));
     assert!(code.contains("__styleId: \"inline-style-"));
@@ -595,6 +563,7 @@ mod tests {
       "/pages/index.tsx",
       ImportHashMap::default(),
       None,
+      None,
       true,
       vec!["/components/logo.ts".into(), "/shared/iife.ts".into()],
     )));
@@ -612,11 +581,7 @@ mod tests {
     assert!(code.contains("import   \"../style/index.css.xxxxxxxxx.js\""));
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
     assert!(code.contains(
-      format!(
-        "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph@v{}/framework/react/head.ts\"].default",
-        VERSION.as_str()
-      )
-      .as_str()
+      "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"].default"
     ));
   }
 

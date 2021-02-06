@@ -17,6 +17,7 @@ export interface TransformOptions {
   url: string
   importMap?: ImportMap
   reactVersion?: string,
+  alephModuleUrl?: string,
   swcOptions?: SWCOptions
   isDev?: boolean,
   bundleMode?: boolean,

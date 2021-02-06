@@ -3,7 +3,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-mod aleph;
 mod error;
 mod fast_refresh;
 mod fixer;
@@ -31,7 +30,10 @@ pub struct Options {
   #[serde(default)]
   pub import_map: ImportHashMap,
 
-  #[serde(default = "default_react_version")]
+  #[serde(default)]
+  pub aleph_module_url: String,
+
+  #[serde(default)]
   pub react_version: String,
 
   #[serde(default)]
@@ -90,10 +92,6 @@ fn default_pragma_frag() -> String {
   "React.Fragment".into()
 }
 
-fn default_react_version() -> String {
-  "17.0.1".into()
-}
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransformOutput {
@@ -115,7 +113,14 @@ pub fn transform_sync(s: &str, opts: JsValue) -> Result<JsValue, JsValue> {
   let resolver = Rc::new(RefCell::new(Resolver::new(
     opts.url.as_str(),
     opts.import_map,
-    Some(opts.react_version),
+    match opts.aleph_module_url.as_str() {
+      "" => None,
+      _ => Some(opts.aleph_module_url),
+    },
+    match opts.react_version.as_str() {
+      "" => None,
+      _ => Some(opts.react_version),
+    },
     opts.bundle_mode,
     opts.bundled_modules,
   )));

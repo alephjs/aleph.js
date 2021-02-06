@@ -1,6 +1,5 @@
 // Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
-use crate::aleph::VERSION;
 use crate::resolve::{
   create_aleph_pack_var_decl, is_remote_url, DependencyDescriptor, InlineStyle, Resolver,
 };
@@ -409,6 +408,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
 
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
+    let aleph_module_url = self.resolver.borrow().get_aleph_module_url();
     let mut resolver = self.resolver.borrow_mut();
 
     for mut name in resolver.used_builtin_jsx_tags.clone() {
@@ -417,12 +417,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
       }
       let id = quote_ident!(rename_builtin_tag(name.as_str()));
       let (resolved_path, fixed_url) = resolver.resolve(
-        format!(
-          "https://deno.land/x/aleph@v{}/framework/react/{}.ts",
-          VERSION.as_str(),
-          name
-        )
-        .as_str(),
+        format!("{}/framework/react/{}.ts", aleph_module_url, name).as_str(),
         false,
         None,
       );
