@@ -1,8 +1,10 @@
 // Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
 
 use indexmap::IndexMap;
+use path_slash::PathBufExt;
+use relative_path::RelativePath;
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 type SpecifierHashMap = HashMap<String, String>;
 type SpecifierMap = IndexMap<String, String>;
@@ -36,12 +38,36 @@ impl ImportMap {
     let mut imports: SpecifierMap = IndexMap::new();
     let mut scopes = IndexMap::new();
     for (k, v) in map.imports.iter() {
-      imports.insert(k.into(), v.into());
+      if k.eq("@/") || k.eq("~/") {
+        imports.insert(
+          k.into(),
+          RelativePath::new(v)
+            .normalize()
+            .to_path(Path::new("/"))
+            .to_slash()
+            .unwrap()
+            .into(),
+        );
+      } else {
+        imports.insert(k.into(), v.into());
+      }
     }
     for (k, v) in map.scopes.iter() {
       let mut map: SpecifierMap = IndexMap::new();
       for (k, v) in v.iter() {
-        map.insert(k.into(), v.into());
+        if k.eq("@/") || k.eq("~/") {
+          imports.insert(
+            k.into(),
+            RelativePath::new(v)
+              .normalize()
+              .to_path(Path::new("/"))
+              .to_slash()
+              .unwrap()
+              .into(),
+          );
+        } else {
+          map.insert(k.into(), v.into());
+        }
       }
       scopes.insert(k.into(), map);
     }
@@ -92,6 +118,8 @@ mod tests {
     let mut imports: SpecifierHashMap = HashMap::new();
     let mut scopes: HashMap<String, SpecifierHashMap> = HashMap::new();
     let mut scope_imports: SpecifierHashMap = HashMap::new();
+    imports.insert("@/".into(), "./".into());
+    imports.insert("~/".into(), "./".into());
     imports.insert("react".into(), "https://esm.sh/react".into());
     imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
     imports.insert(
@@ -102,15 +130,23 @@ mod tests {
     scopes.insert("/scope/".into(), scope_imports);
     let import_map = ImportMap::from_hashmap(ImportHashMap { imports, scopes });
     assert_eq!(
-      import_map.resolve("./app.tsx", "react"),
+      import_map.resolve("/pages/index.tsx", "@/components/logo.tsx"),
+      "/components/logo.tsx"
+    );
+    assert_eq!(
+      import_map.resolve("/pages/index.tsx", "~/components/logo.tsx"),
+      "/components/logo.tsx"
+    );
+    assert_eq!(
+      import_map.resolve("/app.tsx", "react"),
       "https://esm.sh/react"
     );
     assert_eq!(
-      import_map.resolve("./app.tsx", "https://deno.land/x/aleph/mod.ts"),
+      import_map.resolve("/app.tsx", "https://deno.land/x/aleph/mod.ts"),
       "http://localhost:2020/mod.ts"
     );
     assert_eq!(
-      import_map.resolve("./renderer.ts", "react-dom/server"),
+      import_map.resolve("/framework/react/renderer.ts", "react-dom/server"),
       "https://esm.sh/react-dom/server"
     );
     assert_eq!(
