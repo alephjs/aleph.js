@@ -404,10 +404,10 @@ impl AlephResolveFold {
     hasher.update(callback_code.clone());
     ident.push_str(
       base64::encode(hasher.finalize())
-        .replace("/", "")
         .replace("+", "")
-        .as_str()
-        .trim_end_matches('='),
+        .replace("/", "")
+        .replace("=", "")
+        .as_str(),
     );
     ident
   }
