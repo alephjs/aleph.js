@@ -1,7 +1,6 @@
-import { createHash } from "https://deno.land/std@0.86.0/hash/mod.ts"
 import { buildChecksum, initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
 import type { AcceptedPlugin, ECMA } from '../deps.ts'
-import { CleanCSS, colors, ensureDir, minify, path, postcss, walk } from '../deps.ts'
+import { CleanCSS, colors, createHash, ensureDir, minify, path, postcss, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { isModuleURL, RouteModule, Routing, toPagePath } from '../framework/core/routing.ts'
 import { minDenoVersion, moduleExts } from '../shared/constants.ts'

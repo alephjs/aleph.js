@@ -1,5 +1,5 @@
-import { MultipartFormData } from "https://deno.land/std@0.86.0/mime/multipart.ts"
-import { brotli, BufReader, BufWriter, gzipEncode, MultipartReader } from '../deps.ts'
+import type { BufReader, BufWriter, MultipartFormData } from '../deps.ts'
+import { brotli, gzipEncode, MultipartReader } from '../deps.ts'
 import log from '../shared/log.ts'
 import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 
@@ -12,7 +12,6 @@ export class Request implements APIRequest {
   #resp = {
     status: 200,
     headers: new Headers({
-      'Status': '200',
       'Server': 'Aleph.js',
     }),
     done: false
@@ -81,31 +80,6 @@ export class Request implements APIRequest {
     return this.#cookies
   }
 
-  status(code: number): this {
-    this.#resp.headers.set('status', code.toString())
-    this.#resp.status = code
-    return this
-  }
-
-  addHeader(key: string, value: string): this {
-    this.#resp.headers.append(key, value)
-    return this
-  }
-
-  setHeader(key: string, value: string): this {
-    this.#resp.headers.set(key, value)
-    return this
-  }
-
-  removeHeader(key: string): this {
-    this.#resp.headers.delete(key)
-    return this
-  }
-
-  async json(data: any, replacer?: (this: any, key: string, value: any) => any, space?: string | number): Promise<void> {
-    await this.send(JSON.stringify(data, replacer, space), 'application/json; charset=utf-8')
-  }
-
   async readBody(type?: 'raw'): Promise<Uint8Array>
   async readBody(type: 'text'): Promise<string>
   async readBody(type: 'json'): Promise<any>
@@ -134,20 +108,39 @@ export class Request implements APIRequest {
     }
   }
 
-  async send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void> {
+  addHeader(key: string, value: string): this {
+    this.#resp.headers.append(key, value)
+    return this
+  }
+
+  setHeader(key: string, value: string): this {
+    this.#resp.headers.set(key, value)
+    return this
+  }
+
+  removeHeader(key: string): this {
+    this.#resp.headers.delete(key)
+    return this
+  }
+
+  status(code: number): this {
+    this.#resp.status = code
+    return this
+  }
+
+  async send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void> {
     if (this.#resp.done) {
       log.warn('ServerRequest: repeat respond calls')
-      return
+      return Promise.resolve()
     }
-    let body: Uint8Array
+
+    let body = new Uint8Array()
     if (typeof data === 'string') {
       body = new TextEncoder().encode(data)
-    } else if (data instanceof ArrayBuffer) {
-      body = new Uint8Array(data)
     } else if (data instanceof Uint8Array) {
       body = data
-    } else {
-      return
+    } else if (data instanceof ArrayBuffer) {
+      body = new Uint8Array(data)
     }
     if (contentType) {
       this.#resp.headers.set('Content-Type', contentType)
@@ -156,17 +149,17 @@ export class Request implements APIRequest {
     } else if (typeof data === 'string' && data.length > 0) {
       contentType = 'text/plain; charset=utf-8'
     }
-    let isText = false
+    let shouldCompress = false
     if (contentType) {
       if (contentType.startsWith('text/')) {
-        isText = true
-      } else if (/^application\/(javascript|typecript|json|xml)/i.test(contentType)) {
-        isText = true
+        shouldCompress = true
+      } else if (/^application\/(javascript|typecript|wasm|json|xml)/i.test(contentType)) {
+        shouldCompress = true
       } else if (/^image\/svg+xml/i.test(contentType)) {
-        isText = true
+        shouldCompress = true
       }
     }
-    if (isText && body.length > 1024) {
+    if (shouldCompress && body.length > 1024) {
       if (this.headers.get('accept-encoding')?.includes('br')) {
         this.#resp.headers.set('Vary', 'Origin')
         this.#resp.headers.set('Content-Encoding', 'br')
@@ -179,10 +172,18 @@ export class Request implements APIRequest {
     }
     this.#resp.headers.set('Date', (new Date).toUTCString())
     this.#resp.done = true
-    await this.respond({
-      status: this.#resp.status,
-      headers: this.#resp.headers,
-      body
-    }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
+    try {
+      return this.respond({
+        status: this.#resp.status,
+        headers: this.#resp.headers,
+        body
+      })
+    } catch (err) {
+      return log.warn('ServerRequest.respond:', err.message)
+    }
+  }
+
+  json(data: any, replacer?: (this: any, key: string, value: any) => any, space?: string | number): Promise<void> {
+    return this.send(JSON.stringify(data, replacer, space), 'application/json; charset=utf-8')
   }
 }

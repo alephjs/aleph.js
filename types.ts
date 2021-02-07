@@ -123,8 +123,11 @@ export interface APIRequest extends ServerRequest {
   readonly params: Record<string, string>
   readonly query: URLSearchParams
   readonly cookies: ReadonlyMap<string, string>
-  /** `status` sets response status of the request. */
-  status(code: number): this
+  /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
+  readBody(type?: 'raw'): Promise<Uint8Array>
+  readBody(type: 'text'): Promise<string>
+  readBody(type: 'json'): Promise<any>
+  readBody(type: 'form'): Promise<MultipartFormData>
   /**
    * `addHeader` adds a new value onto an existing response header of the request, or
    * adds the header if it does not already exist.
@@ -137,15 +140,12 @@ export interface APIRequest extends ServerRequest {
   setHeader(key: string, value: string): this
   /** `removeHeader` removes the value for an existing response header of the request. */
   removeHeader(key: string): this
+  /** `status` sets response status of the request. */
+  status(code: number): this
   /** `send` replies to the request with any content with type. */
-  send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
+  send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
   /** `json` replies to the request with a json content. */
   json(data: any): Promise<void>
-  /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
-  readBody(type?: 'raw'): Promise<Uint8Array>
-  readBody(type: 'text'): Promise<string>
-  readBody(type: 'json'): Promise<any>
-  readBody(type: 'form'): Promise<MultipartFormData>
 }
 
 /**
