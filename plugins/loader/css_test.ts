@@ -10,7 +10,7 @@ Deno.test('css loader', async () => {
   assertEquals(loader.test.test('/test.css'), true)
   assertEquals(loader.test.test('/test.pcss'), true)
   assertEquals(loader.acceptHMR, true)
-  assertEquals(code, 'import { applyCSS } from "https://deno.land/framework/core/style.ts"\napplyCSS("/test.css", "h1 { font-size: 18px; }")')
+  assertEquals(code, 'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"\napplyCSS("/test.css", "h1 { font-size: 18px; }")')
 })
 
 Deno.test('css loader in bundle mode', async () => {
@@ -20,7 +20,7 @@ Deno.test('css loader in bundle mode', async () => {
     content: (new TextEncoder).encode('h1 { font-size: 18px; }'),
     bundleMode: true,
   })
-  assertEquals(code, 'import { applyCSS } from "https://deno.land/framework/core/style.ts"\n__ALEPH.pack["/test.css"] = { default: () => applyCSS("/test.css", "h1 { font-size: 18px; }") }')
+  assertEquals(code, 'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"\n__ALEPH.pack["/test.css"] = { default: () => applyCSS("/test.css", "h1 { font-size: 18px; }") }')
 })
 
 Deno.test('css loader in production mode', async () => {
@@ -31,17 +31,17 @@ Deno.test('css loader in production mode', async () => {
     url: '/test.css',
     content: (new TextEncoder).encode('h1 { font-size: 18px; }'),
   })
-  assertEquals(code, 'import { applyCSS } from "https://deno.land/framework/core/style.ts"\napplyCSS("/test.css", "h1{font-size:18px}")')
+  assertEquals(code, 'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"\napplyCSS("/test.css", "h1{font-size:18px}")')
 
   Deno.env.delete('BUILD_MODE')
 })
 
 Deno.test('css loader with postcss plugins', async () => {
-  const loader = cssLoader({ postcss: { plugins: ['autoprefixer'] } })
+  const loader = cssLoader({ postcss: { plugins: ['postcss-nested'] } })
   await loader.init!()
   const { code } = await loader.transform({
     url: '/test.css',
-    content: (new TextEncoder).encode('.pic { user-select: none; }'),
+    content: (new TextEncoder).encode('.foo { .bar { font-size: 100%; } }'),
   })
-  assertEquals(code, 'import { applyCSS } from "https://deno.land/framework/core/style.ts"\napplyCSS("/test.css", ".pic { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }")')
+  assertEquals(code, 'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"\napplyCSS("/test.css", ".foo .bar { font-size: 100%; }")')
 })

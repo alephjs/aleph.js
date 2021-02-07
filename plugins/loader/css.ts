@@ -61,7 +61,7 @@ export default (options?: Options): LoaderPlugin => {
         'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
         bundleMode
           ? `__ALEPH.pack[${stringify(url)}] = { default: () => ${appyCSS} }`
-          : `export default ${appyCSS}`
+          : appyCSS
       ].join('\n')
       return {
         code: js,

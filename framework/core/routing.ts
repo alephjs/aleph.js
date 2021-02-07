@@ -61,8 +61,8 @@ export class Routing {
     return JSON.parse(JSON.stringify(this._routes))
   }
 
-  update({ url, hash, hasData }: RouteModule) {
-    const newRoute: Route = { path: toPagePath(url), module: { url, hash, hasData } }
+  update(module: RouteModule) {
+    const newRoute: Route = { path: toPagePath(module.url), module: module }
     const dirtyRoutes: Set<Route[]> = new Set()
     let exists = false
     let targetRoutes = this._routes
@@ -70,8 +70,8 @@ export class Routing {
       const path = routePath.map(r => r.path).join('')
       const route = routePath[routePath.length - 1]
       const parentRoute = routePath[routePath.length - 2]
-      if (route.module.url === url) {
-        Object.assign(route.module, { url, hash, hasData })
+      if (route.module.url === module.url) {
+        Object.assign(route.module, module)
         exists = true
         return false
       }
