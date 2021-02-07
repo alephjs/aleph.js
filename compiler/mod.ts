@@ -1,6 +1,6 @@
 import { ensureDir, path } from '../deps.ts'
 import { existsFileSync } from '../shared/fs.ts'
-import type { ImportMap } from '../types.ts'
+import type { ImportMap } from '../shared/types.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
 import init, { transformSync } from './dist/wasm-pack.js'

@@ -1,6 +1,7 @@
 import { moduleExts } from '../../shared/constants.ts'
+import type { DependencyDescriptor } from '../../shared/types.ts'
 import util from '../../shared/util.ts'
-import type { DependencyDescriptor, RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
 
 const ghostRoute: Route = { path: '', module: { url: '', hash: '' } }

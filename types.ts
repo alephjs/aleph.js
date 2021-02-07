@@ -168,43 +168,6 @@ export type RouterURL = {
 }
 
 /**
- * A module includes compilation details.
- */
-export type Module = {
-  url: string
-  loader: string
-  sourceHash: string
-  hash: string
-  deps: DependencyDescriptor[]
-  jsFile: string
-  bundlingFile: string
-  error: Error | null
-}
-
-/**
- * The dependency descriptor.
- */
-export type DependencyDescriptor = {
-  url: string
-  hash: string
-  isDynamic?: boolean
-  isStyle?: boolean
-  isData?: boolean
-}
-
-/**
- * The render result of SSR.
- */
-export type RenderResult = {
-  url: RouterURL
-  status: number
-  head: string[]
-  body: string
-  scripts: Record<string, any>[]
-  data: Record<string, string> | null
-}
-
-/**
  * The form data body.
  */
 export type FormDataBody = {
@@ -223,12 +186,4 @@ export type FormFile = {
   contentType: string
   filename: string
   size: number
-}
-
-/**
- * The ES Import maps.
- */
-export type ImportMap = {
-  imports: Record<string, string>,
-  scopes: Record<string, Record<string, string>>
 }

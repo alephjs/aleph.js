@@ -1,6 +1,6 @@
+import { getFlag, parsePortNumber } from '../server/helper.ts'
 import type { ServeOptions } from '../server/mod.ts'
 import { Application, serve } from '../server/mod.ts'
-import { getFlag, parsePortNumber } from '../server/util.ts'
 import log from '../shared/log.ts'
 
 export const helpMessage = `

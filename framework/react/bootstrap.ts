@@ -3,10 +3,10 @@ import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
 import util from '../../shared/util.ts'
 import { RouteModule, Routing, RoutingOptions } from '../core/routing.ts'
+import { importModule, loadPageDataFromTag } from './helper.ts'
 import type { PageRoute } from './pageprops.ts'
 import { createPageProps } from './pageprops.ts'
 import Router from './router.ts'
-import { importModule, loadPageDataFromTag } from './util.ts'
 
 type BootstrapOptions = Required<RoutingOptions> & {
   sharedModules: RouteModule[],

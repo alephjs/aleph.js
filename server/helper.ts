@@ -64,8 +64,8 @@ export function computeHash(content: string | Uint8Array): string {
   return (new Sha1).update(content).hex()
 }
 
-/** cleanup the previous compilation cache */
-export async function cleanupCompilation(jsFile: string) {
+/** clear the previous compilation cache */
+export async function clearCompilation(jsFile: string) {
   const dir = path.dirname(jsFile)
   const jsFileName = path.basename(jsFile)
   if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {

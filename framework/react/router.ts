@@ -4,9 +4,9 @@ import events from '../core/events.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './error.ts'
+import { importModule, isLikelyReactComponent, loadPageData } from './helper.ts'
 import type { PageRoute } from './pageprops.ts'
 import { createPageProps } from './pageprops.ts'
-import { importModule, isLikelyReactComponent, loadPageData } from './util.ts'
 
 export default function Router({
   customComponents,

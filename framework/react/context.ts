@@ -1,6 +1,6 @@
 import { createContext } from 'https://esm.sh/react'
 import type { RouterURL } from '../../types.ts'
-import { createNamedContext } from './util.ts'
+import { createNamedContext } from './helper.ts'
 
 export const RouterContext = createNamedContext<RouterURL>({
   locale: 'en',

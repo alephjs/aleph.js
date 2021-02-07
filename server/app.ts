@@ -6,12 +6,13 @@ import { isModuleURL, RouteModule, Routing, toPagePath } from '../framework/core
 import { minDenoVersion, moduleExts } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
+import type { DependencyDescriptor, ImportMap, Module, RenderResult } from '../shared/types.ts'
 import util from '../shared/util.ts'
-import type { Config, DependencyDescriptor, ImportMap, Module, RenderResult, RouterURL, ServerRequest } from '../types.ts'
+import type { Config, RouterURL, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
 import { defaultConfig, loadConfig } from './config.ts'
-import { AlephRuntimeCode, cleanupCompilation, computeHash, createHtml, formatBytesWithColor, getAlephModuleUrl, getRelativePath, reFullVersion, reHashJs, reHashResolve, respondErrorJSON } from './util.ts'
+import { AlephRuntimeCode, clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephModuleUrl, getRelativePath, reFullVersion, reHashJs, reHashResolve, respondErrorJSON } from './helper.ts'
 
 /**
  * The Aleph Server Application class.
@@ -141,7 +142,7 @@ export class Application {
   async removePageModule(pathname: string): Promise<void> {
     const url = path.join('/pages/', util.cleanPath(pathname) + '.tsx')
     if (this.#modules.has(url)) {
-      await cleanupCompilation(this.#modules.get(url)!.jsFile)
+      await clearCompilation(this.#modules.get(url)!.jsFile)
       this.#modules.delete(url)
       this.#pageRouting.removeRoute(url)
     }
@@ -1023,7 +1024,7 @@ export class Application {
       if (!bundleMode) {
         mod.hash = computeHash(jsContent + buildChecksum)
         mod.jsFile = path.join(saveDir, name + (isRemote ? '' : `.${util.shortHash(mod.hash)}`) + '.js')
-        await cleanupCompilation(mod.jsFile)
+        await clearCompilation(mod.jsFile)
         await Promise.all([
           ensureTextFile(mod.jsFile, jsContent + (jsSourceMap ? '//# sourceMappingURL=' + path.basename(mod.jsFile) + '.map' : '')),
           jsSourceMap ? ensureTextFile(mod.jsFile + '.map', jsSourceMap) : Promise.resolve(),
@@ -1036,7 +1037,7 @@ export class Application {
         ])
       } else {
         mod.bundlingFile = path.join(saveDir, `${name}.bundling.${util.shortHash(mod.sourceHash)}.js`)
-        await cleanupCompilation(mod.bundlingFile)
+        await clearCompilation(mod.bundlingFile)
         await Promise.all([
           await ensureTextFile(mod.bundlingFile, jsContent),
           await ensureTextFile(metaFile, JSON.stringify({
@@ -1085,7 +1086,7 @@ export class Application {
               }
               return line
             }).join('\n')
-            await cleanupCompilation(mod.jsFile)
+            await clearCompilation(mod.jsFile)
             await Promise.all([
               ensureTextFile(mod.jsFile.replace(reHashJs, '') + '.meta.json', JSON.stringify({
                 url: mod.url,
@@ -1332,7 +1333,7 @@ export class Application {
       code = ret.code
     }
 
-    await cleanupCompilation(bundleFile)
+    await clearCompilation(bundleFile)
     await Deno.writeTextFile(bundleFile, code)
   }
 

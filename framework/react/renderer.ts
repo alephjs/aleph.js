@@ -2,12 +2,19 @@ import type { ComponentType, ReactElement } from 'https://esm.sh/react'
 import { createElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import util from '../../shared/util.ts'
-import type { RenderResult, RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RendererContext, RouterContext } from './context.ts'
 import { AsyncUseDenoError, E400MissingComponent, E404Page } from './error.ts'
+import { isLikelyReactComponent } from './helper.ts'
 import { createPageProps } from './pageprops.ts'
-import { isLikelyReactComponent } from './util.ts'
+
+type RenderResult = {
+  head: string[]
+  body: string
+  scripts: Record<string, any>[]
+  data: Record<string, string> | null
+}
 
 export async function render(
   url: RouterURL,
@@ -15,9 +22,9 @@ export async function render(
   E404: ComponentType | undefined,
   pageComponentChain: { url: string, Component?: any }[],
   styles: { url: string, hash: string }[]
-) {
+): Promise<RenderResult> {
   const global = globalThis as any
-  const ret: Omit<RenderResult, 'url' | 'status'> = {
+  const ret: RenderResult = {
     head: [],
     body: '',
     scripts: [],

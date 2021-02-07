@@ -2,7 +2,7 @@ import type { ComponentType } from 'https://esm.sh/react'
 import { RouterURL } from '../../types.ts'
 import { toPagePath } from '../core/routing.ts'
 import { E400MissingComponent } from './error.ts'
-import { isLikelyReactComponent } from './util.ts'
+import { isLikelyReactComponent } from './helper.ts'
 
 export type PageProps = {
   Page: ComponentType<any> | null

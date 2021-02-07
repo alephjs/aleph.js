@@ -3,9 +3,10 @@ import { path } from '../deps.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
+import type { ImportMap } from '../shared/types.ts'
 import util from '../shared/util.ts'
-import type { Config, ImportMap } from '../types.ts'
-import { getAlephModuleUrl, reLocaleID } from './util.ts'
+import type { Config } from '../types.ts'
+import { getAlephModuleUrl, reLocaleID } from './helper.ts'
 
 export const defaultConfig: Readonly<Required<Config>> = {
   framework: 'react',
@@ -207,17 +208,15 @@ function fixImportMap(v: any) {
   const imports: Record<string, string> = {}
   if (util.isPlainObject(v)) {
     Object.entries(v).forEach(([key, value]) => {
-      if (key == '' || key == '/') {
+      if (key == '') {
         return
       }
-      const isPrefix = key.endsWith('/')
-      const y = (v: string) => util.isNEString(v) && (!isPrefix || v.endsWith('/'))
-      if (y(value)) {
+      if (util.isNEString(value)) {
         imports[key] = value
         return
       } else if (util.isNEArray(value)) {
         for (const v of value) {
-          if (y(v)) {
+          if (util.isNEString(v)) {
             imports[key] = v
             return
           }

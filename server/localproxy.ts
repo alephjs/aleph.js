@@ -2,8 +2,8 @@ import { path, serve } from '../deps.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { Request } from './api.ts'
+import { createHtml } from './helper.ts'
 import { getContentType } from './mime.ts'
-import { createHtml } from './util.ts'
 
 /** proxy https://deno.land/x/aleph on localhost */
 export async function localProxy() {

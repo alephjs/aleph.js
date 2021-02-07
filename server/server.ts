@@ -6,8 +6,8 @@ import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
+import { createHtml, reHashJs } from './helper.ts'
 import { getContentType } from './mime.ts'
-import { createHtml, reHashJs } from './util.ts'
 
 /** The Aleph Server class. */
 export class Server {
@@ -158,7 +158,7 @@ export class Server {
 }
 
 export type ServeOptions = {
-  /** The Application to serve. */
+  /** The Aleph Server Application to serve. */
   app: Application
   /** The port to listen on. */
   port: number

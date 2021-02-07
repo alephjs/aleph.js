@@ -1,7 +1,7 @@
 import type { ComponentType, LinkHTMLAttributes } from 'https://esm.sh/react'
 import { createElement, useEffect, useState } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import { isLikelyReactComponent } from './util.ts'
+import { isLikelyReactComponent } from './helper.ts'
 
 type LinkProps = LinkHTMLAttributes<{}> & {
   'data-fallback'?: JSX.Element
