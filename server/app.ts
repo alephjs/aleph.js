@@ -1,6 +1,7 @@
+import { createHash } from "https://deno.land/std@0.86.0/hash/mod.ts"
 import { buildChecksum, initWasm, SWCOptions, TransformOptions, transpileSync } from '../compiler/mod.ts'
 import type { AcceptedPlugin, ECMA } from '../deps.ts'
-import { CleanCSS, colors, ensureDir, minify, path, postcss, Sha256, walk } from '../deps.ts'
+import { CleanCSS, colors, ensureDir, minify, path, postcss, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { isModuleURL, RouteModule, Routing, toPagePath } from '../framework/core/routing.ts'
 import { minDenoVersion, moduleExts } from '../shared/constants.ts'
@@ -1120,7 +1121,7 @@ export class Application {
     const versioned = reFullVersion.test(pathname)
     const reload = this.#reloading || !versioned
     const cacheDir = path.join(this.#denoCacheDir, 'deps', util.trimSuffix(protocol, ':'), hostname + (port ? '_PORT' + port : ''))
-    const cacheFilename = path.join(cacheDir, (new Sha256()).update(pathname + search).hex())
+    const cacheFilename = path.join(cacheDir, createHash('sha256').update(pathname + search).toString())
 
     if (!reload && existsFileSync(cacheFilename)) {
       return await Deno.readFile(cacheFilename)

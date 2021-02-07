@@ -1,4 +1,4 @@
-import { colors, path, Sha1 } from '../deps.ts'
+import { colors, createHash, path } from '../deps.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -61,7 +61,7 @@ export function getRelativePath(from: string, to: string): string {
 
 /** compute hash of the content */
 export function computeHash(content: string | Uint8Array): string {
-  return (new Sha1).update(content).hex()
+  return createHash('sha1').update(content).toString()
 }
 
 /** clear the previous compilation cache */
