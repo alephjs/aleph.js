@@ -1,4 +1,4 @@
-import type { AcceptedPlugin, bufio } from './deps.ts'
+import type { AcceptedPlugin, BufReader, BufWriter, MultipartFormData } from './deps.ts'
 
 /**
  * The transform result of compiler.
@@ -100,8 +100,8 @@ export interface ServerRequest {
   readonly method: string
   readonly headers: Headers
   readonly conn: Deno.Conn
-  readonly r: bufio.BufReader
-  readonly w: bufio.BufWriter
+  readonly r: BufReader
+  readonly w: BufWriter
   readonly body: Deno.Reader
   respond(r: ServerResponse): Promise<void>
 }
@@ -141,10 +141,11 @@ export interface APIRequest extends ServerRequest {
   send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
   /** `json` replies to the request with a json content. */
   json(data: any): Promise<void>
-  /** `decodeBody` will return a string, form-data, or json object. */
-  decodeBody(type: 'form-data'): Promise<FormDataBody>
-  decodeBody(type: 'text'): Promise<string>
-  decodeBody(type: 'json'): Promise<any>
+  /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
+  readBody(type?: 'raw'): Promise<Uint8Array>
+  readBody(type: 'text'): Promise<string>
+  readBody(type: 'json'): Promise<any>
+  readBody(type: 'form'): Promise<MultipartFormData>
 }
 
 /**

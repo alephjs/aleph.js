@@ -1,7 +1,7 @@
-import { brotli, bufio, gzipEncode } from '../deps.ts'
+import { MultipartFormData } from "https://deno.land/std@0.86.0/mime/multipart.ts"
+import { brotli, BufReader, BufWriter, gzipEncode, MultipartReader } from '../deps.ts'
 import log from '../shared/log.ts'
-import type { APIRequest, FormDataBody, ServerRequest, ServerResponse } from '../types.ts'
-import { multiParser } from './multiparser.ts'
+import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 
 export class Request implements APIRequest {
   #req: ServerRequest
@@ -49,11 +49,11 @@ export class Request implements APIRequest {
     return this.#req.conn
   }
 
-  get r(): bufio.BufReader {
+  get r(): BufReader {
     return this.#req.r
   }
 
-  get w(): bufio.BufWriter {
+  get w(): BufWriter {
     return this.#req.w
   }
 
@@ -106,27 +106,31 @@ export class Request implements APIRequest {
     await this.send(JSON.stringify(data, replacer, space), 'application/json; charset=utf-8')
   }
 
-  async decodeBody(type: "text"): Promise<string>
-  async decodeBody(type: "json"): Promise<any>
-  async decodeBody(type: "form-data"): Promise<FormDataBody>
-  async decodeBody(type: string): Promise<any> {
-    if (type === "text") {
-      const buff: Uint8Array = await Deno.readAll(this.body)
-      const encoded = new TextDecoder("utf-8").decode(buff)
-      return encoded
-    }
-
-    if (type === "json") {
-      const buff: Uint8Array = await Deno.readAll(this.body)
-      const encoded = new TextDecoder("utf-8").decode(buff)
-      const json = JSON.parse(encoded)
-      return json
-    }
-
-    if (type === "form-data") {
-      const contentType = this.headers.get("content-type") as string
-      const form = await multiParser(this.body, contentType)
-      return form
+  async readBody(type?: 'raw'): Promise<Uint8Array>
+  async readBody(type: 'text'): Promise<string>
+  async readBody(type: 'json'): Promise<any>
+  async readBody(type: 'form'): Promise<MultipartFormData>
+  async readBody(type?: string): Promise<any> {
+    switch (type) {
+      case 'text': {
+        const buff: Uint8Array = await Deno.readAll(this.body)
+        const encoded = new TextDecoder('utf-8').decode(buff)
+        return encoded
+      }
+      case 'json': {
+        const buff: Uint8Array = await Deno.readAll(this.body)
+        const encoded = new TextDecoder('utf-8').decode(buff)
+        const data = JSON.parse(encoded)
+        return data
+      }
+      case 'form': {
+        const contentType = this.headers.get('content-type') as string
+        const reader = new MultipartReader(this.body, contentType)
+        return reader.readForm()
+      }
+      default: {
+        return await Deno.readAll(this.body)
+      }
     }
   }
 
