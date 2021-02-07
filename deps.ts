@@ -1,14 +1,15 @@
 // std
 export { Untar } from 'https://deno.land/std@0.86.0/archive/tar.ts'
-export * as bytes from 'https://deno.land/std@0.86.0/bytes/mod.ts'
 export * as base64 from 'https://deno.land/std@0.86.0/encoding/base64.ts'
 export * as flags from 'https://deno.land/std@0.86.0/flags/mod.ts'
 export * as colors from 'https://deno.land/std@0.86.0/fmt/colors.ts'
 export { ensureDir } from 'https://deno.land/std@0.86.0/fs/ensure_dir.ts'
 export { walk } from 'https://deno.land/std@0.86.0/fs/walk.ts'
 export { createHash } from 'https://deno.land/std@0.86.0/hash/mod.ts'
-export { listenAndServe, serve, serveTLS } from 'https://deno.land/std@0.86.0/http/server.ts'
-export * as bufio from 'https://deno.land/std@0.86.0/io/bufio.ts'
+export { serve, serveTLS } from 'https://deno.land/std@0.86.0/http/server.ts'
+export type { BufReader, BufWriter } from 'https://deno.land/std@0.86.0/io/bufio.ts'
+export { MultipartReader } from 'https://deno.land/std@0.86.0/mime/multipart.ts'
+export type { MultipartFormData } from 'https://deno.land/std@0.86.0/mime/multipart.ts'
 export * as path from 'https://deno.land/std@0.86.0/path/mod.ts'
 export * as ws from 'https://deno.land/std@0.86.0/ws/mod.ts'
 // deno.land/x
