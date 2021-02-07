@@ -33,9 +33,8 @@ export default async function bootstrap(options: BootstrapOptions) {
   const imports = await Promise.all(pageModuleChain.map(async mod => {
     const [{ default: Component }] = await Promise.all([
       importModule(baseUrl, mod),
-      mod.asyncDeps?.filter(({ isData }) => !!isData).length ? loadPageDataFromTag(url) : Promise.resolve()
+      mod.hasData ? loadPageDataFromTag(url) : Promise.resolve()
     ])
-    await Promise.all(mod.asyncDeps?.filter(({ isStyle }) => !!isStyle).map(dep => importModule(baseUrl, dep)) || [])
     return {
       url: mod.url,
       Component,

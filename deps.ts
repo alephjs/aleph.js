@@ -16,9 +16,6 @@ export * as ws from 'https://deno.land/std@0.86.0/ws/mod.ts'
 export * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 export { gzipDecode, gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 // esm.sh
-export { default as CleanCSS } from 'https://esm.sh/clean-css@5.0.1?no-check'
-export { default as postcss } from 'https://esm.sh/postcss@8.2.4'
-export type { AcceptedPlugin } from 'https://esm.sh/postcss@8.2.4'
 export { minify } from 'https://esm.sh/terser@5.5.1'
 export type { ECMA } from 'https://esm.sh/terser@5.5.1'
 

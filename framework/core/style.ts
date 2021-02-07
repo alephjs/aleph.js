@@ -1,5 +1,7 @@
 import util from '../../shared/util.ts'
 
+export const serverStyles = new Map<string, string>()
+
 export function removeCSS(id: string) {
   const { document } = window as any
   Array.from(document.head.children).forEach((el: any) => {
@@ -11,7 +13,7 @@ export function removeCSS(id: string) {
 
 export function applyCSS(id: string, css: string) {
   if (util.inDeno()) {
-    return { id, css }
+    serverStyles.set(id, css)
   } else {
     const { document } = window as any
     const ssrStyle = Array.from<any>(document.head.children).find((el: any) => {
@@ -31,7 +33,6 @@ export function applyCSS(id: string, css: string) {
       if (prevStyleEls.length > 0) {
         prevStyleEls.forEach(el => document.head.removeChild(el))
       }
-      return styleEl
     }
   }
 }

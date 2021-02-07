@@ -1,14 +1,14 @@
 import type { PropsWithChildren, ScriptHTMLAttributes } from 'https://esm.sh/react'
 import { useContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import { RendererContext } from './context.ts'
+import { SSRContext } from './context.ts'
 
 export default function Script(props: PropsWithChildren<ScriptHTMLAttributes<{}>>) {
-  const renderer = useContext(RendererContext)
+  const { scriptElements } = useContext(SSRContext)
 
   if (util.inDeno()) {
-    const key = 'script-' + (renderer.scriptsElements.size + 1)
-    renderer.scriptsElements.set(key, { type: 'script', props })
+    const key = 'script-' + (scriptElements.size + 1)
+    scriptElements.set(key, { props })
   }
 
   // todo: insert page scripts in browser

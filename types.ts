@@ -1,32 +1,38 @@
-import type { AcceptedPlugin, BufReader, BufWriter, MultipartFormData } from './deps.ts'
+import type { BufReader, BufWriter, MultipartFormData } from './deps.ts'
 
 /**
  * The transform result of compiler.
  */
 export type TransformResult = {
   code: string,
-  map?: string,
-  format?: 'js' | 'ts' | 'jsx' | 'tsx' | 'css',
+  map?: string
+  loader?: string
 }
 
 /**
  * A loader plugin to load source media.
  */
 export type LoaderPlugin = {
+  /** `name` gives the plugin a name. */
+  name: string
   /** `type` specifies the plugin type. */
   type: 'loader'
   /** `test` matches the import url. */
   test: RegExp
   /** `acceptHMR` enables the HMR. */
   acceptHMR?: boolean
+  /** `init` initiates the plugin. */
+  init?(): Promise<void>
   /** `transform` transforms the source content. */
-  transform(content: Uint8Array, url: string): TransformResult | Promise<TransformResult>
+  transform(source: { url: string, content: Uint8Array, map?: string, bundleMode?: boolean }): TransformResult | Promise<TransformResult>
 }
 
 /**
  * A server plugin to enhance the aleph server application.
  */
 export type ServerPlugin = {
+  /** `name` gives the plugin a name. */
+  name: string
   /** `type` specifies the plugin type. */
   type: 'server'
   /** `onInit` adds an `init` event to the server. */
@@ -76,8 +82,6 @@ export type Config = {
   rewrites?: Record<string, string>
   /** A list of plugin. */
   plugins?: Plugin[]
-  /** A list of plugin of PostCSS. */
-  postcss?: { plugins: (string | AcceptedPlugin | [string | ((options: Record<string, any>) => AcceptedPlugin), Record<string, any>])[] }
   /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable). */
   env?: Record<string, string>
 }
@@ -166,25 +170,4 @@ export type RouterURL = {
   readonly pagePath: string
   readonly params: Record<string, string>
   readonly query: URLSearchParams
-}
-
-/**
- * The form data body.
- */
-export type FormDataBody = {
-  fields: Record<string, string>
-  files: FormFile[]
-  get(key: string): string | undefined
-  getFile(key: string): FormFile | undefined
-}
-
-/**
- * The form file.
- */
-export type FormFile = {
-  name: string
-  content: Uint8Array
-  contentType: string
-  filename: string
-  size: number
 }

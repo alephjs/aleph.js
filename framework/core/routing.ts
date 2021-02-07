@@ -1,5 +1,4 @@
 import { moduleExts } from '../../shared/constants.ts'
-import type { DependencyDescriptor } from '../../shared/types.ts'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
@@ -15,7 +14,7 @@ export type Route = {
 export type RouteModule = {
   readonly url: string
   readonly hash: string
-  readonly asyncDeps?: DependencyDescriptor[]
+  readonly hasData?: boolean
 }
 
 export type RoutingOptions = {
@@ -62,8 +61,8 @@ export class Routing {
     return JSON.parse(JSON.stringify(this._routes))
   }
 
-  update(module: RouteModule) {
-    const newRoute: Route = { path: toPagePath(module.url), module }
+  update({ url, hash, hasData }: RouteModule) {
+    const newRoute: Route = { path: toPagePath(url), module: { url, hash, hasData } }
     const dirtyRoutes: Set<Route[]> = new Set()
     let exists = false
     let targetRoutes = this._routes
@@ -71,8 +70,8 @@ export class Routing {
       const path = routePath.map(r => r.path).join('')
       const route = routePath[routePath.length - 1]
       const parentRoute = routePath[routePath.length - 2]
-      if (route.module.url === module.url) {
-        Object.assign(route.module, module)
+      if (route.module.url === url) {
+        Object.assign(route.module, { url, hash, hasData })
         exists = true
         return false
       }

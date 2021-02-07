@@ -1,5 +1,5 @@
-import type { AcceptedPlugin } from '../deps.ts'
 import { path } from '../deps.ts'
+import cssLoader from '../plugins/loader/css.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -20,11 +20,6 @@ export const defaultConfig: Readonly<Required<Config>> = {
   rewrites: {},
   ssr: {},
   plugins: [],
-  postcss: {
-    plugins: [
-      'autoprefixer'
-    ]
-  },
   env: {},
 }
 
@@ -53,7 +48,7 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     }
   }
 
-  const config: Config = {}
+  const config: Config = { plugins: [cssLoader()] }
   const {
     framework,
     reactVersion,
@@ -66,7 +61,6 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     ssr,
     rewrites,
     plugins,
-    postcss,
     env,
   } = data
   if (isFramework(framework)) {
@@ -109,31 +103,11 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     config.env = env
   }
   if (util.isNEArray(plugins)) {
-    config.plugins = plugins
-  }
-  if (isPostcssConfig(postcss)) {
-    config.postcss = postcss
-  } else {
-    for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
-      const p = path.join(workingDir, name)
-      if (existsFileSync(p)) {
-        if (name.endsWith('.json')) {
-          const postcss = JSON.parse(await Deno.readTextFile(p))
-          if (isPostcssConfig(postcss)) {
-            config.postcss = postcss
-          }
-        } else {
-          let { default: postcss } = await import('file://' + p)
-          if (util.isFunction(postcss)) {
-            postcss = await postcss()
-          }
-          if (isPostcssConfig(postcss)) {
-            config.postcss = postcss
-          }
-        }
-        break
+    plugins.forEach(p => {
+      if (!config.plugins?.find(({ name, type }) => p.type === type && p.name === name)) {
+        config.plugins?.push(p)
       }
-    }
+    })
   }
 
   // todo: load ssr.config.ts
@@ -198,10 +172,6 @@ function isBuildTarget(v: any): v is 'es5' | 'es2015' | 'es2016' | 'es2017' | 'e
 
 function isLocaleID(v: any): v is string {
   return util.isNEString(v) && reLocaleID.test(v)
-}
-
-function isPostcssConfig(v: any): v is { plugins: (string | AcceptedPlugin | [string | ((options: Record<string, any>) => AcceptedPlugin), Record<string, any>])[] } {
-  return util.isPlainObject(v) && util.isArray(v.plugins)
 }
 
 function fixImportMap(v: any) {

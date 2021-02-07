@@ -10,6 +10,26 @@ export const reFullVersion = /@v?\d+\.\d+\.\d+/i
 export const reHashJs = /\.[0-9a-fx]{9}\.js$/i
 export const reHashResolve = /(import|import\s*\(|from|href\s*:)(\s*)("|')([^'"]+\.[0-9a-fx]{9}\.js)("|')/g
 
+// inject browser navigator polyfill
+Object.assign(globalThis, {
+  navigator: {
+    connection: {
+      downlink: 10,
+      effectiveType: "4g",
+      onchange: null,
+      rtt: 50,
+      saveData: false,
+    },
+    cookieEnabled: false,
+    deviceMemory: 8,
+    hardwareConcurrency: 4,
+    language: 'en',
+    onLine: true,
+    userAgent: `Deno/${Deno.version.deno}`,
+    vendor: 'Deno Land',
+  }
+})
+
 export const AlephRuntimeCode = `
   var __ALEPH = window.__ALEPH || (window.__ALEPH = {
     pack: {},

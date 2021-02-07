@@ -45,9 +45,8 @@ export default function Router({
       const imports = pageModuleChain.map(async mod => {
         const [{ default: Component }] = await Promise.all([
           importModule(baseUrl, mod, e.forceRefetch),
-          mod.asyncDeps?.filter(({ isData }) => !!isData).length ? loadPageData(url) : Promise.resolve(),
+          mod.hasData ? loadPageData(url) : Promise.resolve(),
         ])
-        await Promise.all(mod.asyncDeps?.filter(({ isStyle }) => !!isStyle).map(dep => importModule(baseUrl, dep)) || [])
         return {
           url: mod.url,
           Component
@@ -125,7 +124,7 @@ export default function Router({
       const [url, pageModuleChain] = routing.createRouter({ pathname, search })
       if (url.pagePath !== '') {
         pageModuleChain.map(mod => {
-          if (mod.asyncDeps?.filter(({ isData }) => !!isData).length) {
+          if (mod.hasData) {
             loadPageData(url)
           }
           importModule(baseUrl, mod)

@@ -1,11 +1,11 @@
 import type { PropsWithChildren, ReactNode } from 'https://esm.sh/react'
 import { Children, Fragment, isValidElement, useContext, useEffect } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import { RendererContext } from './context.ts'
+import { SSRContext } from './context.ts'
 import Script from './script.ts'
 
 export default function Head(props: PropsWithChildren<{}>) {
-  const renderer = useContext(RendererContext)
+  const renderer = useContext(SSRContext)
 
   if (util.inDeno()) {
     parse(props.children).forEach(({ type, props }, key) => renderer.headElements.set(key, { type, props }))
