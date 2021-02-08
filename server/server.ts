@@ -55,11 +55,10 @@ export class Server {
                   const mod = app.getModule(data.url)
                   if (mod) {
                     watcher.on('modify-' + mod.url, (hash: string) => {
-                      const updateUrl = `/_aleph/${util.trimModuleExt(mod.url)}.${util.shortHash(hash!)}.js`
                       socket.send(JSON.stringify({
                         type: 'update',
                         url: mod.url,
-                        updateUrl: baseUrl !== '/' ? baseUrl + updateUrl : updateUrl,
+                        updateUrl: util.cleanPath(`${baseUrl}/_aleph/${util.trimModuleExt(mod.url)}.${util.shortHash(hash)}.js`),
                         hash,
                       }))
                     })
