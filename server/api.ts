@@ -5,7 +5,6 @@ import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 
 export class Request implements APIRequest {
   #req: ServerRequest
-  #pathname: string
   #params: Record<string, string>
   #query: URLSearchParams
   #cookies: ReadonlyMap<string, string>
@@ -17,9 +16,8 @@ export class Request implements APIRequest {
     done: false
   }
 
-  constructor(req: ServerRequest, pathname: string, params: Record<string, string>, query: URLSearchParams) {
+  constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams) {
     this.#req = req
-    this.#pathname = pathname
     this.#params = params
     this.#query = query
     const cookies = new Map()
@@ -62,10 +60,6 @@ export class Request implements APIRequest {
 
   async respond(r: ServerResponse): Promise<void> {
     return this.#req.respond(r)
-  }
-
-  get pathname(): string {
-    return this.#pathname
   }
 
   get params(): Record<string, string> {

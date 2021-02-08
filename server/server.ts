@@ -29,7 +29,12 @@ export class Server {
     const { baseUrl, rewrites } = app.config
     const url = rewriteURL(r.url, baseUrl, rewrites)
     const pathname = decodeURI(url.pathname)
-    const req = new Request(r, pathname, {}, url.searchParams)
+    const req = new Request(r, {}, url.searchParams)
+
+    // set custom headers
+    for (const key in app.config.headers) {
+      req.setHeader(key, app.config.headers[key])
+    }
 
     try {
       // serve hmr ws
@@ -140,7 +145,7 @@ export class Server {
 
       // serve APIs
       if (pathname.startsWith('/api/')) {
-        app.handleAPI(r, { pathname, search: url.searchParams.toString() })
+        app.handleAPIRequest(r, { pathname, search: url.searchParams.toString() })
         return
       }
 

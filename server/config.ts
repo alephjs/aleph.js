@@ -1,9 +1,9 @@
+import type { ImportMap } from '../compiler/mod.ts'
 import { path } from '../deps.ts'
 import cssLoader from '../plugins/loader/css.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
-import type { ImportMap } from '../shared/types.ts'
 import util from '../shared/util.ts'
 import type { Config } from '../types.ts'
 import { getAlephModuleUrl, reLocaleID } from './helper.ts'
@@ -20,6 +20,7 @@ export const defaultConfig: Readonly<Required<Config>> = {
   rewrites: {},
   ssr: {},
   plugins: [],
+  headers: {},
   env: {},
 }
 
@@ -61,6 +62,7 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     ssr,
     rewrites,
     plugins,
+    headers,
     env,
   } = data
   if (isFramework(framework)) {
@@ -97,10 +99,13 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     config.ssr = { include, exclude, staticPaths }
   }
   if (util.isPlainObject(rewrites)) {
-    config.rewrites = rewrites
+    config.rewrites = toPlainStringRecord(rewrites)
+  }
+  if (util.isPlainObject(headers)) {
+    config.headers = toPlainStringRecord(headers)
   }
   if (util.isPlainObject(env)) {
-    config.env = env
+    config.env = toPlainStringRecord(env)
   }
   if (util.isNEArray(plugins)) {
     plugins.forEach(p => {
@@ -118,11 +123,11 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     const importMapFile = path.join(workingDir, filename)
     if (existsFileSync(importMapFile)) {
       const data = JSON.parse(await Deno.readTextFile(importMapFile))
-      const imports: Record<string, string> = fixImportMap(data.imports)
+      const imports: Record<string, string> = toPlainStringRecord(data.imports)
       const scopes: Record<string, Record<string, string>> = {}
       if (util.isPlainObject(data.scopes)) {
         Object.entries(data.scopes).forEach(([scope, imports]) => {
-          scopes[scope] = fixImportMap(imports)
+          scopes[scope] = toPlainStringRecord(imports)
         })
       }
       Object.assign(importMap, { imports, scopes })
@@ -174,7 +179,7 @@ function isLocaleID(v: any): v is string {
   return util.isNEString(v) && reLocaleID.test(v)
 }
 
-function fixImportMap(v: any) {
+function toPlainStringRecord(v: any) {
   const imports: Record<string, string> = {}
   if (util.isPlainObject(v)) {
     Object.entries(v).forEach(([key, value]) => {

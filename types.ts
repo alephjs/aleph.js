@@ -1,9 +1,9 @@
 import type { BufReader, BufWriter, MultipartFormData } from './deps.ts'
 
 /**
- * The transform result of compiler.
+ * The result of loader transform.
  */
-export type TransformResult = {
+export type LoaderTransformResult = {
   code: string,
   map?: string
   loader?: string
@@ -21,10 +21,12 @@ export type LoaderPlugin = {
   test: RegExp
   /** `acceptHMR` enables the HMR. */
   acceptHMR?: boolean
+  /** `allowPage` allows the loaded module as a page. */
+  allowPage?: boolean
   /** `init` initiates the plugin. */
   init?(): Promise<void>
   /** `transform` transforms the source content. */
-  transform(source: { url: string, content: Uint8Array, map?: string, bundleMode?: boolean }): TransformResult | Promise<TransformResult>
+  transform(source: { url: string, content: Uint8Array, map?: string, bundleMode?: boolean }): LoaderTransformResult | Promise<LoaderTransformResult>
 }
 
 /**
@@ -78,11 +80,13 @@ export type Config = {
   locales?: string[]
   /** The options for **SSR**. */
   ssr?: boolean | SSROptions
-  /* The server path rewrite rules. */
-  rewrites?: Record<string, string>
   /** A list of plugin. */
   plugins?: Plugin[]
-  /** `env` appends env variables (use `Deno.env.get(key)` to get an env variable). */
+  /** `headers` appends custom headers for each server request. */
+  headers?: Record<string, string>
+  /* The server path rewrite map. */
+  rewrites?: Record<string, string>
+  /** `env` appends env variables. */
   env?: Record<string, string>
 }
 
@@ -123,7 +127,6 @@ export interface ServerResponse {
  * An interface extends the `ServerRequest` for API requests.
  */
 export interface APIRequest extends ServerRequest {
-  readonly pathname: string
   readonly params: Record<string, string>
   readonly query: URLSearchParams
   readonly cookies: ReadonlyMap<string, string>

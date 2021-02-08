@@ -85,13 +85,13 @@ export default {
       .split(/[\/\\]+/g)
       .map(p => p.trim())
       .filter(p => p !== '' && p !== '.')
-      .reduce((path, p) => {
+      .reduce((slice, p) => {
         if (p === '..') {
-          path.pop()
+          slice.pop()
         } else {
-          path.push(p)
+          slice.push(p)
         }
-        return path
+        return slice
       }, [] as Array<string>)
   },
   cleanPath(path: string): string {
