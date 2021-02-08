@@ -1,5 +1,5 @@
 import { Options, renderSync } from 'https://esm.sh/sass@1.32.5'
-import type { LoaderPlugin } from '../../types.ts'
+import type { LoaderPlugin } from '../types.ts'
 
 export default (opts?: Options): LoaderPlugin => ({
   name: 'sass-loader',

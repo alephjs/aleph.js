@@ -1,12 +1,13 @@
 import CleanCSS from 'https://esm.sh/clean-css@5.0.1?no-check'
 import type { AcceptedPlugin } from 'https://esm.sh/postcss@8.2.4'
 import postcss from 'https://esm.sh/postcss@8.2.4'
-import { path } from '../../deps.ts'
-import { existsFileSync } from '../../shared/fs.ts'
-import util from '../../shared/util.ts'
-import type { LoaderPlugin } from '../../types.ts'
+import { path } from '../deps.ts'
+import { existsFileSync } from '../shared/fs.ts'
+import util from '../shared/util.ts'
+import type { LoaderPlugin } from '../types.ts'
 
 const cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
+const productionOnlyPostcssPlugins = ['autoprefixer']
 
 type Options = {
   postcss?: {
@@ -75,9 +76,9 @@ async function loadPostcssPlugins(plugins: (string | [string, any] | AcceptedPlu
   const isDev = Deno.env.get('BUILD_MODE') === 'development'
   return await Promise.all(plugins.filter(p => {
     if (isDev) {
-      if (p === 'autoprefixer') {
+      if (util.isNEString(p) && productionOnlyPostcssPlugins.includes(p)) {
         return false
-      } else if (Array.isArray(p) && p[0] === 'autoprefixer') {
+      } else if (Array.isArray(p) && productionOnlyPostcssPlugins.includes(p[0])) {
         return false
       }
     }

@@ -1,4 +1,4 @@
-import type { LoaderPlugin } from '../../types.ts'
+import type { LoaderPlugin } from '../types.ts'
 
 export default (): LoaderPlugin => ({
   name: 'wasm-loader',
