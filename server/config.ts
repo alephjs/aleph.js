@@ -1,6 +1,6 @@
 import type { ImportMap } from '../compiler/mod.ts'
 import { path } from '../deps.ts'
-import cssLoader from '../plugins/loader/css.ts'
+import cssLoader from '../plugins/css.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -49,7 +49,7 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     }
   }
 
-  const config: Config = { plugins: [cssLoader()] }
+  const config: Config = {}
   const {
     framework,
     reactVersion,
@@ -107,13 +107,10 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
   if (util.isPlainObject(env)) {
     config.env = toPlainStringRecord(env)
   }
-  if (util.isNEArray(plugins)) {
-    plugins.forEach(p => {
-      if (!config.plugins?.find(({ name, type }) => p.type === type && p.name === name)) {
-        config.plugins?.push(p)
-      }
-    })
-  }
+  config.plugins = [
+    util.isNEArray(plugins) ? plugins : [],
+    cssLoader() // add the css loader as default
+  ].flat()
 
   // todo: load ssr.config.ts
 
