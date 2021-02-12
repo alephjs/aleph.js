@@ -32,9 +32,8 @@ pub fn aleph_jsx_fold(
 /// - resolve `a` to `Anchor`
 /// - resolve `head` to `Head`
 /// - resolve `link` to `Link`
-/// - resolve `Link` component `href` prop
-/// - resolve `script` to `Script`
 /// - resolve `style` to `Style`
+/// - resolve `script` to `Script`
 /// - optimize `img` in producation mode
 struct AlephJsxFold {
   resolver: Rc<RefCell<Resolver>>,
@@ -117,13 +116,10 @@ impl AlephJsxFold {
                   value: Some(JSXAttrValue::Lit(Lit::Str(Str { value, .. }))),
                   ..
                 }) => {
-                  let key = id.sym.as_ref();
-                  let value = value.as_ref();
-                  if key == "rel" {
-                    rel = Some(value.into());
-                    if value == "style" || value == "stylesheet" || value == "component" {
-                      should_replace = true
-                    }
+                  if id.sym.eq("rel") && (value.eq("stylesheet") || value.eq("style")) {
+                    should_replace = true;
+                    rel = Some(value.to_string());
+                    break;
                   }
                 }
                 _ => {}

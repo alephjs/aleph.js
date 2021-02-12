@@ -28,14 +28,13 @@ impl Fold for JSXLinkFixer {
     let dep_graph = self.resolver.borrow().dep_graph.clone();
     let bundled_modules = self.resolver.borrow().bundled_modules.clone();
     let mut resolver = self.resolver.borrow_mut();
-    let mut i = 1;
 
     for dep in dep_graph {
       if dep.is_dynamic && !bundled_modules.contains(&dep.specifier) {
         if let Some(rel) = &dep.rel {
           let rel = rel.as_str();
           match rel {
-            "style" | "stylesheet" => {
+            "stylesheet" | "style" => {
               let (url, _) = resolver.resolve(dep.specifier.as_str(), false, Some(".".into()));
               items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
                 span: DUMMY_SP,
@@ -49,8 +48,6 @@ impl Fold for JSXLinkFixer {
                 type_only: false,
                 asserts: None,
               })));
-
-              i = i + 1;
             }
             _ => {}
           }
