@@ -9,6 +9,7 @@ mod fixer;
 mod import_map;
 mod jsx;
 mod resolve;
+mod resolve_fold;
 mod source_type;
 mod swc;
 

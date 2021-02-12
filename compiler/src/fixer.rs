@@ -1,6 +1,7 @@
 // Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
-use crate::resolve::{is_call_expr_by_name, Resolver};
+use crate::resolve::Resolver;
+use crate::resolve_fold::is_call_expr_by_name;
 
 use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;

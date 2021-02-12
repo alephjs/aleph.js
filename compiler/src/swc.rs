@@ -5,7 +5,8 @@ use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::fast_refresh::fast_refresh_fold;
 use crate::fixer::{compat_fixer_fold, jsx_link_fixer_fold};
 use crate::jsx::aleph_jsx_fold;
-use crate::resolve::{aleph_resolve_fold, Resolver};
+use crate::resolve::Resolver;
+use crate::resolve_fold::aleph_resolve_fold;
 use crate::source_type::SourceType;
 
 use std::{cell::RefCell, path::Path, rc::Rc};
@@ -308,7 +309,7 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_ts() {
+  fn ts() {
     let source = r#"
       enum D {
         A,
@@ -344,7 +345,7 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_jsx() {
+  fn jsx() {
     let source = r#"
       import React from "https://esm.sh/react"
       export default function Index() {
@@ -363,7 +364,7 @@ mod tests {
   }
 
   #[test]
-  fn test_sign_use_deno() {
+  fn sign_use_deno_hook() {
     let specifer = "/pages/index.tsx";
     let source = r#"
       export default function Index() {
@@ -414,7 +415,7 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_jsx_builtin_tags() {
+  fn resolve_jsx_builtin_tags() {
     let source = r#"
       import React from "https://esm.sh/react"
       export default function Index() {
@@ -505,7 +506,7 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_inlie_style() {
+  fn resolve_inlie_style() {
     let source = r#"
       export default function Index() {
         const [color, setColor] = useState('white');
@@ -537,7 +538,16 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_bundling_import() {
+  fn resolve_import_meta_url() {
+    let source = r#"
+      console.log(import.meta.url)
+    "#;
+    let (code, _) = t("/pages/index.tsx", source, true);
+    assert!(code.contains("console.log(\"/pages/index.tsx\")"));
+  }
+
+  #[test]
+  fn bundling_import() {
     let source = r#"
       import React, { useState, useEffect as useEffect_ } from "https://esm.sh/react"
       import * as React_ from "https://esm.sh/react"
@@ -585,7 +595,7 @@ mod tests {
   }
 
   #[test]
-  fn test_transpile_bundling_export() {
+  fn bundling_export() {
     let source = r#"
       export {default as React, useState, useEffect as useEffect_ } from "https://esm.sh/react"
       export * as React_ from "https://esm.sh/react"

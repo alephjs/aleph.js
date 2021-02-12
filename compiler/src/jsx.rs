@@ -1,8 +1,7 @@
 // Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
 
-use crate::resolve::{
-  create_aleph_pack_var_decl, is_remote_url, DependencyDescriptor, InlineStyle, Resolver,
-};
+use crate::resolve::{is_remote_url, DependencyDescriptor, InlineStyle, Resolver};
+use crate::resolve_fold::create_aleph_pack_var_decl;
 
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, rc::Rc};

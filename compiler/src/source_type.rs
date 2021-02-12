@@ -99,7 +99,7 @@ mod tests {
   use super::*;
 
   #[test]
-  fn test_map_file_extension() {
+  fn map_file_extension() {
     assert_eq!(
       SourceType::from(Path::new("foo/bar.ts")),
       SourceType::TypeScript
@@ -126,7 +126,7 @@ mod tests {
   }
 
   #[test]
-  fn test_display() {
+  fn display() {
     assert_eq!(format!("{}", SourceType::JavaScript), "JavaScript");
     assert_eq!(format!("{}", SourceType::JSX), "JSX");
     assert_eq!(format!("{}", SourceType::TypeScript), "TypeScript");
