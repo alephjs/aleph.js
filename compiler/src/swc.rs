@@ -461,7 +461,7 @@ mod tests {
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
-        "__import: \"../style/index.css.{}.js\"",
+        "__module: \"/style/index.css.{}.js\"",
         HASH_PLACEHOLDER.as_str()
       )
       .as_str()

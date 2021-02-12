@@ -3,8 +3,10 @@
 use crate::resolve::{is_remote_url, DependencyDescriptor, InlineStyle, Resolver};
 use crate::resolve_fold::create_aleph_pack_var_decl;
 
+use path_slash::PathBufExt;
+use relative_path::RelativePath;
 use sha1::{Digest, Sha1};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 use swc_common::{SourceMap, Spanned, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
@@ -126,7 +128,7 @@ impl AlephJsxFold {
             }
 
             if should_replace {
-              let mut import_prop_index: i32 = -1;
+              let mut module_prop_index: i32 = -1;
               let mut href_prop_index: i32 = -1;
               let mut href_prop_value = "";
 
@@ -141,8 +143,8 @@ impl AlephJsxFold {
                       href_prop_index = i as i32;
                       href_prop_value = value.as_ref();
                     }
-                    "__import" => {
-                      import_prop_index = i as i32;
+                    "__module" => {
+                      module_prop_index = i as i32;
                     }
                     _ => {}
                   },
@@ -166,20 +168,30 @@ impl AlephJsxFold {
                 });
               }
 
-              let import_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
+              let mut buf = PathBuf::from(
+                resolver
+                  .fix_import_url(resolver.specifier.as_str())
+                  .as_str(),
+              );
+              buf.pop();
+              let module_url = "/".to_owned()
+                + RelativePath::new(buf.join(resolved_path).to_slash().unwrap().as_str())
+                  .normalize()
+                  .as_str();
+              let module_prop = JSXAttrOrSpread::JSXAttr(JSXAttr {
                 span: DUMMY_SP,
-                name: JSXAttrName::Ident(quote_ident!("__import")),
+                name: JSXAttrName::Ident(quote_ident!("__module")),
                 value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                   span: DUMMY_SP,
-                  value: resolved_path.into(),
+                  value: module_url.into(),
                   has_escape: false,
                   kind: Default::default(),
                 }))),
               });
-              if import_prop_index >= 0 {
-                el.attrs[import_prop_index as usize] = import_attr;
+              if module_prop_index >= 0 {
+                el.attrs[module_prop_index as usize] = module_prop;
               } else {
-                el.attrs.push(import_attr);
+                el.attrs.push(module_prop);
               }
 
               if name.eq("link") {
