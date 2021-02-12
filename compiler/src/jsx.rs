@@ -4,9 +4,8 @@ use crate::resolve::{
   create_aleph_pack_var_decl, is_remote_url, DependencyDescriptor, InlineStyle, Resolver,
 };
 
-use path_slash::PathBufExt;
 use sha1::{Digest, Sha1};
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 use swc_common::{SourceMap, Spanned, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
@@ -132,9 +131,8 @@ impl AlephJsxFold {
             }
 
             if should_replace {
+              let mut import_prop_index: i32 = -1;
               let mut href_prop_index: i32 = -1;
-              let mut base_prop_index: i32 = -1;
-              let mut url_prop_index: i32 = -1;
               let mut href_prop_value = "";
 
               for (i, attr) in el.attrs.iter().enumerate() {
@@ -148,11 +146,8 @@ impl AlephJsxFold {
                       href_prop_index = i as i32;
                       href_prop_value = value.as_ref();
                     }
-                    "__base" => {
-                      base_prop_index = i as i32;
-                    }
-                    "__url" => {
-                      url_prop_index = i as i32;
+                    "__import" => {
+                      import_prop_index = i as i32;
                     }
                     _ => {}
                   },
@@ -169,48 +164,27 @@ impl AlephJsxFold {
                   name: JSXAttrName::Ident(quote_ident!("href")),
                   value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                     span: DUMMY_SP,
-                    value: resolved_path.into(),
+                    value: fixed_url.into(),
                     has_escape: false,
                     kind: Default::default(),
                   }))),
                 });
               }
 
-              let mut buf = PathBuf::from(
-                resolver
-                  .fix_import_url(resolver.specifier.as_str())
-                  .as_str(),
-              );
-              buf.pop();
-              let base_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
+              let import_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
                 span: DUMMY_SP,
-                name: JSXAttrName::Ident(quote_ident!("__base")),
+                name: JSXAttrName::Ident(quote_ident!("__import")),
                 value: Some(JSXAttrValue::Lit(Lit::Str(Str {
                   span: DUMMY_SP,
-                  value: buf.to_slash().unwrap().into(),
+                  value: resolved_path.into(),
                   has_escape: false,
                   kind: Default::default(),
                 }))),
               });
-              let url_attr = JSXAttrOrSpread::JSXAttr(JSXAttr {
-                span: DUMMY_SP,
-                name: JSXAttrName::Ident(quote_ident!("__url")),
-                value: Some(JSXAttrValue::Lit(Lit::Str(Str {
-                  span: DUMMY_SP,
-                  value: fixed_url.into(),
-                  has_escape: false,
-                  kind: Default::default(),
-                }))),
-              });
-              if base_prop_index >= 0 {
-                el.attrs[base_prop_index as usize] = base_attr;
+              if import_prop_index >= 0 {
+                el.attrs[import_prop_index as usize] = import_attr;
               } else {
-                el.attrs.push(base_attr);
-              }
-              if url_prop_index >= 0 {
-                el.attrs[url_prop_index as usize] = url_attr;
-              } else {
-                el.attrs.push(url_attr);
+                el.attrs.push(import_attr);
               }
 
               if name.eq("link") {
