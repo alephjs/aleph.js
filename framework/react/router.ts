@@ -40,9 +40,9 @@ export default function Router({
   const [route, setRoute] = useState<PageRoute>(pageRoute)
   const onpopstate = useCallback(async (e: any) => {
     const { baseURL } = routing
-    const [url, pageModuleChain] = routing.createRouter()
+    const [url, nestedModules] = routing.createRouter()
     if (url.pagePath !== '') {
-      const imports = pageModuleChain.map(async mod => {
+      const imports = nestedModules.map(async mod => {
         const [{ default: Component }] = await Promise.all([
           importModule(baseURL, mod, e.forceRefetch),
           mod.hasData ? loadPageData(url) : Promise.resolve(),
@@ -121,9 +121,9 @@ export default function Router({
     }
     const onFetchPageModule = async ({ href }: { href: string }) => {
       const [pathname, search] = href.split('?')
-      const [url, pageModuleChain] = routing.createRouter({ pathname, search })
+      const [url, nestedModules] = routing.createRouter({ pathname, search })
       if (url.pagePath !== '') {
-        pageModuleChain.map(mod => {
+        nestedModules.map(mod => {
           if (mod.hasData) {
             loadPageData(url)
           }

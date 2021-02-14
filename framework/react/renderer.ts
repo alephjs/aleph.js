@@ -27,7 +27,7 @@ export async function render(
   url: RouterURL,
   App: ComponentType<any> | undefined,
   E404: ComponentType | undefined,
-  pageComponentChain: { url: string, Component?: any }[]
+  nestedPageComponents: { url: string, Component?: any }[]
 ): Promise<RenderResult> {
   const global = globalThis as any
   const ret: RenderResult = {
@@ -45,7 +45,7 @@ export async function render(
   const dataUrl = 'data://' + url.pathname
   const asyncCalls: Array<Promise<any>> = []
   const data: Record<string, any> = {}
-  const pageProps = createPageProps(pageComponentChain)
+  const pageProps = createPageProps(nestedPageComponents)
   const defer = () => {
     delete global['rendering-' + dataUrl]
     events.removeAllListeners('useDeno-' + dataUrl)

@@ -29,8 +29,8 @@ export default async function bootstrap(options: BootstrapOptions) {
     }
   }))
   const routing = new Routing({ routes, rewrites, baseURL, defaultLocale, locales })
-  const [url, pageModuleChain] = routing.createRouter()
-  const imports = await Promise.all(pageModuleChain.map(async mod => {
+  const [url, nestedModules] = routing.createRouter()
+  const imports = await Promise.all(nestedModules.map(async mod => {
     const [{ default: Component }] = await Promise.all([
       importModule(baseURL, mod),
       mod.hasData ? loadPageDataFromTag(url) : Promise.resolve()

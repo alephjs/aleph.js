@@ -13,16 +13,16 @@ export type PageRoute = PageProps & {
   url: RouterURL
 }
 
-export function createPageProps(componentChain: { url: string, Component?: ComponentType<any> }[]): PageProps {
+export function createPageProps(nestedComponents: { url: string, Component?: ComponentType<any> }[]): PageProps {
   const pageProps: PageProps = {
     Page: null,
     pageProps: null
   }
-  if (componentChain.length > 0) {
-    Object.assign(pageProps, createPagePropsSegment(componentChain[0]))
+  if (nestedComponents.length > 0) {
+    Object.assign(pageProps, createPagePropsSegment(nestedComponents[0]))
   }
-  if (componentChain.length > 1) {
-    componentChain.slice(1).reduce((p, seg) => {
+  if (nestedComponents.length > 1) {
+    nestedComponents.slice(1).reduce((p, seg) => {
       const c = createPagePropsSegment(seg)
       p.pageProps = c
       return c
