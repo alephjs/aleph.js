@@ -1,4 +1,5 @@
-import { LinkHTMLAttributes, useContext, useEffect, useMemo } from 'https://esm.sh/react'
+import type { LinkHTMLAttributes } from 'https://esm.sh/react'
+import { useContext, useEffect, useMemo } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import { removeCSS } from '../core/style.ts'
 import { RouterContext, SSRContext } from './context.ts'

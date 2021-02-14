@@ -1,4 +1,5 @@
-import { Component, createElement, CSSProperties } from 'https://esm.sh/react'
+import type { CSSProperties } from 'https://esm.sh/react'
+import { Component, createElement } from 'https://esm.sh/react'
 
 export class ErrorBoundary extends Component {
   state: { error: Error | null, promise: Promise<any> | null }

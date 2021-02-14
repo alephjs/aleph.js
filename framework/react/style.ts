@@ -1,4 +1,5 @@
-import { StyleHTMLAttributes, useEffect } from 'https://esm.sh/react'
+import type { StyleHTMLAttributes } from 'https://esm.sh/react'
+import { useEffect } from 'https://esm.sh/react'
 import { applyCSS, removeCSS } from '../core/style.ts'
 
 export default function Style({ children, ...rest }: StyleHTMLAttributes<{}>) {
