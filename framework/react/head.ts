@@ -1,41 +1,43 @@
 import type { PropsWithChildren, ReactNode } from 'https://esm.sh/react'
-import { Children, Fragment, isValidElement, useContext, useEffect } from 'https://esm.sh/react'
+import { Children, Fragment, isValidElement, useContext, useEffect, useMemo } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import { SSRContext } from './context.ts'
+import Link from './link.ts'
 import Script from './script.ts'
+import Style from './style.ts'
 
 export default function Head(props: PropsWithChildren<{}>) {
   const renderer = useContext(SSRContext)
+  const els = useMemo(() => parse(props.children), [props.children])
 
   if (util.inDeno()) {
-    parse(props.children).forEach(({ type, props }, key) => renderer.headElements.set(key, { type, props }))
+    els.forEach(({ type, props }, key) => renderer.headElements.set(key, { type, props }))
   }
 
   useEffect(() => {
-    const doc = (window as any).document
-    const nodes = parse(props.children)
+    const { document } = (window as any)
     const insertedEls: Array<Object> = []
 
-    if (nodes.size > 0) {
-      let charset = doc.querySelector('meta[charset]')
+    if (els.size > 0) {
+      let charset = document.querySelector('meta[charset]')
       if (!charset) {
-        charset = doc.createElement('meta')
+        charset = document.createElement('meta')
         charset.setAttribute('charset', 'utf-8')
-        doc.head.prepend(charset)
+        document.head.prepend(charset)
       }
 
-      const anchor = doc.createElement('meta')
+      const anchor = document.createElement('meta')
       if (charset.nextElementSibling) {
-        doc.head.insertBefore(anchor, charset.nextElementSibling)
+        document.head.insertBefore(anchor, charset.nextElementSibling)
       } else {
-        doc.head.appendChild(anchor)
+        document.head.appendChild(anchor)
       }
 
-      nodes.forEach(({ type, props }) => {
+      els.forEach(({ type, props }) => {
         if (type === 'script') {
           return
         }
-        const el = doc.createElement(type)
+        const el = document.createElement(type)
         Object.keys(props).forEach(key => {
           const value = props[key]
           if (key === 'children') {
@@ -48,16 +50,16 @@ export default function Head(props: PropsWithChildren<{}>) {
             el.setAttribute(key, String(value || ''))
           }
         })
-        doc.head.insertBefore(el, anchor)
+        document.head.insertBefore(el, anchor)
         insertedEls.push(el)
       })
-      doc.head.removeChild(anchor)
+      document.head.removeChild(anchor)
     }
 
     return () => {
-      insertedEls.forEach(el => doc.head.removeChild(el))
+      insertedEls.forEach(el => document.head.removeChild(el))
     }
-  }, [props.children])
+  }, [els])
 
   return null
 }
@@ -73,8 +75,14 @@ function parse(node: ReactNode, els: Map<string, { type: string, props: Record<s
       case Fragment:
         parse(props.children, els)
         break
+      case Link:
+        Link(props)
+        break
+      case Style:
+        Style(props)
+        break
       case Script:
-        type = "script"
+        type = 'script'
       case 'base':
       case 'title':
       case 'meta':

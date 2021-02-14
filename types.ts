@@ -26,7 +26,7 @@ export type LoaderPlugin = {
   /** `init` initiates the plugin. */
   init?(): Promise<void>
   /** `transform` transforms the source content. */
-  transform(source: { url: string, content: Uint8Array, map?: string, bundleMode?: boolean }): LoaderTransformResult | Promise<LoaderTransformResult>
+  transform(source: { url: string, content: Uint8Array, map?: string }): LoaderTransformResult | Promise<LoaderTransformResult>
 }
 
 /**
@@ -168,9 +168,12 @@ export type APIHandler = {
  * The router url object of the routing, you can access it with `useRouter()` hook.
  */
 export type RouterURL = {
+  readonly baseURL: string
   readonly locale: string
   readonly pathname: string
   readonly pagePath: string
   readonly params: Record<string, string>
   readonly query: URLSearchParams
+  push(url: string): void,
+  replace(url: string): void,
 }

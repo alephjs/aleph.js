@@ -1,36 +1,42 @@
-import { LinkHTMLAttributes, useContext, useEffect, useRef } from 'https://esm.sh/react'
+import { LinkHTMLAttributes, useContext, useEffect, useMemo } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import { SSRContext } from './context.ts'
+import { removeCSS } from '../core/style.ts'
+import { RouterContext, SSRContext } from './context.ts'
+import { importModule } from './helper.ts'
 
-export default function Link({
-  rel,
-  href,
-  ...rest
-}: LinkHTMLAttributes<{}>) {
-  const { __base: baseUrl, __url: url } = rest as any
+const reHashJs = /\.([0-9a-fx]{9})\.js$/i
+
+export default function Link({ href, rel, ...rest }: LinkHTMLAttributes<{}>) {
+  const { __module: module } = rest as any
   const { styleLinks } = useContext(SSRContext)
-  const onceRef = useRef(true)
+  const { baseURL } = useContext(RouterContext)
+  const isStyle = useMemo(() => rel === 'stylesheet' || rel === 'style', [rel])
 
-  if (rel === 'stylesheet' || rel === 'style') {
+  if (isStyle && util.isNEString(href) && util.isNEString(module)) {
     if (util.inDeno()) {
-      styleLinks.set(url, { module: util.cleanPath(baseUrl + '/' + href) })
-    } else if (onceRef.current) {
+      styleLinks.set(href, { module })
+    } else {
       const { document } = window as any
       const prevEl = Array.from<any>(document.head.children).find((el: any) => {
-        return el.getAttribute('data-module-id') === url
+        return el.getAttribute('data-module-id') === href
       })
-      if (!prevEl) {
-
-      } else if (prevEl.hasAttribute('ssr')) {
-        import(util.cleanPath(`/_aleph/${baseUrl}/${href}`))
+      if (reHashJs.test(module)) {
+        let hash = ''
+        module.replace(reHashJs, (_: string, h: string) => hash = h)
+        if (!prevEl) {
+          throw importModule(baseURL, { url: href, hash })
+        } else if (prevEl.hasAttribute('ssr')) {
+          importModule(baseURL, { url: href, hash })
+        }
       }
-      onceRef.current = false
     }
   }
 
-  useEffect(() => {
-
-  }, [rel, href, url])
+  useEffect(() => () => {
+    if (isStyle && util.isNEString(href)) {
+      removeCSS(href)
+    }
+  }, [isStyle, href])
 
   return null
 }

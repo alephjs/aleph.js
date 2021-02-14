@@ -1,37 +1,50 @@
 import { Component, createElement, CSSProperties } from 'https://esm.sh/react'
 
 export class ErrorBoundary extends Component {
-  state: { stack: string | null }
+  state: { error: Error | null, promise: Promise<any> | null }
 
   constructor(props: any) {
     super(props)
-    this.state = { stack: null }
+    this.state = { error: null, promise: null }
   }
 
-  static getDerivedStateFromError(error: Error) {
-    // Update state so the next render will show the fallback UI.
-    return { stack: error?.stack || null }
+  static getDerivedStateFromError(e: any) {
+    if (e instanceof Promise) {
+      return { error: null, promise: e }
+    }
+    return { error: e, promise: null }
   }
 
-  componentDidCatch(error: any, errorInfo: any) {
-    this.state = { stack: error?.stack || null }
+  componentDidCatch(e: any) {
+    if (e instanceof Promise) {
+      e.then(() => {
+        this.setState({ promise: null })
+      })
+    } else {
+      console.error(e)
+    }
   }
 
   render() {
-    if (this.state.stack) {
+    const { error, promise } = this.state
+
+    if (error) {
       return (
         createElement(
           'pre',
           null,
-          this.state.stack
+          error.stack || error.message || error.toString()
         )
       )
+    }
+
+    if (promise) {
+      return null
     }
 
     return this.props.children
   }
 }
-
 
 export function E404Page() {
   return createElement(

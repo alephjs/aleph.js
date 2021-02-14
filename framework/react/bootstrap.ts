@@ -14,11 +14,11 @@ type BootstrapOptions = Required<RoutingOptions> & {
 }
 
 export default async function bootstrap(options: BootstrapOptions) {
-  const { baseUrl, defaultLocale, locales, routes, rewrites, sharedModules, renderMode } = options
+  const { baseURL, defaultLocale, locales, routes, rewrites, sharedModules, renderMode } = options
   const { document } = window as any
   const customComponents: Record<string, ComponentType> = {}
   await Promise.all(sharedModules.map(async mod => {
-    const { default: C } = await importModule(baseUrl, mod)
+    const { default: C } = await importModule(baseURL, mod)
     switch (util.trimModuleExt(mod.url)) {
       case '/404':
         customComponents['E404'] = C
@@ -28,11 +28,11 @@ export default async function bootstrap(options: BootstrapOptions) {
         break
     }
   }))
-  const routing = new Routing({ routes, rewrites, baseUrl, defaultLocale, locales })
+  const routing = new Routing({ routes, rewrites, baseURL, defaultLocale, locales })
   const [url, pageModuleChain] = routing.createRouter()
   const imports = await Promise.all(pageModuleChain.map(async mod => {
     const [{ default: Component }] = await Promise.all([
-      importModule(baseUrl, mod),
+      importModule(baseURL, mod),
       mod.hasData ? loadPageDataFromTag(url) : Promise.resolve()
     ])
     return {
