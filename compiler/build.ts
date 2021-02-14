@@ -19,12 +19,12 @@ if (import.meta.main) {
       [
         `import { base64, brotli } from "../../deps.ts";`,
         `const dataRaw = "${data64}";`,
-        `export default () => brotli.decompress(base64.decode(dataRaw))`
+        `export default () => brotli.decompress(base64.decode(dataRaw));`
       ].join('\n')
     )
     await Deno.writeTextFile(
       './dist/wasm-checksum.js',
-      `export const checksum = ${JSON.stringify(hash)}`
+      `export const checksum = ${JSON.stringify(hash)};`
     )
     await Deno.writeTextFile(
       './dist/wasm-pack.js',
@@ -38,6 +38,13 @@ if (import.meta.main) {
         }
       `)
     )
+    const p = Deno.run({
+      cmd: ['deno', 'run', '-q', './dist/wasm-pack.js'],
+      stdout: 'inherit',
+      stderr: 'inherit'
+    })
+    await p.status()
+    p.close()
   }
   p.close()
 }
