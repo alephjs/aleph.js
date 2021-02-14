@@ -13,8 +13,7 @@ Deno.test('wasm loader', async () => {
   ])
   const { code } = await loader.transform({
     url: '42.wasm',
-    content: wasmBytes,
-    bundleMode: false
+    content: wasmBytes
   })
   const jsfile = (await Deno.makeTempFile()) + '.js'
   await Deno.writeTextFile(jsfile, code)
