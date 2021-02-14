@@ -1,5 +1,3 @@
-// Copyright 2020 the Aleph.js authors. All rights reserved. MIT license.
-
 use indexmap::IndexMap;
 use path_slash::PathBufExt;
 use relative_path::RelativePath;

@@ -1,9 +1,6 @@
-// Copyright 2018-2020 the Deno authors. All rights reserved. MIT license.
-// Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
-
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
-use crate::fast_refresh::fast_refresh_fold;
-use crate::fixer::{compat_fixer_fold, jsx_link_fixer_fold};
+use crate::fast_refresh::react_refresh_fold;
+use crate::fixer::compat_fixer_fold;
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve::Resolver;
 use crate::resolve_fold::aleph_resolve_fold;
@@ -114,21 +111,20 @@ impl ParsedModule {
     })
   }
 
-  /// Transform a JS/TS/JSX file into a JS file, based on the supplied options.
+  /// transform a JS/TS/JSX/TSX file into a JS file, based on the supplied options.
   ///
   /// ### Arguments
   ///
   /// - `resolver` - a resolver to resolve import/export url.
   /// - `options` - the options for emit code.
   ///
-  pub fn transpile(
+  pub fn transform(
     self,
     resolver: Rc<RefCell<Resolver>>,
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
-      let bundle_mode = resolver.borrow().bundle_mode;
       let is_ts = match self.source_type {
         SourceType::TypeScript => true,
         SourceType::TSX => true,
@@ -149,9 +145,8 @@ impl ParsedModule {
         aleph_resolve_fold(resolver.clone(), self.source_map.clone()),
         Optional::new(aleph_jsx_fold, is_jsx),
         Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
-        Optional::new(jsx_link_fixer_fold(resolver.clone()), is_jsx && bundle_mode),
         Optional::new(
-          fast_refresh_fold(
+          react_refresh_fold(
             "$RefreshReg$",
             "$RefreshSig$",
             false,
@@ -302,8 +297,8 @@ mod tests {
       vec![],
     )));
     let (code, _) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
-      .expect("could not transpile module");
+      .transform(resolver.clone(), &EmitOptions::default())
+      .expect("could not transform module");
     println!("{}", code);
     (code, resolver)
   }
@@ -474,32 +469,26 @@ mod tests {
         DependencyDescriptor {
           specifier: "https://esm.sh/react".into(),
           is_dynamic: false,
-          rel: None,
         },
         DependencyDescriptor {
           specifier: "/style/index.css".into(),
           is_dynamic: true,
-          rel: Some("stylesheet".into()),
         },
         DependencyDescriptor {
           specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/head.ts".into(),
           is_dynamic: false,
-          rel: None,
         },
         DependencyDescriptor {
           specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/link.ts".into(),
           is_dynamic: false,
-          rel: None,
         },
         DependencyDescriptor {
           specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/anchor.ts".into(),
           is_dynamic: false,
-          rel: None,
         },
         DependencyDescriptor {
           specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/script.ts".into(),
           is_dynamic: false,
-          rel: None,
         }
       ]
     );
@@ -577,8 +566,8 @@ mod tests {
       vec!["/components/logo.ts".into(), "/shared/iife.ts".into()],
     )));
     let (code, _) = module
-      .transpile(resolver.clone(), &EmitOptions::default())
-      .expect("could not transpile module");
+      .transform(resolver.clone(), &EmitOptions::default())
+      .expect("could not transform module");
     println!("{}", code);
     assert!(code.contains("React = __ALEPH.pack[\"https://esm.sh/react\"].default"));
     assert!(code.contains("useState = __ALEPH.pack[\"https://esm.sh/react\"].useState"));
@@ -587,7 +576,6 @@ mod tests {
     assert!(code.contains("Logo = __ALEPH.pack[\"/components/logo.ts\"].default"));
     assert!(!code.contains("Nav = __ALEPH.pack[\"/components/nav.ts\"].default"));
     assert!(code.contains("import Nav from \""));
-    assert!(code.contains("import   \"../style/index.css.xxxxxxxxx.js\""));
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
     assert!(code.contains(
       "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"].default"

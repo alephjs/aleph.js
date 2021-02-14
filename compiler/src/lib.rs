@@ -1,5 +1,3 @@
-// Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
-
 #[macro_use]
 extern crate lazy_static;
 
@@ -131,7 +129,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
   };
   let module = ParsedModule::parse(url, code, specify_source_type).expect("could not parse module");
   let (code, map) = module
-    .transpile(
+    .transform(
       resolver.clone(),
       &EmitOptions {
         target: options.swc_options.target,
@@ -141,7 +139,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
         is_dev: options.is_dev,
       },
     )
-    .expect("could not transpile module");
+    .expect("could not transform module");
   let r = resolver.borrow_mut();
   Ok(
     JsValue::from_serde(&TransformOutput {

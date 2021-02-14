@@ -1,5 +1,3 @@
-// Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
-
 use crate::resolve::{is_remote_url, DependencyDescriptor, InlineStyle, Resolver};
 use crate::resolve_fold::create_aleph_pack_var_decl;
 
@@ -245,7 +243,6 @@ impl AlephJsxFold {
             resolver.dep_graph.push(DependencyDescriptor {
               specifier: "#".to_owned() + id.as_str(),
               is_dynamic: false,
-              rel: None,
             });
             resolver.used_builtin_jsx_tags.insert(name.into());
             el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));

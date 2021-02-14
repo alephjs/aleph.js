@@ -1,5 +1,3 @@
-// Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
-
 use std::{fmt, sync::Arc, sync::RwLock};
 use swc_common::{
   errors::{Diagnostic, DiagnosticBuilder, Emitter},

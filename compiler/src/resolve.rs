@@ -1,5 +1,3 @@
-// Copyright 2020-2021 postUI Lab. All rights reserved. MIT license.
-
 use crate::import_map::{ImportHashMap, ImportMap};
 
 use indexmap::IndexSet;
@@ -32,8 +30,6 @@ lazy_static! {
 pub struct DependencyDescriptor {
   pub specifier: String,
   pub is_dynamic: bool,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub rel: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -354,7 +350,6 @@ impl Resolver {
       self.dep_graph.push(DependencyDescriptor {
         specifier: fixed_url.clone(),
         is_dynamic,
-        rel,
       });
     }
     let path = resolved_path.to_slash().unwrap();
