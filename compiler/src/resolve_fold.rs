@@ -146,6 +146,7 @@ impl Fold for AlephResolveFold {
                   specifiers,
                   src: Some(src),
                   type_only: true,
+                  asserts: None,
                 }))
               } else {
                 let mut resolver = self.resolver.borrow_mut();
@@ -234,6 +235,7 @@ impl Fold for AlephResolveFold {
                     specifiers,
                     src: Some(new_str(resolved_path)),
                     type_only: false,
+                    asserts: None,
                   }))
                 }
               }
@@ -279,6 +281,7 @@ impl Fold for AlephResolveFold {
                 ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
                   span: DUMMY_SP,
                   src: new_str(resolved_path.into()),
+                  asserts: None,
                 }))
               }
             }
