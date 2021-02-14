@@ -2,40 +2,39 @@ import { ensureDir, path } from '../deps.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
-import init, { transformSync } from './dist/wasm-pack.js'
+import init, { transformSync as swc } from './dist/wasm-pack.js'
 
 export type ImportMap = {
   imports: Record<string, string>
   scopes: Record<string, Record<string, string>>
 }
 
-export interface SWCOptions {
+export type SWCOptions = {
+  sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
   target?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
   jsxFactory?: string
   jsxFragmentFactory?: string
-  sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
-  sourceMap?: boolean
 }
 
-export interface TransformOptions {
-  url: string
+export type TransformOptions = {
   importMap?: ImportMap
   reactVersion?: string,
   alephModuleUrl?: string,
   swcOptions?: SWCOptions
+  sourceMap?: boolean
   isDev?: boolean,
   bundleMode?: boolean,
-  bundledModules?: string[],
+  bundleExternal?: string[],
 }
 
-export interface TransformResult {
+export type TransformResult = {
   code: string
   deps: DependencyDescriptor[]
   inlineStyles: Record<string, { type: string, quasis: string[], exprs: string[] }>
   map?: string
 }
 
-interface DependencyDescriptor {
+type DependencyDescriptor = {
   specifier: string,
   rel?: string
   isDynamic: boolean,
@@ -45,7 +44,7 @@ interface DependencyDescriptor {
  * transpile code synchronously by swc.
  *
  * ```tsx
- * transpileSync(`
+ * transformSync(`
  *   export default App() {
  *     return <h1>Hello World</h1>
  *   }
@@ -59,10 +58,10 @@ interface DependencyDescriptor {
  * ```
  *
  * @param {string} code - code string.
- * @param {object} opts - transform options.
+ * @param {object} options - transform options.
  */
-export function transpileSync(code: string, opts?: TransformOptions): TransformResult {
-  return transformSync(code, opts)
+export function transformSync(url: string, code: string, options: TransformOptions = {}): TransformResult {
+  return swc(url, code, options)
 }
 
 /**
