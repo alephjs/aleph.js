@@ -1,6 +1,6 @@
 import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts'
 import { colors, createHash, path, walk } from '../deps.ts'
-import { initWasm, transpileSync } from './mod.ts'
+import { initWasm, transformSync } from './mod.ts'
 
 function tsc(source: string, opts: any) {
   const compileOptions: CompileOptions = {
@@ -40,13 +40,16 @@ async function benchmark() {
   }
   console.log(`[benchmark] ${sourceFiles.length} files`)
 
-  const d1 = { d: 0, min: 0, max: 0, }
-  const d2 = { d: 0, min: 0, max: 0, }
+  const d1 = { d: 0, min: 0, max: 0 }
+  const d2 = { d: 0, min: 0, max: 0 }
+  const n = 2
 
   for (const { code, filename } of sourceFiles) {
     const t = performance.now()
-    tsc(code, { filename, isDev: true })
-    const d = (performance.now() - t)
+    for (let i = 0; i < n; i++) {
+      tsc(code, { filename, isDev: true })
+    }
+    const d = ((performance.now() - t) / n)
     if (d1.min === 0 || d < d1.min) {
       d1.min = d
     }
@@ -57,12 +60,13 @@ async function benchmark() {
   }
   for (const { code, filename } of sourceFiles) {
     const t = performance.now()
-    transpileSync(code, {
-      url: filename,
-      swcOptions: { target: 'es2020' },
-      isDev: true
-    })
-    const d = (performance.now() - t)
+    for (let i = 0; i < n; i++) {
+      transformSync(filename, code, {
+        swcOptions: { target: 'es2020' },
+        isDev: true
+      })
+    }
+    const d = ((performance.now() - t) / n)
     if (d2.min === 0 || d < d2.min) {
       d2.min = d
     }
@@ -91,7 +95,7 @@ async function init() {
   await initWasm(denoCacheDir)
 
   // wasm warm-up
-  transpileSync('console.log("Hello World")', { url: '/test.ts', isDev: true })
+  transformSync('test.ts', 'console.log("Hello World")', { isDev: true })
 }
 
 if (import.meta.main) {
