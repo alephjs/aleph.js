@@ -6,7 +6,7 @@ export default (opts?: Options): LoaderPlugin => ({
   type: 'loader',
   test: /\.(sass|scss)$/i,
   acceptHMR: true,
-  async transform({ content, url, bundleMode }) {
+  async transform({ content, url }) {
     const { css, map } = renderSync({
       indentedSyntax: url.endsWith('.sass'),
       ...opts,

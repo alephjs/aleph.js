@@ -52,17 +52,14 @@ export default (options?: Options): LoaderPlugin => {
       postcssPlugins = await loadPostcssPlugins(['autoprefixer'])
       return
     },
-    async transform({ content, url, bundleMode }) {
+    async transform({ content, url }) {
       const { stringify } = JSON
       const pcss = (await postcss(postcssPlugins).process((new TextDecoder).decode(content)).async()).content
       const mini = Deno.env.get('BUILD_MODE') === 'production'
       const css = mini ? cleanCSS.minify(pcss).styles : pcss
-      const appyCSS = `applyCSS(${stringify(url)}, ${stringify(css)})`
       const js = [
         'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-        bundleMode
-          ? `__ALEPH.pack[${stringify(url)}] = { default: () => ${appyCSS} }`
-          : appyCSS
+        `applyCSS(${stringify(url)}, ${stringify(css)})`
       ].join('\n')
       return {
         code: js,
