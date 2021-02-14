@@ -30,7 +30,7 @@ pub struct Options {
   pub import_map: ImportHashMap,
 
   #[serde(default)]
-  pub aleph_module_url: String,
+  pub aleph_pkg_uri: String,
 
   #[serde(default)]
   pub react_version: String,
@@ -111,9 +111,9 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
   let resolver = Rc::new(RefCell::new(Resolver::new(
     url,
     options.import_map,
-    match options.aleph_module_url.as_str() {
+    match options.aleph_pkg_uri.as_str() {
       "" => None,
-      _ => Some(options.aleph_module_url),
+      _ => Some(options.aleph_pkg_uri),
     },
     match options.react_version.as_str() {
       "" => None,

@@ -19,7 +19,7 @@ export type SWCOptions = {
 export type TransformOptions = {
   importMap?: ImportMap
   reactVersion?: string,
-  alephModuleUrl?: string,
+  alephPkgUri?: string,
   swcOptions?: SWCOptions
   sourceMap?: boolean
   isDev?: boolean,

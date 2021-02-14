@@ -389,7 +389,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
 
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
-    let aleph_module_url = self.resolver.borrow().get_aleph_module_url();
+    let aleph_pkg_uri = self.resolver.borrow().get_aleph_pkg_uri();
     let mut resolver = self.resolver.borrow_mut();
 
     for mut name in resolver.used_builtin_jsx_tags.clone() {
@@ -398,7 +398,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
       }
       let id = quote_ident!(rename_builtin_tag(name.as_str()));
       let (resolved_path, fixed_url) = resolver.resolve(
-        format!("{}/framework/react/{}.ts", aleph_module_url, name).as_str(),
+        format!("{}/framework/react/{}.ts", aleph_pkg_uri, name).as_str(),
         false,
         None,
       );

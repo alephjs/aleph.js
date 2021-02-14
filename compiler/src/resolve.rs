@@ -63,7 +63,7 @@ pub struct Resolver {
 
   // private
   import_map: ImportMap,
-  aleph_module_url: Option<String>,
+  aleph_pkg_uri: Option<String>,
   react_version: Option<String>,
 }
 
@@ -71,7 +71,7 @@ impl Resolver {
   pub fn new(
     specifier: &str,
     import_map: ImportHashMap,
-    aleph_module_url: Option<String>,
+    aleph_pkg_uri: Option<String>,
     react_version: Option<String>,
     bundle_mode: bool,
     bundled_modules: Vec<String>,
@@ -87,16 +87,16 @@ impl Resolver {
       dep_graph: Vec::new(),
       inline_styles: HashMap::new(),
       import_map: ImportMap::from_hashmap(import_map),
-      aleph_module_url,
+      aleph_pkg_uri,
       react_version,
       bundle_mode,
       bundled_modules: set,
     }
   }
 
-  pub fn get_aleph_module_url(&self) -> String {
-    if let Some(aleph_module_url) = &self.aleph_module_url {
-      return aleph_module_url.into();
+  pub fn get_aleph_pkg_uri(&self) -> String {
+    if let Some(aleph_pkg_uri) = &self.aleph_pkg_uri {
+      return aleph_pkg_uri.into();
     }
     "https://deno.land/x/aleph".into()
   }
@@ -229,11 +229,11 @@ impl Resolver {
       }
     };
     // fix deno.land/x/aleph url
-    if let Some(aleph_module_url) = &self.aleph_module_url {
+    if let Some(aleph_pkg_uri) = &self.aleph_pkg_uri {
       if fixed_url.starts_with("https://deno.land/x/aleph/") {
         fixed_url = format!(
           "{}/{}",
-          aleph_module_url.as_str(),
+          aleph_pkg_uri.as_str(),
           fixed_url.trim_start_matches("https://deno.land/x/aleph/")
         );
       }
