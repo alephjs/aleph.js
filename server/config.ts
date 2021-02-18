@@ -6,7 +6,7 @@ import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Config } from '../types.ts'
-import { getAlephModuleUrl, reLocaleID } from './helper.ts'
+import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
 export const defaultConfig: Readonly<Required<Config>> = {
   framework: 'react',
@@ -135,10 +135,10 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
   // update import map for alephjs dev env
   const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')
   if (DEV_PORT) {
-    const alephModuleUrl = getAlephModuleUrl()
+    const alephPkgUri = getAlephPkgUri()
     const imports = {
-      'aleph': `${alephModuleUrl}/mod.ts`,
-      'aleph/': `${alephModuleUrl}/`,
+      'aleph': `${alephPkgUri}/mod.ts`,
+      'aleph/': `${alephPkgUri}/`,
       'react': `https://esm.sh/react@${config.reactVersion}`,
       'react-dom': `https://esm.sh/react-dom@${config.reactVersion}`,
     }

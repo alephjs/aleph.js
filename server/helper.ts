@@ -8,7 +8,7 @@ import { VERSION } from '../version.ts'
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
 export const reHashJs = /\.[0-9a-fx]{9}\.js$/i
-export const reHashResolve = /(import|import\s*\(|from|href\s*:)(\s*)("|')([^'"]+\.[0-9a-fx]{9}\.js)("|')/g
+export const reHashResolve = /[^a-z0-9\$_](import|import\s*\(|from|__module\s*:)(\s*)("|')([^'"]+\.[0-9a-fx]{9}\.js)("|')/g
 
 // inject browser navigator polyfill
 Object.assign(globalThis, {
@@ -61,8 +61,8 @@ export const AlephRuntimeCode = `
   });
 `
 
-/** get aleph module url. */
-export function getAlephModuleUrl() {
+/** get aleph pkg uri. */
+export function getAlephPkgUri() {
   const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')
   if (DEV_PORT) {
     return `http://localhost:${DEV_PORT}`
