@@ -37,7 +37,7 @@ export type ServerPlugin = {
   name: string
   /** `type` specifies the plugin type. */
   type: 'server'
-  /** `onInit` adds an `init` event to the server. */
+  /** `onInit` invokes when the server initiated. */
   onInit(app: ServerApplication): Promise<void> | void
 }
 
@@ -62,31 +62,31 @@ export type SSROptions = {
  * The config for the aleph server application.
  */
 export type Config = {
-  /** `framework` to run your application (default is 'react'). */
+  /** `framework` specifies the framework (default is 'react'). */
   framework?: 'react'
-  /** `reactVersion` specifies the **react version** (default is '17.0.1'). */
+  /** `reactVersion` specifies the react version (default is '17.0.1'). */
   reactVersion?: string
   /** `buildTarget` specifies the build target in production mode (default is **es5** to be compatible with IE11). */
   buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
   /** `baseUrl` specifies the path prefix for the application (default is '/'). */
   baseUrl?: string
-  /** `srcDir` to put your application source code (default is '/'). */
+  /** `srcDir` specifies the **src** dir (default is '/'). */
   srcDir?: string
   /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
   outputDir?: string
   /** `defaultLocale` specifies the default locale of the application (default is '**en**'). */
   defaultLocale?: string
-  /** A list of locales. */
+  /** `locales` specifies the available locales. */
   locales?: string[]
-  /** The options for **SSR**. */
+  /** `ssr` specifies the options for **SSR**. */
   ssr?: boolean | SSROptions
-  /** A list of plugin. */
+  /** `plugins` specifies some plugins for the appliaction. */
   plugins?: Plugin[]
-  /** `headers` appends custom headers for each server request. */
+  /** `headers` appends custom headers for server requests. */
   headers?: Record<string, string>
-  /* The server path rewrite map. */
+  /** `rewrites` specifies the server rewrite map. */
   rewrites?: Record<string, string>
-  /** `env` appends env variables. */
+  /** `env` appends system env variables. */
   env?: Record<string, string>
 }
 

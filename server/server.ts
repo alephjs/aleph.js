@@ -9,7 +9,7 @@ import { Application } from './app.ts'
 import { createHtml, reHashJs } from './helper.ts'
 import { getContentType } from './mime.ts'
 
-/** The Aleph Server class. */
+/** The Aleph server class. */
 export class Server {
   #app: Application
   #ready: boolean
@@ -161,6 +161,7 @@ export class Server {
   }
 }
 
+/** Options for creating a standard Aleph server. */
 export type ServeOptions = {
   /** The Aleph Server Application to serve. */
   app: Application
@@ -175,7 +176,7 @@ export type ServeOptions = {
   keyFile?: string
 }
 
-/** start a standard aleph server. */
+/** Create a standard Aleph server. */
 export async function serve({ app, port, hostname, certFile, keyFile }: ServeOptions) {
   const server = new Server(app)
   await app.ready
