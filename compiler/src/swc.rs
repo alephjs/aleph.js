@@ -31,6 +31,7 @@ pub struct EmitOptions {
   pub jsx_factory: String,
   pub jsx_fragment_factory: String,
   pub is_dev: bool,
+  pub transpile_only: bool,
   pub source_map: bool,
 }
 
@@ -41,6 +42,7 @@ impl Default for EmitOptions {
       jsx_factory: "React.createElement".into(),
       jsx_fragment_factory: "React.Fragment".into(),
       is_dev: false,
+      transpile_only: false,
       source_map: false,
     }
   }
@@ -125,6 +127,7 @@ impl ParsedModule {
   ) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
+      let transpile_only = options.transpile_only;
       let is_ts = match self.source_type {
         SourceType::TypeScript => true,
         SourceType::TSX => true,
@@ -135,16 +138,16 @@ impl ParsedModule {
         SourceType::TSX => true,
         _ => false,
       };
-      let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) = aleph_jsx_fold(
-        resolver.clone(),
-        self.source_map.clone(),
-        options.is_dev && !specifier_is_remote,
-      );
+      let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) =
+        aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev);
       let root_mark = Mark::fresh(Mark::root());
       let mut passes = chain!(
-        aleph_resolve_fold(resolver.clone(), self.source_map.clone()),
-        Optional::new(aleph_jsx_fold, is_jsx),
-        Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
+        Optional::new(
+          aleph_resolve_fold(resolver.clone(), self.source_map.clone()),
+          !transpile_only
+        ),
+        Optional::new(aleph_jsx_fold, is_jsx && !transpile_only),
+        Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx && !transpile_only),
         Optional::new(
           react_refresh_fold(
             "$RefreshReg$",
@@ -152,7 +155,7 @@ impl ParsedModule {
             false,
             self.source_map.clone()
           ),
-          options.is_dev && !specifier_is_remote
+          options.is_dev && !specifier_is_remote && !transpile_only
         ),
         Optional::new(
           react::jsx(
@@ -166,12 +169,15 @@ impl ParsedModule {
               ..Default::default()
             },
           ),
-          is_jsx
+          is_jsx && !transpile_only
         ),
-        decorators::decorators(decorators::Config {
-          legacy: true,
-          emit_metadata: false
-        }),
+        Optional::new(
+          decorators::decorators(decorators::Config {
+            legacy: true,
+            emit_metadata: false
+          }),
+          !transpile_only
+        ),
         Optional::new(es2020(), options.target < JscTarget::Es2020),
         Optional::new(strip(), is_ts),
         Optional::new(es2018(), options.target < JscTarget::Es2018),

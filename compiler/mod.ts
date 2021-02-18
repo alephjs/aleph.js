@@ -18,13 +18,14 @@ export type SWCOptions = {
 
 export type TransformOptions = {
   importMap?: ImportMap
-  reactVersion?: string,
-  alephPkgUri?: string,
+  reactVersion?: string
+  alephPkgUri?: string
   swcOptions?: SWCOptions
   sourceMap?: boolean
-  isDev?: boolean,
-  bundleMode?: boolean,
-  bundleExternal?: string[],
+  isDev?: boolean
+  transpileOnly?: boolean
+  bundleMode?: boolean
+  bundleExternal?: string[]
 }
 
 export type TransformResult = {
@@ -35,9 +36,8 @@ export type TransformResult = {
 }
 
 type DependencyDescriptor = {
-  specifier: string,
-  rel?: string
-  isDynamic: boolean,
+  specifier: string
+  isDynamic: boolean
 }
 
 /**

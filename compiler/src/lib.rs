@@ -43,6 +43,9 @@ pub struct Options {
   pub is_dev: bool,
 
   #[serde(default)]
+  pub transpile_only: bool,
+
+  #[serde(default)]
   pub bundle_mode: bool,
 
   #[serde(default)]
@@ -137,6 +140,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
         jsx_fragment_factory: options.swc_options.jsx_fragment_factory.clone(),
         source_map: options.source_map,
         is_dev: options.is_dev,
+        transpile_only: options.transpile_only,
       },
     )
     .expect("could not transform module");
