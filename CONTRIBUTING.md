@@ -15,7 +15,7 @@ You will need [Deno](https://deno.land/) 1.7+.
 1. Fork this repository to your own GitHub account.
 2. Clone the repository to your local device.
 3. Create a new branch `git checkout -b BRANCH_NAME`.
-4. Change code then run our examples.
+4. Change code then run the examples.
 5. Push your branch to Github after all tests passed.
 6. Make a [pull request](https://github.com/alephjs/aleph.js/pulls).
 7. Marge to master branch by our maintainers.
@@ -46,7 +46,7 @@ deno test -A --location=http://localhost
   - **react** framework in React
 - **/design** design drawings and assets
 - **/examples** examples
-- **/plugins** official plugins
+- **/plugins** plugins
 - **/server** server code
 - **/shared** shared code
 
