@@ -26,7 +26,7 @@ export type LoaderPlugin = {
   /** `init` initiates the plugin. */
   init?(): Promise<void>
   /** `transform` transforms the source content. */
-  transform(source: { url: string, content: Uint8Array, map?: string }): LoaderTransformResult | Promise<LoaderTransformResult>
+  transform(source: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformResult | Promise<LoaderTransformResult>
 }
 
 /**
@@ -96,6 +96,7 @@ export type Config = {
 interface ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
+  readonly config: Required<Config>
   addPageModule(pathname: string, code: string): Promise<void>
   removePageModule(pathname: string): Promise<void>
 }
