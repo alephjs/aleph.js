@@ -37,7 +37,7 @@ export class Routing {
     defaultLocale = 'en',
     locales = [],
     routes = [],
-    rewrites = {},
+    rewrites = {}
   }: RoutingOptions) {
     this._baseURL = baseURL
     this._defaultLocale = defaultLocale
