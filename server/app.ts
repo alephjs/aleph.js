@@ -8,11 +8,11 @@ import { defaultReactVersion, minDenoVersion, moduleExts } from '../shared/const
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, RouterURL, ServerApplication } from '../types.ts'
+import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, RouterURL, ServerApplication, TransformFn } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Bundler } from './bundler.ts'
 import { defaultConfig, loadConfig } from './config.ts'
-import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, reFullVersion, reHashJs, reHashResolve } from './helper.ts'
+import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, reFullVersion, reHashJs, reHashResolve, toLocalUrl } from './helper.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -56,6 +56,7 @@ export class Application implements ServerApplication {
   #bundler: Bundler = new Bundler(this)
   #renderer: { render: CallableFunction } = { render: () => { } }
   #renderCache: Map<string, Map<string, RenderResult>> = new Map()
+  #injects = { compilation: new Array<TransformFn>(), hmr: new Array<TransformFn>() }
   #compilerReady: Promise<void> | boolean = false
   #reloading = false
 
@@ -71,6 +72,7 @@ export class Application implements ServerApplication {
   private async init(reload: boolean) {
     const t = performance.now()
     const alephPkgUri = getAlephPkgUri()
+    const mode = this.mode
     const { env, framework, plugins, ssr } = this.config
     const walkOptions = { includeDirs: false, exts: moduleExts, skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
     const apiDir = path.join(this.srcDir, 'api')
@@ -121,12 +123,14 @@ export class Application implements ServerApplication {
     for (const plugin of plugins) {
       if (plugin.type === 'server') {
         await plugin.onInit(this)
+        Object.assign(this, { mode }) // to avoid plugin from changing the mode
       }
     }
 
     // init framework
-    const { init } = await import(`${alephPkgUri}/framework/${framework}/init.ts`)
+    const { init } = await import(`../framework/${framework}/init.ts`)
     await init(this)
+    Object.assign(this, { mode }) // to avoid framework from changing the mode
 
     if (!this.isDev) {
       log.info('Building...')
@@ -341,6 +345,11 @@ export class Application implements ServerApplication {
     }
   }
 
+  /** inject code */
+  injectCode(stage: 'compilation' | 'hmr', transform: TransformFn): void {
+    this.#injects[stage].push(transform)
+  }
+
   async getSSRData(loc: { pathname: string, search?: string }): Promise<[number, any]> {
     if (!this.isSSRable(loc.pathname)) {
       return [404, null]
@@ -466,50 +475,32 @@ export class Application implements ServerApplication {
 
   /** inject HMR code  */
   injectHMRCode({ url }: Module, content: string): string {
-    const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')
-    const alephModuleLocalUrlPrefix = DEV_PORT ? `http_localhost_${DEV_PORT}` : `deno.land/x/aleph@v${VERSION}`
-    const baseUrl = path.dirname(this.toLocalUrl(url))
-    const hmrImportPath = getRelativePath(
-      baseUrl,
-      `/-/${alephModuleLocalUrlPrefix}/framework/core/hmr.js`
+    const hmrModuleImportUrl = getRelativePath(
+      path.dirname(toLocalUrl(url)),
+      toLocalUrl(`${getAlephPkgUri()}/framework/core/hmr.js`)
     )
     const lines = [
-      `import { createHotContext } from ${JSON.stringify(hmrImportPath)};`,
-      `import.meta.hot = createHotContext(${JSON.stringify(url)});`
+      `import { createHotContext } from ${JSON.stringify(hmrModuleImportUrl)};`,
+      `import.meta.hot = createHotContext(${JSON.stringify(url)});`,
+      '',
+      content,
+      '',
+      'import.meta.hot.accept();'
     ]
-    const reactRefresh = this.config.framework === 'react' && (content.includes('$RefreshReg$') || content.includes('$RefreshSig$'))
-    if (reactRefresh) {
-      const refreshImportPath = getRelativePath(
-        baseUrl,
-        `/-/${alephModuleLocalUrlPrefix}/framework/react/refresh.js`
-      )
-      lines.push(
-        `import { RefreshRuntime, performReactRefresh } from ${JSON.stringify(refreshImportPath)};`,
-        '',
-        'const prevRefreshReg = window.$RefreshReg$;',
-        'const prevRefreshSig = window.$RefreshSig$;',
-        `window.$RefreshReg$ = (type, id) => RefreshRuntime.register(type, ${JSON.stringify(url)} + "#" + id);`,
-        'window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;',
-      )
+
+    let code = lines.join('\n')
+    if (this.#injects.hmr.length > 0) {
+      this.#injects.hmr.forEach(transform => {
+        code = transform(url, code)
+      })
     }
-    lines.push('')
-    lines.push(content)
-    lines.push('')
-    if (reactRefresh) {
-      lines.push(
-        'window.$RefreshReg$ = prevRefreshReg;',
-        'window.$RefreshSig$ = prevRefreshSig;',
-        'import.meta.hot.accept(performReactRefresh);'
-      )
-    } else {
-      lines.push('import.meta.hot.accept();')
-    }
-    return lines.join('\n')
+    return code
   }
 
   /** get main code in javascript. */
   getMainJS(bundleMode = false): string {
     const alephPkgUri = getAlephPkgUri()
+    const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
     const { baseUrl: baseURL, defaultLocale, framework } = this.config
     const config: Record<string, any> = {
       baseURL,
@@ -533,12 +524,16 @@ export class Application implements ServerApplication {
       return `var bootstrap=__ALEPH.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default;bootstrap(${JSON.stringify(config)})`
     }
 
-    const prefix = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
-    return [
-      (this.config.framework === 'react' && this.isDev) && `import "./-/${prefix}/framework/react/refresh.js"`,
-      `import bootstrap from "./-/${prefix}/framework/${framework}/bootstrap.js"`,
+    let code = [
+      `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js"`,
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)})`
     ].filter(Boolean).join('\n')
+    if (this.#injects.compilation.length > 0) {
+      this.#injects.compilation.forEach(transform => {
+        code = transform('/main.js', code)
+      })
+    }
+    return code
   }
 
   private getDir(name: string, init: () => string) {
@@ -572,39 +567,6 @@ export class Application implements ServerApplication {
     return [
       { src: util.cleanPath(`${baseUrl}/_aleph/main.bundle.${util.shortHash(computeHash(mainJS))}.js`) },
     ]
-  }
-
-  /** fix remote import url to local */
-  private toLocalUrl(importUrl: string): string {
-    const isRemote = util.isLikelyHttpURL(importUrl)
-    if (isRemote) {
-      const url = new URL(importUrl)
-      let pathname = url.pathname
-      let ok = moduleExts.findIndex(ext => pathname.endsWith('.' + ext)) > -1
-      if (!ok) {
-        for (const plugin of this.config.plugins) {
-          if (plugin.type === 'loader' && plugin.test.test(pathname)) {
-            ok = true
-            break
-          }
-        }
-      }
-      let search = Array.from(url.searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
-      if (search.length > 0) {
-        pathname += '_' + search.join(',')
-      }
-      if (!ok) {
-        pathname += '.js'
-      }
-      return [
-        '/-/',
-        (url.protocol === 'http:' ? 'http_' : ''),
-        url.hostname,
-        (url.port ? '_' + url.port : ''),
-        pathname
-      ].join('')
-    }
-    return importUrl
   }
 
   /** apply loaders recurively. */
@@ -669,7 +631,7 @@ export class Application implements ServerApplication {
   ): Promise<Module> {
     const { sourceCode, forceCompile, once } = options
     const isRemote = util.isLikelyHttpURL(url)
-    const localUrl = this.toLocalUrl(url)
+    const localUrl = toLocalUrl(url)
     const name = util.trimModuleExt(path.basename(localUrl))
     const saveDir = path.join(this.buildDir, path.dirname(localUrl))
     const metaFile = path.join(saveDir, `${name}.meta.json`)
@@ -880,8 +842,8 @@ export class Application implements ServerApplication {
         dep.hash = depMod.hash
         if (!util.isLikelyHttpURL(dep.url)) {
           const relativePathname = getRelativePath(
-            path.dirname(url),
-            util.trimModuleExt(dep.url)
+            path.dirname(toLocalUrl(url)),
+            util.trimModuleExt(toLocalUrl(dep.url))
           )
           if (jsContent === '') {
             jsContent = await Deno.readTextFile(mod.jsFile)
@@ -1106,8 +1068,8 @@ export class Application implements ServerApplication {
           if (dep.hash !== "" && dep.hash !== hash) {
             dep.hash = hash
             const relativePathname = getRelativePath(
-              path.dirname(mod.url),
-              util.trimModuleExt(dep.url)
+              path.dirname(toLocalUrl(mod.url)),
+              util.trimModuleExt(toLocalUrl(dep.url))
             )
             const jsContent = (await Deno.readTextFile(mod.jsFile))
               .replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {

@@ -94,6 +94,11 @@ export interface ServerApplication {
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
   addModule(url: string, options?: ModuleOptions): Promise<void>
+  injectCode(stage: 'compilation' | 'hmr', transform: TransformFn): void
+}
+
+export type TransformFn = {
+  (url: string, code: string): string
 }
 
 /**

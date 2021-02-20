@@ -32,23 +32,6 @@ Object.assign(globalThis, {
 export const AlephRuntimeCode = `
   var __ALEPH = window.__ALEPH || (window.__ALEPH = {
     pack: {},
-    exportFrom: function(specifier, url, exports) {
-      if (url in this.pack) {
-        var mod = this.pack[url]
-        if (!(specifier in this.pack)) {
-          this.pack[specifier] = {}
-        }
-        if (exports === '*') {
-          for (var k in mod) {
-            this.pack[specifier][k] = mod[k]
-          }
-        } else if (typeof exports === 'object' && exports !== null) {
-          for (var k in exports) {
-            this.pack[specifier][exports[k]] = mod[k]
-          }
-        }
-      }
-    },
     require: function(name) {
       switch (name) {
       case 'regenerator-runtime':
@@ -76,6 +59,26 @@ export function getRelativePath(from: string, to: string): string {
     r = './' + r
   }
   return r
+}
+
+/** fix remote import url to local */
+export function toLocalUrl(url: string): string {
+  const isRemote = util.isLikelyHttpURL(url)
+  if (isRemote) {
+    let { hostname, pathname, port, protocol, searchParams } = new URL(url)
+    let search = Array.from(searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
+    if (search.length > 0) {
+      pathname += '_' + search.join(',')
+    }
+    return [
+      '/-/',
+      (protocol === 'http:' ? 'http_' : ''),
+      hostname,
+      (port ? '_' + port : ''),
+      pathname
+    ].join('')
+  }
+  return url
 }
 
 /** compute hash of the content */
