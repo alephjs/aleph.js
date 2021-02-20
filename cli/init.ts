@@ -76,7 +76,7 @@ export default async function (nameArg?: string) {
     const settigns = {
       'deno.enable': true,
       'deno.unstable': true,
-      'deno.import_map': './import_map.json'
+      'deno.importMap': './import_map.json'
     }
     await ensureDir(path.join(name, '.vscode'))
     await Promise.all([
