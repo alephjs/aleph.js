@@ -2,13 +2,12 @@ import { colors, createHash, path } from '../deps.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
 export const reHashJs = /\.[0-9a-fx]{9}\.js$/i
-export const reHashResolve = /[^a-z0-9\$_](import|import\s*\(|from|__module\s*:)(\s*)("|')([^'"]+\.[0-9a-fx]{9}\.js)("|')/g
+export const reHashResolve = /((?:[^a-z0-9\$_\.])import|import\s*\(|from|__module\s*:)(\s*)("|')([^'"]+\.[0-9a-fx]{9}\.js)("|')/g
 
 // inject browser navigator polyfill
 Object.assign(globalThis, {
@@ -137,15 +136,6 @@ export function formatBytesWithColor(bytes: number) {
     cf = colors.yellow
   }
   return cf(util.formatBytes(bytes))
-}
-
-/** Reponse an error jons to the request */
-export function respondErrorJSON(req: ServerRequest, status: number, message: string) {
-  req.respond({
-    status,
-    headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' }),
-    body: JSON.stringify({ error: { status, message } })
-  }).catch((err: Error) => log.warn('ServerRequest.respond:', err.message))
 }
 
 /** create html content by given arguments */
