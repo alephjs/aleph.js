@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'https://esm.sh/react'
-import { Children, Fragment, isValidElement, useContext, useEffect, useMemo } from 'https://esm.sh/react'
+import { Children, createElement, Fragment, isValidElement, useContext, useEffect, useMemo } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import { SSRContext } from './context.ts'
 import Link from './link.ts'
@@ -8,7 +8,7 @@ import Style from './style.ts'
 
 export default function Head(props: PropsWithChildren<{}>) {
   const renderer = useContext(SSRContext)
-  const els = useMemo(() => parse(props.children), [props.children])
+  const [els, forwardNodes] = useMemo(() => parse(props.children), [props.children])
 
   if (util.inDeno()) {
     els.forEach(({ type, props }, key) => renderer.headElements.set(key, { type, props }))
@@ -61,63 +61,69 @@ export default function Head(props: PropsWithChildren<{}>) {
     }
   }, [els])
 
-  return null
+  return createElement(Fragment, { children: forwardNodes })
 }
 
-function parse(node: ReactNode, els: Map<string, { type: string, props: Record<string, any> }> = new Map()) {
-  Children.forEach(node, child => {
-    if (!isValidElement(child)) {
-      return
-    }
+function parse(node: ReactNode): [Map<string, { type: string, props: Record<string, any> }>, ReactNode[]] {
+  const els: Map<string, { type: string, props: Record<string, any> }> = new Map()
+  const forwardNodes: ReactNode[] = []
+  const parseFn = (node: ReactNode) => {
+    Children.forEach(node, child => {
+      if (!isValidElement(child)) {
+        return
+      }
 
-    let { type, props } = child
-    switch (type) {
-      case Fragment:
-        parse(props.children, els)
-        break
-      case Link:
-        Link(props)
-        break
-      case Style:
-        Style(props)
-        break
-      case Script:
-        type = 'script'
-      case 'base':
-      case 'title':
-      case 'meta':
-      case 'link':
-      case 'style':
-      case 'script':
-      case 'no-script':
-        let key = type
-        if (type === 'meta') {
-          const propKeys = Object.keys(props).map(k => k.toLowerCase())
-          if (propKeys.includes('charset')) {
-            return // ignore charset, always use utf-8
+      let { type, props } = child
+      switch (type) {
+        case Fragment:
+          parseFn(props.children)
+          break
+        case Link:
+          forwardNodes.push(createElement(Link, props))
+          break
+        case Style:
+          forwardNodes.push(createElement(Style, props))
+          break
+        case Script:
+          forwardNodes.push(createElement(Script, props))
+          break
+        case 'base':
+        case 'title':
+        case 'meta':
+        case 'link':
+        case 'style':
+        case 'script':
+        case 'no-script':
+          let key = type
+          if (type === 'meta') {
+            const propKeys = Object.keys(props).map(k => k.toLowerCase())
+            if (propKeys.includes('charset')) {
+              return // ignore charset, always use utf-8
+            }
+            if (propKeys.includes('name')) {
+              key += `[name=${JSON.stringify(props['name'])}]`
+            } else if (propKeys.includes('property')) {
+              key += `[property=${JSON.stringify(props['property'])}]`
+            } else if (propKeys.includes('http-equiv')) {
+              key += `[http-equiv=${JSON.stringify(props['http-equiv'])}]`
+            } else {
+              key += Object.keys(props).filter(k => !(/^content|children$/i.test(k))).map(k => `[${k.toLowerCase()}=${JSON.stringify(props[k])}]`).join('')
+            }
+          } else if (type !== 'title') {
+            key += '-' + (els.size + 1)
           }
-          if (propKeys.includes('name')) {
-            key += `[name=${JSON.stringify(props['name'])}]`
-          } else if (propKeys.includes('property')) {
-            key += `[property=${JSON.stringify(props['property'])}]`
-          } else if (propKeys.includes('http-equiv')) {
-            key += `[http-equiv=${JSON.stringify(props['http-equiv'])}]`
+          // remove the children prop of base/meta/link
+          if (['base', 'meta', 'link'].includes(type) && 'children' in props) {
+            const { children, ...rest } = props
+            els.set(key, { type, props: rest })
           } else {
-            key += Object.keys(props).filter(k => !(/^content|children$/i.test(k))).map(k => `[${k.toLowerCase()}=${JSON.stringify(props[k])}]`).join('')
+            els.set(key, { type, props })
           }
-        } else if (type !== 'title') {
-          key += '-' + (els.size + 1)
-        }
-        // remove the children prop of base/meta/link
-        if (['base', 'meta', 'link'].includes(type) && 'children' in props) {
-          const { children, ...rest } = props
-          els.set(key, { type, props: rest })
-        } else {
-          els.set(key, { type, props })
-        }
-        break
-    }
-  })
+          break
+      }
+    })
+  }
 
-  return els
+  parseFn(node)
+  return [els, forwardNodes]
 }
