@@ -1,10 +1,8 @@
 use crate::resolve::{is_remote_url, DependencyDescriptor, InlineStyle, Resolver};
 use crate::resolve_fold::create_aleph_pack_var_decl;
 
-use path_slash::PathBufExt;
-use relative_path::RelativePath;
 use sha1::{Digest, Sha1};
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 use swc_common::{SourceMap, Spanned, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
@@ -106,7 +104,6 @@ impl AlephJsxFold {
 
           "link" | "Link" => {
             let mut should_replace = false;
-            let mut rel: Option<String> = None;
 
             for attr in &el.attrs {
               match &attr {
@@ -117,7 +114,6 @@ impl AlephJsxFold {
                 }) => {
                   if id.sym.eq("rel") && (value.eq("stylesheet") || value.eq("style")) {
                     should_replace = true;
-                    rel = Some(value.to_string());
                     break;
                   }
                 }
@@ -126,7 +122,6 @@ impl AlephJsxFold {
             }
 
             if should_replace {
-              let mut module_prop_index: i32 = -1;
               let mut href_prop_index: i32 = -1;
               let mut href_prop_value = "";
 
@@ -141,9 +136,6 @@ impl AlephJsxFold {
                       href_prop_index = i as i32;
                       href_prop_value = value.as_ref();
                     }
-                    "__module" => {
-                      module_prop_index = i as i32;
-                    }
                     _ => {}
                   },
                   _ => continue,
@@ -151,7 +143,8 @@ impl AlephJsxFold {
               }
 
               let mut resolver = self.resolver.borrow_mut();
-              let (resolved_path, fixed_url) = resolver.resolve(href_prop_value, true, rel);
+              let (resolved_path, fixed_url) = resolver.resolve(href_prop_value, false);
+              resolver.add_extra_import(resolved_path.as_str());
 
               if href_prop_index >= 0 {
                 el.attrs[href_prop_index as usize] = JSXAttrOrSpread::JSXAttr(JSXAttr {
@@ -164,32 +157,6 @@ impl AlephJsxFold {
                     kind: Default::default(),
                   }))),
                 });
-              }
-
-              let mut buf = PathBuf::from(
-                resolver
-                  .fix_import_url(resolver.specifier.as_str())
-                  .as_str(),
-              );
-              buf.pop();
-              let module_url = "/".to_owned()
-                + RelativePath::new(buf.join(resolved_path).to_slash().unwrap().as_str())
-                  .normalize()
-                  .as_str();
-              let module_prop = JSXAttrOrSpread::JSXAttr(JSXAttr {
-                span: DUMMY_SP,
-                name: JSXAttrName::Ident(quote_ident!("__module")),
-                value: Some(JSXAttrValue::Lit(Lit::Str(Str {
-                  span: DUMMY_SP,
-                  value: module_url.into(),
-                  has_escape: false,
-                  kind: Default::default(),
-                }))),
-              });
-              if module_prop_index >= 0 {
-                el.attrs[module_prop_index as usize] = module_prop;
-              } else {
-                el.attrs.push(module_prop);
               }
 
               if name.eq("link") {
@@ -387,6 +354,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
     let aleph_pkg_uri = self.resolver.borrow().get_aleph_pkg_uri();
+    let extra_imports = self.resolver.borrow().extra_imports.clone();
     let mut resolver = self.resolver.borrow_mut();
 
     for mut name in resolver.used_builtin_jsx_tags.clone() {
@@ -397,7 +365,6 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
       let (resolved_path, fixed_url) = resolver.resolve(
         format!("{}/framework/react/{}.ts", aleph_pkg_uri, name).as_str(),
         false,
-        None,
       );
       if resolver.bundle_mode {
         items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
@@ -427,6 +394,21 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
           asserts: None,
         })));
       }
+    }
+
+    for imp in extra_imports {
+      items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+        span: DUMMY_SP,
+        specifiers: vec![],
+        src: Str {
+          span: DUMMY_SP,
+          value: imp.into(),
+          has_escape: false,
+          kind: Default::default(),
+        },
+        type_only: false,
+        asserts: None,
+      })));
     }
 
     for item in module_items {

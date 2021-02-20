@@ -462,7 +462,7 @@ mod tests {
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
-        "__module: \"/style/index.css.{}.js\"",
+        "import   \"../style/index.css.{}.js\"",
         HASH_PLACEHOLDER.as_str()
       )
       .as_str()
@@ -478,7 +478,7 @@ mod tests {
         },
         DependencyDescriptor {
           specifier: "/style/index.css".into(),
-          is_dynamic: true,
+          is_dynamic: false,
         },
         DependencyDescriptor {
           specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/head.ts".into(),

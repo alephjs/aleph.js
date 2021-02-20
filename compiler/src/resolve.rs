@@ -56,6 +56,8 @@ pub struct Resolver {
   pub bundle_mode: bool,
   /// bundled modules
   pub bundled_modules: IndexSet<String>,
+  /// extra imports
+  pub extra_imports: IndexSet<String>,
 
   // private
   import_map: ImportMap,
@@ -87,6 +89,7 @@ impl Resolver {
       react_version,
       bundle_mode,
       bundled_modules: set,
+      extra_imports: IndexSet::new(),
     }
   }
 
@@ -95,6 +98,10 @@ impl Resolver {
       return aleph_pkg_uri.into();
     }
     "https://deno.land/x/aleph".into()
+  }
+
+  pub fn add_extra_import(&mut self, url: &str) {
+    self.extra_imports.insert(url.into());
   }
 
   /// fix import/export url.
@@ -185,7 +192,7 @@ impl Resolver {
   // - `../styles/app.css` -> `/styles/app.css.{HASH}.js`
   // - `@/components/logo.tsx` -> `/components/logo.{HASH}.js`
   // - `~/components/logo.tsx` -> `/components/logo.{HASH}.js`
-  pub fn resolve(&mut self, url: &str, is_dynamic: bool, rel: Option<String>) -> (String, String) {
+  pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> (String, String) {
     // apply import map
     let url = self.import_map.resolve(self.specifier.as_str(), url);
     let mut fixed_url: String = if is_remote_url(url.as_str()) {
@@ -342,16 +349,10 @@ impl Resolver {
       },
       None => {}
     };
-    let update_dep_graph = match rel {
-      Some(ref rel) => !rel.eq("."),
-      None => true,
-    };
-    if update_dep_graph {
-      self.dep_graph.push(DependencyDescriptor {
-        specifier: fixed_url.clone(),
-        is_dynamic,
-      });
-    }
+    self.dep_graph.push(DependencyDescriptor {
+      specifier: fixed_url.clone(),
+      is_dynamic,
+    });
     let path = resolved_path.to_slash().unwrap();
     if !path.starts_with("./") && !path.starts_with("../") && !path.starts_with("/") {
       return (format!("./{}", path), fixed_url);
@@ -438,109 +439,105 @@ mod tests {
       vec![],
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react", false, None),
+      resolver.resolve("https://esm.sh/react", false),
       (
         "../-/esm.sh/react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-refresh", false, None),
+      resolver.resolve("https://esm.sh/react-refresh", false),
       (
         "../-/esm.sh/react-refresh.js".into(),
         "https://esm.sh/react-refresh".into()
       )
     );
     assert_eq!(
-      resolver.resolve(
-        "https://deno.land/x/aleph/framework/react/link.ts",
-        false,
-        None
-      ),
+      resolver.resolve("https://deno.land/x/aleph/framework/react/link.ts", false),
       (
         "../-/http_localhost_2020/framework/react/link.js".into(),
         "http://localhost:2020/framework/react/link.ts".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react@16", false, None),
+      resolver.resolve("https://esm.sh/react@16", false),
       (
         "../-/esm.sh/react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-dom", false, None),
+      resolver.resolve("https://esm.sh/react-dom", false),
       (
         "../-/esm.sh/react-dom@17.0.1.js".into(),
         "https://esm.sh/react-dom@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-dom@16.14.0", false, None),
+      resolver.resolve("https://esm.sh/react-dom@16.14.0", false),
       (
         "../-/esm.sh/react-dom@17.0.1.js".into(),
         "https://esm.sh/react-dom@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-dom/server", false, None),
+      resolver.resolve("https://esm.sh/react-dom/server", false),
       (
         "../-/esm.sh/react-dom@17.0.1/server.js".into(),
         "https://esm.sh/react-dom@17.0.1/server".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://esm.sh/react-dom@16.13.1/server", false, None),
+      resolver.resolve("https://esm.sh/react-dom@16.13.1/server", false),
       (
         "../-/esm.sh/react-dom@17.0.1/server.js".into(),
         "https://esm.sh/react-dom@17.0.1/server".into()
       )
     );
     assert_eq!(
-      resolver.resolve("react-dom/server", false, None),
+      resolver.resolve("react-dom/server", false),
       (
         "../-/esm.sh/react-dom@17.0.1/server.js".into(),
         "https://esm.sh/react-dom@17.0.1/server".into()
       )
     );
     assert_eq!(
-      resolver.resolve("react", false, None),
+      resolver.resolve("react", false),
       (
         "../-/esm.sh/react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("https://deno.land/x/aleph/mod.ts", false, None),
+      resolver.resolve("https://deno.land/x/aleph/mod.ts", false),
       (
         "../-/http_localhost_2020/mod.js".into(),
         "http://localhost:2020/mod.ts".into()
       )
     );
     assert_eq!(
-      resolver.resolve("../components/logo.tsx", false, None),
+      resolver.resolve("../components/logo.tsx", false),
       (
         format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
-      resolver.resolve("../styles/app.css", false, None),
+      resolver.resolve("../styles/app.css", false),
       (
         format!("../styles/app.css.{}.js", HASH_PLACEHOLDER.as_str()),
         "/styles/app.css".into()
       )
     );
     assert_eq!(
-      resolver.resolve("@/components/logo.tsx", false, None),
+      resolver.resolve("@/components/logo.tsx", false),
       (
         format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
-      resolver.resolve("~/components/logo.tsx", false, None),
+      resolver.resolve("~/components/logo.tsx", false),
       (
         format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
         "/components/logo.tsx".into()
@@ -559,25 +556,21 @@ mod tests {
       vec![],
     );
     assert_eq!(
-      resolver.resolve(
-        "https://cdn.esm.sh/react@17.0.1/es2020/react.js",
-        false,
-        None
-      ),
+      resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js", false),
       (
         "../cdn.esm.sh/react@17.0.1/es2020/react.js".into(),
         "https://cdn.esm.sh/react@17.0.1/es2020/react.js".into()
       )
     );
     assert_eq!(
-      resolver.resolve("./react", false, None),
+      resolver.resolve("./react", false),
       (
         "./react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
       )
     );
     assert_eq!(
-      resolver.resolve("/react", false, None),
+      resolver.resolve("/react", false),
       (
         "./react@17.0.1.js".into(),
         "https://esm.sh/react@17.0.1".into()
@@ -596,22 +589,18 @@ mod tests {
       vec![],
     );
     assert_eq!(
-      resolver.resolve(
-        "https://cdn.esm.sh/preact@10.5.7/es2020/preact.js",
-        false,
-        None
-      ),
+      resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js", false),
       (
         "../../cdn.esm.sh/preact@10.5.7/es2020/preact.js".into(),
         "https://cdn.esm.sh/preact@10.5.7/es2020/preact.js".into()
       )
     );
     assert_eq!(
-      resolver.resolve("../preact", false, None),
+      resolver.resolve("../preact", false),
       ("../preact.js".into(), "https://esm.sh/preact".into())
     );
     assert_eq!(
-      resolver.resolve("/preact", false, None),
+      resolver.resolve("/preact", false),
       ("../preact.js".into(), "https://esm.sh/preact".into())
     );
   }
