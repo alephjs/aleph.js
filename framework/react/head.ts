@@ -61,7 +61,7 @@ export default function Head(props: PropsWithChildren<{}>) {
     }
   }, [els])
 
-  return createElement(Fragment, { children: forwardNodes })
+  return createElement(Fragment, null, ...forwardNodes)
 }
 
 function parse(node: ReactNode): [Map<string, { type: string, props: Record<string, any> }>, ReactNode[]] {
