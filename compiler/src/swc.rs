@@ -587,22 +587,4 @@ mod tests {
       "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"].default"
     ));
   }
-
-  #[test]
-  fn bundling_export() {
-    let source = r#"
-      export {default as React, useState, useEffect as useEffect_ } from "https://esm.sh/react"
-      export * as React_ from "https://esm.sh/react"
-      export * from "https://esm.sh/react"
-    "#;
-    let (code, _) = t("/pages/index.tsx", source, true);
-    assert!(code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", {"));
-    assert!(
-      code.contains("__ALEPH.exportFrom(\"/pages/index.tsx\", \"https://esm.sh/react\", \"*\")")
-    );
-    assert!(code.contains("\"default\": \"React\""));
-    assert!(code.contains("\"useState\": \"useState\""));
-    assert!(code.contains("\"useEffect\": \"useEffect_\""));
-    assert!(code.contains("\"*\": \"React_\""));
-  }
 }
