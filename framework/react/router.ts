@@ -1,5 +1,4 @@
-import type { ComponentType } from 'https://esm.sh/react'
-import { createElement, useCallback, useEffect, useState } from 'https://esm.sh/react'
+import { ComponentType, createElement, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import events from '../core/events.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
@@ -13,15 +12,16 @@ export default function Router({
   pageRoute,
   routing,
 }: {
-  customComponents: Record<'E404' | 'App', ComponentType<any>>
+  customComponents: Record<'E404' | 'App', { C: ComponentType, useDeno?: boolean }>
   pageRoute: PageRoute,
   routing: Routing
 }) {
+  const appUseDeno = !!customComponents.App?.useDeno
   const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
     const { E404 } = customComponents
     if (E404) {
-      if (isLikelyReactComponent(E404)) {
-        return { Component: E404 }
+      if (isLikelyReactComponent(E404.C)) {
+        return { Component: E404.C }
       }
       return { Component: E400MissingComponent, props: { name: 'Custom 404 Page' } }
     }
@@ -30,8 +30,8 @@ export default function Router({
   const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
     const { App } = customComponents
     if (App) {
-      if (isLikelyReactComponent(App)) {
-        return { Component: App }
+      if (isLikelyReactComponent(App.C)) {
+        return { Component: App.C }
       }
       return { Component: E400MissingComponent, props: { name: 'Custom App' } }
     }
@@ -43,15 +43,15 @@ export default function Router({
     const [url, nestedModules] = routing.createRouter()
     if (url.pagePath !== '') {
       const imports = nestedModules.map(async mod => {
-        const [{ default: Component }] = await Promise.all([
-          importModule(baseURL, mod, e.forceRefetch),
-          mod.hasData ? loadPageData(url) : Promise.resolve(),
-        ])
+        const { default: Component } = await importModule(baseURL, mod, e.forceRefetch)
         return {
           url: mod.url,
           Component
         }
       })
+      if (appUseDeno || nestedModules.findIndex(mod => !!mod.useDeno) > -1) {
+        await loadPageData(url)
+      }
       setRoute({ ...createPageProps(await Promise.all(imports)), url })
       if (e.resetScroll) {
         (window as any).scrollTo(0, 0)
@@ -124,11 +124,11 @@ export default function Router({
       const [url, nestedModules] = routing.createRouter({ pathname, search })
       if (url.pagePath !== '') {
         nestedModules.map(mod => {
-          if (mod.hasData) {
-            loadPageData(url)
-          }
           importModule(baseURL, mod)
         })
+        if (appUseDeno || nestedModules.findIndex(mod => !!mod.useDeno) > -1) {
+          loadPageData(url)
+        }
       }
     }
 

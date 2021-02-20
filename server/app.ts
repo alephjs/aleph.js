@@ -548,8 +548,8 @@ export class Application implements ServerApplication {
 
   /** returns the route module by given module. */
   private getRouteModule({ url, hash }: Pick<Module, 'url' | 'hash'>): RouteModule {
-    const hasData = this.lookupDeps(url).filter((({ url }) => url.startsWith('#useDeno-'))).length > 0 || undefined
-    return { url, hash, hasData }
+    const useDeno = this.lookupDeps(url).filter((({ url }) => url.startsWith('#useDeno-'))).length > 0 || undefined
+    return { url, hash, useDeno }
   }
 
   private getHTMLScripts() {

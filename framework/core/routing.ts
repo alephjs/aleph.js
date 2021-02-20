@@ -14,7 +14,7 @@ export type Route = {
 export type RouteModule = {
   readonly url: string
   readonly hash: string
-  readonly hasData?: boolean
+  readonly useDeno?: boolean
 }
 
 export type RoutingOptions = {

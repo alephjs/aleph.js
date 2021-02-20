@@ -17,31 +17,31 @@ type BootstrapOptions = Required<RoutingOptions> & {
 export default async function bootstrap(options: BootstrapOptions) {
   const { baseURL, defaultLocale, locales, routes, rewrites, sharedModules, renderMode } = options
   const { document } = window as any
-  const customComponents: Record<string, ComponentType> = {}
-  await Promise.all(sharedModules.map(async mod => {
-    const { default: C } = await importModule(baseURL, mod)
-    switch (util.trimModuleExt(mod.url)) {
+  const customComponents: Record<string, { C: ComponentType, useDeno?: boolean }> = {}
+  await Promise.all(sharedModules.map(async ({ url, hash, useDeno }) => {
+    const { default: C } = await importModule(baseURL, { url, hash })
+    switch (util.trimModuleExt(url)) {
       case '/404':
-        customComponents['E404'] = C
+        customComponents['E404'] = { C, useDeno }
         break
       case '/app':
-        customComponents['App'] = C
+        customComponents['App'] = { C, useDeno }
         break
     }
   }))
   const routing = new Routing({ routes, rewrites, baseURL, defaultLocale, locales })
   const [url, nestedModules] = routing.createRouter()
-  const imports = await Promise.all(nestedModules.map(async mod => {
-    const [{ default: Component }] = await Promise.all([
-      importModule(baseURL, mod),
-      mod.hasData ? loadPageDataFromTag(url) : Promise.resolve()
-    ])
+  const imports = nestedModules.map(async mod => {
+    const { default: Component } = await importModule(baseURL, mod)
     return {
       url: mod.url,
-      Component,
+      Component
     }
-  }))
-  const pageRoute: PageRoute = { ...createPageProps(imports), url }
+  })
+  if (!!customComponents.App?.useDeno || nestedModules.findIndex(mod => !!mod.useDeno) > -1) {
+    await loadPageDataFromTag(url)
+  }
+  const pageRoute: PageRoute = { ...createPageProps(await Promise.all(imports)), url }
   const routerEl = createElement(Router, { customComponents, pageRoute, routing })
   const mountPoint = document.getElementById('__aleph')
 
