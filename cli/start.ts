@@ -1,5 +1,4 @@
 import { getFlag, parsePortNumber } from '../server/helper.ts'
-import type { ServeOptions } from '../server/mod.ts'
 import { Application, serve } from '../server/mod.ts'
 import log from '../shared/log.ts'
 
@@ -13,27 +12,23 @@ if the <dir> is empty, the current directory will be used.
 Options:
     -p, --port      <port>       A port number to start the aleph.js app, default is 8080
         --hostname  <hostname>   The address at which the server is to be started
-        --cert      <certFile>   The server certificate file
-        --key       <keyFile>    The server public key file
+        --tls-cert  <cert-file>  The server certificate file
+        --tls-key   <key-file>   The server public key file
     -L, --log-level <log-level>  Set log level [possible values: debug, info]
     -r, --reload                 Reload source code cache
     -h, --help                   Prints help message
 `
 
-export default async function (workingDir: string, flags: Record<string, string | boolean>) {
+export default async function (workingDir: string, flags: Record<string, any>) {
   const app = new Application(workingDir, 'production', Boolean(flags.r || flags.reload))
   const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
-  const hostname = getFlag(flags, ['hostname'], 'localhost')
-  const certFile = getFlag(flags, ['cert'])
-  const keyFile = getFlag(flags, ['key'])
-  const opts: ServeOptions = { app, port, hostname }
-  if (certFile && keyFile) {
-    opts.certFile = certFile
-    opts.keyFile = keyFile
-  } else if (certFile) {
-    log.fatal('missing `--key` option')
-  } else if (keyFile) {
-    log.fatal('missing `--cert` option')
+  const hostname = getFlag(flags, ['hostname'])
+  const certFile = getFlag(flags, ['tls-cert'])
+  const keyFile = getFlag(flags, ['tls-key'])
+  if (keyFile !== undefined && certFile === undefined) {
+    log.fatal('missing `--tls-cert` option')
+  } else if (certFile !== undefined && keyFile === undefined) {
+    log.fatal('missing `--tls-key` option')
   }
-  await serve(opts)
+  await serve({ app, port, hostname, certFile, keyFile })
 }

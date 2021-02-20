@@ -13,7 +13,7 @@ Options:
     -h, --help                   Prints help message
 `
 
-export default async function (workingDir: string, options: Record<string, string | boolean>) {
+export default async function (workingDir: string, options: Record<string, any>) {
   const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
   await app.build()
   Deno.exit(0)

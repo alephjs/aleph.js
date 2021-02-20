@@ -15,8 +15,8 @@ Options:
     -h, --help                   Prints help message
 `
 
-export default async function (workingDir: string, flags: Record<string, string | boolean>) {
+export default async function (workingDir: string, flags: Record<string, any>) {
   const app = new Application(workingDir, 'development', Boolean(flags.r || flags.reload))
   const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
-  await serve({ app, port, hostname: 'localhost' })
+  await serve({ app, port })
 }

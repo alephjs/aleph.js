@@ -113,11 +113,13 @@ export function parsePortNumber(v: string): number {
   return num
 }
 
-/** get flag */
-export function getFlag(flags: Record<string, string | boolean>, keys: string[], defaultValue?: string): string {
-  let value = defaultValue || ''
+/** get flag value by given keys. */
+export function getFlag(flags: Record<string, any>, keys: string[]): string | undefined
+export function getFlag(flags: Record<string, any>, keys: string[], defaultValue: string): string
+export function getFlag(flags: Record<string, any>, keys: string[], defaultValue?: string): string | undefined {
+  let value = defaultValue
   for (const key of keys) {
-    if (key in flags && util.isNEString(flags[key])) {
+    if (key in flags) {
       value = String(flags[key])
       break
     }

@@ -205,7 +205,7 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
       } else {
         s = stdServe({ port, hostname })
       }
-      log.info(`Aleph server ready on http://${hostname}:${port}${app.config.baseUrl}`)
+      log.info(`Aleph server ready on http://${hostname || 'localhost'}:${port}${app.config.baseUrl}`)
       for await (const r of s) {
         server.handle(r)
       }
