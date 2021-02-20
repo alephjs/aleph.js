@@ -1,6 +1,7 @@
 import { buildChecksum, TransformOptions, transformSync } from '../compiler/mod.ts'
 import type { ECMA } from '../deps.ts'
 import { colors, minify, path } from '../deps.ts'
+import { defaultReactVersion } from "../shared/constants.ts"
 import { existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -64,7 +65,7 @@ export class Bundler {
       ...options,
       importMap: this.#app.importMap,
       alephPkgUri: getAlephPkgUri(),
-      reactVersion: this.#app.config.reactVersion,
+      reactVersion: defaultReactVersion,
     })
   }
 

@@ -4,16 +4,15 @@ import { colors, createHash, ensureDir, minify, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import type { RouteModule } from '../framework/core/routing.ts'
 import { createBlankRouterURL, isModuleURL, Routing, toPagePath } from '../framework/core/routing.ts'
-import { minDenoVersion, moduleExts } from '../shared/constants.ts'
+import { defaultReactVersion, minDenoVersion, moduleExts } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, RouterURL, ServerApplication, ServerRequest } from '../types.ts'
+import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, RouterURL, ServerApplication } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { Request } from './api.ts'
 import { Bundler } from './bundler.ts'
 import { defaultConfig, loadConfig } from './config.ts'
-import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, reFullVersion, reHashJs, reHashResolve, respondErrorJSON } from './helper.ts'
+import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, reFullVersion, reHashJs, reHashResolve } from './helper.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -118,11 +117,36 @@ export class Application implements ServerApplication {
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
 
-    // create page routing
-    this.#pageRouting = new Routing(this.config)
+    // apply server plugins
+    for (const plugin of plugins) {
+      if (plugin.type === 'server') {
+        await plugin.onInit(this)
+      }
+    }
+
+    // init framework
+    const { init } = await import(`${alephPkgUri}/framework/${framework}/init.ts`)
+    await init(this)
 
     if (!this.isDev) {
       log.info('Building...')
+    }
+
+    // pre-compile framework modules
+    await this.compile(`${alephPkgUri}/framework/${framework}/bootstrap.ts`)
+    if (this.isDev) {
+      const mods = ['hmr.ts', 'nomodule.ts']
+      for (const mod of mods) {
+        await this.compile(`${alephPkgUri}/framework/core/${mod}`)
+      }
+    }
+
+    // compile and import framework renderer when ssr is enable
+    if (ssr) {
+      const rendererModuleUrl = `${alephPkgUri}/framework/${framework}/renderer.ts`
+      const { jsFile } = await this.compile(rendererModuleUrl, { once: true })
+      const { render } = await import('file://' + jsFile)
+      this.#renderer = { render }
     }
 
     // check custom components
@@ -137,7 +161,7 @@ export class Application implements ServerApplication {
       }
     }
 
-    // create api routing
+    // update api routing
     if (existsDirSync(apiDir)) {
       for await (const { path: p } of walk(apiDir, walkOptions)) {
         const mod = await this.compile(util.cleanPath('/api/' + util.trimPrefix(p, apiDir)))
@@ -145,47 +169,16 @@ export class Application implements ServerApplication {
       }
     }
 
-    // create page routing
+    // update page routing
+    this.#pageRouting.config(this.config)
     for await (const { path: p } of walk(pagesDir, { ...walkOptions })) {
       const mod = await this.compile(util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir)))
       this.#pageRouting.update(this.getRouteModule(mod))
     }
 
-    // pre-compile framework modules
-    await this.compile(`${alephPkgUri}/framework/${framework}/bootstrap.ts`)
-    if (this.isDev) {
-      const mods = ['hmr.ts', 'nomodule.ts']
-      for (const mod of mods) {
-        await this.compile(`${alephPkgUri}/framework/core/${mod}`)
-      }
-      // add fast-refresh support
-      if (framework === 'react') {
-        Object.assign(globalThis, {
-          $RefreshReg$: () => { },
-          $RefreshSig$: () => (type: any) => type,
-        })
-        await this.compile(`${alephPkgUri}/framework/react/refresh.ts`)
-      }
-    }
-
     // pre-bundle
     if (!this.isDev) {
       await this.bundle()
-    }
-
-    // compile and import framework renderer when ssr is enable
-    if (ssr) {
-      const rendererModuleUrl = `${alephPkgUri}/framework/${framework}/renderer.ts`
-      const { jsFile } = await this.compile(rendererModuleUrl, { once: true })
-      const { render } = await import('file://' + jsFile)
-      this.#renderer = { render }
-    }
-
-    // apply server plugins
-    for (const plugin of plugins) {
-      if (plugin.type === 'server') {
-        await plugin.onInit(this)
-      }
     }
 
     // reload end
@@ -318,6 +311,15 @@ export class Application implements ServerApplication {
     return null
   }
 
+  getAPIRouter(location: { pathname: string, search?: string }): [RouterURL, Module] | null {
+    const [url, nestedModules] = this.#apiRouting.createRouter(location)
+    if (url.pagePath !== '') {
+      const { url: moduleUrl } = nestedModules.pop()!
+      return [url, this.#modules.get(moduleUrl)!]
+    }
+    return null
+  }
+
   /** add a new page module by given path and source code. */
   async addModule(url: string, options: ModuleOptions = {}): Promise<void> {
     const mod = await this.compile(url, { sourceCode: options.code })
@@ -427,29 +429,6 @@ export class Application implements ServerApplication {
     }
 
     log.info(`Done in ${Math.round(performance.now() - start)}ms`)
-  }
-
-  async handleAPIRequest(req: ServerRequest, loc: { pathname: string, search?: string }) {
-    const [url, nestedModules] = this.#apiRouting.createRouter({
-      ...loc,
-      pathname: decodeURI(loc.pathname)
-    })
-    if (url.pagePath !== '') {
-      const { url: moduleUrl } = nestedModules.pop()!
-      try {
-        const { default: handle } = await import('file://' + this.#modules.get(moduleUrl)!.jsFile)
-        if (util.isFunction(handle)) {
-          await handle(new Request(req, url.params, url.query))
-        } else {
-          respondErrorJSON(req, 500, 'bad api handler')
-        }
-      } catch (err) {
-        respondErrorJSON(req, 500, err.message)
-        log.error('invoke API:', err)
-      }
-    } else {
-      respondErrorJSON(req, 404, 'not found')
-    }
   }
 
   createFSWatcher(): EventEmitter {
@@ -650,6 +629,7 @@ export class Application implements ServerApplication {
     return {
       importMap: this.importMap,
       alephPkgUri: getAlephPkgUri(),
+      reactVersion: defaultReactVersion,
       isDev: this.isDev,
     }
   }

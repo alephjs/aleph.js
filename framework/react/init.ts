@@ -1,5 +1,5 @@
-import type { ServerApplication } from '../../types.ts'
 import { getAlephPkgUri } from '../../server/helper.ts'
+import type { ServerApplication } from '../../types.ts'
 
 export async function init(app: ServerApplication) {
   if (app.mode == 'development') {

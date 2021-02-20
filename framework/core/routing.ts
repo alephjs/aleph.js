@@ -61,6 +61,12 @@ export class Routing {
     return JSON.parse(JSON.stringify(this._routes))
   }
 
+  config(options: RoutingOptions) {
+    Object.keys(options).forEach((key) => {
+      Object.assign(this, { ['_' + key]: options[key as keyof typeof options] })
+    })
+  }
+
   update(module: RouteModule) {
     const newRoute: Route = { path: toPagePath(module.url), module: module }
     const dirtyRoutes: Set<Route[]> = new Set()

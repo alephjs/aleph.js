@@ -10,7 +10,6 @@ import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
 export const defaultConfig: Readonly<Required<Config>> = {
   framework: 'react',
-  reactVersion: defaultReactVersion,
   buildTarget: 'es5',
   baseUrl: '/',
   srcDir: '/',
@@ -52,7 +51,6 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
   const config: Config = {}
   const {
     framework,
-    reactVersion,
     srcDir,
     outputDir,
     baseUrl,
@@ -67,9 +65,6 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
   } = data
   if (isFramework(framework)) {
     config.framework = framework
-  }
-  if (util.isNEString(reactVersion)) {
-    config.reactVersion = reactVersion
   }
   if (util.isNEString(srcDir)) {
     config.srcDir = util.cleanPath(srcDir)
@@ -139,8 +134,8 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     const imports = {
       'aleph': `${alephPkgUri}/mod.ts`,
       'aleph/': `${alephPkgUri}/`,
-      'react': `https://esm.sh/react@${config.reactVersion}`,
-      'react-dom': `https://esm.sh/react-dom@${config.reactVersion}`,
+      'react': `https://esm.sh/react@${defaultReactVersion}`,
+      'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
     }
     Object.assign(importMap.imports, imports)
   }
