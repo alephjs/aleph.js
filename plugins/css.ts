@@ -1,6 +1,6 @@
 import CleanCSS from 'https://esm.sh/clean-css@5.0.1?no-check'
 import type { AcceptedPlugin } from 'https://esm.sh/postcss@8.2.4'
-import postcss from 'https://esm.sh/postcss@8.2.4'
+import PostCSS from 'https://esm.sh/postcss@8.2.4'
 import { path } from '../deps.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
@@ -16,50 +16,51 @@ type Options = {
 }
 
 export default (options?: Options): LoaderPlugin => {
-  let postcssPlugins: AcceptedPlugin[] = []
+  let postcss: any = null
+  let loading = (async () => {
+    if (options?.postcss) {
+      postcss = PostCSS(await loadPostcssPlugins(options.postcss.plugins))
+      return
+    }
+
+    for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
+      const p = path.join(Deno.cwd(), name)
+      if (existsFileSync(p)) {
+        let config: any = null
+        if (name.endsWith('.json')) {
+          config = JSON.parse(await Deno.readTextFile(p))
+        } else {
+          const mod = await import('file://' + p)
+          config = mod.default
+          if (util.isFunction(config)) {
+            config = await config()
+          }
+        }
+        if (isPostcssConfig(config)) {
+          postcss = PostCSS(await loadPostcssPlugins(config.plugins))
+          return
+        }
+      }
+    }
+
+    postcss = PostCSS(await loadPostcssPlugins(['autoprefixer']))
+  })()
 
   return {
     name: 'css-loader',
     type: 'loader',
     test: /\.p?css$/i,
     acceptHMR: true,
-    async init() {
-      if (options?.postcss) {
-        postcssPlugins = await loadPostcssPlugins(options.postcss.plugins)
-        return
+    async transform({ url, content }) {
+      if (postcss == null) {
+        await loading
       }
-
-      for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
-        const p = path.join(Deno.cwd(), name)
-        if (existsFileSync(p)) {
-          let config: any = null
-          if (name.endsWith('.json')) {
-            config = JSON.parse(await Deno.readTextFile(p))
-          } else {
-            const mod = await import('file://' + p)
-            config = mod.default
-            if (util.isFunction(config)) {
-              config = await config()
-            }
-          }
-          if (isPostcssConfig(config)) {
-            postcssPlugins = await loadPostcssPlugins(config.plugins)
-            return
-          }
-        }
-      }
-
-      postcssPlugins = await loadPostcssPlugins(['autoprefixer'])
-      return
-    },
-    async transform({ content, url }) {
-      const { stringify } = JSON
-      const pcss = (await postcss(postcssPlugins).process((new TextDecoder).decode(content)).async()).content
+      const pcss = (await postcss!.process((new TextDecoder).decode(content)).async()).content
       const mini = Deno.env.get('BUILD_MODE') === 'production'
       const css = mini ? cleanCSS.minify(pcss).styles : pcss
       const js = [
         'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-        `applyCSS(${stringify(url)}, ${stringify(css)})`
+        `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)})`
       ].join('\n')
       return {
         code: js,

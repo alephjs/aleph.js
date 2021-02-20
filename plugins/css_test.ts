@@ -28,7 +28,6 @@ Deno.test('css loader in production mode', async () => {
 
 Deno.test('css loader with postcss plugins', async () => {
   const loader = cssLoader({ postcss: { plugins: ['postcss-nested'] } })
-  await loader.init!()
   const { code } = await loader.transform({
     url: '/test.css',
     content: (new TextEncoder).encode('.foo { .bar { font-size: 100%; } }'),

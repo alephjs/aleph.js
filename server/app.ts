@@ -118,13 +118,6 @@ export class Application {
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
 
-    await Promise.all(plugins.map(async p => {
-      if (p.type === 'loader' && p.init) {
-        await p.init()
-      }
-      log.debug(`plugin '${p.name}' inited`)
-    }))
-
     // create page routing
     this.#pageRouting = new Routing(this.config)
 

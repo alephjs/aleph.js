@@ -23,8 +23,6 @@ export type LoaderPlugin = {
   acceptHMR?: boolean
   /** `allowPage` allows the loaded module as a page. */
   allowPage?: boolean
-  /** `init` initiates the plugin. */
-  init?(): Promise<void>
   /** `transform` transforms the source content. */
   transform(source: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformResult | Promise<LoaderTransformResult>
 }
