@@ -1,14 +1,24 @@
 import util from '../../shared/util.ts'
 
 export const serverStyles = new Map<string, string>()
+export const recoverStyles = new Map<string, string>()
 
-export function removeCSS(id: string) {
+export function removeCSS(id: string, recoverable?: boolean) {
   const { document } = window as any
   Array.from(document.head.children).forEach((el: any) => {
     if (el.getAttribute('data-module-id') === id) {
+      if (recoverable) {
+        recoverStyles.set(id, el.innerHTML)
+      }
       document.head.removeChild(el)
     }
   })
+}
+
+export function recoverCSS(id: string) {
+  if (recoverStyles.has(id)) {
+    applyCSS(id, recoverStyles.get(id)!)
+  }
 }
 
 export function applyCSS(id: string, css: string) {

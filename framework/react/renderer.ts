@@ -18,7 +18,6 @@ type RenderResult = {
 }
 
 export type RendererStorage = {
-  styleLinks: Map<string, { module: string }>
   headElements: Map<string, { type: string, props: Record<string, any> }>
   scriptElements: Map<string, { props: Record<string, any> }>
 }
@@ -38,7 +37,6 @@ export async function render(
   }
   const buildMode = Deno.env.get('BUILD_MODE')
   const rendererStorage: RendererStorage = {
-    styleLinks: new Map(),
     headElements: new Map(),
     scriptElements: new Map(),
   }
@@ -153,9 +151,6 @@ export async function render(
   })
 
   // get styles
-  await Promise.all(Array.from(rendererStorage.styleLinks.values()).map(async ({ module }) => {
-    await import('file://' + util.cleanPath(`${Deno.cwd()}/.aleph/${buildMode}/${module}`))
-  }))
   serverStyles.forEach((css, url) => {
     ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
   })

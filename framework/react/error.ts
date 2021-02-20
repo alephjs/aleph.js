@@ -2,32 +2,23 @@ import type { CSSProperties } from 'https://esm.sh/react'
 import { Component, createElement } from 'https://esm.sh/react'
 
 export class ErrorBoundary extends Component {
-  state: { error: Error | null, promise: Promise<any> | null }
+  state: { error: Error | null }
 
   constructor(props: any) {
     super(props)
-    this.state = { error: null, promise: null }
+    this.state = { error: null }
   }
 
   static getDerivedStateFromError(e: any) {
-    if (e instanceof Promise) {
-      return { error: null, promise: e }
-    }
-    return { error: e, promise: null }
+    return { error: e }
   }
 
   componentDidCatch(e: any) {
-    if (e instanceof Promise) {
-      e.then(() => {
-        this.setState({ promise: null })
-      })
-    } else {
-      console.error(e)
-    }
+    console.error(e)
   }
 
   render() {
-    const { error, promise } = this.state
+    const { error } = this.state
 
     if (error) {
       return (
@@ -37,10 +28,6 @@ export class ErrorBoundary extends Component {
           error.stack || error.message || error.toString()
         )
       )
-    }
-
-    if (promise) {
-      return null
     }
 
     return this.props.children

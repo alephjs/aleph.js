@@ -2,9 +2,9 @@ import type { PropsWithChildren, ReactNode } from 'https://esm.sh/react'
 import { Children, createElement, Fragment, isValidElement, useContext, useEffect, useMemo } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import { SSRContext } from './context.ts'
-import Link from './link.ts'
 import Script from './script.ts'
 import Style from './style.ts'
+import StyleLink from './stylelink.ts'
 
 export default function Head(props: PropsWithChildren<{}>) {
   const renderer = useContext(SSRContext)
@@ -78,8 +78,8 @@ function parse(node: ReactNode): [Map<string, { type: string, props: Record<stri
         case Fragment:
           parseFn(props.children)
           break
-        case Link:
-          forwardNodes.push(createElement(Link, props))
+        case StyleLink:
+          forwardNodes.push(createElement(StyleLink, props))
           break
         case Style:
           forwardNodes.push(createElement(Style, props))
