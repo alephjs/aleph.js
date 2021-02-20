@@ -8,7 +8,7 @@ import { minDenoVersion, moduleExts } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, LoaderPlugin, LoaderTransformResult, RouterURL, ServerRequest, ServerApplication } from '../types.ts'
+import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, RouterURL, ServerApplication, ServerRequest } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
 import { Bundler } from './bundler.ts'
@@ -319,16 +319,23 @@ export class Application implements ServerApplication {
   }
 
   /** add a new page module by given path and source code. */
-  async addModule(url: string, options: { code?: string, asPage?: boolean, pagePath?: string } = {}): Promise<void> {
+  async addModule(url: string, options: ModuleOptions = {}): Promise<void> {
     const mod = await this.compile(url, { sourceCode: options.code })
-    if (options.asPage) {
-      const rm = this.getRouteModule(mod)
-      if (options.pagePath) {
-        Object.assign(rm, { url: util.cleanPath('/pages/' + options.pagePath) + '.tsx' })
-      } else if (!rm.url.startsWith('/pages/')) {
-        throw new Error(`addModule: page module url should start with '/pages/'`)
+    const routeMod = this.getRouteModule(mod)
+    if (options.asAPI) {
+      if (options.pathname) {
+        Object.assign(routeMod, { url: util.cleanPath('/api/' + options.pathname) + '.tsx' })
+      } else if (!routeMod.url.startsWith('/api/')) {
+        throw new Error(`the api module url should start with '/api/': ${routeMod.url}`)
       }
-      this.#pageRouting.update(rm)
+      this.#apiRouting.update(routeMod)
+    } else if (options.asPage) {
+      if (options.pathname) {
+        Object.assign(routeMod, { url: util.cleanPath('/pages/' + options.pathname) + '.tsx' })
+      } else if (!routeMod.url.startsWith('/pages/')) {
+        throw new Error(`the page module url should start with '/pages/': ${routeMod.url}`)
+      }
+      this.#pageRouting.update(routeMod)
     }
   }
 
@@ -643,7 +650,6 @@ export class Application implements ServerApplication {
     return {
       importMap: this.importMap,
       alephPkgUri: getAlephPkgUri(),
-      reactVersion: this.config.reactVersion,
       isDev: this.isDev,
     }
   }
