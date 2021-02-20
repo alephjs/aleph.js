@@ -8,7 +8,7 @@ import { minDenoVersion, moduleExts } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, LoaderPlugin, LoaderTransformResult, RouterURL, ServerRequest } from '../types.ts'
+import type { Config, LoaderPlugin, LoaderTransformResult, RouterURL, ServerRequest, ServerApplication } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Request } from './api.ts'
 import { Bundler } from './bundler.ts'
@@ -42,7 +42,7 @@ export type RenderResult = {
 }
 
 /** The Aleph Server Application class. */
-export class Application {
+export class Application implements ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
@@ -319,19 +319,16 @@ export class Application {
   }
 
   /** add a new page module by given path and source code. */
-  async addPageModule(pathname: string, code: string): Promise<void> {
-    const url = util.cleanPath('/pages/' + pathname) + '.tsx'
-    const mod = await this.compile(url, { sourceCode: code })
-    this.#pageRouting.update(this.getRouteModule(mod))
-  }
-
-  /** remove the page module by given path. */
-  async removePageModule(pathname: string): Promise<void> {
-    const url = util.cleanPath('/pages/' + pathname) + '.tsx'
-    if (this.#modules.has(url)) {
-      await clearCompilation(this.#modules.get(url)!.jsFile)
-      this.#modules.delete(url)
-      this.#pageRouting.removeRoute(url)
+  async addModule(url: string, options: { code?: string, asPage?: boolean, pagePath?: string } = {}): Promise<void> {
+    const mod = await this.compile(url, { sourceCode: options.code })
+    if (options.asPage) {
+      const rm = this.getRouteModule(mod)
+      if (options.pagePath) {
+        Object.assign(rm, { url: util.cleanPath('/pages/' + options.pagePath) + '.tsx' })
+      } else if (!rm.url.startsWith('/pages/')) {
+        throw new Error(`addModule: page module url should start with '/pages/'`)
+      }
+      this.#pageRouting.update(rm)
     }
   }
 

@@ -91,12 +91,11 @@ export type Config = {
 /**
  * An interface that aligns to the parts of the aleph server's `Application`.
  */
-interface ServerApplication {
+export interface ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
-  addPageModule(pathname: string, code: string): Promise<void>
-  removePageModule(pathname: string): Promise<void>
+  addModule(url: string, options?: { code?: string, asPage?: boolean }): Promise<void>
 }
 
 /**
