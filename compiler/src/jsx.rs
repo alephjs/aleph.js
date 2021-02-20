@@ -102,7 +102,7 @@ impl AlephJsxFold {
             }
           }
 
-          "link" | "Link" => {
+          "link" | "StyleLink" => {
             let mut should_replace = false;
 
             for attr in &el.attrs {
@@ -112,7 +112,9 @@ impl AlephJsxFold {
                   value: Some(JSXAttrValue::Lit(Lit::Str(Str { value, .. }))),
                   ..
                 }) => {
-                  if id.sym.eq("rel") && (value.eq("stylesheet") || value.eq("style")) {
+                  if name.eq("StyleLink")
+                    || (id.sym.eq("rel") && (value.eq("stylesheet") || value.eq("style")))
+                  {
                     should_replace = true;
                     break;
                   }
@@ -160,8 +162,8 @@ impl AlephJsxFold {
               }
 
               if name.eq("link") {
-                resolver.used_builtin_jsx_tags.insert(name.into());
-                el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+                resolver.used_builtin_jsx_tags.insert("stylelink".into());
+                el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag("stylelink")));
               }
             }
           }

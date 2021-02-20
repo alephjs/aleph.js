@@ -450,7 +450,7 @@ mod tests {
       "import __ALEPH_Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/head.js\""
     ));
     assert!(code.contains(
-      "import __ALEPH_Link from \"../-/deno.land/x/aleph@v0.3.0/framework/react/link.js\""
+      "import __ALEPH_Stylelink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/stylelink.js\""
     ));
     assert!(code.contains(
       "import __ALEPH_Script from \"../-/deno.land/x/aleph@v0.3.0/framework/react/script.js\""
@@ -458,7 +458,7 @@ mod tests {
     assert!(code.contains("React.createElement(\"a\","));
     assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
     assert!(code.contains("React.createElement(__ALEPH_Head,"));
-    assert!(code.contains("React.createElement(__ALEPH_Link,"));
+    assert!(code.contains("React.createElement(__ALEPH_Stylelink,"));
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
@@ -485,7 +485,7 @@ mod tests {
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/link.ts".into(),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/stylelink.ts".into(),
           is_dynamic: false,
         },
         DependencyDescriptor {
