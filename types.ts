@@ -22,9 +22,12 @@ export type LoaderPlugin = {
  * The result of loader transform.
  */
 export type LoaderTransformResult = {
-  code: string,
+  /** The transformed code in string. */
+  code: string
+  /** The transformed code type (default is 'js'). */
+  type?: string
+  /** The source map. */
   map?: string
-  loader?: string
 }
 
 /**
@@ -185,6 +188,6 @@ export type RouterURL = {
   readonly pagePath: string
   readonly params: Record<string, string>
   readonly query: URLSearchParams
-  push(url: string): void,
-  replace(url: string): void,
+  push(url: string): void
+  replace(url: string): void
 }

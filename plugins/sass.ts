@@ -16,8 +16,8 @@ export default (opts?: Options): LoaderPlugin => ({
     })
     return {
       code: (new TextDecoder).decode(css),
+      type: 'css',
       map: map ? (new TextDecoder).decode(map) : undefined,
-      loader: 'css-loader'
     }
   }
 })

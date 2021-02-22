@@ -571,16 +571,17 @@ export class Application implements ServerApplication {
 
   /** apply loaders recurively. */
   private async applyLoader(loader: LoaderPlugin, input: { url: string, content: Uint8Array, map?: Uint8Array }): Promise<Omit<LoaderTransformResult, 'loader'>> {
-    const { code, map, loader: next } = await loader.transform(input)
-    if (next) {
-      const nextLoader = this.config.plugins.find(({ name }) => name === next)
-      if (nextLoader && nextLoader.type === 'loader') {
-        const encoder = new TextEncoder()
-        return this.applyLoader(nextLoader, {
-          url: input.url,
-          content: encoder.encode(code),
-          map: map ? encoder.encode(map) : undefined
-        })
+    const { code, map, type } = await loader.transform(input)
+    if (type) {
+      for (const plugin of this.config.plugins) {
+        if (plugin.type === 'loader' && plugin.test.test('.' + type) && plugin !== loader) {
+          const encoder = new TextEncoder()
+          return this.applyLoader(plugin, {
+            url: input.url,
+            content: encoder.encode(code),
+            map: map ? encoder.encode(map) : undefined
+          })
+        }
       }
     }
     return { code, map }
@@ -797,8 +798,8 @@ export class Application implements ServerApplication {
         if (style.type !== 'css') {
           for (const plugin of this.config.plugins) {
             if (plugin.type === 'loader' && plugin.test.test(`.${style.type}`)) {
-              const { code, loader } = await plugin.transform({ url, content: (new TextEncoder).encode(tpl) })
-              if (loader === 'css-loader') {
+              const { code, type } = await plugin.transform({ url, content: (new TextEncoder).encode(tpl) })
+              if (type === 'css') {
                 tpl = code
                 break
               }
