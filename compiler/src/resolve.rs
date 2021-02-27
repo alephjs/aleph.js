@@ -55,7 +55,7 @@ pub struct Resolver {
   /// bundle mode
   pub bundle_mode: bool,
   /// bundled modules
-  pub bundled_modules: IndexSet<String>,
+  pub bundle_external: IndexSet<String>,
   /// extra imports
   pub extra_imports: IndexSet<String>,
 
@@ -72,10 +72,10 @@ impl Resolver {
     aleph_pkg_uri: Option<String>,
     react_version: Option<String>,
     bundle_mode: bool,
-    bundled_modules: Vec<String>,
+    bundle_external: Vec<String>,
   ) -> Self {
     let mut set = IndexSet::<String>::new();
-    for url in bundled_modules {
+    for url in bundle_external {
       set.insert(url);
     }
     Resolver {
@@ -88,7 +88,7 @@ impl Resolver {
       aleph_pkg_uri,
       react_version,
       bundle_mode,
-      bundled_modules: set,
+      bundle_external: set,
       extra_imports: IndexSet::new(),
     }
   }

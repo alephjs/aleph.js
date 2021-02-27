@@ -72,10 +72,7 @@ impl Fold for AlephResolveFold {
                 let mut resolver = self.resolver.borrow_mut();
                 let (resolved_path, fixed_url) =
                   resolver.resolve(import_decl.src.value.as_ref(), false);
-                if resolver.bundle_mode
-                  && (is_remote_url(fixed_url.as_str())
-                    || resolver.bundled_modules.contains(fixed_url.as_str()))
-                {
+                if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
                   let mut var_decls: Vec<VarDeclarator> = vec![];
                   import_decl.specifiers.into_iter().for_each(|specifier| {
                     match specifier {
@@ -289,10 +286,6 @@ impl Fold for AlephResolveFold {
 
     call.fold_children_with(self)
   }
-}
-
-pub fn is_remote_url(url: &str) -> bool {
-  return url.starts_with("https://") || url.starts_with("http://");
 }
 
 pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {

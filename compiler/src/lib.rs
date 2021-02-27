@@ -49,7 +49,7 @@ pub struct Options {
   pub bundle_mode: bool,
 
   #[serde(default)]
-  pub bundled_modules: Vec<String>,
+  pub bundle_external: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -121,7 +121,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
       _ => Some(options.react_version),
     },
     options.bundle_mode,
-    options.bundled_modules,
+    options.bundle_external,
   )));
   let specify_source_type = match options.swc_options.source_type.as_str() {
     "js" => Some(SourceType::JavaScript),
