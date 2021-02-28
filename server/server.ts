@@ -1,12 +1,13 @@
 import { path, serve as stdServe, serveTLS, ws } from '../deps.ts'
 import { rewriteURL, RouteModule } from '../framework/core/routing.ts'
+import { hashShortLength } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
-import { createHtml, reHashJs } from './helper.ts'
+import { createHtml, reHashJs, trimModuleExt } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */
@@ -58,7 +59,7 @@ export class Server {
                       socket.send(JSON.stringify({
                         type: 'update',
                         url: mod.url,
-                        updateUrl: util.cleanPath(`${baseUrl}/_aleph/${util.trimModuleExt(mod.url)}.${util.shortHash(hash)}.js`),
+                        updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.${hash.slice(0, hashShortLength)}.js`),
                         hash,
                       }))
                     })

@@ -41,6 +41,15 @@ export function isLikelyReactComponent(type: any): Boolean {
   }
 }
 
+export function trimModuleExt(url: string) {
+  for (const ext of ['tsx', 'jsx', 'ts', 'js', 'mjs']) {
+    if (url.endsWith('.' + ext)) {
+      return url.slice(0, -(ext.length + 1))
+    }
+  }
+  return url
+}
+
 export function importModule(baseUrl: string, mod: { url: string, hash: string }, forceRefetch = false): Promise<any> {
   const { __ALEPH: ALEPH, document } = window as any
 
@@ -49,7 +58,7 @@ export function importModule(baseUrl: string, mod: { url: string, hash: string }
   }
 
   if (ALEPH && mod.url.startsWith('/pages/')) {
-    const src = util.cleanPath(baseUrl + '/_aleph/' + util.trimModuleExt(mod.url) + `.bundle.${util.shortHash(mod.hash)}.js`)
+    const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.bundle.${util.shortHash(mod.hash)}.js`)
     return new Promise((resolve, reject) => {
       const script = document.createElement('script')
       script.onload = () => {
@@ -63,7 +72,7 @@ export function importModule(baseUrl: string, mod: { url: string, hash: string }
     })
   }
 
-  const src = util.cleanPath(baseUrl + '/_aleph/' + util.trimModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
+  const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
   return import(src)
 }
 

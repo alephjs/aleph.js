@@ -1,5 +1,3 @@
-import { moduleExts } from './constants.ts'
-
 export default {
   inDeno(): boolean {
     return typeof Deno !== 'undefined' && this.isNEString(Deno.version?.deno)
@@ -26,9 +24,6 @@ export default {
     const p = s.slice(0, 8).toLowerCase()
     return p === 'https://' || p.slice(0, 7) === 'http://'
   },
-  shortHash(hash: string): string {
-    return hash.slice(0, 9)
-  },
   trimPrefix(s: string, prefix: string): string {
     if (prefix !== '' && s.startsWith(prefix)) {
       return s.slice(prefix.length)
@@ -40,20 +35,6 @@ export default {
       return s.slice(0, -suffix.length)
     }
     return s
-  },
-  trimModuleExt(url: string) {
-    for (const ext of moduleExts) {
-      if (url.endsWith('.' + ext)) {
-        return url.slice(0, -(ext.length + 1))
-      }
-    }
-    return url
-  },
-  ensureExt(s: string, ext: string): string {
-    if (s.endsWith(ext)) {
-      return s
-    }
-    return s + ext
   },
   splitBy(s: string, searchString: string): [string, string] {
     const i = s.indexOf(searchString)

@@ -1,4 +1,3 @@
-import { moduleExts } from '../../shared/constants.ts'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
@@ -292,7 +291,7 @@ export async function redirect(url: string, replace?: boolean) {
 }
 
 export function isModuleURL(url: string) {
-  for (const ext of moduleExts) {
+  for (const ext of ['tsx', 'jsx', 'ts', 'js', 'mjs']) {
     if (url.endsWith('.' + ext)) {
       return true
     }
@@ -301,7 +300,13 @@ export function isModuleURL(url: string) {
 }
 
 export function toPagePath(url: string): string {
-  let pathname = util.trimModuleExt(url)
+  let pathname = url
+  for (const ext of ['tsx', 'jsx', 'ts', 'js', 'mjs']) {
+    if (url.endsWith('.' + ext)) {
+      pathname = url.slice(0, -(ext.length + 1))
+      break
+    }
+  }
   if (pathname.startsWith('/pages/')) {
     pathname = util.trimPrefix(pathname, '/pages')
   }

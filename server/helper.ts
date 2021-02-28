@@ -60,6 +60,15 @@ export function getRelativePath(from: string, to: string): string {
   return r
 }
 
+export function trimModuleExt(url: string) {
+  for (const ext of ['tsx', 'jsx', 'ts', 'js', 'mjs']) {
+    if (url.endsWith('.' + ext)) {
+      return url.slice(0, -(ext.length + 1))
+    }
+  }
+  return url
+}
+
 /** fix remote import url to local */
 export function toLocalUrl(url: string): string {
   const isRemote = util.isLikelyHttpURL(url)

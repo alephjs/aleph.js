@@ -1,10 +1,9 @@
 import type { ComponentType } from 'https://esm.sh/react'
 import { createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import util from '../../shared/util.ts'
 import type { RouteModule, RoutingOptions } from '../core/routing.ts'
 import { Routing } from '../core/routing.ts'
-import { importModule, loadPageDataFromTag } from './helper.ts'
+import { importModule, loadPageDataFromTag, trimModuleExt } from './helper.ts'
 import type { PageRoute } from './pageprops.ts'
 import { createPageProps } from './pageprops.ts'
 import Router from './router.ts'
@@ -20,7 +19,7 @@ export default async function bootstrap(options: BootstrapOptions) {
   const customComponents: Record<string, { C: ComponentType, useDeno?: boolean }> = {}
   await Promise.all(sharedModules.map(async ({ url, hash, useDeno }) => {
     const { default: C } = await importModule(baseURL, { url, hash })
-    switch (util.trimModuleExt(url)) {
+    switch (trimModuleExt(url)) {
       case '/404':
         customComponents['E404'] = { C, useDeno }
         break
