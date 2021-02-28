@@ -44,22 +44,22 @@ export default {
     return [s, '']
   },
   formatBytes(bytes: number) {
-    if (bytes < 1 << 10) {
+    if (bytes < 1024) {
       return bytes.toString() + 'B'
     }
-    if (bytes < 1 << 20) {
-      return Math.ceil(bytes / (1 << 10)) + 'KB'
+    if (bytes < 1024 ** 2) {
+      return Math.ceil(bytes / 1024) + 'KB'
     }
-    if (bytes < 1 << 30) {
-      return this.trimSuffix((bytes / (1 << 20)).toFixed(1), '.0') + 'MB'
+    if (bytes < 1024 ** 3) {
+      return Math.ceil(bytes / 1024 ** 2) + 'MB'
     }
-    if (bytes < 1 << 40) {
-      return this.trimSuffix((bytes / (1 << 30)).toFixed(1), '.0') + 'GB'
+    if (bytes < 1024 ** 4) {
+      return Math.ceil(bytes / 1024 ** 3) + 'GB'
     }
-    if (bytes < 1 << 50) {
-      return this.trimSuffix((bytes / (1 << 40)).toFixed(1), '.0') + 'TB'
+    if (bytes < 1024 ** 5) {
+      return Math.ceil(bytes / 1024 ** 4) + 'TB'
     }
-    return this.trimSuffix((bytes / (1 << 50)).toFixed(1), '.0') + 'PB'
+    return Math.ceil(bytes / 1024 ** 5) + 'PB'
   },
   splitPath(path: string): string[] {
     return path
