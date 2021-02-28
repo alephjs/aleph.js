@@ -1,8 +1,9 @@
 import { ensureDir, path } from '../deps.ts'
 import { existsFileSync } from '../shared/fs.ts'
+import log from '../shared/log.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
-import init, { transformSync as swc } from './dist/wasm-pack.js'
+import init, { transformSync } from './dist/wasm-pack.js'
 
 export type ImportMap = {
   imports: Record<string, string>
@@ -40,35 +41,21 @@ type DependencyDescriptor = {
   isDynamic: boolean
 }
 
-/**
- * transpile code synchronously by swc.
- *
- * ```tsx
- * transformSync(`
- *   export default App() {
- *     return <h1>Hello World</h1>
- *   }
- * `,
- * {
- *   url: '/app.tsx'
- *   swcOptions: {
- *     target: 'es2020'
- *   }
- * })
- * ```
- *
- * @param {string} code - code string.
- * @param {object} options - transform options.
- */
-export function transformSync(url: string, code: string, options: TransformOptions = {}): TransformResult {
-  return swc(url, code, options)
+let wasmReady: Promise<void> | boolean = false
+
+async function getDenoDir() {
+  const p = Deno.run({
+    cmd: [Deno.execPath(), 'info', '--json', '--unstable'],
+    stdout: 'piped',
+    stderr: 'null'
+  })
+  const output = (new TextDecoder).decode(await p.output())
+  p.close()
+  return JSON.parse(output).denoDir
 }
 
-/**
- * initiate the compiler wasm.
- */
-export const initWasm = async (denoCacheDir: string) => {
-  const cacheDir = path.join(denoCacheDir, `deps/https/deno.land/aleph@v${VERSION}`)
+async function initWasm() {
+  const cacheDir = path.join(await getDenoDir(), `deps/https/deno.land/aleph@v${VERSION}`)
   const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
   if (existsFileSync(cachePath)) {
     const wasmData = await Deno.readFile(cachePath)
@@ -80,6 +67,46 @@ export const initWasm = async (denoCacheDir: string) => {
     await ensureDir(cacheDir)
     await Deno.writeFile(cachePath, wasmData)
   }
+}
+
+/**
+ * transform module by swc.
+ *
+ * ```tsx
+ * transform(
+ *   '/app.tsx',
+ *   `
+ *     export default App() {
+ *       return <h1>Hello World</h1>
+ *     }
+ *   `,
+ *   {
+ *     url: '/app.tsx'
+ *     swcOptions: {
+ *       target: 'es2020'
+ *     }
+ *   }
+ * )
+ * ```
+ *
+ * @param {string} url - the module URL.
+ * @param {string} code - the mocule code.
+ * @param {object} options - the transform options.
+ */
+export async function transform(url: string, code: string, options: TransformOptions = {}): Promise<TransformResult> {
+  let t: number | null = null
+  if (wasmReady === false) {
+    t = performance.now()
+    wasmReady = initWasm()
+  }
+  if (wasmReady instanceof Promise) {
+    await wasmReady
+    wasmReady = true
+  }
+  if (t !== null) {
+    log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
+  }
+  return transformSync(url, code, options)
 }
 
 /**

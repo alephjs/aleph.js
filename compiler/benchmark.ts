@@ -1,6 +1,6 @@
 import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts'
 import { colors, createHash, path, walk } from '../deps.ts'
-import { initWasm, transformSync } from './mod.ts'
+import { transform } from './mod.ts'
 
 function tsc(source: string, opts: any) {
   const compileOptions: CompileOptions = {
@@ -61,7 +61,7 @@ async function benchmark() {
   for (const { code, filename } of sourceFiles) {
     const t = performance.now()
     for (let i = 0; i < n; i++) {
-      transformSync(filename, code, {
+      transform(filename, code, {
         swcOptions: { target: 'es2020' },
         isDev: true
       })
@@ -81,24 +81,8 @@ async function benchmark() {
   console.log(`swc is ${colorDiff(d1.d / d2.d)} ${d1.d > d2.d ? 'faster' : 'slower'} than tsc`)
 }
 
-async function init() {
-  const p = Deno.run({
-    cmd: [Deno.execPath(), 'info', '--unstable', '--json'],
-    stdout: 'piped',
-    stderr: 'null'
-  })
-  const output = (new TextDecoder).decode(await p.output())
-  const denoCacheDir = JSON.parse(output).denoDir
-  p.close()
-
-  // initiate wasm
-  await initWasm(denoCacheDir)
-
-  // wasm warm-up
-  transformSync('test.ts', 'console.log("Hello World")', { isDev: true })
-}
-
 if (import.meta.main) {
-  await init()
+  // wasm warm-up
+  await transform('/app.ts', 'console.log("bla bla bla...")', { isDev: true })
   await benchmark()
 }
