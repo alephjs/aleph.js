@@ -26,7 +26,7 @@ export const defaultConfig: Readonly<Required<Config>> = {
 /** load config from `aleph.config.(ts|js|json)` */
 export async function loadConfig(workingDir: string): Promise<[Config, ImportMap]> {
   let data: Config = {}
-  for (const name of Array.from(['ts', 'js', 'json']).map(ext => 'aleph.config.' + ext)) {
+  for (const name of ['ts', 'js', 'json'].map(ext => 'aleph.config.' + ext)) {
     const p = path.join(workingDir, name)
     if (existsFileSync(p)) {
       log.info('Aleph server config loaded from', name)

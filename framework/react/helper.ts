@@ -1,5 +1,6 @@
 import { createContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
+import { hashShortLength, moduleExts } from '../../shared/constants.ts'
 import type { RouterURL } from '../../types.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for
@@ -42,7 +43,7 @@ export function isLikelyReactComponent(type: any): Boolean {
 }
 
 export function trimModuleExt(url: string) {
-  for (const ext of ['tsx', 'jsx', 'ts', 'js', 'mjs']) {
+  for (const ext of moduleExts) {
     if (url.endsWith('.' + ext)) {
       return url.slice(0, -(ext.length + 1))
     }
@@ -58,7 +59,7 @@ export function importModule(baseUrl: string, mod: { url: string, hash: string }
   }
 
   if (ALEPH && mod.url.startsWith('/pages/')) {
-    const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.bundle.${util.shortHash(mod.hash)}.js`)
+    const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.bundle.${mod.hash.slice(0, hashShortLength)}.js`)
     return new Promise((resolve, reject) => {
       const script = document.createElement('script')
       script.onload = () => {
@@ -72,7 +73,7 @@ export function importModule(baseUrl: string, mod: { url: string, hash: string }
     })
   }
 
-  const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.${util.shortHash(mod.hash)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
+  const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.${mod.hash.slice(0, hashShortLength)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
   return import(src)
 }
 

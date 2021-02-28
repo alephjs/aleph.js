@@ -1,5 +1,6 @@
 import { colors, createHash, path } from '../deps.ts'
 import { existsDirSync } from '../shared/fs.ts'
+import { moduleExts } from '../shared/constants.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
@@ -61,7 +62,7 @@ export function getRelativePath(from: string, to: string): string {
 }
 
 export function trimModuleExt(url: string) {
-  for (const ext of ['tsx', 'jsx', 'ts', 'js', 'mjs']) {
+  for (const ext of moduleExts) {
     if (url.endsWith('.' + ext)) {
       return url.slice(0, -(ext.length + 1))
     }

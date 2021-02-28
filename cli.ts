@@ -101,7 +101,7 @@ async function main() {
         Deno.env.set(key, value.trim())
       }
     })
-    log.debug('load env from', path.basename(p))
+    log.info('load env from', path.basename(p))
   }
 
   // proxy https://deno.land/x/aleph on localhost

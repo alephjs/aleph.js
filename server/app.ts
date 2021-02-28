@@ -4,7 +4,7 @@ import { colors, createHash, ensureDir, minify, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import type { RouteModule } from '../framework/core/routing.ts'
 import { createBlankRouterURL, isModuleURL, Routing, toPagePath } from '../framework/core/routing.ts'
-import { defaultReactVersion, minDenoVersion, hashShortLength } from '../shared/constants.ts'
+import { defaultReactVersion, minDenoVersion, moduleExts, hashShortLength } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -71,9 +71,8 @@ export class Application implements ServerApplication {
   private async init(reload: boolean) {
     const t = performance.now()
     const alephPkgUri = getAlephPkgUri()
-    const mode = this.mode
     const { env, framework, plugins, ssr } = this.config
-    const walkOptions = { includeDirs: false, exts: ['tsx', 'jsx', 'ts', 'js', 'mjs'], skip: [/^\./, /\.d\.ts$/i, /\.(test|spec|e2e)\.m?(j|t)sx?$/i] }
+    const walkOptions = { includeDirs: false, skip: [/(^|\/|\\)\./, /\.d\.ts$/i, /(\.|_)(test|spec|e2e)\.(tsx?|jsx?|mjs)?$/i] }
     const apiDir = path.join(this.srcDir, 'api')
     const pagesDir = path.join(this.srcDir, 'pages')
 
@@ -122,14 +121,12 @@ export class Application implements ServerApplication {
     for (const plugin of plugins) {
       if (plugin.type === 'server') {
         await plugin.onInit(this)
-        Object.assign(this, { mode }) // to avoid plugin from changing the mode
       }
     }
 
     // init framework
     const { init } = await import(`../framework/${framework}/init.ts`)
     await init(this)
-    Object.assign(this, { mode }) // to avoid framework from changing the mode
 
     if (!this.isDev) {
       log.info('Building...')
@@ -150,31 +147,44 @@ export class Application implements ServerApplication {
       this.#renderer = await import('file://' + jsFile)
     }
 
-    // check custom components
-    for await (const { path: p, } of walk(this.srcDir, { ...walkOptions, maxDepth: 1 })) {
-      const name = path.basename(p)
-      switch (trimModuleExt(name)) {
-        case 'app':
-        case '404':
-        case 'loading':
-          await this.compile('/' + name)
+    // compile custom components
+    for (const name of ['app', '404', 'loading']) {
+      for (const ext of moduleExts) {
+        if (existsFileSync(path.join(this.srcDir, name + '.' + ext))) {
+          await this.compile('/' + name + '.' + ext)
           break
-      }
-    }
-
-    // update api routing
-    if (existsDirSync(apiDir)) {
-      for await (const { path: p } of walk(apiDir, walkOptions)) {
-        const mod = await this.compile(util.cleanPath('/api/' + util.trimPrefix(p, apiDir)))
-        this.#apiRouting.update(this.getRouteModule(mod))
+        }
       }
     }
 
     // update page routing
     this.#pageRouting.config(this.config)
-    for await (const { path: p } of walk(pagesDir, { ...walkOptions })) {
-      const mod = await this.compile(util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir)))
-      this.#pageRouting.update(this.getRouteModule(mod))
+    for await (const { path: p } of walk(pagesDir, walkOptions)) {
+      const url = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
+      let validated = moduleExts.some(ext => p.endsWith('.' + ext))
+      if (!validated) {
+        validated = this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)
+      }
+      if (validated) {
+        const mod = await this.compile(url)
+        this.#pageRouting.update(this.getRouteModule(mod))
+      }
+    }
+
+    // update api routing
+    if (existsDirSync(apiDir)) {
+      for await (const { path: p } of walk(apiDir, { ...walkOptions, exts: moduleExts })) {
+        const url = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
+        let mod: Module
+        if (this.isDev) {
+          // in dev mode, we pre-compile the api code to support re-import the api module
+          // when it is changed.
+          mod = await this.compile(url)
+        } else {
+          mod = { url, hash: '', sourceHash: '', deps: [], jsFile: p }
+        }
+        this.#apiRouting.update(this.getRouteModule(mod))
+      }
     }
 
     // pre-bundle
@@ -221,13 +231,13 @@ export class Application implements ServerApplication {
 
           // is dep
           for (const { deps } of this.#modules.values()) {
-            if (deps.findIndex(dep => dep.url === url) > -1) {
+            if (deps.some(dep => dep.url === url)) {
               return true
             }
           }
 
           // is loaded by plugin
-          return this.config.plugins.findIndex(p => p.type === 'loader' && p.test.test(url)) > -1
+          return this.config.plugins.some(p => p.type === 'loader' && p.test.test(url))
         }
 
         if (validated()) {
@@ -455,7 +465,7 @@ export class Application implements ServerApplication {
     if (!this.isDev) {
       return false
     }
-    for (const ext of ['tsx', 'jsx', 'ts', 'js', 'mjs']) {
+    for (const ext of moduleExts) {
       if (url.endsWith('.' + ext)) {
         return url.startsWith('/pages/') ||
           url.startsWith('/components/') ||
