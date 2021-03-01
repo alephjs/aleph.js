@@ -61,6 +61,15 @@ export function getRelativePath(from: string, to: string): string {
   return r
 }
 
+export function isModuleURL(url: string) {
+  for (const ext of moduleExts) {
+    if (url.endsWith('.' + ext)) {
+      return true
+    }
+  }
+  return false
+}
+
 export function trimModuleExt(url: string) {
   for (const ext of moduleExts) {
     if (url.endsWith('.' + ext)) {

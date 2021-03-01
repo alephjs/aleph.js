@@ -291,15 +291,6 @@ export async function redirect(url: string, replace?: boolean) {
   events.emit('popstate', { type: 'popstate', resetScroll: true })
 }
 
-export function isModuleURL(url: string) {
-  for (const ext of moduleExts) {
-    if (url.endsWith('.' + ext)) {
-      return true
-    }
-  }
-  return false
-}
-
 export function toPagePath(url: string): string {
   let pathname = url
   for (const ext of moduleExts) {

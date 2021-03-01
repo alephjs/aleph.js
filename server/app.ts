@@ -3,7 +3,7 @@ import { buildChecksum, transform } from '../compiler/mod.ts'
 import { colors, createHash, ensureDir, minify, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import type { RouteModule } from '../framework/core/routing.ts'
-import { createBlankRouterURL, isModuleURL, Routing, toPagePath } from '../framework/core/routing.ts'
+import { createBlankRouterURL, Routing, toPagePath } from '../framework/core/routing.ts'
 import { defaultReactVersion, minDenoVersion, moduleExts, hashShortLength } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -12,7 +12,7 @@ import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, Router
 import { VERSION } from '../version.ts'
 import { Bundler } from './bundler.ts'
 import { defaultConfig, loadConfig } from './config.ts'
-import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
+import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, isModuleURL, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -211,36 +211,7 @@ export class Application implements ServerApplication {
     for await (const event of w) {
       for (const p of event.paths) {
         const url = util.cleanPath(util.trimPrefix(p, this.srcDir))
-        const validated = () => {
-          // ignore `.aleph` and output directories
-          if (url.startsWith('/.aleph/') || url.startsWith(this.config.outputDir)) {
-            return false
-          }
-
-          // is module
-          if (isModuleURL(url)) {
-            if (url.startsWith('/pages/') || url.startsWith('/api/')) {
-              return true
-            }
-            switch (trimModuleExt(url)) {
-              case '/404':
-              case '/app':
-                return true
-            }
-          }
-
-          // is dep
-          for (const { deps } of this.#modules.values()) {
-            if (deps.some(dep => dep.url === url)) {
-              return true
-            }
-          }
-
-          // is loaded by plugin
-          return this.config.plugins.some(p => p.type === 'loader' && p.test.test(url))
-        }
-
-        if (validated()) {
+        if (this.isScopedModule(url)) {
           util.debounceX(url, () => {
             if (existsFileSync(p)) {
               let type = 'modify'
@@ -296,6 +267,34 @@ export class Application implements ServerApplication {
         }
       }
     }
+  }
+
+  private isScopedModule(url: string) {
+    // is module
+    if (isModuleURL(url)) {
+      if (url.startsWith('/pages/') || url.startsWith('/api/')) {
+        return true
+      }
+      switch (trimModuleExt(url)) {
+        case '/404':
+        case '/app':
+          return true
+      }
+    }
+
+    // is page module by plugin
+    if (this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)) {
+      return true
+    }
+
+    // is dep
+    for (const { deps } of this.#modules.values()) {
+      if (deps.some(dep => dep.url === url)) {
+        return true
+      }
+    }
+
+    return false
   }
 
   get isDev() {
@@ -472,12 +471,7 @@ export class Application implements ServerApplication {
           ['/app', '/404'].includes(trimModuleExt(url))
       }
     }
-    for (const plugin of this.config.plugins) {
-      if (plugin.type === 'loader' && plugin.test.test(url)) {
-        return plugin.allowPage || plugin.acceptHMR
-      }
-    }
-    return false
+    return this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && (p.allowPage || p.acceptHMR))
   }
 
   /** inject HMR code  */
