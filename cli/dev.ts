@@ -18,7 +18,7 @@ Options:
 
 export default async function (workingDir: string, flags: Record<string, any>) {
   const app = new Application(workingDir, 'development', Boolean(flags.r || flags.reload))
-  const hostname = getFlag(flags, ['hostname'], '0.0.0.0')
+  const hostname = getFlag(flags, ['hostname'])
   const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
   await serve({ app, port, hostname })
 }
