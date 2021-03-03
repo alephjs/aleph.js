@@ -128,9 +128,7 @@ export class Application implements ServerApplication {
     const { init } = await import(`../framework/${framework}/init.ts`)
     await init(this)
 
-    if (!this.isDev) {
-      log.info('Building...')
-    }
+    log.info('Building...')
 
     // pre-compile framework modules
     await this.compile(`${alephPkgUri}/framework/${framework}/bootstrap.ts`)
@@ -150,8 +148,8 @@ export class Application implements ServerApplication {
     // compile custom components
     for (const name of ['app', '404', 'loading']) {
       for (const ext of moduleExts) {
-        if (existsFileSync(path.join(this.srcDir, name + '.' + ext))) {
-          await this.compile('/' + name + '.' + ext)
+        if (existsFileSync(path.join(this.srcDir, `${name}.${ext}`))) {
+          await this.compile(`/${name}.${ext}`)
           break
         }
       }
@@ -338,14 +336,18 @@ export class Application implements ServerApplication {
       if (options.pathname) {
         Object.assign(routeMod, { url: util.cleanPath('/api/' + options.pathname) + '.tsx' })
       } else if (!routeMod.url.startsWith('/api/')) {
-        throw new Error(`the api module url should start with '/api/': ${routeMod.url}`)
+        log.warn(`the api module url should start with '/api/': ${routeMod.url}`)
+        this.#modules.delete(mod.url)
+        return
       }
       this.#apiRouting.update(routeMod)
     } else if (options.asPage) {
       if (options.pathname) {
         Object.assign(routeMod, { url: util.cleanPath('/pages/' + options.pathname) + '.tsx' })
       } else if (!routeMod.url.startsWith('/pages/')) {
-        throw new Error(`the page module url should start with '/pages/': ${routeMod.url}`)
+        log.warn(`the page module url should start with '/pages/': ${routeMod.url}`)
+        this.#modules.delete(mod.url)
+        return
       }
       this.#pageRouting.update(routeMod)
     }
@@ -466,9 +468,11 @@ export class Application implements ServerApplication {
     }
     for (const ext of moduleExts) {
       if (url.endsWith('.' + ext)) {
-        return url.startsWith('/pages/') ||
+        return (
+          url.startsWith('/pages/') ||
           url.startsWith('/components/') ||
-          ['/app', '/404'].includes(trimModuleExt(url))
+          ['/app', '/404'].includes(util.trimSuffix(url, '.' + ext))
+        )
       }
     }
     return this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && (p.allowPage || p.acceptHMR))

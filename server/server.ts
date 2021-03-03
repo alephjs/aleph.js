@@ -89,38 +89,39 @@ export class Server {
             req.status(status).send('')
           }
           return
-        } else if (reHashJs.test(pathname) && ['main', 'main.bundle'].includes(util.trimPrefix(pathname, '/_aleph/').replace(reHashJs, ''))) {
-          req.send(app.getMainJS(pathname.startsWith('/_aleph/main.bundle')), 'application/javascript; charset=utf-8')
+        }
+
+        if (pathname.startsWith('/_aleph/main') && ['main', 'main.bundle'].includes(util.trimPrefix(pathname, '/_aleph/').replace(reHashJs, ''))) {
+          req.send(app.getMainJS(pathname.includes('.bundle.')), 'application/javascript; charset=utf-8')
           return
-        } else {
-          const filePath = path.join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
-          if (existsFileSync(filePath)) {
-            const info = Deno.lstatSync(filePath)
-            const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
-            if (lastModified === r.headers.get('If-Modified-Since')) {
-              req.status(304).send('')
-              return
-            }
+        }
 
-            let content = await Deno.readTextFile(filePath)
-
-            if (reHashJs.test(filePath)) {
-              const metaFile = filePath.replace(reHashJs, '') + '.meta.json'
-              if (existsFileSync(metaFile)) {
-                try {
-                  const { url } = JSON.parse(await Deno.readTextFile(metaFile))
-                  const mod = app.getModule(url)
-                  if (mod && app.isHMRable(mod.url)) {
-                    content = app.injectHMRCode(mod, content)
-                  }
-                } catch (e) { }
-              }
-            }
-
-            req.setHeader('Last-Modified', lastModified)
-            req.send(content, getContentType(filePath))
+        const filePath = path.join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
+        if (existsFileSync(filePath)) {
+          const info = Deno.lstatSync(filePath)
+          const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
+          if (lastModified === r.headers.get('If-Modified-Since')) {
+            req.status(304).send('')
             return
           }
+
+          let content = await Deno.readTextFile(filePath)
+          if (reHashJs.test(filePath)) {
+            const metaFile = filePath.replace(reHashJs, '') + '.meta.json'
+            if (existsFileSync(metaFile)) {
+              try {
+                const { url } = JSON.parse(await Deno.readTextFile(metaFile))
+                const mod = app.getModule(url)
+                if (mod && app.isHMRable(mod.url)) {
+                  content = app.injectHMRCode(mod, content)
+                }
+              } catch (e) { }
+            }
+          }
+
+          req.setHeader('Last-Modified', lastModified)
+          req.send(content, getContentType(filePath))
+          return
         }
 
         req.status(404).send('file not found')
@@ -206,7 +207,7 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
       } else {
         s = stdServe({ port, hostname })
       }
-      log.info(`Aleph server ready on http://${hostname || 'localhost'}:${port}${app.config.baseUrl}`)
+      log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.baseUrl}`)
       for await (const r of s) {
         server.handle(r)
       }
