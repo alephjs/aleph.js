@@ -12,7 +12,7 @@ import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, Router
 import { VERSION } from '../version.ts'
 import { Bundler } from './bundler.ts'
 import { defaultConfig, loadConfig } from './config.ts'
-import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
+import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, isLoaderPlugin, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -730,13 +730,14 @@ export class Application implements ServerApplication {
       }
 
       const t = performance.now()
-      const { code, map, deps, inlineStyles } = await transform(url, sourceCode, {
+      const { code, map, deps } = await transform(url, sourceCode, {
         ...this.defaultCompileOptions,
         swcOptions: {
           target: 'es2020',
           sourceType
         },
         sourceMap: this.isDev,
+        loaders: this.config.plugins.filter(isLoaderPlugin)
       })
 
       fsync = true
@@ -744,39 +745,6 @@ export class Application implements ServerApplication {
       if (map) {
         jsSourceMap = map
       }
-
-      // resolve inline-style
-      await Promise.all(Object.entries(inlineStyles).map(async ([key, style]) => {
-        let tpl = style.quasis.reduce((tpl, quais, i, a) => {
-          tpl += quais
-          if (i < a.length - 1) {
-            tpl += `%%aleph-inline-style-expr-${i}%%`
-          }
-          return tpl
-        }, '')
-          .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
-          .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
-        if (style.type !== 'css') {
-          for (const plugin of this.config.plugins) {
-            if (plugin.type === 'loader' && plugin.test.test(`.${style.type}`)) {
-              const { code, type } = await plugin.transform({ url, content: (new TextEncoder).encode(tpl) })
-              if (type === 'css') {
-                tpl = code
-                break
-              }
-            }
-          }
-        }
-        // todo: postcss and minify
-        tpl = tpl.replace(
-          /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
-          (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'
-        ).replace(
-          /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
-          (_, id) => '${' + style.exprs[parseInt(id)] + '}'
-        )
-        jsContent = jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
-      }))
 
       mod.deps = deps.map(({ specifier, isDynamic }) => {
         const dep: DependencyDescriptor = { url: specifier, hash: '' }

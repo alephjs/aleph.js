@@ -2,6 +2,7 @@ import { colors, createHash, path } from '../deps.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import { moduleExts } from '../shared/constants.ts'
 import util from '../shared/util.ts'
+import type { Plugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
@@ -41,6 +42,11 @@ export const AlephRuntimeCode = `
     },
   });
 `
+
+/** check the plugin whether is a loader plugin. */
+export function isLoaderPlugin(plugin: Plugin): plugin is LoaderPlugin {
+  return plugin.type === 'loader'
+}
 
 /** get aleph pkg uri. */
 export function getAlephPkgUri() {

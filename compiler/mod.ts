@@ -1,6 +1,7 @@
 import { ensureDir, path } from '../deps.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
+import type { LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
 import init, { transformSync } from './dist/wasm-pack.js'
@@ -27,14 +28,17 @@ export type TransformOptions = {
   transpileOnly?: boolean
   bundleMode?: boolean
   bundleExternal?: string[]
+  // loaders for inline styles transform
+  loaders?: LoaderPlugin[]
 }
 
 export type TransformResult = {
   code: string
   deps: DependencyDescriptor[]
-  inlineStyles: Record<string, { type: string, quasis: string[], exprs: string[] }>
   map?: string
 }
+
+type InlineStyles = Record<string, { type: string, quasis: string[], exprs: string[] }>
 
 type DependencyDescriptor = {
   specifier: string
@@ -106,7 +110,44 @@ export async function transform(url: string, code: string, options: TransformOpt
   if (t !== null) {
     log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
   }
-  return transformSync(url, code, options)
+
+  const { loaders, ...transformOptions } = options
+  let { code: jsContent, inlineStyles, deps, map } = transformSync(url, code, transformOptions)
+
+  // resolve inline-style
+  await Promise.all(Object.entries(inlineStyles as InlineStyles).map(async ([key, style]) => {
+    let tpl = style.quasis.reduce((tpl, quais, i, a) => {
+      tpl += quais
+      if (i < a.length - 1) {
+        tpl += `%%aleph-inline-style-expr-${i}%%`
+      }
+      return tpl
+    }, '')
+      .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
+      .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
+    if (style.type !== 'css' && loaders !== undefined) {
+      for (const loader of loaders) {
+        if (loader.test.test(`.${style.type}`)) {
+          const { code, type } = await loader.transform({ url, content: (new TextEncoder).encode(tpl) })
+          if (type === 'css') {
+            tpl = code
+            break
+          }
+        }
+      }
+    }
+    // todo: postcss and minify
+    tpl = tpl.replace(
+      /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
+      (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'
+    ).replace(
+      /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
+      (_, id) => '${' + style.exprs[parseInt(id)] + '}'
+    )
+    jsContent = jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
+  }))
+
+  return { code: jsContent, deps, map }
 }
 
 /**
