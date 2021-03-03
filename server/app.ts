@@ -267,35 +267,6 @@ export class Application implements ServerApplication {
     }
   }
 
-  private isScopedModule(url: string) {
-    for (const ext of moduleExts) {
-      if (url.endsWith('.' + ext)) {
-        if (url.startsWith('/pages/') || url.startsWith('/api/')) {
-          return true
-        }
-        switch (trimModuleExt(url)) {
-          case '/404':
-          case '/app':
-            return true
-        }
-      }
-    }
-
-    // is page module by plugin
-    if (this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)) {
-      return true
-    }
-
-    // is dep
-    for (const { deps } of this.#modules.values()) {
-      if (deps.some(dep => dep.url === url)) {
-        return true
-      }
-    }
-
-    return false
-  }
-
   get isDev() {
     return this.mode === 'development'
   }
@@ -1247,6 +1218,35 @@ export class Application implements ServerApplication {
       return true
     }
     return ssr
+  }
+
+  private isScopedModule(url: string) {
+    for (const ext of moduleExts) {
+      if (url.endsWith('.' + ext)) {
+        if (url.startsWith('/pages/') || url.startsWith('/api/')) {
+          return true
+        }
+        switch (trimModuleExt(url)) {
+          case '/404':
+          case '/app':
+            return true
+        }
+      }
+    }
+
+    // is page module by plugin
+    if (this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)) {
+      return true
+    }
+
+    // is dep
+    for (const { deps } of this.#modules.values()) {
+      if (deps.some(dep => dep.url === url)) {
+        return true
+      }
+    }
+
+    return false
   }
 
   /** lookup deps recurively. */
