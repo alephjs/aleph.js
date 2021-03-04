@@ -125,10 +125,21 @@ export async function transform(url: string, code: string, options: TransformOpt
     }, '')
       .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
       .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
-    if (style.type !== 'css' && loaders !== undefined) {
+    if (loaders !== undefined) {
+      if (style.type !== 'css') {
+        for (const loader of loaders) {
+          if (loader.test.test(`.${style.type}`)) {
+            const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
+            if (type === 'css') {
+              tpl = code
+              break
+            }
+          }
+        }
+      }
       for (const loader of loaders) {
-        if (loader.test.test(`.${style.type}`)) {
-          const { code, type } = await loader.transform({ url, content: (new TextEncoder).encode(tpl) })
+        if (loader.test.test('.css')) {
+          const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
           if (type === 'css') {
             tpl = code
             break
@@ -136,7 +147,6 @@ export async function transform(url: string, code: string, options: TransformOpt
         }
       }
     }
-    // todo: postcss and minify
     tpl = tpl.replace(
       /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
       (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'
