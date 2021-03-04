@@ -13,6 +13,16 @@ Deno.test('css loader', async () => {
   assertEquals(code, 'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"\napplyCSS("/test.css", "h1 { font-size: 18px; }")')
 })
 
+Deno.test('css loader for inline style', async () => {
+  const loader = cssLoader()
+  const { code, type } = await loader.transform({
+    url: '#inline-style-{}',
+    content: (new TextEncoder).encode('h1 { font-size: 18px; }'),
+  })
+  assertEquals(code, 'h1 { font-size: 18px; }')
+  assertEquals(type, 'css')
+})
+
 Deno.test('css loader in production mode', async () => {
   Deno.env.set('BUILD_MODE', 'production')
 

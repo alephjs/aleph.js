@@ -56,14 +56,19 @@ export default (options?: Options): LoaderPlugin => {
         await loading
       }
       const pcss = (await postcss!.process((new TextDecoder).decode(content)).async()).content
-      const mini = Deno.env.get('BUILD_MODE') === 'production'
-      const css = mini ? cleanCSS.minify(pcss).styles : pcss
-      const js = [
-        'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-        `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)})`
-      ].join('\n')
+      const css = Deno.env.get('BUILD_MODE') === 'production' ? cleanCSS.minify(pcss).styles : pcss
+      if (url.startsWith('#inline-style-')) {
+        return {
+          code: css,
+          type: 'css',
+          map: undefined
+        }
+      }
       return {
-        code: js,
+        code: [
+          'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
+          `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)})`
+        ].join('\n'),
         map: undefined // todo: generate map
       }
     }
