@@ -24,7 +24,7 @@ export const defaultConfig: Readonly<Required<Config>> = {
 }
 
 /** load config from `aleph.config.(ts|js|json)` */
-export async function loadConfig(workingDir: string): Promise<[Config, ImportMap]> {
+export async function loadConfig(workingDir: string): Promise<Config> {
   let data: Config = {}
   for (const name of ['ts', 'js', 'json'].map(ext => 'aleph.config.' + ext)) {
     const p = path.join(workingDir, name)
@@ -109,7 +109,11 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
 
   // todo: load ssr.config.ts
 
-  // load import maps
+  return config
+}
+
+/** load import maps from `import_map.json` */
+export async function loadImportMap(workingDir: string): Promise<ImportMap> {
   const importMap: ImportMap = { imports: {}, scopes: {} }
   for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
     const importMapFile = path.join(workingDir, filename)
@@ -140,7 +144,7 @@ export async function loadConfig(workingDir: string): Promise<[Config, ImportMap
     Object.assign(importMap.imports, imports)
   }
 
-  return [config, importMap]
+  return importMap
 }
 
 function isFramework(v: any): v is 'react' {

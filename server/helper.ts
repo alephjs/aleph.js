@@ -48,6 +48,23 @@ export function isLoaderPlugin(plugin: Plugin): plugin is LoaderPlugin {
   return plugin.type === 'loader'
 }
 
+/** get deno dir. */
+export async function getDenoDir() {
+  const p = Deno.run({
+    cmd: [Deno.execPath(), 'info', '--json', '--unstable'],
+    stdout: 'piped',
+    stderr: 'null'
+  })
+  const output = (new TextDecoder).decode(await p.output())
+  const { denoDir } = JSON.parse(output)
+  p.close()
+  if (denoDir === undefined || !existsDirSync(denoDir)) {
+    throw new Error(`can't find the deno dir`)
+  }
+  return denoDir
+}
+
+
 /** get aleph pkg uri. */
 export function getAlephPkgUri() {
   const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')

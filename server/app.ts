@@ -11,8 +11,8 @@ import util from '../shared/util.ts'
 import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, RouterURL, ServerApplication, TransformFn } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Bundler } from './bundler.ts'
-import { defaultConfig, loadConfig } from './config.ts'
-import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, isLoaderPlugin, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
+import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
+import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, getDenoDir, isLoaderPlugin, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -75,6 +75,7 @@ export class Application implements ServerApplication {
     const walkOptions = { includeDirs: false, skip: [/(^|\/|\\)\./, /\.d\.ts$/i, /(\.|_)(test|spec|e2e)\.(tsx?|jsx?|mjs)?$/i] }
     const apiDir = path.join(this.srcDir, 'api')
     const pagesDir = path.join(this.srcDir, 'pages')
+    const buildManifestFile = path.join(this.buildDir, 'build.manifest.json')
 
     if (!(existsDirSync(pagesDir))) {
       log.fatal(`'pages' directory not found.`)
@@ -84,21 +85,21 @@ export class Application implements ServerApplication {
       log.fatal(`need Deno ${minDenoVersion}+, but got ${Deno.version.deno}`)
     }
 
-    const p = Deno.run({
-      cmd: [Deno.execPath(), 'info', '--unstable', '--json'],
-      stdout: 'piped',
-      stderr: 'null'
-    })
-    const output = (new TextDecoder).decode(await p.output())
-    const { denoDir } = JSON.parse(output)
-    p.close()
-    if (!existsDirSync(denoDir)) {
-      log.fatal(`can't find the deno dir`)
+    let shouldRebuild = !existsFileSync(buildManifestFile)
+    if (!shouldRebuild) {
+      try {
+        const bm = JSON.parse(await Deno.readTextFile(buildManifestFile))
+        shouldRebuild = bm.compiler !== buildChecksum
+        if (shouldRebuild) {
+          log.debug('rebuild...')
+        }
+      } catch (e) { }
     }
-    this.#dirs.set('denoDir', denoDir)
 
-    if (reload) {
-      this.#reloading = true
+    if (reload || shouldRebuild) {
+      if (reload && !shouldRebuild) {
+        this.#reloading = true
+      }
       if (existsDirSync(this.buildDir)) {
         await Deno.remove(this.buildDir, { recursive: true })
       }
@@ -113,9 +114,14 @@ export class Application implements ServerApplication {
     Deno.env.set('ALEPH_VERSION', VERSION)
     Deno.env.set('BUILD_MODE', this.mode)
 
-    const [config, importMap] = await loadConfig(this.workingDir)
+    const [config, importMap, denoDir] = await Promise.all([
+      loadConfig(this.workingDir),
+      loadImportMap(this.workingDir),
+      getDenoDir()
+    ])
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
+    this.#dirs.set('denoDir', denoDir)
 
     // apply server plugins
     for (const plugin of plugins) {
@@ -194,6 +200,12 @@ export class Application implements ServerApplication {
     if (reload) {
       this.#reloading = false
     }
+
+    ensureTextFile(buildManifestFile, JSON.stringify({
+      aleph: VERSION,
+      compiler: buildChecksum,
+      deno: Deno.version.deno,
+    }))
 
     log.debug(`init project in ${Math.round(performance.now() - t)}ms`)
 
@@ -612,8 +624,8 @@ export class Application implements ServerApplication {
       }
       try {
         if (existsFileSync(metaFile)) {
-          const { url, sourceHash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
-          if (url === url && util.isNEString(sourceHash) && util.isArray(deps)) {
+          const { sourceHash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
+          if (util.isNEString(sourceHash) && util.isArray(deps)) {
             mod.sourceHash = sourceHash
             mod.deps = deps
           } else {
@@ -625,9 +637,9 @@ export class Application implements ServerApplication {
     }
 
     let sourceContent = new Uint8Array()
-    let contentType: string | null = null
+    let contentType: null | string = null
     let jsContent = ''
-    let jsSourceMap: string | null = null
+    let jsSourceMap: null | string = null
     let shouldCompile = false
     let fsync = false
 
@@ -639,7 +651,14 @@ export class Application implements ServerApplication {
         shouldCompile = true
       }
     } else if (isRemote) {
-      try {
+      let shouldFetch = true
+      if (mod.sourceHash !== '' && !url.startsWith('http://localhost:')) {
+        const jsFile = util.cleanPath(saveDir + '/' + name + '.js')
+        if (existsFileSync(jsFile)) {
+          shouldFetch = false
+        }
+      }
+      if (shouldFetch) {
         const [content, headers] = await this.fetchModule(url)
         const sourceHash = computeHash(content)
         sourceContent = content
@@ -648,9 +667,6 @@ export class Application implements ServerApplication {
           mod.sourceHash = sourceHash
           shouldCompile = true
         }
-      } catch (err) {
-        log.error(`Download ${url}:`, err)
-        return mod
       }
     } else {
       const filepath = path.join(this.srcDir, url)
@@ -671,7 +687,7 @@ export class Application implements ServerApplication {
     }
 
     // compute hash
-    mod.hash = computeHash(mod.sourceHash + buildChecksum + JSON.stringify(this.defaultCompileOptions))
+    mod.hash = isRemote ? mod.sourceHash : computeHash(mod.sourceHash + JSON.stringify(this.defaultCompileOptions))
     mod.jsFile = util.cleanPath(saveDir + '/' + name + (isRemote ? '' : `.${mod.hash.slice(0, hashShortLength)}`) + '.js')
 
     // check previous compilation output if the source content doesn't changed.
@@ -711,7 +727,10 @@ export class Application implements ServerApplication {
 
       for (const plugin of this.config.plugins) {
         if (plugin.type === 'loader' && plugin.test.test(url)) {
-          const { code, type = 'js' } = await this.applyLoader(plugin, { url, content: sourceContent })
+          const { code, type = 'js' } = await this.applyLoader(
+            plugin,
+            { url, content: sourceContent }
+          )
           sourceCode = code
           sourceType = type
           break
@@ -778,13 +797,16 @@ export class Application implements ServerApplication {
           if (jsContent === '') {
             jsContent = await Deno.readTextFile(mod.jsFile)
           }
-          const newContent = jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
-            const importPathname = importPath.replace(reHashJs, '')
-            if (importPathname == dep.url || importPathname === relativePathname) {
-              return `${key}${spaces}${ql}${importPathname}.${dep.hash.slice(0, hashShortLength)}.js${qr}`
+          const newContent = jsContent.replace(
+            reHashResolve,
+            (s, key, spaces, ql, importPath, qr) => {
+              const importPathname = importPath.replace(reHashJs, '')
+              if (importPathname == dep.url || importPathname === relativePathname) {
+                return `${key}${spaces}${ql}${importPathname}.${dep.hash.slice(0, hashShortLength)}.js${qr}`
+              }
+              return s
             }
-            return s
-          })
+          )
           if (newContent !== jsContent) {
             jsContent = newContent
             if (!fsync) {
@@ -841,11 +863,16 @@ export class Application implements ServerApplication {
         }
       })
     })
-    this.#pageRouting.lookup(routes => routes.forEach(({ module: { url } }) => entryMods.add(url)))
+    this.#pageRouting.lookup(routes => {
+      routes.forEach(({ module: { url } }) => entryMods.add(url))
+    })
     refCounter.forEach((refers, url) => {
       if (refers.size > 1) {
-        const localDepEntryMods = Array.from(depMods.entries()).filter(([url, isEntry]) => !util.isLikelyHttpURL(url) && isEntry).map(([url]) => url)
-        const exported = Array.from(refers).filter(url => entryMods.has(url) || localDepEntryMods.includes(url)).length > 1
+        const localDepEntryMods = Array.from(depMods.entries())
+          .filter(([url, isEntry]) => !util.isLikelyHttpURL(url) && isEntry)
+          .map(([url]) => url)
+        const exported = Array.from(refers)
+          .some(url => entryMods.has(url) || localDepEntryMods.includes(url))
         if (exported) {
           addDepEntry(url)
         } else if (!depMods.has(url)) {
@@ -885,7 +912,11 @@ export class Application implements ServerApplication {
           const htmlFile = path.join(outputDir, pathname, 'index.html')
           await ensureTextFile(htmlFile, html)
           if (data) {
-            const dataFile = path.join(outputDir, '_aleph/data', (pathname === '/' ? 'index' : pathname) + '.json')
+            const dataFile = path.join(
+              outputDir,
+              '_aleph/data',
+              (pathname === '/' ? 'index' : pathname) + '.json'
+            )
             await ensureTextFile(dataFile, JSON.stringify(data))
           }
           log.info('  ○', pathname, colors.dim('• ' + util.formatBytes(html.length)))
@@ -922,7 +953,7 @@ export class Application implements ServerApplication {
   }
 
   /** fetch remote module content */
-  private async fetchModule(url: string): Promise<[Uint8Array, Headers]> {
+  async fetchModule(url: string): Promise<[Uint8Array, Headers]> {
     const u = new URL(url)
     if (url.startsWith('https://esm.sh/')) {
       if (this.isDev && !u.searchParams.has('dev')) {
@@ -934,7 +965,7 @@ export class Application implements ServerApplication {
     const { protocol, hostname, port, pathname, search } = u
     const versioned = reFullVersion.test(pathname)
     const reload = this.#reloading || !versioned
-    const isLocalhost = /^https?:\/\/localhost(:\d+)?\//.test(url)
+    const isLocalhost = url.startsWith('http://localhost:')
     const cacheDir = path.join(
       this.#dirs.get('denoDir')!,
       'deps',
