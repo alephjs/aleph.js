@@ -652,9 +652,10 @@ export class Application implements ServerApplication {
       if (
         !this.#reloading &&
         (isRemote && !url.startsWith('http://localhost:')) &&
+        reFullVersion.test(url) &&
         mod.sourceHash !== ''
       ) {
-        const jsFile = util.cleanPath(saveDir + '/' + name + '.js')
+        const jsFile = path.join(saveDir, name + '.js')
         if (existsFileSync(jsFile)) {
           shouldFetch = false
         }
@@ -671,9 +672,16 @@ export class Application implements ServerApplication {
       }
     }
 
-    // compute hash
-    mod.hash = isRemote ? mod.sourceHash : computeHash(mod.sourceHash + JSON.stringify(this.defaultCompileOptions))
-    mod.jsFile = util.cleanPath(saveDir + '/' + name + (isRemote ? '' : `.${mod.hash.slice(0, hashShortLength)}`) + '.js')
+    mod.hash = computeHash(
+      mod.sourceHash +
+      JSON.stringify(this.defaultCompileOptions) +
+      this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name).join(',')
+    )
+    if (isRemote) {
+      mod.jsFile = util.cleanPath(`${saveDir}/${name}.js`)
+    } else {
+      mod.jsFile = `${saveDir}/${name}.${mod.hash.slice(0, hashShortLength)}.js`
+    }
 
     // check previous compilation output if the source content doesn't changed.
     if (!shouldCompile && !existsFileSync(mod.jsFile)) {
