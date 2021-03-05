@@ -17,9 +17,9 @@ import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAle
 /** A module includes the compilation details. */
 export type Module = {
   url: string
-  hash: string
-  sourceHash: string
   deps: DependencyDescriptor[]
+  sourceHash: string
+  hash: string
   jsFile: string
 }
 
@@ -90,16 +90,19 @@ export class Application implements ServerApplication {
       try {
         const bm = JSON.parse(await Deno.readTextFile(buildManifestFile))
         shouldRebuild = bm.compiler !== buildChecksum
-        if (shouldRebuild) {
-          log.debug('rebuild...')
-        }
       } catch (e) { }
     }
+    if (shouldRebuild) {
+      log.debug('rebuild...')
+      ensureTextFile(buildManifestFile, JSON.stringify({
+        aleph: VERSION,
+        compiler: buildChecksum,
+        deno: Deno.version.deno,
+      }, undefined, 2))
+    }
 
+    this.#reloading = reload
     if (reload || shouldRebuild) {
-      if (reload && !shouldRebuild) {
-        this.#reloading = true
-      }
       if (existsDirSync(this.buildDir)) {
         await Deno.remove(this.buildDir, { recursive: true })
       }
@@ -200,12 +203,6 @@ export class Application implements ServerApplication {
     if (reload) {
       this.#reloading = false
     }
-
-    ensureTextFile(buildManifestFile, JSON.stringify({
-      aleph: VERSION,
-      compiler: buildChecksum,
-      deno: Deno.version.deno,
-    }))
 
     log.debug(`init project in ${Math.round(performance.now() - t)}ms`)
 
@@ -614,9 +611,9 @@ export class Application implements ServerApplication {
     } else {
       mod = {
         url,
-        hash: '',
-        sourceHash: '',
         deps: [],
+        sourceHash: '',
+        hash: '',
         jsFile: '',
       }
       if (!once) {
@@ -650,39 +647,27 @@ export class Application implements ServerApplication {
         mod.sourceHash = sourceHash
         shouldCompile = true
       }
-    } else if (isRemote) {
+    } else {
       let shouldFetch = true
-      if (mod.sourceHash !== '' && !url.startsWith('http://localhost:')) {
+      if (
+        !this.#reloading &&
+        (isRemote && !url.startsWith('http://localhost:')) &&
+        mod.sourceHash !== ''
+      ) {
         const jsFile = util.cleanPath(saveDir + '/' + name + '.js')
         if (existsFileSync(jsFile)) {
           shouldFetch = false
         }
       }
       if (shouldFetch) {
-        const [content, headers] = await this.fetchModule(url)
+        const { content, contentType: ctype } = await this.fetchModule(url)
         const sourceHash = computeHash(content)
         sourceContent = content
-        contentType = headers.get('content-type')
+        contentType = ctype
         if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
           mod.sourceHash = sourceHash
           shouldCompile = true
         }
-      }
-    } else {
-      const filepath = path.join(this.srcDir, url)
-      try {
-        sourceContent = await Deno.readFile(filepath)
-        const sourceHash = computeHash(sourceContent)
-        if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
-          mod.sourceHash = sourceHash
-          shouldCompile = true
-        }
-      } catch (err) {
-        if (err instanceof Deno.errors.NotFound) {
-          log.error(`local module '${url}' not found`)
-          return mod
-        }
-        throw err
       }
     }
 
@@ -826,7 +811,7 @@ export class Application implements ServerApplication {
           url,
           sourceHash: mod.sourceHash,
           deps: mod.deps,
-        }, undefined, 4)),
+        }, undefined, 2)),
       ])
     }
 
@@ -952,8 +937,14 @@ export class Application implements ServerApplication {
     }
   }
 
-  /** fetch remote module content */
-  async fetchModule(url: string): Promise<[Uint8Array, Headers]> {
+  /** fetch module content */
+  async fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
+    if (!util.isLikelyHttpURL(url)) {
+      const filepath = path.join(this.srcDir, util.trimPrefix(url, 'file://'))
+      const content = await Deno.readFile(filepath)
+      return { content, contentType: null }
+    }
+
     const u = new URL(url)
     if (url.startsWith('https://esm.sh/')) {
       if (this.isDev && !u.searchParams.has('dev')) {
@@ -983,10 +974,10 @@ export class Application implements ServerApplication {
       ])
       try {
         const { headers } = JSON.parse(meta)
-        return [
+        return {
           content,
-          new Headers(headers)
-        ]
+          contentType: headers['content-type'] || null
+        }
       } catch (e) { }
     }
 
@@ -1017,9 +1008,12 @@ export class Application implements ServerApplication {
               return m
             }, {} as Record<string, string>),
             url
-          }, undefined, 4))
+          }, undefined, 2))
         }
-        return [content, resp.headers]
+        return {
+          content,
+          contentType: resp.headers.get('content-type')
+        }
       } catch (e) {
         err = e
       }
