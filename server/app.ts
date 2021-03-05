@@ -137,7 +137,7 @@ export class Application implements ServerApplication {
     const { init } = await import(`../framework/${framework}/init.ts`)
     await init(this)
 
-    log.info('Building...')
+    log.info('Compiling...')
 
     // pre-compile framework modules
     await this.compile(`${alephPkgUri}/framework/${framework}/bootstrap.ts`)
