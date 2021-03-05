@@ -25,6 +25,7 @@ Object.assign(globalThis.navigator, {
   onLine: true,
   userAgent: `Deno/${Deno.version.deno}`,
   vendor: 'Deno Land',
+  javaEnabled: () => false
 })
 
 export const AlephRuntimeCode = `
