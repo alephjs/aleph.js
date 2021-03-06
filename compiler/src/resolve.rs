@@ -149,35 +149,40 @@ impl Resolver {
       },
       None => "js",
     });
-    match path.file_name() {
-      Some(os_str) => match os_str.to_str() {
-        Some(s) => {
-          let mut file_name = s.trim_end_matches(ext.as_str()).to_owned();
-          match url.query() {
-            Some(q) => {
-              file_name.push('_');
-              file_name.push_str(q);
-            }
-            _ => {}
-          };
-          file_name.push_str(ext.as_str());
-          path_buf.set_file_name(file_name);
+    if let Some(os_str) = path.file_name() {
+      if let Some(s) = os_str.to_str() {
+        let mut file_name = "".to_owned();
+        if let Some(q) = url.query() {
+          file_name.push('[');
+          file_name.push_str(
+            base64::encode(q)
+              .replace("+", "")
+              .replace("/", "")
+              .replace("=", "")
+              .as_str(),
+          );
+          file_name.push(']');
         }
-        _ => {}
-      },
-      _ => {}
-    };
+        file_name.push_str(s);
+        if !file_name.ends_with(ext.as_str()) {
+          file_name.push_str(ext.as_str());
+        }
+        path_buf.set_file_name(file_name);
+      }
+    }
     let mut p = "/-/".to_owned();
-    if url.scheme() == "http" {
+    let scheme = url.scheme();
+    if scheme == "http" {
       p.push_str("http_");
     }
     p.push_str(url.host_str().unwrap());
-    match url.port() {
-      Some(port) => {
+    if let Some(port) = url.port() {
+      if scheme == "http" && port == 80 {
+      } else if scheme == "https" && port == 443 {
+      } else {
         p.push('_');
         p.push_str(port.to_string().as_str());
       }
-      _ => {}
     }
     p.push_str(path_buf.to_str().unwrap());
     p
@@ -387,7 +392,7 @@ mod tests {
     );
     assert_eq!(
       resolver.fix_import_url("https://esm.sh/react@17.0.1?target=es2015&dev"),
-      "/-/esm.sh/react@17.0.1_target=es2015&dev.js"
+      "/-/esm.sh/[dGFyZ2V0PWVzMjAxNSZkZXY]react@17.0.1.js"
     );
     assert_eq!(
       resolver.fix_import_url("http://localhost:8080/mod"),

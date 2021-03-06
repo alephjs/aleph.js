@@ -569,7 +569,11 @@ mod tests {
       None,
       None,
       true,
-      vec!["/components/logo.ts".into(), "/shared/iife.ts".into()],
+      vec![
+        "https://esm.sh/react".into(),
+        "/components/logo.ts".into(),
+        "/shared/iife.ts".into(),
+      ],
     )));
     let (code, _) = module
       .transform(resolver.clone(), &EmitOptions::default())

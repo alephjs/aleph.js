@@ -1,7 +1,6 @@
 import { colors, createHash, path } from '../deps.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import { moduleExts } from '../shared/constants.ts'
-import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 
@@ -81,22 +80,28 @@ export function trimModuleExt(url: string) {
 
 /** fix remote import url to local */
 export function toLocalUrl(url: string): string {
-  const isRemote = util.isLikelyHttpURL(url)
-  if (isRemote) {
-    let { hostname, pathname, port, protocol, searchParams } = new URL(url)
-    let search = Array.from(searchParams.entries()).map(([key, value]) => value ? `${key}=${value}` : key)
-    if (search.length > 0) {
-      pathname += '_' + search.join(',')
+  if (util.isLikelyHttpURL(url)) {
+    let { hostname, pathname, port, protocol, search } = new URL(url)
+    const isHttp = protocol === 'http:'
+    if ((isHttp && port === '80') || (protocol === 'https:' && port === '443')) {
+      port = ''
+    }
+    if (search !== '') {
+      const a = util.splitPath(pathname)
+      const searchKey = btoa(search.slice(1)).replace(/[+/=]/g, '')
+      const basename = `[${searchKey}]${a.pop()}`
+      a.push(basename)
+      pathname = '/' + a.join('/')
     }
     return [
       '/-/',
-      (protocol === 'http:' ? 'http_' : ''),
+      (isHttp ? 'http_' : ''),
       hostname,
       (port ? '_' + port : ''),
       pathname
     ].join('')
   }
-  return url
+  return util.trimPrefix(url, 'file://')
 }
 
 /** compute hash of the content */
@@ -126,7 +131,7 @@ export async function clearCompilation(jsFile: string) {
 export function parsePortNumber(v: string): number {
   const num = parseInt(v)
   if (isNaN(num) || !Number.isInteger(num) || num <= 0 || num >= 1 << 16) {
-    log.fatal(`invalid port '${v}'`)
+    throw new Error(`invalid port '${v}'`)
   }
   return num
 }
