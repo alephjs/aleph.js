@@ -1,5 +1,4 @@
-import type { ComponentType } from 'react'
-import React from 'react'
+import React, { ComponentType } from 'react'
 
 export default function App({ Page, pageProps }: { Page: ComponentType<any>, pageProps: any }) {
   return (

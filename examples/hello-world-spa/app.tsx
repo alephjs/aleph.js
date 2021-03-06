@@ -1,11 +1,10 @@
-import type { ComponentType } from 'react'
-import React from 'react'
+import React, { ComponentType } from 'react'
 
 export default function App({ Page, pageProps }: { Page: ComponentType<any>, pageProps: any }) {
   return (
     <main>
       <head>
-        <title>Hello World - Aleph.js</title>
+        <meta name="viewport" content="width=device-width" />
       </head>
       <Page {...pageProps} />
     </main>
