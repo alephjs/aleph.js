@@ -59,6 +59,9 @@ export class Application implements ServerApplication {
   #reloading = false
 
   constructor(workingDir = '.', mode: 'development' | 'production' = 'production', reload = false) {
+    if (Deno.version.deno < minDenoVersion) {
+      log.fatal(`need Deno ${minDenoVersion}+, but got ${Deno.version.deno}`)
+    }
     this.workingDir = path.resolve(workingDir)
     this.mode = mode
     this.config = { ...defaultConfig }
@@ -71,18 +74,24 @@ export class Application implements ServerApplication {
     const t = performance.now()
     const alephPkgUri = getAlephPkgUri()
     const walkOptions = { includeDirs: false, skip: [/(^|\/|\\)\./, /\.d\.ts$/i, /(\.|_)(test|spec|e2e)\.(tsx?|jsx?|mjs)?$/i] }
-    const apiDir = path.join(this.srcDir, 'api')
-    const pagesDir = path.join(this.srcDir, 'pages')
+    const [config, importMap, denoDir] = await Promise.all([
+      loadConfig(this.workingDir),
+      loadImportMap(this.workingDir),
+      getDenoDir()
+    ])
+
+    Object.assign(this.config, config)
+    Object.assign(this.importMap, importMap)
+
+    // change current working directory to appDoot
+    Deno.chdir(this.workingDir)
+
+    // inject env variables
+    Deno.env.set('ALEPH_VERSION', VERSION)
+    Deno.env.set('BUILD_MODE', this.mode)
+    this.#dirs.set('denoDir', denoDir)
+
     const buildManifestFile = path.join(this.buildDir, 'build.manifest.json')
-
-    if (!(existsDirSync(pagesDir))) {
-      log.fatal(`'pages' directory not found.`)
-    }
-
-    if (Deno.version.deno < minDenoVersion) {
-      log.fatal(`need Deno ${minDenoVersion}+, but got ${Deno.version.deno}`)
-    }
-
     let shouldRebuild = !existsFileSync(buildManifestFile)
     if (!shouldRebuild) {
       try {
@@ -106,22 +115,6 @@ export class Application implements ServerApplication {
       }
       await ensureDir(this.buildDir)
     }
-
-    // inject env variables
-    Deno.env.set('ALEPH_VERSION', VERSION)
-    Deno.env.set('BUILD_MODE', this.mode)
-
-    // change current working directory to appDoot
-    Deno.chdir(this.workingDir)
-
-    const [config, importMap, denoDir] = await Promise.all([
-      loadConfig(this.workingDir),
-      loadImportMap(this.workingDir),
-      getDenoDir()
-    ])
-    Object.assign(this.config, config)
-    Object.assign(this.importMap, importMap)
-    this.#dirs.set('denoDir', denoDir)
 
     // apply server plugins
     for (const plugin of this.config.plugins) {
@@ -162,6 +155,10 @@ export class Application implements ServerApplication {
     }
 
     // update page routing
+    const pagesDir = path.join(this.srcDir, 'pages')
+    if (!(existsDirSync(pagesDir))) {
+      log.fatal(`'pages' directory not found.`)
+    }
     this.#pageRouting.config(this.config)
     for await (const { path: p } of walk(pagesDir, walkOptions)) {
       const url = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
@@ -176,6 +173,7 @@ export class Application implements ServerApplication {
     }
 
     // update api routing
+    const apiDir = path.join(this.srcDir, 'api')
     if (existsDirSync(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...walkOptions, exts: moduleExts })) {
         const url = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))

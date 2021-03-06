@@ -1,7 +1,7 @@
 import type { ImportMap } from '../compiler/mod.ts'
 import { path } from '../deps.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
-import { existsFileSync } from '../shared/fs.ts'
+import { existsFileSync, existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Config } from '../types.ts'
@@ -67,6 +67,8 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (util.isNEString(srcDir)) {
     config.srcDir = util.cleanPath(srcDir)
+  } else if (existsDirSync(path.join(workingDir, 'src'))) {
+    config.srcDir = '/src'
   }
   if (util.isNEString(outputDir)) {
     config.outputDir = util.cleanPath(outputDir)
