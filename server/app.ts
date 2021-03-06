@@ -680,7 +680,7 @@ export class Application implements ServerApplication {
     if (isRemote) {
       mod.jsFile = util.cleanPath(`${saveDir}/${name}.js`)
     } else {
-      mod.jsFile = `${saveDir}/${name}.${mod.hash.slice(0, hashShortLength)}.js`
+      mod.jsFile = util.cleanPath(`${saveDir}/${name}.${mod.hash.slice(0, hashShortLength)}.js`)
     }
 
     // check previous compilation output if the source content doesn't changed.
@@ -790,15 +790,13 @@ export class Application implements ServerApplication {
           if (jsContent === '') {
             jsContent = await Deno.readTextFile(mod.jsFile)
           }
-          const newContent = jsContent.replace(
-            reHashResolve,
-            (s, key, spaces, ql, importPath, qr) => {
-              const importPathname = importPath.replace(reHashJs, '')
-              if (importPathname == dep.url || importPathname === relativePathname) {
-                return `${key}${spaces}${ql}${importPathname}.${dep.hash.slice(0, hashShortLength)}.js${qr}`
-              }
-              return s
+          const newContent = jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
+            const importPathname = importPath.replace(reHashJs, '')
+            if (importPathname == dep.url || importPathname === relativePathname) {
+              return `${key}${spaces}${ql}${importPathname}.${dep.hash.slice(0, hashShortLength)}.js${qr}`
             }
+            return s
+          }
           )
           if (newContent !== jsContent) {
             jsContent = newContent
@@ -813,13 +811,13 @@ export class Application implements ServerApplication {
     if (fsync) {
       await clearCompilation(mod.jsFile)
       await Promise.all([
-        ensureTextFile(mod.jsFile, jsContent + (jsSourceMap ? `//# sourceMappingURL=${path.basename(mod.jsFile)}.map` : '')),
-        jsSourceMap ? ensureTextFile(mod.jsFile + '.map', jsSourceMap) : Promise.resolve(),
         ensureTextFile(metaFile, JSON.stringify({
           url,
           sourceHash: mod.sourceHash,
           deps: mod.deps,
         }, undefined, 2)),
+        ensureTextFile(mod.jsFile, jsContent + (jsSourceMap ? `//# sourceMappingURL=${path.basename(mod.jsFile)}.map` : '')),
+        jsSourceMap ? ensureTextFile(mod.jsFile + '.map', jsSourceMap) : Promise.resolve(),
       ])
     }
 
