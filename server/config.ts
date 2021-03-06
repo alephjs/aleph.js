@@ -1,6 +1,5 @@
 import type { ImportMap } from '../compiler/mod.ts'
 import { path } from '../deps.ts'
-import cssLoader from '../plugins/css.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -103,10 +102,9 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     config.env = toPlainStringRecord(env)
     Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
   }
-  config.plugins = [
-    cssLoader(), // add the css loader as default
-    util.isNEArray(plugins) ? plugins : [],
-  ].flat()
+  if (util.isNEArray(plugins)) {
+    config.plugins = plugins
+  }
 
   // todo: load ssr.config.ts
 
