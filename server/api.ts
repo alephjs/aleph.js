@@ -11,7 +11,7 @@ export class Request implements APIRequest {
   #resp = {
     status: 200,
     headers: new Headers({
-      'Server': 'Aleph.js',
+      Server: 'Aleph.js',
     }),
     done: false
   }

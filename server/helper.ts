@@ -64,7 +64,6 @@ export async function getDenoDir() {
   return denoDir
 }
 
-
 /** get aleph pkg uri. */
 export function getAlephPkgUri() {
   const DEV_PORT = Deno.env.get('ALEPH_DEV_PORT')

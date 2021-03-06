@@ -41,37 +41,36 @@ export class Server {
       // serve hmr ws
       if (pathname === '/_hmr') {
         const { conn, r: bufReader, w: bufWriter, headers } = r
-        ws.acceptWebSocket({ conn, bufReader, bufWriter, headers }).then(async socket => {
-          const watcher = app.createFSWatcher()
-          watcher.on('add', (mod: RouteModule) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
-          watcher.on('remove', (url: string) => {
-            watcher.removeAllListeners('modify-' + url)
-            socket.send(JSON.stringify({ type: 'remove', url }))
-          })
-          for await (const e of socket) {
-            if (util.isNEString(e)) {
-              try {
-                const data = JSON.parse(e)
-                if (data.type === 'hotAccept' && util.isNEString(data.url)) {
-                  const mod = app.getModule(data.url)
-                  if (mod) {
-                    watcher.on('modify-' + mod.url, (hash: string) => {
-                      socket.send(JSON.stringify({
-                        type: 'update',
-                        url: mod.url,
-                        updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.${hash.slice(0, hashShortLength)}.js`),
-                        hash,
-                      }))
-                    })
-                  }
-                }
-              } catch (e) { }
-            } else if (ws.isWebSocketCloseEvent(e)) {
-              break
-            }
-          }
-          app.removeFSWatcher(watcher)
+        const socket = await ws.acceptWebSocket({ conn, bufReader, bufWriter, headers })
+        const watcher = app.createFSWatcher()
+        watcher.on('add', (mod: RouteModule) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
+        watcher.on('remove', (url: string) => {
+          watcher.removeAllListeners('modify-' + url)
+          socket.send(JSON.stringify({ type: 'remove', url }))
         })
+        for await (const e of socket) {
+          if (util.isNEString(e)) {
+            try {
+              const data = JSON.parse(e)
+              if (data.type === 'hotAccept' && util.isNEString(data.url)) {
+                const mod = app.getModule(data.url)
+                if (mod) {
+                  watcher.on('modify-' + mod.url, (hash: string) => {
+                    socket.send(JSON.stringify({
+                      type: 'update',
+                      url: mod.url,
+                      updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.${hash.slice(0, hashShortLength)}.js`),
+                      hash,
+                    }))
+                  })
+                }
+              }
+            } catch (e) { }
+          } else if (ws.isWebSocketCloseEvent(e)) {
+            break
+          }
+        }
+        app.removeFSWatcher(watcher)
         return
       }
 
