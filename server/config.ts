@@ -101,6 +101,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (util.isPlainObject(env)) {
     config.env = toPlainStringRecord(env)
+    Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
   }
   config.plugins = [
     util.isNEArray(plugins) ? plugins : [],
