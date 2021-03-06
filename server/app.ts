@@ -12,7 +12,7 @@ import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, Router
 import { VERSION } from '../version.ts'
 import { Bundler } from './bundler.ts'
 import { defaultConfig, loadConfig } from './config.ts'
-import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, isModuleURL, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
+import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -268,15 +268,16 @@ export class Application implements ServerApplication {
   }
 
   private isScopedModule(url: string) {
-    // is module
-    if (isModuleURL(url)) {
-      if (url.startsWith('/pages/') || url.startsWith('/api/')) {
-        return true
-      }
-      switch (trimModuleExt(url)) {
-        case '/404':
-        case '/app':
+    for (const ext of moduleExts) {
+      if (url.endsWith('.' + ext)) {
+        if (url.startsWith('/pages/') || url.startsWith('/api/')) {
           return true
+        }
+        switch (trimModuleExt(url)) {
+          case '/404':
+          case '/app':
+            return true
+        }
       }
     }
 
