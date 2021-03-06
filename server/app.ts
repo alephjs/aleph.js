@@ -71,7 +71,6 @@ export class Application implements ServerApplication {
   private async init(reload: boolean) {
     const t = performance.now()
     const alephPkgUri = getAlephPkgUri()
-    const { env, framework, plugins, ssr } = this.config
     const walkOptions = { includeDirs: false, skip: [/(^|\/|\\)\./, /\.d\.ts$/i, /(\.|_)(test|spec|e2e)\.(tsx?|jsx?|mjs)?$/i] }
     const apiDir = path.join(this.srcDir, 'api')
     const pagesDir = path.join(this.srcDir, 'pages')
@@ -109,13 +108,12 @@ export class Application implements ServerApplication {
       await ensureDir(this.buildDir)
     }
 
-    // change current working directory to appDoot
-    Deno.chdir(this.workingDir)
-
     // inject env variables
-    Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
     Deno.env.set('ALEPH_VERSION', VERSION)
     Deno.env.set('BUILD_MODE', this.mode)
+
+    // change current working directory to appDoot
+    Deno.chdir(this.workingDir)
 
     const [config, importMap, denoDir] = await Promise.all([
       loadConfig(this.workingDir),
@@ -127,20 +125,20 @@ export class Application implements ServerApplication {
     this.#dirs.set('denoDir', denoDir)
 
     // apply server plugins
-    for (const plugin of plugins) {
+    for (const plugin of this.config.plugins) {
       if (plugin.type === 'server') {
         await plugin.onInit(this)
       }
     }
 
     // init framework
-    const { init } = await import(`../framework/${framework}/init.ts`)
+    const { init } = await import(`../framework/${this.config.framework}/init.ts`)
     await init(this)
 
     log.info('Compiling...')
 
     // pre-compile framework modules
-    await this.compile(`${alephPkgUri}/framework/${framework}/bootstrap.ts`)
+    await this.compile(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`)
     if (this.isDev) {
       await Promise.all(['hmr.ts', 'nomodule.ts'].map(name => {
         this.compile(`${alephPkgUri}/framework/core/${name}`)
@@ -148,8 +146,8 @@ export class Application implements ServerApplication {
     }
 
     // compile and import framework renderer when ssr is enable
-    if (ssr) {
-      const rendererModuleUrl = `${alephPkgUri}/framework/${framework}/renderer.ts`
+    if (this.config.ssr) {
+      const rendererModuleUrl = `${alephPkgUri}/framework/${this.config.framework}/renderer.ts`
       const { jsFile } = await this.compile(rendererModuleUrl, { once: true })
       this.#renderer = await import('file://' + jsFile)
     }
