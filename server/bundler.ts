@@ -1,27 +1,60 @@
-import { buildChecksum, TransformOptions, transformSync } from '../compiler/mod.ts'
+import { TransformOptions, transform } from '../compiler/mod.ts'
 import type { ECMA } from '../deps.ts'
 import { colors, minify, path } from '../deps.ts'
-import { defaultReactVersion } from "../shared/constants.ts"
+import { defaultReactVersion, hashShortLength } from '../shared/constants.ts'
 import { existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
-import type { Application } from './app.ts'
-import { AlephRuntimeCode, clearCompilation, computeHash, getAlephPkgUri } from './helper.ts'
+import type { Application, Module } from './app.ts'
+import { AlephRuntimeCode, clearCompilation, computeHash, getAlephPkgUri, isLoaderPlugin, trimModuleExt } from './helper.ts'
 
-/**
- * The Aleph Server Application class.
- */
+/** The bundler class for aleph server. */
 export class Bundler {
-  readonly #app: Application
+  #app: Application
+  #deps: Array<string>
 
   constructor(app: Application) {
     this.#app = app
+    this.#deps = []
   }
 
-  async bundle(entryMods: Set<string>, depMods: Map<string, boolean>) {
-    console.log(entryMods)
-    console.log(depMods)
+  async bundle(entryMods: Array<string>, depMods: Map<string, boolean>) {
+    this.#deps = Array.from(depMods.keys())
+    await Promise.all([
+      await this.createPolyfillBundle(),
+      await this.createBundleChunk(
+        '/deps.js',
+        Array.from(depMods.entries())
+          .filter(([url, exported]) => exported && util.isLikelyHttpURL(url))
+          .map(([url]) => url)
+      ),
+      await this.createBundleChunk(
+        '/shared.js',
+        Array.from(depMods.entries())
+          .filter(([url, exported]) => exported && !util.isLikelyHttpURL(url))
+          .map(([url]) => url)
+      ),
+      ...entryMods.map(async url => {
+        await this.createBundleChunk(trimModuleExt(url) + '.js', [url])
+      })
+    ])
+  }
+
+  private async compile(module: Module) {
+    const { content: sourceCode } = await this.#app.fetchModule(module.url)
+    const { code, map, deps } = await transform(module.url, (new TextDecoder).decode(sourceCode), {
+      importMap: this.#app.importMap,
+      alephPkgUri: getAlephPkgUri(),
+      reactVersion: defaultReactVersion,
+      swcOptions: {
+        target: 'es2020',
+        sourceType: 'js'
+      },
+      bundleMode: true,
+      bundleExternal: this.#deps,
+      loaders: this.#app.config.plugins.filter(isLoaderPlugin)
+    })
   }
 
   async copyDist() {
@@ -59,27 +92,17 @@ export class Bundler {
     // ])
   }
 
-  /** transpile code without type check. */
-  private async transpile(url: string, sourceCode: string, options: TransformOptions) {
-    return transformSync(url, sourceCode, {
-      ...options,
-      importMap: this.#app.importMap,
-      alephPkgUri: getAlephPkgUri(),
-      reactVersion: defaultReactVersion,
-    })
-  }
-
   /** create polyfill bundle. */
   private async createPolyfillBundle() {
     const alephPkgUri = getAlephPkgUri()
     const { buildTarget } = this.#app.config
-    const hash = computeHash(AlephRuntimeCode + buildTarget + buildChecksum + Deno.version.deno)
-    const polyfillFile = path.join(this.#app.buildDir, `polyfill.bundle.${util.shortHash(hash)}.js`)
-    if (!existsFileSync(polyfillFile)) {
-      const rawPolyfillFile = `${alephPkgUri}/compiler/polyfills/${buildTarget}/polyfill.js`
-      await this.runDenoBundle(rawPolyfillFile, polyfillFile, AlephRuntimeCode, true)
+    const hash = computeHash(AlephRuntimeCode + buildTarget + Deno.version.deno + VERSION)
+    const bundleFile = path.join(this.#app.buildDir, `polyfill.bundle.${hash.slice(0, hashShortLength)}.js`)
+    if (!existsFileSync(bundleFile)) {
+      const rawPolyfillFile = `${alephPkgUri}/compiler/polyfills/${buildTarget}/mod.ts`
+      await this.runDenoBundle(rawPolyfillFile, bundleFile, AlephRuntimeCode, true)
     }
-    log.info(`  {} polyfill (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(polyfillFile).size))}`)
+    log.info(`  {} polyfill (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
   }
 
   /** create bundle chunk. */
@@ -96,7 +119,7 @@ export class Bundler {
     }).flat().join('\n')
     const hash = computeHash(entryCode + VERSION + Deno.version.deno)
     const bundleEntryFile = path.join(this.#app.buildDir, `${name}.bundle.entry.js`)
-    const bundleFile = path.join(this.#app.buildDir, `${name}.bundle.${util.shortHash(hash)}.js`)
+    const bundleFile = path.join(this.#app.buildDir, `${name}.bundle.${hash.slice(0, hashShortLength)}.js`)
     if (!existsFileSync(bundleFile)) {
       await Deno.writeTextFile(bundleEntryFile, entryCode)
       await this.runDenoBundle(bundleEntryFile, bundleFile)
@@ -124,7 +147,7 @@ export class Bundler {
     // transpile bundle code to `buildTarget`
     const { buildTarget } = this.#app.config
 
-    let { code } = transformSync(
+    let { code } = await transform(
       '/bundle.js',
       await Deno.readTextFile(bundleFile),
       {
@@ -134,11 +157,6 @@ export class Bundler {
         }
       }
     )
-
-    // workaround for https://github.com/denoland/deno/issues/9212
-    if (Deno.version.deno === '1.7.0' && bundleEntryFile.endsWith('deps.bundle.entry.js')) {
-      code = code.replace(' _ = l.baseState, ', ' var _ = l.baseState, ')
-    }
 
     // IIFEify
     code = `(() => { ${header};${code} })()`
