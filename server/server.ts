@@ -196,6 +196,9 @@ export type ServeOptions = {
 
 /** Create a standard Aleph server. */
 export async function serve({ app, port, hostname, certFile, keyFile }: ServeOptions) {
+  const server = new Server(app)
+  await app.ready
+
   while (true) {
     try {
       let s: AsyncIterable<ServerRequest>
@@ -204,7 +207,6 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
       } else {
         s = stdServe({ port, hostname })
       }
-      const server = new Server(app)
       log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.baseUrl}`)
       for await (const r of s) {
         server.handle(r)
