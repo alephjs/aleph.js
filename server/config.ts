@@ -29,7 +29,6 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   for (const name of ['ts', 'js', 'json'].map(ext => 'aleph.config.' + ext)) {
     const p = path.join(workingDir, name)
     if (existsFileSync(p)) {
-      log.info('Aleph server config loaded from', name)
       if (name.endsWith('.json')) {
         const v = JSON.parse(await Deno.readTextFile(p))
         if (util.isPlainObject(v)) {
@@ -44,6 +43,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
           data = v
         }
       }
+      log.info('Config loaded from', name)
       break
     }
   }
@@ -104,8 +104,8 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
   }
   config.plugins = [
+    cssLoader(), // add the css loader as default
     util.isNEArray(plugins) ? plugins : [],
-    cssLoader() // add the css loader as default
   ].flat()
 
   // todo: load ssr.config.ts
