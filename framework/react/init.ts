@@ -7,7 +7,7 @@ export async function init(app: ServerApplication) {
   if (app.mode === 'development') {
     const alephPkgUri = getAlephPkgUri()
     app.injectCode('hmr', (url: string, code: string) => {
-      const reactRefresh = code.includes('$RefreshSig$') || code.includes('$RefreshReg$')
+      const reactRefresh = code.includes('$RefreshSig$(') || code.includes('$RefreshReg$(')
       if (reactRefresh) {
         const refreshModuleUrl = getRelativePath(
           path.dirname(toLocalUrl(url)),
@@ -32,7 +32,7 @@ export async function init(app: ServerApplication) {
     app.injectCode('compilation', (url: string, code: string) => {
       if (url === '/main.js') {
         return [
-          `import '.${toLocalUrl(`${alephPkgUri}/framework/react/refresh.js`)}';`,
+          `import ".${toLocalUrl(`${alephPkgUri}/framework/react/refresh.js`)}";`,
           code
         ].join('\n')
       }
