@@ -1,6 +1,6 @@
-import sassLoader from 'aleph/plugins/sass.ts'
-import wasmLoader from 'aleph/plugins/wasm.ts'
-import type { Config } from 'aleph/types.ts'
+import sassLoader from '../../plugins/sass.ts'
+import wasmLoader from '../../plugins/wasm.ts'
+import type { Config } from '../../types.ts'
 
 export default (): Config => ({
   plugins: [sassLoader(), wasmLoader()]
