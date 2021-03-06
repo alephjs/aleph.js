@@ -26,7 +26,6 @@ export type Module = {
 /** The dependency descriptor. */
 export type DependencyDescriptor = {
   url: string
-  hash: string
   isDynamic?: boolean
 }
 
@@ -593,12 +592,12 @@ export class Application implements ServerApplication {
       once?: boolean,
     } = {}
   ): Promise<Module> {
-    const { sourceCode, forceCompile, once } = options
     const isRemote = util.isLikelyHttpURL(url)
     const localUrl = toLocalUrl(url)
     const name = trimModuleExt(path.basename(localUrl))
     const saveDir = path.join(this.buildDir, path.dirname(localUrl))
     const metaFile = path.join(saveDir, `${name}.meta.json`)
+    const { sourceCode, forceCompile, once } = options
 
     let mod: Module
     if (this.#modules.has(url)) {
@@ -757,17 +756,12 @@ export class Application implements ServerApplication {
       }
 
       mod.deps = deps.map(({ specifier, isDynamic }) => {
-        const dep: DependencyDescriptor = { url: specifier, hash: '' }
+        const dep: DependencyDescriptor = { url: specifier }
         if (isDynamic) {
           dep.isDynamic = true
         }
-        if (dep.url.startsWith('#useDeno-')) {
-          dep.hash = util.trimPrefix(dep.url, '#useDeno-')
-          if (!this.config.ssr) {
-            log.warn(`use 'useDeno' hook in SPA mode: ${url}`)
-          }
-        } else if (dep.url.startsWith('#inline-style-')) {
-          dep.hash = util.trimPrefix(dep.url, '#inline-style-')
+        if (dep.url.startsWith('#useDeno-') && !this.config.ssr) {
+          log.warn(`use 'useDeno' hook in SPA mode: ${url}`)
         }
         return dep
       })
@@ -778,29 +772,26 @@ export class Application implements ServerApplication {
     // compile deps
     for (const dep of mod.deps.filter(({ url }) => !url.startsWith('#'))) {
       const depMod = await this.compile(dep.url, { once })
-      if (dep.hash === '' || dep.hash !== depMod.hash) {
-        dep.hash = depMod.hash
-        if (!util.isLikelyHttpURL(dep.url)) {
-          const relativePathname = getRelativePath(
-            path.dirname(toLocalUrl(url)),
-            trimModuleExt(toLocalUrl(dep.url))
-          )
-          if (jsContent === '') {
-            jsContent = await Deno.readTextFile(mod.jsFile)
+      if (!util.isLikelyHttpURL(dep.url)) {
+        const relativePathname = getRelativePath(
+          path.dirname(toLocalUrl(url)),
+          trimModuleExt(toLocalUrl(dep.url))
+        )
+        if (jsContent === '') {
+          jsContent = await Deno.readTextFile(mod.jsFile)
+        }
+        const newContent = jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
+          const importPathname = importPath.replace(reHashJs, '')
+          if (importPathname == dep.url || importPathname === relativePathname) {
+            return `${key}${spaces}${ql}${importPathname}.${depMod.hash.slice(0, hashShortLength)}.js${qr}`
           }
-          const newContent = jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
-            const importPathname = importPath.replace(reHashJs, '')
-            if (importPathname == dep.url || importPathname === relativePathname) {
-              return `${key}${spaces}${ql}${importPathname}.${dep.hash.slice(0, hashShortLength)}.js${qr}`
-            }
-            return s
-          }
-          )
-          if (newContent !== jsContent) {
-            jsContent = newContent
-            if (!fsync) {
-              fsync = true
-            }
+          return s
+        }
+        )
+        if (newContent !== jsContent) {
+          jsContent = newContent
+          if (!fsync) {
+            fsync = true
           }
         }
       }
@@ -1033,25 +1024,22 @@ export class Application implements ServerApplication {
     for (const mod of this.#modules.values()) {
       for (const dep of mod.deps) {
         if (dep.url === url) {
-          if (dep.hash !== "" && dep.hash !== hash) {
-            dep.hash = hash
-            const relativePathname = getRelativePath(
-              path.dirname(toLocalUrl(mod.url)),
-              trimModuleExt(toLocalUrl(dep.url))
-            )
-            const jsContent = (await Deno.readTextFile(mod.jsFile))
-              .replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
-                const importPathname = importPath.replace(reHashJs, '')
-                if (importPathname === dep.url || importPathname === relativePathname) {
-                  return `${key}${spaces}${ql}${importPathname}.${dep.hash.slice(0, hashShortLength)}.js${qr}`
-                }
-                return s
-              })
-            await ensureTextFile(mod.jsFile, jsContent)
-            callback(mod)
-            log.debug('compilation side-effect:', mod.url, colors.dim('<-'), url)
-            this.checkCompilationSideEffect(mod.url, callback)
-          }
+          const relativePathname = getRelativePath(
+            path.dirname(toLocalUrl(mod.url)),
+            trimModuleExt(toLocalUrl(dep.url))
+          )
+          const jsContent = (await Deno.readTextFile(mod.jsFile))
+            .replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
+              const importPathname = importPath.replace(reHashJs, '')
+              if (importPathname === dep.url || importPathname === relativePathname) {
+                return `${key}${spaces}${ql}${importPathname}.${hash.slice(0, hashShortLength)}.js${qr}`
+              }
+              return s
+            })
+          await ensureTextFile(mod.jsFile, jsContent)
+          callback(mod)
+          log.debug('compilation side-effect:', mod.url, colors.dim('<-'), url)
+          this.checkCompilationSideEffect(mod.url, callback)
           break
         }
       }
