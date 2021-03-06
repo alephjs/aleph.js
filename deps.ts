@@ -15,7 +15,3 @@ export * as ws from 'https://deno.land/std@0.88.0/ws/mod.ts'
 // deno.land/x
 export * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 export { gzipDecode, gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
-// esm.sh
-export { minify } from 'https://esm.sh/terser@5.5.1'
-export type { ECMA } from 'https://esm.sh/terser@5.5.1'
-

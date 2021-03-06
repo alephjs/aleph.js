@@ -1,6 +1,6 @@
 import type { ImportMap, TransformOptions } from '../compiler/mod.ts'
 import { buildChecksum, transform } from '../compiler/mod.ts'
-import { colors, createHash, ensureDir, minify, path, walk } from '../deps.ts'
+import { colors, createHash, ensureDir, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import type { RouteModule } from '../framework/core/routing.ts'
 import { createBlankRouterURL, Routing, toPagePath } from '../framework/core/routing.ts'
@@ -1095,7 +1095,7 @@ export class Application implements ServerApplication {
       ret.head = head
       ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
         if (script.innerText && !this.isDev) {
-          return { ...script, innerText: (await minify(script.innerText)).code }
+          return { ...script, innerText: script.innerText }
         }
         return script
       }))
@@ -1138,7 +1138,7 @@ export class Application implements ServerApplication {
       ret.head = head
       ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
         if (script.innerText && !this.isDev) {
-          return { ...script, innerText: (await minify(script.innerText)).code }
+          return { ...script, innerText: script.innerText }
         }
         return script
       }))

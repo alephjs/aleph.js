@@ -1,6 +1,6 @@
+import { minify, ECMA } from 'https://esm.sh/terser@5.5.1'
 import { TransformOptions, transform } from '../compiler/mod.ts'
-import type { ECMA } from '../deps.ts'
-import { colors, minify, path } from '../deps.ts'
+import { colors, path } from '../deps.ts'
 import { defaultReactVersion, hashShortLength } from '../shared/constants.ts'
 import { existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
