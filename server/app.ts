@@ -167,8 +167,8 @@ export class Application implements ServerApplication {
         validated = this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)
       }
       if (validated) {
-        const mod = await this.compile(url)
-        this.#pageRouting.update(this.getRouteModule(mod))
+        const { hash } = await this.compile(url)
+        this.#pageRouting.update(this.createRouteModule(url, hash))
       }
     }
 
@@ -184,8 +184,9 @@ export class Application implements ServerApplication {
           mod = await this.compile(url)
         } else {
           mod = { url, hash: '', sourceHash: '', deps: [], jsFile: p }
+          this.#modules.set(url, mod)
         }
-        this.#apiRouting.update(this.getRouteModule(mod))
+        this.#apiRouting.update(this.createRouteModule(url, mod.hash))
       }
     }
 
@@ -228,9 +229,9 @@ export class Application implements ServerApplication {
                     this.#renderCache.clear()
                   } else if (url.startsWith('/pages/')) {
                     this.#renderCache.delete(toPagePath(url))
-                    this.#pageRouting.update(this.getRouteModule({ url, hash }))
+                    this.#pageRouting.update(this.createRouteModule(url, hash))
                   } else if (url.startsWith('/api/')) {
-                    this.#apiRouting.update(this.getRouteModule({ url, hash }))
+                    this.#apiRouting.update(this.createRouteModule(url, hash))
                   }
                 }
                 if (hmrable) {
@@ -295,7 +296,7 @@ export class Application implements ServerApplication {
     return null
   }
 
-  getAPIRouter(location: { pathname: string, search?: string }): [RouterURL, Module] | null {
+  getAPIRoute(location: { pathname: string, search?: string }): [RouterURL, Module] | null {
     const [url, nestedModules] = this.#apiRouting.createRouter(location)
     if (url.pagePath !== '') {
       const { url: moduleUrl } = nestedModules.pop()!
@@ -306,23 +307,23 @@ export class Application implements ServerApplication {
 
   /** add a new page module by given path and source code. */
   async addModule(url: string, options: ModuleOptions = {}): Promise<void> {
-    const mod = await this.compile(url, { sourceCode: options.code })
-    const routeMod = this.getRouteModule(mod)
+    const { hash } = await this.compile(url, { sourceCode: options.code })
+    const routeMod = this.createRouteModule(url, hash)
     if (options.asAPI) {
       if (options.pathname) {
         Object.assign(routeMod, { url: util.cleanPath('/api/' + options.pathname) + '.tsx' })
-      } else if (!routeMod.url.startsWith('/api/')) {
-        log.warn(`the api module url should start with '/api/': ${routeMod.url}`)
-        this.#modules.delete(mod.url)
+      } else if (!url.startsWith('/api/')) {
+        log.warn(`the api module url should start with '/api/': ${url}`)
+        this.#modules.delete(url)
         return
       }
       this.#apiRouting.update(routeMod)
     } else if (options.asPage) {
       if (options.pathname) {
         Object.assign(routeMod, { url: util.cleanPath('/pages/' + options.pathname) + '.tsx' })
-      } else if (!routeMod.url.startsWith('/pages/')) {
-        log.warn(`the page module url should start with '/pages/': ${routeMod.url}`)
-        this.#modules.delete(mod.url)
+      } else if (!url.startsWith('/pages/')) {
+        log.warn(`the page module url should start with '/pages/': ${url}`)
+        this.#modules.delete(url)
         return
       }
       this.#pageRouting.update(routeMod)
@@ -497,7 +498,7 @@ export class Application implements ServerApplication {
           default:
             return false
         }
-      }).map(mod => this.getRouteModule(mod)),
+      }).map(({ url, hash }) => this.createRouteModule(url, hash)),
       renderMode: this.config.ssr ? 'ssr' : 'spa'
     }
 
@@ -506,8 +507,8 @@ export class Application implements ServerApplication {
     }
 
     let code = [
-      `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js"`,
-      `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 4 : undefined)})`
+      `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js";`,
+      `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
     ].filter(Boolean).join('\n')
     if (this.#injects.compilation.length > 0) {
       this.#injects.compilation.forEach(transform => {
@@ -528,11 +529,8 @@ export class Application implements ServerApplication {
   }
 
   /** returns the route module by given module. */
-  private getRouteModule({ url, hash }: Pick<Module, 'url' | 'hash'>): RouteModule {
-    let useDeno = this.lookupDeps(url).filter((({ url }) => url.startsWith('#useDeno-'))).length > 0 || undefined
-    if (this.config.ssr === false) {
-      useDeno = undefined
-    }
+  private createRouteModule(url: string, hash: string): RouteModule {
+    const useDeno = (this.config.ssr !== false && this.lookupDeps(url).some(dep => dep.url.startsWith('#useDeno-'))) || undefined
     return { url, hash, useDeno }
   }
 
@@ -1239,7 +1237,7 @@ export class Application implements ServerApplication {
   /** lookup deps recurively. */
   private lookupDeps(url: string, __deps: DependencyDescriptor[] = [], __tracing: Set<string> = new Set()) {
     const mod = this.getModule(url)
-    if (!mod) {
+    if (mod === null) {
       return __deps
     }
     if (__tracing.has(url)) {

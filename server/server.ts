@@ -145,13 +145,13 @@ export class Server {
 
       // serve APIs
       if (pathname.startsWith('/api/')) {
-        const router = app.getAPIRouter({ pathname, search: url.searchParams.toString() })
-        if (router !== null) {
+        const route = app.getAPIRoute({ pathname, search: url.searchParams.toString() })
+        if (route !== null) {
           try {
-            const [url, mod] = router
-            const { default: handle } = await import('file://' + mod.jsFile)
+            const [{ params, query }, { jsFile }] = route
+            const { default: handle } = await import('file://' + jsFile)
             if (util.isFunction(handle)) {
-              await handle(new Request(req, url.params, url.query))
+              await handle(new Request(req, params, query))
             } else {
               req.status(500).json({ status: 500, message: 'bad api handler' })
             }
