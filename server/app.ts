@@ -12,7 +12,7 @@ import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, Router
 import { VERSION } from '../version.ts'
 import { Bundler } from './bundler.ts'
 import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
-import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, getDenoDir, isLoaderPlugin, reFullVersion, reHashJs, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
+import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, getDenoDir, isLoaderPlugin, reFullVersion, reHashJS, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -781,7 +781,7 @@ export class Application implements ServerApplication {
           jsContent = await Deno.readTextFile(mod.jsFile)
         }
         const newContent = jsContent.replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
-          const importPathname = importPath.replace(reHashJs, '')
+          const importPathname = importPath.replace(reHashJS, '')
           if (importPathname == dep.url || importPathname === relativePathname) {
             return `${key}${spaces}${ql}${importPathname}.${depMod.hash.slice(0, hashShortLength)}.js${qr}`
           }
@@ -1030,7 +1030,7 @@ export class Application implements ServerApplication {
           )
           const jsContent = (await Deno.readTextFile(mod.jsFile))
             .replace(reHashResolve, (s, key, spaces, ql, importPath, qr) => {
-              const importPathname = importPath.replace(reHashJs, '')
+              const importPathname = importPath.replace(reHashJS, '')
               if (importPathname === dep.url || importPathname === relativePathname) {
                 return `${key}${spaces}${ql}${importPathname}.${hash.slice(0, hashShortLength)}.js${qr}`
               }

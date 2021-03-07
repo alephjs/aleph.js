@@ -7,7 +7,7 @@ import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
-import { createHtml, reHashJs, trimModuleExt } from './helper.ts'
+import { createHtml, reHashJS, trimModuleExt } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */
@@ -90,7 +90,7 @@ export class Server {
           return
         }
 
-        if (pathname.startsWith('/_aleph/main') && ['main', 'main.bundle'].includes(util.trimPrefix(pathname, '/_aleph/').replace(reHashJs, ''))) {
+        if (pathname.startsWith('/_aleph/main') && ['main', 'main.bundle'].includes(util.trimPrefix(pathname, '/_aleph/').replace(reHashJS, ''))) {
           req.send(app.getMainJS(pathname.includes('.bundle.')), 'application/javascript; charset=utf-8')
           return
         }
@@ -105,8 +105,8 @@ export class Server {
           }
 
           let content = await Deno.readTextFile(filePath)
-          if (reHashJs.test(filePath)) {
-            const metaFile = filePath.replace(reHashJs, '') + '.meta.json'
+          if (reHashJS.test(filePath)) {
+            const metaFile = filePath.replace(reHashJS, '') + '.meta.json'
             if (existsFileSync(metaFile)) {
               try {
                 const { url } = JSON.parse(await Deno.readTextFile(metaFile))

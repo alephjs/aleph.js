@@ -7,7 +7,7 @@ import { VERSION } from '../version.ts'
 
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
-export const reHashJs = /\.[0-9a-fx]{9}\.js$/i
+export const reHashJS = /\.[0-9a-fx]{9}\.js$/i
 export const reHashResolve = /((?:[^a-z0-9_\.\$])from|import|import\s*\()(\s*)("|')([^'"]+\.[0-9a-fx]{9}\.js)("|')/g
 
 // inject browser navigator polyfill
@@ -20,13 +20,12 @@ Object.assign(globalThis.navigator, {
     saveData: false,
   },
   cookieEnabled: false,
-  deviceMemory: 8,
-  hardwareConcurrency: 4,
   language: 'en',
+  languages: ['en'],
   onLine: true,
+  platform: Deno.build.os,
   userAgent: `Deno/${Deno.version.deno}`,
-  vendor: 'Deno Land',
-  javaEnabled: () => false
+  vendor: 'Deno Land'
 })
 
 export const AlephRuntimeCode = `
@@ -126,7 +125,7 @@ export function computeHash(content: string | Uint8Array): string {
 export async function clearCompilation(jsFile: string) {
   const dir = path.dirname(jsFile)
   const jsFileName = path.basename(jsFile)
-  if (!reHashJs.test(jsFile) || !existsDirSync(dir)) {
+  if (!reHashJS.test(jsFile) || !existsDirSync(dir)) {
     return
   }
   const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'

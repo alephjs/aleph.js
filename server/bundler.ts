@@ -83,7 +83,7 @@ export class Bundler {
     //   }),
     //   ...pageModules.map(async mod => {
     //     const { jsFile, hash } = mod
-    //     const pathname = util.trimSuffix(jsFile.replace(reHashJs, ''), '.bundling')
+    //     const pathname = util.trimSuffix(jsFile.replace(reHashJS, ''), '.bundling')
     //     const bundleFile = pathname + `.bundle.${util.shortHash(hash)}.js`
     //     const saveAs = path.join(this.outputDir, `/_aleph/`, util.trimPrefix(pathname, this.buildDir) + `.bundle.${util.shortHash(hash)}.js`)
     //     await ensureDir(path.dirname(saveAs))
