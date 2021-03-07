@@ -96,7 +96,7 @@ export interface ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
-  addModule(url: string, options?: ModuleOptions): Promise<void>
+  addModule(url: string, options?: { code?: string, once?: boolean }): Promise<Module>
   injectCode(stage: 'compilation' | 'hmr', transform: TransformFn): void
 }
 
@@ -104,14 +104,19 @@ export type TransformFn = {
   (url: string, code: string): string
 }
 
-/**
- * The module options.
- */
-export type ModuleOptions = {
-  code?: string
-  asAPI?: boolean
-  asPage?: boolean
-  pathname?: string
+/** A module includes the compilation details. */
+export type Module = {
+  url: string
+  deps: DependencyDescriptor[]
+  sourceHash: string
+  hash: string
+  jsFile: string
+}
+
+/** The dependency descriptor. */
+export type DependencyDescriptor = {
+  url: string
+  isDynamic?: boolean
 }
 
 /**

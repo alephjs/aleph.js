@@ -230,9 +230,9 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
   return [params, true]
 }
 
-export function createBlankRouterURL(locale = 'en'): RouterURL {
+export function createBlankRouterURL(baseURL = '/', locale = 'en'): RouterURL {
   return {
-    baseURL: '/',
+    baseURL,
     locale,
     pagePath: '',
     pathname: '/',

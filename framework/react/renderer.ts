@@ -1,5 +1,4 @@
-import type { ComponentType, ReactElement } from 'https://esm.sh/react'
-import { createElement } from 'https://esm.sh/react'
+import { createElement, ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
@@ -10,6 +9,11 @@ import { AsyncUseDenoError, E400MissingComponent, E404Page } from './error.ts'
 import { isLikelyReactComponent } from './helper.ts'
 import { createPageProps } from './pageprops.ts'
 
+export type RendererStorage = {
+  headElements: Map<string, { type: string, props: Record<string, any> }>
+  scriptElements: Map<string, { props: Record<string, any> }>
+}
+
 type RenderResult = {
   head: string[]
   body: string
@@ -17,15 +21,9 @@ type RenderResult = {
   data: Record<string, string> | null
 }
 
-export type RendererStorage = {
-  headElements: Map<string, { type: string, props: Record<string, any> }>
-  scriptElements: Map<string, { props: Record<string, any> }>
-}
-
 export async function render(
   url: RouterURL,
   App: ComponentType<any> | undefined,
-  E404: ComponentType | undefined,
   nestedPageComponents: { url: string, Component?: any }[]
 ): Promise<RenderResult> {
   const global = globalThis as any
@@ -35,7 +33,6 @@ export async function render(
     scripts: [],
     data: null,
   }
-  const buildMode = Deno.env.get('BUILD_MODE')
   const rendererStorage: RendererStorage = {
     headElements: new Map(),
     scriptElements: new Map(),
@@ -70,15 +67,7 @@ export async function render(
     }
   } else {
     if (pageProps.Page == null) {
-      if (E404) {
-        if (isLikelyReactComponent(E404)) {
-          el = createElement(E404)
-        } else {
-          el = createElement(E400MissingComponent, { name: 'Custom 404' })
-        }
-      } else {
-        el = createElement(E404Page)
-      }
+      el = createElement(E404Page)
     } else {
       el = createElement(pageProps.Page, pageProps.pageProps)
     }

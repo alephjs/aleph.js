@@ -166,7 +166,7 @@ export class Server {
       }
 
       // ssr
-      const [status, html] = await app.getPageHtml({ pathname, search: url.searchParams.toString() })
+      const [status, html] = await app.getPageHTML({ pathname, search: url.searchParams.toString() })
       req.status(status).send(html, 'text/html; charset=utf-8')
     } catch (err) {
       req.status(500).send(createHtml({

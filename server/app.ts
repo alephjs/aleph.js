@@ -3,41 +3,17 @@ import { buildChecksum, transform } from '../compiler/mod.ts'
 import { colors, createHash, ensureDir, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import type { RouteModule } from '../framework/core/routing.ts'
-import { createBlankRouterURL, Routing, toPagePath } from '../framework/core/routing.ts'
+import { Routing, toPagePath } from '../framework/core/routing.ts'
 import { defaultReactVersion, minDenoVersion, moduleExts, hashShortLength } from '../shared/constants.ts'
 import { ensureTextFile, existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, LoaderPlugin, LoaderTransformResult, ModuleOptions, RouterURL, ServerApplication, TransformFn } from '../types.ts'
+import type { Config, LoaderPlugin, LoaderTransformResult, Module, DependencyDescriptor, RouterURL, ServerApplication, TransformFn } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Bundler } from './bundler.ts'
 import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
 import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, getDenoDir, isLoaderPlugin, reFullVersion, reHashJS, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
-
-/** A module includes the compilation details. */
-export type Module = {
-  url: string
-  deps: DependencyDescriptor[]
-  sourceHash: string
-  hash: string
-  jsFile: string
-}
-
-/** The dependency descriptor. */
-export type DependencyDescriptor = {
-  url: string
-  isDynamic?: boolean
-}
-
-/** The render result of SSR. */
-export type RenderResult = {
-  url: RouterURL
-  status: number
-  head: string[]
-  body: string
-  scripts: Record<string, any>[]
-  data: Record<string, string> | null
-}
+import { Renderer } from './renderer.ts'
 
 /** The application class for aleph server. */
 export class Application implements ServerApplication {
@@ -53,8 +29,8 @@ export class Application implements ServerApplication {
   #apiRouting: Routing = new Routing({})
   #fsWatchListeners: Array<EventEmitter> = []
   #bundler: Bundler = new Bundler(this)
-  #renderer: { render: CallableFunction } = { render: () => { } }
-  #renderCache: Map<string, Map<string, RenderResult>> = new Map()
+  #renderer: Renderer = new Renderer(this)
+  #renderCache: Map<string, Map<string, [string, any]>> = new Map()
   #injects = { compilation: new Array<TransformFn>(), hmr: new Array<TransformFn>() }
   #reloading = false
 
@@ -139,9 +115,7 @@ export class Application implements ServerApplication {
 
     // compile and import framework renderer when ssr is enable
     if (this.config.ssr) {
-      const rendererModuleUrl = `${alephPkgUri}/framework/${this.config.framework}/renderer.ts`
-      const { jsFile } = await this.compile(rendererModuleUrl, { once: true })
-      this.#renderer = await import('file://' + jsFile)
+      await this.#renderer.load()
     }
 
     // compile custom components
@@ -296,9 +270,24 @@ export class Application implements ServerApplication {
     return null
   }
 
+  findModuleByName(name: string): Module | null {
+    for (const ext of moduleExts) {
+      const url = `/${util.trimPrefix(name, '/')}.${ext}`
+      if (this.#modules.has(url)) {
+        return this.#modules.get(url)!
+      }
+    }
+    return null
+  }
+
+  getPageRoute(location: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
+    return this.#pageRouting.createRouter(location)
+  }
+
   getAPIRoute(location: { pathname: string, search?: string }): [RouterURL, Module] | null {
-    const [url, nestedModules] = this.#apiRouting.createRouter(location)
-    if (url.pagePath !== '') {
+    const router = this.#apiRouting.createRouter(location)
+    if (router !== null) {
+      const [url, nestedModules] = router
       const { url: moduleUrl } = nestedModules.pop()!
       return [url, this.#modules.get(moduleUrl)!]
     }
@@ -306,28 +295,14 @@ export class Application implements ServerApplication {
   }
 
   /** add a new page module by given path and source code. */
-  async addModule(url: string, options: ModuleOptions = {}): Promise<void> {
-    const { hash } = await this.compile(url, { sourceCode: options.code })
-    const routeMod = this.createRouteModule(url, hash)
-    if (options.asAPI) {
-      if (options.pathname) {
-        Object.assign(routeMod, { url: util.cleanPath('/api/' + options.pathname) + '.tsx' })
-      } else if (!url.startsWith('/api/')) {
-        log.warn(`the api module url should start with '/api/': ${url}`)
-        this.#modules.delete(url)
-        return
-      }
-      this.#apiRouting.update(routeMod)
-    } else if (options.asPage) {
-      if (options.pathname) {
-        Object.assign(routeMod, { url: util.cleanPath('/pages/' + options.pathname) + '.tsx' })
-      } else if (!url.startsWith('/pages/')) {
-        log.warn(`the page module url should start with '/pages/': ${url}`)
-        this.#modules.delete(url)
-        return
-      }
-      this.#pageRouting.update(routeMod)
+  async addModule(url: string, options: { code?: string, once?: boolean } = {}): Promise<Module> {
+    const mod = await this.compile(url, { sourceCode: options.code })
+    if (url.startsWith('/pages/')) {
+      this.#pageRouting.update(this.createRouteModule(mod.url, mod.hash))
+    } else if (url.startsWith('/api/')) {
+      this.#apiRouting.update(this.createRouteModule(mod.url, mod.hash))
     }
+    return mod
   }
 
   /** inject code */
@@ -335,49 +310,60 @@ export class Application implements ServerApplication {
     this.#injects[stage].push(transform)
   }
 
-  async getSSRData(loc: { pathname: string, search?: string }): Promise<[number, any]> {
+  async getSSRData(loc: { pathname: string, search?: string }): Promise<any> {
     if (!this.isSSRable(loc.pathname)) {
-      return [404, null]
+      return null
     }
 
-    const { status, data } = await this.renderPage(loc)
-    return [status, data]
-  }
-
-  async getPageHtml(loc: { pathname: string, search?: string }): Promise<[number, string, Record<string, string> | null]> {
-    if (!this.isSSRable(loc.pathname)) {
-      const [url] = this.#pageRouting.createRouter(loc)
-      return [url.pagePath === '' ? 404 : 200, await this.getSPAIndexHtml(), null]
+    const [router, nestedModules] = this.#pageRouting.createRouter(loc)
+    const { pagePath } = router
+    if (pagePath === '') {
+      return null
     }
 
-    const { url, status, head, scripts, body, data } = await this.renderPage(loc)
-    const html = createHtml({
-      lang: url.locale,
-      head: head,
-      scripts: [
-        data ? { type: 'application/json', innerText: JSON.stringify(data, undefined, this.isDev ? 2 : 0), id: 'ssr-data' } : '',
-        ...this.getHTMLScripts(),
-        ...scripts
-      ],
-      body,
-      minify: !this.isDev
+    const cacheKey = router.pathname + router.query.toString()
+    const ret = await this.useRenderCache(pagePath, cacheKey, async () => {
+      return await this.#renderer.renderPage(router, nestedModules)
     })
-    return [status, html, data]
+    return ret[1]
   }
 
-  async getSPAIndexHtml() {
-    const { defaultLocale } = this.config
-    const customLoading = await this.renderLoadingPage()
-    const html = createHtml({
-      lang: defaultLocale,
-      scripts: [
-        ...this.getHTMLScripts()
-      ],
-      head: customLoading?.head || [],
-      body: `<div id="__aleph">${customLoading?.body || ''}</div>`,
-      minify: !this.isDev
+  async getPageHTML(loc: { pathname: string, search?: string }): Promise<[number, string]> {
+    const [router, nestedModules] = this.#pageRouting.createRouter(loc)
+    const { pagePath } = router
+    const status = pagePath !== '' ? 200 : 404
+
+    if (!this.isSSRable(loc.pathname)) {
+      const [html] = await this.useRenderCache('-', 'spa-index', async () => {
+        return [await this.#renderer.renderSPAIndexPage(), null]
+      })
+      return [status, html]
+    }
+
+    if (pagePath === '') {
+      return [status, await this.#renderer.render404Page(router)]
+    }
+
+    const cacheKey = router.pathname + router.query.toString()
+    const [html] = await this.useRenderCache(pagePath, cacheKey, async () => {
+      return await this.#renderer.renderPage(router, nestedModules)
     })
-    return html
+    return [status, html]
+  }
+
+  private async useRenderCache(namespace: string, key: string, render: () => Promise<[string, any]>): Promise<[string, any]> {
+    let cache = this.#renderCache.get(namespace)
+    if (cache === undefined) {
+      cache = new Map()
+      this.#renderCache.set(namespace, cache)
+    }
+    const cached = cache.get(key)
+    if (cached !== undefined) {
+      return cached
+    }
+    const ret = await render()
+    cache.set(key, ret)
+    return ret
   }
 
   /** build the application to a static site(SSG) */
@@ -532,23 +518,6 @@ export class Application implements ServerApplication {
   private createRouteModule(url: string, hash: string): RouteModule {
     const useDeno = (this.config.ssr !== false && this.lookupDeps(url).some(dep => dep.url.startsWith('#useDeno-'))) || undefined
     return { url, hash, useDeno }
-  }
-
-  private getHTMLScripts() {
-    const { baseUrl } = this.config
-
-    if (this.isDev) {
-      const mainJS = this.getMainJS()
-      return [
-        { src: util.cleanPath(`${baseUrl}/_aleph/main.${computeHash(mainJS).slice(0, hashShortLength)}.js`), type: 'module' },
-        { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true },
-      ]
-    }
-
-    const mainJS = this.getMainJS(true)
-    return [
-      { src: util.cleanPath(`${baseUrl}/_aleph/main.bundle.${computeHash(mainJS).slice(0, hashShortLength)}.js`) },
-    ]
   }
 
   /** apply loaders recurively. */
@@ -873,8 +842,8 @@ export class Application implements ServerApplication {
     const { ssr } = this.config
     const outputDir = this.outputDir
 
-    if (!ssr) {
-      const html = await this.getSPAIndexHtml()
+    if (ssr === false) {
+      const html = await this.#renderer.renderSPAIndexPage()
       await ensureTextFile(path.join(outputDir, 'index.html'), html)
       await ensureTextFile(path.join(outputDir, '404.html'), html)
       return
@@ -887,8 +856,9 @@ export class Application implements ServerApplication {
     }
     await Promise.all(Array.from(paths).map(async pathname => {
       if (this.isSSRable(pathname)) {
-        const [status, html, data] = await this.getPageHtml({ pathname })
-        if (status == 200) {
+        const [router, nestedModules] = this.#pageRouting.createRouter({ pathname })
+        if (router.pagePath !== '') {
+          const [html, data] = await this.#renderer.renderPage(router, nestedModules)
           const htmlFile = path.join(outputDir, pathname, 'index.html')
           await ensureTextFile(htmlFile, html)
           if (data) {
@@ -900,36 +870,18 @@ export class Application implements ServerApplication {
             await ensureTextFile(dataFile, JSON.stringify(data))
           }
           log.info('  ○', pathname, colors.dim('• ' + util.formatBytes(html.length)))
-        } else if (status == 404) {
-          log.info('  ○', colors.dim(pathname), colors.red('Page not found'))
-        } else if (status == 500) {
-          log.info('  ○', colors.dim(pathname), colors.red('Error 500'))
+        } else {
+          log.error('Page not found:', pathname)
         }
       }
     }))
 
-    // write 404 page
-    const { url, head, scripts, body, data } = await this.render404Page()
-    const e404PageHtml = createHtml({
-      lang: url.locale,
-      head: head,
-      scripts: [
-        data ? {
-          type: 'application/json',
-          innerText: JSON.stringify(data, undefined, this.isDev ? 2 : 0),
-          id: 'ssr-data'
-        } : '',
-        ...this.getHTMLScripts(),
-        ...scripts
-      ],
-      body,
-      minify: !this.isDev
-    })
-    await ensureTextFile(path.join(outputDir, '404.html'), e404PageHtml)
-    if (data) {
-      const dataFile = path.join(outputDir, '_aleph/data/_404.json')
-      await ensureTextFile(dataFile, JSON.stringify(data))
-    }
+    // create 404 page
+    const [router] = this.#pageRouting.createRouter({ pathname: '/404' })
+    await ensureTextFile(
+      path.join(outputDir, '404.html'),
+      await this.#renderer.render404Page(router)
+    )
   }
 
   /** fetch module content */
@@ -1046,144 +998,8 @@ export class Application implements ServerApplication {
     }
   }
 
-  /** render page base the given location. */
-  private async renderPage(loc: { pathname: string, search?: string }) {
-    const start = performance.now()
-    const [url, nestedModules] = this.#pageRouting.createRouter(loc)
-    const key = [url.pathname, url.query.toString()].filter(Boolean).join('?')
-    if (url.pagePath !== '') {
-      if (this.#renderCache.has(url.pagePath)) {
-        const cache = this.#renderCache.get(url.pagePath)!
-        if (cache.has(key)) {
-          return cache.get(key)!
-        }
-      } else {
-        this.#renderCache.set(url.pagePath, new Map())
-      }
-    }
-    const ret: RenderResult = {
-      url,
-      status: url.pagePath === '' ? 404 : 200,
-      head: [],
-      scripts: [],
-      body: '<div id="__aleph"></div>',
-      data: null,
-    }
-    if (ret.status === 404) {
-      if (this.isDev) {
-        log.warn(`${colors.bold('404')} '${url.pathname}' not found`)
-      }
-      return await this.render404Page(url)
-    }
-    try {
-      const appModule = Array.from(this.#modules.values()).find(({ url }) => trimModuleExt(url) == '/app')
-      const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
-      const imports = nestedModules.map(async ({ url }) => {
-        const mod = this.#modules.get(url)!
-        const { default: Component } = await import('file://' + mod.jsFile)
-        return {
-          url,
-          Component
-        }
-      })
-      const { head, body, data, scripts } = await this.#renderer.render(
-        url,
-        App,
-        undefined,
-        await Promise.all(imports)
-      )
-      ret.head = head
-      ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
-        if (script.innerText && !this.isDev) {
-          return { ...script, innerText: script.innerText }
-        }
-        return script
-      }))
-      ret.body = `<div id="__aleph">${body}</div>`
-      ret.data = data
-      this.#renderCache.get(url.pagePath)!.set(key, ret)
-      if (this.isDev) {
-        log.info(`render '${url.pathname}' in ${Math.round(performance.now() - start)}ms`)
-      }
-    } catch (err) {
-      ret.status = 500
-      ret.head = ['<title>Error 500 - Aleph.js</title>']
-      ret.body = `<div id="__aleph"><pre>${colors.stripColor(err.stack)}</pre></div>`
-      log.error(err)
-    }
-    return ret
-  }
-
-  /** render custom 404 page. */
-  private async render404Page(url = createBlankRouterURL(this.config.defaultLocale)) {
-    const ret: RenderResult = {
-      url,
-      status: 404,
-      head: [],
-      scripts: [],
-      body: '<div id="__aleph"></div>',
-      data: null
-    }
-    try {
-      const e404Module = Array.from(this.#modules.keys())
-        .filter(url => trimModuleExt(url) == '/404')
-        .map(url => this.#modules.get(url))[0]
-      const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
-      const { head, body, data, scripts } = await this.#renderer.render(
-        url,
-        undefined,
-        E404,
-        []
-      )
-      ret.head = head
-      ret.scripts = await Promise.all(scripts.map(async (script: Record<string, any>) => {
-        if (script.innerText && !this.isDev) {
-          return { ...script, innerText: script.innerText }
-        }
-        return script
-      }))
-      ret.body = `<div id="__aleph">${body}</div>`
-      ret.data = data
-    } catch (err) {
-      ret.status = 500
-      ret.head = ['<title>Error 500 - Aleph.js</title>']
-      ret.body = `<div id="__aleph"><pre>${colors.stripColor(err.stack)}</pre></div>`
-      log.error(err)
-    }
-    return ret
-  }
-
-  /** render custom loading page for SPA mode. */
-  private async renderLoadingPage() {
-    const loadingModule = Array.from(this.#modules.values()).find(({ url }) => trimModuleExt(url) === '/loading')
-    if (loadingModule) {
-      const { default: Loading } = await import('file://' + loadingModule.jsFile)
-      const router = {
-        locale: this.config.defaultLocale,
-        pagePath: '',
-        pathname: '/',
-        params: {},
-        query: new URLSearchParams()
-      }
-      const {
-        head,
-        body
-      } = await this.#renderer.render(
-        router,
-        undefined,
-        undefined,
-        [{ url: loadingModule.url, Component: Loading }]
-      )
-      return {
-        head,
-        body: `<div id="__aleph">${body}</div>`
-      } as Pick<RenderResult, 'head' | 'body'>
-    }
-    return null
-  }
-
   /** check a page whether is able to SSR. */
-  private isSSRable(pathname: string): boolean {
+  isSSRable(pathname: string): boolean {
     const { ssr } = this.config
     if (util.isPlainObject(ssr)) {
       if (ssr.include) {
