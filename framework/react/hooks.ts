@@ -1,5 +1,4 @@
-import type { ComponentType } from 'https://esm.sh/react'
-import { createElement, useContext, useMemo } from 'https://esm.sh/react'
+import { ComponentType, createElement, useContext, useMemo } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'

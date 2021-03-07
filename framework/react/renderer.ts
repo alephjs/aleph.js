@@ -1,6 +1,7 @@
 import { createElement, ComponentType, ReactElement } from 'https://esm.sh/react'
 import { renderToString } from 'https://esm.sh/react-dom/server'
 import util from '../../shared/util.ts'
+import type { FrameworkRenderResult } from '../../server/renderer.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { serverStyles } from '../core/style.ts'
@@ -14,20 +15,13 @@ export type RendererStorage = {
   scriptElements: Map<string, { props: Record<string, any> }>
 }
 
-type RenderResult = {
-  head: string[]
-  body: string
-  scripts: Record<string, any>[]
-  data: Record<string, string> | null
-}
-
 export async function render(
   url: RouterURL,
   App: ComponentType<any> | undefined,
   nestedPageComponents: { url: string, Component?: any }[]
-): Promise<RenderResult> {
+): Promise<FrameworkRenderResult> {
   const global = globalThis as any
-  const ret: RenderResult = {
+  const ret: FrameworkRenderResult = {
     head: [],
     body: '',
     scripts: [],

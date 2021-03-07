@@ -12,7 +12,7 @@ import type { Config, LoaderPlugin, LoaderTransformResult, Module, DependencyDes
 import { VERSION } from '../version.ts'
 import { Bundler } from './bundler.ts'
 import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
-import { clearCompilation, computeHash, createHtml, formatBytesWithColor, getAlephPkgUri, getRelativePath, getDenoDir, isLoaderPlugin, reFullVersion, reHashJS, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
+import { clearCompilation, computeHash, formatBytesWithColor, getAlephPkgUri, getRelativePath, getDenoDir, isLoaderPlugin, reFullVersion, reHashJS, reHashResolve, toLocalUrl, trimModuleExt } from './helper.ts'
 import { Renderer } from './renderer.ts'
 
 /** The application class for aleph server. */

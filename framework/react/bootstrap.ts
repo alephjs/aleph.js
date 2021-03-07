@@ -1,11 +1,8 @@
-import type { ComponentType } from 'https://esm.sh/react'
-import { createElement } from 'https://esm.sh/react'
+import { ComponentType, createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import type { RouteModule, RoutingOptions } from '../core/routing.ts'
-import { Routing } from '../core/routing.ts'
+import { RouteModule, Routing, RoutingOptions } from '../core/routing.ts'
 import { importModule, loadPageDataFromTag, trimModuleExt } from './helper.ts'
-import type { PageRoute } from './pageprops.ts'
-import { createPageProps } from './pageprops.ts'
+import { createPageProps, PageRoute } from './pageprops.ts'
 import Router from './router.ts'
 
 type BootstrapOptions = Required<RoutingOptions> & {

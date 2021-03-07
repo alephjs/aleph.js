@@ -1,4 +1,4 @@
-import type { ComponentType } from 'https://esm.sh/react'
+import { ComponentType } from 'https://esm.sh/react'
 import type { RouterURL } from '../../types.ts'
 import { toPagePath } from '../core/routing.ts'
 import { E400MissingComponent } from './error.ts'

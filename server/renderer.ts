@@ -17,19 +17,10 @@ export type FrameworkRenderResult = {
 /** The framework renderer for SSR. */
 export type FrameworkRenderer = {
   render(
-    url: Omit<RouterURL, 'push' | 'replace'>,
+    url: RouterURL,
     AppComponent: any,
     nestedPageComponents: { url: string, Component?: any }[]
   ): Promise<FrameworkRenderResult>
-}
-
-/** The render result of SSR. */
-export type RenderResult = {
-  url: Omit<RouterURL, 'push' | 'replace'>
-  head: string[]
-  body: string
-  scripts: Record<string, any>[]
-  data: Record<string, string> | null
 }
 
 /** The renderer class for aleph server. */

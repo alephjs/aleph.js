@@ -1,5 +1,4 @@
-import type { PropsWithChildren, ScriptHTMLAttributes } from 'https://esm.sh/react'
-import { useContext } from 'https://esm.sh/react'
+import { PropsWithChildren, ScriptHTMLAttributes, useContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import { SSRContext } from './context.ts'
 
