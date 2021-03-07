@@ -74,9 +74,9 @@ export function getAlephPkgUri() {
 
 /** get relative the path of `to` to `from`. */
 export function getRelativePath(from: string, to: string): string {
-  let r = path.relative(from, to).split('\\').join('/')
+  const r = path.relative(from, to).split('\\').join('/')
   if (!r.startsWith('.') && !r.startsWith('/')) {
-    r = './' + r
+    return './' + r
   }
   return r
 }
@@ -180,18 +180,18 @@ export function formatBytesWithColor(bytes: number) {
 
 /** create html content by given arguments */
 export function createHtml({
+  body,
   lang = 'en',
   head = [],
+  className,
   scripts = [],
-  body,
-  bodyClassName,
   minify = false
 }: {
+  body: string,
   lang?: string,
   head?: string[],
+  className?: string,
   scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean, preload?: boolean })[],
-  body: string,
-  bodyClassName?: string,
   minify?: boolean
 }) {
   const eol = minify ? '' : '\n'
@@ -226,7 +226,7 @@ export function createHtml({
     indent + '<meta charSet="utf-8" />',
     ...headTags.map(tag => indent + tag),
     '</head>',
-    bodyClassName ? `<body class="${bodyClassName}">` : '<body>',
+    className ? `<body class="${className}">` : '<body>',
     indent + body,
     ...scriptTags.map(tag => indent + tag),
     '</body>',

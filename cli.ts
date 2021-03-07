@@ -105,7 +105,10 @@ async function main() {
   }
 
   // proxy https://deno.land/x/aleph on localhost
-  localProxy()
+  const v = Deno.env.get('ALEPH_DEV_PORT')
+  if (v !== undefined && /^\d+$/.test(v)) {
+    localProxy(parseInt(v))
+  }
 
   const { default: cmd } = await import(`./cli/${command}.ts`)
   switch (command) {

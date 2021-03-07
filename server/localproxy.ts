@@ -5,18 +5,8 @@ import { createHtml } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** proxy https://deno.land/x/aleph on localhost */
-export async function localProxy() {
-  const p = Deno.env.get('ALEPH_DEV_PORT')
-  if (!p) {
-    return
-  }
-
-  if (!/^\d+$/.test(p)) {
-    log.fatal('invalid ALEPH_DEV_PORT:', p)
-  }
-
+export async function localProxy(port: number) {
   const cwd = Deno.cwd()
-  const port = parseInt(p)
   const s = serve({ port })
 
   log.debug(`Proxy https://deno.land/x/aleph on http://localhost:${port}`)
