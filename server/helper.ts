@@ -185,16 +185,18 @@ export function createHtml({
   head = [],
   scripts = [],
   body,
+  bodyClassName,
   minify = false
 }: {
   lang?: string,
   head?: string[],
   scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean, preload?: boolean })[],
   body: string,
+  bodyClassName?: string,
   minify?: boolean
 }) {
   const eol = minify ? '' : '\n'
-  const indent = minify ? '' : ' '.repeat(4)
+  const indent = minify ? '' : ' '.repeat(2)
   const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
     if (!util.isString(v) && util.isNEString(v.src)) {
       if (v.type === 'module') {
@@ -225,7 +227,7 @@ export function createHtml({
     indent + '<meta charSet="utf-8" />',
     ...headTags.map(tag => indent + tag),
     '</head>',
-    '<body>',
+    bodyClassName ? `<body class="${bodyClassName}">` : '<body>',
     indent + body,
     ...scriptTags.map(tag => indent + tag),
     '</body>',

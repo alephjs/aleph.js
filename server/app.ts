@@ -355,7 +355,7 @@ export class Application implements ServerApplication {
       lang: url.locale,
       head: head,
       scripts: [
-        data ? { type: 'application/json', innerText: JSON.stringify(data, undefined, this.isDev ? 4 : 0), id: 'ssr-data' } : '',
+        data ? { type: 'application/json', innerText: JSON.stringify(data, undefined, this.isDev ? 2 : 0), id: 'ssr-data' } : '',
         ...this.getHTMLScripts(),
         ...scripts
       ],
@@ -916,7 +916,7 @@ export class Application implements ServerApplication {
       scripts: [
         data ? {
           type: 'application/json',
-          innerText: JSON.stringify(data, undefined, this.isDev ? 4 : 0),
+          innerText: JSON.stringify(data, undefined, this.isDev ? 2 : 0),
           id: 'ssr-data'
         } : '',
         ...this.getHTMLScripts(),
