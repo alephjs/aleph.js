@@ -70,11 +70,12 @@ export function StatusError({ status, message }: { status: number, message: stri
       {
         style: {
           ...resetStyle,
+          position: 'fixed',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'column',
-          width: '100vm',
+          width: '100vw',
           height: '100vh',
         }
       },

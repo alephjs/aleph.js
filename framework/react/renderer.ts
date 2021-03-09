@@ -55,7 +55,11 @@ export async function render(
   let el: ReactElement
   if (App) {
     if (isLikelyReactComponent(App)) {
-      el = createElement(App, pageProps)
+      if (pageProps.Page == null) {
+        el = createElement(E404Page)
+      } else {
+        el = createElement(App, pageProps)
+      }
     } else {
       el = createElement(E400MissingComponent, { name: 'Custom App' })
     }
