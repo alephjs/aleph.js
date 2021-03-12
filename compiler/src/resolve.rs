@@ -14,7 +14,6 @@ use std::{
 use url::Url;
 
 lazy_static! {
-  pub static ref HASH_PLACEHOLDER: String = "x".repeat(9);
   pub static ref RE_ENDS_WITH_VERSION: Regex = Regex::new(
     r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$"
   )
@@ -193,10 +192,10 @@ impl Resolver {
   // - `https://esm.sh/swr` -> `/-/esm.sh/swr.js`
   // - `https://esm.sh/react` -> `/-/esm.sh/react@${REACT_VERSION}.js`
   // - `https://deno.land/x/aleph/mod.ts` -> `/-/deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
-  // - `../components/logo.tsx` -> `/components/logo.{HASH}.js`
-  // - `../styles/app.css` -> `/styles/app.css.{HASH}.js`
-  // - `@/components/logo.tsx` -> `/components/logo.{HASH}.js`
-  // - `~/components/logo.tsx` -> `/components/logo.{HASH}.js`
+  // - `../components/logo.tsx` -> `/components/logo.js#{HASH}`
+  // - `../styles/app.css` -> `/styles/app.css.js#{HASH}`
+  // - `@/components/logo.tsx` -> `/components/logo.js#{HASH}`
+  // - `~/components/logo.tsx` -> `/components/logo.js#{HASH}`
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> (String, String) {
     // apply import map
     let url = self.import_map.resolve(self.specifier.as_str(), url);
@@ -328,11 +327,12 @@ impl Resolver {
               .unwrap()
               .trim_end_matches(s)
               .to_owned();
-            if !is_remote && !self.specifier_is_remote {
-              filename.push_str(HASH_PLACEHOLDER.as_str());
-              filename.push('.');
-            }
             filename.push_str("js");
+            if !is_remote && !self.specifier_is_remote {
+              filename.push_str("#");
+              filename.push_str(fixed_url.as_str());
+              filename.push_str("@000000");
+            }
             resolved_path.set_file_name(filename);
           }
           _ => {
@@ -343,9 +343,9 @@ impl Resolver {
                 .to_str()
                 .unwrap()
                 .to_owned();
-              filename.push('.');
-              filename.push_str(HASH_PLACEHOLDER.as_str());
-              filename.push_str(".js");
+              filename.push_str(".js#");
+              filename.push_str(fixed_url.as_str());
+              filename.push_str("@000000");
               resolved_path.set_file_name(filename);
             }
           }
@@ -523,28 +523,28 @@ mod tests {
     assert_eq!(
       resolver.resolve("../components/logo.tsx", false),
       (
-        format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
+        "../components/logo.js#/components/logo.tsx@000000".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("../styles/app.css", false),
       (
-        format!("../styles/app.css.{}.js", HASH_PLACEHOLDER.as_str()),
+        "../styles/app.css.js#/styles/app.css@000000".into(),
         "/styles/app.css".into()
       )
     );
     assert_eq!(
       resolver.resolve("@/components/logo.tsx", false),
       (
-        format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
+        "../components/logo.js#/components/logo.tsx@000000".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("~/components/logo.tsx", false),
       (
-        format!("../components/logo.{}.js", HASH_PLACEHOLDER.as_str()),
+        "../components/logo.js#/components/logo.tsx@000000".into(),
         "/components/logo.tsx".into()
       )
     );

@@ -289,7 +289,7 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
 mod tests {
   use super::*;
   use crate::import_map::ImportHashMap;
-  use crate::resolve::{DependencyDescriptor, Resolver, HASH_PLACEHOLDER};
+  use crate::resolve::{DependencyDescriptor, Resolver};
   use sha1::{Digest, Sha1};
 
   fn t(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
@@ -462,8 +462,8 @@ mod tests {
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
-        "import   \"../style/index.css.{}.js\"",
-        HASH_PLACEHOLDER.as_str()
+        "import   \"../style/index.css.js#{}@000000\"",
+        "/style/index.css"
       )
       .as_str()
     ));
