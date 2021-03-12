@@ -65,7 +65,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'zh-CN')
     assertEquals(router.pathname, '/hello-world')
     assertEquals(router.pagePath, '/hello-world')
-    assertEquals(nestedModules, [{ url: '/pages/hello-world.tsx', hash: '' }])
+    assertEquals(nestedModules, [{ url: '/pages/hello-world.tsx' }])
   }
 
   {
