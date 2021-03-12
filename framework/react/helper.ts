@@ -1,6 +1,6 @@
 import { createContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import { hashShortLength, moduleExts } from '../../shared/constants.ts'
+import { moduleExts } from '../../shared/constants.ts'
 import type { RouterURL } from '../../types.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for
@@ -51,19 +51,19 @@ export function trimModuleExt(url: string) {
   return url
 }
 
-export function importModule(baseUrl: string, mod: { url: string, hash: string }, forceRefetch = false): Promise<any> {
+export function importModule(baseUrl: string, url: string, forceRefetch = false): Promise<any> {
   const { __ALEPH: ALEPH, document } = window as any
 
-  if (ALEPH && mod.url in ALEPH.pack) {
-    return Promise.resolve(ALEPH.pack[mod.url])
+  if (ALEPH && url in ALEPH.pack) {
+    return Promise.resolve(ALEPH.pack[url])
   }
 
-  if (ALEPH && mod.url.startsWith('/pages/')) {
-    const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.bundle.${mod.hash.slice(0, hashShortLength)}.js`)
+  if (ALEPH && url.startsWith('/pages/')) {
+    const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(url) + '.js')
     return new Promise((resolve, reject) => {
       const script = document.createElement('script')
       script.onload = () => {
-        resolve(ALEPH.pack[mod.url])
+        resolve(ALEPH.pack[url])
       }
       script.onerror = (err: Error) => {
         reject(err)
@@ -73,7 +73,7 @@ export function importModule(baseUrl: string, mod: { url: string, hash: string }
     })
   }
 
-  const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.${mod.hash.slice(0, hashShortLength)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
+  const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(url) + `.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
   return import(src)
 }
 

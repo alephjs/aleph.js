@@ -1,13 +1,12 @@
 import { path, serve as stdServe, serveTLS, ws } from '../deps.ts'
 import { rewriteURL, RouteModule } from '../framework/core/routing.ts'
-import { hashShortLength } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
-import { createHtml, reHashJS, trimModuleExt } from './helper.ts'
+import { createHtml, trimModuleExt } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */
@@ -36,6 +35,9 @@ export class Server {
     for (const key in app.config.headers) {
       req.setHeader(key, app.config.headers[key])
     }
+    if (app.isDev) {
+      req.setHeader('Cache-Control', 'max-age=0')
+    }
 
     try {
       // serve hmr ws
@@ -59,7 +61,7 @@ export class Server {
                     socket.send(JSON.stringify({
                       type: 'update',
                       url: mod.url,
-                      updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.${hash.slice(0, hashShortLength)}.js`),
+                      updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.js`),
                       hash,
                     }))
                   })
@@ -90,7 +92,7 @@ export class Server {
           return
         }
 
-        if (pathname.startsWith('/_aleph/main') && ['main', 'main.bundle'].includes(util.trimPrefix(pathname, '/_aleph/').replace(reHashJS, ''))) {
+        if (pathname == '/_aleph/main.js') {
           req.send(app.getMainJS(pathname.includes('.bundle.')), 'application/javascript; charset=utf-8')
           return
         }
@@ -98,15 +100,15 @@ export class Server {
         const filePath = path.join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
         if (existsFileSync(filePath)) {
           const info = Deno.lstatSync(filePath)
-          const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
+          const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
           if (lastModified === r.headers.get('If-Modified-Since')) {
             req.status(304).send('')
             return
           }
 
           let content = await Deno.readTextFile(filePath)
-          if (reHashJS.test(filePath)) {
-            const metaFile = filePath.replace(reHashJS, '') + '.meta.json'
+          if (filePath.endsWith('.js')) {
+            const metaFile = util.trimSuffix(filePath, '.js') + '.meta.json'
             if (existsFileSync(metaFile)) {
               try {
                 const { url } = JSON.parse(await Deno.readTextFile(metaFile))
@@ -131,7 +133,7 @@ export class Server {
       const filePath = path.join(app.workingDir, 'public', pathname)
       if (existsFileSync(filePath)) {
         const info = Deno.lstatSync(filePath)
-        const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
+        const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
         if (lastModified === r.headers.get('If-Modified-Since')) {
           req.status(304).send('')
           return
@@ -148,8 +150,8 @@ export class Server {
         const route = app.getAPIRoute({ pathname, search: url.searchParams.toString() })
         if (route !== null) {
           try {
-            const [{ params, query }, { jsFile }] = route
-            const { default: handle } = await import('file://' + jsFile)
+            const [{ params, query }, { jsFile, hash }] = route
+            const { default: handle } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
             if (util.isFunction(handle)) {
               await handle(new Request(req, params, query))
             } else {

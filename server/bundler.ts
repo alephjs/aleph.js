@@ -1,61 +1,115 @@
 import { minify, ECMA } from 'https://esm.sh/terser@5.5.1'
 import { TransformOptions, transform } from '../compiler/mod.ts'
 import { colors, path } from '../deps.ts'
-import { defaultReactVersion, hashShortLength } from '../shared/constants.ts'
-import { existsFileSync, lazyRemove } from '../shared/fs.ts'
+import { defaultReactVersion } from '../shared/constants.ts'
+import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { Module } from '../types.ts'
 import { VERSION } from '../version.ts'
 import type { Application } from './app.ts'
-import { AlephRuntimeCode, clearCompilation, computeHash, getAlephPkgUri, isLoaderPlugin, trimModuleExt } from './helper.ts'
+import {
+  clearCompilation,
+  computeHash,
+  getAlephPkgUri,
+  isLoaderPlugin,
+  trimModuleExt
+} from './helper.ts'
+
+const bundlerRuntimeCode = `
+var __ALEPH = window.__ALEPH || (window.__ALEPH = {
+  pack: {},
+  require: function(name) {
+    switch (name) {
+    case 'regenerator-runtime':
+      return regeneratorRuntime
+    default:
+      throw new Error('module "' + name + '" is undefined')
+    }
+  },
+});
+`
 
 /** The bundler class for aleph server. */
 export class Bundler {
   #app: Application
-  #deps: Array<string>
 
   constructor(app: Application) {
     this.#app = app
-    this.#deps = []
   }
 
-  async bundle(entryMods: Array<string>, depMods: Map<string, boolean>) {
-    this.#deps = Array.from(depMods.keys())
+  async bundle(entryMods: Array<{ url: string, shared: boolean }>) {
+    const remoteEntries: Array<string> = []
+    const sharedEntries: Array<string> = []
+    const entries: Array<string> = []
+
+    entryMods.forEach(({ url, shared }) => {
+      if (shared) {
+        if (util.isLikelyHttpURL(url)) {
+          remoteEntries.push(url)
+        } else {
+          sharedEntries.push(url)
+        }
+      } else {
+        entries.push(url)
+      }
+    })
+
     await Promise.all([
-      await this.createPolyfillBundle(),
-      await this.createBundleChunk(
-        '/deps.js',
-        Array.from(depMods.entries())
-          .filter(([url, exported]) => exported && util.isLikelyHttpURL(url))
-          .map(([url]) => url)
+      // this.createPolyfillBundle(),
+      this.createBundleChunk(
+        'deps',
+        remoteEntries,
+        []
       ),
-      await this.createBundleChunk(
-        '/shared.js',
-        Array.from(depMods.entries())
-          .filter(([url, exported]) => exported && !util.isLikelyHttpURL(url))
-          .map(([url]) => url)
+      this.createBundleChunk(
+        'shared',
+        sharedEntries,
+        remoteEntries
       ),
-      ...entryMods.map(async url => {
-        await this.createBundleChunk(trimModuleExt(url) + '.js', [url])
+      ...entries.map(url => {
+        this.createBundleChunk(
+          trimModuleExt(url),
+          [url],
+          [remoteEntries, sharedEntries].flat()
+        )
       })
     ])
   }
 
-  private async compile(module: Module) {
-    const { content: sourceCode } = await this.#app.fetchModule(module.url)
-    const { code, map, deps } = await transform(module.url, (new TextDecoder).decode(sourceCode), {
-      importMap: this.#app.importMap,
-      alephPkgUri: getAlephPkgUri(),
-      reactVersion: defaultReactVersion,
-      swcOptions: {
-        target: 'es2020',
-        sourceType: 'js'
-      },
-      bundleMode: true,
-      bundleExternal: this.#deps,
-      loaders: this.#app.config.plugins.filter(isLoaderPlugin)
-    })
+  private async compile(mod: Module, external: string[]) {
+    const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
+    if (existsFileSync(bundlingFile)) {
+      return bundlingFile
+    }
+
+    const { content, contentType } = await this.#app.fetchModule(mod.url)
+    const source = await this.#app.precompile(mod.url, content, contentType)
+    if (source === null) {
+      throw new Error(`Unsupported module '${mod.url}'`)
+    }
+
+    const [sourceCode, sourceType] = source
+    const { code } = await transform(
+      mod.url,
+      sourceCode,
+      {
+        importMap: this.#app.importMap,
+        alephPkgUri: getAlephPkgUri(),
+        reactVersion: defaultReactVersion,
+        swcOptions: {
+          target: 'es2020',
+          sourceType
+        },
+        bundleMode: true,
+        bundleExternal: external,
+        loaders: this.#app.config.plugins.filter(isLoaderPlugin)
+      }
+    )
+
+    await ensureTextFile(bundlingFile, code)
+
+    return bundlingFile
   }
 
   async copyDist() {
@@ -93,40 +147,48 @@ export class Bundler {
     // ])
   }
 
-  /** create polyfill bundle. */
-  private async createPolyfillBundle() {
-    const alephPkgUri = getAlephPkgUri()
-    const { buildTarget } = this.#app.config
-    const hash = computeHash(AlephRuntimeCode + buildTarget + Deno.version.deno + VERSION)
-    const bundleFile = path.join(this.#app.buildDir, `polyfill.bundle.${hash.slice(0, hashShortLength)}.js`)
-    if (!existsFileSync(bundleFile)) {
-      const rawPolyfillFile = `${alephPkgUri}/compiler/polyfills/${buildTarget}/mod.ts`
-      await this.runDenoBundle(rawPolyfillFile, bundleFile, AlephRuntimeCode, true)
-    }
-    log.info(`  {} polyfill (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
-  }
-
   /** create bundle chunk. */
-  private async createBundleChunk(name: string, entry: string[]) {
-    const entryCode = entry.map((url, i) => {
+  private async createBundleChunk(name: string, entry: string[], deps: string[]) {
+    const entryCode = (await Promise.all(entry.map(async (url, i) => {
       let mod = this.#app.getModule(url)
-      if (mod) {
-        const { jsFile } = mod
-        return jsFile ? [
-          `import * as ${name}_mod_${i} from ${JSON.stringify('file://' + jsFile)}`,
-          `__ALEPH.pack[${JSON.stringify(url)}] = ${name}_mod_${i}`
-        ] : []
+      if (mod && mod.jsFile !== '') {
+        if (deps.length === 0) {
+          return [
+            `import * as mod_${i} from ${JSON.stringify('file://' + mod.jsFile)}`,
+            `__ALEPH.pack[${JSON.stringify(url)}] = mod_${i}`
+          ]
+        } else {
+          const jsFile = await this.compile(mod, deps)
+          return [
+            `import * as mod_${i} from ${JSON.stringify('file://' + jsFile)}`,
+            `__ALEPH.pack[${JSON.stringify(url)}] = mod_${i}`
+          ]
+        }
       }
-    }).flat().join('\n')
+      return []
+    }))).flat().join('\n')
     const hash = computeHash(entryCode + VERSION + Deno.version.deno)
     const bundleEntryFile = path.join(this.#app.buildDir, `${name}.bundle.entry.js`)
-    const bundleFile = path.join(this.#app.buildDir, `${name}.bundle.${hash.slice(0, hashShortLength)}.js`)
+    const bundleFile = path.join(this.#app.buildDir, `${name}.bundle.${hash.slice(0, 8)}.js`)
     if (!existsFileSync(bundleFile)) {
       await Deno.writeTextFile(bundleEntryFile, entryCode)
       await this.runDenoBundle(bundleEntryFile, bundleFile)
       lazyRemove(bundleEntryFile)
     }
     log.info(`  {} ${name} ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+  }
+
+  /** create polyfill bundle. */
+  private async createPolyfillBundle() {
+    const alephPkgUri = getAlephPkgUri()
+    const { buildTarget } = this.#app.config
+    const hash = computeHash(bundlerRuntimeCode + buildTarget + Deno.version.deno + VERSION)
+    const bundleFile = path.join(this.#app.buildDir, `polyfill.bundle.${hash.slice(0, 8)}.js`)
+    if (!existsFileSync(bundleFile)) {
+      const rawPolyfillFile = `${alephPkgUri}/compiler/polyfills/${buildTarget}/mod.ts`
+      await this.runDenoBundle(rawPolyfillFile, bundleFile, bundlerRuntimeCode, false)
+    }
+    log.info(`  {} polyfill (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
   }
 
   /** run deno bundle and compress the output using terser. */

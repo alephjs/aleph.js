@@ -43,7 +43,7 @@ export default function Router({
     const [url, nestedModules] = routing.createRouter()
     if (url.pagePath !== '') {
       const imports = nestedModules.map(async mod => {
-        const { default: Component } = await importModule(baseURL, mod, e.forceRefetch)
+        const { default: Component } = await importModule(baseURL, mod.url, e.forceRefetch)
         return {
           url: mod.url,
           Component
@@ -77,7 +77,7 @@ export default function Router({
     const onAddModule = async (mod: RouteModule) => {
       switch (mod.url) {
         case '/404.js': {
-          const { default: Component } = await importModule(baseURL, mod, true)
+          const { default: Component } = await importModule(baseURL, mod.url, true)
           if (isLikelyReactComponent(Component)) {
             setE404({ Component })
           } else {
@@ -86,7 +86,7 @@ export default function Router({
           break
         }
         case '/app.js': {
-          const { default: Component } = await importModule(baseURL, mod, true)
+          const { default: Component } = await importModule(baseURL, mod.url, true)
           if (isLikelyReactComponent(Component)) {
             setApp({ Component })
           } else {
@@ -124,7 +124,7 @@ export default function Router({
       const [url, nestedModules] = routing.createRouter({ pathname, search })
       if (url.pagePath !== '') {
         nestedModules.map(mod => {
-          importModule(baseURL, mod)
+          importModule(baseURL, mod.url)
         })
         if (appUseDeno || nestedModules.findIndex(mod => !!mod.useDeno) > -1) {
           loadPageData(url)

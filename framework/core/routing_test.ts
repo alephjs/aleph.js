@@ -9,19 +9,19 @@ Deno.test(`routing`, () => {
       '/你好世界': '/zh-CN/hello-world',
     }
   })
-  routing.update({ url: '/pages/index.tsx', hash: '' })
-  routing.update({ url: '/pages/hello-world.tsx', hash: '' })
-  routing.update({ url: '/pages/blog/index.tsx', hash: '' })
-  routing.update({ url: '/pages/blog/[slug].tsx', hash: '' })
-  routing.update({ url: '/pages/user/index.tsx', hash: '' })
-  routing.update({ url: '/pages/user/[...all].tsx', hash: '' })
-  routing.update({ url: '/pages/blog.tsx', hash: '' })
-  routing.update({ url: '/pages/user.tsx', hash: '' })
-  routing.update({ url: '/pages/blog/[slug]/subpage.tsx', hash: '' })
-  routing.update({ url: '/pages/docs.tsx', hash: '' })
-  routing.update({ url: '/pages/docs/get-started.tsx', hash: '' })
-  routing.update({ url: '/pages/docs/installation.tsx', hash: '' })
-  routing.update({ url: '/pages/index.tsx', hash: 'hsidfshy3yhfya49848' })
+  routing.update({ url: '/pages/index.tsx' })
+  routing.update({ url: '/pages/hello-world.tsx' })
+  routing.update({ url: '/pages/blog/index.tsx' })
+  routing.update({ url: '/pages/blog/[slug].tsx' })
+  routing.update({ url: '/pages/user/index.tsx' })
+  routing.update({ url: '/pages/user/[...all].tsx' })
+  routing.update({ url: '/pages/blog.tsx' })
+  routing.update({ url: '/pages/user.tsx' })
+  routing.update({ url: '/pages/blog/[slug]/subpage.tsx' })
+  routing.update({ url: '/pages/docs.tsx' })
+  routing.update({ url: '/pages/docs/get-started.tsx' })
+  routing.update({ url: '/pages/docs/installation.tsx' })
+  routing.update({ url: '/pages/index.tsx' })
 
   assertEquals(routing.paths, [
     '/',
@@ -41,7 +41,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'en')
     assertEquals(router.pathname, '/')
     assertEquals(router.pagePath, '/')
-    assertEquals(nestedModules, [{ url: '/pages/index.tsx', hash: 'hsidfshy3yhfya49848' }])
+    assertEquals(nestedModules, [{ url: '/pages/index.tsx' }])
   }
 
   {
@@ -49,7 +49,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'zh-CN')
     assertEquals(router.pathname, '/')
     assertEquals(router.pagePath, '/')
-    assertEquals(nestedModules, [{ url: '/pages/index.tsx', hash: 'hsidfshy3yhfya49848' }])
+    assertEquals(nestedModules, [{ url: '/pages/index.tsx' }])
   }
 
   {
@@ -57,7 +57,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'en')
     assertEquals(router.pathname, '/hello-world')
     assertEquals(router.pagePath, '/hello-world')
-    assertEquals(nestedModules, [{ url: '/pages/hello-world.tsx', hash: '' }])
+    assertEquals(nestedModules, [{ url: '/pages/hello-world.tsx' }])
   }
 
   {

@@ -3,7 +3,7 @@ import { moduleExts } from '../../shared/constants.ts'
 import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
 
-const ghostRoute: Route = { path: '', module: { url: '', hash: '' } }
+const ghostRoute: Route = { path: '', module: { url: '' } }
 
 export type Route = {
   path: string
@@ -13,7 +13,6 @@ export type Route = {
 
 export type RouteModule = {
   readonly url: string
-  readonly hash: string
   readonly useDeno?: boolean
 }
 

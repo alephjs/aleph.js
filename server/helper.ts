@@ -7,8 +7,6 @@ import { VERSION } from '../version.ts'
 
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
-export const reHashJS = /\.[0-9a-fx]{9}\.js$/i
-export const reHashResolve = /((?:[^a-z0-9_\.\$])from|import|import\s*\()(\s*)("|')([^'"]+\.[0-9a-fx]{9}\.js)("|')/g
 
 // inject browser navigator polyfill
 Object.assign(globalThis.navigator, {
@@ -28,27 +26,18 @@ Object.assign(globalThis.navigator, {
   vendor: 'Deno Land'
 })
 
-export const AlephRuntimeCode = `
-  var __ALEPH = window.__ALEPH || (window.__ALEPH = {
-    pack: {},
-    require: function(name) {
-      switch (name) {
-      case 'regenerator-runtime':
-        return regeneratorRuntime
-      default:
-        throw new Error('module "' + name + '" is undefined')
-      }
-    },
-  });
-`
-
 /** check the plugin whether is a loader plugin. */
 export function isLoaderPlugin(plugin: Plugin): plugin is LoaderPlugin {
   return plugin.type === 'loader'
 }
 
 /** get deno dir. */
+let __denoDir: string | null = null
 export async function getDenoDir() {
+  if (__denoDir !== null) {
+    return __denoDir
+  }
+
   const p = Deno.run({
     cmd: [Deno.execPath(), 'info', '--json', '--unstable'],
     stdout: 'piped',
@@ -60,6 +49,7 @@ export async function getDenoDir() {
   if (denoDir === undefined || !existsDirSync(denoDir)) {
     throw new Error(`can't find the deno dir`)
   }
+  __denoDir = denoDir
   return denoDir
 }
 
@@ -123,20 +113,7 @@ export function computeHash(content: string | Uint8Array): string {
 
 /** clear the previous compilation cache */
 export async function clearCompilation(jsFile: string) {
-  const dir = path.dirname(jsFile)
-  const jsFileName = path.basename(jsFile)
-  if (!reHashJS.test(jsFile) || !existsDirSync(dir)) {
-    return
-  }
-  const jsName = jsFileName.split('.').slice(0, -2).join('.') + '.js'
-  for await (const entry of Deno.readDir(dir)) {
-    if (entry.isFile && (entry.name.endsWith('.js') || entry.name.endsWith('.js.map'))) {
-      const _jsName = util.trimSuffix(entry.name, '.map').split('.').slice(0, -2).join('.') + '.js'
-      if (_jsName === jsName && jsFileName !== entry.name) {
-        await Deno.remove(path.join(dir, entry.name))
-      }
-    }
-  }
+
 }
 
 /** parse port number */

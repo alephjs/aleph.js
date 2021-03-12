@@ -116,6 +116,7 @@ export type Module = {
 /** The dependency descriptor. */
 export type DependencyDescriptor = {
   url: string
+  hash: string
   isDynamic?: boolean
 }
 

@@ -1,10 +1,9 @@
 import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import { hashShortLength } from '../shared/constants.ts'
 import type { RouterURL } from '../types.ts'
 import type { Application } from './app.ts'
-import { computeHash, createHtml, getAlephPkgUri } from './helper.ts'
+import { createHtml, getAlephPkgUri } from './helper.ts'
 
 /** The framework render result of SSR. */
 export type FrameworkRenderResult = {
@@ -43,16 +42,14 @@ export class Renderer {
     const { baseUrl } = this.#app.config
 
     if (this.#app.isDev) {
-      const mainJS = this.#app.getMainJS()
       return [
-        { src: util.cleanPath(`${baseUrl}/_aleph/main.${computeHash(mainJS).slice(0, hashShortLength)}.js`), type: 'module' },
+        { src: util.cleanPath(`${baseUrl}/_aleph/main.js`), type: 'module' },
         { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true },
       ]
     }
 
-    const mainJS = this.#app.getMainJS(true)
     return [
-      { src: util.cleanPath(`${baseUrl}/_aleph/main.bundle.${computeHash(mainJS).slice(0, hashShortLength)}.js`) },
+      { src: util.cleanPath(`${baseUrl}/_aleph/main.js`) },
     ]
   }
 
@@ -61,12 +58,12 @@ export class Renderer {
     const start = performance.now()
     const isDev = this.#app.isDev
     const appModule = this.#app.findModuleByName('app')
-    const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
+    const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 6)}`) : {} as any
     const imports = nestedModules
       .filter(({ url }) => this.#app.getModule(url) !== null)
       .map(async ({ url }) => {
-        const { jsFile } = this.#app.getModule(url)!
-        const { default: Component } = await import('file://' + jsFile)
+        const { jsFile, hash } = this.#app.getModule(url)!
+        const { default: Component } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
         return {
           url,
           Component
@@ -111,8 +108,8 @@ export class Renderer {
   async render404Page(url: RouterURL): Promise<string> {
     const appModule = this.#app.findModuleByName('app')
     const e404Module = this.#app.findModuleByName('404')
-    const { default: App } = appModule ? await import('file://' + appModule.jsFile) : {} as any
-    const { default: E404 } = e404Module ? await import('file://' + e404Module.jsFile) : {} as any
+    const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 6)}`) : {} as any
+    const { default: E404 } = e404Module ? await import(`file://${e404Module.jsFile}#${e404Module.hash.slice(0, 6)}`) : {} as any
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
       App,
@@ -146,7 +143,7 @@ export class Renderer {
     const loadingModule = this.#app.findModuleByName('loading')
 
     if (loadingModule) {
-      const { default: Loading } = await import('file://' + loadingModule.jsFile)
+      const { default: Loading } = await import(`file://${loadingModule.jsFile}#${loadingModule.hash.slice(0, 6)}`)
       const {
         head,
         body,
