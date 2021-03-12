@@ -119,11 +119,12 @@ async function main() {
       await cmd(options.v || options.version || args[0] || 'latest')
       break
     default:
-      const appDir = path.resolve(String(args[0] || '.'))
-      if (!existsDirSync(appDir)) {
-        log.fatal('No such directory:', appDir)
+      const workingDir = path.resolve(String(args[0] || '.'))
+      if (!existsDirSync(workingDir)) {
+        log.fatal('No such directory:', workingDir)
       }
-      await cmd(appDir, options)
+      Deno.chdir(workingDir)
+      await cmd(workingDir, options)
       break
   }
 }

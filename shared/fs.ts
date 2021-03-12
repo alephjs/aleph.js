@@ -72,9 +72,9 @@ export async function ensureTextFile(name: string, content: string): Promise<voi
 }
 
 /** remove the file if it exists. */
-export async function lazyRemove(name: string): Promise<void> {
+export async function lazyRemove(name: string, options?: { recursive?: boolean }): Promise<void> {
   try {
-    await Deno.remove(name)
+    await Deno.remove(name, options)
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) {
       return
