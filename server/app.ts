@@ -898,7 +898,7 @@ export class Application implements ServerApplication {
     return mod
   }
 
-  /** check compilation side-effect caused by dependency graph changing. */
+  /** apply compilation side-effect caused by dependency graph breaking. */
   private async applyCompilationSideEffect(url: string, callback: (mod: Module) => void) {
     const { hash } = this.#modules.get(url)!
 
@@ -910,6 +910,7 @@ export class Application implements ServerApplication {
             { url, hash }
           )
           await Deno.writeTextFile(mod.jsFile, jsContent)
+          mod.hash = computeHash(mod.sourceHash + mod.deps.map(({ hash }) => hash).join(''))
           callback(mod)
           log.debug('compilation side-effect:', mod.url, colors.dim('<-'), url)
           this.applyCompilationSideEffect(mod.url, callback)
