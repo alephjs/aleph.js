@@ -109,6 +109,15 @@ export class Application implements ServerApplication {
         )
       } catch (e) { }
     }
+
+    this.#reloading = reload
+    if (reload || shouldRebuild) {
+      if (existsDirSync(this.buildDir)) {
+        await Deno.remove(this.buildDir, { recursive: true })
+      }
+      await ensureDir(this.buildDir)
+    }
+
     if (shouldRebuild) {
       log.debug('rebuild...')
       ensureTextFile(buildManifestFile, JSON.stringify({
@@ -117,14 +126,6 @@ export class Application implements ServerApplication {
         configHash,
         deno: Deno.version.deno,
       }, undefined, 2))
-    }
-
-    this.#reloading = reload
-    if (reload || shouldRebuild) {
-      if (existsDirSync(this.buildDir)) {
-        await Deno.remove(this.buildDir, { recursive: true })
-      }
-      await ensureDir(this.buildDir)
     }
 
     // apply server plugins
