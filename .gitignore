@@ -1,5 +1,6 @@
 .DS_Store
-*.env
+.env
+.env.*
 Thumbs.db
 compiler/target/
 compiler/pkg/
