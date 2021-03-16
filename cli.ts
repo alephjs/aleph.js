@@ -92,7 +92,7 @@ async function main() {
   }
 
   // load .env
-  for await (const { path: p, } of walk(Deno.cwd(), { exts: ['env'], maxDepth: 1 })) {
+  for await (const { path: p, } of walk(Deno.cwd(), { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
     const text = await Deno.readTextFile(p)
     text.split('\n').forEach(line => {
       let [key, value] = util.splitBy(line, '=')
