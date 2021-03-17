@@ -1,7 +1,7 @@
 import { ComponentType, createElement } from 'https://esm.sh/react'
 import { hydrate, render } from 'https://esm.sh/react-dom'
-import { RouteModule, Routing, RoutingOptions } from '../core/routing.ts'
-import { importModule, loadPageDataFromTag, trimModuleExt } from './helper.ts'
+import { importModule, RouteModule, Routing, RoutingOptions, trimModuleExt } from '../core/routing.ts'
+import { loadPageDataFromTag } from './helper.ts'
 import { createPageProps, PageRoute } from './pageprops.ts'
 import Router from './router.ts'
 
