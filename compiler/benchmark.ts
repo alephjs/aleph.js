@@ -42,7 +42,7 @@ async function benchmark() {
 
   const d1 = { d: 0, min: 0, max: 0 }
   const d2 = { d: 0, min: 0, max: 0 }
-  const n = 2
+  const n = 10
 
   for (const { code, filename } of sourceFiles) {
     const t = performance.now()
@@ -82,7 +82,8 @@ async function benchmark() {
 }
 
 if (import.meta.main) {
-  // wasm warm-up
+  // v8 warm-up
+  tsc('console.log("bla bla bla...")', { filename: '/app.ts', isDev: true })
   await transform('/app.ts', 'console.log("bla bla bla...")', { isDev: true })
   await benchmark()
 }
