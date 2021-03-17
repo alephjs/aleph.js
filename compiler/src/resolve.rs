@@ -327,6 +327,13 @@ impl Resolver {
               .unwrap()
               .trim_end_matches(s)
               .to_owned();
+            if self.bundle_mode {
+              if is_dynamic {
+                filename.push_str("bundle.");
+              } else {
+                filename.push_str("bundling.");
+              }
+            }
             filename.push_str("js");
             if !is_remote && !self.specifier_is_remote {
               filename.push_str("#");
@@ -343,6 +350,13 @@ impl Resolver {
                 .to_str()
                 .unwrap()
                 .to_owned();
+              if self.bundle_mode {
+                if is_dynamic {
+                  filename.push_str(".bundle");
+                } else {
+                  filename.push_str(".bundling");
+                }
+              }
               filename.push_str(".js#");
               filename.push_str(fixed_url.as_str());
               filename.push_str("@000000");

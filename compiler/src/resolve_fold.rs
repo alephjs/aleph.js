@@ -231,6 +231,12 @@ impl Fold for AlephResolveFold {
         _ => return call,
       };
       let mut resolver = self.resolver.borrow_mut();
+      if resolver.bundle_mode {
+        call.callee = ExprOrSuper::Expr(Box::new(Expr::MetaProp(MetaPropExpr {
+          meta: quote_ident!("__ALEPH"),
+          prop: quote_ident!("import"),
+        })))
+      }
       call.args = vec![ExprOrSpread {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(new_str(resolver.resolve(url, true).0)))),
