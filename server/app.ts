@@ -58,7 +58,7 @@ export class Application implements ServerApplication {
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
   #renderCache: Map<string, Map<string, [string, any]>> = new Map()
-  #injects = { compilation: new Array<TransformFn>(), hmr: new Array<TransformFn>() }
+  #injects: Map<'compilation' | 'hmr' | 'ssr', TransformFn[]> = new Map()
   #reloading = false
 
   constructor(
@@ -340,8 +340,12 @@ export class Application implements ServerApplication {
   }
 
   /** inject code */
-  injectCode(stage: 'compilation' | 'hmr', transform: TransformFn): void {
-    this.#injects[stage].push(transform)
+  injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: TransformFn): void {
+    if (this.#injects.has(stage)) {
+      this.#injects.get(stage)!.push(transform)
+    } else {
+      this.#injects.set(stage, [transform])
+    }
   }
 
   /** get ssr data */
@@ -368,6 +372,7 @@ export class Application implements ServerApplication {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { pagePath } = router
     const status = pagePath !== '' ? 200 : 404
+    const path = router.pathname + router.query.toString()
 
     if (!this.isSSRable(loc.pathname)) {
       const [html] = await this.useRenderCache('-', 'spa-index', async () => {
@@ -377,12 +382,15 @@ export class Application implements ServerApplication {
     }
 
     if (pagePath === '') {
-      return [status, await this.#renderer.render404Page(router)]
+      const [html] = await this.useRenderCache('404', path, async () => {
+        return [await this.#renderer.render404Page(router), null]
+      })
+      return [status, html]
     }
 
-    const cacheKey = router.pathname + router.query.toString()
-    const [html] = await this.useRenderCache(pagePath, cacheKey, async () => {
-      return await this.#renderer.renderPage(router, nestedModules)
+    const [html] = await this.useRenderCache(pagePath, path, async () => {
+      let [html, data] = await this.#renderer.renderPage(router, nestedModules)
+      return [html, data]
     })
     return [status, html]
   }
@@ -405,6 +413,7 @@ export class Application implements ServerApplication {
     if (!this.isDev) {
       return false
     }
+
     for (const ext of moduleExts) {
       if (url.endsWith('.' + ext)) {
         return (
@@ -414,7 +423,12 @@ export class Application implements ServerApplication {
         )
       }
     }
-    return this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && (p.allowPage || p.acceptHMR))
+
+    return this.config.plugins.some(p => (
+      p.type === 'loader' &&
+      p.test.test(url) &&
+      (p.allowPage || p.acceptHMR)
+    ))
   }
 
   /** inject HMR code  */
@@ -433,11 +447,9 @@ export class Application implements ServerApplication {
     ]
 
     let code = lines.join('\n')
-    if (this.#injects.hmr.length > 0) {
-      this.#injects.hmr.forEach(transform => {
-        code = transform(url, code)
-      })
-    }
+    this.#injects.get('hmr')?.forEach(transform => {
+      code = transform(url, code)
+    })
     return code
   }
 
@@ -475,11 +487,9 @@ export class Application implements ServerApplication {
       `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js";`,
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
     ].filter(Boolean).join('\n')
-    if (this.#injects.compilation.length > 0) {
-      this.#injects.compilation.forEach(transform => {
-        code = transform('/main.js', code)
-      })
-    }
+    this.#injects.get('compilation')?.forEach(transform => {
+      code = transform('/main.js', code)
+    })
     return code
   }
 
@@ -1032,6 +1042,8 @@ export class Application implements ServerApplication {
     }
 
     log.info(colors.bold('- Pages (SSG)'))
+
+    // render pages
     const paths = new Set(this.#pageRouting.paths)
     if (typeof ssr === 'object' && ssr.staticPaths) {
       ssr.staticPaths.forEach(path => paths.add(path))
@@ -1040,9 +1052,11 @@ export class Application implements ServerApplication {
       if (this.isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname })
         if (router.pagePath !== '') {
-          const [html, data] = await this.#renderer.renderPage(router, nestedModules)
-          const htmlFile = path.join(outputDir, pathname, 'index.html')
-          await ensureTextFile(htmlFile, html)
+          let [html, data] = await this.#renderer.renderPage(router, nestedModules)
+          this.#injects.get('ssr')?.forEach(transform => {
+            html = transform(pathname, html)
+          })
+          await ensureTextFile(path.join(outputDir, pathname, 'index.html'), html)
           if (data) {
             const dataFile = path.join(
               outputDir,
@@ -1058,12 +1072,15 @@ export class Application implements ServerApplication {
       }
     }))
 
-    // create 404 page
-    const [router] = this.#pageRouting.createRouter({ pathname: '/404' })
-    await ensureTextFile(
-      path.join(outputDir, '404.html'),
-      await this.#renderer.render404Page(router)
-    )
+    // render 404 page
+    {
+      const [router] = this.#pageRouting.createRouter({ pathname: '/404' })
+      let html = await this.#renderer.render404Page(router)
+      this.#injects.get('ssr')?.forEach(transform => {
+        html = transform('/404', html)
+      })
+      await ensureTextFile(path.join(outputDir, '404.html'), html)
+    }
   }
 
   private async useRenderCache(
@@ -1081,6 +1098,11 @@ export class Application implements ServerApplication {
       return cached
     }
     const ret = await render()
+    if (namespace !== '-') {
+      this.#injects.get('ssr')?.forEach(transform => {
+        ret[0] = transform(key, ret[0])
+      })
+    }
     cache.set(key, ret)
     return ret
   }
