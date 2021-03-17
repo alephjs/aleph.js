@@ -50,8 +50,8 @@ impl Fold for AlephResolveFold {
   // - development mode:
   //   - `import React, {useState} from "https://esm.sh/react"` -> `import React, {useState} from "/-/esm.sh/react.js"`
   //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/-/esm.sh/react.js"`
-  //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/components/logo.{HASH_PLACEHOLDER}.js"`
-  //   - `import "../style/index.css" -> `import "/style/index.css.{HASH_PLACEHOLDER}.js"`
+  //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/components/logo.js"`
+  //   - `import "../style/index.css" -> `import "/style/index.css.js"`
   //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
   //   - `export * from "https://esm.sh/react"` -> `export * from "/-/esm.sh/react.js"`
   // - bundling mode:
@@ -216,8 +216,9 @@ impl Fold for AlephResolveFold {
 
   // resolve dynamic import url & sign useDeno hook
   // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
-  // - `import("../components/logo.tsx")` -> `import("/-/esm.sh/react.js")`
-  // - `useDeno(() => {})` -> `useDeno(() => {}, false, "useDeno.RANDOM_KEY")`
+  // - `import("../components/logo.tsx")` -> `import("../components/logo.js#/components/logo.tsx@000000")`
+  // - `import("../components/logo.tsx")` -> `__ALEPH.import("../components/logo.js#/components/logo.tsx@000000", "/pages/index.tsx")`
+  // - `useDeno(() => {})` -> `useDeno(() => {}, false, "useDeno.KEY")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
       let url = match call.args.first() {
@@ -241,6 +242,12 @@ impl Fold for AlephResolveFold {
         spread: None,
         expr: Box::new(Expr::Lit(Lit::Str(new_str(resolver.resolve(url, true).0)))),
       }];
+      if resolver.bundle_mode {
+        call.args.push(ExprOrSpread {
+          spread: None,
+          expr: Box::new(Expr::Lit(Lit::Str(new_str(resolver.specifier.clone())))),
+        })
+      }
     } else if is_call_expr_by_name(&call, "useDeno") {
       let callback_span = match call.args.first() {
         Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {

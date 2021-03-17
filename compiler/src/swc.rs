@@ -595,7 +595,7 @@ mod tests {
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
     assert!(code.contains("import   \"../shared/iife2.bundling.js#/shared/iife2.ts@000000\""));
     assert!(code
-      .contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"../components/async-logo.bundle.js#/components/async-logo.tsx@000000\""));
+      .contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"../components/async-logo.bundle.js#/components/async-logo.tsx@000000\", \"/pages/index.tsx\""));
     assert!(code.contains(
       "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"].default"
     ));
