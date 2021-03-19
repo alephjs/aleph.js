@@ -1,6 +1,7 @@
 import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts'
 import { colors, createHash, path, walk } from '../deps.ts'
-import { transform } from './mod.ts'
+import { initWasm } from './mod.ts'
+import { transformSync } from './dist/wasm-pack.js'
 
 function tsc(source: string, opts: any) {
   const compileOptions: CompileOptions = {
@@ -42,8 +43,12 @@ async function benchmark() {
 
   const d1 = { d: 0, min: 0, max: 0 }
   const d2 = { d: 0, min: 0, max: 0 }
-  const n = 10
+  const n = 5
 
+  for (let i = 0; i < n; i++) {
+    // v8 warm-up
+    tsc('console.log("bla bla bla...")', { filename: '/app.ts', isDev: true })
+  }
   for (const { code, filename } of sourceFiles) {
     const t = performance.now()
     for (let i = 0; i < n; i++) {
@@ -58,10 +63,15 @@ async function benchmark() {
     }
     d1.d += d
   }
+
+  for (let i = 0; i < n; i++) {
+    // v8 warm-up
+    transformSync('/app.ts', 'console.log("bla bla bla...")', { isDev: true })
+  }
   for (const { code, filename } of sourceFiles) {
     const t = performance.now()
     for (let i = 0; i < n; i++) {
-      transform(filename, code, {
+      transformSync(filename, code, {
         swcOptions: { target: 'es2020' },
         isDev: true
       })
@@ -82,8 +92,6 @@ async function benchmark() {
 }
 
 if (import.meta.main) {
-  // v8 warm-up
-  tsc('console.log("bla bla bla...")', { filename: '/app.ts', isDev: true })
-  await transform('/app.ts', 'console.log("bla bla bla...")', { isDev: true })
+  await initWasm()
   await benchmark()
 }
