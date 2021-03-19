@@ -1,4 +1,4 @@
-import type { ImportMap, TransformOptions } from '../compiler/mod.ts'
+import { ImportMap, SourceType, TransformOptions } from '../compiler/mod.ts'
 import { buildChecksum, transform } from '../compiler/mod.ts'
 import { colors, createHash, ensureDir, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
@@ -280,6 +280,35 @@ export class Application implements ServerApplication {
     }
   }
 
+  private isScopedModule(url: string) {
+    for (const ext of moduleExts) {
+      if (url.endsWith('.' + ext)) {
+        if (url.startsWith('/pages/') || url.startsWith('/api/')) {
+          return true
+        }
+        switch (trimModuleExt(url)) {
+          case '/404':
+          case '/app':
+            return true
+        }
+      }
+    }
+
+    // is page module by plugin
+    if (this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)) {
+      return true
+    }
+
+    // is dep
+    for (const { deps } of this.#modules.values()) {
+      if (deps.some(dep => dep.url === url)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
   get isDev() {
     return this.mode === 'development'
   }
@@ -478,8 +507,8 @@ export class Application implements ServerApplication {
 
     if (bundleMode) {
       return [
-        `var bootstrap=__ALEPH.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default;`,
-        `bootstrap(${JSON.stringify(config)});`
+        `__ALEPH.baseURL = ${JSON.stringify(baseURL)};`,
+        `__ALEPH.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default(${JSON.stringify(config)});`
       ].join('\n')
     }
 
@@ -683,31 +712,24 @@ export class Application implements ServerApplication {
     url: string,
     sourceContent: Uint8Array,
     contentType: string | null
-  ): Promise<[string, 'js' | 'jsx' | 'ts' | 'tsx'] | null> {
+  ): Promise<[string, SourceType] | null> {
     let sourceCode = (new TextDecoder).decode(sourceContent)
-    let sourceType = path.extname(url).slice(1)
-
-    if (sourceType == 'mjs') {
-      sourceType = 'js'
-    }
+    let sourceType: SourceType = SourceType.Unknown
 
     if (contentType !== null) {
       switch (contentType.split(';')[0].trim()) {
         case 'application/javascript':
         case 'text/javascript':
-          sourceType = 'js'
+          sourceType = SourceType.JS
           break
         case 'text/typescript':
-          sourceType = 'ts'
+          sourceType = SourceType.TS
           break
         case 'text/jsx':
-          sourceType = 'jsx'
+          sourceType = SourceType.JSX
           break
         case 'text/tsx':
-          sourceType = 'tsx'
-          break
-        default:
-          sourceType = 'js'
+          sourceType = SourceType.TSX
           break
       }
     }
@@ -719,19 +741,42 @@ export class Application implements ServerApplication {
           { url, content: sourceContent }
         )
         sourceCode = code
-        sourceType = type
+        switch (type) {
+          case 'js':
+            sourceType = SourceType.JS
+            break
+          case 'jsx':
+            sourceType = SourceType.JSX
+            break
+          case 'ts':
+            sourceType = SourceType.TS
+            break
+          case 'tsx':
+            sourceType = SourceType.TSX
+            break
+        }
         break
       }
     }
 
-    switch (sourceType) {
-      case 'js':
-      case 'jsx':
-      case 'ts':
-      case 'tsx':
-        break
-      default:
-        return null
+    if (sourceType === SourceType.Unknown) {
+      switch (path.extname(url).slice(1).toLowerCase()) {
+        case 'mjs':
+        case 'js':
+          sourceType = SourceType.JS
+          break
+        case 'jsx':
+          sourceType = SourceType.JSX
+          break
+        case 'ts':
+          sourceType = SourceType.TS
+          break
+        case 'tsx':
+          sourceType = SourceType.TSX
+          break
+        default:
+          return null
+      }
     }
 
     return [sourceCode, sourceType]
@@ -943,30 +988,27 @@ export class Application implements ServerApplication {
 
   /** create bundle chunks for production. */
   private async bundle() {
-    const sharedScopeMods = new Set<string>()
     const sharedEntryMods = new Set<string>()
-    const entryMods = new Map<string, boolean>()
+    const entryMods = new Map<string[], boolean>()
     const refCounter = new Map<string, Set<string>>()
     const concatAllEntries = () => [
-      Array.from(entryMods.entries()).map(([url, shared]) => ({ url, shared })),
+      Array.from(entryMods.entries()).map(([urls, shared]) => urls.map(url => ({ url, shared }))),
       Array.from(sharedEntryMods).map(url => ({ url, shared: true })),
-    ].flat()
+    ].flat(2)
 
     // add framwork bootstrap module as shared entry
-    entryMods.set(`${getAlephPkgUri()}/framework/${this.config.framework}/bootstrap.ts`, true)
+    entryMods.set(
+      [`${getAlephPkgUri()}/framework/${this.config.framework}/bootstrap.ts`],
+      true
+    )
+
+    entryMods.set(Array.from(this.#modules.keys()).filter(url => ['/app', '/404'].includes(trimModuleExt(url))), true)
 
     this.#modules.forEach(mod => {
-      switch (trimModuleExt(mod.url)) {
-        case '/app':
-        case '/404':
-          // add custom app/404 module as shared entry
-          entryMods.set(mod.url, true)
-          break
-      }
       mod.deps.forEach(({ url, isDynamic }) => {
         if (isDynamic) {
           // add dynamic imported module as entry
-          entryMods.set(url, false)
+          entryMods.set([url], false)
         }
         return url
       })
@@ -983,44 +1025,34 @@ export class Application implements ServerApplication {
 
     // add page module entries
     this.#pageRouting.lookup(routes => {
-      routes.forEach(({ module: { url } }) => entryMods.set(url, false))
+      routes.forEach(({ module: { url } }) => entryMods.set([url], false))
     })
 
     refCounter.forEach((refers, url) => {
       if (refers.size > 1) {
-        for (const [key, shared] of entryMods.entries()) {
-          if ((!shared || !util.isLikelyHttpURL(key)) && refers.has(key)) {
-            // add shared module entry
-            sharedEntryMods.add(url)
-            break
+        let shared = 0
+        for (const mods of entryMods.keys()) {
+          const some = mods.some(u => {
+            let scoped = false
+            this.lookupDeps(u, dep => {
+              if (!dep.isDynamic && refers.has(dep.url)) {
+                scoped = true
+                return false
+              }
+            })
+            return scoped
+          })
+          if (some) {
+            shared++
           }
         }
-      }
-    })
-
-    // some modules are shared deeply
-    const entries = concatAllEntries()
-    entries.forEach(({ url, shared }) => {
-      if (shared) {
-        this.lookupDeps(url, dep => {
-          if (!dep.isDynamic) {
-            sharedScopeMods.add(dep.url)
-          }
-        })
-      }
-    })
-    refCounter.forEach((refers, url) => {
-      if (refers.size > 1) {
-        const scopedMods = [
-          ...Array.from(sharedScopeMods),
-          ...entries.map(({ url }) => url)
-        ]
-        if (scopedMods.every(url => !refers.has(url))) {
+        if (shared > 1) {
           sharedEntryMods.add(url)
         }
       }
     })
 
+    log.info('- bundle')
     await this.#bundler.bundle(concatAllEntries())
   }
 
@@ -1130,37 +1162,8 @@ export class Application implements ServerApplication {
     return ssr
   }
 
-  private isScopedModule(url: string) {
-    for (const ext of moduleExts) {
-      if (url.endsWith('.' + ext)) {
-        if (url.startsWith('/pages/') || url.startsWith('/api/')) {
-          return true
-        }
-        switch (trimModuleExt(url)) {
-          case '/404':
-          case '/app':
-            return true
-        }
-      }
-    }
-
-    // is page module by plugin
-    if (this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)) {
-      return true
-    }
-
-    // is dep
-    for (const { deps } of this.#modules.values()) {
-      if (deps.some(dep => dep.url === url)) {
-        return true
-      }
-    }
-
-    return false
-  }
-
   /** lookup deps recurively. */
-  private lookupDeps(
+  lookupDeps(
     url: string,
     callback: (dep: DependencyDescriptor) => false | void,
     __tracing: Set<string> = new Set()

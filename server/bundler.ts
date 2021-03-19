@@ -1,5 +1,5 @@
-import { minify, ECMA } from 'https://esm.sh/terser@5.5.1'
-import { TransformOptions, transform } from '../compiler/mod.ts'
+import { minify as terser, ECMA } from 'https://esm.sh/terser@5.5.1'
+import { transform } from '../compiler/mod.ts'
 import { colors, path } from '../deps.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
@@ -16,19 +16,31 @@ import {
   trimModuleExt
 } from './helper.ts'
 
-const bundlerRuntimeCode = `
-var __ALEPH = window.__ALEPH || (window.__ALEPH = {
-  pack: {},
-  require: function(name) {
-    switch (name) {
-    case 'regenerator-runtime':
-      return regeneratorRuntime
-    default:
-      throw new Error('module "' + name + '" is undefined')
+export const createBundlerRuntimeCode = () => minify(`
+  window.__ALEPH = {
+    baseURL: '/'
+    pack: {},
+    import: function(src, specifier) {
+      var pack = this.pack
+      return new Promise(function(resolve, reject) {
+        var script = document.createElement('script'),
+            a = src.split('#'),
+            src = a[0],
+            b = a[1].split('@'),
+            url = b[0],
+            hash = b[1];
+        script.onload = function () {
+          resolve(pack[url])
+        }
+        script.onerror = function(err) {
+          reject(err)
+        }
+        script.src = src + '?v=' + hash
+        document.body.appendChild(script)
+      })
     }
-  },
-});
-`
+  }
+`)
 
 /** The bundler class for aleph server. */
 export class Bundler {
@@ -55,6 +67,11 @@ export class Bundler {
       }
     })
 
+    console.log(remoteEntries)
+    console.log(sharedEntries)
+    console.log(entries)
+
+
     await Promise.all([
       // this.createPolyfillBundle(),
       this.createBundleChunk(
@@ -71,17 +88,34 @@ export class Bundler {
         this.createBundleChunk(
           trimModuleExt(url),
           [url],
-          [remoteEntries, sharedEntries].flat()
+          [
+            ...remoteEntries,
+            ...sharedEntries
+          ]
         )
       })
     ])
   }
 
-  private async compile(mod: Module, external: string[]) {
+  #compiled = new Set<string>()
+
+  private async compile(mod: Module, external: string[]): Promise<[string, Boolean]> {
     const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
-    if (existsFileSync(bundlingFile)) {
-      return bundlingFile
+
+    if (this.#compiled.has(mod.url)) {
+      return [bundlingFile, false]
     }
+    this.#compiled.add(mod.url)
+    // let shouldCompile = false
+    // this.#app.lookupDeps(mod.url, dep => {
+    //   if (external.includes(dep.url)) {
+    //     shouldCompile = true
+    //     return false
+    //   }
+    // })
+    // if (!shouldCompile) {
+    //   return [mod.jsFile, false]
+    // }
 
     const { content, contentType } = await this.#app.fetchModule(mod.url)
     const source = await this.#app.precompile(mod.url, content, contentType)
@@ -90,7 +124,7 @@ export class Bundler {
     }
 
     const [sourceCode, sourceType] = source
-    const { code } = await transform(
+    let { code } = await transform(
       mod.url,
       sourceCode,
       {
@@ -107,9 +141,25 @@ export class Bundler {
       }
     )
 
-    await ensureTextFile(bundlingFile, code)
+    // compile deps
+    for (const dep of mod.deps) {
+      if (!dep.url.startsWith('#') && !external.includes(dep.url)) {
+        const depMod = this.#app.getModule(dep.url)
+        if (depMod !== null) {
+          const [_, isBundling] = await this.compile(depMod, external)
+          const s = `.bundling.js#${dep.url}@`
+          code = code.split(s).map((p, i) => {
+            if (i > 0 && p.charAt(6) === '"') {
+              return dep.hash.slice(0, 6) + p.slice(6)
+            }
+            return p
+          }).join(s)
+        }
+      }
+    }
 
-    return bundlingFile
+    await ensureTextFile(bundlingFile, code)
+    return [bundlingFile, true]
   }
 
   async copyDist() {
@@ -148,17 +198,17 @@ export class Bundler {
   }
 
   /** create bundle chunk. */
-  private async createBundleChunk(name: string, entry: string[], deps: string[]) {
+  private async createBundleChunk(name: string, entry: string[], external: string[]) {
     const entryCode = (await Promise.all(entry.map(async (url, i) => {
       let mod = this.#app.getModule(url)
       if (mod && mod.jsFile !== '') {
-        if (deps.length === 0) {
+        if (external.length === 0) {
           return [
             `import * as mod_${i} from ${JSON.stringify('file://' + mod.jsFile)}`,
             `__ALEPH.pack[${JSON.stringify(url)}] = mod_${i}`
           ]
         } else {
-          const jsFile = await this.compile(mod, deps)
+          const [jsFile] = await this.compile(mod, external)
           return [
             `import * as mod_${i} from ${JSON.stringify('file://' + jsFile)}`,
             `__ALEPH.pack[${JSON.stringify(url)}] = mod_${i}`
@@ -182,27 +232,27 @@ export class Bundler {
   private async createPolyfillBundle() {
     const alephPkgUri = getAlephPkgUri()
     const { buildTarget } = this.#app.config
-    const hash = computeHash(bundlerRuntimeCode + buildTarget + Deno.version.deno + VERSION)
+    const hash = computeHash(buildTarget + Deno.version.deno + VERSION)
     const bundleFile = path.join(this.#app.buildDir, `polyfill.bundle.${hash.slice(0, 8)}.js`)
     if (!existsFileSync(bundleFile)) {
       const rawPolyfillFile = `${alephPkgUri}/compiler/polyfills/${buildTarget}/mod.ts`
-      await this.runDenoBundle(rawPolyfillFile, bundleFile, bundlerRuntimeCode, false)
+      await this.runDenoBundle(rawPolyfillFile, bundleFile)
     }
     log.info(`  {} polyfill (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
   }
 
   /** run deno bundle and compress the output using terser. */
-  private async runDenoBundle(bundleEntryFile: string, bundleFile: string, header = '', reload = false) {
+  private async runDenoBundle(bundleEntryFile: string, bundleFile: string) {
     // todo: use Deno.emit()
     const p = Deno.run({
-      cmd: [Deno.execPath(), 'bundle', '--no-check', reload ? '--reload' : '', bundleEntryFile, bundleFile].filter(Boolean),
+      cmd: [Deno.execPath(), 'bundle', '--no-check', bundleEntryFile, bundleFile],
       stdout: 'null',
       stderr: 'piped'
     })
     const data = await p.stderrOutput()
     p.close()
     if (!existsFileSync(bundleFile)) {
-      const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.#app.buildDir, '/aleph.js')
+      const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.#app.buildDir, '/_aleph')
       await Deno.stderr.write((new TextEncoder).encode(msg))
       Deno.exit(1)
     }
@@ -222,21 +272,25 @@ export class Bundler {
     )
 
     // IIFEify
-    code = `(() => { ${header};${code} })()`
+    code = `(() => { ${code} })()`
 
     // minify code
     // todo: use swc minify instead(https://github.com/swc-project/swc/pull/1302)
-    const ret = await minify(code, {
-      compress: true,
-      mangle: true,
-      ecma: parseInt(util.trimPrefix(buildTarget, 'es')) as ECMA,
-      sourceMap: false
-    })
-    if (ret.code) {
-      code = ret.code
+    const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')) as ECMA)
+    if (mini !== undefined) {
+      code = mini
     }
 
     await clearCompilation(bundleFile)
     await Deno.writeTextFile(bundleFile, code)
   }
+}
+
+async function minify(code: string, ecma: ECMA = 5) {
+  return (await terser(code, {
+    compress: true,
+    mangle: true,
+    ecma,
+    sourceMap: false
+  })).code
 }
