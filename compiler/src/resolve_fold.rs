@@ -47,17 +47,19 @@ impl Fold for AlephResolveFold {
 
   // resolve import/export url
   // [/pages/index.tsx]
-  // - development mode:
-  //   - `import React, {useState} from "https://esm.sh/react"` -> `import React, {useState} from "/-/esm.sh/react.js"`
+  // - es6 mode:
+  //   - `import React, { useState } from "https://esm.sh/react"` -> `import React, {useState} from "/-/esm.sh/react.js"`
   //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/-/esm.sh/react.js"`
   //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/components/logo.js"`
   //   - `import "../style/index.css" -> `import "/style/index.css.js"`
   //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
   //   - `export * from "https://esm.sh/react"` -> `export * from "/-/esm.sh/react.js"`
   // - bundling mode:
-  //   - `import React, {useState} from "https://esm.sh/react"` -> `var React = __ALEPH.pack["https://esm.sh/react"].default, useState = __ALEPH__.PACK["https://esm.sh/react"].useState;`
-  //   - `import * as React from "https://esm.sh/react"` -> `var React = __ALEPH.pack["https://esm.sh/react"]`
-  //   - `import Logo from "../components/logo.tsx"` -> `var Logo = __ALEPH.pack["/components/logo.tsx"].default`
+  //   - `import React, { useState } from "https://esm.sh/react"` -> `const { default: React, useState } = __ALEPH.pack["https://esm.sh/react"];`
+  //   - `import * as React from "https://esm.sh/react"` -> `const React = __ALEPH.pack["https://esm.sh/react"]`
+  //   - `import Logo from "../components/logo.tsx"` -> `const { default: Logo } = __ALEPH.pack["/components/logo.tsx"]`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `export const { default: React, useState } = __ALEPH.pack["https://esm.sh/react"]`
+  //   - `export * from "https://esm.sh/react"` -> `export const $$star_N = __ALEPH.pack["https://esm.sh/react"]`
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
 
@@ -65,55 +67,54 @@ impl Fold for AlephResolveFold {
       match item {
         ModuleItem::ModuleDecl(decl) => {
           let item: ModuleItem = match decl {
+            // match: import React, { useState } from "https://esm.sh/react"
             ModuleDecl::Import(import_decl) => {
               if import_decl.type_only {
+                // ingore type import
                 ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl))
               } else {
                 let mut resolver = self.resolver.borrow_mut();
                 let (resolved_path, fixed_url) =
                   resolver.resolve(import_decl.src.value.as_ref(), false);
                 if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
-                  let mut var_decls: Vec<VarDeclarator> = vec![];
-                  import_decl.specifiers.into_iter().for_each(|specifier| {
-                    match specifier {
-                      // import { default as React, useState } from "https://esm.sh/react"
+                  let mut names: Vec<(Ident, Option<String>)> = vec![];
+                  let mut ns: Option<Ident> = None;
+                  import_decl
+                    .specifiers
+                    .into_iter()
+                    .for_each(|specifier| match specifier {
                       ImportSpecifier::Named(ImportNamedSpecifier {
                         local, imported, ..
                       }) => {
-                        var_decls.push(create_aleph_pack_var_decl(
-                          local.clone(),
-                          fixed_url.as_str(),
-                          Some(
-                            match imported {
-                              Some(name) => name,
-                              None => local,
-                            }
-                            .sym
-                            .as_ref(),
-                          ),
-                        ));
-                      }
-                      // import React from "https://esm.sh/react"
-                      ImportSpecifier::Default(ImportDefaultSpecifier { local, .. }) => {
-                        var_decls.push(create_aleph_pack_var_decl(
+                        names.push((
                           local,
-                          fixed_url.as_str(),
-                          Some("default"),
+                          match imported {
+                            Some(name) => Some(name.sym.as_ref().into()),
+                            None => None,
+                          },
                         ));
                       }
-                      // import * as React from "https://esm.sh/react"
-                      ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => {
-                        var_decls.push(create_aleph_pack_var_decl(local, fixed_url.as_str(), None));
+                      ImportSpecifier::Default(ImportDefaultSpecifier { local, .. }) => {
+                        names.push((local, Some("default".into())));
                       }
-                    }
-                  });
-                  if var_decls.len() > 0 {
-                    // var React = __ALEPH.pack["https://esm.sh/react"].default, useState = __ALEPH.pack["https://esm.sh/react"].useState;
+                      ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => {
+                        ns = Some(local);
+                      }
+                    });
+                  if let Some(name) = ns {
                     ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
                       span: DUMMY_SP,
-                      kind: VarDeclKind::Var,
+                      kind: VarDeclKind::Const,
                       declare: false,
-                      decls: var_decls,
+                      decls: vec![create_aleph_pack_var_decl(fixed_url.as_ref(), name)],
+                    })))
+                  } else if names.len() > 0 {
+                    // const {default: React, useState} = __ALEPH.pack["https://esm.sh/react"];
+                    ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
+                      span: DUMMY_SP,
+                      kind: VarDeclKind::Const,
+                      declare: false,
+                      decls: vec![create_aleph_pack_var_decl_member(fixed_url.as_ref(), names)],
                     })))
                   } else {
                     ModuleItem::Stmt(Stmt::Empty(EmptyStmt { span: DUMMY_SP }))
@@ -126,7 +127,8 @@ impl Fold for AlephResolveFold {
                 }
               }
             }
-            // export { default as React, useState } from "https://esm.sh/react"
+            // match: export { default as React, useState } from "https://esm.sh/react"
+            // match: export * as React from "https://esm.sh/react"
             ModuleDecl::ExportNamed(NamedExport {
               type_only,
               specifiers,
@@ -134,6 +136,7 @@ impl Fold for AlephResolveFold {
               ..
             }) => {
               if type_only {
+                // ingore type export
                 ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(NamedExport {
                   span: DUMMY_SP,
                   specifiers,
@@ -143,25 +146,88 @@ impl Fold for AlephResolveFold {
                 }))
               } else {
                 let mut resolver = self.resolver.borrow_mut();
-                let (resolved_path, _) = resolver.resolve(src.value.as_ref(), false);
-                ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(NamedExport {
+                let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
+                if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
+                  let mut names: Vec<(Ident, Option<String>)> = vec![];
+                  let mut ns: Option<Ident> = None;
+                  specifiers
+                    .into_iter()
+                    .for_each(|specifier| match specifier {
+                      ExportSpecifier::Named(ExportNamedSpecifier { orig, exported, .. }) => {
+                        names.push((
+                          orig,
+                          match exported {
+                            Some(name) => Some(name.sym.as_ref().into()),
+                            None => None,
+                          },
+                        ));
+                      }
+                      ExportSpecifier::Default(ExportDefaultSpecifier { exported, .. }) => {
+                        names.push((exported, Some("default".into())));
+                      }
+                      ExportSpecifier::Namespace(ExportNamespaceSpecifier { name, .. }) => {
+                        ns = Some(name);
+                      }
+                    });
+                  if let Some(name) = ns {
+                    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                      span: DUMMY_SP,
+                      decl: Decl::Var(VarDecl {
+                        span: DUMMY_SP,
+                        kind: VarDeclKind::Const,
+                        declare: false,
+                        decls: vec![create_aleph_pack_var_decl(fixed_url.as_ref(), name)],
+                      }),
+                    }))
+                  } else if names.len() > 0 {
+                    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                      span: DUMMY_SP,
+                      decl: Decl::Var(VarDecl {
+                        span: DUMMY_SP,
+                        kind: VarDeclKind::Const,
+                        declare: false,
+                        decls: vec![create_aleph_pack_var_decl_member(fixed_url.as_ref(), names)],
+                      }),
+                    }))
+                  } else {
+                    ModuleItem::Stmt(Stmt::Empty(EmptyStmt { span: DUMMY_SP }))
+                  }
+                } else {
+                  ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(NamedExport {
+                    span: DUMMY_SP,
+                    specifiers,
+                    src: Some(new_str(resolved_path)),
+                    type_only: false,
+                    asserts: None,
+                  }))
+                }
+              }
+            }
+            // match: export * from "https://esm.sh/react"
+            ModuleDecl::ExportAll(ExportAll { src, .. }) => {
+              let mut resolver = self.resolver.borrow_mut();
+              let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
+              if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
+                resolver.star_exports.push(fixed_url.clone());
+                ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                   span: DUMMY_SP,
-                  specifiers,
-                  src: Some(new_str(resolved_path)),
-                  type_only: false,
+                  decl: Decl::Var(VarDecl {
+                    span: DUMMY_SP,
+                    kind: VarDeclKind::Const,
+                    declare: false,
+                    decls: vec![create_aleph_pack_var_decl(
+                      fixed_url.as_ref(),
+                      quote_ident!(format!("$$star_{}", resolver.star_exports.len() - 1)),
+                    )],
+                  }),
+                }))
+              } else {
+                ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
+                  span: DUMMY_SP,
+                  src: new_str(resolved_path.into()),
                   asserts: None,
                 }))
               }
-            }
-            // export * from "https://esm.sh/react"
-            ModuleDecl::ExportAll(ExportAll { src, .. }) => {
-              let mut resolver = self.resolver.borrow_mut();
-              let (resolved_path, _) = resolver.resolve(src.value.as_ref(), false);
-              ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
-                span: DUMMY_SP,
-                src: new_str(resolved_path.into()),
-                asserts: None,
-              }))
             }
             _ => ModuleItem::ModuleDecl(decl),
           };
@@ -187,10 +253,10 @@ impl Fold for AlephResolveFold {
       }) => {
         let mut is_import_meta_url = false;
         if let Expr::Ident(id) = prop.as_ref() {
-          if id.sym.eq("url") {
+          if id.sym.as_ref().eq("url") {
             if let ExprOrSuper::Expr(ref expr) = obj {
               if let Expr::MetaProp(MetaPropExpr { meta, prop }) = expr.as_ref() {
-                if meta.sym.eq("import") && prop.sym.eq("meta") {
+                if meta.sym.as_ref().eq("import") && prop.sym.as_ref().eq("meta") {
                   is_import_meta_url = true
                 }
               }
@@ -313,8 +379,8 @@ pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
   }
 }
 
-pub fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -> VarDeclarator {
-  let m = Expr::Member(MemberExpr {
+fn create_aleph_pack_member_expr(url: &str) -> MemberExpr {
+  MemberExpr {
     span: DUMMY_SP,
     obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH")))),
     prop: Box::new(Expr::Member(MemberExpr {
@@ -329,26 +395,48 @@ pub fn create_aleph_pack_var_decl(ident: Ident, url: &str, prop: Option<&str>) -
       computed: true,
     })),
     computed: false,
-  });
+  }
+}
 
-  match prop {
-    Some(prop) => VarDeclarator {
+fn create_aleph_pack_var_decl(url: &str, name: Ident) -> VarDeclarator {
+  VarDeclarator {
+    span: DUMMY_SP,
+    name: Pat::Ident(name),
+    init: Some(Box::new(Expr::Member(create_aleph_pack_member_expr(url)))),
+    definite: false,
+  }
+}
+
+pub fn create_aleph_pack_var_decl_member(
+  url: &str,
+  names: Vec<(Ident, Option<String>)>,
+) -> VarDeclarator {
+  VarDeclarator {
+    span: DUMMY_SP,
+    name: Pat::Object(ObjectPat {
       span: DUMMY_SP,
-      name: Pat::Ident(ident),
-      init: Some(Box::new(Expr::Member(MemberExpr {
-        span: DUMMY_SP,
-        obj: ExprOrSuper::Expr(Box::new(m)),
-        prop: Box::new(Expr::Ident(quote_ident!(prop))),
-        computed: false,
-      }))),
-      definite: false,
-    },
-    None => VarDeclarator {
-      span: DUMMY_SP,
-      name: Pat::Ident(ident),
-      init: Some(Box::new(m)),
-      definite: false,
-    },
+      props: names
+        .into_iter()
+        .map(|(name, rename)| {
+          if let Some(rename) = rename {
+            ObjectPatProp::KeyValue(KeyValuePatProp {
+              key: PropName::Ident(quote_ident!(rename)),
+              value: Box::new(Pat::Ident(name)),
+            })
+          } else {
+            ObjectPatProp::Assign(AssignPatProp {
+              span: DUMMY_SP,
+              key: name,
+              value: None,
+            })
+          }
+        })
+        .collect(),
+      optional: false,
+      type_ann: None,
+    }),
+    init: Some(Box::new(Expr::Member(create_aleph_pack_member_expr(url)))),
+    definite: false,
   }
 }
 
@@ -358,5 +446,139 @@ fn new_str(str: String) -> Str {
     value: str.into(),
     has_escape: false,
     kind: Default::default(),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::import_map::ImportHashMap;
+  use crate::resolve::Resolver;
+  use crate::swc::{st, EmitOptions, ParsedModule};
+  use sha1::{Digest, Sha1};
+
+  #[test]
+  fn sign_use_deno_hook() {
+    let specifer = "/pages/index.tsx";
+    let source = r#"
+      export default function Index() {
+        const verison = useDeno(() => Deno.version)
+        const verison = useDeno(async function() {
+          return await readJson("./data.json")
+        }, 1000)
+        return (
+          <>
+            <p>Deno v{version.deno}</p>
+            <V8 />
+            <TS />
+          </>
+        )
+      }
+    "#;
+
+    let mut hasher = Sha1::new();
+    hasher.update(specifer.clone());
+    hasher.update("1");
+    hasher.update("() => Deno.version");
+    let id_1 = base64::encode(hasher.finalize())
+      .replace("/", "")
+      .replace("+", "");
+    let id_1 = id_1.trim_end_matches('=');
+
+    let mut hasher = Sha1::new();
+    hasher.update(specifer.clone());
+    hasher.update("2");
+    hasher.update(
+      r#"async function() {
+          return await readJson("./data.json")
+        }"#,
+    );
+    let id_2 = base64::encode(hasher.finalize())
+      .replace("/", "")
+      .replace("+", "");
+    let id_2 = id_2.trim_end_matches('=');
+
+    for _ in 0..3 {
+      let (code, _) = st(specifer, source, false);
+      assert!(code.contains(format!("0, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!("1000, \"useDeno-{}\"", id_2).as_str()));
+      let (code, _) = st(specifer, source, true);
+      assert!(code.contains(format!("null, 0, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_2).as_str()));
+    }
+  }
+
+  #[test]
+  fn resolve_import_meta_url() {
+    let source = r#"
+      console.log(import.meta.url)
+    "#;
+    let (code, _) = st("/pages/index.tsx", source, true);
+    assert!(code.contains("console.log(\"/pages/index.tsx\")"));
+  }
+
+  #[test]
+  fn bundle_mode() {
+    let source = r#"
+      import React, { useState, useEffect as useEffect_ } from 'https://esm.sh/react'
+      import * as React_ from 'https://esm.sh/react'
+      import Logo from '../components/logo.tsx'
+      import Nav from '../components/nav.tsx'
+      import '../shared/iife.ts'
+      import '../shared/iife2.ts'
+      export * from "https://esm.sh/react"
+      export { render } from "https://esm.sh/react-dom"
+      export * as ReactDom from "https://esm.sh/react-dom"
+
+      const AsyncLogo = React.lazy(() => import('../components/async-logo.tsx'))
+
+      export default function Index() {
+        return (
+          <>
+            <link rel="stylesheet" href="../style/index.css" />
+            <head></head>
+            <Logo />
+            <AsyncLogo />
+            <Nav />
+            <h1>Hello World</h1>
+          </>
+        )
+      }
+    "#;
+    let module =
+      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      "/pages/index.tsx",
+      ImportHashMap::default(),
+      None,
+      None,
+      true,
+      vec![
+        "https://esm.sh/react".into(),
+        "https://esm.sh/react-dom".into(),
+        "/components/logo.tsx".into(),
+        "/shared/iife.ts".into(),
+      ],
+    )));
+    let (code, _) = module
+      .transform(resolver.clone(), &EmitOptions::default())
+      .expect("could not transform module");
+    println!("{}", code);
+    assert!(code.contains("const { default: React , useState , useEffect: useEffect_  } = __ALEPH.pack[\"https://esm.sh/react\"]"));
+    assert!(code.contains("const React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));
+    assert!(code.contains("const { default: Logo  } = __ALEPH.pack[\"/components/logo.tsx\"]"));
+    assert!(
+      code.contains("import Nav from \"../components/nav.bundling.js#/components/nav.tsx@000000\"")
+    );
+    assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
+    assert!(code.contains("import   \"../shared/iife2.bundling.js#/shared/iife2.ts@000000\""));
+    assert!(code
+      .contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"../components/async-logo.bundle.js#/components/async-logo.tsx@000000\", \"/pages/index.tsx\""));
+    assert!(code.contains(
+      "const { default: __ALEPH_Head  } = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"]"
+    ));
+    assert!(code.contains("export const $$star_0 = __ALEPH.pack[\"https://esm.sh/react\"]"));
+    assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
+    assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
   }
 }

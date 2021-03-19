@@ -99,6 +99,7 @@ pub struct TransformOutput {
   pub map: Option<String>,
   pub deps: Vec<DependencyDescriptor>,
   pub inline_styles: HashMap<String, InlineStyle>,
+  pub star_exports: Vec<String>,
 }
 
 #[wasm_bindgen(js_name = "transformSync")]
@@ -151,6 +152,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
       map,
       deps: r.dep_graph.clone(),
       inline_styles: r.inline_styles.clone(),
+      star_exports: r.star_exports.clone(),
     })
     .unwrap(),
   )

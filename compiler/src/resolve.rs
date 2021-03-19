@@ -49,6 +49,8 @@ pub struct Resolver {
   pub used_builtin_jsx_tags: IndexSet<String>,
   /// dependency graph
   pub dep_graph: Vec<DependencyDescriptor>,
+  /// star exports
+  pub star_exports: Vec<String>,
   /// inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
   /// bundle mode
@@ -82,6 +84,7 @@ impl Resolver {
       specifier_is_remote: is_remote_url(specifier),
       used_builtin_jsx_tags: IndexSet::new(),
       dep_graph: Vec::new(),
+      star_exports: Vec::new(),
       inline_styles: HashMap::new(),
       import_map: ImportMap::from_hashmap(import_map),
       aleph_pkg_uri,
@@ -189,13 +192,11 @@ impl Resolver {
 
   /// resolve import/export url.
   // [/pages/index.tsx]
-  // - `https://esm.sh/swr` -> `/-/esm.sh/swr.js`
-  // - `https://esm.sh/react` -> `/-/esm.sh/react@${REACT_VERSION}.js`
-  // - `https://deno.land/x/aleph/mod.ts` -> `/-/deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
-  // - `../components/logo.tsx` -> `/components/logo.js#{HASH}`
-  // - `../styles/app.css` -> `/styles/app.css.js#{HASH}`
-  // - `@/components/logo.tsx` -> `/components/logo.js#{HASH}`
-  // - `~/components/logo.tsx` -> `/components/logo.js#{HASH}`
+  // - `https://esm.sh/swr` -> `../-/esm.sh/swr.js`
+  // - `https://esm.sh/react` -> `../-/esm.sh/react@${REACT_VERSION}.js`
+  // - `https://deno.land/x/aleph/mod.ts` -> `../-/deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
+  // - `../components/logo.tsx` -> `../components/logo.js#/styles/app.css@000000`
+  // - `../styles/app.css` -> `../styles/app.css.js#/styles/app.css@000000`
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> (String, String) {
     // apply import map
     let url = self.import_map.resolve(self.specifier.as_str(), url);

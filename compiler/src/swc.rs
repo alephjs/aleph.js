@@ -1,6 +1,7 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::fast_refresh::react_refresh_fold;
 use crate::fixer::compat_fixer_fold;
+use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve::Resolver;
 use crate::resolve_fold::aleph_resolve_fold;
@@ -285,29 +286,27 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
   }
 }
 
+#[allow(dead_code)]
+pub fn st(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
+  let module = ParsedModule::parse(specifer, source, None).expect("could not parse module");
+  let resolver = Rc::new(RefCell::new(Resolver::new(
+    specifer,
+    ImportHashMap::default(),
+    Some("https://deno.land/x/aleph@v0.3.0".into()),
+    None,
+    bundling,
+    vec![],
+  )));
+  let (code, _) = module
+    .transform(resolver.clone(), &EmitOptions::default())
+    .expect("could not transform module");
+  println!("{}", code);
+  (code, resolver)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::import_map::ImportHashMap;
-  use crate::resolve::{DependencyDescriptor, Resolver};
-  use sha1::{Digest, Sha1};
-
-  fn t(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
-    let module = ParsedModule::parse(specifer, source, None).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      specifer,
-      ImportHashMap::default(),
-      Some("https://deno.land/x/aleph@v0.3.0".into()),
-      None,
-      bundling,
-      vec![],
-    )));
-    let (code, _) = module
-      .transform(resolver.clone(), &EmitOptions::default())
-      .expect("could not transform module");
-    println!("{}", code);
-    (code, resolver)
-  }
 
   #[test]
   fn ts() {
@@ -340,7 +339,7 @@ mod tests {
         bar() {}
       }
     "#;
-    let (code, _) = t("https://deno.land/x/mod.ts", source, false);
+    let (code, _) = st("https://deno.land/x/mod.ts", source, false);
     assert!(code.contains("var D;\n(function(D) {\n"));
     assert!(code.contains("_applyDecoratedDescriptor("));
   }
@@ -357,247 +356,10 @@ mod tests {
         )
       }
     "#;
-    let (code, _) = t("/pages/index.tsx", source, false);
+    let (code, _) = st("/pages/index.tsx", source, false);
     assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("className: \"title\""));
     assert!(code.contains("import React from \"../-/esm.sh/react.js\""));
-  }
-
-  #[test]
-  fn sign_use_deno_hook() {
-    let specifer = "/pages/index.tsx";
-    let source = r#"
-      export default function Index() {
-        const verison = useDeno(() => Deno.version)
-        const verison = useDeno(async function() {
-          return await readJson("./data.json")
-        }, 1000)
-        return (
-          <>
-            <p>Deno v{version.deno}</p>
-            <V8 />
-            <TS />
-          </>
-        )
-      }
-    "#;
-
-    let mut hasher = Sha1::new();
-    hasher.update(specifer.clone());
-    hasher.update("1");
-    hasher.update("() => Deno.version");
-    let id_1 = base64::encode(hasher.finalize())
-      .replace("/", "")
-      .replace("+", "");
-    let id_1 = id_1.trim_end_matches('=');
-
-    let mut hasher = Sha1::new();
-    hasher.update(specifer.clone());
-    hasher.update("2");
-    hasher.update(
-      r#"async function() {
-          return await readJson("./data.json")
-        }"#,
-    );
-    let id_2 = base64::encode(hasher.finalize())
-      .replace("/", "")
-      .replace("+", "");
-    let id_2 = id_2.trim_end_matches('=');
-
-    for _ in 0..3 {
-      let (code, _) = t(specifer, source, false);
-      assert!(code.contains(format!("0, \"useDeno-{}\"", id_1).as_str()));
-      assert!(code.contains(format!("1000, \"useDeno-{}\"", id_2).as_str()));
-      let (code, _) = t(specifer, source, true);
-      assert!(code.contains(format!("null, 0, \"useDeno-{}\"", id_1).as_str()));
-      assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_2).as_str()));
-    }
-  }
-
-  #[test]
-  fn resolve_jsx_builtin_tags() {
-    let source = r#"
-      import React from "https://esm.sh/react"
-      export default function Index() {
-        return (
-          <>
-            <head>
-              <title>Hello World!</title>
-              <link rel="stylesheet" href="../style/index.css" />
-            </head>
-            <a href="/about">About</a>
-            <a href="https://github.com">About</a>
-            <a href="/about" target="_blank">About</a>
-            <script src="ga.js"></script>
-            <script>{`
-              function gtag() {
-                dataLayer.push(arguments)
-              }
-              window.dataLayer = window.dataLayer || [];
-              gtag("js", new Date());
-              gtag("config", "G-1234567890");
-            `}</script>
-          </>
-        )
-      }
-    "#;
-    let (code, resolver) = t("/pages/index.tsx", source, false);
-    assert!(code.contains(
-      "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/anchor.js\""
-    ));
-    assert!(code.contains(
-      "import __ALEPH_Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/head.js\""
-    ));
-    assert!(code.contains(
-      "import __ALEPH_Stylelink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/stylelink.js\""
-    ));
-    assert!(code.contains(
-      "import __ALEPH_Script from \"../-/deno.land/x/aleph@v0.3.0/framework/react/script.js\""
-    ));
-    assert!(code.contains("React.createElement(\"a\","));
-    assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
-    assert!(code.contains("React.createElement(__ALEPH_Head,"));
-    assert!(code.contains("React.createElement(__ALEPH_Stylelink,"));
-    assert!(code.contains("href: \"/style/index.css\""));
-    assert!(code.contains(
-      format!(
-        "import   \"../style/index.css.js#{}@000000\"",
-        "/style/index.css"
-      )
-      .as_str()
-    ));
-    assert!(code.contains("React.createElement(__ALEPH_Script,"));
-    let r = resolver.borrow_mut();
-    assert_eq!(
-      r.dep_graph,
-      vec![
-        DependencyDescriptor {
-          specifier: "https://esm.sh/react".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "/style/index.css".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/head.ts".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/stylelink.ts".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/anchor.ts".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/script.ts".into(),
-          is_dynamic: false,
-        }
-      ]
-    );
-  }
-
-  #[test]
-  fn resolve_inlie_style() {
-    let source = r#"
-      export default function Index() {
-        const [color, setColor] = useState('white');
-
-        return (
-          <>
-            <style>{`
-              :root {
-                --color: ${color};
-              }
-            `}</style>
-            <style>{`
-              h1 {
-                font-size: 12px;
-              }
-            `}</style>
-          </>
-        )
-      }
-    "#;
-    let (code, resolver) = t("/pages/index.tsx", source, false);
-    assert!(code.contains(
-      "import __ALEPH_Style from \"../-/deno.land/x/aleph@v0.3.0/framework/react/style.js\""
-    ));
-    assert!(code.contains("React.createElement(__ALEPH_Style,"));
-    assert!(code.contains("__styleId: \"inline-style-"));
-    let r = resolver.borrow_mut();
-    assert!(r.inline_styles.len() == 2);
-  }
-
-  #[test]
-  fn resolve_import_meta_url() {
-    let source = r#"
-      console.log(import.meta.url)
-    "#;
-    let (code, _) = t("/pages/index.tsx", source, true);
-    assert!(code.contains("console.log(\"/pages/index.tsx\")"));
-  }
-
-  #[test]
-  fn bundle_mode() {
-    let source = r#"
-      import React, { useState, useEffect as useEffect_ } from 'https://esm.sh/react'
-      import * as React_ from 'https://esm.sh/react'
-      import Logo from '../components/logo.tsx'
-      import Nav from '../components/nav.tsx'
-      import '../shared/iife.ts'
-      import '../shared/iife2.ts'
-
-      const AsyncLogo = React.lazy(() => import('../components/async-logo.tsx'))
-
-      export default function Index() {
-        return (
-          <>
-            <link rel="stylesheet" href="../style/index.css" />
-            <head></head>
-            <Logo />
-            <AsyncLogo />
-            <Nav />
-            <h1>Hello World</h1>
-          </>
-        )
-      }
-    "#;
-    let module =
-      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/index.tsx",
-      ImportHashMap::default(),
-      None,
-      None,
-      true,
-      vec![
-        "https://esm.sh/react".into(),
-        "/components/logo.tsx".into(),
-        "/shared/iife.ts".into(),
-      ],
-    )));
-    let (code, _) = module
-      .transform(resolver.clone(), &EmitOptions::default())
-      .expect("could not transform module");
-    println!("{}", code);
-    assert!(code.contains("React = __ALEPH.pack[\"https://esm.sh/react\"].default"));
-    assert!(code.contains("useState = __ALEPH.pack[\"https://esm.sh/react\"].useState"));
-    assert!(code.contains("useEffect_ = __ALEPH.pack[\"https://esm.sh/react\"].useEffect"));
-    assert!(code.contains("React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));
-    assert!(code.contains("Logo = __ALEPH.pack[\"/components/logo.tsx\"].default"));
-    assert!(
-      code.contains("import Nav from \"../components/nav.bundling.js#/components/nav.tsx@000000\"")
-    );
-    assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
-    assert!(code.contains("import   \"../shared/iife2.bundling.js#/shared/iife2.ts@000000\""));
-    assert!(code
-      .contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"../components/async-logo.bundle.js#/components/async-logo.tsx@000000\", \"/pages/index.tsx\""));
-    assert!(code.contains(
-      "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"].default"
-    ));
   }
 }
