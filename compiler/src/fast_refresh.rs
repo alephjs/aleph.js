@@ -1025,12 +1025,12 @@ fn get_call_callee(call: &CallExpr) -> Option<(Option<Ident>, Ident)> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::swc::ParsedModule;
+  use crate::swc::SWC;
   use std::cmp::min;
   use swc_common::Globals;
 
   fn t(specifier: &str, source: &str, expect: &str) -> bool {
-    let module = ParsedModule::parse(specifier, source, None).expect("could not parse module");
+    let module = SWC::parse(specifier, source, None).expect("could not parse module");
     let (code, _) = swc_common::GLOBALS.set(&Globals::new(), || {
       module
         .apply_transform(

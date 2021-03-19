@@ -4,7 +4,17 @@ import log from '../shared/log.ts'
 import type { LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
-import init, { transformSync } from './dist/wasm-pack.js'
+import init, { parseExportNamesSync, transformSync } from './dist/wasm-pack.js'
+
+export enum SourceType {
+  JS = 0,
+  JSX = 1,
+  TS = 2,
+  TSX = 3,
+  JSON = 4,
+  WASM = 5,
+  Unknown = 9,
+}
 
 export type ImportMap = {
   imports: Record<string, string>
@@ -12,7 +22,7 @@ export type ImportMap = {
 }
 
 export type SWCOptions = {
-  sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
+  sourceType?: SourceType
   target?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
   jsxFactory?: string
   jsxFragmentFactory?: string
@@ -58,7 +68,7 @@ async function getDenoDir() {
   return JSON.parse(output).denoDir
 }
 
-async function initWasm() {
+export async function initWasm() {
   const cacheDir = path.join(await getDenoDir(), `deps/https/deno.land/aleph@v${VERSION}`)
   const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
   if (existsFileSync(cachePath)) {
@@ -158,6 +168,24 @@ export async function transform(url: string, code: string, options: TransformOpt
   }))
 
   return { code: jsContent, deps, map }
+}
+
+/* parse export names of the module */
+export async function parseExportNames(url: string, code: string, options: SWCOptions = {}): Promise<string[]> {
+  let t: number | null = null
+  if (wasmReady === false) {
+    t = performance.now()
+    wasmReady = initWasm()
+  }
+  if (wasmReady instanceof Promise) {
+    await wasmReady
+    wasmReady = true
+  }
+  if (t !== null) {
+    log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
+  }
+
+  return parseExportNamesSync(url, code, options)
 }
 
 /**

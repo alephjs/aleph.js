@@ -4,7 +4,7 @@ use crate::fixer::compat_fixer_fold;
 use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve::Resolver;
-use crate::resolve_fold::aleph_resolve_fold;
+use crate::resolve_fold::{resolve_fold, ExportsParser};
 use crate::source_type::SourceType;
 
 use std::{cell::RefCell, path::Path, rc::Rc};
@@ -50,7 +50,7 @@ impl Default for EmitOptions {
 }
 
 #[derive(Clone)]
-pub struct ParsedModule {
+pub struct SWC {
   pub specifier: String,
   pub module: Module,
   pub source_type: SourceType,
@@ -58,7 +58,7 @@ pub struct ParsedModule {
   pub comments: SingleThreadedComments,
 }
 
-impl ParsedModule {
+impl SWC {
   /// parse the source of the module.
   ///
   /// ### Arguments
@@ -80,7 +80,10 @@ impl ParsedModule {
     let sm = &source_map;
     let error_buffer = ErrorBuffer::new();
     let source_type = match source_type {
-      Some(source_type) => source_type,
+      Some(source_type) => match source_type {
+        SourceType::Unknown => SourceType::from(Path::new(specifier)),
+        _ => source_type,
+      },
       None => SourceType::from(Path::new(specifier)),
     };
     let syntax = get_syntax(&source_type);
@@ -105,7 +108,7 @@ impl ParsedModule {
       })
       .unwrap();
 
-    Ok(ParsedModule {
+    Ok(SWC {
       specifier: specifier.into(),
       module,
       source_type,
@@ -130,7 +133,7 @@ impl ParsedModule {
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
       let transpile_only = options.transpile_only;
       let is_ts = match self.source_type {
-        SourceType::TypeScript => true,
+        SourceType::TS => true,
         SourceType::TSX => true,
         _ => false,
       };
@@ -144,7 +147,7 @@ impl ParsedModule {
       let root_mark = Mark::fresh(Mark::root());
       let mut passes = chain!(
         Optional::new(
-          aleph_resolve_fold(resolver.clone(), self.source_map.clone()),
+          resolve_fold(resolver.clone(), self.source_map.clone()),
           !transpile_only
         ),
         Optional::new(aleph_jsx_fold, is_jsx && !transpile_only),
@@ -201,6 +204,13 @@ impl ParsedModule {
     })
   }
 
+  pub fn parse_export_names(&self) -> Result<Vec<String>, anyhow::Error> {
+    let program = Program::Module(self.module.clone());
+    let mut parser = ExportsParser { names: vec![] };
+    program.fold_with(&mut parser);
+    Ok(parser.names)
+  }
+
   /// Apply transform with fold.
   pub fn apply_transform<T: Fold>(
     &self,
@@ -234,6 +244,8 @@ impl ParsedModule {
       };
       program.emit_with(&mut emitter).unwrap();
     }
+
+    // output
     let src = String::from_utf8(buf).unwrap();
     if source_map {
       let mut buf = Vec::new();
@@ -278,9 +290,9 @@ fn get_ts_config(tsx: bool) -> TsConfig {
 
 fn get_syntax(source_type: &SourceType) -> Syntax {
   match source_type {
-    SourceType::JavaScript => Syntax::Es(get_es_config(false)),
+    SourceType::JS => Syntax::Es(get_es_config(false)),
     SourceType::JSX => Syntax::Es(get_es_config(true)),
-    SourceType::TypeScript => Syntax::Typescript(get_ts_config(false)),
+    SourceType::TS => Syntax::Typescript(get_ts_config(false)),
     SourceType::TSX => Syntax::Typescript(get_ts_config(true)),
     _ => Syntax::Es(get_es_config(false)),
   }
@@ -288,7 +300,7 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
 
 #[allow(dead_code)]
 pub fn st(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
-  let module = ParsedModule::parse(specifer, source, None).expect("could not parse module");
+  let module = SWC::parse(specifer, source, None).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
     ImportHashMap::default(),

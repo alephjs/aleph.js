@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use source_type::SourceType;
 use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
-use swc::{EmitOptions, ParsedModule};
+use swc::{EmitOptions, SWC};
 use swc_ecmascript::parser::JscTarget;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
@@ -56,7 +56,7 @@ pub struct Options {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SWCOptions {
   #[serde(default)]
-  pub source_type: String,
+  pub source_type: SourceType,
 
   #[serde(default = "default_target")]
   pub target: JscTarget,
@@ -71,7 +71,7 @@ pub struct SWCOptions {
 impl Default for SWCOptions {
   fn default() -> Self {
     SWCOptions {
-      source_type: "tsx".into(),
+      source_type: SourceType::default(),
       target: default_target(),
       jsx_factory: default_pragma(),
       jsx_fragment_factory: default_pragma_frag(),
@@ -102,6 +102,23 @@ pub struct TransformOutput {
   pub star_exports: Vec<String>,
 }
 
+#[wasm_bindgen(js_name = "parseExportNamesSync")]
+pub fn parse_export_names_sync(
+  url: &str,
+  code: &str,
+  options: JsValue,
+) -> Result<JsValue, JsValue> {
+  console_error_panic_hook::set_once();
+
+  let options: SWCOptions = options
+    .into_serde()
+    .map_err(|err| format!("failed to parse options: {}", err))
+    .unwrap();
+  let module = SWC::parse(url, code, Some(options.source_type)).expect("could not parse module");
+  let export_names = module.parse_export_names().unwrap();
+  Ok(JsValue::from_serde(&export_names).unwrap())
+}
+
 #[wasm_bindgen(js_name = "transformSync")]
 pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
   console_error_panic_hook::set_once();
@@ -124,14 +141,8 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
     options.bundle_mode,
     options.bundle_external,
   )));
-  let specify_source_type = match options.swc_options.source_type.as_str() {
-    "js" => Some(SourceType::JavaScript),
-    "jsx" => Some(SourceType::JSX),
-    "ts" => Some(SourceType::TypeScript),
-    "tsx" => Some(SourceType::TSX),
-    _ => None,
-  };
-  let module = ParsedModule::parse(url, code, specify_source_type).expect("could not parse module");
+  let module =
+    SWC::parse(url, code, Some(options.swc_options.source_type)).expect("could not parse module");
   let (code, map) = module
     .transform(
       resolver.clone(),

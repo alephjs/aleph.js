@@ -7,21 +7,21 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 
-pub fn aleph_resolve_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
-  AlephResolveFold {
+pub fn resolve_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
+  ResolveFold {
     deno_hooks_idx: 0,
     resolver,
     source,
   }
 }
 
-pub struct AlephResolveFold {
+pub struct ResolveFold {
   deno_hooks_idx: i32,
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
 }
 
-impl AlephResolveFold {
+impl ResolveFold {
   fn new_use_deno_hook_ident(&mut self, callback_span: &Span) -> String {
     let resolver = self.resolver.borrow_mut();
     self.deno_hooks_idx = self.deno_hooks_idx + 1;
@@ -42,7 +42,7 @@ impl AlephResolveFold {
   }
 }
 
-impl Fold for AlephResolveFold {
+impl Fold for ResolveFold {
   noop_fold_type!();
 
   // resolve import/export url
@@ -367,6 +367,96 @@ impl Fold for AlephResolveFold {
   }
 }
 
+pub struct ExportsParser {
+  pub names: Vec<String>,
+}
+
+impl ExportsParser {
+  fn push_pat(&mut self, pat: &Pat) {
+    match pat {
+      Pat::Ident(id) => self.names.push(id.sym.as_ref().into()),
+      Pat::Array(ArrayPat { elems, .. }) => elems.into_iter().for_each(|e| {
+        if let Some(el) = e {
+          self.push_pat(el)
+        }
+      }),
+      Pat::Assign(AssignPat { left, .. }) => self.push_pat(left.as_ref()),
+      Pat::Object(ObjectPat { props, .. }) => props.into_iter().for_each(|prop| match prop {
+        ObjectPatProp::Assign(AssignPatProp { key, .. }) => {
+          self.names.push(key.sym.as_ref().into())
+        }
+        ObjectPatProp::KeyValue(KeyValuePatProp { value, .. }) => self.push_pat(value.as_ref()),
+        ObjectPatProp::Rest(RestPat { arg, .. }) => self.push_pat(arg.as_ref()),
+      }),
+      Pat::Rest(RestPat { arg, .. }) => self.push_pat(arg.as_ref()),
+      _ => {}
+    }
+  }
+}
+
+impl Fold for ExportsParser {
+  noop_fold_type!();
+
+  fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
+    for item in &module_items {
+      match item {
+        ModuleItem::ModuleDecl(decl) => match decl {
+          // match: export const foo = 'bar'
+          // match: export function foo() {}
+          // match: export class foo {}
+          ModuleDecl::ExportDecl(ExportDecl { decl, .. }) => match decl {
+            Decl::Class(ClassDecl { ident, .. }) => self.names.push(ident.sym.as_ref().into()),
+            Decl::Fn(FnDecl { ident, .. }) => self.names.push(ident.sym.as_ref().into()),
+            Decl::Var(VarDecl { decls, .. }) => decls.into_iter().for_each(|decl| {
+              self.push_pat(&decl.name);
+            }),
+            _ => {}
+          },
+          // match: export default function
+          // match: export default class
+          ModuleDecl::ExportDefaultDecl(_) => self.names.push("default".into()),
+          // match: export default foo
+          ModuleDecl::ExportDefaultExpr(_) => self.names.push("default".into()),
+          // match: export { default as React, useState } from "https://esm.sh/react"
+          // match: export * as React from "https://esm.sh/react"
+          ModuleDecl::ExportNamed(NamedExport {
+            type_only,
+            specifiers,
+            ..
+          }) => {
+            if !type_only {
+              specifiers
+                .into_iter()
+                .for_each(|specifier| match specifier {
+                  ExportSpecifier::Named(ExportNamedSpecifier { orig, exported, .. }) => {
+                    match exported {
+                      Some(name) => self.names.push(name.sym.as_ref().into()),
+                      None => self.names.push(orig.sym.as_ref().into()),
+                    }
+                  }
+                  ExportSpecifier::Default(ExportDefaultSpecifier { exported, .. }) => {
+                    self.names.push(exported.sym.as_ref().into());
+                  }
+                  ExportSpecifier::Namespace(ExportNamespaceSpecifier { name, .. }) => {
+                    self.names.push(name.sym.as_ref().into())
+                  }
+                });
+            }
+          }
+          // match: export * from "https://esm.sh/react"
+          ModuleDecl::ExportAll(ExportAll { src, .. }) => {
+            self.names.push(format!("{{{}}}", src.value))
+          }
+          _ => {}
+        },
+        _ => {}
+      };
+    }
+
+    module_items
+  }
+}
+
 pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
   let callee = match &call.callee {
     ExprOrSuper::Super(_) => return false,
@@ -454,7 +544,7 @@ mod tests {
   use super::*;
   use crate::import_map::ImportHashMap;
   use crate::resolve::Resolver;
-  use crate::swc::{st, EmitOptions, ParsedModule};
+  use crate::swc::{st, EmitOptions, SWC};
   use sha1::{Digest, Sha1};
 
   #[test]
@@ -545,8 +635,7 @@ mod tests {
         )
       }
     "#;
-    let module =
-      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
+    let module = SWC::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportHashMap::default(),
@@ -580,5 +669,56 @@ mod tests {
     assert!(code.contains("export const $$star_0 = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
     assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
+  }
+
+  #[test]
+  fn parse_export_names() {
+    let source = r#"
+      export const name = "alephjs"
+      export const version = "1.0.1"
+      const start = () => {}
+      export default start
+      export const { build } = { build: () => {} }
+      export function dev() {}
+      export class Server {}
+      export const { a: { a1, a2 }, 'b': [ b1, b2 ], c, ...rest } = { a: { a1: 0, a2: 0 }, b: [ 0, 0 ], c: 0, d: 0 }
+      export const [ d, e, ...{f, g, rest3} ] = [0, 0, {f:0,g:0,h:0}]
+      let i
+      export const j = i = [0, 0]
+      export { exists, existsSync } from "https://deno.land/std/fs/exists.ts"
+      export * as DenoStdServer from "https://deno.land/std/http/sever.ts"
+      export * from "https://deno.land/std/http/sever.ts"
+    "#;
+    let module = SWC::parse("/app.ts", source, None).expect("could not parse module");
+    assert_eq!(
+      module.parse_export_names().unwrap(),
+      vec![
+        "name",
+        "version",
+        "default",
+        "build",
+        "dev",
+        "Server",
+        "a1",
+        "a2",
+        "b1",
+        "b2",
+        "c",
+        "rest",
+        "d",
+        "e",
+        "f",
+        "g",
+        "rest3",
+        "j",
+        "exists",
+        "existsSync",
+        "DenoStdServer",
+        "{https://deno.land/std/http/sever.ts}",
+      ]
+      .into_iter()
+      .map(|s| s.to_owned())
+      .collect::<Vec<String>>()
+    )
   }
 }
