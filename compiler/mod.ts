@@ -7,13 +7,11 @@ import { checksum } from './dist/wasm-checksum.js'
 import init, { parseExportNamesSync, transformSync } from './dist/wasm-pack.js'
 
 export enum SourceType {
-  JS = 0,
-  JSX = 1,
-  TS = 2,
-  TSX = 3,
-  JSON = 4,
-  WASM = 5,
-  Unknown = 9,
+  JS = 'js',
+  JSX = 'jsx',
+  TS = 'ts',
+  TSX = 'tsx',
+  Unknown = '??',
 }
 
 export type ImportMap = {

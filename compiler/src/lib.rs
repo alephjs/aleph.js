@@ -21,7 +21,7 @@ use swc::{EmitOptions, SWC};
 use swc_ecmascript::parser::JscTarget;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Options {
   #[serde(default)]
@@ -52,7 +52,7 @@ pub struct Options {
   pub bundle_external: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SWCOptions {
   #[serde(default)]
@@ -91,7 +91,7 @@ fn default_pragma_frag() -> String {
   "React.Fragment".into()
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransformOutput {
   pub code: String,

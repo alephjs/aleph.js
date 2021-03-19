@@ -1,16 +1,18 @@
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-#[repr(i32)]
-#[derive(Clone, Copy, Eq, PartialEq, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub enum SourceType {
-  JS = 0,
-  JSX = 1,
-  TS = 2,
-  TSX = 3,
-  JSON = 4,
-  WASM = 5,
-  Unknown = 9,
+  #[serde(rename = "js")]
+  JS,
+  #[serde(rename = "jsx")]
+  JSX,
+  #[serde(rename = "ts")]
+  TS,
+  #[serde(rename = "tsx")]
+  TSX,
+  #[serde(rename = "??")]
+  Unknown,
 }
 
 impl<'a> From<&'a Path> for SourceType {
@@ -47,8 +49,6 @@ impl SourceType {
         Some("mjs") => SourceType::JS,
         Some("js") => SourceType::JS,
         Some("jsx") => SourceType::JSX,
-        Some("json") => SourceType::JSON,
-        Some("wasm") => SourceType::WASM,
         _ => SourceType::Unknown,
       },
     }
@@ -66,14 +66,6 @@ mod tests {
     assert_eq!(SourceType::from(Path::new("/foo/bar.js")), SourceType::JS);
     assert_eq!(SourceType::from(Path::new("/foo/bar.mjs")), SourceType::JS);
     assert_eq!(SourceType::from(Path::new("/foo/bar.jsx")), SourceType::JSX);
-    assert_eq!(
-      SourceType::from(Path::new("/foo/bar.json")),
-      SourceType::JSON
-    );
-    assert_eq!(
-      SourceType::from(Path::new("/foo/bar.wasm")),
-      SourceType::WASM
-    );
     assert_eq!(
       SourceType::from(Path::new("/foo/bar.txt")),
       SourceType::Unknown
