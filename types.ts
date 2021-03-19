@@ -96,7 +96,7 @@ export interface ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
-  addModule(url: string, options?: { code?: string, once?: boolean }): Promise<Module>
+  addModule(url: string, options?: { code?: string }): Promise<Module>
   injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: TransformFn): void
 }
 
