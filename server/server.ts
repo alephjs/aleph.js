@@ -6,7 +6,7 @@ import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
-import { createHtml, trimModuleExt } from './helper.ts'
+import { trimModuleExt } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */
@@ -171,11 +171,10 @@ export class Server {
       const [status, html] = await app.getPageHTML({ pathname, search: url.searchParams.toString() })
       req.status(status).send(html, 'text/html; charset=utf-8')
     } catch (err) {
-      req.status(500).send(createHtml({
-        lang: 'en',
-        head: ['<title>500 - internal server error</title>'],
-        body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`
-      }), 'text/html; charset=utf-8')
+      req.status(500).send(
+        `<!DOCTYPE html><title>500 - internal server error</title><p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`,
+        'text/html; charset=utf-8'
+      )
     }
   }
 }

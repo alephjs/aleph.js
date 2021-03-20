@@ -1,7 +1,6 @@
 import { path, serve } from '../deps.ts'
 import log from '../shared/log.ts'
 import { Request } from './api.ts'
-import { createHtml } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** proxy https://deno.land/x/aleph on localhost */
@@ -24,10 +23,10 @@ export async function localProxy(port: number) {
             items.push(`<li><a href='${path.join(url.pathname, encodeURI(item.name))}'>${item.name}${item.isDirectory ? '/' : ''}<a></li>`)
           }
         }
-        resp.send(createHtml({
-          head: [`<title>aleph.js/</title>`],
-          body: `<h1>&nbsp;aleph.js/</h1><ul>${Array.from(items).join('')}</ul>`
-        }), 'text/html')
+        resp.send(
+          `<!DOCTYPE html><title>aleph.js/</title><h1>&nbsp;aleph.js/</h1><ul>${Array.from(items).join('')}</ul>`,
+          'text/html; charset=utf-8'
+        )
         return
       }
       resp.send(await Deno.readFile(filepath), getContentType(filepath))

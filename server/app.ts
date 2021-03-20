@@ -27,7 +27,7 @@ import type {
   TransformFn
 } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { Bundler } from './bundler.ts'
+import { Bundler, bundlerRuntimeCode } from './bundler.ts'
 import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
 import {
   computeHash,
@@ -432,6 +432,26 @@ export class Application implements ServerApplication {
     return [status, html]
   }
 
+  getSSRHTMLScripts() {
+    const { baseUrl } = this.config
+
+    if (this.isDev) {
+      return [
+        { src: util.cleanPath(`${baseUrl}/_aleph/main.js`), type: 'module' },
+        { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true },
+      ]
+    }
+
+    return [
+      bundlerRuntimeCode,
+      ...['polyfill', 'deps', 'shared', 'main']
+        .filter(name => this.#bundler.getBundledFile(name) !== null)
+        .map(name => ({
+          src: util.cleanPath(`${baseUrl}/_aleph/${this.#bundler.getBundledFile(name)}`)
+        }))
+    ]
+  }
+
   createFSWatcher(): EventEmitter {
     const e = new EventEmitter()
     this.#fsWatchListeners.push(e)
@@ -517,7 +537,7 @@ export class Application implements ServerApplication {
       return [
         `__ALEPH.baseURL = ${JSON.stringify(baseURL)};`,
         `__ALEPH.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default(${JSON.stringify(config)});`
-      ].join('\n')
+      ].join('')
     }
 
     let code = [
@@ -632,14 +652,11 @@ export class Application implements ServerApplication {
     }
     await ensureDir(distDir)
 
-    //  optimizing
-    await this.optimize()
+    // copy bundle dist
+    await this.#bundler.copyDist()
 
     // ssg
     await this.ssg()
-
-    // copy bundle dist
-    await this.#bundler.copyDist()
 
     // copy public assets
     const publicDir = path.join(this.workingDir, 'public')
@@ -1064,11 +1081,6 @@ export class Application implements ServerApplication {
     await this.#bundler.bundle(concatAllEntries())
   }
 
-  /** optimize for production. */
-  private async optimize() {
-    // todo: optimize
-  }
-
   /** render all pages in routing. */
   private async ssg() {
     const { ssr } = this.config
@@ -1171,7 +1183,7 @@ export class Application implements ServerApplication {
   }
 
   /** lookup deps recurively. */
-  lookupDeps(
+  private lookupDeps(
     url: string,
     callback: (dep: DependencyDescriptor) => false | void,
     __tracing: Set<string> = new Set()

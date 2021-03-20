@@ -3,7 +3,6 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
 import type { Application } from './app.ts'
-import { createHtml } from './helper.ts'
 
 /** The framework render result of SSR. */
 export type FrameworkRenderResult = {
@@ -34,21 +33,6 @@ export class Renderer {
 
   setFrameworkRenderer(renderer: FrameworkRenderer) {
     this.#renderer = renderer
-  }
-
-  private getHTMLScripts() {
-    const { baseUrl } = this.#app.config
-
-    if (this.#app.isDev) {
-      return [
-        { src: util.cleanPath(`${baseUrl}/_aleph/main.js`), type: 'module' },
-        { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true },
-      ]
-    }
-
-    return [
-      { src: util.cleanPath(`${baseUrl}/_aleph/main.js`) },
-    ]
   }
 
   /** render page base the given location. */
@@ -87,7 +71,7 @@ export class Renderer {
             type: 'application/json',
             innerText: JSON.stringify(data, undefined, isDev ? 2 : 0),
           } : '',
-          ...this.getHTMLScripts(),
+          ...this.#app.getSSRHTMLScripts(),
           ...scripts.map((script: Record<string, any>) => {
             if (script.innerText && !this.#app.isDev) {
               return { ...script, innerText: script.innerText }
@@ -122,7 +106,7 @@ export class Renderer {
           type: 'application/json',
           innerText: JSON.stringify(data, undefined, this.#app.isDev ? 2 : 0),
         } : '',
-        ...this.getHTMLScripts(),
+        ...this.#app.getSSRHTMLScripts(),
         ...scripts.map((script: Record<string, any>) => {
           if (script.innerText && !this.#app.isDev) {
             return { ...script, innerText: script.innerText }
@@ -155,7 +139,7 @@ export class Renderer {
         lang: defaultLocale,
         head,
         scripts: [
-          ...this.getHTMLScripts(),
+          ...this.#app.getSSRHTMLScripts(),
           ...scripts.map((script: Record<string, any>) => {
             if (script.innerText && !this.#app.isDev) {
               return { ...script, innerText: script.innerText }
@@ -171,9 +155,79 @@ export class Renderer {
     return createHtml({
       lang: defaultLocale,
       head: [],
-      scripts: this.getHTMLScripts(),
+      scripts: this.#app.getSSRHTMLScripts(),
       body: '',
       minify: !this.#app.isDev
     })
   }
+}
+
+/** create html content by given arguments */
+function createHtml({
+  body,
+  lang = 'en',
+  head = [],
+  className,
+  scripts = [],
+  minify = false
+}: {
+  body: string,
+  lang?: string,
+  head?: string[],
+  className?: string,
+  scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean })[],
+  minify?: boolean
+}) {
+  const eol = minify ? '' : '\n'
+  const indent = minify ? '' : ' '.repeat(2)
+  const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
+    if (!util.isString(v) && util.isNEString(v.src)) {
+      if (v.type === 'module') {
+        return `<link rel="modulepreload" href=${JSON.stringify(util.cleanPath(v.src))} />`
+      } else if (!v.nomodule) {
+        return `<link rel="preload" href=${JSON.stringify(util.cleanPath(v.src))} as="script" />`
+      }
+    }
+    return ''
+  })).filter(Boolean)
+  const scriptTags = scripts.map(v => {
+    if (util.isString(v)) {
+      return `<script>${v}</script>`
+    } else if (util.isNEString(v.innerText)) {
+      const { innerText, ...rest } = v
+      return `<script${formatAttrs(rest)}>${eol}${innerText}${eol}${indent}</script>`
+    } else if (util.isNEString(v.src)) {
+      return `<script${formatAttrs({ ...v, src: util.cleanPath(v.src) })}></script>`
+    } else {
+      return ''
+    }
+  }).filter(Boolean)
+
+  if (!head.some(tag => tag.trimLeft().startsWith('<meta') && tag.includes('name="viewport"'))) {
+    headTags.unshift('<meta name="viewport" content="width=device-width" />')
+  }
+
+  return [
+    '<!DOCTYPE html>',
+    `<html lang="${lang}">`,
+    '<head>',
+    indent + '<meta charSet="utf-8" />',
+    ...headTags.map(tag => indent + tag),
+    '</head>',
+    className ? `<body class="${className}">` : '<body>',
+    indent + body,
+    ...scriptTags.map(tag => indent + tag),
+    '</body>',
+    '</html>'
+  ].join(eol)
+}
+
+function formatAttrs(v: any): string {
+  return Object.keys(v).filter(k => !!v[k]).map(k => {
+    if (v[k] === true) {
+      return ` ${k}`
+    } else {
+      return ` ${k}=${JSON.stringify(String(v[k]))}`
+    }
+  }).join('')
 }
