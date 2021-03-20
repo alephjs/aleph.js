@@ -374,7 +374,7 @@ pub struct ExportsParser {
 impl ExportsParser {
   fn push_pat(&mut self, pat: &Pat) {
     match pat {
-      Pat::Ident(id) => self.names.push(id.sym.as_ref().into()),
+      Pat::Ident(BindingIdent { id, .. }) => self.names.push(id.sym.as_ref().into()),
       Pat::Array(ArrayPat { elems, .. }) => elems.into_iter().for_each(|e| {
         if let Some(el) = e {
           self.push_pat(el)
@@ -491,7 +491,10 @@ fn create_aleph_pack_member_expr(url: &str) -> MemberExpr {
 fn create_aleph_pack_var_decl(url: &str, name: Ident) -> VarDeclarator {
   VarDeclarator {
     span: DUMMY_SP,
-    name: Pat::Ident(name),
+    name: Pat::Ident(BindingIdent {
+      id: name,
+      type_ann: None,
+    }),
     init: Some(Box::new(Expr::Member(create_aleph_pack_member_expr(url)))),
     definite: false,
   }
@@ -511,7 +514,10 @@ pub fn create_aleph_pack_var_decl_member(
           if let Some(rename) = rename {
             ObjectPatProp::KeyValue(KeyValuePatProp {
               key: PropName::Ident(quote_ident!(rename)),
-              value: Box::new(Pat::Ident(name)),
+              value: Box::new(Pat::Ident(BindingIdent {
+                id: name,
+                type_ann: None,
+              })),
             })
           } else {
             ObjectPatProp::Assign(AssignPatProp {

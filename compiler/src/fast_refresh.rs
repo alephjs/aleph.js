@@ -100,17 +100,17 @@ impl ReactRefreshFold {
         Stmt::Decl(Decl::Var(VarDecl { decls, .. })) => {
           decls.into_iter().for_each(|decl| match decl {
             VarDeclarator {
-              name: Pat::Ident(ident),
+              name: Pat::Ident(BindingIdent { id, .. }),
               init: Some(init_expr),
               ..
             } => match init_expr.as_ref() {
               // const useFancyState = function () {}
               Expr::Fn(_) => {
-                bindings_scope.insert(ident.sym.as_ref().into());
+                bindings_scope.insert(id.sym.as_ref().into());
               }
               // const useFancyState = () => {}
               Expr::Arrow(_) => {
-                bindings_scope.insert(ident.sym.as_ref().into());
+                bindings_scope.insert(id.sym.as_ref().into());
               }
               _ => {}
             },
@@ -150,9 +150,9 @@ impl ReactRefreshFold {
                 },
                 ..
               }) => match name {
-                Pat::Ident(ident) => {
+                Pat::Ident(BindingIdent { id, .. }) => {
                   if let (_, Some(signature)) =
-                    self.get_persistent_fn(&bindings_scope, Some(ident), body)
+                    self.get_persistent_fn(&bindings_scope, Some(id), body)
                   {
                     exotic_signatures.push((index, signature, None));
                   }
@@ -164,9 +164,9 @@ impl ReactRefreshFold {
                 body: BlockStmtOrExpr::BlockStmt(body),
                 ..
               }) => match name {
-                Pat::Ident(ident) => {
+                Pat::Ident(BindingIdent { id, .. }) => {
                   if let (_, Some(signature)) =
-                    self.get_persistent_fn(&bindings_scope, Some(ident), body)
+                    self.get_persistent_fn(&bindings_scope, Some(id), body)
                   {
                     exotic_signatures.push((index, signature, None));
                   }
@@ -269,7 +269,10 @@ impl ReactRefreshFold {
             .into_iter()
             .map(|signature| VarDeclarator {
               span: DUMMY_SP,
-              name: Pat::Ident(signature.1.handle_ident),
+              name: Pat::Ident(BindingIdent {
+                id: signature.1.handle_ident,
+                type_ann: None,
+              }),
               init: Some(Box::new(Expr::Call(CallExpr {
                 span: DUMMY_SP,
                 callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!(self
@@ -686,10 +689,10 @@ impl Fold for ReactRefreshFold {
         })) => {
           decls.into_iter().for_each(|decl| match decl {
             VarDeclarator {
-              name: Pat::Ident(ident),
+              name: Pat::Ident(BindingIdent { id, .. }),
               ..
             } => {
-              bindings.insert(ident.sym.as_ref().into());
+              bindings.insert(id.sym.as_ref().into());
             }
             _ => {}
           });
@@ -772,7 +775,7 @@ impl Fold for ReactRefreshFold {
         })) => {
           decls.into_iter().for_each(|decl| match decl {
             VarDeclarator {
-              name: Pat::Ident(ident),
+              name: Pat::Ident(BindingIdent { id, .. }),
               init: Some(init_expr),
               ..
             } => {
@@ -783,30 +786,30 @@ impl Fold for ReactRefreshFold {
                     body: Some(body), ..
                   },
                   ..
-                }) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(ident), body)),
+                }) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(id), body)),
                 // const Foo = () => {}
                 Expr::Arrow(ArrowExpr {
                   body: BlockStmtOrExpr::BlockStmt(body),
                   ..
-                }) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(ident), body)),
+                }) => persistent_fns.push(self.get_persistent_fn(&bindings, Some(id), body)),
                 // const Bar = () => <div />
                 Expr::Arrow(ArrowExpr {
                   body: BlockStmtOrExpr::Expr(expr),
                   ..
                 }) => match expr.as_ref() {
                   Expr::JSXElement(jsx) => match jsx.as_ref() {
-                    JSXElement { .. } => persistent_fns.push((Some(ident.clone()), None)),
+                    JSXElement { .. } => persistent_fns.push((Some(id.clone()), None)),
                   },
                   _ => {}
                 },
                 // const A = forwardRef(function() {});
                 Expr::Call(call) => {
-                  if self.find_inner_component(&bindings, ident.sym.as_ref(), call) {
+                  if self.find_inner_component(&bindings, id.sym.as_ref(), call) {
                     let handle_ident = self.create_registration_handle_ident();
                     self
                       .registrations
-                      .push((handle_ident.clone(), ident.sym.as_ref().into()));
-                    hocs.push((ident.clone(), handle_ident))
+                      .push((handle_ident.clone(), id.sym.as_ref().into()));
+                    hocs.push((id.clone(), handle_ident))
                   }
                 }
                 _ => {}
@@ -836,7 +839,10 @@ impl Fold for ReactRefreshFold {
             expr: Box::new(Expr::Assign(AssignExpr {
               span: DUMMY_SP,
               op: AssignOp::Assign,
-              left: PatOrExpr::Pat(Box::new(Pat::Ident(registration_handle_id))),
+              left: PatOrExpr::Pat(Box::new(Pat::Ident(BindingIdent {
+                id: registration_handle_id,
+                type_ann: None,
+              }))),
               right: Box::new(Expr::Ident(fc_id)),
             })),
           })));
@@ -856,7 +862,10 @@ impl Fold for ReactRefreshFold {
           expr: Box::new(Expr::Assign(AssignExpr {
             span: DUMMY_SP,
             op: AssignOp::Assign,
-            left: PatOrExpr::Pat(Box::new(Pat::Ident(hoc_handle_id))),
+            left: PatOrExpr::Pat(Box::new(Pat::Ident(BindingIdent {
+              id: hoc_handle_id,
+              type_ann: None,
+            }))),
             right: Box::new(Expr::Ident(hoc_id)),
           })),
         })));
@@ -876,7 +885,10 @@ impl Fold for ReactRefreshFold {
           .into_iter()
           .map(|registration| VarDeclarator {
             span: DUMMY_SP,
-            name: Pat::Ident(registration.0),
+            name: Pat::Ident(BindingIdent {
+              id: registration.0,
+              type_ann: None,
+            }),
             init: None,
             definite: false,
           })
@@ -897,7 +909,10 @@ impl Fold for ReactRefreshFold {
           .into_iter()
           .map(|signature| VarDeclarator {
             span: DUMMY_SP,
-            name: Pat::Ident(signature.handle_ident),
+            name: Pat::Ident(BindingIdent {
+              id: signature.handle_ident,
+              type_ann: None,
+            }),
             init: Some(Box::new(Expr::Call(CallExpr {
               span: DUMMY_SP,
               callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!(self
