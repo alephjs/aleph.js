@@ -3,7 +3,7 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
 import type { Application } from './app.ts'
-import { createHtml, getAlephPkgUri } from './helper.ts'
+import { createHtml } from './helper.ts'
 
 /** The framework render result of SSR. */
 export type FrameworkRenderResult = {
@@ -29,13 +29,11 @@ export class Renderer {
 
   constructor(app: Application) {
     this.#app = app
-    this.#renderer = { render: async () => ({ head: [], body: '', scripts: [], data: null }) }
+    this.#renderer = { render: async () => { throw new Error("framework renderer is undefined") } }
   }
 
-  async load() {
-    const rendererModuleUrl = `${getAlephPkgUri()}/framework/${this.#app.config.framework}/renderer.ts`
-    const { jsFile } = await this.#app.addModule(rendererModuleUrl, { once: true })
-    this.#renderer = await import('file://' + jsFile)
+  setFrameworkRenderer(renderer: FrameworkRenderer) {
+    this.#renderer = renderer
   }
 
   private getHTMLScripts() {

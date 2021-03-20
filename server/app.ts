@@ -92,6 +92,7 @@ export class Application implements ServerApplication {
     Deno.env.set('ALEPH_VERSION', VERSION)
     Deno.env.set('BUILD_MODE', this.mode)
 
+    const alephPkgUri = getAlephPkgUri()
     const buildManifestFile = path.join(this.buildDir, 'build.manifest.json')
     const configHash = computeHash(JSON.stringify({
       ...this.defaultCompileOptions,
@@ -139,16 +140,23 @@ export class Application implements ServerApplication {
     const { init } = await import(`../framework/${this.config.framework}/init.ts`)
     await init(this)
 
+    // import framework renderer
+    if (this.config.ssr) {
+      const { jsFile } = await this.compile(`${alephPkgUri}/framework/${this.config.framework}/renderer.ts`)
+      const { render } = await import(`file://${jsFile}`)
+      if (util.isFunction(render)) {
+        this.#renderer.setFrameworkRenderer({ render })
+      }
+    }
+
     log.info('Compiling...')
 
     // pre-compile framework modules
-    const alephPkgUri = getAlephPkgUri()
-    await Promise.all<any>([
-      this.compile(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`),
-      this.isDev ? this.compile(`${alephPkgUri}/framework/core/hmr.ts`) : Promise.resolve(),
-      this.isDev ? this.compile(`${alephPkgUri}/framework/core/nomodule.ts`) : Promise.resolve(),
-      this.config.ssr ? this.#renderer.load() : Promise.resolve()
-    ])
+    await this.compile(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`)
+    if (this.isDev) {
+      await this.compile(`${alephPkgUri}/framework/core/hmr.ts`)
+      await this.compile(`${alephPkgUri}/framework/core/nomodule.ts`)
+    }
 
     // compile custom components
     for (const name of ['app', '404', 'loading']) {

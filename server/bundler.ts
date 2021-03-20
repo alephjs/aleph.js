@@ -67,11 +67,6 @@ export class Bundler {
       }
     })
 
-    console.log(remoteEntries)
-    console.log(sharedEntries)
-    console.log(entries)
-
-
     await Promise.all([
       // this.createPolyfillBundle(),
       this.createBundleChunk(
