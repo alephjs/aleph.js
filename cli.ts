@@ -85,6 +85,18 @@ async function main() {
     return
   }
 
+  // proxy https://deno.land/x/aleph on localhost
+  const v = Deno.env.get('ALEPH_DEV_PORT')
+  if (v !== undefined && /^\d+$/.test(v)) {
+    localProxy(parseInt(v))
+  }
+
+  // sets log level
+  const l = options.L || options['log-level']
+  if (util.isNEString(l)) {
+    log.setLevel(l.toLowerCase() as LevelNames)
+  }
+
   // check working Dir
   const workingDir = path.resolve(String(args[0] || '.'))
   if (!existsDirSync(workingDir)) {
@@ -103,18 +115,6 @@ async function main() {
       }
     })
     log.info('load env from', path.basename(p))
-  }
-
-  // proxy https://deno.land/x/aleph on localhost
-  const v = Deno.env.get('ALEPH_DEV_PORT')
-  if (v !== undefined && /^\d+$/.test(v)) {
-    localProxy(parseInt(v))
-  }
-
-  // sets log level
-  const l = options.L || options['log-level']
-  if (util.isNEString(l)) {
-    log.setLevel(l.toLowerCase() as LevelNames)
   }
 
   await cmd(workingDir, options)

@@ -1,6 +1,7 @@
 import { ECMA, minify as terser } from 'https://esm.sh/terser@5.5.1'
 import { transform } from '../compiler/mod.ts'
 import { colors, ensureDir, path } from '../deps.ts'
+import { trimModuleExt } from '../framework/core/module.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -12,8 +13,7 @@ import {
   clearCompilation,
   computeHash,
   getAlephPkgUri,
-  isLoaderPlugin,
-  trimModuleExt
+  isLoaderPlugin
 } from './helper.ts'
 
 export const bundlerRuntimeCode = `

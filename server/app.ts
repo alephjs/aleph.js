@@ -1,12 +1,12 @@
 import { buildChecksum, ImportMap, SourceType, transform, TransformOptions } from '../compiler/mod.ts'
 import { colors, createHash, ensureDir, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
-import type { RouteModule } from '../framework/core/routing.ts'
-import { Routing, toPagePath } from '../framework/core/routing.ts'
+import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
+import { Routing, RouteModule } from '../framework/core/routing.ts'
 import {
   defaultReactVersion,
   minDenoVersion,
-  moduleExts
+
 } from '../shared/constants.ts'
 import {
   ensureTextFile,
@@ -17,13 +17,10 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type {
   Config,
-
-
-
-  DependencyDescriptor, LoaderPlugin,
+  DependencyDescriptor,
+  LoaderPlugin,
   LoaderTransformResult,
   Module,
-
   RouterURL,
   ServerApplication,
   TransformFn
@@ -35,13 +32,11 @@ import {
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
-
-  getDenoDir, getRelativePath,
-
+  getDenoDir,
+  getRelativePath,
   isLoaderPlugin,
   reFullVersion,
-  toLocalUrl,
-  trimModuleExt
+  toLocalUrl
 } from './helper.ts'
 import { Renderer } from './ssr.ts'
 

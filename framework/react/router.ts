@@ -1,6 +1,7 @@
 import { ComponentType, createElement, useCallback, useEffect, useState } from 'https://esm.sh/react'
 import events from '../core/events.ts'
-import { importModule, RouteModule, Routing } from '../core/routing.ts'
+import { importModule } from '../core/module.ts'
+import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './error.ts'
 import { isLikelyReactComponent, loadPageData } from './helper.ts'

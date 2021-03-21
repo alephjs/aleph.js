@@ -1,4 +1,5 @@
 import { path, serve as stdServe, serveTLS, ws } from '../deps.ts'
+import { trimModuleExt } from '../framework/core/module.ts'
 import { rewriteURL, RouteModule } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -6,7 +7,6 @@ import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
-import { trimModuleExt } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */

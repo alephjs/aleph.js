@@ -1,6 +1,5 @@
 import { colors, createHash, path } from '../deps.ts'
 import { existsDirSync } from '../shared/fs.ts'
-import { moduleExts } from '../shared/constants.ts'
 import util from '../shared/util.ts'
 import type { Plugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
@@ -69,15 +68,6 @@ export function getRelativePath(from: string, to: string): string {
     return './' + r
   }
   return r
-}
-
-export function trimModuleExt(url: string) {
-  for (const ext of moduleExts) {
-    if (url.endsWith('.' + ext)) {
-      return url.slice(0, -(ext.length + 1))
-    }
-  }
-  return url
 }
 
 /** fix remote import url to local */
