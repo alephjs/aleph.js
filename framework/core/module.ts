@@ -26,27 +26,15 @@ export function trimModuleExt(url: string) {
 }
 
 export function importModule(baseUrl: string, url: string, forceRefetch = false): Promise<any> {
-  const { __ALEPH: ALEPH, document } = window as any
+  const { __ALEPH: ALEPH } = window as any
 
-  if (ALEPH && url in ALEPH.pack) {
-    return Promise.resolve(ALEPH.pack[url])
+  if (ALEPH) {
+    return ALEPH.import(url, forceRefetch)
   }
 
-  if (ALEPH && url.startsWith('/pages/')) {
-    const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(url) + '.js')
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script')
-      script.onload = () => {
-        resolve(ALEPH.pack[url])
-      }
-      script.onerror = (err: Error) => {
-        reject(err)
-      }
-      script.src = src
-      document.body.appendChild(script)
-    })
+  let src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(url) + '.js')
+  if (forceRefetch) {
+    src += '?t=' + Date.now()
   }
-
-  const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(url) + `.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
   return import(src)
 }

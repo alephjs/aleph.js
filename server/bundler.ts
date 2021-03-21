@@ -17,26 +17,36 @@ import {
 } from './helper.ts'
 
 export const bundlerRuntimeCode = `
-  window.__ALEPH = {
+  window.__ALEPH = window.__ALEPH || {
     baseURL: '/',
     pack: {},
     bundledFiles: {},
-    import: function(src, specifier) {
-      var pack = this.pack
+    import: function(url, forceRefetch) {
+      var baseURL = this.baseURL,
+          pack = this.pack,
+          bundledFiles = this.bundledFiles;
+      if (url in pack) {
+        return Promise.resolve(pack[url])
+      }
       return new Promise(function(resolve, reject) {
         var script = document.createElement('script'),
-            a = src.split('#'),
-            src = a[0],
-            b = a[1].split('@'),
-            url = b[0],
-            hash = b[1];
+            jsFilename = bundledFiles[url] || bundledFiles[url.replace(/\\.[a-zA-Z0-9]+$/, '')],
+            src = (baseURL + '/_aleph').replace('//', '/');
+        if (!jsFilename) {
+          reject(err)
+          return
+        }
         script.onload = function () {
           resolve(pack[url])
         }
         script.onerror = function(err) {
           reject(err)
         }
-        script.src = src + '?v=' + hash
+        src += jsFilename
+        if (forceRefetch) {
+          src += '?t=' + (new Date).getTime()
+        }
+        script.src = src
         document.body.appendChild(script)
       })
     }
@@ -87,7 +97,7 @@ export class Bundler {
     }
     for (const url of entries) {
       await this.createBundleChunk(
-        util.trimPrefix(trimModuleExt(url), '/'),
+        trimModuleExt(url),
         [url],
         [remoteEntries, sharedEntries].flat()
       )
@@ -266,10 +276,10 @@ export class Bundler {
 
     // minify code
     // todo: use swc minify instead(https://github.com/swc-project/swc/pull/1302)
-    const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')) as ECMA)
-    if (mini !== undefined) {
-      code = mini
-    }
+    // const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')) as ECMA)
+    // if (mini !== undefined) {
+    //   code = mini
+    // }
 
     await clearCompilation(bundleFile)
     await Deno.writeTextFile(bundleFile, code)

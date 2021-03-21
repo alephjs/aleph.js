@@ -93,7 +93,7 @@ export class Server {
         }
 
         if (pathname == '/_aleph/main.js') {
-          req.send(app.getMainJS(pathname.includes('.bundle.')), 'application/javascript; charset=utf-8')
+          req.send(app.getMainJS(false), 'application/javascript; charset=utf-8')
           return
         }
 
@@ -107,7 +107,7 @@ export class Server {
           }
 
           let content = await Deno.readTextFile(filePath)
-          if (filePath.endsWith('.js')) {
+          if (app.isDev && filePath.endsWith('.js')) {
             const metaFile = util.trimSuffix(filePath, '.js') + '.meta.json'
             if (existsFileSync(metaFile)) {
               try {
@@ -125,7 +125,7 @@ export class Server {
           return
         }
 
-        req.status(404).send('file not found')
+        req.status(404).send('not found')
         return
       }
 
