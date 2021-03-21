@@ -7,24 +7,6 @@ import { VERSION } from '../version.ts'
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
 
-// inject browser navigator polyfill
-Object.assign(globalThis.navigator, {
-  connection: {
-    downlink: 10,
-    effectiveType: "4g",
-    onchange: null,
-    rtt: 50,
-    saveData: false,
-  },
-  cookieEnabled: false,
-  language: 'en',
-  languages: ['en'],
-  onLine: true,
-  platform: Deno.build.os,
-  userAgent: `Deno/${Deno.version.deno}`,
-  vendor: 'Deno Land'
-})
-
 /** check the plugin whether is a loader plugin. */
 export function isLoaderPlugin(plugin: Plugin): plugin is LoaderPlugin {
   return plugin.type === 'loader'

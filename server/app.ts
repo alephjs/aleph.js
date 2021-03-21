@@ -3,11 +3,7 @@ import { colors, createHash, ensureDir, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
 import { Routing, RouteModule } from '../framework/core/routing.ts'
-import {
-  defaultReactVersion,
-  minDenoVersion,
-
-} from '../shared/constants.ts'
+import { defaultReactVersion, minDenoVersion } from '../shared/constants.ts'
 import {
   ensureTextFile,
   existsDirSync,
@@ -65,7 +61,8 @@ export class Application implements ServerApplication {
     reload = false
   ) {
     if (Deno.version.deno < minDenoVersion) {
-      log.fatal(`need Deno ${minDenoVersion}+, but got ${Deno.version.deno}`)
+      log.error(`Aleph.js needs Deno ${minDenoVersion}+, please upgrade Deno.`)
+      Deno.exit(1)
     }
     this.workingDir = path.resolve(workingDir)
     this.mode = mode
@@ -89,6 +86,24 @@ export class Application implements ServerApplication {
     // inject env variables
     Deno.env.set('ALEPH_VERSION', VERSION)
     Deno.env.set('BUILD_MODE', this.mode)
+
+    // inject browser navigator polyfill
+    Object.assign((globalThis as any).navigator, {
+      connection: {
+        downlink: 10,
+        effectiveType: "4g",
+        onchange: null,
+        rtt: 50,
+        saveData: false,
+      },
+      cookieEnabled: false,
+      language: 'en',
+      languages: ['en'],
+      onLine: true,
+      platform: Deno.build.os,
+      userAgent: `Deno/${Deno.version.deno}`,
+      vendor: 'Deno Land'
+    })
 
     const alephPkgUri = getAlephPkgUri()
     const buildManifestFile = path.join(this.buildDir, 'build.manifest.json')
