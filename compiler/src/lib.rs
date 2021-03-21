@@ -99,7 +99,7 @@ pub struct TransformOutput {
   pub map: Option<String>,
   pub deps: Vec<DependencyDescriptor>,
   pub inline_styles: HashMap<String, InlineStyle>,
-  pub star_exports: Vec<String>,
+  pub bundle_star_exports: Option<Vec<String>>,
 }
 
 #[wasm_bindgen(js_name = "parseExportNamesSync")]
@@ -163,7 +163,11 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
       map,
       deps: r.dep_graph.clone(),
       inline_styles: r.inline_styles.clone(),
-      star_exports: r.star_exports.clone(),
+      bundle_star_exports: if r.bundle_star_exports.len() > 0 {
+        Some(r.bundle_star_exports.clone())
+      } else {
+        None
+      },
     })
     .unwrap(),
   )
