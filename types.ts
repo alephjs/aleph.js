@@ -12,8 +12,8 @@ export type LoaderPlugin = {
   test: RegExp
   /** `acceptHMR` enables the HMR. */
   acceptHMR?: boolean
-  /** `allowPage` allows the loaded module as a page. */
-  allowPage?: boolean
+  /** `asPage` allows the loaded module as a page. */
+  asPage?: boolean
   /** `transform` transforms the source content. */
   transform(source: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformResult | Promise<LoaderTransformResult>
 }
