@@ -208,13 +208,7 @@ export class Application implements ServerApplication {
     if (existsDirSync(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...walkOptions, exts: moduleExts })) {
         const url = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
-        if (this.isDev) {
-          // in dev mode, we pre-compile the api code to support re-import the api module
-          // when it is changed.
-          await this.compile(url)
-        } else {
-          this.#modules.set(url, { url, deps: [], sourceHash: '', hash: '', jsFile: p })
-        }
+        await this.compile(url)
         this.#apiRouting.update(this.createRouteModule(url))
       }
     }
