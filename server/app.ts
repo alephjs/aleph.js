@@ -1,5 +1,4 @@
-import { ImportMap, SourceType, TransformOptions } from '../compiler/mod.ts'
-import { buildChecksum, transform } from '../compiler/mod.ts'
+import { buildChecksum, ImportMap, SourceType, transform, TransformOptions } from '../compiler/mod.ts'
 import { colors, createHash, ensureDir, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import type { RouteModule } from '../framework/core/routing.ts'
@@ -18,10 +17,13 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type {
   Config,
-  LoaderPlugin,
+
+
+
+  DependencyDescriptor, LoaderPlugin,
   LoaderTransformResult,
   Module,
-  DependencyDescriptor,
+
   RouterURL,
   ServerApplication,
   TransformFn
@@ -33,8 +35,9 @@ import {
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
-  getRelativePath,
-  getDenoDir,
+
+  getDenoDir, getRelativePath,
+
   isLoaderPlugin,
   reFullVersion,
   toLocalUrl,
@@ -432,26 +435,6 @@ export class Application implements ServerApplication {
     return [status, html]
   }
 
-  getSSRHTMLScripts() {
-    const { baseUrl } = this.config
-
-    if (this.isDev) {
-      return [
-        { src: util.cleanPath(`${baseUrl}/_aleph/main.js`), type: 'module' },
-        { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true },
-      ]
-    }
-
-    return [
-      bundlerRuntimeCode,
-      ...['polyfill', 'deps', 'shared', 'main']
-        .filter(name => this.#bundler.getBundledFile(name) !== null)
-        .map(name => ({
-          src: util.cleanPath(`${baseUrl}/_aleph/${this.#bundler.getBundledFile(name)}`)
-        }))
-    ]
-  }
-
   createFSWatcher(): EventEmitter {
     const e = new EventEmitter()
     this.#fsWatchListeners.push(e)
@@ -548,6 +531,27 @@ export class Application implements ServerApplication {
       code = transform('/main.js', code)
     })
     return code
+  }
+
+  /** get ssr html scripts */
+  getSSRHTMLScripts() {
+    const { baseUrl } = this.config
+
+    if (this.isDev) {
+      return [
+        { src: util.cleanPath(`${baseUrl}/_aleph/main.js`), type: 'module' },
+        { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true },
+      ]
+    }
+
+    return [
+      bundlerRuntimeCode,
+      ...['polyfill', 'deps', 'shared', 'main']
+        .filter(name => this.#bundler.getBundledFile(name) !== null)
+        .map(name => ({
+          src: util.cleanPath(`${baseUrl}/_aleph/${this.#bundler.getBundledFile(name)}`)
+        }))
+    ]
   }
 
   /** fetch module content */
@@ -1015,7 +1019,7 @@ export class Application implements ServerApplication {
   private async bundle() {
     const sharedEntryMods = new Set<string>()
     const entryMods = new Map<string[], boolean>()
-    const refCounter = new Map<string, Set<string>>()
+    const refCounter = new Set<string>()
     const concatAllEntries = () => [
       Array.from(entryMods.entries()).map(([urls, shared]) => urls.map(url => ({ url, shared }))),
       Array.from(sharedEntryMods).map(url => ({ url, shared: true })),
@@ -1027,55 +1031,41 @@ export class Application implements ServerApplication {
       true
     )
 
+    // add app/404 modules as shared entry
     entryMods.set(Array.from(this.#modules.keys()).filter(url => ['/app', '/404'].includes(trimModuleExt(url))), true)
-
-    this.#modules.forEach(mod => {
-      mod.deps.forEach(({ url, isDynamic }) => {
-        if (isDynamic) {
-          // add dynamic imported module as entry
-          entryMods.set([url], false)
-        }
-        return url
-      })
-      mod.deps.forEach(({ url }) => {
-        if (!url.startsWith('#')) {
-          if (refCounter.has(url)) {
-            refCounter.get(url)!.add(mod.url)
-          } else {
-            refCounter.set(url, new Set([mod.url]))
-          }
-        }
-      })
-    })
 
     // add page module entries
     this.#pageRouting.lookup(routes => {
       routes.forEach(({ module: { url } }) => entryMods.set([url], false))
     })
 
-    refCounter.forEach((refers, url) => {
-      if (refers.size > 1) {
-        let shared = 0
-        for (const mods of entryMods.keys()) {
-          const some = mods.some(u => {
-            let scoped = false
-            this.lookupDeps(u, dep => {
-              if (!dep.isDynamic && refers.has(dep.url)) {
-                scoped = true
-                return false
-              }
-            })
-            return scoped
-          })
-          if (some) {
-            shared++
-          }
+    // add dynamic imported module as entry
+    this.#modules.forEach(mod => {
+      mod.deps.forEach(({ url, isDynamic }) => {
+        if (isDynamic) {
+          entryMods.set([url], false)
         }
-        if (shared > 1) {
-          sharedEntryMods.add(url)
-        }
-      }
+        return url
+      })
     })
+
+    for (const mods of entryMods.keys()) {
+      const deps = new Set<string>()
+      mods.forEach(url => {
+        this.lookupDeps(url, dep => {
+          if (!dep.isDynamic) {
+            deps.add(dep.url)
+          }
+        })
+      })
+      deps.forEach(url => {
+        if (refCounter.has(url)) {
+          sharedEntryMods.add(url)
+        } else {
+          refCounter.add(url)
+        }
+      })
+    }
 
     log.info('- bundle')
     await this.#bundler.bundle(concatAllEntries())
