@@ -19,7 +19,7 @@ lazy_static! {
   )
   .unwrap();
   pub static ref RE_REACT_URL: Regex = Regex::new(
-    r"^https?://(esm.sh/|cdn.esm.sh/v\d+/|esm.x-static.io/v\d+/|jspm.dev/|cdn.skypack.dev/|jspm.dev/npm:|esm.run/)react(\-dom)?(@[\^|~]{0,1}[0-9a-z\.\-]+)?([/|\?].*)?$"
+    r"^https?://(esm.sh/|cdn.esm.sh/v\d+/|cdn.esm.sh.cn/v\d+/|esm.x-static.io/v\d+/)react(\-dom)?(@[\^|~]{0,1}[0-9a-z\.\-]+)?([/|\?].*)?$"
   )
   .unwrap();
 }
@@ -45,20 +45,20 @@ pub struct Resolver {
   pub specifier: String,
   /// a flag indicating if the specifier is remote url or not.
   pub specifier_is_remote: bool,
-  /// builtin jsx tags like `a`, `link`, `head`, etc
-  pub used_builtin_jsx_tags: IndexSet<String>,
   /// dependency graph
   pub dep_graph: Vec<DependencyDescriptor>,
-  /// star exports
-  pub star_exports: Vec<String>,
   /// inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
   /// bundle mode
   pub bundle_mode: bool,
   /// bundled modules
   pub bundle_external: IndexSet<String>,
+  /// bundle star exports
+  pub bundle_star_exports: Vec<String>,
   /// extra imports
   pub extra_imports: IndexSet<String>,
+  /// builtin jsx tags like `a`, `link`, `head`, etc
+  pub used_builtin_jsx_tags: IndexSet<String>,
 
   // private
   import_map: ImportMap,
@@ -84,7 +84,7 @@ impl Resolver {
       specifier_is_remote: is_remote_url(specifier),
       used_builtin_jsx_tags: IndexSet::new(),
       dep_graph: Vec::new(),
-      star_exports: Vec::new(),
+      bundle_star_exports: Vec::new(),
       inline_styles: HashMap::new(),
       import_map: ImportMap::from_hashmap(import_map),
       aleph_pkg_uri,
@@ -108,13 +108,10 @@ impl Resolver {
 
   /// fix import/export url.
   //  - `https://esm.sh/react` -> `/-/esm.sh/react.js`
-  //  - `https://esm.sh/react@17.0.1?target=es2015&dev` -> `/-/esm.sh/react@17.0.1_target=es2015&dev.js`
+  //  - `https://esm.sh/react@17.0.1?target=es2015&dev` -> `/-/esm.sh/[base64('target=es2015&dev')]react@17.0.1.js`
   //  - `http://localhost:8080/mod` -> `/-/http_localhost_8080/mod.js`
-  //  - `/components/logo.tsx` -> `/components/logo.tsx`
-  //  - `../components/logo.tsx` -> `../components/logo.tsx`
-  //  - `./button.tsx` -> `./button.tsx`
-  //  - `/components/foo/./logo.tsx` -> `/components/foo/logo.tsx`
-  //  - `/components/foo/../logo.tsx` -> `/components/logo.tsx`
+  //  - `/components/x/./logo.tsx` -> `/components/x/logo.tsx`
+  //  - `/components/x/../logo.tsx` -> `/components/logo.tsx`
   pub fn fix_import_url(&self, url: &str) -> String {
     let is_remote = is_remote_url(url);
     if !is_remote {
@@ -194,8 +191,8 @@ impl Resolver {
   // [/pages/index.tsx]
   // - `https://esm.sh/swr` -> `../-/esm.sh/swr.js`
   // - `https://esm.sh/react` -> `../-/esm.sh/react@${REACT_VERSION}.js`
-  // - `https://deno.land/x/aleph/mod.ts` -> `../-/deno.land/x/aleph@v${CURRENT_ALEPH_VERSION}/mod.ts`
-  // - `../components/logo.tsx` -> `../components/logo.js#/styles/app.css@000000`
+  // - `https://deno.land/x/aleph/mod.ts` -> `../-/deno.land/x/aleph@v${ALEPH_VERSION}/mod.ts`
+  // - `../components/logo.tsx` -> `../components/logo.js#/components/logo.tsx@000000`
   // - `../styles/app.css` -> `../styles/app.css.js#/styles/app.css@000000`
   pub fn resolve(&mut self, url: &str, is_dynamic: bool) -> (String, String) {
     // apply import map
@@ -328,12 +325,8 @@ impl Resolver {
               .unwrap()
               .trim_end_matches(s)
               .to_owned();
-            if self.bundle_mode {
-              if is_dynamic {
-                filename.push_str("bundle.");
-              } else {
-                filename.push_str("bundling.");
-              }
+            if self.bundle_mode && !is_dynamic {
+              filename.push_str("bundling.");
             }
             filename.push_str("js");
             if !is_remote && !self.specifier_is_remote {
@@ -351,12 +344,8 @@ impl Resolver {
                 .to_str()
                 .unwrap()
                 .to_owned();
-              if self.bundle_mode {
-                if is_dynamic {
-                  filename.push_str(".bundle");
-                } else {
-                  filename.push_str(".bundling");
-                }
+              if self.bundle_mode && !is_dynamic {
+                filename.push_str(".bundling");
               }
               filename.push_str(".js#");
               filename.push_str(fixed_url.as_str());

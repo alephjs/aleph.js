@@ -1,4 +1,4 @@
-import { minify as terser, ECMA } from 'https://esm.sh/terser@5.5.1'
+import { ECMA, minify as terser } from 'https://esm.sh/terser@5.5.1'
 import { transform } from '../compiler/mod.ts'
 import { colors, ensureDir, path } from '../deps.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
@@ -20,6 +20,7 @@ export const bundlerRuntimeCode = `
   window.__ALEPH = {
     baseURL: '/',
     pack: {},
+    bundledFiles: {},
     import: function(src, specifier) {
       var pack = this.pack
       return new Promise(function(resolve, reject) {
@@ -86,11 +87,12 @@ export class Bundler {
     }
     for (const url of entries) {
       await this.createBundleChunk(
-        trimModuleExt(url),
+        util.trimPrefix(trimModuleExt(url), '/'),
         [url],
         [remoteEntries, sharedEntries].flat()
       )
     }
+    await this.createMainJS()
   }
 
   getBundledFile(name: string): string | null {
@@ -98,19 +100,9 @@ export class Bundler {
   }
 
   async copyDist() {
-    await Promise.all([
-      ...Array.from(this.#bundledFiles.values()).map(jsFile => this.copyBundleFile(jsFile)),
-      this.copyMainJS(),
-    ])
-  }
-
-  private async copyMainJS() {
-    const mainJS = this.#app.getMainJS(true)
-    const hash = computeHash(mainJS)
-    const jsFilename = `main.bundle.${hash.slice(0, 8)}.js`
-    const saveAs = path.join(this.#app.outputDir, '_aleph', jsFilename)
-    this.#bundledFiles.set('main', jsFilename)
-    await ensureTextFile(saveAs, mainJS)
+    await Promise.all(
+      Array.from(this.#bundledFiles.keys()).map(jsFile => this.copyBundleFile(jsFile))
+    )
   }
 
   private async copyBundleFile(jsFilename: string) {
@@ -175,6 +167,37 @@ export class Bundler {
     return bundlingFile
   }
 
+  private async createMainJS() {
+    const bundledFiles = Array.from(this.#bundledFiles.entries())
+      .filter(([name]) => !['polyfill', 'deps', 'shared'].includes(name))
+      .reduce((r, [name, filename]) => {
+        r[name] = filename
+        return r
+      }, {} as Record<string, string>)
+    const mainJS = `__ALEPH.bundledFiles=${JSON.stringify(bundledFiles)};` + this.#app.getMainJS(true)
+    const hash = computeHash(mainJS)
+    const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
+    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
+    await Deno.writeTextFile(bundleFile, mainJS)
+    this.#bundledFiles.set('main', bundleFilename)
+    log.info(`  {} main.js ${colors.dim('• ' + util.formatBytes(mainJS.length))}`)
+  }
+
+  /** create polyfill bundle. */
+  private async createPolyfillBundle() {
+    const alephPkgUri = getAlephPkgUri()
+    const { buildTarget } = this.#app.config
+    const hash = computeHash(buildTarget + Deno.version.deno + VERSION)
+    const bundleFilename = `polyfill.bundle.${hash.slice(0, 8)}.js`
+    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
+    if (!existsFileSync(bundleFile)) {
+      const rawPolyfillFile = `${alephPkgUri}/compiler/polyfills/${buildTarget}/mod.ts`
+      await this._bundle(rawPolyfillFile, bundleFile)
+    }
+    this.#bundledFiles.set('polyfill', bundleFilename)
+    log.info(`  {} polyfill.js (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+  }
+
   /** create bundle chunk. */
   private async createBundleChunk(name: string, entry: string[], external: string[]) {
     const entryCode = (await Promise.all(entry.map(async (url, i) => {
@@ -205,22 +228,7 @@ export class Bundler {
       lazyRemove(bundleEntryFile)
     }
     this.#bundledFiles.set(name, bundleFilename)
-    log.info(`  {} ${name} ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
-  }
-
-  /** create polyfill bundle. */
-  private async createPolyfillBundle() {
-    const alephPkgUri = getAlephPkgUri()
-    const { buildTarget } = this.#app.config
-    const hash = computeHash(buildTarget + Deno.version.deno + VERSION)
-    const bundleFilename = `polyfill.bundle.${hash.slice(0, 8)}.js`
-    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
-    if (!existsFileSync(bundleFile)) {
-      const rawPolyfillFile = `${alephPkgUri}/compiler/polyfills/${buildTarget}/mod.ts`
-      await this._bundle(rawPolyfillFile, bundleFile)
-    }
-    this.#bundledFiles.set('polyfill', bundleFilename)
-    log.info(`  {} polyfill (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+    log.info(`  {} ${name}.js ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
   }
 
   /** run deno bundle and compress the output using terser. */

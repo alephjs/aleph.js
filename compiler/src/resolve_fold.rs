@@ -208,7 +208,7 @@ impl Fold for ResolveFold {
               let mut resolver = self.resolver.borrow_mut();
               let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
               if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
-                resolver.star_exports.push(fixed_url.clone());
+                resolver.bundle_star_exports.push(fixed_url.clone());
                 ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                   span: DUMMY_SP,
                   decl: Decl::Var(VarDecl {
@@ -217,7 +217,7 @@ impl Fold for ResolveFold {
                     declare: false,
                     decls: vec![create_aleph_pack_var_decl(
                       fixed_url.as_ref(),
-                      quote_ident!(format!("$$star_{}", resolver.star_exports.len() - 1)),
+                      quote_ident!(format!("$$star_{}", resolver.bundle_star_exports.len() - 1)),
                     )],
                   }),
                 }))
@@ -304,15 +304,17 @@ impl Fold for ResolveFold {
           prop: quote_ident!("import"),
         })))
       }
-      call.args = vec![ExprOrSpread {
-        spread: None,
-        expr: Box::new(Expr::Lit(Lit::Str(new_str(resolver.resolve(url, true).0)))),
-      }];
+      let (resolved_path, fixed_url) = resolver.resolve(url, true);
       if resolver.bundle_mode {
-        call.args.push(ExprOrSpread {
+        call.args = vec![ExprOrSpread {
           spread: None,
-          expr: Box::new(Expr::Lit(Lit::Str(new_str(resolver.specifier.clone())))),
-        })
+          expr: Box::new(Expr::Lit(Lit::Str(new_str(fixed_url)))),
+        }];
+      } else {
+        call.args = vec![ExprOrSpread {
+          spread: None,
+          expr: Box::new(Expr::Lit(Lit::Str(new_str(resolved_path)))),
+        }];
       }
     } else if is_call_expr_by_name(&call, "useDeno") {
       let callback_span = match call.args.first() {
@@ -330,6 +332,7 @@ impl Fold for ResolveFold {
         let bundle_mode = self.resolver.borrow().bundle_mode;
         let id = self.new_use_deno_hook_ident(span);
         if bundle_mode {
+          // tree-shake useDeno callback in bundle mode
           call.args[0] = ExprOrSpread {
             spread: None,
             expr: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
@@ -552,6 +555,59 @@ mod tests {
   use crate::resolve::Resolver;
   use crate::swc::{st, EmitOptions, SWC};
   use sha1::{Digest, Sha1};
+  use std::collections::HashMap;
+
+  #[test]
+  fn resolve_import_export() {
+    let source = r#"
+      import React from 'react'
+      import { redirect } from 'aleph'
+      import { useDeno } from 'aleph/hooks.ts'
+      import { render } from 'react-dom/server'
+      import { render as _render } from 'https://cdn.esm.sh/v1/react-dom@16.14.1/es2020/react-dom.js'
+      import Logo from '../component/logo.tsx'
+      import Logo2 from '~/component/logo.tsx'
+      import Logo3 from '@/component/logo.tsx'
+      const AsyncLogo = React.lazy(() => import('../components/async-logo.tsx'))
+      export { useState } from 'https://esm.sh/react'
+      export * from 'https://esm.sh/swr'
+      export { React, redirect, useDeno, render, _render, Logo, Logo2, Logo3, AsyncLogo }
+    "#;
+    let module = SWC::parse("/pages/index.tsx", source, None).expect("could not parse module");
+    let mut imports: HashMap<String, String> = HashMap::new();
+    imports.insert("@/".into(), "./".into());
+    imports.insert("~/".into(), "./".into());
+    imports.insert("aleph".into(), "https://deno.land/x/aleph/mod.ts".into());
+    imports.insert("aleph/".into(), "https://deno.land/x/aleph/".into());
+    imports.insert("react".into(), "https://esm.sh/react".into());
+    imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+      "/pages/index.tsx",
+      ImportHashMap {
+        imports,
+        scopes: HashMap::new(),
+      },
+      Some("https://deno.land/x/aleph@v1.0.0".into()),
+      Some("17.0.1".into()),
+      false,
+      vec![],
+    )));
+    let (code, _) = module
+      .transform(resolver.clone(), &EmitOptions::default())
+      .expect("could not transform module");
+    println!("{}", code);
+    assert!(code.contains("import React from \"../-/esm.sh/react@17.0.1.js\""));
+    assert!(code.contains("import { redirect } from \"../-/deno.land/x/aleph@v1.0.0/mod.js\""));
+    assert!(code.contains("import { useDeno } from \"../-/deno.land/x/aleph@v1.0.0/hooks.js\""));
+    assert!(code.contains("import { render } from \"../-/esm.sh/react-dom@17.0.1/server.js\""));
+    assert!(code.contains("import { render as _render } from \"../-/cdn.esm.sh/v1/react-dom@17.0.1/es2020/react-dom.js\""));
+    assert!(code.contains("import Logo from \"../component/logo.js#/component/logo.tsx@000000\""));
+    assert!(code.contains("import Logo2 from \"../component/logo.js#/component/logo.tsx@000000\""));
+    assert!(code.contains("import Logo3 from \"../component/logo.js#/component/logo.tsx@000000\""));
+    assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000000\")"));
+    assert!(code.contains("export { useState } from \"../-/esm.sh/react@17.0.1.js\""));
+    assert!(code.contains("export * from \"../-/esm.sh/swr.js\""));
+  }
 
   #[test]
   fn sign_use_deno_hook() {
@@ -559,16 +615,10 @@ mod tests {
     let source = r#"
       export default function Index() {
         const verison = useDeno(() => Deno.version)
-        const verison = useDeno(async function() {
+        const data = useDeno(async function() {
           return await readJson("./data.json")
         }, 1000)
-        return (
-          <>
-            <p>Deno v{version.deno}</p>
-            <V8 />
-            <TS />
-          </>
-        )
+        return null
       }
     "#;
 
@@ -623,8 +673,8 @@ mod tests {
       import '../shared/iife.ts'
       import '../shared/iife2.ts'
       export * from "https://esm.sh/react"
-      export { render } from "https://esm.sh/react-dom"
       export * as ReactDom from "https://esm.sh/react-dom"
+      export { render } from "https://esm.sh/react-dom"
 
       const AsyncLogo = React.lazy(() => import('../components/async-logo.tsx'))
 
@@ -667,8 +717,9 @@ mod tests {
     );
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
     assert!(code.contains("import   \"../shared/iife2.bundling.js#/shared/iife2.ts@000000\""));
-    assert!(code
-      .contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"../components/async-logo.bundle.js#/components/async-logo.tsx@000000\", \"/pages/index.tsx\""));
+    assert!(
+      code.contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"/components/async-logo.tsx\"")
+    );
     assert!(code.contains(
       "const { default: __ALEPH_Head  } = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"]"
     ));

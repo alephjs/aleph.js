@@ -33,17 +33,15 @@ Options:
 
 async function main() {
   const { _: args, ...options } = flags.parse(Deno.args)
-  const hasCommand = args.length > 0 && args[0] in commands
-  const command = (hasCommand ? String(args.shift()) : 'dev') as keyof typeof commands
 
   // prints aleph.js version
-  if (options.v && command != 'upgrade') {
+  if (options.v) {
     console.log(`aleph.js v${VERSION}`)
     Deno.exit(0)
   }
 
   // prints aleph.js and deno version
-  if (options.version && command != 'upgrade') {
+  if (options.version) {
     const { deno, v8, typescript } = Deno.version
     console.log([
       `aleph.js ${VERSION}`,
@@ -54,45 +52,48 @@ async function main() {
     Deno.exit(0)
   }
 
-  // prints help message
+  // prints help message when the command not found
+  if (!(args.length > 0 && args[0] in commands)) {
+    console.log(helpMessage)
+    Deno.exit(0)
+  }
+
+  const command = String(args.shift()) as keyof typeof commands
+
+  // prints command help message
   if (options.h || options.help) {
-    if (hasCommand) {
-      import(`./cli/${command}.ts`).then(({ helpMessage }) => {
-        console.log(commands[command] + '\n' + helpMessage)
-        Deno.exit(0)
-      })
-      return
-    } else {
+    import(`./cli/${command}.ts`).then(({ helpMessage }) => {
+      console.log(commands[command])
       console.log(helpMessage)
       Deno.exit(0)
-    }
+    })
+    return
   }
 
-  // sets log level
-  const l = options.L || options['log-level']
-  if (util.isNEString(l)) {
-    log.setLevel(l.toLowerCase() as LevelNames)
+  // import command module
+  const { default: cmd } = await import(`./cli/${command}.ts`)
+
+  // execute `init` command
+  if (command === 'init') {
+    await cmd(args[0])
+    return
   }
 
-  if (!hasCommand && !args[0]) {
-    const walkOptions = { includeDirs: false, exts: ['.js', '.jsx', '.mjs', '.ts', '.tsx'], skip: [/\.d\.ts$/i], dep: 1 }
-    const pagesDir = path.join(path.resolve('.'), 'pages')
-    let hasIndexPage = false
-    if (existsDirSync(pagesDir)) {
-      for await (const { path: p } of walk(pagesDir, walkOptions)) {
-        if (path.basename(p).split('.')[0] === 'index') {
-          hasIndexPage = true
-        }
-      }
-    }
-    if (!hasIndexPage) {
-      console.log(helpMessage)
-      Deno.exit(0)
-    }
+  // execute `upgrade` command
+  if (command === 'upgrade') {
+    await cmd(options.v || options.version || args[0] || 'latest')
+    return
   }
+
+  // check working Dir
+  const workingDir = path.resolve(String(args[0] || '.'))
+  if (!existsDirSync(workingDir)) {
+    log.fatal('No such directory:', workingDir)
+  }
+  Deno.chdir(workingDir)
 
   // load .env
-  for await (const { path: p, } of walk(Deno.cwd(), { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
+  for await (const { path: p, } of walk(workingDir, { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
     const text = await Deno.readTextFile(p)
     text.split('\n').forEach(line => {
       let [key, value] = util.splitBy(line, '=')
@@ -110,23 +111,13 @@ async function main() {
     localProxy(parseInt(v))
   }
 
-  const { default: cmd } = await import(`./cli/${command}.ts`)
-  switch (command) {
-    case 'init':
-      await cmd(args[0])
-      break
-    case 'upgrade':
-      await cmd(options.v || options.version || args[0] || 'latest')
-      break
-    default:
-      const workingDir = path.resolve(String(args[0] || '.'))
-      if (!existsDirSync(workingDir)) {
-        log.fatal('No such directory:', workingDir)
-      }
-      Deno.chdir(workingDir)
-      await cmd(workingDir, options)
-      break
+  // sets log level
+  const l = options.L || options['log-level']
+  if (util.isNEString(l)) {
+    log.setLevel(l.toLowerCase() as LevelNames)
   }
+
+  await cmd(workingDir, options)
 }
 
 if (import.meta.main) {

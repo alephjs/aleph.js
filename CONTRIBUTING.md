@@ -22,7 +22,7 @@ You will need [Deno](https://deno.land/) 1.7+.
 
 ```bash
 # set dev env
-echo 'ALEPH_DEV_PORT=2021' > .env.local
+echo 'ALEPH_DEV_PORT=2020' > .env.local
 
 # ssr/development with HMR
 deno run -A --unstable cli.ts dev ./examples/hello-world -L debug
@@ -34,7 +34,7 @@ deno run -A --unstable cli.ts start ./examples/hello-world -L debug
 deno run -A --unstable cli.ts build ./examples/hello-world -L debug
 
 # run all tests
-deno test -A --unstable --location=http://localhost
+deno test -A --unstable --location=https://deno.land/x/aleph
 ```
 
 ## Project Structure

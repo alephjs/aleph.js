@@ -43,6 +43,7 @@ export type TransformOptions = {
 export type TransformResult = {
   code: string
   deps: DependencyDescriptor[]
+  bundleStarExports?: string[]
   map?: string
 }
 
@@ -120,7 +121,7 @@ export async function transform(url: string, code: string, options: TransformOpt
   }
 
   const { loaders, ...transformOptions } = options
-  let { code: jsContent, inlineStyles, deps, map } = transformSync(url, code, transformOptions)
+  let { code: jsContent, deps, map, inlineStyles, bundleStarExports } = transformSync(url, code, transformOptions)
 
   // resolve inline-style
   await Promise.all(Object.entries(inlineStyles as InlineStyles).map(async ([key, style]) => {
@@ -165,7 +166,7 @@ export async function transform(url: string, code: string, options: TransformOpt
     jsContent = jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
   }))
 
-  return { code: jsContent, deps, map }
+  return { code: jsContent, deps, map, bundleStarExports }
 }
 
 /* parse export names of the module */

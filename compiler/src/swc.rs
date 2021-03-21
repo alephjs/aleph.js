@@ -372,6 +372,5 @@ mod tests {
     assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("className: \"title\""));
-    assert!(code.contains("import React from \"../-/esm.sh/react.js\""));
   }
 }

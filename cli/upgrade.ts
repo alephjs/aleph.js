@@ -1,19 +1,20 @@
-import { colors } from '../deps.ts'
-import { VERSION } from '../version.ts'
+import { colors, path } from '../deps.ts'
+import { existsFileSync } from '../shared/fs.ts'
+
+const versionMetaUrl = 'https://cdn.deno.land/aleph/meta/versions.json'
 
 export const helpMessage = `
 Usage:
     aleph upgrade
 
 Options:
-    -v, --version <version>  The upgrading version
+        --version <version>  The version to upgrade to
     -h, --help               Prints help message
 `
 
-export default async function (version: string) {
+export default async function (version = 'latest') {
   console.log('Looking up latest version...')
-  const metaUrl = 'https://cdn.deno.land/aleph/meta/versions.json'
-  const { latest, versions } = await (await fetch(metaUrl)).json()
+  const { latest, versions } = await (await fetch(versionMetaUrl)).json()
   if (version === 'latest') {
     version = latest
   } else if (!versions.includes(version)) {
@@ -23,17 +24,31 @@ export default async function (version: string) {
       Deno.exit(1)
     }
   }
-  if (version === 'v' + VERSION) {
-    console.log('Already up-to-date!')
-    Deno.exit(0)
-  }
+
+  const denoExecPath = Deno.execPath()
+  const cmdExists = existsFileSync(path.join(path.dirname(denoExecPath), 'aleph'))
   const p = Deno.run({
-    cmd: [Deno.execPath(), 'install', '-A', '-f', '--location', 'http://localhost', '-n', 'aleph', `https://deno.land/x/aleph@${version}/cli.ts`],
+    cmd: [
+      denoExecPath,
+      'install',
+      '-A',
+      '-f',
+      '--unstable',
+      '-n', 'aleph',
+      '--location', 'https://deno.land/x/aleph',
+      `https://deno.land/x/aleph@${version}/cli.ts`
+    ],
     stdout: 'null',
-    stderr: 'piped'
+    stderr: 'inherit'
   })
-  Deno.stderr.write(await p.stderrOutput())
-  console.log(`Aleph.js is up to ${version}!`)
-  p.close()
-  Deno.exit(0)
+  const status = await p.status()
+  if (status.success) {
+    if (cmdExists) {
+      console.log(`Aleph.js is up to ${version}!`)
+    } else {
+      console.log('Aleph.js was installed successfully!')
+      console.log(`Run 'aleph --help' to get started`)
+    }
+  }
+  Deno.exit(status.code)
 }
