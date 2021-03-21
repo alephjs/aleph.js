@@ -29,11 +29,13 @@ export default async function (version = 'latest') {
   const cmdExists = existsFileSync(path.join(path.dirname(denoExecPath), 'aleph'))
   const p = Deno.run({
     cmd: [
-      denoExecPath, 'install',
-      '--location', 'https://deno.land/x/aleph',
-      '-n', 'aleph',
-      '-A', '-f',
+      denoExecPath,
+      'install',
+      '-A',
+      '-f',
       '--unstable',
+      '-n', 'aleph',
+      '--location', 'https://deno.land/x/aleph',
       `https://deno.land/x/aleph@${version}/cli.ts`
     ],
     stdout: 'null',
