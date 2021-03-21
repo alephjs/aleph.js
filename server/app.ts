@@ -1027,7 +1027,13 @@ export class Application implements ServerApplication {
       true
     )
 
+    // add app/404 modules as shared entry
     entryMods.set(Array.from(this.#modules.keys()).filter(url => ['/app', '/404'].includes(trimModuleExt(url))), true)
+
+    // add page module entries
+    this.#pageRouting.lookup(routes => {
+      routes.forEach(({ module: { url } }) => entryMods.set([url], false))
+    })
 
     this.#modules.forEach(mod => {
       mod.deps.forEach(({ url, isDynamic }) => {
@@ -1048,11 +1054,6 @@ export class Application implements ServerApplication {
       })
     })
 
-    // add page module entries
-    this.#pageRouting.lookup(routes => {
-      routes.forEach(({ module: { url } }) => entryMods.set([url], false))
-    })
-
     refCounter.forEach((refers, url) => {
       if (refers.size > 1) {
         let shared = 0
@@ -1060,7 +1061,7 @@ export class Application implements ServerApplication {
           const some = mods.some(u => {
             let scoped = false
             this.lookupDeps(u, dep => {
-              if (!dep.isDynamic && refers.has(dep.url)) {
+              if (!dep.isDynamic && url === dep.url) {
                 scoped = true
                 return false
               }
