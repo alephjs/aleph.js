@@ -1,4 +1,4 @@
-import { useDeno } from 'aleph'
+import { useDeno } from 'aleph/react.ts'
 import React from 'react'
 import Logo from '../components/logo.tsx'
 import useCounter from '../lib/useCounter.ts'
