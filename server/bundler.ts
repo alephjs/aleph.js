@@ -1,5 +1,5 @@
 import { ECMA, minify as terser } from 'https://esm.sh/terser@5.5.1'
-import { transform } from '../compiler/mod.ts'
+import { transform, parseExportNames } from '../compiler/mod.ts'
 import { colors, ensureDir, path } from '../deps.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
@@ -130,14 +130,13 @@ export class Bundler {
       return bundlingFile
     }
 
-    const { content, contentType } = await this.#app.fetchModule(mod.url)
-    const source = await this.#app.precompile(mod.url, content, contentType)
+    const source = await this.#app.resolveModule(mod.url)
     if (source === null) {
       throw new Error(`Unsupported module '${mod.url}'`)
     }
 
     const [sourceCode, sourceType] = source
-    let { code } = await transform(
+    let { code, bundleStarExports } = await transform(
       mod.url,
       sourceCode,
       {
@@ -153,6 +152,15 @@ export class Bundler {
         loaders: this.#app.config.plugins.filter(isLoaderPlugin)
       }
     )
+
+    if (bundleStarExports && bundleStarExports.length > 0) {
+      for (let index = 0; index < bundleStarExports.length; index++) {
+        const url = bundleStarExports[index]
+        const [sourceCode, sourceType] = await this.#app.resolveModule(url)
+        const names = await parseExportNames(url, sourceCode, { sourceType })
+        code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
+      }
+    }
 
     // compile deps
     for (const dep of mod.deps) {

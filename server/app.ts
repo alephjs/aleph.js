@@ -558,89 +558,23 @@ export class Application implements ServerApplication {
     ]
   }
 
-  /** fetch module content */
-  async fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
-    if (!util.isLikelyHttpURL(url)) {
-      const filepath = path.join(this.srcDir, util.trimPrefix(url, 'file://'))
-      const content = await Deno.readFile(filepath)
-      return { content, contentType: null }
+  async resolveModule(url: string) {
+    const { content, contentType } = await this.fetchModule(url)
+    const source = await this.precompile(url, content, contentType)
+    if (source === null) {
+      throw new Error(`Unsupported module '${url}'`)
     }
+    return source
+  }
 
-    const u = new URL(url)
-    if (url.startsWith('https://esm.sh/')) {
-      if (this.isDev && !u.searchParams.has('dev')) {
-        u.searchParams.set('dev', '')
-        u.search = u.search.replace('dev=', 'dev')
-      }
+  /** default compiler options */
+  private get defaultCompileOptions(): TransformOptions {
+    return {
+      importMap: this.importMap,
+      alephPkgUri: getAlephPkgUri(),
+      reactVersion: defaultReactVersion,
+      isDev: this.isDev,
     }
-
-    const { protocol, hostname, port, pathname, search } = u
-    const versioned = reFullVersion.test(pathname)
-    const reload = this.#reloading || !versioned
-    const isLocalhost = url.startsWith('http://localhost:')
-    const cacheDir = path.join(
-      await getDenoDir(),
-      'deps',
-      util.trimSuffix(protocol, ':'),
-      hostname + (port ? '_PORT' + port : '')
-    )
-    const hash = createHash('sha256').update(pathname + search).toString()
-    const contentFile = path.join(cacheDir, hash)
-    const metaFile = path.join(cacheDir, hash + '.metadata.json')
-
-    if (!reload && !isLocalhost && existsFileSync(contentFile) && existsFileSync(metaFile)) {
-      const [content, meta] = await Promise.all([
-        Deno.readFile(contentFile),
-        Deno.readTextFile(metaFile),
-      ])
-      try {
-        const { headers } = JSON.parse(meta)
-        return {
-          content,
-          contentType: headers['content-type'] || null
-        }
-      } catch (e) { }
-    }
-
-    // download dep when deno cache failed
-    let err = new Error('Unknown')
-    for (let i = 0; i < 15; i++) {
-      if (i === 0) {
-        if (!isLocalhost) {
-          log.info('Download', url)
-        }
-      } else {
-        log.debug('Download error:', err)
-        log.warn(`Download ${url} failed, retrying...`)
-      }
-      try {
-        const resp = await fetch(u.toString())
-        if (resp.status >= 400) {
-          return Promise.reject(new Error(resp.statusText))
-        }
-        const buffer = await resp.arrayBuffer()
-        const content = await Deno.readAll(new Deno.Buffer(buffer))
-        if (!isLocalhost) {
-          await ensureDir(cacheDir)
-          Deno.writeFile(contentFile, content)
-          Deno.writeTextFile(metaFile, JSON.stringify({
-            headers: Array.from(resp.headers.entries()).reduce((m, [k, v]) => {
-              m[k] = v
-              return m
-            }, {} as Record<string, string>),
-            url
-          }, undefined, 2))
-        }
-        return {
-          content,
-          contentType: resp.headers.get('content-type')
-        }
-      } catch (e) {
-        err = e
-      }
-    }
-
-    return Promise.reject(err)
   }
 
   /** build the application to a static site(SSG) */
@@ -731,17 +665,107 @@ export class Application implements ServerApplication {
     return { code, map }
   }
 
-  /** default compiler options */
-  private get defaultCompileOptions(): TransformOptions {
-    return {
-      importMap: this.importMap,
-      alephPkgUri: getAlephPkgUri(),
-      reactVersion: defaultReactVersion,
-      isDev: this.isDev,
+  /** fetch module content */
+  private async fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
+    for (const plugin of this.config.plugins) {
+      if (plugin.type === 'loader' && plugin.test.test(url) && plugin.resolve !== undefined) {
+        const ret = plugin.resolve(url)
+        let content: Uint8Array
+        if (ret instanceof Promise) {
+          content = (await ret).content
+        } else {
+          content = ret.content
+        }
+        if (content instanceof Uint8Array) {
+          return { content, contentType: null }
+        }
+      }
     }
+
+    if (!util.isLikelyHttpURL(url)) {
+      const filepath = path.join(this.srcDir, util.trimPrefix(url, 'file://'))
+      const content = await Deno.readFile(filepath)
+      return { content, contentType: null }
+    }
+
+    const u = new URL(url)
+    if (url.startsWith('https://esm.sh/')) {
+      if (this.isDev && !u.searchParams.has('dev')) {
+        u.searchParams.set('dev', '')
+        u.search = u.search.replace('dev=', 'dev')
+      }
+    }
+
+    const { protocol, hostname, port, pathname, search } = u
+    const versioned = reFullVersion.test(pathname)
+    const reload = this.#reloading || !versioned
+    const isLocalhost = url.startsWith('http://localhost:')
+    const cacheDir = path.join(
+      await getDenoDir(),
+      'deps',
+      util.trimSuffix(protocol, ':'),
+      hostname + (port ? '_PORT' + port : '')
+    )
+    const hash = createHash('sha256').update(pathname + search).toString()
+    const contentFile = path.join(cacheDir, hash)
+    const metaFile = path.join(cacheDir, hash + '.metadata.json')
+
+    if (!reload && !isLocalhost && existsFileSync(contentFile) && existsFileSync(metaFile)) {
+      const [content, meta] = await Promise.all([
+        Deno.readFile(contentFile),
+        Deno.readTextFile(metaFile),
+      ])
+      try {
+        const { headers } = JSON.parse(meta)
+        return {
+          content,
+          contentType: headers['content-type'] || null
+        }
+      } catch (e) { }
+    }
+
+    // download dep when deno cache failed
+    let err = new Error('Unknown')
+    for (let i = 0; i < 15; i++) {
+      if (i === 0) {
+        if (!isLocalhost) {
+          log.info('Download', url)
+        }
+      } else {
+        log.debug('Download error:', err)
+        log.warn(`Download ${url} failed, retrying...`)
+      }
+      try {
+        const resp = await fetch(u.toString())
+        if (resp.status >= 400) {
+          return Promise.reject(new Error(resp.statusText))
+        }
+        const buffer = await resp.arrayBuffer()
+        const content = await Deno.readAll(new Deno.Buffer(buffer))
+        if (!isLocalhost) {
+          await ensureDir(cacheDir)
+          Deno.writeFile(contentFile, content)
+          Deno.writeTextFile(metaFile, JSON.stringify({
+            headers: Array.from(resp.headers.entries()).reduce((m, [k, v]) => {
+              m[k] = v
+              return m
+            }, {} as Record<string, string>),
+            url
+          }, undefined, 2))
+        }
+        return {
+          content,
+          contentType: resp.headers.get('content-type')
+        }
+      } catch (e) {
+        err = e
+      }
+    }
+
+    return Promise.reject(err)
   }
 
-  async precompile(
+  private async precompile(
     url: string,
     sourceContent: Uint8Array,
     contentType: string | null
@@ -1009,16 +1033,6 @@ export class Application implements ServerApplication {
     }
   }
 
-  private replaceDepHash(jsContent: string, dep: DependencyDescriptor) {
-    const s = `.js#${dep.url}@`
-    return jsContent.split(s).map((p, i) => {
-      if (i > 0 && p.charAt(6) === '"') {
-        return dep.hash.slice(0, 6) + p.slice(6)
-      }
-      return p
-    }).join(s)
-  }
-
   /** create bundle chunks for production. */
   private async bundle() {
     const sharedEntryMods = new Set<string>()
@@ -1174,6 +1188,16 @@ export class Application implements ServerApplication {
       return true
     }
     return ssr
+  }
+
+  private replaceDepHash(jsContent: string, dep: DependencyDescriptor) {
+    const s = `.js#${dep.url}@`
+    return jsContent.split(s).map((p, i) => {
+      if (i > 0 && p.charAt(6) === '"') {
+        return dep.hash.slice(0, 6) + p.slice(6)
+      }
+      return p
+    }).join(s)
   }
 
   /** lookup deps recurively. */

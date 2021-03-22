@@ -14,6 +14,8 @@ export type LoaderPlugin = {
   acceptHMR?: boolean
   /** `asPage` allows the loaded module as a page. */
   asPage?: boolean
+  /** `resolve` resolves the module content. */
+  resolve?(url: string): { content: Uint8Array } | Promise<{ content: Uint8Array }>
   /** `transform` transforms the source content. */
   transform(source: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformResult | Promise<LoaderTransformResult>
 }
