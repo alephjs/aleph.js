@@ -1,6 +1,6 @@
 import { red } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
 import { dirname, join } from 'https://deno.land/std@0.90.0/path/mod.ts'
-import { existsFileSync } from '../shared/fs.ts'
+import { existsSync } from 'https://deno.land/std@0.90.0/fs/exists.ts'
 
 const versionMetaUrl = 'https://cdn.deno.land/aleph/meta/versions.json'
 
@@ -27,7 +27,7 @@ export default async function (version = 'latest') {
   }
 
   const denoExecPath = Deno.execPath()
-  const cmdExists = existsFileSync(join(dirname(denoExecPath), 'aleph'))
+  const cmdExists = existsSync(join(dirname(denoExecPath), 'aleph'))
   const p = Deno.run({
     cmd: [
       denoExecPath,
@@ -37,7 +37,6 @@ export default async function (version = 'latest') {
       '--unstable',
       '-n', 'aleph',
       '--location', 'https://deno.land/x/aleph',
-      '--import-map', 'https://deno.land/x/aleph@{version}/import_map.json',
       `https://deno.land/x/aleph@${version}/cli.ts`
     ],
     stdout: 'null',

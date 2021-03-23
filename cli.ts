@@ -1,6 +1,6 @@
-import * as path from 'std/path/mod.ts'
-import { walk } from 'std/fs/walk.ts'
-import * as flags from 'std/flags/mod.ts'
+import { resolve, basename } from 'https://deno.land/std@0.90.0/path/mod.ts'
+import { walk } from 'https://deno.land/std@0.90.0/fs/walk.ts'
+import { parse } from 'https://deno.land/std@0.90.0/flags/mod.ts'
 import { existsDirSync } from './shared/fs.ts'
 import type { LevelNames } from './shared/log.ts'
 import log from './shared/log.ts'
@@ -33,7 +33,7 @@ Options:
 `
 
 async function main() {
-  const { _: args, ...options } = flags.parse(Deno.args)
+  const { _: args, ...options } = parse(Deno.args)
 
   // prints aleph.js version
   if (options.v) {
@@ -99,8 +99,8 @@ async function main() {
     log.setLevel(l.toLowerCase() as LevelNames)
   }
 
-  // check working Dir
-  const workingDir = path.resolve(String(args[0] || '.'))
+  // check working dir
+  const workingDir = resolve(String(args[0] || '.'))
   if (!existsDirSync(workingDir)) {
     log.fatal('No such directory:', workingDir)
   }
@@ -116,7 +116,7 @@ async function main() {
         Deno.env.set(key, value.trim())
       }
     })
-    log.info('load env from', path.basename(p))
+    log.info('load env from', basename(p))
   }
 
   await cmd(workingDir, options)

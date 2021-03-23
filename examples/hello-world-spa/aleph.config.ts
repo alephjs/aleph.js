@@ -1,5 +1,5 @@
-import css from 'aleph/plugins/css.ts'
-import type { Config } from 'aleph/types.ts'
+import css from '../../plugins/css.ts'
+import type { Config } from '../../types.ts'
 
 export default (): Config => ({
   plugins: [

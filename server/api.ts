@@ -1,8 +1,8 @@
-import type { BufReader, BufWriter } from 'std/io/bufio.ts'
-import type { MultipartFormData } from 'std/mime/multipart.ts'
-import { MultipartReader } from 'std/mime/multipart.ts'
-import * as brotli from 'brotli'
-import { gzipEncode } from 'gzip'
+import type { BufReader, BufWriter } from 'https://deno.land/std@0.90.0/io/bufio.ts'
+import type { MultipartFormData } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
+import { MultipartReader } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
+import * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
+import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from '../shared/log.ts'
 import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 

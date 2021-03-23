@@ -1,4 +1,4 @@
-import { dirname } from 'std/path/mod.ts'
+import { dirname } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import {
   getAlephPkgUri,
   getRelativePath,

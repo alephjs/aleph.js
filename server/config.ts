@@ -1,4 +1,4 @@
-import * as path from 'std/path/mod.ts'
+import * as path from 'https://deno.land/std@0.90.0/path/mod.ts'
 import type { ImportMap } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
