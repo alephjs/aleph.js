@@ -71,7 +71,7 @@ export class Renderer {
             type: 'application/json',
             innerText: JSON.stringify(data, undefined, isDev ? 2 : 0),
           } : '',
-          ...this.#app.getSSRHTMLScripts(),
+          ...this.#app.getSSRHTMLScripts(url.pagePath),
           ...scripts.map((script: Record<string, any>) => {
             if (script.innerText && !this.#app.isDev) {
               return { ...script, innerText: script.innerText }

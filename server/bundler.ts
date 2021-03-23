@@ -1,5 +1,5 @@
 import { ECMA, minify as terser } from 'https://esm.sh/terser@5.5.1'
-import { transform, parseExportNames } from '../compiler/mod.ts'
+import { parseExportNames, transform } from '../compiler/mod.ts'
 import { colors, ensureDir, path } from '../deps.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
@@ -136,7 +136,7 @@ export class Bundler {
     }
 
     const [sourceCode, sourceType] = source
-    let { code, bundleStarExports } = await transform(
+    let { code, starExports } = await transform(
       mod.url,
       sourceCode,
       {
@@ -153,9 +153,9 @@ export class Bundler {
       }
     )
 
-    if (bundleStarExports && bundleStarExports.length > 0) {
-      for (let index = 0; index < bundleStarExports.length; index++) {
-        const url = bundleStarExports[index]
+    if (starExports && starExports.length > 0) {
+      for (let index = 0; index < starExports.length; index++) {
+        const url = starExports[index]
         const [sourceCode, sourceType] = await this.#app.resolveModule(url)
         const names = await parseExportNames(url, sourceCode, { sourceType })
         code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
@@ -284,10 +284,10 @@ export class Bundler {
 
     // minify code
     // todo: use swc minify instead(https://github.com/swc-project/swc/pull/1302)
-    // const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')) as ECMA)
-    // if (mini !== undefined) {
-    //   code = mini
-    // }
+    const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')) as ECMA)
+    if (mini !== undefined) {
+      code = mini
+    }
 
     await clearCompilation(bundleFile)
     await Deno.writeTextFile(bundleFile, code)

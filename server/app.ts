@@ -1,8 +1,8 @@
-import { buildChecksum, ImportMap, SourceType, transform, TransformOptions } from '../compiler/mod.ts'
+import { buildChecksum, ImportMap, parseExportNames, SourceType, transform, TransformOptions } from '../compiler/mod.ts'
 import { colors, createHash, ensureDir, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
-import { Routing, RouteModule } from '../framework/core/routing.ts'
+import { RouteModule, Routing } from '../framework/core/routing.ts'
 import { defaultReactVersion, minDenoVersion } from '../shared/constants.ts'
 import {
   ensureTextFile,
@@ -73,11 +73,15 @@ export class Application implements ServerApplication {
 
   /** initiate application */
   private async init(reload: boolean) {
-    const t = performance.now()
+    let t = performance.now()
+
     const [config, importMap] = await Promise.all([
       loadConfig(this.workingDir),
       loadImportMap(this.workingDir)
     ])
+
+    log.debug(`load config in ${Math.round(performance.now() - t)}ms`)
+    t = performance.now()
 
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
@@ -538,7 +542,7 @@ export class Application implements ServerApplication {
   }
 
   /** get ssr html scripts */
-  getSSRHTMLScripts() {
+  getSSRHTMLScripts(pagePath?: string) {
     const { baseUrl } = this.config
 
     if (this.isDev) {
@@ -550,8 +554,8 @@ export class Application implements ServerApplication {
 
     return [
       bundlerRuntimeCode,
-      ...['polyfill', 'deps', 'shared', 'main']
-        .filter(name => this.#bundler.getBundledFile(name) !== null)
+      ...['polyfill', 'deps', 'shared', 'main', pagePath ? '/pages' + pagePath.replace(/\/$/, '/index') : '']
+        .filter(name => name !== "" && this.#bundler.getBundledFile(name) !== null)
         .map(name => ({
           src: util.cleanPath(`${baseUrl}/_aleph/${this.#bundler.getBundledFile(name)}`)
         }))
@@ -939,12 +943,14 @@ export class Application implements ServerApplication {
 
       const t = performance.now()
       const [sourceCode, sourceType] = source
-      const { code, map, deps } = await transform(url, sourceCode, {
+      const { code, deps, starExports, map } = await transform(url, sourceCode, {
         ...this.defaultCompileOptions,
         swcOptions: {
           target: 'es2020',
           sourceType
         },
+        // workaround for https://github.com/denoland/deno/issues/9849
+        resolveStarExports: !this.isDev && Deno.version.deno.replace(/\.\d+$/, '') === '1.8',
         sourceMap: this.isDev,
         loaders: this.config.plugins.filter(isLoaderPlugin)
       })
@@ -953,6 +959,16 @@ export class Application implements ServerApplication {
       jsContent = code
       if (map) {
         jsSourceMap = map
+      }
+
+      // workaround for https://github.com/denoland/deno/issues/9849
+      if (starExports && starExports.length > 0) {
+        for (let index = 0; index < starExports.length; index++) {
+          const url = starExports[index]
+          const [sourceCode, sourceType] = await this.resolveModule(url)
+          const names = await parseExportNames(url, sourceCode, { sourceType })
+          jsContent = jsContent.replace(`export * from "${url}:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+        }
       }
 
       mod.deps = deps.map(({ specifier, isDynamic }) => {
