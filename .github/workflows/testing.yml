@@ -33,9 +33,6 @@ jobs:
         with:
           version: latest
 
-      - name: Cache deps
-        run: deno cache deps.ts
-
       - name: Deno test
         run: deno test -A --unstable --import-map=import_map.json --location=https://deno.land/x/aleph
 
