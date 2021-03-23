@@ -1,6 +1,7 @@
 import { red } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
 import { dirname, join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { existsSync } from 'https://deno.land/std@0.90.0/fs/exists.ts'
+import { VERSION } from '../version.ts'
 
 const versionMetaUrl = 'https://cdn.deno.land/aleph/meta/versions.json'
 
@@ -24,6 +25,11 @@ export default async function (version = 'latest') {
       console.log(`${red('error')}: version(${version}) not found!`)
       Deno.exit(1)
     }
+  }
+
+  if (version === 'v' + VERSION) {
+    console.log('Already up-to-date!')
+    Deno.exit(0)
   }
 
   const denoExecPath = Deno.execPath()
