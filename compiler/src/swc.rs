@@ -1,12 +1,13 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::fast_refresh::react_refresh_fold;
 use crate::fixer::compat_fixer_fold;
+use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve::Resolver;
-use crate::resolve_fold::aleph_resolve_fold;
+use crate::resolve_fold::{resolve_fold, ExportsParser};
 use crate::source_type::SourceType;
 
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{cell::RefCell, cmp::min, path::Path, rc::Rc};
 use swc_common::{
   chain,
   comments::SingleThreadedComments,
@@ -32,6 +33,7 @@ pub struct EmitOptions {
   pub jsx_fragment_factory: String,
   pub is_dev: bool,
   pub transpile_only: bool,
+  pub resolve_star_exports: bool,
   pub source_map: bool,
 }
 
@@ -43,13 +45,14 @@ impl Default for EmitOptions {
       jsx_fragment_factory: "React.Fragment".into(),
       is_dev: false,
       transpile_only: false,
+      resolve_star_exports: false,
       source_map: false,
     }
   }
 }
 
 #[derive(Clone)]
-pub struct ParsedModule {
+pub struct SWC {
   pub specifier: String,
   pub module: Module,
   pub source_type: SourceType,
@@ -57,7 +60,7 @@ pub struct ParsedModule {
   pub comments: SingleThreadedComments,
 }
 
-impl ParsedModule {
+impl SWC {
   /// parse the source of the module.
   ///
   /// ### Arguments
@@ -79,7 +82,10 @@ impl ParsedModule {
     let sm = &source_map;
     let error_buffer = ErrorBuffer::new();
     let source_type = match source_type {
-      Some(source_type) => source_type,
+      Some(source_type) => match source_type {
+        SourceType::Unknown => SourceType::from(Path::new(specifier)),
+        _ => source_type,
+      },
       None => SourceType::from(Path::new(specifier)),
     };
     let syntax = get_syntax(&source_type);
@@ -104,7 +110,7 @@ impl ParsedModule {
       })
       .unwrap();
 
-    Ok(ParsedModule {
+    Ok(SWC {
       specifier: specifier.into(),
       module,
       source_type,
@@ -129,7 +135,7 @@ impl ParsedModule {
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
       let transpile_only = options.transpile_only;
       let is_ts = match self.source_type {
-        SourceType::TypeScript => true,
+        SourceType::TS => true,
         SourceType::TSX => true,
         _ => false,
       };
@@ -143,7 +149,11 @@ impl ParsedModule {
       let root_mark = Mark::fresh(Mark::root());
       let mut passes = chain!(
         Optional::new(
-          aleph_resolve_fold(resolver.clone(), self.source_map.clone()),
+          resolve_fold(
+            resolver.clone(),
+            self.source_map.clone(),
+            options.resolve_star_exports,
+          ),
           !transpile_only
         ),
         Optional::new(aleph_jsx_fold, is_jsx && !transpile_only),
@@ -200,6 +210,13 @@ impl ParsedModule {
     })
   }
 
+  pub fn parse_export_names(&self) -> Result<Vec<String>, anyhow::Error> {
+    let program = Program::Module(self.module.clone());
+    let mut parser = ExportsParser { names: vec![] };
+    program.fold_with(&mut parser);
+    Ok(parser.names)
+  }
+
   /// Apply transform with fold.
   pub fn apply_transform<T: Fold>(
     &self,
@@ -233,6 +250,8 @@ impl ParsedModule {
       };
       program.emit_with(&mut emitter).unwrap();
     }
+
+    // output
     let src = String::from_utf8(buf).unwrap();
     if source_map {
       let mut buf = Vec::new();
@@ -277,37 +296,62 @@ fn get_ts_config(tsx: bool) -> TsConfig {
 
 fn get_syntax(source_type: &SourceType) -> Syntax {
   match source_type {
-    SourceType::JavaScript => Syntax::Es(get_es_config(false)),
+    SourceType::JS => Syntax::Es(get_es_config(false)),
     SourceType::JSX => Syntax::Es(get_es_config(true)),
-    SourceType::TypeScript => Syntax::Typescript(get_ts_config(false)),
+    SourceType::TS => Syntax::Typescript(get_ts_config(false)),
     SourceType::TSX => Syntax::Typescript(get_ts_config(true)),
     _ => Syntax::Es(get_es_config(false)),
   }
 }
 
+#[allow(dead_code)]
+pub fn t<T: Fold>(specifier: &str, source: &str, tr: T, expect: &str) -> bool {
+  let module = SWC::parse(specifier, source, None).expect("could not parse module");
+  let (code, _) = swc_common::GLOBALS.set(&Globals::new(), || {
+    module
+      .apply_transform(tr, false)
+      .expect("could not transpile module")
+  });
+  let matched = code.as_str().trim().eq(expect.trim());
+
+  if !matched {
+    let mut p: usize = 0;
+    for i in 0..min(code.len(), expect.len()) {
+      if code.get(i..i + 1) != expect.get(i..i + 1) {
+        p = i;
+        break;
+      }
+    }
+    println!(
+      "{}\x1b[0;31m{}\x1b[0m",
+      code.get(0..p).unwrap(),
+      code.get(p..).unwrap()
+    );
+  }
+  matched
+}
+
+#[allow(dead_code)]
+pub fn st(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
+  let module = SWC::parse(specifer, source, None).expect("could not parse module");
+  let resolver = Rc::new(RefCell::new(Resolver::new(
+    specifer,
+    ImportHashMap::default(),
+    Some("https://deno.land/x/aleph@v0.3.0".into()),
+    None,
+    bundling,
+    vec![],
+  )));
+  let (code, _) = module
+    .transform(resolver.clone(), &EmitOptions::default())
+    .expect("could not transform module");
+  println!("{}", code);
+  (code, resolver)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::import_map::ImportHashMap;
-  use crate::resolve::{DependencyDescriptor, Resolver, HASH_PLACEHOLDER};
-  use sha1::{Digest, Sha1};
-
-  fn t(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
-    let module = ParsedModule::parse(specifer, source, None).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      specifer,
-      ImportHashMap::default(),
-      Some("https://deno.land/x/aleph@v0.3.0".into()),
-      None,
-      bundling,
-      vec![],
-    )));
-    let (code, _) = module
-      .transform(resolver.clone(), &EmitOptions::default())
-      .expect("could not transform module");
-    println!("{}", code);
-    (code, resolver)
-  }
 
   #[test]
   fn ts() {
@@ -340,7 +384,7 @@ mod tests {
         bar() {}
       }
     "#;
-    let (code, _) = t("https://deno.land/x/mod.ts", source, false);
+    let (code, _) = st("https://deno.land/x/mod.ts", source, false);
     assert!(code.contains("var D;\n(function(D) {\n"));
     assert!(code.contains("_applyDecoratedDescriptor("));
   }
@@ -357,238 +401,9 @@ mod tests {
         )
       }
     "#;
-    let (code, _) = t("/pages/index.tsx", source, false);
+    let (code, _) = st("/pages/index.tsx", source, false);
     assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("className: \"title\""));
-    assert!(code.contains("import React from \"../-/esm.sh/react.js\""));
-  }
-
-  #[test]
-  fn sign_use_deno_hook() {
-    let specifer = "/pages/index.tsx";
-    let source = r#"
-      export default function Index() {
-        const verison = useDeno(() => Deno.version)
-        const verison = useDeno(async function() {
-          return await readJson("./data.json")
-        }, 1000)
-        return (
-          <>
-            <p>Deno v{version.deno}</p>
-            <V8 />
-            <TS />
-          </>
-        )
-      }
-    "#;
-
-    let mut hasher = Sha1::new();
-    hasher.update(specifer.clone());
-    hasher.update("1");
-    hasher.update("() => Deno.version");
-    let id_1 = base64::encode(hasher.finalize())
-      .replace("/", "")
-      .replace("+", "");
-    let id_1 = id_1.trim_end_matches('=');
-
-    let mut hasher = Sha1::new();
-    hasher.update(specifer.clone());
-    hasher.update("2");
-    hasher.update(
-      r#"async function() {
-          return await readJson("./data.json")
-        }"#,
-    );
-    let id_2 = base64::encode(hasher.finalize())
-      .replace("/", "")
-      .replace("+", "");
-    let id_2 = id_2.trim_end_matches('=');
-
-    for _ in 0..3 {
-      let (code, _) = t(specifer, source, false);
-      assert!(code.contains(format!("0, \"useDeno-{}\"", id_1).as_str()));
-      assert!(code.contains(format!("1000, \"useDeno-{}\"", id_2).as_str()));
-      let (code, _) = t(specifer, source, true);
-      assert!(code.contains(format!("null, 0, \"useDeno-{}\"", id_1).as_str()));
-      assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_2).as_str()));
-    }
-  }
-
-  #[test]
-  fn resolve_jsx_builtin_tags() {
-    let source = r#"
-      import React from "https://esm.sh/react"
-      export default function Index() {
-        return (
-          <>
-            <head>
-              <title>Hello World!</title>
-              <link rel="stylesheet" href="../style/index.css" />
-            </head>
-            <a href="/about">About</a>
-            <a href="https://github.com">About</a>
-            <a href="/about" target="_blank">About</a>
-            <script src="ga.js"></script>
-            <script>{`
-              function gtag() {
-                dataLayer.push(arguments)
-              }
-              window.dataLayer = window.dataLayer || [];
-              gtag("js", new Date());
-              gtag("config", "G-1234567890");
-            `}</script>
-          </>
-        )
-      }
-    "#;
-    let (code, resolver) = t("/pages/index.tsx", source, false);
-    assert!(code.contains(
-      "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/anchor.js\""
-    ));
-    assert!(code.contains(
-      "import __ALEPH_Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/head.js\""
-    ));
-    assert!(code.contains(
-      "import __ALEPH_Stylelink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/stylelink.js\""
-    ));
-    assert!(code.contains(
-      "import __ALEPH_Script from \"../-/deno.land/x/aleph@v0.3.0/framework/react/script.js\""
-    ));
-    assert!(code.contains("React.createElement(\"a\","));
-    assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
-    assert!(code.contains("React.createElement(__ALEPH_Head,"));
-    assert!(code.contains("React.createElement(__ALEPH_Stylelink,"));
-    assert!(code.contains("href: \"/style/index.css\""));
-    assert!(code.contains(
-      format!(
-        "import   \"../style/index.css.{}.js\"",
-        HASH_PLACEHOLDER.as_str()
-      )
-      .as_str()
-    ));
-    assert!(code.contains("React.createElement(__ALEPH_Script,"));
-    let r = resolver.borrow_mut();
-    assert_eq!(
-      r.dep_graph,
-      vec![
-        DependencyDescriptor {
-          specifier: "https://esm.sh/react".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "/style/index.css".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/head.ts".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/stylelink.ts".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/anchor.ts".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/script.ts".into(),
-          is_dynamic: false,
-        }
-      ]
-    );
-  }
-
-  #[test]
-  fn resolve_inlie_style() {
-    let source = r#"
-      export default function Index() {
-        const [color, setColor] = useState('white');
-
-        return (
-          <>
-            <style>{`
-              :root {
-                --color: ${color};
-              }
-            `}</style>
-            <style>{`
-              h1 {
-                font-size: 12px;
-              }
-            `}</style>
-          </>
-        )
-      }
-    "#;
-    let (code, resolver) = t("/pages/index.tsx", source, false);
-    assert!(code.contains(
-      "import __ALEPH_Style from \"../-/deno.land/x/aleph@v0.3.0/framework/react/style.js\""
-    ));
-    assert!(code.contains("React.createElement(__ALEPH_Style,"));
-    assert!(code.contains("__styleId: \"inline-style-"));
-    let r = resolver.borrow_mut();
-    assert!(r.inline_styles.len() == 2);
-  }
-
-  #[test]
-  fn resolve_import_meta_url() {
-    let source = r#"
-      console.log(import.meta.url)
-    "#;
-    let (code, _) = t("/pages/index.tsx", source, true);
-    assert!(code.contains("console.log(\"/pages/index.tsx\")"));
-  }
-
-  #[test]
-  fn bundling_import() {
-    let source = r#"
-      import React, { useState, useEffect as useEffect_ } from "https://esm.sh/react"
-      import * as React_ from "https://esm.sh/react"
-      import Logo from '../components/logo.ts'
-      import Nav from '../components/nav.ts'
-      import '../shared/iife.ts'
-      export default function Index() {
-        return (
-          <>
-            <link rel="stylesheet" href="../style/index.css" />
-            <head></head>
-            <Logo />
-            <Nav />
-            <h1>Hello World</h1>
-          </>
-        )
-      }
-    "#;
-    let module =
-      ParsedModule::parse("/pages/index.tsx", source, None).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-      "/pages/index.tsx",
-      ImportHashMap::default(),
-      None,
-      None,
-      true,
-      vec![
-        "https://esm.sh/react".into(),
-        "/components/logo.ts".into(),
-        "/shared/iife.ts".into(),
-      ],
-    )));
-    let (code, _) = module
-      .transform(resolver.clone(), &EmitOptions::default())
-      .expect("could not transform module");
-    println!("{}", code);
-    assert!(code.contains("React = __ALEPH.pack[\"https://esm.sh/react\"].default"));
-    assert!(code.contains("useState = __ALEPH.pack[\"https://esm.sh/react\"].useState"));
-    assert!(code.contains("useEffect_ = __ALEPH.pack[\"https://esm.sh/react\"].useEffect"));
-    assert!(code.contains("React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));
-    assert!(code.contains("Logo = __ALEPH.pack[\"/components/logo.ts\"].default"));
-    assert!(!code.contains("Nav = __ALEPH.pack[\"/components/nav.ts\"].default"));
-    assert!(code.contains("import Nav from \""));
-    assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
-    assert!(code.contains(
-      "__ALEPH_Head = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"].default"
-    ));
   }
 }

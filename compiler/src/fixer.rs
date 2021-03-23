@@ -14,33 +14,66 @@ struct CompatFixer {}
 impl Fold for CompatFixer {
   noop_fold_type!();
 
-  // - `require("regenerator-runtime")` -> `__ALEPH.require("regenerator-runtime")`
+  // - `require("regenerator-runtime")` -> `(() => window.regeneratorRuntime)()`
   fn fold_call_expr(&mut self, call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "require") {
-      let ok = match call.args.first() {
+      let name = match call.args.first() {
         Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
           Expr::Lit(lit) => match lit {
-            Lit::Str(_) => true,
-            _ => false,
+            Lit::Str(s) => s.value.as_ref(),
+            _ => "",
           },
-          _ => false,
+          _ => "",
         },
-        _ => false,
+        _ => "",
       };
-      if ok {
-        return CallExpr {
-          span: DUMMY_SP,
-          callee: ExprOrSuper::Expr(Box::new(Expr::Member(MemberExpr {
+      match name {
+        "regenerator-runtime" => {
+          return CallExpr {
             span: DUMMY_SP,
-            obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH")))),
-            prop: Box::new(Expr::Ident(quote_ident!("require"))),
-            computed: false,
-          }))),
-          args: call.args,
-          type_args: None,
-        };
+            callee: ExprOrSuper::Expr(Box::new(Expr::Paren(ParenExpr {
+              span: DUMMY_SP,
+              expr: Box::new(Expr::Arrow(ArrowExpr {
+                span: DUMMY_SP,
+                params: vec![],
+                body: BlockStmtOrExpr::Expr(Box::new(Expr::MetaProp(MetaPropExpr {
+                  meta: quote_ident!("window"),
+                  prop: quote_ident!("regeneratorRuntime"),
+                }))),
+                is_async: false,
+                is_generator: false,
+                type_params: None,
+                return_type: None,
+              })),
+            }))),
+            args: vec![],
+            type_args: None,
+          };
+        }
+        _ => {}
       }
     }
     call
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::swc::t;
+
+  #[test]
+  fn compat_fix() {
+    let source = r#"
+      require("regenerator-runtime")
+      const { mark } = require("regenerator-runtime")
+    "#;
+    let expect = r#"
+(()=>window.regeneratorRuntime
+)();
+const { mark  } = (()=>window.regeneratorRuntime
+)();
+"#;
+    assert!(t("/app.js", source, compat_fixer_fold(), expect));
   }
 }

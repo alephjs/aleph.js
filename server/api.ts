@@ -11,7 +11,7 @@ export class Request implements APIRequest {
   #resp = {
     status: 200,
     headers: new Headers({
-      'Server': 'Aleph.js',
+      Server: 'Aleph.js',
     }),
     done: false
   }
@@ -167,13 +167,13 @@ export class Request implements APIRequest {
     this.#resp.headers.set('Date', (new Date).toUTCString())
     this.#resp.done = true
     try {
-      return this.respond({
+      await this.respond({
         status: this.#resp.status,
         headers: this.#resp.headers,
         body
       })
     } catch (err) {
-      return log.warn('ServerRequest.respond:', err.message)
+      log.warn('ServerRequest.respond:', err.message)
     }
   }
 

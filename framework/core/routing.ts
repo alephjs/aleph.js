@@ -1,9 +1,9 @@
 import util from '../../shared/util.ts'
-import { moduleExts } from '../../shared/constants.ts'
 import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
+import { toPagePath } from './module.ts'
 
-const ghostRoute: Route = { path: '', module: { url: '', hash: '' } }
+const ghostRoute: Route = { path: '', module: { url: '' } }
 
 export type Route = {
   path: string
@@ -13,7 +13,6 @@ export type Route = {
 
 export type RouteModule = {
   readonly url: string
-  readonly hash: string
   readonly useDeno?: boolean
 }
 
@@ -230,9 +229,9 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
   return [params, true]
 }
 
-export function createBlankRouterURL(locale = 'en'): RouterURL {
+export function createBlankRouterURL(baseURL = '/', locale = 'en'): RouterURL {
   return {
-    baseURL: '/',
+    baseURL,
     locale,
     pagePath: '',
     pathname: '/',
@@ -289,24 +288,4 @@ export async function redirect(url: string, replace?: boolean) {
     history.pushState(null, '', url)
   }
   events.emit('popstate', { type: 'popstate', resetScroll: true })
-}
-
-export function toPagePath(url: string): string {
-  let pathname = url
-  for (const ext of moduleExts) {
-    if (url.endsWith('.' + ext)) {
-      pathname = url.slice(0, -(ext.length + 1))
-      break
-    }
-  }
-  if (pathname.startsWith('/pages/')) {
-    pathname = util.trimPrefix(pathname, '/pages')
-  }
-  if (pathname.endsWith('/index')) {
-    pathname = util.trimSuffix(pathname, 'index')
-  }
-  if (pathname === '') {
-    pathname = '/'
-  }
-  return pathname
 }

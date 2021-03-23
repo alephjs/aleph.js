@@ -12,8 +12,10 @@ export type LoaderPlugin = {
   test: RegExp
   /** `acceptHMR` enables the HMR. */
   acceptHMR?: boolean
-  /** `allowPage` allows the loaded module as a page. */
-  allowPage?: boolean
+  /** `asPage` allows the loaded module as a page. */
+  asPage?: boolean
+  /** `resolve` resolves the module content. */
+  resolve?(url: string): { content: Uint8Array } | Promise<{ content: Uint8Array }>
   /** `transform` transforms the source content. */
   transform(source: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformResult | Promise<LoaderTransformResult>
 }
@@ -96,22 +98,28 @@ export interface ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
-  addModule(url: string, options?: ModuleOptions): Promise<void>
-  injectCode(stage: 'compilation' | 'hmr', transform: TransformFn): void
+  addModule(url: string, options?: { code?: string }): Promise<Module>
+  injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: TransformFn): void
 }
 
 export type TransformFn = {
   (url: string, code: string): string
 }
 
-/**
- * The module options.
- */
-export type ModuleOptions = {
-  code?: string
-  asAPI?: boolean
-  asPage?: boolean
-  pathname?: string
+/** A module includes the compilation details. */
+export type Module = {
+  url: string
+  deps: DependencyDescriptor[]
+  sourceHash: string
+  hash: string
+  jsFile: string
+}
+
+/** The dependency descriptor. */
+export type DependencyDescriptor = {
+  url: string
+  hash: string
+  isDynamic?: boolean
 }
 
 /**

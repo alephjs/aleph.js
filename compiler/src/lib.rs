@@ -17,11 +17,11 @@ use serde::{Deserialize, Serialize};
 use source_type::SourceType;
 use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
-use swc::{EmitOptions, ParsedModule};
+use swc::{EmitOptions, SWC};
 use swc_ecmascript::parser::JscTarget;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Options {
   #[serde(default)]
@@ -46,17 +46,20 @@ pub struct Options {
   pub transpile_only: bool,
 
   #[serde(default)]
+  pub resolve_star_exports: bool,
+
+  #[serde(default)]
   pub bundle_mode: bool,
 
   #[serde(default)]
   pub bundle_external: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SWCOptions {
   #[serde(default)]
-  pub source_type: String,
+  pub source_type: SourceType,
 
   #[serde(default = "default_target")]
   pub target: JscTarget,
@@ -71,7 +74,7 @@ pub struct SWCOptions {
 impl Default for SWCOptions {
   fn default() -> Self {
     SWCOptions {
-      source_type: "tsx".into(),
+      source_type: SourceType::default(),
       target: default_target(),
       jsx_factory: default_pragma(),
       jsx_fragment_factory: default_pragma_frag(),
@@ -91,7 +94,7 @@ fn default_pragma_frag() -> String {
   "React.Fragment".into()
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransformOutput {
   pub code: String,
@@ -99,6 +102,24 @@ pub struct TransformOutput {
   pub map: Option<String>,
   pub deps: Vec<DependencyDescriptor>,
   pub inline_styles: HashMap<String, InlineStyle>,
+  pub star_exports: Option<Vec<String>>,
+}
+
+#[wasm_bindgen(js_name = "parseExportNamesSync")]
+pub fn parse_export_names_sync(
+  url: &str,
+  code: &str,
+  options: JsValue,
+) -> Result<JsValue, JsValue> {
+  console_error_panic_hook::set_once();
+
+  let options: SWCOptions = options
+    .into_serde()
+    .map_err(|err| format!("failed to parse options: {}", err))
+    .unwrap();
+  let module = SWC::parse(url, code, Some(options.source_type)).expect("could not parse module");
+  let export_names = module.parse_export_names().unwrap();
+  Ok(JsValue::from_serde(&export_names).unwrap())
 }
 
 #[wasm_bindgen(js_name = "transformSync")]
@@ -123,14 +144,8 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
     options.bundle_mode,
     options.bundle_external,
   )));
-  let specify_source_type = match options.swc_options.source_type.as_str() {
-    "js" => Some(SourceType::JavaScript),
-    "jsx" => Some(SourceType::JSX),
-    "ts" => Some(SourceType::TypeScript),
-    "tsx" => Some(SourceType::TSX),
-    _ => None,
-  };
-  let module = ParsedModule::parse(url, code, specify_source_type).expect("could not parse module");
+  let module =
+    SWC::parse(url, code, Some(options.swc_options.source_type)).expect("could not parse module");
   let (code, map) = module
     .transform(
       resolver.clone(),
@@ -141,6 +156,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
         source_map: options.source_map,
         is_dev: options.is_dev,
         transpile_only: options.transpile_only,
+        resolve_star_exports: options.resolve_star_exports,
       },
     )
     .expect("could not transform module");
@@ -151,6 +167,11 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
       map,
       deps: r.dep_graph.clone(),
       inline_styles: r.inline_styles.clone(),
+      star_exports: if r.star_exports.len() > 0 {
+        Some(r.star_exports.clone())
+      } else {
+        None
+      },
     })
     .unwrap(),
   )

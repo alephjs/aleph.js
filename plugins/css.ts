@@ -15,9 +15,7 @@ type Options = {
 }
 
 export default (options?: Options): LoaderPlugin => {
-  const isDev = Deno.env.get('BUILD_MODE') === 'production'
   const decoder = new TextDecoder()
-
   let pcssProcessor: any = null
 
   return {
@@ -30,7 +28,7 @@ export default (options?: Options): LoaderPlugin => {
         pcssProcessor = await initPostCSSProcessor(options)
       }
       const { content: pcss } = await pcssProcessor.process(decoder.decode(content)).async()
-      const css = isDev ? cleanCSS.minify(pcss).styles : pcss
+      const css = Deno.env.get('BUILD_MODE') === 'production' ? cleanCSS.minify(pcss).styles : pcss
       if (url.startsWith('#inline-style-')) {
         return {
           code: css,

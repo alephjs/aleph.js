@@ -1,8 +1,7 @@
 import type { ImportMap } from '../compiler/mod.ts'
 import { path } from '../deps.ts'
-import cssLoader from '../plugins/css.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
-import { existsFileSync } from '../shared/fs.ts'
+import { existsFileSync, existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Config } from '../types.ts'
@@ -29,7 +28,6 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   for (const name of ['ts', 'js', 'json'].map(ext => 'aleph.config.' + ext)) {
     const p = path.join(workingDir, name)
     if (existsFileSync(p)) {
-      log.info('Aleph server config loaded from', name)
       if (name.endsWith('.json')) {
         const v = JSON.parse(await Deno.readTextFile(p))
         if (util.isPlainObject(v)) {
@@ -44,6 +42,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
           data = v
         }
       }
+      log.info('Config loaded from', name)
       break
     }
   }
@@ -68,6 +67,8 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (util.isNEString(srcDir)) {
     config.srcDir = util.cleanPath(srcDir)
+  } else if (existsDirSync(path.join(workingDir, 'src'))) {
+    config.srcDir = '/src'
   }
   if (util.isNEString(outputDir)) {
     config.outputDir = util.cleanPath(outputDir)
@@ -103,10 +104,9 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     config.env = toPlainStringRecord(env)
     Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
   }
-  config.plugins = [
-    util.isNEArray(plugins) ? plugins : [],
-    cssLoader() // add the css loader as default
-  ].flat()
+  if (util.isNEArray(plugins)) {
+    config.plugins = plugins
+  }
 
   // todo: load ssr.config.ts
 

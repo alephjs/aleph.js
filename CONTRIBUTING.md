@@ -21,20 +21,17 @@ You will need [Deno](https://deno.land/) 1.7+.
 7. Marge to master branch by our maintainers.
 
 ```bash
-# set dev env
-echo 'ALEPH_DEV_PORT=2021' > .local.env
-
 # ssr/development with HMR
-deno run -A cli.ts dev ./examples/hello-world -L debug
+ALEPH_DEV_PORT=2020 deno run -A --unstable --location=http://localhost dev ./examples/hello-world -L debug
 
 # ssr/production
-deno run -A cli.ts start ./examples/hello-world -L debug
+ALEPH_DEV_PORT=2020 deno run -A --unstable --location=http://localhost start ./examples/hello-world -L debug
 
 # ssg
-deno run -A cli.ts build ./examples/hello-world -L debug
+ALEPH_DEV_PORT=2020 deno run -A --unstable --location=http://localhost build ./examples/hello-world -L debug
 
 # run all tests
-deno test -A --location=http://localhost
+deno test -A --unstable --location=https://deno.land/x/aleph
 ```
 
 ## Project Structure

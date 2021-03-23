@@ -4,7 +4,15 @@ import log from '../shared/log.ts'
 import type { LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
-import init, { transformSync } from './dist/wasm-pack.js'
+import init, { parseExportNamesSync, transformSync } from './dist/wasm-pack.js'
+
+export enum SourceType {
+  JS = 'js',
+  JSX = 'jsx',
+  TS = 'ts',
+  TSX = 'tsx',
+  Unknown = '??',
+}
 
 export type ImportMap = {
   imports: Record<string, string>
@@ -12,7 +20,7 @@ export type ImportMap = {
 }
 
 export type SWCOptions = {
-  sourceType?: 'js' | 'jsx' | 'ts' | 'tsx'
+  sourceType?: SourceType
   target?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
   jsxFactory?: string
   jsxFragmentFactory?: string
@@ -26,6 +34,7 @@ export type TransformOptions = {
   sourceMap?: boolean
   isDev?: boolean
   transpileOnly?: boolean
+  resolveStarExports?: boolean
   bundleMode?: boolean
   bundleExternal?: string[]
   // loaders for inline styles transform
@@ -35,7 +44,8 @@ export type TransformOptions = {
 export type TransformResult = {
   code: string
   deps: DependencyDescriptor[]
-  map?: string
+  starExports: string[] | null
+  map: string | null
 }
 
 type InlineStyles = Record<string, { type: string, quasis: string[], exprs: string[] }>
@@ -58,7 +68,7 @@ async function getDenoDir() {
   return JSON.parse(output).denoDir
 }
 
-async function initWasm() {
+export async function initWasm() {
   const cacheDir = path.join(await getDenoDir(), `deps/https/deno.land/aleph@v${VERSION}`)
   const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
   if (existsFileSync(cachePath)) {
@@ -112,7 +122,13 @@ export async function transform(url: string, code: string, options: TransformOpt
   }
 
   const { loaders, ...transformOptions } = options
-  let { code: jsContent, inlineStyles, deps, map } = transformSync(url, code, transformOptions)
+  let {
+    code: jsContent,
+    deps,
+    map,
+    inlineStyles,
+    starExports
+  } = transformSync(url, code, transformOptions)
 
   // resolve inline-style
   await Promise.all(Object.entries(inlineStyles as InlineStyles).map(async ([key, style]) => {
@@ -157,7 +173,25 @@ export async function transform(url: string, code: string, options: TransformOpt
     jsContent = jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
   }))
 
-  return { code: jsContent, deps, map }
+  return { code: jsContent, deps, map, starExports }
+}
+
+/* parse export names of the module */
+export async function parseExportNames(url: string, code: string, options: SWCOptions = {}): Promise<string[]> {
+  let t: number | null = null
+  if (wasmReady === false) {
+    t = performance.now()
+    wasmReady = initWasm()
+  }
+  if (wasmReady instanceof Promise) {
+    await wasmReady
+    wasmReady = true
+  }
+  if (t !== null) {
+    log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
+  }
+
+  return parseExportNamesSync(url, code, options)
 }
 
 /**

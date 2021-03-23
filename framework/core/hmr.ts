@@ -1,4 +1,3 @@
-import util from '../../shared/util.ts'
 import events from './events.ts'
 
 interface Callback {
@@ -65,10 +64,10 @@ socket.addEventListener('close', () => {
 socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
   if (rawData) {
     try {
-      const { type, url, hash, asyncDeps, updateUrl } = JSON.parse(rawData)
+      const { type, url, asyncDeps, updateUrl } = JSON.parse(rawData)
       switch (type) {
         case 'add':
-          events.emit('add-module', { url, hash, asyncDeps })
+          events.emit('add-module', { url, asyncDeps })
           break
         case 'update':
           const mod = modules.get(url)
@@ -83,7 +82,7 @@ socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
           }
           break
       }
-      console.log(`[HMR]${hash ? ' [' + util.shortHash(hash) + ']' : ''} ${type} module '${url}'`)
+      console.log(`[HMR]${type} module '${url}'`)
     } catch (err) {
       console.warn(err)
     }

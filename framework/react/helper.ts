@@ -1,6 +1,6 @@
 import { createContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import { hashShortLength, moduleExts } from '../../shared/constants.ts'
+import { moduleExts } from '../../shared/constants.ts'
 import type { RouterURL } from '../../types.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for
@@ -40,41 +40,6 @@ export function isLikelyReactComponent(type: any): Boolean {
     default:
       return false
   }
-}
-
-export function trimModuleExt(url: string) {
-  for (const ext of moduleExts) {
-    if (url.endsWith('.' + ext)) {
-      return url.slice(0, -(ext.length + 1))
-    }
-  }
-  return url
-}
-
-export function importModule(baseUrl: string, mod: { url: string, hash: string }, forceRefetch = false): Promise<any> {
-  const { __ALEPH: ALEPH, document } = window as any
-
-  if (ALEPH && mod.url in ALEPH.pack) {
-    return Promise.resolve(ALEPH.pack[mod.url])
-  }
-
-  if (ALEPH && mod.url.startsWith('/pages/')) {
-    const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.bundle.${mod.hash.slice(0, hashShortLength)}.js`)
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script')
-      script.onload = () => {
-        resolve(ALEPH.pack[mod.url])
-      }
-      script.onerror = (err: Error) => {
-        reject(err)
-      }
-      script.src = src
-      document.body.appendChild(script)
-    })
-  }
-
-  const src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(mod.url) + `.${mod.hash.slice(0, hashShortLength)}.js`) + (forceRefetch ? `?t=${Date.now()}` : '')
-  return import(src)
 }
 
 export async function loadPageData({ pathname }: RouterURL): Promise<void> {

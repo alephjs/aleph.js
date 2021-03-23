@@ -1,5 +1,4 @@
-import type { ComponentType } from 'https://esm.sh/react'
-import { createElement, useContext, useMemo } from 'https://esm.sh/react'
+import { ComponentType, createElement, useContext, useMemo } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
@@ -18,25 +17,6 @@ import { AsyncUseDenoError } from './error.ts'
  */
 export function useRouter(): RouterURL {
   return useContext(RouterContext)
-}
-
-/**
- * `withRouter` allows you to use `useRouter` hook with class component.
- *
- * ```tsx
- * class MyComponent extends React.Component {
- *   render() {
- *     return <p>{this.props.router.pathname}</p>
- *   }
- * }
- * export default withRouter(MyComponent)
- * ```
- */
-export function withRouter<P>(Component: ComponentType<P>) {
-  return function WithRouter(props: P) {
-    const router = useRouter()
-    return createElement(Component, { ...props, router })
-  }
 }
 
 /**
@@ -88,28 +68,4 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), revalidate?: 
     }
     return null
   }, [id, pathname])
-}
-
-/**
- * `withDeno` allows you to use `useDeno` hook with class component.
- *
- * ```tsx
- * class MyComponent extends React.Component {
- *   render() {
- *     return <p>{this.props.deno.version}</p>
- *   }
- * }
- * export default withDeno(() => ({ version: Deno.version.deno }))(MyComponent)
- * ```
- *
- * @param {Function} callback - hook callback.
- * @param {number} revalidate - revalidate duration in seconds.
- */
-export function withDeno<T>(callback: () => (T | Promise<T>), revalidate?: number) {
-  return function <P extends T>(Component: ComponentType<P>): ComponentType<Exclude<P, keyof T>> {
-    return function WithDeno(props: Exclude<P, keyof T>) {
-      const deno = useDeno<T>(callback, revalidate)
-      return createElement(Component, { ...props, deno })
-    }
-  }
 }

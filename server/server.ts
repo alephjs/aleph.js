@@ -1,13 +1,12 @@
 import { path, serve as stdServe, serveTLS, ws } from '../deps.ts'
+import { trimModuleExt } from '../framework/core/module.ts'
 import { rewriteURL, RouteModule } from '../framework/core/routing.ts'
-import { hashShortLength } from '../shared/constants.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
-import { createHtml, reHashJs, trimModuleExt } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */
@@ -36,42 +35,44 @@ export class Server {
     for (const key in app.config.headers) {
       req.setHeader(key, app.config.headers[key])
     }
+    if (app.isDev) {
+      req.setHeader('Cache-Control', 'max-age=0')
+    }
 
     try {
       // serve hmr ws
       if (pathname === '/_hmr') {
         const { conn, r: bufReader, w: bufWriter, headers } = r
-        ws.acceptWebSocket({ conn, bufReader, bufWriter, headers }).then(async socket => {
-          const watcher = app.createFSWatcher()
-          watcher.on('add', (mod: RouteModule) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
-          watcher.on('remove', (url: string) => {
-            watcher.removeAllListeners('modify-' + url)
-            socket.send(JSON.stringify({ type: 'remove', url }))
-          })
-          for await (const e of socket) {
-            if (util.isNEString(e)) {
-              try {
-                const data = JSON.parse(e)
-                if (data.type === 'hotAccept' && util.isNEString(data.url)) {
-                  const mod = app.getModule(data.url)
-                  if (mod) {
-                    watcher.on('modify-' + mod.url, (hash: string) => {
-                      socket.send(JSON.stringify({
-                        type: 'update',
-                        url: mod.url,
-                        updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.${hash.slice(0, hashShortLength)}.js`),
-                        hash,
-                      }))
-                    })
-                  }
-                }
-              } catch (e) { }
-            } else if (ws.isWebSocketCloseEvent(e)) {
-              break
-            }
-          }
-          app.removeFSWatcher(watcher)
+        const socket = await ws.acceptWebSocket({ conn, bufReader, bufWriter, headers })
+        const watcher = app.createFSWatcher()
+        watcher.on('add', (mod: RouteModule) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
+        watcher.on('remove', (url: string) => {
+          watcher.removeAllListeners('modify-' + url)
+          socket.send(JSON.stringify({ type: 'remove', url }))
         })
+        for await (const e of socket) {
+          if (util.isNEString(e)) {
+            try {
+              const data = JSON.parse(e)
+              if (data.type === 'hotAccept' && util.isNEString(data.url)) {
+                const mod = app.getModule(data.url)
+                if (mod) {
+                  watcher.on('modify-' + mod.url, (hash: string) => {
+                    socket.send(JSON.stringify({
+                      type: 'update',
+                      url: mod.url,
+                      updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.js`),
+                      hash,
+                    }))
+                  })
+                }
+              }
+            } catch (e) { }
+          } else if (ws.isWebSocketCloseEvent(e)) {
+            break
+          }
+        }
+        app.removeFSWatcher(watcher)
         return
       }
 
@@ -91,23 +92,23 @@ export class Server {
           return
         }
 
-        if (pathname.startsWith('/_aleph/main') && ['main', 'main.bundle'].includes(util.trimPrefix(pathname, '/_aleph/').replace(reHashJs, ''))) {
-          req.send(app.getMainJS(pathname.includes('.bundle.')), 'application/javascript; charset=utf-8')
+        if (pathname == '/_aleph/main.js') {
+          req.send(app.getMainJS(false), 'application/javascript; charset=utf-8')
           return
         }
 
         const filePath = path.join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
         if (existsFileSync(filePath)) {
           const info = Deno.lstatSync(filePath)
-          const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
+          const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
           if (lastModified === r.headers.get('If-Modified-Since')) {
             req.status(304).send('')
             return
           }
 
           let content = await Deno.readTextFile(filePath)
-          if (reHashJs.test(filePath)) {
-            const metaFile = filePath.replace(reHashJs, '') + '.meta.json'
+          if (app.isDev && filePath.endsWith('.js')) {
+            const metaFile = util.trimSuffix(filePath, '.js') + '.meta.json'
             if (existsFileSync(metaFile)) {
               try {
                 const { url } = JSON.parse(await Deno.readTextFile(metaFile))
@@ -124,7 +125,7 @@ export class Server {
           return
         }
 
-        req.status(404).send('file not found')
+        req.status(404).send('not found')
         return
       }
 
@@ -132,7 +133,7 @@ export class Server {
       const filePath = path.join(app.workingDir, 'public', pathname)
       if (existsFileSync(filePath)) {
         const info = Deno.lstatSync(filePath)
-        const lastModified = info.mtime?.toUTCString() ?? new Date().toUTCString()
+        const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
         if (lastModified === r.headers.get('If-Modified-Since')) {
           req.status(304).send('')
           return
@@ -146,13 +147,13 @@ export class Server {
 
       // serve APIs
       if (pathname.startsWith('/api/')) {
-        const router = app.getAPIRouter({ pathname, search: url.searchParams.toString() })
-        if (router !== null) {
+        const route = app.getAPIRoute({ pathname, search: url.searchParams.toString() })
+        if (route !== null) {
           try {
-            const [url, mod] = router
-            const { default: handle } = await import('file://' + mod.jsFile)
+            const [{ params, query }, { jsFile, hash }] = route
+            const { default: handle } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
             if (util.isFunction(handle)) {
-              await handle(new Request(req, url.params, url.query))
+              await handle(new Request(req, params, query))
             } else {
               req.status(500).json({ status: 500, message: 'bad api handler' })
             }
@@ -167,14 +168,13 @@ export class Server {
       }
 
       // ssr
-      const [status, html] = await app.getPageHtml({ pathname, search: url.searchParams.toString() })
+      const [status, html] = await app.getPageHTML({ pathname, search: url.searchParams.toString() })
       req.status(status).send(html, 'text/html; charset=utf-8')
     } catch (err) {
-      req.status(500).send(createHtml({
-        lang: 'en',
-        head: ['<title>500 - internal server error</title>'],
-        body: `<p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`
-      }), 'text/html; charset=utf-8')
+      req.status(500).send(
+        `<!DOCTYPE html><title>500 - internal server error</title><p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`,
+        'text/html; charset=utf-8'
+      )
     }
   }
 }
@@ -196,6 +196,9 @@ export type ServeOptions = {
 
 /** Create a standard Aleph server. */
 export async function serve({ app, port, hostname, certFile, keyFile }: ServeOptions) {
+  const server = new Server(app)
+  await app.ready
+
   while (true) {
     try {
       let s: AsyncIterable<ServerRequest>
@@ -204,7 +207,6 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
       } else {
         s = stdServe({ port, hostname })
       }
-      const server = new Server(app)
       log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.baseUrl}`)
       for await (const r of s) {
         server.handle(r)

@@ -1,5 +1,5 @@
 use crate::resolve::{is_remote_url, DependencyDescriptor, InlineStyle, Resolver};
-use crate::resolve_fold::create_aleph_pack_var_decl;
+use crate::resolve_fold::create_aleph_pack_var_decl_member;
 
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, rc::Rc};
@@ -368,15 +368,14 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
         format!("{}/framework/react/{}.ts", aleph_pkg_uri, name).as_str(),
         false,
       );
-      if resolver.bundle_mode {
+      if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
         items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
           span: DUMMY_SP,
-          kind: VarDeclKind::Var,
+          kind: VarDeclKind::Const,
           declare: false,
-          decls: vec![create_aleph_pack_var_decl(
-            id,
+          decls: vec![create_aleph_pack_var_decl_member(
             fixed_url.as_str(),
-            Some("default"),
+            vec![(id, Some("default".into()))],
           )],
         }))));
       } else {
@@ -430,4 +429,127 @@ fn rename_builtin_tag(name: &str) -> String {
     name = "Anchor".into();
   }
   "__ALEPH_".to_owned() + name.as_str()
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::resolve::DependencyDescriptor;
+  use crate::swc::st;
+
+  #[test]
+  fn resolve_jsx_builtin_tags() {
+    let source = r#"
+      import React from "https://esm.sh/react"
+      export default function Index() {
+        return (
+          <>
+            <head>
+              <title>Hello World!</title>
+              <link rel="stylesheet" href="../style/index.css" />
+            </head>
+            <a href="/about">About</a>
+            <a href="https://github.com">About</a>
+            <a href="/about" target="_blank">About</a>
+            <script src="ga.js"></script>
+            <script>{`
+              function gtag() {
+                dataLayer.push(arguments)
+              }
+              window.dataLayer = window.dataLayer || [];
+              gtag("js", new Date());
+              gtag("config", "G-1234567890");
+            `}</script>
+          </>
+        )
+      }
+    "#;
+    let (code, resolver) = st("/pages/index.tsx", source, false);
+    assert!(code.contains(
+      "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/anchor.js\""
+    ));
+    assert!(code.contains(
+      "import __ALEPH_Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/head.js\""
+    ));
+    assert!(code.contains(
+      "import __ALEPH_Stylelink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/stylelink.js\""
+    ));
+    assert!(code.contains(
+      "import __ALEPH_Script from \"../-/deno.land/x/aleph@v0.3.0/framework/react/script.js\""
+    ));
+    assert!(code.contains("React.createElement(\"a\","));
+    assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
+    assert!(code.contains("React.createElement(__ALEPH_Head,"));
+    assert!(code.contains("React.createElement(__ALEPH_Stylelink,"));
+    assert!(code.contains("href: \"/style/index.css\""));
+    assert!(code.contains(
+      format!(
+        "import   \"../style/index.css.js#{}@000000\"",
+        "/style/index.css"
+      )
+      .as_str()
+    ));
+    assert!(code.contains("React.createElement(__ALEPH_Script,"));
+    let r = resolver.borrow_mut();
+    assert_eq!(
+      r.dep_graph,
+      vec![
+        DependencyDescriptor {
+          specifier: "https://esm.sh/react".into(),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: "/style/index.css".into(),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/head.ts".into(),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/stylelink.ts".into(),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/anchor.ts".into(),
+          is_dynamic: false,
+        },
+        DependencyDescriptor {
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/script.ts".into(),
+          is_dynamic: false,
+        }
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_inlie_style() {
+    let source = r#"
+      export default function Index() {
+        const [color, setColor] = useState('white');
+
+        return (
+          <>
+            <style>{`
+              :root {
+                --color: ${color};
+              }
+            `}</style>
+            <style>{`
+              h1 {
+                font-size: 12px;
+              }
+            `}</style>
+          </>
+        )
+      }
+    "#;
+    let (code, resolver) = st("/pages/index.tsx", source, false);
+    assert!(code.contains(
+      "import __ALEPH_Style from \"../-/deno.land/x/aleph@v0.3.0/framework/react/style.js\""
+    ));
+    assert!(code.contains("React.createElement(__ALEPH_Style,"));
+    assert!(code.contains("__styleId: \"inline-style-"));
+    let r = resolver.borrow_mut();
+    assert!(r.inline_styles.len() == 2);
+  }
 }
