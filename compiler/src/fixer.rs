@@ -60,45 +60,20 @@ impl Fold for CompatFixer {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::swc::SWC;
-  use std::cmp::min;
-  use swc_common::Globals;
-
-  fn t(specifier: &str, source: &str, expect: &str) -> bool {
-    let module = SWC::parse(specifier, source, None).expect("could not parse module");
-    let (code, _) = swc_common::GLOBALS.set(&Globals::new(), || {
-      module
-        .apply_transform(compat_fixer_fold(), false)
-        .expect("could not transpile module")
-    });
-
-    if code != expect {
-      let mut p: usize = 0;
-      for i in 0..min(code.len(), expect.len()) {
-        if code.get(i..i + 1) != expect.get(i..i + 1) {
-          p = i;
-          break;
-        }
-      }
-      println!(
-        "{}\x1b[0;31m{}\x1b[0m",
-        code.get(0..p).unwrap(),
-        code.get(p..).unwrap()
-      );
-    }
-    code == expect
-  }
+  use crate::swc::t;
 
   #[test]
-  fn fast_refresh() {
-    let source = r#"require("regenerator-runtime")
-const { mark } = require("regenerator-runtime")
+  fn compat_fix() {
+    let source = r#"
+      require("regenerator-runtime")
+      const { mark } = require("regenerator-runtime")
     "#;
-    let expect = r#"(()=>window.regeneratorRuntime
+    let expect = r#"
+(()=>window.regeneratorRuntime
 )();
 const { mark  } = (()=>window.regeneratorRuntime
 )();
 "#;
-    assert!(t("/app.js", source, expect));
+    assert!(t("/app.js", source, compat_fixer_fold(), expect));
   }
 }

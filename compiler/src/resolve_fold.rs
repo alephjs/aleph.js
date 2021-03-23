@@ -7,11 +7,16 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 
-pub fn resolve_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
+pub fn resolve_fold(
+  resolver: Rc<RefCell<Resolver>>,
+  source: Rc<SourceMap>,
+  resolve_star_exports: bool,
+) -> impl Fold {
   ResolveFold {
     deno_hooks_idx: 0,
     resolver,
     source,
+    resolve_star_exports,
   }
 }
 
@@ -19,6 +24,7 @@ pub struct ResolveFold {
   deno_hooks_idx: i32,
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
+  resolve_star_exports: bool,
 }
 
 impl ResolveFold {
@@ -208,7 +214,7 @@ impl Fold for ResolveFold {
               let mut resolver = self.resolver.borrow_mut();
               let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
               if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
-                resolver.bundle_star_exports.push(fixed_url.clone());
+                resolver.star_exports.push(fixed_url.clone());
                 ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                   span: DUMMY_SP,
                   decl: Decl::Var(VarDecl {
@@ -217,16 +223,25 @@ impl Fold for ResolveFold {
                     declare: false,
                     decls: vec![create_aleph_pack_var_decl(
                       fixed_url.as_ref(),
-                      quote_ident!(format!("$$star_{}", resolver.bundle_star_exports.len() - 1)),
+                      quote_ident!(format!("$$star_{}", resolver.star_exports.len() - 1)),
                     )],
                   }),
                 }))
               } else {
-                ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
-                  span: DUMMY_SP,
-                  src: new_str(resolved_path.into()),
-                  asserts: None,
-                }))
+                if self.resolve_star_exports {
+                  resolver.star_exports.push(fixed_url.clone());
+                  ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
+                    span: DUMMY_SP,
+                    src: new_str(fixed_url.into()),
+                    asserts: None,
+                  }))
+                } else {
+                  ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
+                    span: DUMMY_SP,
+                    src: new_str(resolved_path.into()),
+                    asserts: None,
+                  }))
+                }
               }
             }
             _ => ModuleItem::ModuleDecl(decl),

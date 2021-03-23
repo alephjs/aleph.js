@@ -46,6 +46,9 @@ pub struct Options {
   pub transpile_only: bool,
 
   #[serde(default)]
+  pub resolve_star_exports: bool,
+
+  #[serde(default)]
   pub bundle_mode: bool,
 
   #[serde(default)]
@@ -99,7 +102,7 @@ pub struct TransformOutput {
   pub map: Option<String>,
   pub deps: Vec<DependencyDescriptor>,
   pub inline_styles: HashMap<String, InlineStyle>,
-  pub bundle_star_exports: Option<Vec<String>>,
+  pub star_exports: Option<Vec<String>>,
 }
 
 #[wasm_bindgen(js_name = "parseExportNamesSync")]
@@ -153,6 +156,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
         source_map: options.source_map,
         is_dev: options.is_dev,
         transpile_only: options.transpile_only,
+        resolve_star_exports: options.resolve_star_exports,
       },
     )
     .expect("could not transform module");
@@ -163,8 +167,8 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
       map,
       deps: r.dep_graph.clone(),
       inline_styles: r.inline_styles.clone(),
-      bundle_star_exports: if r.bundle_star_exports.len() > 0 {
-        Some(r.bundle_star_exports.clone())
+      star_exports: if r.star_exports.len() > 0 {
+        Some(r.star_exports.clone())
       } else {
         None
       },

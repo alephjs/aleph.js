@@ -7,7 +7,7 @@ use crate::resolve::Resolver;
 use crate::resolve_fold::{resolve_fold, ExportsParser};
 use crate::source_type::SourceType;
 
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{cell::RefCell, cmp::min, path::Path, rc::Rc};
 use swc_common::{
   chain,
   comments::SingleThreadedComments,
@@ -33,6 +33,7 @@ pub struct EmitOptions {
   pub jsx_fragment_factory: String,
   pub is_dev: bool,
   pub transpile_only: bool,
+  pub resolve_star_exports: bool,
   pub source_map: bool,
 }
 
@@ -44,6 +45,7 @@ impl Default for EmitOptions {
       jsx_fragment_factory: "React.Fragment".into(),
       is_dev: false,
       transpile_only: false,
+      resolve_star_exports: false,
       source_map: false,
     }
   }
@@ -147,7 +149,11 @@ impl SWC {
       let root_mark = Mark::fresh(Mark::root());
       let mut passes = chain!(
         Optional::new(
-          resolve_fold(resolver.clone(), self.source_map.clone()),
+          resolve_fold(
+            resolver.clone(),
+            self.source_map.clone(),
+            options.resolve_star_exports,
+          ),
           !transpile_only
         ),
         Optional::new(aleph_jsx_fold, is_jsx && !transpile_only),
@@ -296,6 +302,33 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
     SourceType::TSX => Syntax::Typescript(get_ts_config(true)),
     _ => Syntax::Es(get_es_config(false)),
   }
+}
+
+#[allow(dead_code)]
+pub fn t<T: Fold>(specifier: &str, source: &str, tr: T, expect: &str) -> bool {
+  let module = SWC::parse(specifier, source, None).expect("could not parse module");
+  let (code, _) = swc_common::GLOBALS.set(&Globals::new(), || {
+    module
+      .apply_transform(tr, false)
+      .expect("could not transpile module")
+  });
+  let matched = code.as_str().trim().eq(expect.trim());
+
+  if !matched {
+    let mut p: usize = 0;
+    for i in 0..min(code.len(), expect.len()) {
+      if code.get(i..i + 1) != expect.get(i..i + 1) {
+        p = i;
+        break;
+      }
+    }
+    println!(
+      "{}\x1b[0;31m{}\x1b[0m",
+      code.get(0..p).unwrap(),
+      code.get(p..).unwrap()
+    );
+  }
+  matched
 }
 
 #[allow(dead_code)]

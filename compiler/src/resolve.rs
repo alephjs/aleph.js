@@ -53,8 +53,8 @@ pub struct Resolver {
   pub bundle_mode: bool,
   /// bundled modules
   pub bundle_external: IndexSet<String>,
-  /// bundle star exports
-  pub bundle_star_exports: Vec<String>,
+  /// star exports
+  pub star_exports: Vec<String>,
   /// extra imports
   pub extra_imports: IndexSet<String>,
   /// builtin jsx tags like `a`, `link`, `head`, etc
@@ -84,7 +84,7 @@ impl Resolver {
       specifier_is_remote: is_remote_url(specifier),
       used_builtin_jsx_tags: IndexSet::new(),
       dep_graph: Vec::new(),
-      bundle_star_exports: Vec::new(),
+      star_exports: Vec::new(),
       inline_styles: HashMap::new(),
       import_map: ImportMap::from_hashmap(import_map),
       aleph_pkg_uri,
