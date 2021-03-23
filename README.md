@@ -7,7 +7,7 @@
 </p>
 
 ```bash
-deno run -A https://deno.land/x/aleph@v0.3.0-alpha.9/install.ts
+deno run -A https://deno.land/x/aleph/install.ts
 ```
 
 <p>
