@@ -368,7 +368,7 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
         format!("{}/framework/react/{}.ts", aleph_pkg_uri, name).as_str(),
         false,
       );
-      if resolver.bundle_mode {
+      if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
         items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
           span: DUMMY_SP,
           kind: VarDeclKind::Const,

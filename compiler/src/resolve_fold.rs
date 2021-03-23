@@ -229,10 +229,13 @@ impl Fold for ResolveFold {
                 }))
               } else {
                 if self.resolve_star_exports {
+                  let mut src = fixed_url.to_owned();
+                  src.push(':');
+                  src.push_str(resolved_path.as_str());
                   resolver.star_exports.push(fixed_url.clone());
                   ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
                     span: DUMMY_SP,
-                    src: new_str(fixed_url.into()),
+                    src: new_str(src.into()),
                     asserts: None,
                   }))
                 } else {
@@ -696,8 +699,9 @@ mod tests {
       export default function Index() {
         return (
           <>
-            <link rel="stylesheet" href="../style/index.css" />
-            <head></head>
+            <head>
+              <link rel="stylesheet" href="../style/index.css" />
+            </head>
             <Logo />
             <AsyncLogo />
             <Nav />
@@ -716,6 +720,7 @@ mod tests {
       vec![
         "https://esm.sh/react".into(),
         "https://esm.sh/react-dom".into(),
+        "https://deno.land/x/aleph/framework/react/head.ts".into(),
         "/components/logo.tsx".into(),
         "/shared/iife.ts".into(),
       ],
@@ -737,6 +742,9 @@ mod tests {
     );
     assert!(code.contains(
       "const { default: __ALEPH_Head  } = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"]"
+    ));
+    assert!(code.contains(
+      "import __ALEPH_Stylelink from \"../-/deno.land/x/aleph/framework/react/stylelink.bundling.js\""
     ));
     assert!(code.contains("export const $$star_0 = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
