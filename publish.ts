@@ -1,4 +1,4 @@
-// custom script for deno.land/x/publish
+// custom script for https://deno.land/x/publish
 
 export async function prepublish(version: string) {
   const p = Deno.run({
@@ -7,6 +7,7 @@ export async function prepublish(version: string) {
     stdout: 'inherit',
     stderr: 'inherit',
   })
-  await p.status()
+  const { success } = await p.status()
   p.close()
+  return success
 }
