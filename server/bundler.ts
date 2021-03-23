@@ -113,7 +113,7 @@ export class Bundler {
 
   async copyDist() {
     await Promise.all(
-      Array.from(this.#bundledFiles.keys()).map(jsFile => this.copyBundleFile(jsFile))
+      Array.from(this.#bundledFiles.values()).map(jsFile => this.copyBundleFile(jsFile))
     )
   }
 
