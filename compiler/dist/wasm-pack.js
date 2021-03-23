@@ -1,4 +1,4 @@
-import log from "../../shared/log.ts";
+import { red } from "https://deno.land/std@0.90.0/fmt/colors.ts";
 let wasm;
 
 const heap = new Array(32).fill(undefined);
@@ -246,9 +246,9 @@ async function init(input) {
       const msg = getStringFromWasm0(arg0, arg1);
       if (msg.includes('DiagnosticBuffer(["')) {
         const diagnostic = msg.split('DiagnosticBuffer(["')[1].split('"])')[0];
-        log.error("swc:", diagnostic);
+        console.error(red("ERROR"), "swc:", diagnostic);
       } else {
-        log.error(msg);
+        console.error(red("ERROR"), msg);
       }
     } finally {
       wasm.__wbindgen_free(arg0, arg1);

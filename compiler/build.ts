@@ -37,13 +37,13 @@ if (import.meta.main) {
     )
     await Deno.writeTextFile(
       './dist/wasm-pack.js',
-      `import log from "../../shared/log.ts";` + wasmPackJS.replace('console.error(getStringFromWasm0(arg0, arg1));', `
+      `import { red } from 'https://deno.land/std@0.90.0/fmt/colors.ts';` + wasmPackJS.replace('console.error(getStringFromWasm0(arg0, arg1));', `
         const msg = getStringFromWasm0(arg0, arg1);
         if (msg.includes('DiagnosticBuffer(["')) {
           const diagnostic = msg.split('DiagnosticBuffer(["')[1].split('"])')[0]
-          log.error("swc:", diagnostic)
+          console.error(red("ERROR"), "swc:", diagnostic)
         } else {
-          log.error(msg)
+          console.error(red("ERROR"), msg)
         }
       `)
     )

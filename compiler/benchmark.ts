@@ -1,7 +1,10 @@
 import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts'
-import { colors, createHash, path, walk } from '../deps.ts'
-import { initWasm } from './mod.ts'
-import { transformSync } from './dist/wasm-pack.js'
+import { walk } from 'https://deno.land/std@0.90.0/fs/walk.ts'
+import { resolve } from 'https://deno.land/std@0.90.0/path/mod.ts'
+import { green, red, yellow } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
+import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
+import init, { transformSync } from './dist/wasm-pack.js'
+import getWasmData from './dist/wasm.js'
 
 function tsc(source: string, opts: any) {
   const compileOptions: CompileOptions = {
@@ -24,11 +27,11 @@ function tsc(source: string, opts: any) {
  * - green: >= 10.0 faster as expected
  */
 function colorDiff(d: number) {
-  let cf = colors.green
+  let cf = green
   if (d < 1) {
-    cf = colors.red
+    cf = red
   } else if (d < 10) {
-    cf = colors.yellow
+    cf = yellow
   }
   return cf(d.toFixed(2) + 'x')
 }
@@ -36,7 +39,7 @@ function colorDiff(d: number) {
 async function benchmark() {
   const sourceFiles: Array<{ code: string, filename: string }> = []
   const walkOptions = { includeDirs: false, exts: ['ts', '.tsx'], skip: [/[\._](test|d)\.tsx?$/i, /\/compiler\//] }
-  for await (const { path: filename } of walk(path.resolve('..'), walkOptions)) {
+  for await (const { path: filename } of walk(resolve('..'), walkOptions)) {
     sourceFiles.push({ code: await Deno.readTextFile(filename), filename })
   }
   console.log(`[benchmark] ${sourceFiles.length} files`)
@@ -92,6 +95,7 @@ async function benchmark() {
 }
 
 if (import.meta.main) {
-  await initWasm()
+  const wasmData = getWasmData()
+  await init(wasmData)
   await benchmark()
 }
