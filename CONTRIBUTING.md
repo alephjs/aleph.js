@@ -22,16 +22,16 @@ You will need [Deno](https://deno.land/) 1.7+.
 
 ```bash
 # ssr/development with HMR
-ALEPH_DEV_PORT=2020 deno run -A --unstable --location=http://localhost dev ./examples/hello-world -L debug
+ALEPH_DEV_PORT=2020 deno run -A --unstable --import-map=import_map.json --location=http://localhost cli.ts dev ./examples/hello-world -L debug
 
 # ssr/production
-ALEPH_DEV_PORT=2020 deno run -A --unstable --location=http://localhost start ./examples/hello-world -L debug
+ALEPH_DEV_PORT=2020 deno run -A --unstable --import-map=import_map.json --location=http://localhost cli.ts start ./examples/hello-world -L debug
 
 # ssg
-ALEPH_DEV_PORT=2020 deno run -A --unstable --location=http://localhost build ./examples/hello-world -L debug
+ALEPH_DEV_PORT=2020 deno run -A --unstable --import-map=import_map.json --location=http://localhost cli.ts build ./examples/hello-world -L debug
 
 # run all tests
-deno test -A --unstable --location=https://deno.land/x/aleph
+deno test -A --unstable --import-map=import_map.json --location=https://deno.land/x/aleph
 ```
 
 ## Project Structure
