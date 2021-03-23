@@ -1,4 +1,7 @@
-import { base64, brotli, createHash, ensureDir } from '../deps.ts'
+import { encode } from 'https://deno.land/std@0.90.0/encoding/base64.ts'
+import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
+import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
+import { compress } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 
 async function run(cmd: string[]) {
   const p = Deno.run({
@@ -15,16 +18,17 @@ if (import.meta.main) {
   if (await run(['wasm-pack', 'build', '--target', 'web'])) {
     const wasmData = await Deno.readFile('./pkg/aleph_compiler_bg.wasm')
     const wasmPackJS = await Deno.readTextFile('./pkg/aleph_compiler.js')
-    const data = brotli.compress(wasmData)
-    const dataBase64 = base64.encode(data)
+    const data = compress(wasmData)
+    const dataBase64 = encode(data)
     const hash = createHash('sha1').update(data).toString()
     await ensureDir('./dist')
     await Deno.writeTextFile(
       './dist/wasm.js',
       [
-        `import { base64, brotli } from "../../deps.ts";`,
+        `import { decode } from "https://deno.land/std@0.90.0/encoding/base64.ts";`,
+        `import { decompress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";`,
         `const dataRaw = "${dataBase64}";`,
-        `export default () => brotli.decompress(base64.decode(dataRaw));`
+        `export default () => decompress(decode(dataRaw));`
       ].join('\n')
     )
     await Deno.writeTextFile(

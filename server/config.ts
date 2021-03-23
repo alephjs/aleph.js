@@ -1,5 +1,5 @@
+import * as path from 'std/path/mod.ts'
 import type { ImportMap } from '../compiler/mod.ts'
-import { path } from '../deps.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'

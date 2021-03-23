@@ -1,5 +1,8 @@
-import type { BufReader, BufWriter, MultipartFormData } from '../deps.ts'
-import { brotli, gzipEncode, MultipartReader } from '../deps.ts'
+import type { BufReader, BufWriter } from 'std/io/bufio.ts'
+import type { MultipartFormData } from 'std/mime/multipart.ts'
+import { MultipartReader } from 'std/mime/multipart.ts'
+import * as brotli from 'brotli'
+import { gzipEncode } from 'gzip'
 import log from '../shared/log.ts'
 import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 

@@ -1,4 +1,6 @@
-import { path, serve as stdServe, serveTLS, ws } from '../deps.ts'
+import * as path from 'std/path/mod.ts'
+import { serve as stdServe, serveTLS } from 'std/http/server.ts'
+import { acceptWebSocket, isWebSocketCloseEvent } from 'std/ws/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { rewriteURL, RouteModule } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'
@@ -43,7 +45,7 @@ export class Server {
       // serve hmr ws
       if (pathname === '/_hmr') {
         const { conn, r: bufReader, w: bufWriter, headers } = r
-        const socket = await ws.acceptWebSocket({ conn, bufReader, bufWriter, headers })
+        const socket = await acceptWebSocket({ conn, bufReader, bufWriter, headers })
         const watcher = app.createFSWatcher()
         watcher.on('add', (mod: RouteModule) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
         watcher.on('remove', (url: string) => {
@@ -68,7 +70,7 @@ export class Server {
                 }
               }
             } catch (e) { }
-          } else if (ws.isWebSocketCloseEvent(e)) {
+          } else if (isWebSocketCloseEvent(e)) {
             break
           }
         }

@@ -1,6 +1,5 @@
 import { createContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import { moduleExts } from '../../shared/constants.ts'
 import type { RouterURL } from '../../types.ts'
 
 const symbolFor = typeof Symbol === 'function' && Symbol.for

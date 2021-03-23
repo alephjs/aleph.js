@@ -1,4 +1,6 @@
-import { colors, createHash, path } from '../deps.ts'
+import { dim, red, yellow } from 'std/fmt/colors.ts'
+import { createHash } from 'std/hash/mod.ts'
+import * as path from 'std/path/mod.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { Plugin, LoaderPlugin } from '../types.ts'
@@ -118,11 +120,11 @@ export function getFlag(flags: Record<string, any>, keys: string[], defaultValue
  * - red: > 10MB
  */
 export function formatBytesWithColor(bytes: number) {
-  let cf = colors.dim
+  let cf = dim
   if (bytes > 10 << 20) { // 10MB
-    cf = colors.red
+    cf = red
   } else if (bytes > 1 << 20) { // 1MB
-    cf = colors.yellow
+    cf = yellow
   }
   return cf(util.formatBytes(bytes))
 }

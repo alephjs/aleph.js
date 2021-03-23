@@ -1,4 +1,5 @@
-import type { BufReader, BufWriter, MultipartFormData } from './deps.ts'
+import type { BufReader, BufWriter } from 'std/io/bufio.ts'
+import type { MultipartFormData } from 'std/mime/multipart.ts'
 
 /**
  * A loader plugin to load source media.

@@ -1,6 +1,6 @@
 import CleanCSS from 'https://esm.sh/clean-css@5.1.1?no-check'
 import PostCSS, { AcceptedPlugin } from 'https://esm.sh/postcss@8.2.7'
-import { path } from '../deps.ts'
+import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { LoaderPlugin } from '../types.ts'
@@ -53,7 +53,7 @@ async function initPostCSSProcessor(options?: Options) {
   }
 
   for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
-    const p = path.join(Deno.cwd(), name)
+    const p = join(Deno.cwd(), name)
     if (existsFileSync(p)) {
       let config: any = null
       if (name.endsWith('.json')) {

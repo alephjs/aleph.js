@@ -1,4 +1,5 @@
-import { ensureDir, path } from '../deps.ts'
+import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import type { LoaderPlugin } from '../types.ts'
@@ -69,7 +70,7 @@ async function getDenoDir() {
 }
 
 export async function initWasm() {
-  const cacheDir = path.join(await getDenoDir(), `deps/https/deno.land/aleph@v${VERSION}`)
+  const cacheDir = join(await getDenoDir(), `deps/https/deno.land/aleph@v${VERSION}`)
   const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
   if (existsFileSync(cachePath)) {
     const wasmData = await Deno.readFile(cachePath)

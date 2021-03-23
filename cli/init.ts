@@ -1,4 +1,8 @@
-import { colors, ensureDir, gzipDecode, path, Untar } from '../deps.ts'
+import { Untar } from 'std/archive/tar.ts'
+import { green, dim } from 'std/fmt/colors.ts'
+import { ensureDir } from 'std/fs/ensure_dir.ts'
+import { join } from 'std/path/mod.ts'
+import { gzipDecode } from 'gzip'
 import { ensureTextFile } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
@@ -35,7 +39,7 @@ export default async function (nameArg?: string) {
 
   for await (const entry of entryList) {
     if (entry.fileName.startsWith(`alephjs-templates-${rev}/${template}/`)) {
-      const fp = path.join(cwd, name, util.trimPrefix(entry.fileName, `alephjs-templates-${rev}/${template}/`))
+      const fp = join(cwd, name, util.trimPrefix(entry.fileName, `alephjs-templates-${rev}/${template}/`))
       if (entry.type === 'directory') {
         await ensureDir(fp)
         continue
@@ -63,8 +67,8 @@ export default async function (nameArg?: string) {
     scopes: {}
   }
   await Promise.all([
-    Deno.writeTextFile(path.join(cwd, name, '.gitignore'), gitignore.join('\n')),
-    Deno.writeTextFile(path.join(cwd, name, 'import_map.json'), JSON.stringify(importMap, undefined, 4))
+    Deno.writeTextFile(join(cwd, name, '.gitignore'), gitignore.join('\n')),
+    Deno.writeTextFile(join(cwd, name, 'import_map.json'), JSON.stringify(importMap, undefined, 4))
   ])
 
   if (vscode) {
@@ -78,21 +82,21 @@ export default async function (nameArg?: string) {
       'deno.unstable': true,
       'deno.importMap': './import_map.json'
     }
-    await ensureDir(path.join(name, '.vscode'))
+    await ensureDir(join(name, '.vscode'))
     await Promise.all([
-      Deno.writeTextFile(path.join(name, '.vscode', 'extensions.json'), JSON.stringify(extensions, undefined, 4)),
-      Deno.writeTextFile(path.join(name, '.vscode', 'settings.json'), JSON.stringify(settigns, undefined, 4))
+      Deno.writeTextFile(join(name, '.vscode', 'extensions.json'), JSON.stringify(extensions, undefined, 4)),
+      Deno.writeTextFile(join(name, '.vscode', 'settings.json'), JSON.stringify(settigns, undefined, 4))
     ])
   }
 
   console.log('Done')
-  console.log(colors.dim('---'))
-  console.log(colors.green('Aleph.js is ready to go!'))
-  console.log(`${colors.dim('$')} cd ${name}`)
-  console.log(`${colors.dim('$')} aleph dev     ${colors.dim('# start the app in `development` mode')}`)
-  console.log(`${colors.dim('$')} aleph start   ${colors.dim('# start the app in `production` mode')}`)
-  console.log(`${colors.dim('$')} aleph build   ${colors.dim('# build the app to a static site (SSG)')}`)
-  console.log(colors.dim('---'))
+  console.log(dim('---'))
+  console.log(green('Aleph.js is ready to go!'))
+  console.log(`${dim('$')} cd ${name}`)
+  console.log(`${dim('$')} aleph dev     ${dim('# start the app in `development` mode')}`)
+  console.log(`${dim('$')} aleph start   ${dim('# start the app in `production` mode')}`)
+  console.log(`${dim('$')} aleph build   ${dim('# build the app to a static site (SSG)')}`)
+  console.log(dim('---'))
   Deno.exit(0)
 }
 

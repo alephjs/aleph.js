@@ -1,4 +1,5 @@
-import { colors, path } from '../deps.ts'
+import { red } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
+import { dirname, join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { existsFileSync } from '../shared/fs.ts'
 
 const versionMetaUrl = 'https://cdn.deno.land/aleph/meta/versions.json'
@@ -20,13 +21,13 @@ export default async function (version = 'latest') {
   } else if (!versions.includes(version)) {
     version = 'v' + version
     if (!versions.includes(version)) {
-      console.log(`${colors.red('error')}: version(${version}) not found!`)
+      console.log(`${red('error')}: version(${version}) not found!`)
       Deno.exit(1)
     }
   }
 
   const denoExecPath = Deno.execPath()
-  const cmdExists = existsFileSync(path.join(path.dirname(denoExecPath), 'aleph'))
+  const cmdExists = existsFileSync(join(dirname(denoExecPath), 'aleph'))
   const p = Deno.run({
     cmd: [
       denoExecPath,
@@ -36,6 +37,7 @@ export default async function (version = 'latest') {
       '--unstable',
       '-n', 'aleph',
       '--location', 'https://deno.land/x/aleph',
+      '--import-map', 'https://deno.land/x/aleph@{version}/import_map.json',
       `https://deno.land/x/aleph@${version}/cli.ts`
     ],
     stdout: 'null',
@@ -44,9 +46,9 @@ export default async function (version = 'latest') {
   const status = await p.status()
   if (status.success) {
     if (cmdExists) {
-      console.log(`Aleph.js is up to ${version}!`)
+      console.log(`Aleph.js is up to ${version}`)
     } else {
-      console.log('Aleph.js was installed successfully!')
+      console.log('Aleph.js was installed successfully')
       console.log(`Run 'aleph --help' to get started`)
     }
   }

@@ -1,4 +1,4 @@
-import { colors } from '../deps.ts'
+import { blue, green, yellow, red } from 'std/fmt/colors.ts'
 
 export type LevelNames = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
 
@@ -35,31 +35,31 @@ export class Logger {
 
   debug(...args: unknown[]) {
     if (this.#level <= Level.Debug) {
-      console.log(colors.blue('DEBUG'), ...args)
+      console.log(blue('DEBUG'), ...args)
     }
   }
 
   info(...args: unknown[]) {
     if (this.#level <= Level.Info) {
-      console.log(colors.green('INFO'), ...args)
+      console.log(green('INFO'), ...args)
     }
   }
 
   warn(...args: unknown[]) {
     if (this.#level <= Level.Warn) {
-      console.log(colors.yellow('WARN'), ...args)
+      console.log(yellow('WARN'), ...args)
     }
   }
 
   error(...args: unknown[]) {
     if (this.#level <= Level.Error) {
-      console.log(colors.red('ERROR'), ...args)
+      console.log(red('ERROR'), ...args)
     }
   }
 
   fatal(...args: unknown[]) {
     if (this.#level <= Level.Fatal) {
-      console.log(colors.red('FATAL'), ...args)
+      console.log(red('FATAL'), ...args)
       Deno.exit(1)
     }
   }

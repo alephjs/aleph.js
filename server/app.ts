@@ -1,5 +1,9 @@
+import { createHash } from 'std/hash/mod.ts'
+import { bold, dim } from 'std/fmt/colors.ts'
+import * as path from 'std/path/mod.ts'
+import { walk } from 'std/fs/walk.ts'
+import { ensureDir } from 'std/fs/ensure_dir.ts'
 import { buildChecksum, ImportMap, parseExportNames, SourceType, transform, TransformOptions } from '../compiler/mod.ts'
-import { colors, createHash, ensureDir, path, walk } from '../deps.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
 import { RouteModule, Routing } from '../framework/core/routing.ts'
@@ -615,9 +619,9 @@ export class Application implements ServerApplication {
         await ensureDir(path.dirname(fp))
         await Deno.copyFile(p, fp)
         if (n === 0) {
-          log.info(colors.bold('- Public Assets'))
+          log.info(bold('- Public Assets'))
         }
-        log.info('  ∆', rp.split('\\').join('/'), colors.dim('•'), formatBytesWithColor(fi.size))
+        log.info('  ∆', rp.split('\\').join('/'), dim('•'), formatBytesWithColor(fi.size))
         n++
       }
     }
@@ -1041,7 +1045,7 @@ export class Application implements ServerApplication {
           await Deno.writeTextFile(mod.jsFile, jsContent)
           mod.hash = computeHash(mod.sourceHash + mod.deps.map(({ hash }) => hash).join(''))
           callback(mod)
-          log.debug('compilation side-effect:', mod.url, colors.dim('<-'), url)
+          log.debug('compilation side-effect:', mod.url, dim('<-'), url)
           this.applyCompilationSideEffect(mod.url, callback)
           break
         }
@@ -1117,7 +1121,7 @@ export class Application implements ServerApplication {
       return
     }
 
-    log.info(colors.bold('- Pages (SSG)'))
+    log.info(bold('- Pages (SSG)'))
 
     // render pages
     const paths = new Set(this.#pageRouting.paths)
@@ -1141,7 +1145,7 @@ export class Application implements ServerApplication {
             )
             await ensureTextFile(dataFile, JSON.stringify(data))
           }
-          log.info('  ○', pathname, colors.dim('• ' + util.formatBytes(html.length)))
+          log.info('  ○', pathname, dim('• ' + util.formatBytes(html.length)))
         } else {
           log.error('Page not found:', pathname)
         }

@@ -1,8 +1,7 @@
-import css from '../../plugins/css.ts'
-import type { Config } from '../../types.ts'
+import css from 'aleph/plugins/css.ts'
+import type { Config } from 'aleph/types.ts'
 
 export default (): Config => ({
-  ssr: false,
   plugins: [
     css({
       postcss: { plugins: ['autoprefixer'] }

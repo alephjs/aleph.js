@@ -1,5 +1,9 @@
-import { path } from '../../deps.ts'
-import { getAlephPkgUri, getRelativePath, toLocalUrl } from '../../server/helper.ts'
+import { dirname } from 'std/path/mod.ts'
+import {
+  getAlephPkgUri,
+  getRelativePath,
+  toLocalUrl
+} from '../../server/helper.ts'
 import util from '../../shared/util.ts'
 import type { ServerApplication } from '../../types.ts'
 
@@ -10,7 +14,7 @@ export async function init(app: ServerApplication) {
       const reactRefresh = code.includes('$RefreshSig$(') || code.includes('$RefreshReg$(')
       if (reactRefresh) {
         const refreshModuleUrl = getRelativePath(
-          path.dirname(toLocalUrl(url)),
+          dirname(toLocalUrl(url)),
           toLocalUrl(`${alephPkgUri}/framework/react/refresh.js`)
         )
         return [

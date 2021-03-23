@@ -1,6 +1,8 @@
+import { dim } from 'std/fmt/colors.ts'
+import * as path from 'std/path/mod.ts'
+import { ensureDir } from 'std/fs/ensure_dir.ts'
 import { ECMA, minify as terser } from 'https://esm.sh/terser@5.5.1'
 import { parseExportNames, transform } from '../compiler/mod.ts'
-import { colors, ensureDir, path } from '../deps.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
@@ -198,7 +200,7 @@ export class Bundler {
     const bundleFile = path.join(this.#app.buildDir, bundleFilename)
     await Deno.writeTextFile(bundleFile, mainJS)
     this.#bundledFiles.set('main', bundleFilename)
-    log.info(`  {} main.js ${colors.dim('• ' + util.formatBytes(mainJS.length))}`)
+    log.info(`  {} main.js ${dim('• ' + util.formatBytes(mainJS.length))}`)
   }
 
   /** create polyfill bundle. */
@@ -213,7 +215,7 @@ export class Bundler {
       await this._bundle(rawPolyfillFile, bundleFile)
     }
     this.#bundledFiles.set('polyfill', bundleFilename)
-    log.info(`  {} polyfill.js (${buildTarget.toUpperCase()}) ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+    log.info(`  {} polyfill.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
   }
 
   /** create bundle chunk. */
@@ -246,7 +248,7 @@ export class Bundler {
       lazyRemove(bundleEntryFile)
     }
     this.#bundledFiles.set(name, bundleFilename)
-    log.info(`  {} ${name}.js ${colors.dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+    log.info(`  {} ${name}.js ${dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
   }
 
   /** run deno bundle and compress the output using terser. */

@@ -1,5 +1,6 @@
-import { flags, path, walk } from './deps.ts'
-import { localProxy } from './server/localproxy.ts'
+import * as path from 'std/path/mod.ts'
+import { walk } from 'std/fs/walk.ts'
+import * as flags from 'std/flags/mod.ts'
 import { existsDirSync } from './shared/fs.ts'
 import type { LevelNames } from './shared/log.ts'
 import log from './shared/log.ts'
@@ -88,6 +89,7 @@ async function main() {
   // proxy https://deno.land/x/aleph on localhost
   const v = Deno.env.get('ALEPH_DEV_PORT')
   if (v !== undefined && /^\d+$/.test(v)) {
+    const { localProxy } = await import('./server/localproxy.ts')
     localProxy(parseInt(v))
   }
 
