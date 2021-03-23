@@ -3,8 +3,8 @@
     "std/": "https://deno.land/std@0.90.0/",
     "brotli": "https://deno.land/x/brotli@v0.1.4/mod.ts",
     "gzip": "https://deno.land/x/wasm_gzip@v1.0.0/mod.ts",
-    "aleph": "https://deno.land/x/aleph@v0.3.0-alpha.9/mod.ts",
-    "aleph/": "https://deno.land/x/aleph@v0.3.0-alpha.9/",
+    "aleph": "https://deno.land/x/aleph@v0.3.0-alpha.10/mod.ts",
+    "aleph/": "https://deno.land/x/aleph@v0.3.0-alpha.10/",
     "react": "https://esm.sh/react@17.0.1",
     "react-dom": "https://esm.sh/react-dom@17.0.1"
   }
