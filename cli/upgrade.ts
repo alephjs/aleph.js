@@ -14,7 +14,7 @@ Options:
     -h, --help               Prints help message
 `
 
-export default async function (version = 'latest') {
+export default async function (version = 'latest', forceUpgrade = false) {
   console.log('Looking up latest version...')
   const { latest, versions } = await (await fetch(versionMetaUrl)).json()
   if (version === 'latest') {
@@ -27,7 +27,7 @@ export default async function (version = 'latest') {
     }
   }
 
-  if (version === 'v' + VERSION) {
+  if (version === 'v' + VERSION && !forceUpgrade) {
     console.log('Already up-to-date!')
     Deno.exit(0)
   }
