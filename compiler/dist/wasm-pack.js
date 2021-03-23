@@ -125,6 +125,35 @@ function addHeapObject(obj) {
 * @param {any} options
 * @returns {any}
 */
+export function parseExportNamesSync(url, code, options) {
+  var ptr0 = passStringToWasm0(
+    url,
+    wasm.__wbindgen_malloc,
+    wasm.__wbindgen_realloc,
+  );
+  var len0 = WASM_VECTOR_LEN;
+  var ptr1 = passStringToWasm0(
+    code,
+    wasm.__wbindgen_malloc,
+    wasm.__wbindgen_realloc,
+  );
+  var len1 = WASM_VECTOR_LEN;
+  var ret = wasm.parseExportNamesSync(
+    ptr0,
+    len0,
+    ptr1,
+    len1,
+    addHeapObject(options),
+  );
+  return takeObject(ret);
+}
+
+/**
+* @param {string} url
+* @param {string} code
+* @param {any} options
+* @returns {any}
+*/
 export function transformSync(url, code, options) {
   var ptr0 = passStringToWasm0(
     url,
@@ -174,7 +203,7 @@ async function load(module, imports) {
 
 async function init(input) {
   if (typeof input === "undefined") {
-    input = import.meta.url.replace(/\.js$/, "_bg.wasm");
+    input = new URL("aleph_compiler_bg.wasm", import.meta.url);
   }
   const imports = {};
   imports.wbg = {};
