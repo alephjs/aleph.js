@@ -12,14 +12,14 @@
 </p>
 
 <details>
-  <summary>BOOM</summary>
+  <summary>Boom</summary>
   <p>
 
-```bash
-// get started
-$ deno run -A https://deno.land/x/aleph/install.ts
-$ aleph -h
-```
+  ```bash
+  # get started
+  $ deno run -A https://deno.land/x/aleph/install.ts
+  $ aleph -h
+  ```
 
   </p>
 </details>
