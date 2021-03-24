@@ -18,7 +18,7 @@
 
   ```bash
   # get started
-  $ deno run -A -r https://deno.land/x/aleph/install.ts
+  $ deno run -A https://deno.land/x/aleph/install.ts
   $ aleph -h
   ```
 
