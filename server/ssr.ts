@@ -5,12 +5,22 @@ import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
 import type { Application } from './app.ts'
 
+export type SSRData = {
+  expires: number
+  value: any
+}
+
+export type SSROutput = {
+  html: string
+  data: Record<string, SSRData> | null
+}
+
 /** The framework render result of SSR. */
 export type FrameworkRenderResult = {
   head: string[]
   body: string
   scripts: Record<string, any>[]
-  data: Record<string, string> | null
+  data: Record<string, SSRData> | null
 }
 
 /** The framework renderer for SSR. */
@@ -26,7 +36,7 @@ export type FrameworkRenderer = {
 export class Renderer {
   #app: Application
   #renderer: FrameworkRenderer
-  #cache: Map<string, Map<string, [string, any]>>
+  #cache: Map<string, Map<string, SSROutput>>
 
   constructor(app: Application) {
     this.#app = app
@@ -41,25 +51,36 @@ export class Renderer {
   async useCache(
     namespace: string,
     key: string,
-    render: () => Promise<[string, any]>
+    render: () => Promise<[string, Record<string, SSRData> | null]>
   ): Promise<[string, any]> {
     let cache = this.#cache.get(namespace)
     if (cache === undefined) {
       cache = new Map()
       this.#cache.set(namespace, cache)
     }
-    const cached = cache.get(key)
-    if (cached !== undefined) {
-      return cached
+    if (cache.has(key)) {
+      const { html, data } = cache.get(key)!
+      let expires = 0
+      if (data !== null) {
+        Object.values(data).forEach(({ expires: _expires }) => {
+          if (expires === 0 || (_expires > 0 && _expires < expires)) {
+            expires = _expires
+          }
+        })
+      }
+      if (expires === 0 || Date.now() < expires) {
+        return [html, data]
+      }
+      cache.delete(key)
     }
-    const ret = await render()
+    let [html, data] = await render()
     if (namespace !== '-') {
       this.#app.getCodeInjects('ssr')?.forEach(transform => {
-        ret[0] = transform(key, ret[0])
+        html = transform(key, html)
       })
     }
-    cache.set(key, ret)
-    return ret
+    cache.set(key, { html, data })
+    return [html, data]
   }
 
   clearCache(url?: string) {
@@ -71,7 +92,7 @@ export class Renderer {
   }
 
   /** render page base the given location. */
-  async renderPage(url: RouterURL, nestedModules: RouteModule[]): Promise<[string, any]> {
+  async renderPage(url: RouterURL, nestedModules: RouteModule[]): Promise<[string, Record<string, SSRData> | null]> {
     const start = performance.now()
     const isDev = this.#app.isDev
     const appModule = this.#app.findModuleByName('app')

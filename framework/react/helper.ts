@@ -1,10 +1,8 @@
 import { createContext } from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
 
-const symbolFor = typeof Symbol === 'function' && Symbol.for
-const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
-const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
+const REACT_FORWARD_REF_TYPE = util.supportSymbolFor ? Symbol.for('react.forward_ref') : 0xead0
+const REACT_MEMO_TYPE = util.supportSymbolFor ? Symbol.for('react.memo') : 0xead3
 
 export function isLikelyReactComponent(type: any): Boolean {
   switch (typeof type) {
@@ -39,31 +37,6 @@ export function isLikelyReactComponent(type: any): Boolean {
     default:
       return false
   }
-}
-
-export async function loadPageData({ pathname }: RouterURL): Promise<void> {
-  const url = `/_aleph/data${pathname === '/' ? '/index' : pathname}.json`
-  const data = await fetch(url).then(resp => resp.json())
-  if (util.isPlainObject(data)) {
-    for (const key in data) {
-      Object.assign(window, { [`data://${pathname}#${key}`]: data[key] })
-    }
-  }
-}
-
-export async function loadPageDataFromTag(url: RouterURL) {
-  const { document } = window as any
-  const ssrDataEl = document.getElementById('ssr-data')
-  if (ssrDataEl) {
-    try {
-      const ssrData = JSON.parse(ssrDataEl.innerText)
-      for (const key in ssrData) {
-        Object.assign(window, { [`data://${url.pathname}#${key}`]: ssrData[key] })
-      }
-      return
-    } catch (e) { }
-  }
-  await loadPageData(url)
 }
 
 export function createNamedContext<T>(defaultValue: T, name: string) {

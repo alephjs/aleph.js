@@ -22,7 +22,7 @@ export function recoverCSS(id: string) {
 }
 
 export function applyCSS(id: string, css: string) {
-  if (util.inDeno()) {
+  if (util.inDeno) {
     serverStyles.set(id, css)
   } else {
     const { document } = window as any

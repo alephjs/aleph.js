@@ -9,7 +9,7 @@ import { SSRContext } from './context.ts'
 export default function Script(props: PropsWithChildren<ScriptHTMLAttributes<{}>>) {
   const { scriptElements } = useContext(SSRContext)
 
-  if (util.inDeno()) {
+  if (util.inDeno) {
     const key = 'script-' + (scriptElements.size + 1)
     scriptElements.set(key, { props })
   }

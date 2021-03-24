@@ -37,14 +37,14 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), revalidate?: 
   const { pathname } = useRouter()
   return useMemo(() => {
     const global = globalThis as any
-    const dataUrl = 'data://' + pathname
+    const dataUrl = 'pagedata://' + pathname
     const eventName = 'useDeno-' + dataUrl
     const key = dataUrl + '#' + id
     const expires = revalidate ? Date.now() + revalidate * 1000 : 0
     const renderingDataCache = global['rendering-' + dataUrl]
     if (renderingDataCache && key in renderingDataCache) {
       return renderingDataCache[key] // 2+ pass
-    } else if (util.inDeno()) {
+    } else if (util.inDeno) {
       const v = callback()
       if (v instanceof Promise) {
         events.emit(eventName, id, v.then(value => {

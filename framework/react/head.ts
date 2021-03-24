@@ -19,7 +19,7 @@ export default function Head(props: PropsWithChildren<{}>) {
   const renderer = useContext(SSRContext)
   const [els, forwardNodes] = useMemo(() => parse(props.children), [props.children])
 
-  if (util.inDeno()) {
+  if (util.inDeno) {
     els.forEach(({ type, props }, key) => renderer.headElements.set(key, { type, props }))
   }
 

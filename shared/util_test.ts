@@ -3,7 +3,7 @@ import { delay } from 'https://deno.land/std@0.90.0/async/delay.ts'
 import util from './util.ts'
 
 Deno.test(`util`, async () => {
-  assertEquals(util.inDeno(), true)
+  assertEquals(util.inDeno, true)
 
   // test isLikelyHttpURL
   assertEquals(util.isLikelyHttpURL('https://deno.land'), true)

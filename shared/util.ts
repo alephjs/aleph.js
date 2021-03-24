@@ -1,7 +1,6 @@
 export default {
-  inDeno(): boolean {
-    return typeof Deno !== 'undefined' && this.isNEString(Deno.version?.deno)
-  },
+  inDeno: typeof Deno !== 'undefined' && typeof Deno.version?.deno === 'string',
+  supportSymbolFor: typeof Symbol === 'function' && typeof Symbol.for === 'function',
   isString(a: any): a is string {
     return typeof a === 'string'
   },
@@ -15,7 +14,7 @@ export default {
     return Array.isArray(a) && a.length > 0
   },
   isPlainObject(a: any): a is Record<string, any> {
-    return typeof a === 'object' && a !== null && !this.isArray(a) && Object.getPrototypeOf(a) == Object.prototype
+    return typeof a === 'object' && a !== null && !Array.isArray(a) && Object.getPrototypeOf(a) == Object.prototype
   },
   isFunction(a: any): a is Function {
     return typeof a === 'function'
