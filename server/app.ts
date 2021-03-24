@@ -68,7 +68,6 @@ export class Application implements ServerApplication {
   #fsWatchListeners: Array<EventEmitter> = []
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
-  #renderCache: Map<string, Map<string, [string, any]>> = new Map()
   #injects: Map<'compilation' | 'hmr' | 'ssr', TransformFn[]> = new Map()
   #reloading = false
 
@@ -270,9 +269,9 @@ export class Application implements ServerApplication {
                 const hmrable = this.isHMRable(mod.url)
                 const update = ({ url }: Module) => {
                   if (trimModuleExt(url) === '/app') {
-                    this.#renderCache.clear()
+                    this.#renderer.clearCache()
                   } else if (url.startsWith('/pages/')) {
-                    this.#renderCache.delete(toPagePath(url))
+                    this.#renderer.clearCache(url)
                     this.#pageRouting.update(this.createRouteModule(url))
                   } else if (url.startsWith('/api/')) {
                     this.#apiRouting.update(this.createRouteModule(url))
@@ -297,9 +296,9 @@ export class Application implements ServerApplication {
               })
             } else if (this.#modules.has(url)) {
               if (trimModuleExt(url) === '/app') {
-                this.#renderCache.clear()
+                this.#renderer.clearCache()
               } else if (url.startsWith('/pages/')) {
-                this.#renderCache.delete(toPagePath(url))
+                this.#renderer.clearCache(toPagePath(url))
                 this.#pageRouting.removeRoute(toPagePath(url))
               } else if (url.startsWith('/api/')) {
                 this.#apiRouting.removeRoute(toPagePath(url))
@@ -426,7 +425,7 @@ export class Application implements ServerApplication {
     }
 
     const cacheKey = router.pathname + router.query.toString()
-    const ret = await this.useRenderCache(pagePath, cacheKey, async () => {
+    const ret = await this.#renderer.useCache(pagePath, cacheKey, async () => {
       return await this.#renderer.renderPage(router, nestedModules)
     })
     return ret[1]
@@ -440,24 +439,28 @@ export class Application implements ServerApplication {
     const path = router.pathname + router.query.toString()
 
     if (!this.isSSRable(loc.pathname)) {
-      const [html] = await this.useRenderCache('-', 'spa-index', async () => {
+      const [html] = await this.#renderer.useCache('-', 'spa-index', async () => {
         return [await this.#renderer.renderSPAIndexPage(), null]
       })
       return [status, html]
     }
 
     if (pagePath === '') {
-      const [html] = await this.useRenderCache('404', path, async () => {
+      const [html] = await this.#renderer.useCache('404', path, async () => {
         return [await this.#renderer.render404Page(router), null]
       })
       return [status, html]
     }
 
-    const [html] = await this.useRenderCache(pagePath, path, async () => {
+    const [html] = await this.#renderer.useCache(pagePath, path, async () => {
       let [html, data] = await this.#renderer.renderPage(router, nestedModules)
       return [html, data]
     })
     return [status, html]
+  }
+
+  getCodeInjects(phase: 'compilation' | 'hmr' | 'ssr') {
+    return this.#injects.get(phase)
   }
 
   createFSWatcher(): EventEmitter {
@@ -1202,30 +1205,6 @@ export class Application implements ServerApplication {
       })
       await ensureTextFile(join(outputDir, '404.html'), html)
     }
-  }
-
-  private async useRenderCache(
-    namespace: string,
-    key: string,
-    render: () => Promise<[string, any]>
-  ): Promise<[string, any]> {
-    let cache = this.#renderCache.get(namespace)
-    if (cache === undefined) {
-      cache = new Map()
-      this.#renderCache.set(namespace, cache)
-    }
-    const cached = cache.get(key)
-    if (cached !== undefined) {
-      return cached
-    }
-    const ret = await render()
-    if (namespace !== '-') {
-      this.#injects.get('ssr')?.forEach(transform => {
-        ret[0] = transform(key, ret[0])
-      })
-    }
-    cache.set(key, ret)
-    return ret
   }
 
   /** check a page whether is able to SSR. */

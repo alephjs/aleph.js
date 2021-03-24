@@ -1,3 +1,4 @@
+import { toPagePath } from '../framework/core/module.ts'
 import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -25,14 +26,48 @@ export type FrameworkRenderer = {
 export class Renderer {
   #app: Application
   #renderer: FrameworkRenderer
+  #cache: Map<string, Map<string, [string, any]>>
 
   constructor(app: Application) {
     this.#app = app
     this.#renderer = { render: async () => { throw new Error("framework renderer is undefined") } }
+    this.#cache = new Map()
   }
 
   setFrameworkRenderer(renderer: FrameworkRenderer) {
     this.#renderer = renderer
+  }
+
+  async useCache(
+    namespace: string,
+    key: string,
+    render: () => Promise<[string, any]>
+  ): Promise<[string, any]> {
+    let cache = this.#cache.get(namespace)
+    if (cache === undefined) {
+      cache = new Map()
+      this.#cache.set(namespace, cache)
+    }
+    const cached = cache.get(key)
+    if (cached !== undefined) {
+      return cached
+    }
+    const ret = await render()
+    if (namespace !== '-') {
+      this.#app.getCodeInjects('ssr')?.forEach(transform => {
+        ret[0] = transform(key, ret[0])
+      })
+    }
+    cache.set(key, ret)
+    return ret
+  }
+
+  clearCache(url?: string) {
+    if (url) {
+      this.#cache.delete(toPagePath(url))
+    } else {
+      this.#cache.clear()
+    }
   }
 
   /** render page base the given location. */
