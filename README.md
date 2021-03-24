@@ -15,10 +15,12 @@
 <details>
   <summary>Boom</summary>
   <p>
+
   ```bash
   # get started
   $ deno run -A -r https://deno.land/x/aleph/install.ts
   $ aleph -h
   ```
+
   </p>
 </details>
