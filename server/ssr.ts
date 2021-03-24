@@ -175,7 +175,7 @@ function createHtml({
   lang?: string,
   head?: string[],
   className?: string,
-  scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, nomodule?: boolean, async?: boolean })[],
+  scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, async?: boolean, preload?: boolean, nomodule?: boolean })[],
   minify?: boolean
 }) {
   const eol = minify ? '' : '\n'
@@ -196,7 +196,7 @@ function createHtml({
     } else if (util.isNEString(v.innerText)) {
       const { innerText, ...rest } = v
       return `<script${formatAttrs(rest)}>${eol}${innerText}${eol}${indent}</script>`
-    } else if (util.isNEString(v.src)) {
+    } else if (util.isNEString(v.src) && !v.preload) {
       return `<script${formatAttrs({ ...v, src: util.cleanPath(v.src) })}></script>`
     } else {
       return ''

@@ -560,12 +560,40 @@ export class Application implements ServerApplication {
 
   /** get ssr html scripts */
   getSSRHTMLScripts(pagePath?: string) {
-    const { baseUrl } = this.config
+    const { framework } = this.config
+    const baseUrl = util.trimSuffix(this.config.baseUrl, '/')
+    const alephPkgPath = getAlephPkgUri().replace('https://', '').replace('http://localhost:', 'http_localhost_')
+    const fullAlephPkgPath = `${baseUrl}/_aleph/-/${alephPkgPath}`
 
     if (this.isDev) {
+      const preload: string[] = [
+        `${fullAlephPkgPath}/framework/core/module.js`,
+        `${fullAlephPkgPath}/framework/core/events.js`,
+        `${fullAlephPkgPath}/framework/core/routing.js`,
+        `${fullAlephPkgPath}/framework/core/hmr.js`,
+        `${fullAlephPkgPath}/framework/${framework}/bootstrap.js`,
+        `${fullAlephPkgPath}/shared/util.js`,
+      ]
+
+      Array.from(this.#modules.keys()).forEach(url => {
+        switch (trimModuleExt(url)) {
+          case '/app':
+            preload.push(`${baseUrl}/_aleph/app.js`)
+            break
+          case '/404':
+            preload.push(`${baseUrl}/_aleph/404.js`)
+            break
+        }
+      })
+
+      if (pagePath) {
+        preload.push(`${baseUrl}/_aleph/pages/${pagePath.replace(/\/$/, '/index')}.js`)
+      }
+
       return [
-        { src: util.cleanPath(`${baseUrl}/_aleph/main.js`), type: 'module' },
-        { src: util.cleanPath(`${baseUrl}/_aleph/-/deno.land/x/aleph/nomodule.js`), nomodule: true },
+        ...preload.map(src => ({ src, type: 'module', preload: true })),
+        { src: `${baseUrl}/_aleph/main.js`, type: 'module' },
+        { src: `${fullAlephPkgPath}/nomodule.js`, nomodule: true },
       ]
     }
 
@@ -574,7 +602,7 @@ export class Application implements ServerApplication {
       ...['polyfill', 'deps', 'shared', 'main', pagePath ? '/pages' + pagePath.replace(/\/$/, '/index') : '']
         .filter(name => name !== "" && this.#bundler.getBundledFile(name) !== null)
         .map(name => ({
-          src: util.cleanPath(`${baseUrl}/_aleph/${this.#bundler.getBundledFile(name)}`)
+          src: `${baseUrl}/_aleph/${this.#bundler.getBundledFile(name)}`
         }))
     ]
   }
