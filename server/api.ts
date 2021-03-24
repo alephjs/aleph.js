@@ -1,8 +1,8 @@
 import type { BufReader, BufWriter } from 'https://deno.land/std@0.90.0/io/bufio.ts'
 import type { MultipartFormData } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
 import { MultipartReader } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
-import * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
-import { gzipEncode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
+import { compress as brotli } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
+import { gzipEncode as gzip } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from '../shared/log.ts'
 import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 
@@ -160,11 +160,11 @@ export class Request implements APIRequest {
       if (this.headers.get('accept-encoding')?.includes('br')) {
         this.#resp.headers.set('Vary', 'Origin')
         this.#resp.headers.set('Content-Encoding', 'br')
-        body = brotli.compress(body)
+        body = brotli(body)
       } else if (this.headers.get('accept-encoding')?.includes('gzip')) {
         this.#resp.headers.set('Vary', 'Origin')
         this.#resp.headers.set('Content-Encoding', 'gzip')
-        body = gzipEncode(body)
+        body = gzip(body)
       }
     }
     this.#resp.headers.set('Date', (new Date).toUTCString())

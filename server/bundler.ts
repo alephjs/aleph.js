@@ -1,7 +1,6 @@
 import { dim } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
 import * as path from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
-import { ECMA, minify as terser } from 'https://esm.sh/terser@5.5.1'
 import { parseExportNames, transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
@@ -285,8 +284,8 @@ export class Bundler {
     code = `(() => { ${code} })()`
 
     // minify code
-    // todo: use swc minify instead(https://github.com/swc-project/swc/pull/1302)
-    const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')) as ECMA)
+    // todo: use swc minify instead (https://github.com/swc-project/swc/pull/1302)
+    const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')))
     if (mini !== undefined) {
       code = mini
     }
@@ -296,7 +295,17 @@ export class Bundler {
   }
 }
 
-async function minify(code: string, ecma: ECMA = 5) {
+interface Minify {
+  (code: string, options: any): Promise<{ code: string }>
+}
+
+let terser: Minify | null = null
+
+async function minify(code: string, ecma: number = 5) {
+  if (terser === null) {
+    const { minify } = await import('https://esm.sh/terser@5.6.1?no-check')
+    terser = minify as Minify
+  }
   const ret = await terser(code, {
     compress: true,
     mangle: true,

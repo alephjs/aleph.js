@@ -86,17 +86,17 @@ async function main() {
     return
   }
 
-  // proxy https://deno.land/x/aleph on localhost
-  const v = Deno.env.get('ALEPH_DEV_PORT')
-  if (v !== undefined && /^\d+$/.test(v)) {
-    const { localProxy } = await import('./server/localproxy.ts')
-    localProxy(parseInt(v))
-  }
-
-  // sets log level
+  // set log level
   const l = options.L || options['log-level']
   if (util.isNEString(l)) {
     log.setLevel(l.toLowerCase() as LevelNames)
+  }
+
+  // proxy https://deno.land/x/aleph on localhost
+  const v = Deno.env.get('ALEPH_DEV')
+  if (v !== undefined) {
+    const { localProxy } = await import('./server/localproxy.ts')
+    localProxy(Deno.cwd(), 2020)
   }
 
   // check working dir

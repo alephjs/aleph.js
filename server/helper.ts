@@ -1,6 +1,6 @@
 import { dim, red, yellow } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
-import * as path from 'https://deno.land/std@0.90.0/path/mod.ts'
+import { relative } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { Plugin, LoaderPlugin } from '../types.ts'
@@ -47,7 +47,7 @@ export function getAlephPkgUri() {
 
 /** get relative the path of `to` to `from`. */
 export function getRelativePath(from: string, to: string): string {
-  const r = path.relative(from, to).split('\\').join('/')
+  const r = relative(from, to).split('\\').join('/')
   if (!r.startsWith('.') && !r.startsWith('/')) {
     return './' + r
   }

@@ -1,4 +1,4 @@
-import * as path from 'https://deno.land/std@0.90.0/path/mod.ts'
+import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import type { ImportMap } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
@@ -26,7 +26,7 @@ export const defaultConfig: Readonly<Required<Config>> = {
 export async function loadConfig(workingDir: string): Promise<Config> {
   let data: Config = {}
   for (const name of ['ts', 'js', 'json'].map(ext => 'aleph.config.' + ext)) {
-    const p = path.join(workingDir, name)
+    const p = join(workingDir, name)
     if (existsFileSync(p)) {
       if (name.endsWith('.json')) {
         const v = JSON.parse(await Deno.readTextFile(p))
@@ -67,7 +67,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (util.isNEString(srcDir)) {
     config.srcDir = util.cleanPath(srcDir)
-  } else if (existsDirSync(path.join(workingDir, 'src'))) {
+  } else if (existsDirSync(join(workingDir, 'src'))) {
     config.srcDir = '/src'
   }
   if (util.isNEString(outputDir)) {
@@ -117,7 +117,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
 export async function loadImportMap(workingDir: string): Promise<ImportMap> {
   const importMap: ImportMap = { imports: {}, scopes: {} }
   for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
-    const importMapFile = path.join(workingDir, filename)
+    const importMapFile = join(workingDir, filename)
     if (existsFileSync(importMapFile)) {
       const data = JSON.parse(await Deno.readTextFile(importMapFile))
       const imports: Record<string, string> = toPlainStringRecord(data.imports)

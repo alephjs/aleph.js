@@ -1,9 +1,22 @@
-import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
 import { bold, dim } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
-import * as path from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { walk } from 'https://deno.land/std@0.90.0/fs/walk.ts'
 import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
-import { buildChecksum, ImportMap, parseExportNames, SourceType, transform, TransformOptions } from '../compiler/mod.ts'
+import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
+import {
+  basename,
+  dirname,
+  extname,
+  join,
+  resolve
+} from 'https://deno.land/std@0.90.0/path/mod.ts'
+import {
+  buildChecksum,
+  ImportMap,
+  parseExportNames,
+  SourceType,
+  transform,
+  TransformOptions
+} from '../compiler/mod.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
 import { RouteModule, Routing } from '../framework/core/routing.ts'
@@ -68,7 +81,7 @@ export class Application implements ServerApplication {
       log.error(`Aleph.js needs Deno ${minDenoVersion}+, please upgrade Deno.`)
       Deno.exit(1)
     }
-    this.workingDir = path.resolve(workingDir)
+    this.workingDir = resolve(workingDir)
     this.mode = mode
     this.config = { ...defaultConfig }
     this.importMap = { imports: {}, scopes: {} }
@@ -114,7 +127,7 @@ export class Application implements ServerApplication {
     })
 
     const alephPkgUri = getAlephPkgUri()
-    const buildManifestFile = path.join(this.buildDir, 'build.manifest.json')
+    const buildManifestFile = join(this.buildDir, 'build.manifest.json')
     const configHash = computeHash(JSON.stringify({
       ...this.defaultCompileOptions,
       plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name)
@@ -182,7 +195,7 @@ export class Application implements ServerApplication {
     // compile custom components
     for (const name of ['app', '404', 'loading']) {
       for (const ext of moduleExts) {
-        if (existsFileSync(path.join(this.srcDir, `${name}.${ext}`))) {
+        if (existsFileSync(join(this.srcDir, `${name}.${ext}`))) {
           await this.compile(`/${name}.${ext}`)
           break
         }
@@ -190,7 +203,7 @@ export class Application implements ServerApplication {
     }
 
     // update page routing
-    const pagesDir = path.join(this.srcDir, 'pages')
+    const pagesDir = join(this.srcDir, 'pages')
     const walkOptions = {
       includeDirs: false,
       skip: [
@@ -212,7 +225,7 @@ export class Application implements ServerApplication {
     }
 
     // update api routing
-    const apiDir = path.join(this.srcDir, 'api')
+    const apiDir = join(this.srcDir, 'api')
     if (existsDirSync(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...walkOptions, exts: moduleExts })) {
         const url = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
@@ -337,15 +350,15 @@ export class Application implements ServerApplication {
   }
 
   get srcDir() {
-    return this.getDir('src', () => path.join(this.workingDir, this.config.srcDir))
+    return this.getDir('src', () => join(this.workingDir, this.config.srcDir))
   }
 
   get outputDir() {
-    return this.getDir('output', () => path.join(this.workingDir, this.config.outputDir))
+    return this.getDir('output', () => join(this.workingDir, this.config.outputDir))
   }
 
   get buildDir() {
-    return this.getDir('build', () => path.join(this.workingDir, '.aleph', this.mode))
+    return this.getDir('build', () => join(this.workingDir, '.aleph', this.mode))
   }
 
   /** returns the module by given url. */
@@ -486,7 +499,7 @@ export class Application implements ServerApplication {
   /** inject HMR code  */
   injectHMRCode({ url }: Module, content: string): string {
     const hmrModuleImportUrl = getRelativePath(
-      path.dirname(toLocalUrl(url)),
+      dirname(toLocalUrl(url)),
       toLocalUrl(`${getAlephPkgUri()}/framework/core/hmr.js`)
     )
     const lines = [
@@ -589,7 +602,7 @@ export class Application implements ServerApplication {
   async build() {
     const start = performance.now()
     const outputDir = this.outputDir
-    const distDir = path.join(outputDir, '_aleph')
+    const distDir = join(outputDir, '_aleph')
 
     // wait for app ready
     await this.ready
@@ -597,7 +610,7 @@ export class Application implements ServerApplication {
     // clear previous build
     if (existsDirSync(outputDir)) {
       for await (const entry of Deno.readDir(outputDir)) {
-        await Deno.remove(path.join(outputDir, entry.name), { recursive: entry.isDirectory })
+        await Deno.remove(join(outputDir, entry.name), { recursive: entry.isDirectory })
       }
     }
     await ensureDir(distDir)
@@ -609,14 +622,14 @@ export class Application implements ServerApplication {
     await this.ssg()
 
     // copy public assets
-    const publicDir = path.join(this.workingDir, 'public')
+    const publicDir = join(this.workingDir, 'public')
     if (existsDirSync(publicDir)) {
       let n = 0
       for await (const { path: p } of walk(publicDir, { includeDirs: false, skip: [/(^|\/|\\)\./] })) {
         const rp = util.trimPrefix(p, publicDir)
-        const fp = path.join(outputDir, rp)
+        const fp = join(outputDir, rp)
         const fi = await Deno.lstat(p)
-        await ensureDir(path.dirname(fp))
+        await ensureDir(dirname(fp))
         await Deno.copyFile(p, fp)
         if (n === 0) {
           log.info(bold('- Public Assets'))
@@ -691,7 +704,7 @@ export class Application implements ServerApplication {
     }
 
     if (!util.isLikelyHttpURL(url)) {
-      const filepath = path.join(this.srcDir, util.trimPrefix(url, 'file://'))
+      const filepath = join(this.srcDir, util.trimPrefix(url, 'file://'))
       const content = await Deno.readFile(filepath)
       return { content, contentType: null }
     }
@@ -708,15 +721,15 @@ export class Application implements ServerApplication {
     const versioned = reFullVersion.test(pathname)
     const reload = this.#reloading || !versioned
     const isLocalhost = url.startsWith('http://localhost:')
-    const cacheDir = path.join(
+    const cacheDir = join(
       await getDenoDir(),
       'deps',
       util.trimSuffix(protocol, ':'),
       hostname + (port ? '_PORT' + port : '')
     )
     const hash = createHash('sha256').update(pathname + search).toString()
-    const contentFile = path.join(cacheDir, hash)
-    const metaFile = path.join(cacheDir, hash + '.metadata.json')
+    const contentFile = join(cacheDir, hash)
+    const metaFile = join(cacheDir, hash + '.metadata.json')
 
     if (!reload && !isLocalhost && existsFileSync(contentFile) && existsFileSync(metaFile)) {
       const [content, meta] = await Promise.all([
@@ -825,7 +838,7 @@ export class Application implements ServerApplication {
     }
 
     if (sourceType === SourceType.Unknown) {
-      switch (path.extname(url).slice(1).toLowerCase()) {
+      switch (extname(url).slice(1).toLowerCase()) {
         case 'mjs':
         case 'js':
           sourceType = SourceType.JS
@@ -861,9 +874,9 @@ export class Application implements ServerApplication {
   ): Promise<Module> {
     const isRemote = util.isLikelyHttpURL(url)
     const localUrl = toLocalUrl(url)
-    const name = trimModuleExt(path.basename(localUrl))
-    const saveDir = path.join(this.buildDir, path.dirname(localUrl))
-    const metaFile = path.join(saveDir, `${name}.meta.json`)
+    const name = trimModuleExt(basename(localUrl))
+    const saveDir = join(this.buildDir, dirname(localUrl))
+    const metaFile = join(saveDir, `${name}.meta.json`)
     const { sourceCode, forceCompile, once } = options
 
     let mod: Module
@@ -919,7 +932,7 @@ export class Application implements ServerApplication {
         reFullVersion.test(url) &&
         mod.sourceHash !== ''
       ) {
-        const jsFile = path.join(saveDir, name + '.js')
+        const jsFile = join(saveDir, name + '.js')
         if (existsFileSync(jsFile)) {
           shouldFetch = false
         }
@@ -1023,7 +1036,7 @@ export class Application implements ServerApplication {
           sourceHash: mod.sourceHash,
           deps: mod.deps,
         }, undefined, 2)),
-        ensureTextFile(mod.jsFile, jsContent + (jsSourceMap ? `//# sourceMappingURL=${path.basename(mod.jsFile)}.map` : '')),
+        ensureTextFile(mod.jsFile, jsContent + (jsSourceMap ? `//# sourceMappingURL=${basename(mod.jsFile)}.map` : '')),
         jsSourceMap ? ensureTextFile(mod.jsFile + '.map', jsSourceMap) : Promise.resolve(),
       ])
     }
@@ -1116,8 +1129,8 @@ export class Application implements ServerApplication {
 
     if (ssr === false) {
       const html = await this.#renderer.renderSPAIndexPage()
-      await ensureTextFile(path.join(outputDir, 'index.html'), html)
-      await ensureTextFile(path.join(outputDir, '404.html'), html)
+      await ensureTextFile(join(outputDir, 'index.html'), html)
+      await ensureTextFile(join(outputDir, '404.html'), html)
       return
     }
 
@@ -1136,9 +1149,9 @@ export class Application implements ServerApplication {
           this.#injects.get('ssr')?.forEach(transform => {
             html = transform(pathname, html)
           })
-          await ensureTextFile(path.join(outputDir, pathname, 'index.html'), html)
+          await ensureTextFile(join(outputDir, pathname, 'index.html'), html)
           if (data) {
-            const dataFile = path.join(
+            const dataFile = join(
               outputDir,
               '_aleph/data',
               (pathname === '/' ? 'index' : pathname) + '.json'
@@ -1159,7 +1172,7 @@ export class Application implements ServerApplication {
       this.#injects.get('ssr')?.forEach(transform => {
         html = transform('/404', html)
       })
-      await ensureTextFile(path.join(outputDir, '404.html'), html)
+      await ensureTextFile(join(outputDir, '404.html'), html)
     }
   }
 

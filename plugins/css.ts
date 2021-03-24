@@ -1,22 +1,25 @@
-import CleanCSS from 'https://esm.sh/clean-css@5.1.1?no-check'
-import PostCSS, { AcceptedPlugin } from 'https://esm.sh/postcss@8.2.7'
+import type { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
 import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { LoaderPlugin } from '../types.ts'
 
-const cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
+const postcssVersion = '8.2.8'
 const productionOnlyPostcssPlugins = ['autoprefixer']
+const decoder = new TextDecoder()
 
-type Options = {
+export type AcceptedPlugin = string | [string, any] | Plugin | PluginCreator<any>
+
+export type Options = {
   postcss?: {
-    plugins: (string | [string, any] | AcceptedPlugin)[]
+    plugins: AcceptedPlugin[]
   }
 }
 
 export default (options?: Options): LoaderPlugin => {
-  const decoder = new TextDecoder()
   let pcssProcessor: any = null
+  let cleanCSS: any = null
+  let isProd: any = null
 
   return {
     name: 'css-loader',
@@ -24,11 +27,18 @@ export default (options?: Options): LoaderPlugin => {
     test: /\.p?css$/i,
     acceptHMR: true,
     async transform({ url, content }) {
+      if (isProd === null) {
+        isProd = Deno.env.get('BUILD_MODE') === 'production'
+      }
+      if (isProd) {
+        const { default: CleanCSS } = await import('https://esm.sh/clean-css@5.1.2?no-check')
+        cleanCSS = new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
+      }
       if (pcssProcessor == null) {
         pcssProcessor = await initPostCSSProcessor(options)
       }
       const { content: pcss } = await pcssProcessor.process(decoder.decode(content)).async()
-      const css = Deno.env.get('BUILD_MODE') === 'production' ? cleanCSS.minify(pcss).styles : pcss
+      const css = isProd ? cleanCSS.minify(pcss).styles : pcss
       if (url.startsWith('#inline-style-')) {
         return {
           code: css,
@@ -48,6 +58,8 @@ export default (options?: Options): LoaderPlugin => {
 }
 
 async function initPostCSSProcessor(options?: Options) {
+  const { default: PostCSS } = await import(`https://esm.sh/postcss@${postcssVersion}`)
+
   if (options?.postcss) {
     return PostCSS(await loadPostcssPlugins(options.postcss.plugins))
   }
@@ -74,7 +86,7 @@ async function initPostCSSProcessor(options?: Options) {
   return PostCSS(await loadPostcssPlugins(['autoprefixer']))
 }
 
-async function loadPostcssPlugins(plugins: (string | [string, any] | AcceptedPlugin)[]) {
+async function loadPostcssPlugins(plugins: AcceptedPlugin[]) {
   const isDev = Deno.env.get('BUILD_MODE') === 'development'
   return await Promise.all(plugins.filter(p => {
     if (isDev) {
@@ -98,10 +110,10 @@ async function loadPostcssPlugins(plugins: (string | [string, any] | AcceptedPlu
 }
 
 async function importPostcssPluginByName(name: string) {
-  const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@8.2.4&no-check`)
+  const { default: Plugin } = await import(`https://esm.sh/${name}?external=postcss@${postcssVersion}&no-check`)
   return Plugin
 }
 
-function isPostcssConfig(v: any): v is { plugins: (string | [string, any] | AcceptedPlugin)[] } {
+function isPostcssConfig(v: any): v is { plugins: AcceptedPlugin[] } {
   return util.isPlainObject(v) && util.isArray(v.plugins)
 }

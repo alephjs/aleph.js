@@ -1,4 +1,4 @@
-import * as path from 'https://deno.land/std@0.90.0/path/mod.ts'
+import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { serve as stdServe, serveTLS } from 'https://deno.land/std@0.90.0/http/server.ts'
 import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.90.0/ws/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
@@ -99,7 +99,7 @@ export class Server {
           return
         }
 
-        const filePath = path.join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
+        const filePath = join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
         if (existsFileSync(filePath)) {
           const info = Deno.lstatSync(filePath)
           const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
@@ -132,7 +132,7 @@ export class Server {
       }
 
       // serve public files
-      const filePath = path.join(app.workingDir, 'public', pathname)
+      const filePath = join(app.workingDir, 'public', pathname)
       if (existsFileSync(filePath)) {
         const info = Deno.lstatSync(filePath)
         const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
