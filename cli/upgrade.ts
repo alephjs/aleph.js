@@ -50,11 +50,11 @@ export default async function (version = 'latest', forceUpgrade = false) {
   })
   const status = await p.status()
   if (status.success) {
-    if (cmdExists) {
+    if (cmdExists && !forceUpgrade) {
       console.log(`Aleph.js is up to ${version}`)
     } else {
       console.log('Aleph.js was installed successfully')
-      console.log(`Run 'aleph --help' to get started`)
+      console.log(`Run 'aleph -h' to get started`)
     }
   }
   Deno.exit(status.code)
