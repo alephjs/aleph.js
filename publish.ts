@@ -12,8 +12,8 @@ export async function prepublish(version: string) {
     const data = await Deno.readTextFile('./import_map.json')
     const importMap = JSON.parse(data)
     Object.assign(importMap.imports, {
-      'aleph': `https://deno.land/x/aleph@${version}/mod.ts`,
-      'aleph/': `https://deno.land/x/aleph@${version}/`,
+      'aleph': `https://deno.land/x/aleph@v${version}/mod.ts`,
+      'aleph/': `https://deno.land/x/aleph@v${version}/`,
     })
     await Deno.writeTextFile(
       './import_map.json',
