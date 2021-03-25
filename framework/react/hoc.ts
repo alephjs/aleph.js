@@ -26,7 +26,7 @@ export function withRouter<P>(Component: ComponentType<P>) {
  * ```tsx
  * class MyComponent extends React.Component {
  *   render() {
- *     return <p>{this.props.deno.version}</p>
+ *     return <p>{this.props.version}</p>
  *   }
  * }
  * export default withDeno(() => ({ version: Deno.version.deno }))(MyComponent)
@@ -39,7 +39,7 @@ export function withDeno<T>(callback: () => (T | Promise<T>), revalidate?: numbe
   return function <P extends T>(Component: ComponentType<P>): ComponentType<Exclude<P, keyof T>> {
     return function WithDeno(props: Exclude<P, keyof T>) {
       const deno = useDeno<T>(callback, revalidate)
-      return createElement(Component, { ...props, deno })
+      return createElement(Component, { ...props, ...deno })
     }
   }
 }
