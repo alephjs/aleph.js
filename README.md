@@ -1,12 +1,10 @@
 [![Aleph.js: The Full-stack Framework in Deno.](./design/poster.svg)](https://alephjs.org)
 
 <p>
-  <samp>
-    <a href="https://alephjs.org">Website</a> &middot;
-    <a href="https://alephjs.org/docs/get-started">Get Started</a> &middot;
-    <a href="https://alephjs.org/docs">Docs</a> &middot;
-    <a href="./CONTRIBUTING.md">Contributing</a>
-  </samp>
+  <a href="https://alephjs.org">Website</a> |
+  <a href="https://alephjs.org/docs/get-started">Get Started</a> |
+  <a href="https://alephjs.org/docs">Docs</a> |
+  <a href="./CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p>
@@ -15,7 +13,7 @@
 </p>
 
 <details>
-  <summary><samp>BOOM<samp></summary>
+  <summary>Boom</summary>
   <p>
 
   ```bash
