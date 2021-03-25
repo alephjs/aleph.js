@@ -5,6 +5,7 @@ import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import { ensureTextFile } from '../shared/fs.ts'
 import util from '../shared/util.ts'
+import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
 
 export const helpMessage = `
@@ -58,17 +59,17 @@ export default async function (nameArg?: string) {
   ]
   const importMap = {
     imports: {
-      '~/': './', '@/': './',
+      '~/': './',
       'aleph': `https://deno.land/x/aleph@v${VERSION}/mod.ts`,
       'aleph/': `https://deno.land/x/aleph@v${VERSION}/`,
-      'react': 'https://esm.sh/react@17.0.1',
-      'react-dom': 'https://esm.sh/react-dom@17.0.1',
+      'react': `https://esm.sh/react@${defaultReactVersion}`,
+      'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
     },
     scopes: {}
   }
   await Promise.all([
     Deno.writeTextFile(join(cwd, name, '.gitignore'), gitignore.join('\n')),
-    Deno.writeTextFile(join(cwd, name, 'import_map.json'), JSON.stringify(importMap, undefined, 4))
+    Deno.writeTextFile(join(cwd, name, 'import_map.json'), JSON.stringify(importMap, undefined, 2))
   ])
 
   if (vscode) {
@@ -84,8 +85,8 @@ export default async function (nameArg?: string) {
     }
     await ensureDir(join(name, '.vscode'))
     await Promise.all([
-      Deno.writeTextFile(join(name, '.vscode', 'extensions.json'), JSON.stringify(extensions, undefined, 4)),
-      Deno.writeTextFile(join(name, '.vscode', 'settings.json'), JSON.stringify(settigns, undefined, 4))
+      Deno.writeTextFile(join(name, '.vscode', 'extensions.json'), JSON.stringify(extensions, undefined, 2)),
+      Deno.writeTextFile(join(name, '.vscode', 'settings.json'), JSON.stringify(settigns, undefined, 2))
     ])
   }
 
@@ -110,6 +111,6 @@ async function ask(question: string = ':', stdin = Deno.stdin, stdout = Deno.std
 
 async function confirm(question: string = 'are you sure?') {
   let a: string
-  while (!/^(y(es)?|no?)$/i.test(a = (await ask(question + ' [y/n]')).trim())) { }
+  while (!/^(y(es)?|no?)$/i.test(a = (await ask(question + ' ' + dim('[y/n]'))).trim())) { }
   return a.charAt(0).toLowerCase() === 'y'
 }
