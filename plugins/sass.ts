@@ -28,9 +28,9 @@ export default (opts?: Options): LoaderPlugin => {
         sourceMap: true
       })
       return {
-        code: css,
+        code: decoder.decode(css),
         type: 'css',
-        map: map,
+        map: map ? decoder.decode(map) : undefined,
       }
     }
   }

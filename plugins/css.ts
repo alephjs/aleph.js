@@ -17,8 +17,6 @@ export type Options = {
 }
 
 export default (options?: Options): LoaderPlugin => {
-  const encoder = new TextEncoder()
-
   let pcssProcessor: any = null
   let cleanCSS: any = null
   let isProd: any = null
@@ -49,10 +47,10 @@ export default (options?: Options): LoaderPlugin => {
         }
       }
       return {
-        code: encoder.encode([
+        code: [
           'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
           `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)})`
-        ].join('\n'))
+        ].join('\n')
         // todo: generate map
       }
     }
