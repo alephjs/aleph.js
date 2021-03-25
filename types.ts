@@ -15,20 +15,22 @@ export type LoaderPlugin = {
   acceptHMR?: boolean
   /** `asPage` allows the loaded module as a page. */
   asPage?: boolean
+  /** `pagePathReoslve` resolves the page path. */
+  pagePathResolve?(path: string): string
   /** `resolve` resolves the module content. */
-  resolve?(url: string): { content: Uint8Array } | Promise<{ content: Uint8Array }>
+  resolve?(url: string): Uint8Array | Promise<Uint8Array>
   /** `transform` transforms the source content. */
-  transform(source: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformResult | Promise<LoaderTransformResult>
+  transform?(input: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformOutput | Promise<LoaderTransformOutput>
 }
 
 /**
  * The result of loader transform.
  */
-export type LoaderTransformResult = {
-  /** The transformed code in string. */
-  code: string
+export type LoaderTransformOutput = {
   /** The transformed code type (default is 'js'). */
   type?: string
+  /** The transformed code. */
+  code: string
   /** The source map. */
   map?: string
 }

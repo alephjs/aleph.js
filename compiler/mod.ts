@@ -123,6 +123,7 @@ export async function transform(url: string, code: string, options: TransformOpt
   }
 
   const { loaders, ...transformOptions } = options
+
   let {
     code: jsContent,
     deps,
@@ -145,7 +146,7 @@ export async function transform(url: string, code: string, options: TransformOpt
     if (loaders !== undefined) {
       if (style.type !== 'css') {
         for (const loader of loaders) {
-          if (loader.test.test(`.${style.type}`)) {
+          if (loader.test.test(`.${style.type}`) && loader.transform) {
             const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
             if (type === 'css') {
               tpl = code
@@ -155,7 +156,7 @@ export async function transform(url: string, code: string, options: TransformOpt
         }
       }
       for (const loader of loaders) {
-        if (loader.test.test('.css')) {
+        if (loader.test.test('.css') && loader.transform) {
           const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
           if (type === 'css') {
             tpl = code

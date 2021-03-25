@@ -136,17 +136,16 @@ export class Bundler {
       throw new Error(`Unsupported module '${mod.url}'`)
     }
 
-    const [sourceCode, sourceType] = source
     let { code, starExports } = await transform(
       mod.url,
-      sourceCode,
+      source.code,
       {
         importMap: this.#app.importMap,
         alephPkgUri: getAlephPkgUri(),
         reactVersion: defaultReactVersion,
         swcOptions: {
           target: 'es2020',
-          sourceType
+          sourceType: source.type,
         },
         bundleMode: true,
         bundleExternal: external,
@@ -157,8 +156,8 @@ export class Bundler {
     if (starExports && starExports.length > 0) {
       for (let index = 0; index < starExports.length; index++) {
         const url = starExports[index]
-        const [sourceCode, sourceType] = await this.#app.resolveModule(url)
-        const names = await parseExportNames(url, sourceCode, { sourceType })
+        const source = await this.#app.resolveModule(url)
+        const names = await parseExportNames(url, source.code, { sourceType: source.type })
         code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
       }
     }

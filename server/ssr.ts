@@ -1,4 +1,3 @@
-import { toPagePath } from '../framework/core/module.ts'
 import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -83,9 +82,9 @@ export class Renderer {
     return [html, data]
   }
 
-  clearCache(url?: string) {
-    if (url) {
-      this.#cache.delete(toPagePath(url))
+  clearCache(namespace?: string) {
+    if (namespace) {
+      this.#cache.delete(namespace)
     } else {
       this.#cache.clear()
     }

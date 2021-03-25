@@ -32,7 +32,7 @@ import type {
   Config,
   DependencyDescriptor,
   LoaderPlugin,
-  LoaderTransformResult,
+  LoaderTransformOutput,
   Module,
   RouterURL,
   ServerApplication,
@@ -221,7 +221,7 @@ export class Application implements ServerApplication {
         }
         if (validated) {
           await this.compile(url)
-          this.#pageRouting.update(this.createRouteModule(url))
+          this.#pageRouting.update(...this.createRouteUpdate(url))
         }
       }
     }
@@ -232,7 +232,7 @@ export class Application implements ServerApplication {
       for await (const { path: p } of walk(apiDir, { ...walkOptions, exts: moduleExts })) {
         const url = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
         await this.compile(url)
-        this.#apiRouting.update(this.createRouteModule(url))
+        this.#apiRouting.update(...this.createRouteUpdate(url))
       }
     }
 
@@ -274,17 +274,39 @@ export class Application implements ServerApplication {
                   if (trimModuleExt(url) === '/app') {
                     this.#renderer.clearCache()
                   } else if (url.startsWith('/pages/')) {
-                    this.#renderer.clearCache(url)
-                    this.#pageRouting.update(this.createRouteModule(url))
+                    this.#renderer.clearCache(toPagePath(url))
+                    this.#pageRouting.update(...this.createRouteUpdate(url))
                   } else if (url.startsWith('/api/')) {
-                    this.#apiRouting.update(this.createRouteModule(url))
+                    this.#apiRouting.update(...this.createRouteUpdate(url))
                   }
                 }
                 if (hmrable) {
-                  if (type === 'add') {
-                    this.#fsWatchListeners.forEach(e => e.emit('add', { url: mod.url }))
+                  let pagePath: string | undefined = undefined
+                  let useDeno: boolean | undefined = undefined
+                  let isIndexModule: boolean | undefined = undefined
+                  if (mod.url.startsWith('/pages/')) {
+                    const [path, _, options] = this.createRouteUpdate(mod.url)
+                    pagePath = path
+                    useDeno = options.useDeno
+                    isIndexModule = options.isIndexModule
                   } else {
-                    this.#fsWatchListeners.forEach(e => e.emit('modify-' + mod.url))
+                    if (['/app', '/404'].includes(trimModuleExt(mod.url))) {
+                      this.lookupDeps(mod.url, dep => {
+                        if (dep.url.startsWith('#useDeno-')) {
+                          useDeno = true
+                          return false
+                        }
+                      })
+                    }
+                  }
+                  if (type === 'add') {
+                    this.#fsWatchListeners.forEach(e => {
+                      e.emit('add', { url: mod.url, pagePath, isIndexModule, useDeno })
+                    })
+                  } else {
+                    this.#fsWatchListeners.forEach(e => {
+                      e.emit('modify-' + mod.url, { useDeno })
+                    })
                   }
                 }
                 update(mod)
@@ -396,12 +418,12 @@ export class Application implements ServerApplication {
   }
 
   /** add a new page module by given path and source code. */
-  async addModule(url: string, options: { code?: string, once?: boolean } = {}): Promise<Module> {
+  async addModule(url: string, options: { code?: string } = {}): Promise<Module> {
     const mod = await this.compile(url, { sourceCode: options.code })
     if (url.startsWith('/pages/')) {
-      this.#pageRouting.update(this.createRouteModule(url))
+      this.#pageRouting.update(...this.createRouteUpdate(url))
     } else if (url.startsWith('/api/')) {
-      this.#apiRouting.update(this.createRouteModule(url))
+      this.#apiRouting.update(...this.createRouteUpdate(url))
     }
     return mod
   }
@@ -536,14 +558,19 @@ export class Application implements ServerApplication {
       routes: this.#pageRouting.routes,
       rewrites: this.config.rewrites,
       sharedModules: Array.from(this.#modules.values()).filter(({ url }) => {
-        switch (trimModuleExt(url)) {
-          case '/404':
-          case '/app':
-            return true
-          default:
-            return false
+        return ['/app', '/404'].includes(trimModuleExt(url))
+      }).map(({ url }) => {
+        let useDeno: boolean | undefined = undefined
+        if (this.config.ssr !== false) {
+          this.lookupDeps(url, dep => {
+            if (dep.url.startsWith('#useDeno-')) {
+              useDeno = true
+              return false
+            }
+          })
         }
-      }).map(({ url }) => this.createRouteModule(url)),
+        return { url, useDeno }
+      }),
       renderMode: this.config.ssr ? 'ssr' : 'spa'
     }
 
@@ -686,8 +713,10 @@ export class Application implements ServerApplication {
     return dir
   }
 
-  private createRouteModule(url: string): RouteModule {
-    let useDeno: true | undefined = undefined
+  private createRouteUpdate(url: string): [string, string, { isIndexModule?: boolean, useDeno?: boolean }] {
+    let pathPath = toPagePath(url)
+    let useDeno: boolean | undefined = undefined
+    let isIndexModule: boolean | undefined = undefined
     if (this.config.ssr !== false) {
       this.lookupDeps(url, dep => {
         if (dep.url.startsWith('#useDeno-')) {
@@ -696,14 +725,30 @@ export class Application implements ServerApplication {
         }
       })
     }
-    return { url, useDeno }
+    if (pathPath !== '/') {
+      for (const ext of moduleExts) {
+        if (url.endsWith('/index.' + ext)) {
+          isIndexModule = true
+          break
+        }
+      }
+    }
+    return [pathPath, url, { isIndexModule, useDeno }]
   }
 
   /** apply loaders recurively. */
   private async applyLoader(
     loader: LoaderPlugin,
     input: { url: string, content: Uint8Array, map?: Uint8Array }
-  ): Promise<Omit<LoaderTransformResult, 'loader'>> {
+  ): Promise<LoaderTransformOutput> {
+    if (!loader.transform) {
+      const decoder = new TextDecoder()
+      return {
+        code: decoder.decode(input.content),
+        map: input.map ? decoder.decode(input.map) : undefined
+      }
+    }
+
     const { code, map, type } = await loader.transform(input)
     if (type) {
       for (const plugin of this.config.plugins) {
@@ -724,12 +769,12 @@ export class Application implements ServerApplication {
   private async fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
     for (const plugin of this.config.plugins) {
       if (plugin.type === 'loader' && plugin.test.test(url) && plugin.resolve !== undefined) {
-        const ret = plugin.resolve(url)
+        const v = plugin.resolve(url)
         let content: Uint8Array
-        if (ret instanceof Promise) {
-          content = (await ret).content
+        if (v instanceof Promise) {
+          content = (await v)
         } else {
-          content = ret.content
+          content = v
         }
         if (content instanceof Uint8Array) {
           return { content, contentType: null }
@@ -824,9 +869,9 @@ export class Application implements ServerApplication {
     url: string,
     sourceContent: Uint8Array,
     contentType: string | null
-  ): Promise<[string, SourceType] | null> {
+  ): Promise<{ code: string, type: SourceType } | null> {
     let sourceCode = (new TextDecoder).decode(sourceContent)
-    let sourceType: SourceType = SourceType.Unknown
+    let sourceType: SourceType | null = null
 
     if (contentType !== null) {
       switch (contentType.split(';')[0].trim()) {
@@ -866,12 +911,15 @@ export class Application implements ServerApplication {
           case 'tsx':
             sourceType = SourceType.TSX
             break
+          default:
+            sourceType = SourceType.Unknown
+            break
         }
         break
       }
     }
 
-    if (sourceType === SourceType.Unknown) {
+    if (sourceType === null) {
       switch (extname(url).slice(1).toLowerCase()) {
         case 'mjs':
         case 'js':
@@ -891,7 +939,7 @@ export class Application implements ServerApplication {
       }
     }
 
-    return [sourceCode, sourceType]
+    return { code: sourceCode, type: sourceType }
   }
 
   /** compile a moudle by given url, then cache on the disk. */
@@ -925,7 +973,7 @@ export class Application implements ServerApplication {
         deps: [],
         sourceHash: '',
         hash: '',
-        jsFile: '',
+        jsFile: util.cleanPath(`${saveDir}/${name}.js`),
       }
       if (!once) {
         this.#modules.set(url, mod)
@@ -993,12 +1041,12 @@ export class Application implements ServerApplication {
       }
 
       const t = performance.now()
-      const [sourceCode, sourceType] = source
-      const { code, deps, starExports, map } = await transform(url, sourceCode, {
+
+      const { code, deps, starExports, map } = await transform(url, source.code, {
         ...this.defaultCompileOptions,
         swcOptions: {
           target: 'es2020',
-          sourceType
+          sourceType: source.type
         },
         // workaround for https://github.com/denoland/deno/issues/9849
         resolveStarExports: !this.isDev && Deno.version.deno.replace(/\.\d+$/, '') === '1.8',
@@ -1016,8 +1064,8 @@ export class Application implements ServerApplication {
       if (starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
           const url = starExports[index]
-          const [sourceCode, sourceType] = await this.resolveModule(url)
-          const names = await parseExportNames(url, sourceCode, { sourceType })
+          const source = await this.resolveModule(url)
+          const names = await parseExportNames(url, source.code, { sourceType: source.type })
           jsContent = jsContent.replace(`export * from "${url}:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
         }
       }
@@ -1035,8 +1083,6 @@ export class Application implements ServerApplication {
 
       log.debug(`compile '${url}' in ${Math.round(performance.now() - t)}ms`)
     }
-
-    mod.jsFile = util.cleanPath(`${saveDir}/${name}.js`)
 
     // compile deps
     for (const dep of mod.deps) {

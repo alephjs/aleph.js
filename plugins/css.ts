@@ -1,4 +1,4 @@
-import type { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
+import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
 import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
@@ -17,6 +17,8 @@ export type Options = {
 }
 
 export default (options?: Options): LoaderPlugin => {
+  const encoder = new TextEncoder()
+
   let pcssProcessor: any = null
   let cleanCSS: any = null
   let isProd: any = null
@@ -47,11 +49,11 @@ export default (options?: Options): LoaderPlugin => {
         }
       }
       return {
-        code: [
+        code: encoder.encode([
           'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
           `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)})`
-        ].join('\n'),
-        map: undefined // todo: generate map
+        ].join('\n'))
+        // todo: generate map
       }
     }
   }

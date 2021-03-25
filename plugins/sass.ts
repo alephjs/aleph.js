@@ -1,9 +1,11 @@
-import type { Options, Result } from 'https://esm.sh/sass@1.32.8'
+import { Options, Result } from 'https://esm.sh/sass@1.32.8'
 import type { LoaderPlugin } from '../types.ts'
 
 type Sass = { renderSync(options: Options): Result }
 
 export default (opts?: Options): LoaderPlugin => {
+  const decoder = new TextDecoder()
+
   let sass: Sass | null = null
 
   return {
@@ -22,13 +24,13 @@ export default (opts?: Options): LoaderPlugin => {
         indentedSyntax: url.endsWith('.sass'),
         ...opts,
         file: url,
-        data: (new TextDecoder).decode(content),
+        data: decoder.decode(content),
         sourceMap: true
       })
       return {
-        code: (new TextDecoder).decode(css),
+        code: css,
         type: 'css',
-        map: map ? (new TextDecoder).decode(map) : undefined,
+        map: map,
       }
     }
   }
