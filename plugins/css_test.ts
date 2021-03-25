@@ -3,7 +3,7 @@ import cssLoader from './css.ts'
 
 Deno.test('css loader', async () => {
   const loader = cssLoader()
-  const { code } = await loader.transform({
+  const { code } = await loader.transform!({
     url: '/test.css',
     content: (new TextEncoder).encode('h1 { font-size: 18px; }'),
   })
@@ -15,7 +15,7 @@ Deno.test('css loader', async () => {
 
 Deno.test('css loader for inline style', async () => {
   const loader = cssLoader()
-  const { code, type } = await loader.transform({
+  const { code, type } = await loader.transform!({
     url: '#inline-style-{}',
     content: (new TextEncoder).encode('h1 { font-size: 18px; }'),
   })
@@ -27,7 +27,7 @@ Deno.test('css loader in production mode', async () => {
   Deno.env.set('BUILD_MODE', 'production')
 
   const loader = cssLoader()
-  const { code } = await loader.transform({
+  const { code } = await loader.transform!({
     url: '/test.css',
     content: (new TextEncoder).encode('h1 { font-size: 18px; }'),
   })
@@ -38,7 +38,7 @@ Deno.test('css loader in production mode', async () => {
 
 Deno.test('css loader with postcss plugins', async () => {
   const loader = cssLoader({ postcss: { plugins: ['postcss-nested'] } })
-  const { code } = await loader.transform({
+  const { code } = await loader.transform!({
     url: '/test.css',
     content: (new TextEncoder).encode('.foo { .bar { font-size: 100%; } }'),
   })

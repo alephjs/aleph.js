@@ -3,7 +3,7 @@ import sassLoader from './sass.ts'
 
 Deno.test('scss loader', async () => {
   const loader = sassLoader()
-  const { code, type } = await loader.transform({
+  const { code, type } = await loader.transform!({
     url: '/test.scss',
     content: (new TextEncoder).encode('$someVar: 123px; .some-selector { width: $someVar; }'),
   })
@@ -15,7 +15,7 @@ Deno.test('scss loader', async () => {
 
 Deno.test('sass loader', async () => {
   const loader = sassLoader()
-  const { code, type } = await loader.transform({
+  const { code, type } = await loader.transform!({
     url: '/test.sass',
     content: (new TextEncoder).encode('$someVar: 123px\n.some-selector\n  width: 123px'),
   })
@@ -27,7 +27,7 @@ Deno.test('sass loader', async () => {
 
 Deno.test('sass loader with options', async () => {
   const loader = sassLoader({ indentType: 'tab', indentWidth: 2 })
-  const { code, type } = await loader.transform({
+  const { code, type } = await loader.transform!({
     url: '/test.sass',
     content: (new TextEncoder).encode('$someVar: 123px\n.some-selector\n  width: 123px'),
   })
