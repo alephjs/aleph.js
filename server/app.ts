@@ -201,8 +201,6 @@ export class Application implements ServerApplication {
       }
     }
 
-    // update page routing
-    const pagesDir = join(this.srcDir, 'pages')
     const walkOptions = {
       includeDirs: false,
       skip: [
@@ -211,19 +209,24 @@ export class Application implements ServerApplication {
         /(\.|_)(test|spec|e2e)\.(tsx?|jsx?|mjs)?$/i
       ]
     }
-    for await (const { path: p } of walk(pagesDir, walkOptions)) {
-      const url = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
-      let validated = moduleExts.some(ext => p.endsWith('.' + ext))
-      if (!validated) {
-        validated = this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.asPage)
-      }
-      if (validated) {
-        await this.compile(url)
-        this.#pageRouting.update(this.createRouteModule(url))
+
+    // load page routing
+    const pagesDir = join(this.srcDir, 'pages')
+    if (existsDirSync(pagesDir)) {
+      for await (const { path: p } of walk(pagesDir, walkOptions)) {
+        const url = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
+        let validated = moduleExts.some(ext => p.endsWith('.' + ext))
+        if (!validated) {
+          validated = this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.asPage)
+        }
+        if (validated) {
+          await this.compile(url)
+          this.#pageRouting.update(this.createRouteModule(url))
+        }
       }
     }
 
-    // update api routing
+    // load api routing
     const apiDir = join(this.srcDir, 'api')
     if (existsDirSync(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...walkOptions, exts: moduleExts })) {
