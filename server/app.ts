@@ -221,7 +221,9 @@ export class Application implements ServerApplication {
         }
         if (validated) {
           await this.compile(url)
-          this.#pageRouting.update(...this.createRouteUpdate(url))
+          if (this.#modules.has(url)) {
+            this.#pageRouting.update(...this.createRouteUpdate(url))
+          }
         }
       }
     }
@@ -232,7 +234,9 @@ export class Application implements ServerApplication {
       for await (const { path: p } of walk(apiDir, { ...walkOptions, exts: moduleExts })) {
         const url = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
         await this.compile(url)
-        this.#apiRouting.update(...this.createRouteUpdate(url))
+        if (this.#modules.has(url)) {
+          this.#apiRouting.update(...this.createRouteUpdate(url))
+        }
       }
     }
 
@@ -772,7 +776,7 @@ export class Application implements ServerApplication {
         const v = plugin.resolve(url)
         let content: Uint8Array
         if (v instanceof Promise) {
-          content = (await v)
+          content = await v
         } else {
           content = v
         }
@@ -784,8 +788,12 @@ export class Application implements ServerApplication {
 
     if (!util.isLikelyHttpURL(url)) {
       const filepath = join(this.srcDir, util.trimPrefix(url, 'file://'))
-      const content = await Deno.readFile(filepath)
-      return { content, contentType: null }
+      if (existsFileSync(filepath)) {
+        const content = await Deno.readFile(filepath)
+        return { content, contentType: null }
+      } else {
+        return Promise.reject(new Error(`No such file`))
+      }
     }
 
     const u = new URL(url)
@@ -826,7 +834,7 @@ export class Application implements ServerApplication {
 
     // download dep when deno cache failed
     let err = new Error('Unknown')
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       if (i === 0) {
         if (!isLocalhost) {
           log.info('Download', url)
@@ -978,8 +986,8 @@ export class Application implements ServerApplication {
       if (!once) {
         this.#modules.set(url, mod)
       }
-      try {
-        if (existsFileSync(metaFile)) {
+      if (existsFileSync(metaFile)) {
+        try {
           const { url: __url, sourceHash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
           if (__url === url && util.isNEString(sourceHash) && util.isArray(deps)) {
             mod.sourceHash = sourceHash
@@ -988,8 +996,8 @@ export class Application implements ServerApplication {
             log.warn(`removing invalid metadata '${name}.meta.json'`)
             Deno.remove(metaFile)
           }
-        }
-      } catch (e) { }
+        } catch (e) { }
+      }
     }
 
     let sourceContent = new Uint8Array()
@@ -1020,13 +1028,19 @@ export class Application implements ServerApplication {
         }
       }
       if (shouldFetch) {
-        const { content, contentType: ctype } = await this.fetchModule(url)
-        const sourceHash = computeHash(content)
-        sourceContent = content
-        contentType = ctype
-        if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
-          mod.sourceHash = sourceHash
-          shouldCompile = true
+        try {
+          const { content, contentType: ctype } = await this.fetchModule(url)
+          const sourceHash = computeHash(content)
+          sourceContent = content
+          contentType = ctype
+          if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
+            mod.sourceHash = sourceHash
+            shouldCompile = true
+          }
+        } catch (err) {
+          log.error(`Fetch module '${url}':`, err.message)
+          this.#modules.delete(url)
+          return mod
         }
       }
     }
@@ -1035,13 +1049,12 @@ export class Application implements ServerApplication {
     if (shouldCompile) {
       const source = await this.precompile(url, sourceContent, contentType)
       if (source === null) {
-        log.warn(`Unsupported module '${url}'`)
+        log.error(`Unsupported module '${url}'`)
         this.#modules.delete(url)
         return mod
       }
 
       const t = performance.now()
-
       const { code, deps, starExports, map } = await transform(url, source.code, {
         ...this.defaultCompileOptions,
         swcOptions: {
