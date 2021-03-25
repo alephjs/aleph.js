@@ -9,19 +9,62 @@ Deno.test(`routing`, () => {
       '/你好世界': '/zh-CN/hello-world',
     }
   })
-  routing.update({ url: '/pages/index.tsx' })
-  routing.update({ url: '/pages/hello-world.tsx' })
-  routing.update({ url: '/pages/blog/index.tsx' })
-  routing.update({ url: '/pages/blog/[slug].tsx' })
-  routing.update({ url: '/pages/user/index.tsx' })
-  routing.update({ url: '/pages/user/[...all].tsx' })
-  routing.update({ url: '/pages/blog.tsx' })
-  routing.update({ url: '/pages/user.tsx' })
-  routing.update({ url: '/pages/blog/[slug]/subpage.tsx' })
-  routing.update({ url: '/pages/docs.tsx' })
-  routing.update({ url: '/pages/docs/get-started.tsx' })
-  routing.update({ url: '/pages/docs/installation.tsx' })
-  routing.update({ url: '/pages/index.tsx' })
+
+  routing.update(
+    '/',
+    '/pages/index.tsx'
+  )
+  routing.update(
+    '/hello-world',
+    '/pages/hello-world.tsx'
+  )
+  routing.update(
+    '/blog',
+    '/pages/blog/index.tsx',
+    { isIndexModule: true }
+  )
+  routing.update(
+    '/blog/[slug]',
+    '/pages/blog/[slug].tsx'
+  )
+  routing.update(
+    '/user',
+    '/pages/user/index.tsx',
+    { isIndexModule: true }
+  )
+  routing.update(
+    '/user/[...all]',
+    '/pages/user/[...all].tsx'
+  )
+  routing.update(
+    '/blog',
+    '/pages/blog.tsx'
+  )
+  routing.update(
+    '/user',
+    '/pages/user.tsx'
+  )
+  routing.update(
+    '/blog/[slug]/subpage',
+    '/pages/blog/[slug]/subpage.tsx'
+  )
+  routing.update(
+    '/docs',
+    '/pages/docs.tsx'
+  )
+  routing.update(
+    '/docs/get-started',
+    '/pages/docs/get-started.tsx'
+  )
+  routing.update(
+    '/docs/installation',
+    '/pages/docs/installation.tsx'
+  )
+  routing.update(
+    '/',
+    '/pages/index.tsx',
+    { isIndexModule: true }
+  )
 
   assertEquals(routing.paths, [
     '/',
@@ -41,7 +84,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'en')
     assertEquals(router.pathname, '/')
     assertEquals(router.pagePath, '/')
-    assertEquals(nestedModules, [{ url: '/pages/index.tsx' }])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/index.tsx'])
   }
 
   {
@@ -49,7 +92,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'zh-CN')
     assertEquals(router.pathname, '/')
     assertEquals(router.pagePath, '/')
-    assertEquals(nestedModules, [{ url: '/pages/index.tsx' }])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/index.tsx'])
   }
 
   {
@@ -57,7 +100,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'en')
     assertEquals(router.pathname, '/hello-world')
     assertEquals(router.pagePath, '/hello-world')
-    assertEquals(nestedModules, [{ url: '/pages/hello-world.tsx' }])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/hello-world.tsx'])
   }
 
   {
@@ -65,7 +108,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'zh-CN')
     assertEquals(router.pathname, '/hello-world')
     assertEquals(router.pagePath, '/hello-world')
-    assertEquals(nestedModules, [{ url: '/pages/hello-world.tsx' }])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/hello-world.tsx'])
   }
 
   {
@@ -73,7 +116,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'en')
     assertEquals(router.pathname, '/blog')
     assertEquals(router.pagePath, '/blog')
-    assertEquals(nestedModules.map(({ url }) => url), ['/pages/blog.tsx', '/pages/blog/index.tsx'])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/blog.tsx', '/pages/blog/index.tsx'])
   }
 
   {
@@ -81,7 +124,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.locale, 'zh-CN')
     assertEquals(router.pathname, '/blog')
     assertEquals(router.pagePath, '/blog')
-    assertEquals(nestedModules.map(({ url }) => url), ['/pages/blog.tsx', '/pages/blog/index.tsx'])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/blog.tsx', '/pages/blog/index.tsx'])
   }
 
   {
@@ -89,7 +132,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.pathname, '/blog/hello-world')
     assertEquals(router.pagePath, '/blog/[slug]')
     assertEquals(router.params, { slug: 'hello-world' })
-    assertEquals(nestedModules.map(({ url }) => url), ['/pages/blog.tsx', '/pages/blog/[slug].tsx'])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/blog.tsx', '/pages/blog/[slug].tsx'])
   }
 
   {
@@ -97,7 +140,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.pathname, '/user')
     assertEquals(router.pagePath, '/user')
     assertEquals(router.params, {})
-    assertEquals(nestedModules.map(({ url }) => url), ['/pages/user.tsx', '/pages/user/index.tsx'])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/index.tsx'])
   }
 
   {
@@ -105,7 +148,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.pathname, '/user/projects')
     assertEquals(router.pagePath, '/user/[...all]')
     assertEquals(router.params, { all: 'projects' })
-    assertEquals(nestedModules.map(({ url }) => url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
   }
 
   {
@@ -113,7 +156,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.pathname, '/user/settings/profile')
     assertEquals(router.pagePath, '/user/[...all]')
     assertEquals(router.params, { all: 'settings/profile' })
-    assertEquals(nestedModules.map(({ url }) => url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
   }
 
   {
@@ -121,7 +164,7 @@ Deno.test(`routing`, () => {
     assertEquals(router.pathname, '/user/settings/security')
     assertEquals(router.pagePath, '/user/[...all]')
     assertEquals(router.params, { all: 'settings/security' })
-    assertEquals(nestedModules.map(({ url }) => url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
+    assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
   }
 
   {
@@ -129,6 +172,6 @@ Deno.test(`routing`, () => {
     assertEquals(router.pathname, '/null')
     assertEquals(router.pagePath, '')
     assertEquals(router.params, {})
-    assertEquals(nestedModules, [])
+    assertEquals(nestedModules.map(m => m.url), [])
   }
 })

@@ -6,7 +6,7 @@ import {
   useState,
 } from 'https://esm.sh/react'
 import events from '../core/events.ts'
-import { importModule } from '../core/module.ts'
+import { importModule, toPagePath } from '../core/module.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './error.ts'
@@ -82,7 +82,7 @@ export default function Router({
   useEffect(() => {
     const isDev = !('__ALEPH' in window)
     const { baseURL } = routing
-    const onAddModule = async (mod: RouteModule) => {
+    const onAddModule = async (mod: RouteModule & { pagePath?: string, isIndexModule?: boolean }) => {
       switch (mod.url) {
         case '/404.js': {
           const { default: Component } = await importModule(baseURL, mod.url, true)
@@ -103,8 +103,9 @@ export default function Router({
           break
         }
         default: {
-          if (mod.url.startsWith('/pages/')) {
-            routing.update(mod)
+          const { pagePath, url, ...rest } = mod
+          if (pagePath) {
+            routing.update(pagePath, url, rest)
             events.emit('popstate', { type: 'popstate', forceRefetch: true })
           }
           break

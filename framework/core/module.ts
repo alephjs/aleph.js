@@ -8,7 +8,7 @@ export function toPagePath(url: string): string {
     pathname = util.trimPrefix(pathname, '/pages')
   }
   if (pathname.endsWith('/index')) {
-    pathname = util.trimSuffix(pathname, 'index')
+    pathname = util.trimSuffix(pathname, '/index')
   }
   if (pathname === '') {
     pathname = '/'

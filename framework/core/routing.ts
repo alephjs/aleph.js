@@ -1,7 +1,6 @@
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from './events.ts'
-import { toPagePath } from './module.ts'
 
 const ghostRoute: Route = { path: '', module: { url: '' } }
 
@@ -17,11 +16,11 @@ export type RouteModule = {
 }
 
 export type RoutingOptions = {
-  routes?: Route[]
-  rewrites?: Record<string, string>
   baseURL?: string
   defaultLocale?: string
   locales?: string[]
+  routes?: Route[]
+  rewrites?: Record<string, string>
 }
 
 export class Routing {
@@ -66,8 +65,12 @@ export class Routing {
     })
   }
 
-  update(module: RouteModule) {
-    const newRoute: Route = { path: toPagePath(module.url), module: module }
+  update(path: string, moduleUrl: string, options: { isIndexModule?: boolean, useDeno?: boolean } = {}) {
+    const { isIndexModule, ...rest } = options
+    const newRoute: Route = {
+      path: path === '/' ? path : path + (options.isIndexModule ? '/' : ''),
+      module: { url: moduleUrl, ...rest }
+    }
     const dirtyRoutes: Set<Route[]> = new Set()
     let exists = false
     let targetRoutes = this._routes
@@ -75,8 +78,8 @@ export class Routing {
       const path = routePath.map(r => r.path).join('')
       const route = routePath[routePath.length - 1]
       const parentRoute = routePath[routePath.length - 2]
-      if (route.module.url === module.url) {
-        Object.assign(route.module, module)
+      if (route.module.url === newRoute.module.url) {
+        Object.assign(route.module, newRoute.module)
         exists = true
         return false
       }

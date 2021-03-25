@@ -2,7 +2,7 @@ import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { serve as stdServe, serveTLS } from 'https://deno.land/std@0.90.0/http/server.ts'
 import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.90.0/ws/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
-import { rewriteURL, RouteModule } from '../framework/core/routing.ts'
+import { rewriteURL } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -47,7 +47,7 @@ export class Server {
         const { conn, r: bufReader, w: bufWriter, headers } = r
         const socket = await acceptWebSocket({ conn, bufReader, bufWriter, headers })
         const watcher = app.createFSWatcher()
-        watcher.on('add', (mod: RouteModule) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
+        watcher.on('add', (mod: any) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
         watcher.on('remove', (url: string) => {
           watcher.removeAllListeners('modify-' + url)
           socket.send(JSON.stringify({ type: 'remove', url }))

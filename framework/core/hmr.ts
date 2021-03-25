@@ -49,7 +49,8 @@ const { location } = window as any
 const { protocol, host } = location
 const modules: Map<string, Module> = new Map()
 const messageQueue: any[] = []
-const socket = new WebSocket((protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr')
+const url = (protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr'
+const socket = new WebSocket(url)
 
 socket.addEventListener('open', () => {
   messageQueue.forEach(msg => socket.send(JSON.stringify(msg)))
@@ -61,13 +62,25 @@ socket.addEventListener('close', () => {
   location.reload()
 })
 
-socket.addEventListener('message', ({ data: rawData }: { data?: string }) => {
-  if (rawData) {
+socket.addEventListener('message', ({ data }: { data?: string }) => {
+  if (data) {
     try {
-      const { type, url, asyncDeps, updateUrl } = JSON.parse(rawData)
+      const {
+        type,
+        url,
+        updateUrl,
+        pagePath,
+        isIndexModule,
+        useDeno,
+      } = JSON.parse(data)
       switch (type) {
         case 'add':
-          events.emit('add-module', { url, asyncDeps })
+          events.emit('add-module', {
+            url,
+            pagePath,
+            isIndexModule,
+            useDeno,
+          })
           break
         case 'update':
           const mod = modules.get(url)
