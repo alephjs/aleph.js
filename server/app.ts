@@ -1055,7 +1055,6 @@ export class Application implements ServerApplication {
       }
 
       const t = performance.now()
-      console.log('-', url, source.type)
       const { code, deps, starExports, map } = await transform(url, source.code, {
         ...this.defaultCompileOptions,
         swcOptions: {
