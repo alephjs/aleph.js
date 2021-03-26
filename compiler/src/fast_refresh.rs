@@ -856,7 +856,7 @@ impl Fold for ReactRefreshFold {
       // ! insert (hoc)
       // _c = App;
       // _c2 = Foo;
-      for (hoc_handle_id, hoc_id) in hocs {
+      for (hoc_id, hoc_handle_id) in hocs {
         raw_items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
           span: DUMMY_SP,
           expr: Box::new(Expr::Assign(AssignExpr {
@@ -1291,14 +1291,14 @@ var _s = $RefreshSig$(), _s2 = $RefreshSig$();
 const A = forwardRef(_c = function() {
     return <h1 >Foo</h1>;
 });
-A = _c2;
+_c2 = A;
 const B = memo(_c4 = React.forwardRef(_c3 = ()=>{
     return <h1 >Foo</h1>;
 }));
-B = _c5;
+_c5 = B;
 const C = forwardRef(_c8 = memo(_c7 = forwardRef(_c6 = ()=>null
 )));
-C = _c9;
+_c9 = C;
 export const D = React.memo(_c11 = React.forwardRef(_c10 = _s((props, ref)=>{
     _s();
     const [foo, setFoo] = useState(0);
@@ -1306,7 +1306,7 @@ export const D = React.memo(_c11 = React.forwardRef(_c10 = _s((props, ref)=>{
     });
     return <h1 ref={ref}>{foo}</h1>;
 }, "useState{[foo, setFoo](0)}\nuseEffect{}")));
-D = _c12;
+_c12 = D;
 export const E = React.memo(_c14 = React.forwardRef(_c13 = _s2(function(props, ref) {
     _s2();
     const [foo, setFoo] = useState(0);
@@ -1314,7 +1314,7 @@ export const E = React.memo(_c14 = React.forwardRef(_c13 = _s2(function(props, r
     });
     return <h1 ref={ref}>{foo}</h1>;
 }, "useState{[foo, setFoo](0)}\nuseEffect{}")));
-E = _c15;
+_c15 = E;
 function hoc() {
     var _s3 = $RefreshSig$();
     return _s3(function Inner() {
