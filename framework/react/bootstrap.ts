@@ -51,7 +51,12 @@ export default async function bootstrap(options: BootstrapOptions) {
   // remove ssr head elements, set a timmer to avoid the tab title flash
   setTimeout(() => {
     Array.from(document.head.children).forEach((el: any) => {
-      if (el.hasAttribute('ssr') && el.tagName.toLowerCase() !== 'style') {
+      const tag = el.tagName.toLowerCase()
+      if (
+        el.hasAttribute('ssr') &&
+        tag !== 'style' &&
+        !(tag === 'link' && el.getAttribute('rel') === 'stylesheet')
+      ) {
         document.head.removeChild(el)
       }
     })

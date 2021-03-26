@@ -139,7 +139,11 @@ export async function render(
 
   // get styles
   serverStyles.forEach((css, url) => {
-    ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
+    if (css) {
+      ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
+    } else if (util.isLikelyHttpURL(url)) {
+      ret.head.push(`<link rel="stylesheet" href="${url}" data-module-id=${JSON.stringify(url)} ssr />`)
+    }
   })
 
   defer()

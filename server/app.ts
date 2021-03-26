@@ -507,7 +507,7 @@ export class Application implements ServerApplication {
   }
 
   isHMRable(url: string) {
-    if (!this.isDev) {
+    if (!this.isDev || util.isLikelyHttpURL(url)) {
       return false
     }
 

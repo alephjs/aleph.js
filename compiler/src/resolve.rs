@@ -218,10 +218,6 @@ impl Resolver {
       } else {
         if url.starts_with("/") {
           url.into()
-        } else if url.starts_with("@/") {
-          url.trim_start_matches("@").into()
-        } else if url.starts_with("~/") {
-          url.trim_start_matches("~").into()
         } else {
           let mut buf = PathBuf::from(self.specifier.as_str());
           buf.pop();
@@ -337,21 +333,22 @@ impl Resolver {
             resolved_path.set_file_name(filename);
           }
           _ => {
+            let mut filename = resolved_path
+              .file_name()
+              .unwrap()
+              .to_str()
+              .unwrap()
+              .to_owned();
+            if self.bundle_mode && !is_dynamic {
+              filename.push_str(".bundling");
+            }
+            filename.push_str(".js");
             if !is_remote && !self.specifier_is_remote {
-              let mut filename = resolved_path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_owned();
-              if self.bundle_mode && !is_dynamic {
-                filename.push_str(".bundling");
-              }
-              filename.push_str(".js#");
+              filename.push('#');
               filename.push_str(fixed_url.as_str());
               filename.push_str("@000000");
-              resolved_path.set_file_name(filename);
             }
+            resolved_path.set_file_name(filename);
           }
         },
         None => {}
@@ -536,6 +533,13 @@ mod tests {
       (
         "../styles/app.css.js#/styles/app.css@000000".into(),
         "/styles/app.css".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/tailwindcss/dist/tailwind.min.css", false),
+      (
+        "../-/esm.sh/tailwindcss/dist/tailwind.min.css.js".into(),
+        "https://esm.sh/tailwindcss/dist/tailwind.min.css".into()
       )
     );
     assert_eq!(

@@ -7,6 +7,7 @@ import type { LoaderPlugin } from '../types.ts'
 const postcssVersion = '8.2.8'
 const productionOnlyPostcssPlugins = ['autoprefixer']
 const decoder = new TextDecoder()
+const importDecl = 'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"'
 
 export type AcceptedPlugin = string | [string, any] | Plugin | PluginCreator<any>
 
@@ -26,7 +27,21 @@ export default (options?: Options): LoaderPlugin => {
     type: 'loader',
     test: /\.p?css$/i,
     acceptHMR: true,
+    async resolve(url: string) {
+      if (util.isLikelyHttpURL(url)) {
+        return Promise.resolve(new Uint8Array())
+      }
+      return Deno.readFile(join(Deno.cwd(), url))
+    },
     async transform({ url, content }) {
+      if (util.isLikelyHttpURL(url)) {
+        return {
+          code: [
+            importDecl,
+            `applyCSS(${JSON.stringify(url)})`
+          ].join('\n')
+        }
+      }
       if (isProd === null) {
         isProd = Deno.env.get('BUILD_MODE') === 'production'
       }
@@ -48,7 +63,7 @@ export default (options?: Options): LoaderPlugin => {
       }
       return {
         code: [
-          'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
+          importDecl,
           `applyCSS(${JSON.stringify(url)}, ${JSON.stringify(css)})`
         ].join('\n')
         // todo: generate map

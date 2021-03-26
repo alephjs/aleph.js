@@ -1,47 +1,67 @@
 import util from '../../shared/util.ts'
 
+export const clientStyles = new Map<string, string>()
 export const serverStyles = new Map<string, string>()
-export const recoverStyles = new Map<string, string>()
 
-export function removeCSS(id: string, recoverable?: boolean) {
+export function removeCSS(url: string, recoverable?: boolean) {
   const { document } = window as any
   Array.from(document.head.children).forEach((el: any) => {
-    if (el.getAttribute('data-module-id') === id) {
+    if (el.getAttribute('data-module-id') === url) {
       if (recoverable) {
-        recoverStyles.set(id, el.innerHTML)
+        const tag = el.tagName.toLowerCase()
+        if (tag === 'style') {
+          clientStyles.set(url, el.innerHTML)
+        } else if (tag === 'link') {
+          clientStyles.set(url, '')
+        }
       }
       document.head.removeChild(el)
     }
   })
 }
 
-export function recoverCSS(id: string) {
-  if (recoverStyles.has(id)) {
-    applyCSS(id, recoverStyles.get(id)!)
+export function recoverCSS(url: string) {
+  if (clientStyles.has(url)) {
+    const css = clientStyles.get(url)!
+    if (css === '' && util.isLikelyHttpURL(url)) {
+      applyCSS(url)
+    } else {
+      applyCSS(url, css)
+    }
   }
 }
 
-export function applyCSS(id: string, css: string) {
+export function applyCSS(url: string, css?: string) {
   if (util.inDeno) {
-    serverStyles.set(id, css)
+    serverStyles.set(url, css || '')
   } else {
     const { document } = window as any
-    const ssrStyle = Array.from<any>(document.head.children).find((el: any) => {
-      return el.getAttribute('data-module-id') === id && el.hasAttribute('ssr')
+    const ssr = Array.from<any>(document.head.children).find((el: any) => {
+      return el.getAttribute('data-module-id') === url && el.hasAttribute('ssr')
     })
-    if (ssrStyle) {
-      ssrStyle.removeAttribute('ssr')
+    if (ssr) {
+      // apply the css at next time
+      ssr.removeAttribute('ssr')
     } else {
-      const prevStyleEls = Array.from(document.head.children).filter((el: any) => {
-        return el.getAttribute('data-module-id') === id
+      const prevEls = Array.from(document.head.children).filter((el: any) => {
+        return el.getAttribute('data-module-id') === url
       })
-      const styleEl = document.createElement('style')
-      styleEl.type = 'text/css'
-      styleEl.appendChild(document.createTextNode(css))
-      styleEl.setAttribute('data-module-id', id)
-      document.head.appendChild(styleEl)
-      if (prevStyleEls.length > 0) {
-        prevStyleEls.forEach(el => document.head.removeChild(el))
+      let el: any
+      if (css !== undefined) {
+        el = document.createElement('style')
+        el.type = 'text/css'
+        el.appendChild(document.createTextNode(css))
+      } else if (util.isLikelyHttpURL(url)) {
+        el = document.createElement('link')
+        el.rel = 'stylesheet'
+        el.href = url
+      } else {
+        throw new Error('applyCSS: missing css')
+      }
+      el.setAttribute('data-module-id', url)
+      document.head.appendChild(el)
+      if (prevEls.length > 0) {
+        prevEls.forEach(el => document.head.removeChild(el))
       }
     }
   }

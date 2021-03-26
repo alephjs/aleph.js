@@ -700,6 +700,7 @@ mod tests {
         return (
           <>
             <head>
+              <link rel="stylesheet" href="https://esm.sh/tailwindcss/dist/tailwind.min.css" />
               <link rel="stylesheet" href="../style/index.css" />
             </head>
             <Logo />
@@ -746,6 +747,8 @@ mod tests {
     assert!(code.contains(
       "import __ALEPH_Stylelink from \"../-/deno.land/x/aleph/framework/react/stylelink.bundling.js\""
     ));
+    assert!(code.contains("import   \"../-/esm.sh/tailwindcss/dist/tailwind.min.css.bundling.js\""));
+    assert!(code.contains("import   \"../style/index.css.bundling.js#/style/index.css@000000\""));
     assert!(code.contains("export const $$star_0 = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
     assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
