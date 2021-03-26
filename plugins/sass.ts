@@ -3,9 +3,9 @@ import type { LoaderPlugin } from '../types.ts'
 
 type Sass = { renderSync(options: Options): Result }
 
-export default (opts?: Options): LoaderPlugin => {
-  const decoder = new TextDecoder()
+const decoder = new TextDecoder()
 
+export default (opts?: Options): LoaderPlugin => {
   let sass: Sass | null = null
 
   return {

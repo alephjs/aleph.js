@@ -29,9 +29,9 @@ export default (options?: Options): LoaderPlugin => {
     acceptHMR: true,
     async resolve(url: string) {
       if (util.isLikelyHttpURL(url)) {
-        return Promise.resolve(new Uint8Array())
+        return new Uint8Array()
       }
-      return Deno.readFile(join(Deno.cwd(), url))
+      return await Deno.readFile(join(Deno.cwd(), url))
     },
     async transform({ url, content }) {
       if (util.isLikelyHttpURL(url)) {

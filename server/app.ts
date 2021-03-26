@@ -274,11 +274,12 @@ export class Application implements ServerApplication {
               log.info(type, url)
               this.compile(url, { forceCompile: true }).then(mod => {
                 const hmrable = this.isHMRable(mod.url)
-                const update = ({ url }: Module) => {
+                const applyEffect = (url: string) => {
                   if (trimModuleExt(url) === '/app') {
                     this.#renderer.clearCache()
                   } else if (url.startsWith('/pages/')) {
-                    this.#renderer.clearCache(toPagePath(url))
+                    const [pagePath] = this.createRouteUpdate(url)
+                    this.#renderer.clearCache(pagePath)
                     this.#pageRouting.update(...this.createRouteUpdate(url))
                   } else if (url.startsWith('/api/')) {
                     this.#apiRouting.update(...this.createRouteUpdate(url))
@@ -287,12 +288,12 @@ export class Application implements ServerApplication {
                 if (hmrable) {
                   let pagePath: string | undefined = undefined
                   let useDeno: boolean | undefined = undefined
-                  let isIndexModule: boolean | undefined = undefined
+                  let isIndex: boolean | undefined = undefined
                   if (mod.url.startsWith('/pages/')) {
                     const [path, _, options] = this.createRouteUpdate(mod.url)
                     pagePath = path
                     useDeno = options.useDeno
-                    isIndexModule = options.isIndexModule
+                    isIndex = options.isIndex
                   } else {
                     if (['/app', '/404'].includes(trimModuleExt(mod.url))) {
                       this.lookupDeps(mod.url, dep => {
@@ -305,7 +306,7 @@ export class Application implements ServerApplication {
                   }
                   if (type === 'add') {
                     this.#fsWatchListeners.forEach(e => {
-                      e.emit('add', { url: mod.url, pagePath, isIndexModule, useDeno })
+                      e.emit('add', { url: mod.url, pagePath, isIndex, useDeno })
                     })
                   } else {
                     this.#fsWatchListeners.forEach(e => {
@@ -313,9 +314,9 @@ export class Application implements ServerApplication {
                     })
                   }
                 }
-                update(mod)
+                applyEffect(mod.url)
                 this.applyCompilationSideEffect(url, (mod) => {
-                  update(mod)
+                  applyEffect(mod.url)
                   if (!hmrable && this.isHMRable(mod.url)) {
                     this.#fsWatchListeners.forEach(w => w.emit('modify-' + mod.url))
                   }
@@ -596,7 +597,7 @@ export class Application implements ServerApplication {
   }
 
   /** get ssr html scripts */
-  getSSRHTMLScripts(pagePath?: string) {
+  getSSRHTMLScripts(entryFile?: string) {
     const { framework } = this.config
     const baseUrl = util.trimSuffix(this.config.baseUrl, '/')
     const alephPkgPath = getAlephPkgUri().replace('https://', '').replace('http://localhost:', 'http_localhost_')
@@ -623,8 +624,8 @@ export class Application implements ServerApplication {
         }
       })
 
-      if (pagePath) {
-        preload.push(`${baseUrl}/_aleph/pages/${pagePath.replace(/\/$/, '/index')}.js`)
+      if (entryFile) {
+        preload.push(`${baseUrl}/_aleph${entryFile}`)
       }
 
       return [
@@ -636,7 +637,7 @@ export class Application implements ServerApplication {
 
     return [
       bundlerRuntimeCode,
-      ...['polyfill', 'deps', 'shared', 'main', pagePath ? '/pages' + pagePath.replace(/\/$/, '/index') : '']
+      ...['polyfill', 'deps', 'shared', 'main', entryFile ? util.trimSuffix(entryFile, '.js') : '']
         .filter(name => name !== "" && this.#bundler.getBundledFile(name) !== null)
         .map(name => ({
           src: `${baseUrl}/_aleph/${this.#bundler.getBundledFile(name)}`
@@ -717,10 +718,12 @@ export class Application implements ServerApplication {
     return dir
   }
 
-  private createRouteUpdate(url: string): [string, string, { isIndexModule?: boolean, useDeno?: boolean }] {
-    let pathPath = toPagePath(url)
+  private createRouteUpdate(url: string): [string, string, { isIndex?: boolean, useDeno?: boolean }] {
+    const isBuiltinModule = moduleExts.some(ext => url.endsWith('.' + ext))
+    let pagePath = isBuiltinModule ? toPagePath(url) : util.trimSuffix(url, '/pages')
     let useDeno: boolean | undefined = undefined
-    let isIndexModule: boolean | undefined = undefined
+    let isIndex: boolean | undefined = undefined
+
     if (this.config.ssr !== false) {
       this.lookupDeps(url, dep => {
         if (dep.url.startsWith('#useDeno-')) {
@@ -729,15 +732,31 @@ export class Application implements ServerApplication {
         }
       })
     }
-    if (pathPath !== '/') {
+
+    if (!isBuiltinModule) {
+      for (const plugin of this.config.plugins) {
+        if (plugin.type === 'loader' && plugin.test.test(url) && plugin.pagePathResolve) {
+          const { path, isIndex: _isIndex } = plugin.pagePathResolve(url)
+          if (!util.isNEString(path)) {
+            throw new Error(`bad pagePathResolve result of '${plugin.name}' plugin`)
+          }
+          pagePath = path
+          if (!!_isIndex) {
+            isIndex = true
+          }
+          break
+        }
+      }
+    } else if (pagePath !== '/') {
       for (const ext of moduleExts) {
         if (url.endsWith('/index.' + ext)) {
-          isIndexModule = true
+          isIndex = true
           break
         }
       }
     }
-    return [pathPath, url, { isIndexModule, useDeno }]
+
+    return [pagePath, url, { isIndex, useDeno }]
   }
 
   /** apply loaders recurively. */
@@ -766,6 +785,7 @@ export class Application implements ServerApplication {
         }
       }
     }
+
     return { code, map }
   }
 
@@ -1149,11 +1169,11 @@ export class Application implements ServerApplication {
             { url, hash }
           )
           await Deno.writeTextFile(mod.jsFile, jsContent)
+          dep.hash = hash
           mod.hash = computeHash(mod.sourceHash + mod.deps.map(({ hash }) => hash).join(''))
           callback(mod)
           log.debug('compilation side-effect:', mod.url, dim('<-'), url)
           this.applyCompilationSideEffect(mod.url, callback)
-          break
         }
       }
     }

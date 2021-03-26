@@ -16,7 +16,7 @@ export type LoaderPlugin = {
   /** `asPage` allows the loaded module as a page. */
   asPage?: boolean
   /** `pagePathReoslve` resolves the page path. */
-  pagePathResolve?(path: string): string
+  pagePathResolve?(url: string): { path: string, isIndex?: boolean }
   /** `resolve` resolves the module content. */
   resolve?(url: string): Uint8Array | Promise<Uint8Array>
   /** `transform` transforms the source content. */

@@ -1,4 +1,5 @@
 import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
+import { dirname, basename } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
@@ -96,20 +97,24 @@ export class Renderer {
     const isDev = this.#app.isDev
     const appModule = this.#app.findModuleByName('app')
     const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 6)}`) : {} as any
-    const imports = nestedModules
+
+    let entryFile = ''
+    const nestedPageComponents = await Promise.all(nestedModules
       .filter(({ url }) => this.#app.getModule(url) !== null)
       .map(async ({ url }) => {
         const { jsFile, hash } = this.#app.getModule(url)!
         const { default: Component } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
+        entryFile = dirname(url) + '/' + basename(jsFile)
         return {
           url,
           Component
         }
       })
+    )
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
       App,
-      await Promise.all(imports)
+      nestedPageComponents
     )
 
     if (isDev) {
@@ -126,9 +131,9 @@ export class Renderer {
             type: 'application/json',
             innerText: JSON.stringify(data, undefined, isDev ? 2 : 0),
           } : '',
-          ...this.#app.getSSRHTMLScripts(url.pagePath),
+          ...this.#app.getSSRHTMLScripts(entryFile),
           ...scripts.map((script: Record<string, any>) => {
-            if (script.innerText && !this.#app.isDev) {
+            if (script.innerText && !isDev) {
               return { ...script, innerText: script.innerText }
             }
             return script

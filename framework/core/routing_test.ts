@@ -21,7 +21,7 @@ Deno.test(`routing`, () => {
   routing.update(
     '/blog',
     '/pages/blog/index.tsx',
-    { isIndexModule: true }
+    { isIndex: true }
   )
   routing.update(
     '/blog/[slug]',
@@ -30,7 +30,7 @@ Deno.test(`routing`, () => {
   routing.update(
     '/user',
     '/pages/user/index.tsx',
-    { isIndexModule: true }
+    { isIndex: true }
   )
   routing.update(
     '/user/[...all]',
@@ -63,7 +63,7 @@ Deno.test(`routing`, () => {
   routing.update(
     '/',
     '/pages/index.tsx',
-    { isIndexModule: true }
+    { isIndex: true }
   )
 
   assertEquals(routing.paths, [

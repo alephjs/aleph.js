@@ -65,10 +65,10 @@ export class Routing {
     })
   }
 
-  update(path: string, moduleUrl: string, options: { isIndexModule?: boolean, useDeno?: boolean } = {}) {
-    const { isIndexModule, ...rest } = options
+  update(path: string, moduleUrl: string, options: { isIndex?: boolean, useDeno?: boolean } = {}) {
+    const { isIndex, ...rest } = options
     const newRoute: Route = {
-      path: path === '/' ? path : path + (options.isIndexModule ? '/' : ''),
+      path: path === '/' ? path : util.trimSuffix(path, '/') + (options.isIndex ? '/' : ''),
       module: { url: moduleUrl, ...rest }
     }
     const dirtyRoutes: Set<Route[]> = new Set()

@@ -82,7 +82,7 @@ export default function Router({
   useEffect(() => {
     const isDev = !('__ALEPH' in window)
     const { baseURL } = routing
-    const onAddModule = async (mod: RouteModule & { pagePath?: string, isIndexModule?: boolean }) => {
+    const onAddModule = async (mod: RouteModule & { pagePath?: string, isIndex?: boolean }) => {
       switch (mod.url) {
         case '/404.js': {
           const { default: Component } = await importModule(baseURL, mod.url, true)

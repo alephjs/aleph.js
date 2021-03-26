@@ -70,7 +70,7 @@ socket.addEventListener('message', ({ data }: { data?: string }) => {
         url,
         updateUrl,
         pagePath,
-        isIndexModule,
+        isIndex,
         useDeno,
       } = JSON.parse(data)
       switch (type) {
@@ -78,7 +78,7 @@ socket.addEventListener('message', ({ data }: { data?: string }) => {
           events.emit('add-module', {
             url,
             pagePath,
-            isIndexModule,
+            isIndex,
             useDeno,
           })
           break
