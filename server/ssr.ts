@@ -216,7 +216,7 @@ export class Renderer {
       lang: defaultLocale,
       head: [],
       scripts: this.#app.getSSRHTMLScripts(),
-      body: '',
+      body: '<div id="__aleph"></div>',
       minify: !this.#app.isDev
     })
   }
