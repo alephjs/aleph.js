@@ -1,9 +1,11 @@
+import { useDeno } from 'framework:react'
 import React from 'react'
 import Logo from '../components/logo.tsx'
 import useCounter from '../lib/useCounter.ts'
 
 export default function Home() {
   const [count, isSyncing, increase, decrease] = useCounter()
+  const version = useDeno(() => Deno.version.deno)
 
   return (
     <div className="page">
@@ -33,7 +35,7 @@ export default function Home() {
         <button onClick={decrease}>-</button>
         <button onClick={increase}>+</button>
       </div>
-      <p className="copyinfo">Built by Aleph.js in Deno</p>
+      <p className="copyinfo">Built by Aleph.js in Deno {version}</p>
     </div>
   )
 }

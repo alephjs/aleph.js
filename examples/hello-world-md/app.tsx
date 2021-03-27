@@ -1,4 +1,4 @@
-import React, { ComponentType } from 'https://esm.sh/react@17.0.1'
+import React, { ComponentType } from 'react'
 
 type Metadata = {
   title?: string

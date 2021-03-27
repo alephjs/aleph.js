@@ -1,4 +1,4 @@
-import React, { ComponentType } from 'https://esm.sh/react@17.0.1'
+import React, { ComponentType } from 'react'
 
 export default function App({ Page, pageProps }: { Page: ComponentType<any>, pageProps: any }) {
   return (
