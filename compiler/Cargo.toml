@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-anyhow = "1.0.39"
+anyhow = "1.0.40"
 base64 = "0.13.0"
 indexmap = "1.6.2"
 lazy_static = "1.4.0"
@@ -21,19 +21,19 @@ pathdiff = "0.2.0"
 regex = "1.4.5"
 relative-path = "1.3.2"
 sha-1 = "0.9.4"
-serde = { version = "1.0.124", features = ["derive"] }
+serde = { version = "1.0.125", features = ["derive"] }
 url = "2.2.1"
 
 # swc
 # docs: https://swc.rs
 swc_common = { version = "0.10.13", features = ["sourcemap"] }
-swc_ecmascript = { version = "0.26.0", features = ["codegen", "parser", "react", "transforms", "visit"] }
-swc_ecma_transforms_typescript = "0.9.0"
-swc_ecma_transforms_compat = "0.8.0"
-swc_ecma_transforms_proposal = "0.8.0"
-swc_ecma_ast = "0.40.0"
-swc_ecma_visit = "0.26.0"
-swc_ecma_utils = "0.30.0"
+swc_ecmascript = { version = "0.28.1", features = ["codegen", "parser", "react", "transforms", "visit"] }
+swc_ecma_transforms_typescript = "0.11.1"
+swc_ecma_transforms_compat = "0.10.1"
+swc_ecma_transforms_proposal = "0.10.1"
+swc_ecma_ast = "0.41.0"
+swc_ecma_visit = "0.27.0"
+swc_ecma_utils = "0.32.0"
 
 # wasm-bindgen
 # docs: https://rustwasm.github.io/docs/wasm-bindgen
