@@ -455,10 +455,10 @@ export class Application implements ServerApplication {
     }
 
     const cacheKey = router.pathname + router.query.toString()
-    const ret = await this.#renderer.useCache(pagePath, cacheKey, async () => {
+    const [_, data] = await this.#renderer.useCache(pagePath, cacheKey, async () => {
       return await this.#renderer.renderPage(router, nestedModules)
     })
-    return ret[1]
+    return data
   }
 
   /** get ssr page */

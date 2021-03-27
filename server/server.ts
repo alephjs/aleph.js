@@ -85,11 +85,11 @@ export class Server {
           if (p === '/index') {
             p = '/'
           }
-          const [status, data] = await app.getSSRData({ pathname: p })
-          if (status === 200) {
-            req.send(JSON.stringify(data), 'application/json; charset=utf-8')
+          const data = await app.getSSRData({ pathname: p })
+          if (data === null) {
+            req.status(404).send('null', 'application/json; charset=utf-8')
           } else {
-            req.status(status).send('')
+            req.send(JSON.stringify(data), 'application/json; charset=utf-8')
           }
           return
         }
