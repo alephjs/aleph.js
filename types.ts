@@ -58,8 +58,8 @@ export type Plugin = LoaderPlugin | ServerPlugin
 export type Config = {
   /** `framework` specifies the framework (default is 'react'). */
   framework?: 'react'
-  /** `buildTarget` specifies the build target in production mode (default is **es5** to be compatible with IE11). */
-  buildTarget?: 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
+  /** `buildTarget` specifies the build target in production mode (default is **es2015**). */
+  buildTarget?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
   /** `baseUrl` specifies the path prefix for the application (default is '/'). */
   baseUrl?: string
   /** `srcDir` specifies the **src** dir (default is '/'). */

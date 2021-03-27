@@ -9,7 +9,7 @@ import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
 export const defaultConfig: Readonly<Required<Config>> = {
   framework: 'react',
-  buildTarget: 'es5',
+  buildTarget: 'es2015',
   baseUrl: '/',
   srcDir: '/',
   outputDir: '/dist',
@@ -157,9 +157,8 @@ function isFramework(v: any): v is 'react' {
   }
 }
 
-function isBuildTarget(v: any): v is 'es5' | 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' {
+function isBuildTarget(v: any): v is 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' {
   switch (v) {
-    case 'es5':
     case 'es2015':
     case 'es2016':
     case 'es2017':

@@ -1,6 +1,5 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::fast_refresh::react_refresh_fold;
-use crate::fixer::compat_fixer_fold;
 use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve::Resolver;
@@ -12,9 +11,9 @@ use swc_common::{
   chain,
   comments::SingleThreadedComments,
   errors::{Handler, HandlerFlags},
-  FileName, Globals, Mark, SourceMap,
+  FileName, Globals, SourceMap,
 };
-use swc_ecma_transforms_compat::{es2015, es2016, es2017, es2018, es2020};
+use swc_ecma_transforms_compat::{es2016, es2017, es2018, es2020};
 use swc_ecma_transforms_proposal::decorators;
 use swc_ecma_transforms_typescript::strip;
 use swc_ecmascript::{
@@ -146,7 +145,6 @@ impl SWC {
       };
       let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) =
         aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev);
-      let root_mark = Mark::fresh(Mark::root());
       let mut passes = chain!(
         Optional::new(
           resolve_fold(
@@ -193,11 +191,6 @@ impl SWC {
         Optional::new(es2018(), options.target < JscTarget::Es2018),
         Optional::new(es2017(), options.target < JscTarget::Es2017),
         Optional::new(es2016(), options.target < JscTarget::Es2016),
-        Optional::new(
-          es2015(root_mark, Default::default()),
-          options.target < JscTarget::Es2015
-        ),
-        Optional::new(compat_fixer_fold(), options.target < JscTarget::Es2015),
         Optional::new(
           helpers::inject_helpers(),
           options.target < JscTarget::Es2020
