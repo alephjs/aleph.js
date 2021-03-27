@@ -1,7 +1,7 @@
 import {
   createElement,
   ComponentType,
-  ExoticComponent,
+  ComponentPropsWithRef,
   ReactChild,
   ReactElement,
   ReactFragment,
@@ -70,8 +70,8 @@ export function withDeno<T>(callback: () => (T | Promise<T>), revalidate?: numbe
  */
 export function dynamic<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>
-): ExoticComponent<T & { fallback?: ReactNode }> {
-  const DynamicComponent = ({ fallback, ...props }: T & { fallback?: ReactNode }) => {
+): ComponentType<ComponentPropsWithRef<T> & { fallback?: ReactNode }> {
+  const DynamicComponent = ({ fallback, ...props }: ComponentPropsWithRef<T> & { fallback?: ReactNode }) => {
     const [mod, setMod] = useState<{ default: T } | null>(null)
 
     useEffect(() => {
@@ -89,5 +89,5 @@ export function dynamic<T extends ComponentType<any>>(
     return null
   }
 
-  return DynamicComponent as ExoticComponent<any>
+  return DynamicComponent
 }
