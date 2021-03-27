@@ -10,7 +10,6 @@ export default (): LoaderPlugin => {
     name: 'markdown-loader',
     type: 'loader',
     test: /\.(md|markdown)$/i,
-    acceptHMR: true,
     asPage: true,
     pagePathResolve: (url) => {
       let path = util.trimPrefix(url.replace(/\.(md|markdown)$/i, ''), '/pages')
@@ -25,40 +24,21 @@ export default (): LoaderPlugin => {
     },
     transform: ({ content }) => {
       const { __content, ...meta } = safeLoadFront(decoder.decode(content))
-      const html = marked.parse(__content)
+      const props = {
+        id: util.isString(meta.id) ? meta.id : undefined,
+        className: util.isString(meta.id) ? meta.className : undefined,
+        style: util.isPlainObject(meta.style) ? meta.style : undefined,
+        html: marked.parse(__content)
+      }
 
       return {
         code: [
-          `import React, { useEffect, useRef } from "https://esm.sh/react";`,
-          `import { redirect } from "https://deno.land/x/aleph/mod.ts";`,
+          `import { createElement } from 'https://esm.sh/react'`,
+          `import HTMLPage from "https://deno.land/x/aleph/framework/react/htmlpage.ts";`,
           `export default function MarkdownPage() {`,
-          `  const ref = useRef(null);`,
-          ``,
-          `  useEffect(() => {`,
-          `    const anchors = [];`,
-          `    const onClick = e => {`,
-          `      e.preventDefault();`,
-          `      redirect(e.currentTarget.getAttribute("href"));`,
-          `    };`,
-          `    if (ref.current) {`,
-          `      ref.current.querySelectorAll("a").forEach(a => {`,
-          `        const href = a.getAttribute("href");`,
-          `        if (href && !/^[a-z0-9]+:/i.test(href)) {`,
-          `          a.addEventListener("click", onClick, false);`,
-          `          anchors.push(a);`,
-          `        }`,
-          `      });`,
-          `    }`,
-          `    return () => anchors.forEach(a => a.removeEventListener("click", onClick));`,
-          `  }, []);`,
-          ``,
-          `  return React.createElement("div", {`,
-          `    className: "markdown-page",`,
-          `    ref,`,
-          `    dangerouslySetInnerHTML: { __html: ${JSON.stringify(html)} }`,
-          `  });`,
+          `  return createElement(HTMLPage, ${JSON.stringify(props)})`,
           `}`,
-          `MarkdownPage.meta = ${JSON.stringify(meta, undefined, 2)};`,
+          `MarkdownPage.meta = ${JSON.stringify(meta)}`,
         ].join('\n')
       }
     }
