@@ -2,13 +2,16 @@ import {
   createElement,
   ComponentType,
   ExoticComponent,
-  Fragment,
-  ReactNode,
+  ReactChild,
+  ReactElement,
+  ReactFragment,
+  ReactPortal,
   useEffect,
   useState
 } from 'https://esm.sh/react'
 import { useDeno, useRouter } from './hooks.ts'
-import util from '../../shared/util.ts'
+
+type ReactNode = ReactChild | ReactFragment | ReactPortal
 
 /**
  * `withRouter` allows you to use `useRouter` hook with class component.
@@ -53,30 +56,38 @@ export function withDeno<T>(callback: () => (T | Promise<T>), revalidate?: numbe
   }
 }
 
+/**
+ * `dynamic` allows you to load a component asynchronously.
+ *
+ * ```tsx
+ * const MyLogo = dynamic(() => import('~/components/logo.tsx'))
+ * export default function Logo() {
+ *   return <MyLogo fallback={<p>loading...</p>}/>
+ * }
+ * ```
+ *
+ * @param {Function} factory - load factory.
+ */
 export function dynamic<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>
 ): ExoticComponent<T & { fallback?: ReactNode }> {
   const DynamicComponent = ({ fallback, ...props }: T & { fallback?: ReactNode }) => {
-    const [Component, setComponent] = useState<T | null>(null)
+    const [mod, setMod] = useState<{ default: T } | null>(null)
 
     useEffect(() => {
-      factory().then(mod => {
-        setComponent(mod.default)
-      })
+      factory().then(setMod)
     }, [])
 
-    if (Component !== null) {
-      return createElement(Component, props)
+    if (mod !== null) {
+      return createElement(mod.default, props)
     }
 
     if (fallback) {
-      return createElement(Fragment, null, fallback)
+      return fallback as unknown as ReactElement
     }
 
     return null
   }
 
-  DynamicComponent.$$typeof = util.supportSymbolFor ? Symbol.for('react.element') : (0xeac7 as unknown as symbol)
-
-  return DynamicComponent
+  return DynamicComponent as ExoticComponent<any>
 }
