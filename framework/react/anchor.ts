@@ -8,7 +8,7 @@ import {
   useEffect,
   useMemo,
   lazy
-} from 'https://esm.sh/react@17.0.1'
+} from 'https://esm.sh/react'
 import util from '../../shared/util.ts'
 import events from '../core/events.ts'
 import { redirect } from '../core/routing.ts'

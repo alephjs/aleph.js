@@ -1,4 +1,4 @@
-import { createContext } from 'https://esm.sh/react@17.0.1'
+import { createContext } from 'https://esm.sh/react'
 import type { RouterURL } from '../../types.ts'
 import { createBlankRouterURL } from '../core/routing.ts'
 import { createNamedContext } from './helper.ts'

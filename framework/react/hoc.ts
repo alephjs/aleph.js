@@ -6,7 +6,7 @@ import {
   ReactNode,
   useEffect,
   useState
-} from 'https://esm.sh/react@17.0.1'
+} from 'https://esm.sh/react'
 import { useDeno, useRouter } from './hooks.ts'
 import util from '../../shared/util.ts'
 
