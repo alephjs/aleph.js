@@ -1,5 +1,14 @@
-import { ComponentType, createElement } from 'https://esm.sh/react'
+import {
+  createElement,
+  ComponentType,
+  ExoticComponent,
+  Fragment,
+  ReactNode,
+  useEffect,
+  useState
+} from 'https://esm.sh/react@17.0.1'
 import { useDeno, useRouter } from './hooks.ts'
+import util from '../../shared/util.ts'
 
 /**
  * `withRouter` allows you to use `useRouter` hook with class component.
@@ -42,4 +51,32 @@ export function withDeno<T>(callback: () => (T | Promise<T>), revalidate?: numbe
       return createElement(Component, { ...props, ...deno })
     }
   }
+}
+
+export function dynamic<T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+): ExoticComponent<T & { fallback?: ReactNode }> {
+  const DynamicComponent = ({ fallback, ...props }: T & { fallback?: ReactNode }) => {
+    const [Component, setComponent] = useState<T | null>(null)
+
+    useEffect(() => {
+      factory().then(mod => {
+        setComponent(mod.default)
+      })
+    }, [])
+
+    if (Component !== null) {
+      return createElement(Component, props)
+    }
+
+    if (fallback) {
+      return createElement(Fragment, null, fallback)
+    }
+
+    return null
+  }
+
+  DynamicComponent.$$typeof = util.supportSymbolFor ? Symbol.for('react.element') : (0xeac7 as unknown as symbol)
+
+  return DynamicComponent
 }

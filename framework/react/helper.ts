@@ -1,4 +1,4 @@
-import { createContext } from 'https://esm.sh/react'
+import { createContext } from 'https://esm.sh/react@17.0.1'
 import util from '../../shared/util.ts'
 
 const REACT_FORWARD_REF_TYPE = util.supportSymbolFor ? Symbol.for('react.forward_ref') : 0xead0

@@ -1,5 +1,5 @@
-import { ComponentType, createElement } from 'https://esm.sh/react'
-import { hydrate, render } from 'https://esm.sh/react-dom'
+import { ComponentType, createElement } from 'https://esm.sh/react@17.0.1'
+import { hydrate, render } from 'https://esm.sh/react-dom@17.0.1'
 import { importModule, trimModuleExt } from '../core/module.ts'
 import { RouteModule, Routing, RoutingOptions } from '../core/routing.ts'
 import { loadPageDataFromTag } from './pagedata.ts'

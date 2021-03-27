@@ -6,8 +6,9 @@ import {
   PropsWithChildren,
   useCallback,
   useEffect,
-  useMemo
-} from 'https://esm.sh/react'
+  useMemo,
+  lazy
+} from 'https://esm.sh/react@17.0.1'
 import util from '../../shared/util.ts'
 import events from '../core/events.ts'
 import { redirect } from '../core/routing.ts'

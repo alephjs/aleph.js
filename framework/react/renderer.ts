@@ -1,5 +1,5 @@
-import { createElement, ComponentType, ReactElement } from 'https://esm.sh/react'
-import { renderToString } from 'https://esm.sh/react-dom/server'
+import { createElement, ComponentType, ReactElement } from 'https://esm.sh/react@17.0.1'
+import { renderToString } from 'https://esm.sh/react-dom@17.0.1/server'
 import util from '../../shared/util.ts'
 import type { FrameworkRenderResult } from '../../server/renderer.ts'
 import type { RouterURL } from '../../types.ts'
