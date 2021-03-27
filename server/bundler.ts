@@ -67,40 +67,43 @@ export class Bundler {
   }
 
   async bundle(entryMods: Array<{ url: string, shared: boolean }>) {
-    const remoteEntries: Array<string> = []
-    const sharedEntries: Array<string> = []
-    const entries: Array<string> = []
+    const remoteEntries = new Set<string>()
+    const sharedEntries = new Set<string>()
+    const entries = new Set<string>()
 
     entryMods.forEach(({ url, shared }) => {
       if (shared) {
         if (util.isLikelyHttpURL(url)) {
-          remoteEntries.push(url)
+          remoteEntries.add(url)
         } else {
-          sharedEntries.push(url)
+          sharedEntries.add(url)
         }
       } else {
-        entries.push(url)
+        entries.add(url)
       }
     })
 
     await this.createPolyfillBundle()
     await this.createBundleChunk(
       'deps',
-      remoteEntries,
+      Array.from(remoteEntries),
       []
     )
-    if (sharedEntries.length > 0) {
+    if (sharedEntries.size > 0) {
       await this.createBundleChunk(
         'shared',
-        sharedEntries,
-        remoteEntries
+        Array.from(sharedEntries),
+        Array.from(remoteEntries)
       )
     }
     for (const url of entries) {
       await this.createBundleChunk(
         trimModuleExt(url),
         [url],
-        [remoteEntries, sharedEntries].flat()
+        [
+          Array.from(remoteEntries),
+          Array.from(sharedEntries)
+        ].flat()
       )
     }
     await this.createMainJS()
@@ -300,7 +303,7 @@ interface Minify {
 
 let terser: Minify | null = null
 
-async function minify(code: string, ecma: number = 5) {
+async function minify(code: string, ecma: number = 2015) {
   if (terser === null) {
     const { minify } = await import('https://esm.sh/terser@5.6.1?no-check')
     terser = minify as Minify
