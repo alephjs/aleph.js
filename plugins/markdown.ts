@@ -24,19 +24,23 @@ export default (): LoaderPlugin => {
     },
     transform: ({ content }) => {
       const { __content, ...meta } = safeLoadFront(decoder.decode(content))
+      const html = marked.parse(__content)
       const props = {
         id: util.isString(meta.id) ? meta.id : undefined,
         className: util.isString(meta.id) ? meta.className : undefined,
         style: util.isPlainObject(meta.style) ? meta.style : undefined,
-        html: marked.parse(__content)
       }
 
       return {
         code: [
           `import { createElement } from 'https://esm.sh/react'`,
-          `import HTMLPage from "https://deno.land/x/aleph/framework/react/htmlpage.ts";`,
-          `export default function MarkdownPage() {`,
-          `  return createElement(HTMLPage, ${JSON.stringify(props)})`,
+          `import HTMLPage from 'https://deno.land/x/aleph/framework/react/htmlpage.ts'`,
+          `export default function MarkdownPage(props) {`,
+          `  return createElement(HTMLPage, {`,
+          `    ...${JSON.stringify(props)},`,
+          `    ...props,`,
+          `    html: ${JSON.stringify(html)}`,
+          `  })`,
           `}`,
           `MarkdownPage.meta = ${JSON.stringify(meta)}`,
         ].join('\n')
