@@ -127,7 +127,7 @@ export class Application implements ServerApplication {
 
     const alephPkgUri = getAlephPkgUri()
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
-    const configHash = computeHash(JSON.stringify({
+    const configChecksum = computeHash(JSON.stringify({
       ...this.defaultCompileOptions,
       plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name)
     }))
@@ -139,7 +139,7 @@ export class Application implements ServerApplication {
           typeof v !== 'object' ||
           v === null ||
           v.compiler !== buildChecksum ||
-          v.configHash !== configHash
+          v.configChecksum !== configChecksum
         )
       } catch (e) { }
     }
@@ -156,9 +156,9 @@ export class Application implements ServerApplication {
       log.debug('rebuild...')
       ensureTextFile(buildManifestFile, JSON.stringify({
         aleph: VERSION,
-        compiler: buildChecksum,
-        configHash,
         deno: Deno.version.deno,
+        compiler: buildChecksum,
+        configChecksum,
       }, undefined, 2))
     }
 

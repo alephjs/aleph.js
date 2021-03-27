@@ -95,7 +95,7 @@ socket.addEventListener('message', ({ data }: { data?: string }) => {
           }
           break
       }
-      console.log(`[HMR]${type} module '${url}'`)
+      console.log(`[HMR] ${type} module '${url}'`)
     } catch (err) {
       console.warn(err)
     }

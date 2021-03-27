@@ -188,8 +188,8 @@ impl SWC {
           }),
           !transpile_only
         ),
-        Optional::new(es2020(), options.target < JscTarget::Es2020),
         Optional::new(strip(), is_ts),
+        Optional::new(es2020(), options.target < JscTarget::Es2020),
         Optional::new(es2018(), options.target < JscTarget::Es2018),
         Optional::new(es2017(), options.target < JscTarget::Es2017),
         Optional::new(es2016(), options.target < JscTarget::Es2016),

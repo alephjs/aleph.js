@@ -1,7 +1,10 @@
 [package]
 name = "aleph-compiler"
 version = "0.0.0"
+description = "The compiler of Aleph.js written in Rust, powered by swc."
+repository = "https://github.com/alephjs/aleph.js"
 authors = ["The Aleph.js authors"]
+license = "MIT"
 edition = "2018"
 
 [lib]

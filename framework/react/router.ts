@@ -6,7 +6,7 @@ import {
   useState,
 } from 'https://esm.sh/react'
 import events from '../core/events.ts'
-import { importModule, toPagePath } from '../core/module.ts'
+import { importModule } from '../core/module.ts'
 import { RouteModule, Routing } from '../core/routing.ts'
 import { RouterContext } from './context.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './error.ts'

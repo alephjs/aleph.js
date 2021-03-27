@@ -7,8 +7,7 @@ export async function init(app: ServerApplication) {
   if (app.mode === 'development') {
     const alephPkgUri = getAlephPkgUri()
     app.injectCode('hmr', (url: string, code: string) => {
-      const reactRefresh = code.includes('$RefreshSig$(') || code.includes('$RefreshReg$(')
-      if (reactRefresh) {
+      if (code.includes('$RefreshReg$(')) {
         const refreshModuleUrl = getRelativePath(
           dirname(toLocalUrl(url)),
           toLocalUrl(`${alephPkgUri}/framework/react/refresh.js`)
