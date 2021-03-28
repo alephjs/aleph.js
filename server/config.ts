@@ -1,4 +1,5 @@
 import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
+import type { PostCSSPlugin } from '../compiler/css.ts'
 import type { ImportMap } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
@@ -108,9 +109,32 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     config.plugins = plugins
   }
 
-  // todo: load ssr.config.ts
+  // todo: load ssr.config.ts|js
 
   return config
+}
+
+export async function loadPostCSSConfig(workingDir: string): Promise<{ plugins: PostCSSPlugin[] }> {
+  for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
+    const p = join(workingDir, name)
+    if (existsFileSync(p)) {
+      let config: any = null
+      if (name.endsWith('.json')) {
+        config = JSON.parse(await Deno.readTextFile(p))
+      } else {
+        const mod = await import('file://' + p)
+        config = mod.default
+        if (util.isFunction(config)) {
+          config = await config()
+        }
+      }
+      if (isPostcssConfig(config)) {
+        return config
+      }
+    }
+  }
+
+  return { plugins: ['autoprefixer'] }
 }
 
 /** load import maps from `import_map.json` */
@@ -169,6 +193,10 @@ function isBuildTarget(v: any): v is 'es2015' | 'es2016' | 'es2017' | 'es2018' |
     default:
       return false
   }
+}
+
+function isPostcssConfig(v: any): v is { plugins: PostCSSPlugin[] } {
+  return util.isPlainObject(v) && util.isArray(v.plugins)
 }
 
 function isLocaleID(v: any): v is string {

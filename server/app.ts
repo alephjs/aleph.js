@@ -9,6 +9,7 @@ import {
   join,
   resolve
 } from 'https://deno.land/std@0.90.0/path/mod.ts'
+import { CSSProcessor } from '../compiler/css.ts'
 import {
   buildChecksum,
   ImportMap,
@@ -38,7 +39,7 @@ import type {
 } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Bundler, bundlerRuntimeCode } from './bundler.ts'
-import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
+import { defaultConfig, loadConfig, loadImportMap, loadPostCSSConfig } from './config.ts'
 import {
   computeHash,
   formatBytesWithColor,
@@ -80,6 +81,7 @@ export class Application implements ServerApplication {
   #pageRouting: Routing = new Routing({})
   #apiRouting: Routing = new Routing({})
   #fsWatchListeners: Array<EventEmitter> = []
+  #cssProcesser: CSSProcessor = new CSSProcessor()
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
   #injects: Map<'compilation' | 'hmr' | 'ssr', TransformFn[]> = new Map()
@@ -104,18 +106,16 @@ export class Application implements ServerApplication {
   /** initiate application */
   private async init(reload: boolean) {
     let t = performance.now()
-
-    const [config, importMap] = await Promise.all([
+    const [config, importMap, postcssConfig] = await Promise.all([
       loadConfig(this.workingDir),
-      loadImportMap(this.workingDir)
+      loadImportMap(this.workingDir),
+      loadPostCSSConfig(this.workingDir),
     ])
-
-    log.debug(`load config in ${Math.round(performance.now() - t)}ms`)
-    t = performance.now()
 
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
     this.#pageRouting.config(this.config)
+    this.#cssProcesser.config(!this.isDev, postcssConfig.plugins)
 
     // inject env variables
     Deno.env.set('ALEPH_VERSION', VERSION)
@@ -138,6 +138,9 @@ export class Application implements ServerApplication {
       userAgent: `Deno/${Deno.version.deno}`,
       vendor: 'Deno Land'
     })
+
+    log.debug(`load config in ${Math.round(performance.now() - t)}ms`)
+    t = performance.now()
 
     const alephPkgUri = getAlephPkgUri()
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
@@ -773,36 +776,6 @@ export class Application implements ServerApplication {
     return [pagePath, url, { isIndex, useDeno }]
   }
 
-  /** apply loaders recurively. */
-  private async applyLoader(
-    loader: LoaderPlugin,
-    input: { url: string, content: Uint8Array, map?: Uint8Array }
-  ): Promise<LoaderTransformOutput> {
-    if (!loader.transform) {
-      const decoder = new TextDecoder()
-      return {
-        code: decoder.decode(input.content),
-        map: input.map ? decoder.decode(input.map) : undefined
-      }
-    }
-
-    const { code, map, type } = await loader.transform(input)
-    if (type) {
-      for (const plugin of this.config.plugins) {
-        if (plugin.type === 'loader' && plugin.test.test('.' + type) && plugin !== loader) {
-          const encoder = new TextEncoder()
-          return this.applyLoader(plugin, {
-            url: input.url,
-            content: encoder.encode(code),
-            map: map ? encoder.encode(map) : undefined
-          })
-        }
-      }
-    }
-
-    return { code, map }
-  }
-
   /** fetch module content */
   private async fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
     for (const plugin of this.config.plugins) {
@@ -830,6 +803,11 @@ export class Application implements ServerApplication {
       }
     }
 
+    // todo: add options to download the remote css
+    if (url.endsWith('.css') || url.endsWith('.pcss')) {
+      return { content: new Uint8Array(), contentType: 'text/css' }
+    }
+
     const u = new URL(url)
     if (url.startsWith('https://esm.sh/')) {
       if (this.isDev && !u.searchParams.has('dev')) {
@@ -839,9 +817,9 @@ export class Application implements ServerApplication {
     }
 
     const { protocol, hostname, port, pathname, search } = u
+    const isLocalhost = hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '172.0.0.1'
     const versioned = reFullVersion.test(pathname)
     const reload = this.#reloading || !versioned
-    const isLocalhost = url.startsWith('http://localhost:')
     const cacheDir = join(
       await getDenoDir(),
       'deps',
@@ -911,9 +889,10 @@ export class Application implements ServerApplication {
     url: string,
     sourceContent: Uint8Array,
     contentType: string | null
-  ): Promise<{ code: string, type: SourceType } | null> {
+  ): Promise<{ code: string, type: SourceType, map: string | null } | null> {
     let sourceCode = (new TextDecoder).decode(sourceContent)
     let sourceType: SourceType | null = null
+    let sourceMap: string | null = null
 
     if (contentType !== null) {
       switch (contentType.split(';')[0].trim()) {
@@ -929,17 +908,19 @@ export class Application implements ServerApplication {
           break
         case 'text/tsx':
           sourceType = SourceType.TSX
+        case 'text/css':
+          sourceType = SourceType.CSS
           break
       }
     }
 
     for (const plugin of this.config.plugins) {
-      if (plugin.type === 'loader' && plugin.test.test(url)) {
-        const { code, type = 'js' } = await this.applyLoader(
-          plugin,
-          { url, content: sourceContent }
-        )
+      if (plugin.type === 'loader' && plugin.test.test(url) && plugin.transform) {
+        const { code, type = 'js', map } = await plugin.transform({ url, content: sourceContent })
         sourceCode = code
+        if (map) {
+          sourceMap = map
+        }
         switch (type) {
           case 'js':
             sourceType = SourceType.JS
@@ -953,8 +934,8 @@ export class Application implements ServerApplication {
           case 'tsx':
             sourceType = SourceType.TSX
             break
-          default:
-            sourceType = SourceType.Unknown
+          case 'css':
+            sourceType = SourceType.CSS
             break
         }
         break
@@ -976,12 +957,25 @@ export class Application implements ServerApplication {
         case 'tsx':
           sourceType = SourceType.TSX
           break
+        case 'pcss':
+        case 'css':
+          sourceType = SourceType.CSS
+          break
         default:
           return null
       }
     }
 
-    return { code: sourceCode, type: sourceType }
+    if (sourceType === SourceType.CSS) {
+      const { code, map } = await this.#cssProcesser.transform(url, sourceCode)
+      sourceCode = code
+      sourceType = SourceType.JS
+      if (map) {
+        sourceMap = map
+      }
+    }
+
+    return { code: sourceCode, type: sourceType, map: sourceMap }
   }
 
   /** compile a moudle by given url, then cache on the disk. */
@@ -1083,6 +1077,7 @@ export class Application implements ServerApplication {
 
     // compile source code
     if (shouldCompile) {
+      const t = performance.now()
       const source = await this.precompile(url, sourceContent, contentType)
       if (source === null) {
         log.error(`Unsupported module '${url}'`)
@@ -1090,7 +1085,6 @@ export class Application implements ServerApplication {
         return mod
       }
 
-      const t = performance.now()
       const { code, deps, starExports, map } = await transform(url, source.code, {
         ...this.defaultCompileOptions,
         swcOptions: {
@@ -1103,7 +1097,6 @@ export class Application implements ServerApplication {
         loaders: this.config.plugins.filter(isLoaderPlugin)
       })
 
-      fsync = true
       jsContent = code
       if (map) {
         jsSourceMap = map
@@ -1130,6 +1123,7 @@ export class Application implements ServerApplication {
         return dep
       })
 
+      fsync = true
       log.debug(`compile '${url}' in ${Math.round(performance.now() - t)}ms`)
     }
 

@@ -12,6 +12,7 @@ export enum SourceType {
   JSX = 'jsx',
   TS = 'ts',
   TSX = 'tsx',
+  CSS = 'css',
   Unknown = '??',
 }
 

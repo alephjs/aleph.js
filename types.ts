@@ -28,7 +28,7 @@ export type LoaderPlugin = {
  */
 export type LoaderTransformOutput = {
   /** The transformed code type (default is 'js'). */
-  type?: string
+  type?: 'css' | 'js' | 'jsx' | 'ts' | 'tsx'
   /** The transformed code. */
   code: string
   /** The source map. */
