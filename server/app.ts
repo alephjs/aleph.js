@@ -1265,9 +1265,7 @@ export class Application implements ServerApplication {
 
     // render pages
     const paths = new Set(this.#pageRouting.paths)
-    if (typeof ssr === 'object' && ssr.staticPaths) {
-      ssr.staticPaths.forEach(path => paths.add(path))
-    }
+    // todo: check getStaticPaths
     await Promise.all(Array.from(paths).map(async pathname => {
       if (this.isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname })

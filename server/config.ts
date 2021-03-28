@@ -92,8 +92,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   } else if (util.isPlainObject(ssr)) {
     const include = util.isArray(ssr.include) ? ssr.include.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
     const exclude = util.isArray(ssr.exclude) ? ssr.exclude.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
-    const staticPaths = util.isArray(ssr.staticPaths) ? ssr.staticPaths.map(v => util.cleanPath(v.split('?')[0])) : []
-    config.ssr = { include, exclude, staticPaths }
+    config.ssr = { include, exclude }
   }
   if (util.isPlainObject(rewrites)) {
     config.rewrites = toPlainStringRecord(rewrites)
@@ -108,8 +107,6 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   if (util.isNEArray(plugins)) {
     config.plugins = plugins
   }
-
-  // todo: load ssr.config.ts|js
 
   return config
 }

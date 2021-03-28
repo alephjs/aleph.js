@@ -90,8 +90,6 @@ export type SSROptions = {
   include?: RegExp[]
   /** A list of RegExp for paths to skip **SSR**. */
   exclude?: RegExp[]
-  /** A list of paths for **dynamic routes** in **SSG**. */
-  staticPaths?: string[]
 }
 
 /**
