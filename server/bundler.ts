@@ -7,9 +7,8 @@ import { defaultReactVersion } from '../shared/constants.ts'
 import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import { Module } from '../types.ts'
 import { VERSION } from '../version.ts'
-import type { Application } from './app.ts'
+import type { Application, Module } from './app.ts'
 import {
   clearCompilation,
   computeHash,

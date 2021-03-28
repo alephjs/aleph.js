@@ -30,10 +30,8 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type {
   Config,
-  DependencyDescriptor,
   LoaderPlugin,
   LoaderTransformOutput,
-  Module,
   RouterURL,
   ServerApplication,
   TransformFn
@@ -52,6 +50,22 @@ import {
   toLocalUrl
 } from './helper.ts'
 import { Renderer } from './ssr.ts'
+
+/** A module includes the compilation details. */
+export type Module = {
+  url: string
+  jsFile: string
+  sourceHash: string
+  hash: string
+  deps: DependencyDescriptor[]
+}
+
+/** The dependency descriptor. */
+export type DependencyDescriptor = {
+  url: string
+  hash: string
+  isDynamic?: boolean
+}
 
 /** The application class for aleph server. */
 export class Application implements ServerApplication {
@@ -423,14 +437,14 @@ export class Application implements ServerApplication {
   }
 
   /** add a new page module by given path and source code. */
-  async addModule(url: string, options: { code?: string } = {}): Promise<Module> {
-    const mod = await this.compile(url, { sourceCode: options.code })
+  async addModule(url: string, options: { code?: string } = {}): Promise<void> {
+    await this.compile(url, { sourceCode: options.code })
     if (url.startsWith('/pages/')) {
       this.#pageRouting.update(...this.createRouteUpdate(url))
     } else if (url.startsWith('/api/')) {
       this.#apiRouting.update(...this.createRouteUpdate(url))
     }
-    return mod
+    return
   }
 
   /** inject code */
@@ -1065,6 +1079,8 @@ export class Application implements ServerApplication {
       }
     }
 
+    mod.hash = mod.sourceHash
+
     // compile source code
     if (shouldCompile) {
       const source = await this.precompile(url, sourceContent, contentType)
@@ -1136,10 +1152,9 @@ export class Application implements ServerApplication {
       }
     }
 
+    // update hash by deps
     if (mod.deps.length > 0) {
       mod.hash = computeHash(mod.sourceHash + mod.deps.map(({ hash }) => hash).join(''))
-    } else {
-      mod.hash = mod.sourceHash
     }
 
     if (fsync) {

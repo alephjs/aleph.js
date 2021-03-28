@@ -101,28 +101,12 @@ export interface ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
-  addModule(url: string, options?: { code?: string }): Promise<Module>
+  addModule(url: string, options?: { code?: string }): Promise<void>
   injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: TransformFn): void
 }
 
 export type TransformFn = {
   (url: string, code: string): string
-}
-
-/** A module includes the compilation details. */
-export type Module = {
-  url: string
-  deps: DependencyDescriptor[]
-  sourceHash: string
-  hash: string
-  jsFile: string
-}
-
-/** The dependency descriptor. */
-export type DependencyDescriptor = {
-  url: string
-  hash: string
-  isDynamic?: boolean
 }
 
 /**
