@@ -13,8 +13,8 @@ export type LoaderPlugin = {
   test: RegExp
   /** `acceptHMR` enables the HMR. */
   acceptHMR?: boolean
-  /** `asPage` allows the loaded module as a page. */
-  asPage?: boolean
+  /** allowPage` allows the loaded module as a page. */
+  allowPage?: boolean
   /** `pagePathReoslve` resolves the page path. */
   pagePathResolve?(url: string): { path: string, isIndex?: boolean }
   /** `resolve` resolves the module content. */

@@ -10,7 +10,7 @@ export default (): LoaderPlugin => {
     name: 'markdown-loader',
     type: 'loader',
     test: /\.(md|markdown)$/i,
-    asPage: true,
+    allowPage: true,
     pagePathResolve: (url) => {
       let path = util.trimPrefix(url.replace(/\.(md|markdown)$/i, ''), '/pages')
       let isIndex = path.endsWith('/index')

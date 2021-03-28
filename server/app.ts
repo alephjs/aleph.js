@@ -233,7 +233,7 @@ export class Application implements ServerApplication {
         const url = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
         let validated = moduleExts.some(ext => p.endsWith('.' + ext))
         if (!validated) {
-          validated = this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.asPage)
+          validated = this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)
         }
         if (validated) {
           await this.compile(url)
@@ -378,7 +378,7 @@ export class Application implements ServerApplication {
     }
 
     // is page module by plugin
-    if (this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.asPage)) {
+    if (this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)) {
       return true
     }
 
@@ -547,7 +547,7 @@ export class Application implements ServerApplication {
     return this.config.plugins.some(p => (
       p.type === 'loader' &&
       p.test.test(url) &&
-      (p.asPage || p.acceptHMR)
+      (p.acceptHMR || p.allowPage)
     ))
   }
 

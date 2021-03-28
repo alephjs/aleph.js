@@ -20,7 +20,7 @@ Deno.test('markdown loader', async () => {
   })
   assertEquals(loader.test.test('/test.md'), true)
   assertEquals(loader.test.test('/test.markdown'), true)
-  assertEquals(loader.asPage, true)
+  assertEquals(loader.allowPage, true)
   assertEquals(loader.pagePathResolve!('/pages/docs/get-started.md'), { path: '/docs/get-started', isIndex: false })
   assertEquals(loader.pagePathResolve!('/pages/docs/index.md'), { path: '/docs', isIndex: true })
   assertEquals(code.includes('html: "<h1 id=\\"alephjs\\">Aleph.js</h1>\\n<p>The Full-stack Framework in Deno.</p>\\n"'), true)
