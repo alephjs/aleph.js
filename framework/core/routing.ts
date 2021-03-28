@@ -260,17 +260,12 @@ export function rewriteURL(reqUrl: string, baseURL: string, rewrites: Record<str
     const to = rewrites[path]
     const [params, ok] = matchPath(path, decodeURI(url.pathname))
     if (ok) {
-      const { searchParams } = url
-      url.href = 'http://localhost' + util.cleanPath(to.replace(/:(.+)(\/|&|$)/g, (s, k, e) => {
+      url.pathname = util.cleanPath(to.replace(/:(.+)(\/|&|$)/g, (s, k, e) => {
         if (k in params) {
           return params[k] + e
         }
         return s
       }))
-      for (const [key, value] of url.searchParams.entries()) {
-        searchParams.append(key, value)
-      }
-      url.search = searchParams.toString()
       break
     }
   }

@@ -31,11 +31,8 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type {
   Config,
-  LoaderPlugin,
-  LoaderTransformOutput,
   RouterURL,
   ServerApplication,
-  TransformFn
 } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Bundler, bundlerRuntimeCode } from './bundler.ts'
@@ -67,6 +64,8 @@ export type DependencyDescriptor = {
   hash: string
   isDynamic?: boolean
 }
+
+type TransformFn = (url: string, code: string) => string
 
 /** The application class for aleph server. */
 export class Application implements ServerApplication {
@@ -345,10 +344,12 @@ export class Application implements ServerApplication {
               if (trimModuleExt(url) === '/app') {
                 this.#renderer.clearCache()
               } else if (url.startsWith('/pages/')) {
-                this.#renderer.clearCache(toPagePath(url))
-                this.#pageRouting.removeRoute(toPagePath(url))
+                const [pagePath] = this.createRouteUpdate(url)
+                this.#renderer.clearCache(pagePath)
+                this.#pageRouting.removeRoute(pagePath)
               } else if (url.startsWith('/api/')) {
-                this.#apiRouting.removeRoute(toPagePath(url))
+                const [pagePath] = this.createRouteUpdate(url)
+                this.#apiRouting.removeRoute(pagePath)
               }
               this.#modules.delete(url)
               if (this.isHMRable(url)) {
@@ -435,7 +436,9 @@ export class Application implements ServerApplication {
       const [url, nestedModules] = router
       if (url.pagePath !== '') {
         const { url: moduleUrl } = nestedModules.pop()!
-        return [url, this.#modules.get(moduleUrl)!]
+        if (this.#modules.has(moduleUrl)) {
+          return [url, this.#modules.get(moduleUrl)!]
+        }
       }
     }
     return null
@@ -473,8 +476,8 @@ export class Application implements ServerApplication {
       return null
     }
 
-    const cacheKey = loc.pathname + (loc.search || '')
-    const [_, data] = await this.#renderer.useCache(pagePath, cacheKey, async () => {
+    const path = loc.pathname + (loc.search || '')
+    const [_, data] = await this.#renderer.useCache(pagePath, path, async () => {
       return await this.#renderer.renderPage(router, nestedModules)
     })
     return data

@@ -149,7 +149,10 @@ export class Server {
 
       // serve APIs
       if (pathname.startsWith('/api/')) {
-        const route = app.getAPIRoute({ pathname, search: url.searchParams.toString() })
+        const route = app.getAPIRoute({
+          pathname,
+          search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
+        })
         if (route !== null) {
           try {
             const [{ params }, { jsFile, hash }] = route
@@ -170,7 +173,10 @@ export class Server {
       }
 
       // ssr
-      const [status, html] = await app.getPageHTML({ pathname, search: url.searchParams.toString() })
+      const [status, html] = await app.getPageHTML({
+        pathname,
+        search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
+      })
       req.status(status).send(html, 'text/html; charset=utf-8')
     } catch (err) {
       req.status(500).send(

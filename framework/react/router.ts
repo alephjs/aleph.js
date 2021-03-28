@@ -129,8 +129,8 @@ export default function Router({
       }
     }
     const onFetchPageModule = async ({ href }: { href: string }) => {
-      const [pathname, search] = href.split('?')
-      const [url, nestedModules] = routing.createRouter({ pathname, search })
+      const [pathname] = href.split('?')
+      const [url, nestedModules] = routing.createRouter({ pathname })
       if (url.pagePath !== '') {
         nestedModules.map(mod => {
           importModule(baseURL, mod.url)
