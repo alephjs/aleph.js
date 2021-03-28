@@ -131,7 +131,7 @@ Deno.test(`routing`, () => {
     const [router, nestedModules] = routing.createRouter({ pathname: '/blog/hello-world' })
     assertEquals(router.pathname, '/blog/hello-world')
     assertEquals(router.pagePath, '/blog/[slug]')
-    assertEquals(router.params, { slug: 'hello-world' })
+    assertEquals(router.params.get('slug'), 'hello-world')
     assertEquals(nestedModules.map(m => m.url), ['/pages/blog.tsx', '/pages/blog/[slug].tsx'])
   }
 
@@ -139,7 +139,14 @@ Deno.test(`routing`, () => {
     const [router, nestedModules] = routing.createRouter({ pathname: '/user' })
     assertEquals(router.pathname, '/user')
     assertEquals(router.pagePath, '/user')
-    assertEquals(router.params, {})
+    assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/index.tsx'])
+  }
+
+  {
+    const [router, nestedModules] = routing.createRouter({ pathname: '/user?name=aleph' })
+    assertEquals(router.pathname, '/user')
+    assertEquals(router.pagePath, '/user')
+    assertEquals(router.params.get('name'), 'aleph')
     assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/index.tsx'])
   }
 
@@ -147,7 +154,7 @@ Deno.test(`routing`, () => {
     const [router, nestedModules] = routing.createRouter({ pathname: '/user/projects' })
     assertEquals(router.pathname, '/user/projects')
     assertEquals(router.pagePath, '/user/[...all]')
-    assertEquals(router.params, { all: 'projects' })
+    assertEquals(router.params.get('all'), 'projects')
     assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
   }
 
@@ -155,7 +162,7 @@ Deno.test(`routing`, () => {
     const [router, nestedModules] = routing.createRouter({ pathname: '/user/settings/profile' })
     assertEquals(router.pathname, '/user/settings/profile')
     assertEquals(router.pagePath, '/user/[...all]')
-    assertEquals(router.params, { all: 'settings/profile' })
+    assertEquals(router.params.get('all'), 'settings/profile')
     assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
   }
 
@@ -163,7 +170,7 @@ Deno.test(`routing`, () => {
     const [router, nestedModules] = routing.createRouter({ pathname: '/user/settings/security' })
     assertEquals(router.pathname, '/user/settings/security')
     assertEquals(router.pagePath, '/user/[...all]')
-    assertEquals(router.params, { all: 'settings/security' })
+    assertEquals(router.params.get('all'), 'settings/security')
     assertEquals(nestedModules.map(m => m.url), ['/pages/user.tsx', '/pages/user/[...all].tsx'])
   }
 
@@ -171,7 +178,6 @@ Deno.test(`routing`, () => {
     const [router, nestedModules] = routing.createRouter({ pathname: '/null' })
     assertEquals(router.pathname, '/null')
     assertEquals(router.pagePath, '')
-    assertEquals(router.params, {})
     assertEquals(nestedModules.map(m => m.url), [])
   }
 })

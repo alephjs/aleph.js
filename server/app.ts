@@ -473,7 +473,7 @@ export class Application implements ServerApplication {
       return null
     }
 
-    const cacheKey = router.pathname + router.query.toString()
+    const cacheKey = loc.pathname + (loc.search || '')
     const [_, data] = await this.#renderer.useCache(pagePath, cacheKey, async () => {
       return await this.#renderer.renderPage(router, nestedModules)
     })
@@ -485,7 +485,7 @@ export class Application implements ServerApplication {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { pagePath } = router
     const status = pagePath !== '' ? 200 : 404
-    const path = router.pathname + router.query.toString()
+    const path = loc.pathname + (loc.search || '')
 
     if (!this.isSSRable(loc.pathname)) {
       const [html] = await this.#renderer.useCache('-', 'spa-index', async () => {

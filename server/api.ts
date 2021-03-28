@@ -8,8 +8,7 @@ import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 
 export class Request implements APIRequest {
   #req: ServerRequest
-  #params: Record<string, string>
-  #query: URLSearchParams
+  #params: URLSearchParams
   #cookies: ReadonlyMap<string, string>
   #resp = {
     status: 200,
@@ -19,10 +18,9 @@ export class Request implements APIRequest {
     done: false
   }
 
-  constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams) {
+  constructor(req: ServerRequest, params: URLSearchParams) {
     this.#req = req
     this.#params = params
-    this.#query = query
     const cookies = new Map()
     this.headers.get('cookie')?.split(';').forEach(cookie => {
       const p = cookie.trim().split('=')
@@ -65,12 +63,8 @@ export class Request implements APIRequest {
     return this.#req.respond(r)
   }
 
-  get params(): Record<string, string> {
+  get params(): URLSearchParams {
     return this.#params
-  }
-
-  get query(): URLSearchParams {
-    return this.#query
   }
 
   get cookies(): ReadonlyMap<string, string> {

@@ -31,7 +31,7 @@ export class Server {
     const { baseUrl, rewrites } = app.config
     const url = rewriteURL(r.url, baseUrl, rewrites)
     const pathname = decodeURI(url.pathname)
-    const req = new Request(r, {}, url.searchParams)
+    const req = new Request(r, url.searchParams)
 
     // set custom headers
     for (const key in app.config.headers) {
@@ -152,10 +152,10 @@ export class Server {
         const route = app.getAPIRoute({ pathname, search: url.searchParams.toString() })
         if (route !== null) {
           try {
-            const [{ params, query }, { jsFile, hash }] = route
+            const [{ params }, { jsFile, hash }] = route
             const { default: handle } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
             if (util.isFunction(handle)) {
-              await handle(new Request(req, params, query))
+              await handle(new Request(req, params))
             } else {
               req.status(500).json({ status: 500, message: 'bad api handler' })
             }

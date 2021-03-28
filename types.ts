@@ -102,11 +102,10 @@ export interface ServerApplication {
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
   addModule(url: string, options?: { code?: string }): Promise<void>
-  injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: TransformFn): void
-}
-
-export type TransformFn = {
-  (url: string, code: string): string
+  injectCode(
+    stage: 'compilation' | 'hmr' | 'ssr',
+    transform: (url: string, code: string) => string
+  ): void
 }
 
 /**
@@ -136,8 +135,7 @@ export interface ServerResponse {
  * An interface extends the `ServerRequest` for API requests.
  */
 export interface APIRequest extends ServerRequest {
-  readonly params: Record<string, string>
-  readonly query: URLSearchParams
+  readonly params: URLSearchParams
   readonly cookies: ReadonlyMap<string, string>
   /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
   readBody(type?: 'raw'): Promise<Uint8Array>
@@ -181,8 +179,7 @@ export type RouterURL = {
   readonly locale: string
   readonly pathname: string
   readonly pagePath: string
-  readonly params: Record<string, string>
-  readonly query: URLSearchParams
+  readonly params: URLSearchParams
   push(url: string): void
   replace(url: string): void
 }

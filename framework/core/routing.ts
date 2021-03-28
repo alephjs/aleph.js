@@ -131,7 +131,7 @@ export class Routing {
     let locale = this._defaultLocale
     let pathname = decodeURI(url.pathname)
     let pagePath = ''
-    let params: Record<string, string> = {}
+    let params = new URLSearchParams()
     let nestedModules: RouteModule[] = []
 
     if (pathname !== '/' && this._locales.length > 0) {
@@ -153,10 +153,17 @@ export class Routing {
           nestedModules.push(c.module)
         }
         pagePath = path
-        params = p
+        Object.entries(p).forEach(([key, value]) => {
+          params.append(key, value)
+        })
         return false
       }
     }, true)
+
+    for (const name of url.searchParams.keys()) {
+      const values = url.searchParams.getAll(name)
+      values.forEach(value => params.append(name, value))
+    }
 
     return [
       {
@@ -165,7 +172,6 @@ export class Routing {
         pathname,
         pagePath,
         params,
-        query: url.searchParams,
         push: (url: string) => redirect(url),
         replace: (url: string) => redirect(url, true),
       },
@@ -238,8 +244,7 @@ export function createBlankRouterURL(baseURL = '/', locale = 'en'): RouterURL {
     locale,
     pagePath: '',
     pathname: '/',
-    params: {},
-    query: new URLSearchParams(),
+    params: new URLSearchParams(),
     push: () => void 0,
     replace: () => void 0,
   }
