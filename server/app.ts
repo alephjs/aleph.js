@@ -433,8 +433,10 @@ export class Application implements ServerApplication {
     const router = this.#apiRouting.createRouter(location)
     if (router !== null) {
       const [url, nestedModules] = router
-      const { url: moduleUrl } = nestedModules.pop()!
-      return [url, this.#modules.get(moduleUrl)!]
+      if (nestedModules.length > 0) {
+        const { url: moduleUrl } = nestedModules.pop()!
+        return [url, this.#modules.get(moduleUrl)!]
+      }
     }
     return null
   }
