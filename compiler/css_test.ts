@@ -10,7 +10,7 @@ Deno.test('css processor', async () => {
   assertEquals(code, 'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"\napplyCSS("/test.css", "h1 { font-size: 18px; }")')
 })
 
-Deno.test('css loader for inline style', async () => {
+Deno.test('css processor for inline style', async () => {
   const processor = new CSSProcessor()
   const { code } = await processor.transform(
     '#inline-style-{}',
@@ -19,7 +19,7 @@ Deno.test('css loader for inline style', async () => {
   assertEquals(code, 'h1 { font-size: 18px; }')
 })
 
-Deno.test('css loader in production mode', async () => {
+Deno.test('css processor in production mode', async () => {
   const processor = new CSSProcessor()
   processor.config(true, [])
   const { code } = await processor.transform(
@@ -30,9 +30,9 @@ Deno.test('css loader in production mode', async () => {
   assertEquals(code, 'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"\napplyCSS("/test.css", "h1{font-size:18px}")')
 })
 
-Deno.test('css loader with postcss plugins', async () => {
+Deno.test('css processor with postcss plugins', async () => {
   const processor = new CSSProcessor()
-  processor.config(true, ['postcss-nested'])
+  processor.config(false, ['postcss-nested'])
   const { code } = await processor.transform(
     '/test.css',
     '.foo { .bar { font-size: 100%; } }'
