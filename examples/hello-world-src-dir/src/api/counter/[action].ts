@@ -5,7 +5,7 @@ const store = globalThis as any
 export default async function handler(req: APIRequest) {
   let count = store.$count || 0
 
-  switch (req.params.action) {
+  switch (req.params.get('action')) {
     case 'increase':
       count++
       store.$count = count
@@ -20,7 +20,7 @@ export default async function handler(req: APIRequest) {
       req.status(400).json({
         error: 'UnknownAction',
         status: 400,
-        message: `undefined action '${req.params.action}'`
+        message: `undefined action '${req.params.get('action')}'`
       })
       break
   }
