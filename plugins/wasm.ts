@@ -1,15 +1,15 @@
-export default {
-    name: 'wasm-loader',
-    test: /.wasm$/,
-    transform(content: Uint8Array, path: string) {
-        return {
-            code: `
-                const wasmCode = new Uint8Array([${content.join(',')}])
-                const wasmModule = new WebAssembly.Module(wasmCode)
-                const { exports } = new WebAssembly.Instance(wasmModule)
-                export default exports
-            `,
-            loader: 'js'
-        }
-    }
-}
+import type { LoaderPlugin } from '../types.ts'
+
+export default (): LoaderPlugin => ({
+  name: 'wasm-loader',
+  type: 'loader',
+  test: /\.wasm$/i,
+  transform: ({ content }) => ({
+    code: [
+      `const wasmBytes = new Uint8Array([${content.join(',')}])`,
+      'const wasmModule = new WebAssembly.Module(wasmBytes)',
+      'const { exports } = new WebAssembly.Instance(wasmModule)',
+      'export default exports',
+    ].join('\n')
+  })
+})

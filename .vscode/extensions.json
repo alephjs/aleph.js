@@ -1,5 +1,7 @@
 {
   "recommendations": [
-    "denoland.vscode-deno"
+    "editorconfig.editorconfig",
+    "denoland.vscode-deno",
+    "rust-lang.rust"
   ]
 }

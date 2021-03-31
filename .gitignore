@@ -1,4 +1,8 @@
 .DS_Store
+.env
+.env.*
 Thumbs.db
-.aleph/
-dist/
+compiler/target/
+compiler/pkg/
+examples/**/.aleph/
+examples/**/dist/

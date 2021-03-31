@@ -1,78 +1,163 @@
-import type { ServerRequest } from './std.ts';
+import type { BufReader, BufWriter } from 'https://deno.land/std@0.90.0/io/bufio.ts'
+import type { MultipartFormData } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
 
 /**
- * The **ENV** of Aleph.js runtime, you can access it with `window.ALEPH.ENV[key]`.
+ * A loader plugin to load source media.
  */
-export interface AlephEnv {
-    [key: string]: string
-    /** The version of **Aleph.js** */
-    readonly __version: string
-    /** The build mode of the appliaction (possible values: '**development**' | '**production**') */
-    readonly __buildMode: string
-    /** The build target of the appliaction (possible values: '**ES2015**' - '**ES2020**' | '**ESNext**') */
-    readonly __buildTarget: string
+export type LoaderPlugin = {
+  /** `name` gives the plugin a name. */
+  name: string
+  /** `type` specifies the plugin type. */
+  type: 'loader'
+  /** `test` matches the import url. */
+  test: RegExp
+  /** `acceptHMR` enables the HMR. */
+  acceptHMR?: boolean
+  /** allowPage` allows the loaded module as a page. */
+  allowPage?: boolean
+  /** `pagePathReoslve` resolves the page path. */
+  pagePathResolve?(url: string): { path: string, isIndex?: boolean }
+  /** `resolve` resolves the module content. */
+  resolve?(url: string): Uint8Array | Promise<Uint8Array>
+  /** `transform` transforms the source content. */
+  transform?(input: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformOutput | Promise<LoaderTransformOutput>
 }
 
 /**
- * A plugin for **Aleph.js** application.
+ * The result of loader transform.
  */
-export interface Plugin {
-    /** `name` gives the plugin a name. */
-    name?: string
-    /** `test` matches the import url. */
-    test: RegExp
-    /** `acceptHMR` accepts the HMR. */
-    acceptHMR?: boolean
-    /** `resolve` resolves the import url, if the `external` returned the compilation will skip the import url. */
-    resolve?(url: string): { url: string, external?: boolean }
-    /** `transform` transforms the source content. */
-    transform?(content: Uint8Array, url: string): Promise<{ code: string, map?: string, loader?: 'js' | 'ts' | 'css' | 'markdown' }>
+export type LoaderTransformOutput = {
+  /** The transformed code type (default is 'js'). */
+  type?: 'css' | 'js' | 'jsx' | 'ts' | 'tsx'
+  /** The transformed code. */
+  code: string
+  /** The source map. */
+  map?: string
+}
+
+/**
+ * A server plugin to enhance the aleph server application.
+ */
+export type ServerPlugin = {
+  /** `name` gives the plugin a name. */
+  name: string
+  /** `type` specifies the plugin type. */
+  type: 'server'
+  /** `onInit` will be invoked after the server initiated. */
+  onInit(app: ServerApplication): Promise<void> | void
+}
+
+/**
+ * A plugin for the aleph server application.
+ */
+export type Plugin = LoaderPlugin | ServerPlugin
+
+/**
+ * The config for the aleph server application.
+ */
+export type Config = {
+  /** `framework` specifies the framework (default is 'react'). */
+  framework?: 'react'
+  /** `buildTarget` specifies the build target in production mode (default is **es2015**). */
+  buildTarget?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
+  /** `baseUrl` specifies the path prefix for the application (default is '/'). */
+  baseUrl?: string
+  /** `srcDir` specifies the **src** dir (default is '/'). */
+  srcDir?: string
+  /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
+  outputDir?: string
+  /** `defaultLocale` specifies the default locale of the application (default is '**en**'). */
+  defaultLocale?: string
+  /** `locales` specifies the available locales. */
+  locales?: string[]
+  /** `ssr` specifies the options for **SSR**. */
+  ssr?: boolean | SSROptions
+  /** `plugins` specifies some plugins for the appliaction. */
+  plugins?: Plugin[]
+  /** `headers` appends custom headers for server requests. */
+  headers?: Record<string, string>
+  /** `rewrites` specifies the server rewrite map. */
+  rewrites?: Record<string, string>
+  /** `env` appends system env variables. */
+  env?: Record<string, string>
 }
 
 /**
  * The options for **SSR**.
  */
-export interface SSROptions {
-    /** The fallback html **dynamic routes** (default is '**_fallback.html**'). */
-    fallback?: string
-    /** A list of RegExp for paths to use **SSR**. */
-    include?: RegExp[]
-    /** A list of RegExp for paths to skip **SSR**. */
-    exclude?: RegExp[]
-    /** A list of paths for **dynamic routes** in **SSR**. */
-    staticPaths?: string[]
+export type SSROptions = {
+  /** A list of RegExp for paths to use **SSR**. */
+  include?: RegExp[]
+  /** A list of RegExp for paths to skip **SSR**. */
+  exclude?: RegExp[]
 }
 
 /**
- * Config for Aleph.js application.
+ * An interface that aligns to the parts of the aleph server's `Application`.
  */
-export interface Config {
-    /** `srcDir` to put your application source code (default is '/'). */
-    srcDir?: string
-    /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
-    outputDir?: string
-    /** `baseUrl` specifies the path prefix for the application (default is '/'). */
-    baseUrl?: string
-    /** `reactUrl` specifies the **react** download URL (default is 'https://esm.sh/react@16.14.0'). */
-    reactUrl?: string
-    /** `reactDomUrl` specifies the **react-dom** download URL (default is 'https://esm.sh/react-dom@16.14.0'). */
-    reactDomUrl?: string
-    /** `defaultLocale` specifies the default locale of the application (default is '**en**'). */
-    defaultLocale?: string
-    /** A list of locales. */
-    locales?: string[]
-    /** The options for **SSR**. */
-    ssr?: boolean | SSROptions
-    /** A list of plugin. */
-    plugins?: Plugin[]
-    /** A list of plugin of PostCSS. */
-    postcss?: { plugins: (string | { name: string, options: Record<string, any> })[] }
-    /** `buildTarget` specifies the build target for **tsc** (possible values: '**ES2015**' - '**ES2020**' | '**ESNext**', default is **ES2015** for `production` and **ES2018** for `development`). */
-    buildTarget?: string
-    /** Enable sourceMap in **production** mode (default is **false**). */
-    sourceMap?: boolean
-    /** `env` defines the `Window.ALEPH.ENV` object in the application. */
-    env?: Record<string, string>
+export interface ServerApplication {
+  readonly workingDir: string
+  readonly mode: 'development' | 'production'
+  readonly config: Required<Config>
+  addModule(url: string, options?: { code?: string }): Promise<void>
+  injectCode(
+    stage: 'compilation' | 'hmr' | 'ssr',
+    transform: (url: string, code: string) => string
+  ): void
+}
+
+/**
+ * An interface that aligns to the parts of std http srever's `ServerRequest`.
+ */
+export interface ServerRequest {
+  readonly url: string
+  readonly method: string
+  readonly headers: Headers
+  readonly conn: Deno.Conn
+  readonly r: BufReader
+  readonly w: BufWriter
+  readonly body: Deno.Reader
+  respond(r: ServerResponse): Promise<void>
+}
+
+/**
+ * An interface is compatible with std http srever's `request.respond()`.
+ */
+export interface ServerResponse {
+  status?: number
+  headers?: Headers
+  body?: Uint8Array | Deno.Reader | string
+}
+
+/**
+ * An interface extends the `ServerRequest` for API requests.
+ */
+export interface APIRequest extends ServerRequest {
+  readonly params: URLSearchParams
+  readonly cookies: ReadonlyMap<string, string>
+  /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
+  readBody(type?: 'raw'): Promise<Uint8Array>
+  readBody(type: 'text'): Promise<string>
+  readBody(type: 'json'): Promise<any>
+  readBody(type: 'form'): Promise<MultipartFormData>
+  /**
+   * `addHeader` adds a new value onto an existing response header of the request, or
+   * adds the header if it does not already exist.
+   */
+  addHeader(key: string, value: string): this
+  /**
+   * `setHeader` sets a new value for an existing response header of the request, or adds
+   * the header if it does not already exist.
+   */
+  setHeader(key: string, value: string): this
+  /** `removeHeader` removes the value for an existing response header of the request. */
+  removeHeader(key: string): this
+  /** `status` sets response status of the request. */
+  status(code: number): this
+  /** `send` replies to the request with any content with type. */
+  send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
+  /** `json` replies to the request with a json content. */
+  json(data: any): Promise<void>
 }
 
 /**
@@ -80,41 +165,19 @@ export interface Config {
  *
  * @param req APIRequest object
  */
-export interface APIHandler {
-    (req: APIRequest): void
+export type APIHandler = {
+  (req: APIRequest): void
 }
 
 /**
- * The request object from api requests.
+ * The router url object of the routing, you can access it with `useRouter()` hook.
  */
-export interface APIRequest extends ServerRequest {
-    readonly pathname: string
-    readonly params: Record<string, string>
-    readonly query: URLSearchParams
-    readonly cookies: ReadonlyMap<string, string>
-    /** `status` sets response status of the request. */
-    status(code: number): this
-    /** `addHeader` adds a new value onto an existing response header of the request, or
-     * adds the header if it does not already exist. */
-    addHeader(key: string, value: string): this
-    /** `setHeader` sets a new value for an existing response header of the request, or adds
-     * the header if it does not already exist. */
-    setHeader(key: string, value: string): this
-    /** `removeHeader` removes the value for an existing response header of the request.  */
-    removeHeader(key: string): this
-    /** `send` replies to the request with any content with type */
-    send(data: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
-    /** `json` replies to the request with a json content */
-    json(data: any): Promise<void>
-}
-
-/**
- * The Router object of the application routing, you can access it with `useRouter()`.
- */
-export interface RouterURL {
-    readonly locale: string
-    readonly pathname: string
-    readonly pagePath: string
-    readonly params: Record<string, string>
-    readonly query: URLSearchParams
+export type RouterURL = {
+  readonly baseURL: string
+  readonly locale: string
+  readonly pathname: string
+  readonly pagePath: string
+  readonly params: URLSearchParams
+  push(url: string): void
+  replace(url: string): void
 }

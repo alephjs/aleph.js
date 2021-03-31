@@ -1,3 +1,5 @@
+import { Application } from '../server/mod.ts'
+
 export const helpMessage = `
 Usage:
     aleph build <dir> [...options]
@@ -6,14 +8,13 @@ Usage:
 if the <dir> is empty, the current directory will be used.
 
 Options:
-    -L, --log-level  Set log level [possible values: debug, info]
-    -r, --reload     Reload source code cache
-    -h, --help       Prints help message
+    -L, --log-level <log-level>  Set log level [possible values: debug, info]
+    -r, --reload                 Reload source code cache
+    -h, --help                   Prints help message
 `
 
-export default async function (appDir: string, options: Record<string, string | boolean>) {
-    const { Project } = await import('../project.ts')
-    const project = new Project(appDir, 'production', Boolean(options.r || options.reload))
-    await project.build()
-    Deno.exit(0)
+export default async function (workingDir: string, options: Record<string, any>) {
+  const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
+  await app.build()
+  Deno.exit(0)
 }
