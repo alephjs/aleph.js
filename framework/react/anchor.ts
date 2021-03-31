@@ -39,10 +39,7 @@ export default function Anchor(props: AnchorProps) {
   const prefetching = useMemo(() => relKeys.includes('prefetch'), [relKeys])
   const replace = useMemo(() => relKeys.includes('replace'), [relKeys])
   const isNav = useMemo(() => relKeys.includes('nav'), [relKeys])
-  const { pathname: currentPathname, query: currentQuery } = useRouter()
-  const currentHref = useMemo(() => {
-    return [currentPathname, currentQuery.toString()].filter(Boolean).join('?')
-  }, [currentPathname, currentQuery])
+  const { pathname, params } = useRouter()
   const href = useMemo(() => {
     if (!util.isNEString(propHref)) {
       return ''
@@ -50,26 +47,48 @@ export default function Anchor(props: AnchorProps) {
     if (util.isLikelyHttpURL(propHref)) {
       return propHref
     }
-    let [pathname, search] = util.splitBy(propHref, '?')
-    if (pathname.startsWith('/')) {
-      pathname = util.cleanPath(pathname)
+    let [p, q] = util.splitBy(propHref, '?')
+    if (p.startsWith('/')) {
+      p = util.cleanPath(p)
     } else {
-      pathname = util.cleanPath(currentPathname + '/' + pathname)
+      p = util.cleanPath(pathname + '/' + p)
     }
-    return [pathname, search].filter(Boolean).join('?')
-  }, [currentPathname, propHref])
+    return [p, q].filter(Boolean).join('?')
+  }, [pathname, propHref])
+  const isCurrent = useMemo(() => {
+    if (!util.isNEString(propHref)) {
+      return false
+    }
+
+    const [p, q] = util.splitBy(propHref, '?')
+    if (p !== pathname) {
+      return false
+    }
+    if (q) {
+      const search = new URLSearchParams(q)
+      for (const key of search.keys()) {
+        if (
+          !params.has(key) ||
+          search.getAll(key).join(',') !== params.getAll(key).join(',')
+        ) {
+          return false
+        }
+      }
+    }
+    return true
+  }, [pathname, params, propHref])
   const className = useMemo(() => {
-    if (!isNav || currentHref !== href) {
+    if (!isNav || !isCurrent) {
       return propClassName
     }
     return [propClassName, activeClassName].filter(util.isNEString).map(n => n.trim()).filter(Boolean).join(' ')
-  }, [propClassName, activeClassName, currentHref, href, isNav])
+  }, [propClassName, activeClassName, isCurrent, isNav])
   const style = useMemo(() => {
-    if (!isNav || currentHref !== href) {
+    if (!isNav || !isCurrent) {
       return propStyle
     }
     return Object.assign({}, propStyle, activeStyle)
-  }, [propStyle, activeStyle, currentHref, href, isNav])
+  }, [propStyle, activeStyle, isCurrent, isNav])
   const ariaCurrent = useMemo(() => {
     if (util.isNEString(propAriaCurrent)) {
       return propAriaCurrent
@@ -80,11 +99,11 @@ export default function Anchor(props: AnchorProps) {
     return undefined
   }, [href, propAriaCurrent])
   const prefetch = useCallback(() => {
-    if (href && !util.isLikelyHttpURL(href) && href !== currentHref && !prefetchedPages.has(href)) {
+    if (href && !util.isLikelyHttpURL(href) && !isCurrent && !prefetchedPages.has(href)) {
       events.emit('fetch-page-module', { href })
       prefetchedPages.add(href)
     }
-  }, [href, currentHref])
+  }, [isCurrent])
   const onMouseEnter = useCallback((e: MouseEvent) => {
     if (util.isFunction(props.onMouseEnter)) {
       props.onMouseEnter(e)
@@ -102,10 +121,10 @@ export default function Anchor(props: AnchorProps) {
       return
     }
     e.preventDefault()
-    if (href && href !== currentHref) {
+    if (isCurrent) {
       redirect(href, replace)
     }
-  }, [href, currentHref, replace])
+  }, [isCurrent, href, replace])
 
   useEffect(() => {
     if (prefetching) {
