@@ -18,7 +18,8 @@ export default (opts?: Options): LoaderPlugin => {
         Object.assign(window.navigator, { userAgent: `Deno/${Deno.version.deno}` })
       }
       if (sass === null) {
-        sass = await import('https://esm.sh/sass@1.32.8')
+        const { default: SASS } = await import('https://esm.sh/sass@1.32.8')
+        sass = SASS
       }
       const { css, map } = sass.renderSync({
         indentedSyntax: url.endsWith('.sass'),
