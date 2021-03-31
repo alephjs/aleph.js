@@ -19,7 +19,7 @@ lazy_static! {
   )
   .unwrap();
   pub static ref RE_REACT_URL: Regex = Regex::new(
-    r"^https?://(esm.sh/|cdn.esm.sh/v\d+/|cdn.esm.sh.cn/v\d+/|esm.x-static.io/v\d+/)react(\-dom)?(@[\^|~]{0,1}[0-9a-z\.\-]+)?([/|\?].*)?$"
+    r"^https?://(esm.sh|cdn.esm.sh|cdn.esm.sh.cn|esm.x-static.io)(/v\d+)?/react(\-dom)?(@[\^|~]{0,1}[0-9a-z\.\-]+)?([/|\?].*)?$"
   )
   .unwrap();
 }
@@ -64,16 +64,18 @@ pub struct Resolver {
   import_map: ImportMap,
   aleph_pkg_uri: Option<String>,
   react_version: Option<String>,
+  fixed_react_esm_sh_build_version: Option<usize>,
 }
 
 impl Resolver {
   pub fn new(
     specifier: &str,
     import_map: ImportHashMap,
-    aleph_pkg_uri: Option<String>,
-    react_version: Option<String>,
     bundle_mode: bool,
     bundle_external: Vec<String>,
+    aleph_pkg_uri: Option<String>,
+    react_version: Option<String>,
+    fixed_react_esm_sh_build_version: Option<usize>,
   ) -> Self {
     let mut set = IndexSet::<String>::new();
     for url in bundle_external {
@@ -86,12 +88,13 @@ impl Resolver {
       dep_graph: Vec::new(),
       star_exports: Vec::new(),
       inline_styles: HashMap::new(),
-      import_map: ImportMap::from_hashmap(import_map),
-      aleph_pkg_uri,
-      react_version,
       bundle_mode,
       bundle_external: set,
       extra_imports: IndexSet::new(),
+      import_map: ImportMap::from_hashmap(import_map),
+      aleph_pkg_uri,
+      react_version,
+      fixed_react_esm_sh_build_version,
     }
   }
 
@@ -244,17 +247,48 @@ impl Resolver {
       if RE_REACT_URL.is_match(fixed_url.as_str()) {
         let caps = RE_REACT_URL.captures(fixed_url.as_str()).unwrap();
         let mut host = caps.get(1).map_or("", |m| m.as_str());
-        let non_esm_sh_cdn = !host.starts_with("esm.sh/")
-          && !host.starts_with("cdn.esm.sh/")
-          && !host.starts_with("esm.x-static.io/");
+        let build_version = caps
+          .get(2)
+          .map_or("", |m| m.as_str().trim_start_matches("/v"));
+        let dom = caps.get(3).map_or("", |m| m.as_str());
+        let ver = caps.get(4).map_or("", |m| m.as_str());
+        let path = caps.get(5).map_or("", |m| m.as_str());
+        let (target_build_version, should_replace_build_version) =
+          match self.fixed_react_esm_sh_build_version {
+            Some(v) => {
+              if build_version != "" && v > 0 && !build_version.eq(v.to_string().as_str()) {
+                (v.to_string(), true)
+              } else {
+                ("".to_owned(), false)
+              }
+            }
+            _ => ("".to_owned(), false),
+          };
+        println!(
+          "---{}-{}---",
+          target_build_version, should_replace_build_version
+        );
+        let non_esm_sh_cdn = match host {
+          "esm.sh" | "cdn.esm.sh" | "cdn.esm.sh.cn" | "esm.x-static.io" => false,
+          _ => true,
+        };
         if non_esm_sh_cdn {
-          host = "esm.sh/"
+          host = "esm.sh"
         }
-        let pkg = caps.get(2).map_or("", |m| m.as_str());
-        let ver = caps.get(3).map_or("", |m| m.as_str());
-        let path = caps.get(4).map_or("", |m| m.as_str());
-        if non_esm_sh_cdn || ver != version {
-          fixed_url = format!("https://{}react{}@{}{}", host, pkg, version, path);
+        if non_esm_sh_cdn || ver != version || should_replace_build_version {
+          if should_replace_build_version {
+            fixed_url = format!(
+              "https://{}/v{}/react{}@{}{}",
+              host, target_build_version, dom, version, path
+            );
+          } else if build_version != "" {
+            fixed_url = format!(
+              "https://{}/v{}/react{}@{}{}",
+              host, build_version, dom, version, path
+            );
+          } else {
+            fixed_url = format!("https://{}/react{}@{}{}", host, dom, version, path);
+          }
         }
       }
     }
@@ -382,10 +416,11 @@ mod tests {
     let resolver = Resolver::new(
       "/app.tsx",
       ImportHashMap::default(),
-      None,
-      None,
       false,
       vec![],
+      None,
+      None,
+      None,
     );
     assert_eq!(
       resolver.fix_import_url("https://esm.sh/react"),
@@ -439,10 +474,11 @@ mod tests {
         imports,
         scopes: HashMap::new(),
       },
-      None,
-      Some("17.0.1".into()),
       false,
       vec![],
+      None,
+      Some("17.0.1".into()),
+      None,
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react", false),
@@ -563,16 +599,27 @@ mod tests {
     let mut resolver = Resolver::new(
       "https://esm.sh/react-dom",
       ImportHashMap::default(),
-      None,
-      Some("17.0.1".into()),
       false,
       vec![],
+      None,
+      Some("17.0.1".into()),
+      Some(2),
     );
     assert_eq!(
-      resolver.resolve("https://cdn.esm.sh/react@17.0.1/es2020/react.js", false),
+      resolver.resolve("https://cdn.esm.sh/v1/react@17.0.1/es2020/react.js", false),
       (
-        "../cdn.esm.sh/react@17.0.1/es2020/react.js".into(),
-        "https://cdn.esm.sh/react@17.0.1/es2020/react.js".into()
+        "../cdn.esm.sh/v2/react@17.0.1/es2020/react.js".into(),
+        "https://cdn.esm.sh/v2/react@17.0.1/es2020/react.js".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve(
+        "https://cdn.esm.sh/v1/react-dom@17.0.1/es2020/react.js",
+        false
+      ),
+      (
+        "../cdn.esm.sh/v2/react-dom@17.0.1/es2020/react.js".into(),
+        "https://cdn.esm.sh/v2/react-dom@17.0.1/es2020/react.js".into()
       )
     );
     assert_eq!(
@@ -596,16 +643,20 @@ mod tests {
     let mut resolver = Resolver::new(
       "https://esm.sh/preact/hooks",
       ImportHashMap::default(),
-      None,
-      None,
       false,
       vec![],
+      None,
+      None,
+      Some(2),
     );
     assert_eq!(
-      resolver.resolve("https://cdn.esm.sh/preact@10.5.7/es2020/preact.js", false),
+      resolver.resolve(
+        "https://cdn.esm.sh/v1/preact@10.5.7/es2020/preact.js",
+        false
+      ),
       (
-        "../../cdn.esm.sh/preact@10.5.7/es2020/preact.js".into(),
-        "https://cdn.esm.sh/preact@10.5.7/es2020/preact.js".into()
+        "../../cdn.esm.sh/v1/preact@10.5.7/es2020/preact.js".into(),
+        "https://cdn.esm.sh/v1/preact@10.5.7/es2020/preact.js".into()
       )
     );
     assert_eq!(

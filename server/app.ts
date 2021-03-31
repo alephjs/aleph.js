@@ -408,6 +408,10 @@ export class Application implements ServerApplication {
     return this.getDir('build', () => join(this.workingDir, '.aleph', this.mode))
   }
 
+  get loaders() {
+    return this.config.plugins.filter(isLoaderPlugin)
+  }
+
   /** returns the module by given url. */
   getModule(url: string): Module | null {
     if (this.#modules.has(url)) {
@@ -1099,7 +1103,20 @@ export class Application implements ServerApplication {
         // workaround for https://github.com/denoland/deno/issues/9849
         resolveStarExports: !this.isDev && Deno.version.deno.replace(/\.\d+$/, '') === '1.8',
         sourceMap: this.isDev,
-        loaders: this.config.plugins.filter(isLoaderPlugin)
+        inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
+          if (type !== 'css') {
+            for (const loader of this.loaders) {
+              if (loader.test.test(`.${type}`) && loader.transform) {
+                const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
+                if (type === 'css') {
+                  tpl = code
+                  break
+                }
+              }
+            }
+          }
+          return (await this.#cssProcesser.transform(key, tpl)).code
+        }
       })
 
       jsContent = code

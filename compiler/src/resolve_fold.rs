@@ -605,10 +605,11 @@ mod tests {
         imports,
         scopes: HashMap::new(),
       },
-      Some("https://deno.land/x/aleph@v1.0.0".into()),
-      Some("17.0.1".into()),
       false,
       vec![],
+      Some("https://deno.land/x/aleph@v1.0.0".into()),
+      Some("17.0.1".into()),
+      None,
     )));
     let (code, _) = module
       .transform(resolver.clone(), &EmitOptions::default())
@@ -715,8 +716,6 @@ mod tests {
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
       ImportHashMap::default(),
-      None,
-      None,
       true,
       vec![
         "https://esm.sh/react".into(),
@@ -725,6 +724,9 @@ mod tests {
         "/components/logo.tsx".into(),
         "/shared/iife.ts".into(),
       ],
+      None,
+      None,
+      None,
     )));
     let (code, _) = module
       .transform(resolver.clone(), &EmitOptions::default())

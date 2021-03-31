@@ -33,6 +33,9 @@ pub struct Options {
   pub react_version: String,
 
   #[serde(default)]
+  pub fixed_react_esm_sh_build_version: usize,
+
+  #[serde(default)]
   pub swc_options: SWCOptions,
 
   #[serde(default)]
@@ -132,6 +135,8 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
   let resolver = Rc::new(RefCell::new(Resolver::new(
     url,
     options.import_map,
+    options.bundle_mode,
+    options.bundle_external,
     match options.aleph_pkg_uri.as_str() {
       "" => None,
       _ => Some(options.aleph_pkg_uri),
@@ -140,8 +145,11 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
       "" => None,
       _ => Some(options.react_version),
     },
-    options.bundle_mode,
-    options.bundle_external,
+    if options.fixed_react_esm_sh_build_version > 0 {
+      Some(options.fixed_react_esm_sh_build_version)
+    } else {
+      None
+    },
   )));
   let module =
     SWC::parse(url, code, Some(options.swc_options.source_type)).expect("could not parse module");

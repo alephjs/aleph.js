@@ -30,8 +30,9 @@ export type SWCOptions = {
 
 export type TransformOptions = {
   importMap?: ImportMap
-  reactVersion?: string
   alephPkgUri?: string
+  reactVersion?: string
+  fixedReactEsmShBuildVersion?: number
   swcOptions?: SWCOptions
   sourceMap?: boolean
   isDev?: boolean
@@ -39,8 +40,7 @@ export type TransformOptions = {
   resolveStarExports?: boolean
   bundleMode?: boolean
   bundleExternal?: string[]
-  // loaders for inline styles transform
-  loaders?: LoaderPlugin[]
+  inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>
 }
 
 export type TransformResult = {
@@ -123,7 +123,7 @@ export async function transform(url: string, code: string, options: TransformOpt
     log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
   }
 
-  const { loaders, ...transformOptions } = options
+  const { inlineStylePreprocess, ...transformOptions } = options
 
   let {
     code: jsContent,
@@ -144,27 +144,8 @@ export async function transform(url: string, code: string, options: TransformOpt
     }, '')
       .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
       .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
-    if (loaders !== undefined) {
-      if (style.type !== 'css') {
-        for (const loader of loaders) {
-          if (loader.test.test(`.${style.type}`) && loader.transform) {
-            const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
-            if (type === 'css') {
-              tpl = code
-              break
-            }
-          }
-        }
-      }
-      for (const loader of loaders) {
-        if (loader.test.test('.css') && loader.transform) {
-          const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
-          if (type === 'css') {
-            tpl = code
-            break
-          }
-        }
-      }
+    if (inlineStylePreprocess !== undefined) {
+      tpl = await inlineStylePreprocess(key, style.type, tpl)
     }
     tpl = tpl.replace(
       /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
