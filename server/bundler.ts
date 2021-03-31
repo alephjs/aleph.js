@@ -16,42 +16,45 @@ import {
   isLoaderPlugin
 } from './helper.ts'
 
-export const bundlerRuntimeCode = `
-  window.__ALEPH = window.__ALEPH || {
+export const bundlerRuntimeCode = (`
+  window.__ALEPH = {
     baseURL: '/',
     pack: {},
     bundledFiles: {},
-    import: function(url, forceRefetch) {
-      var baseURL = this.baseURL,
-          pack = this.pack,
-          bundledFiles = this.bundledFiles;
-      if (url in pack) {
-        return Promise.resolve(pack[url])
+    import: function(u, F) {
+      var b = this.baseURL,
+          a = this.pack,
+          l = this.bundledFiles;
+      if (u in a) {
+        return Promise.resolve(a[u]);
       }
-      return new Promise(function(resolve, reject) {
-        var script = document.createElement('script'),
-            jsFilename = bundledFiles[url] || bundledFiles[url.replace(/\\.[a-zA-Z0-9]+$/, '')],
-            src = (baseURL + '/_aleph').replace('//', '/');
-        if (!jsFilename) {
-          reject(err)
-          return
+      return new Promise(function(y, n) {
+        var s = document.createElement('script'),
+            f = l[u] || l[u.replace(/\\.[a-zA-Z0-9]+$/, '')],
+            p = (b + '/_aleph').replace('//', '/');
+        if (!f) {
+          n(new Error('invalid url: ' + u));
+          return;
         }
-        script.onload = function () {
-          resolve(pack[url])
+        s.onload = function() {
+          y(a[u]);
+        };
+        s.onerror = n;
+        p += f;
+        if (F) {
+          p += '?t=' + (new Date).getTime();
         }
-        script.onerror = function(err) {
-          reject(err)
-        }
-        src += jsFilename
-        if (forceRefetch) {
-          src += '?t=' + (new Date).getTime()
-        }
-        script.src = src
-        document.body.appendChild(script)
+        s.src = p;
+        document.body.appendChild(s);
       })
     }
   }
-`
+`).split('\n')
+  .map(l => l.trim()
+    .replaceAll(') {', '){')
+    .replace(/\s*([,:=|+]{1,2})\s+/g, '$1')
+  )
+  .join('')
 
 /** The bundler class for aleph server. */
 export class Bundler {
