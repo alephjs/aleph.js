@@ -3,7 +3,7 @@ import * as path from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
 import { parseExportNames, transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
-import { defaultReactVersion } from '../shared/constants.ts'
+import { defaultReactVersion, defaultReactEsmShBuildVersion } from '../shared/constants.ts'
 import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -145,16 +145,13 @@ export class Bundler {
       mod.url,
       source.code,
       {
-        importMap: this.#app.importMap,
-        alephPkgUri: getAlephPkgUri(),
-        reactVersion: defaultReactVersion,
+        ...this.#app.sharedCompileOptions,
         swcOptions: {
           target: 'es2020',
           sourceType: source.type,
         },
         bundleMode: true,
         bundleExternal: external,
-        loaders: this.#app.config.plugins.filter(isLoaderPlugin)
       }
     )
 

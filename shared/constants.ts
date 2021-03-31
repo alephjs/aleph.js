@@ -1,2 +1,3 @@
 export const minDenoVersion = '1.8.0'
-export const defaultReactVersion = '17.0.1'
+export const defaultReactVersion = '17.0.2'
+export const defaultReactEsmShBuildVersion = 33

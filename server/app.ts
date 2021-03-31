@@ -21,7 +21,11 @@ import {
 import { EventEmitter } from '../framework/core/events.ts'
 import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
 import { RouteModule, Routing } from '../framework/core/routing.ts'
-import { defaultReactVersion, minDenoVersion } from '../shared/constants.ts'
+import {
+  defaultReactVersion,
+  defaultReactEsmShBuildVersion,
+  minDenoVersion
+} from '../shared/constants.ts'
 import {
   ensureTextFile,
   existsDirSync,
@@ -144,8 +148,13 @@ export class Application implements ServerApplication {
     const alephPkgUri = getAlephPkgUri()
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
     const configChecksum = computeHash(JSON.stringify({
-      ...this.defaultCompileOptions,
+      ...this.sharedCompileOptions,
       plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name)
+    }, (key: string, value: any) => {
+      if (key === 'inlineStylePreprocess') {
+        return void 0
+      }
+      return value
     }))
     let shouldRebuild = !existsFileSync(buildManifestFile)
     if (!shouldRebuild) {
@@ -233,7 +242,7 @@ export class Application implements ServerApplication {
         const url = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
         let validated = moduleExts.some(ext => p.endsWith('.' + ext))
         if (!validated) {
-          validated = this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)
+          validated = this.loaders.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)
         }
         if (validated) {
           await this.compile(url)
@@ -378,7 +387,7 @@ export class Application implements ServerApplication {
     }
 
     // is page module by plugin
-    if (this.config.plugins.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)) {
+    if (this.loaders.some(p => p.test.test(url) && p.allowPage)) {
       return true
     }
 
@@ -548,8 +557,7 @@ export class Application implements ServerApplication {
       }
     }
 
-    return this.config.plugins.some(p => (
-      p.type === 'loader' &&
+    return this.loaders.some(p => (
       p.test.test(url) &&
       (p.acceptHMR || p.allowPage)
     ))
@@ -681,12 +689,27 @@ export class Application implements ServerApplication {
   }
 
   /** default compiler options */
-  private get defaultCompileOptions(): TransformOptions {
+  get sharedCompileOptions(): TransformOptions {
     return {
       importMap: this.importMap,
       alephPkgUri: getAlephPkgUri(),
       reactVersion: defaultReactVersion,
+      fixedReactEsmShBuildVersion: defaultReactEsmShBuildVersion,
       isDev: this.isDev,
+      inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
+        if (type !== 'css') {
+          for (const loader of this.loaders) {
+            if (loader.test.test(`.${type}`) && loader.transform) {
+              const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
+              if (type === 'css') {
+                tpl = code
+                break
+              }
+            }
+          }
+        }
+        return (await this.#cssProcesser.transform(key, tpl)).code
+      }
     }
   }
 
@@ -760,11 +783,11 @@ export class Application implements ServerApplication {
     }
 
     if (!isBuiltinModule) {
-      for (const plugin of this.config.plugins) {
-        if (plugin.type === 'loader' && plugin.test.test(url) && plugin.pagePathResolve) {
-          const { path, isIndex: _isIndex } = plugin.pagePathResolve(url)
+      for (const loader of this.loaders) {
+        if (loader.test.test(url) && loader.pagePathResolve) {
+          const { path, isIndex: _isIndex } = loader.pagePathResolve(url)
           if (!util.isNEString(path)) {
-            throw new Error(`bad pagePathResolve result of '${plugin.name}' plugin`)
+            throw new Error(`bad pagePathResolve result of '${loader.name}' plugin`)
           }
           pagePath = path
           if (!!_isIndex) {
@@ -787,9 +810,9 @@ export class Application implements ServerApplication {
 
   /** fetch module content */
   private async fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
-    for (const plugin of this.config.plugins) {
-      if (plugin.type === 'loader' && plugin.test.test(url) && plugin.resolve !== undefined) {
-        const v = plugin.resolve(url)
+    for (const loader of this.loaders) {
+      if (loader.test.test(url) && loader.resolve !== undefined) {
+        const v = loader.resolve(url)
         let content: Uint8Array
         if (v instanceof Promise) {
           content = await v
@@ -923,9 +946,9 @@ export class Application implements ServerApplication {
       }
     }
 
-    for (const plugin of this.config.plugins) {
-      if (plugin.type === 'loader' && plugin.test.test(url) && plugin.transform) {
-        const { code, type = 'js', map } = await plugin.transform({ url, content: sourceContent })
+    for (const loader of this.loaders) {
+      if (loader.test.test(url) && loader.transform) {
+        const { code, type = 'js', map } = await loader.transform({ url, content: sourceContent })
         sourceCode = code
         if (map) {
           sourceMap = map
@@ -1095,28 +1118,14 @@ export class Application implements ServerApplication {
       }
 
       const { code, deps, starExports, map } = await transform(url, source.code, {
-        ...this.defaultCompileOptions,
+        ...this.sharedCompileOptions,
+        sourceMap: this.isDev,
         swcOptions: {
           target: 'es2020',
           sourceType: source.type
         },
         // workaround for https://github.com/denoland/deno/issues/9849
         resolveStarExports: !this.isDev && Deno.version.deno.replace(/\.\d+$/, '') === '1.8',
-        sourceMap: this.isDev,
-        inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
-          if (type !== 'css') {
-            for (const loader of this.loaders) {
-              if (loader.test.test(`.${type}`) && loader.transform) {
-                const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
-                if (type === 'css') {
-                  tpl = code
-                  break
-                }
-              }
-            }
-          }
-          return (await this.#cssProcesser.transform(key, tpl)).code
-        }
       })
 
       jsContent = code
