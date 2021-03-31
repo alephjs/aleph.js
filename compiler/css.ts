@@ -70,7 +70,7 @@ async function initCleanCSS() {
 
 async function initPostCSS(plugins: PostCSSPlugin[]) {
   const { default: PostCSS } = await import(`https://esm.sh/postcss@${postcssVersion}`)
-  const isDev = Deno.env.get('BUILD_MODE') === 'development'
+  const isDev = Deno.env.get('ALEPH_BUILD_MODE') === 'development'
   return PostCSS(await Promise.all(plugins.filter(p => {
     if (isDev) {
       if (util.isNEString(p) && productionOnlyPostcssPlugins.includes(p)) {

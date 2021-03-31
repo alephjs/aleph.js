@@ -79,7 +79,6 @@ export class Application implements ServerApplication {
   readonly importMap: ImportMap
   readonly ready: Promise<void>
 
-  #dirs: Map<string, string> = new Map()
   #modules: Map<string, Module> = new Map()
   #pageRouting: Routing = new Routing({})
   #apiRouting: Routing = new Routing({})
@@ -122,7 +121,8 @@ export class Application implements ServerApplication {
 
     // inject env variables
     Deno.env.set('ALEPH_VERSION', VERSION)
-    Deno.env.set('BUILD_MODE', this.mode)
+    Deno.env.set('ALEPH_BUILD_MODE', this.mode)
+    Deno.env.set('ALEPH_FRAMEWORK', this.framework)
 
     // inject browser navigator polyfill
     Object.assign((globalThis as any).navigator, {
@@ -195,12 +195,12 @@ export class Application implements ServerApplication {
     }
 
     // init framework
-    const { init } = await import(`../framework/${this.config.framework}/init.ts`)
+    const { init } = await import(`../framework/${this.framework}/init.ts`)
     await init(this)
 
     // import framework renderer
     if (this.config.ssr) {
-      const { jsFile } = await this.compile(`${alephPkgUri}/framework/${this.config.framework}/renderer.ts`)
+      const { jsFile } = await this.compile(`${alephPkgUri}/framework/${this.framework}/renderer.ts`)
       const { render } = await import(`file://${jsFile}`)
       if (util.isFunction(render)) {
         this.#renderer.setFrameworkRenderer({ render })
@@ -210,7 +210,7 @@ export class Application implements ServerApplication {
     log.info('Compiling...')
 
     // pre-compile framework modules
-    await this.compile(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`)
+    await this.compile(`${alephPkgUri}/framework/${this.framework}/bootstrap.ts`)
     if (this.isDev) {
       await this.compile(`${alephPkgUri}/framework/core/hmr.ts`)
       await this.compile(`${alephPkgUri}/framework/core/nomodule.ts`)
@@ -405,16 +405,20 @@ export class Application implements ServerApplication {
     return this.mode === 'development'
   }
 
+  get framework() {
+    return this.config.framework
+  }
+
   get srcDir() {
-    return this.getDir('src', () => join(this.workingDir, this.config.srcDir))
+    return join(this.workingDir, this.config.srcDir)
   }
 
   get outputDir() {
-    return this.getDir('output', () => join(this.workingDir, this.config.outputDir))
+    return join(this.workingDir, this.config.outputDir)
   }
 
   get buildDir() {
-    return this.getDir('build', () => join(this.workingDir, '.aleph', this.mode))
+    return join(this.workingDir, '.aleph', this.mode)
   }
 
   get loaders() {
@@ -755,16 +759,6 @@ export class Application implements ServerApplication {
     }
 
     log.info(`Done in ${Math.round(performance.now() - start)}ms`)
-  }
-
-  private getDir(name: string, init: () => string) {
-    if (this.#dirs.has(name)) {
-      return this.#dirs.get(name)!
-    }
-
-    const dir = init()
-    this.#dirs.set(name, dir)
-    return dir
   }
 
   private createRouteUpdate(url: string): [string, string, { isIndex?: boolean, useDeno?: boolean }] {
@@ -1231,7 +1225,7 @@ export class Application implements ServerApplication {
 
     // add framwork bootstrap module as shared entry
     entryMods.set(
-      [`${getAlephPkgUri()}/framework/${this.config.framework}/bootstrap.ts`],
+      [`${getAlephPkgUri()}/framework/${this.framework}/bootstrap.ts`],
       true
     )
 
