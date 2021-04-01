@@ -40,7 +40,7 @@ import type {
 } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Bundler, bundlerRuntimeCode } from './bundler.ts'
-import { defaultConfig, loadConfig, loadImportMap, loadPostCSSConfig } from './config.ts'
+import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
 import {
   computeHash,
   formatBytesWithColor,
@@ -108,16 +108,17 @@ export class Application implements ServerApplication {
   /** initiate application */
   private async init(reload: boolean) {
     let t = performance.now()
-    const [config, importMap, postcssConfig] = await Promise.all([
+    const [config, importMap,] = await Promise.all([
       loadConfig(this.workingDir),
       loadImportMap(this.workingDir),
-      loadPostCSSConfig(this.workingDir),
     ])
 
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
     this.#pageRouting.config(this.config)
-    this.#cssProcesser.config(!this.isDev, postcssConfig.plugins)
+    this.#cssProcesser.config(!this.isDev, this.config.postcss.plugins)
+
+    console.log(this.config.postcss.plugins)
 
     // inject env variables
     Deno.env.set('ALEPH_VERSION', VERSION)
@@ -150,7 +151,7 @@ export class Application implements ServerApplication {
     const configChecksum = computeHash(JSON.stringify({
       ...this.sharedCompileOptions,
       plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name),
-      postcssPlugins: postcssConfig.plugins.map(p => p.toString())
+      postcssPlugins: this.config.postcss.plugins.map(p => p.toString())
     }, (key: string, value: any) => {
       if (key === 'inlineStylePreprocess') {
         return void 0

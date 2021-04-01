@@ -1,10 +1,8 @@
-import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
 import util from '../shared/util.ts'
+import { PostCSSPlugin } from '../types.ts'
 
 const postcssVersion = '8.2.8'
 const productionOnlyPostcssPlugins = ['autoprefixer']
-
-export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
 
 export class CSSProcessor {
   #isProd: boolean
