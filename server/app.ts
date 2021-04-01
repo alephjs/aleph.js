@@ -1,6 +1,6 @@
 import { bold, dim } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
-import { walk } from 'https://deno.land/std@0.90.0/fs/walk.ts'
 import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
+import { walk } from 'https://deno.land/std@0.90.0/fs/walk.ts'
 import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
 import {
   basename,
@@ -22,8 +22,8 @@ import { EventEmitter } from '../framework/core/events.ts'
 import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
 import { RouteModule, Routing } from '../framework/core/routing.ts'
 import {
-  defaultReactVersion,
-  defaultReactEsmShBuildVersion,
+  defaultReactEsmShBuildVersion, defaultReactVersion,
+
   minDenoVersion
 } from '../shared/constants.ts'
 import {
@@ -36,7 +36,7 @@ import util from '../shared/util.ts'
 import type {
   Config,
   RouterURL,
-  ServerApplication,
+  ServerApplication
 } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Bundler, bundlerRuntimeCode } from './bundler.ts'
@@ -117,8 +117,6 @@ export class Application implements ServerApplication {
     Object.assign(this.importMap, importMap)
     this.#pageRouting.config(this.config)
     this.#cssProcesser.config(!this.isDev, this.config.postcss.plugins)
-
-    console.log(this.config.postcss.plugins)
 
     // inject env variables
     Deno.env.set('ALEPH_VERSION', VERSION)
