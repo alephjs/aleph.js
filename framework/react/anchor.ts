@@ -121,7 +121,7 @@ export default function Anchor(props: AnchorProps) {
       return
     }
     e.preventDefault()
-    if (isCurrent) {
+    if (!isCurrent) {
       redirect(href, replace)
     }
   }, [isCurrent, href, replace])
