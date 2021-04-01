@@ -68,7 +68,10 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (util.isNEString(srcDir)) {
     config.srcDir = util.cleanPath(srcDir)
-  } else if (existsDirSync(join(workingDir, 'src'))) {
+  } else if (
+    !existsDirSync(join(workingDir, 'pages')) &&
+    existsDirSync(join(workingDir, 'src', 'pages'))
+  ) {
     config.srcDir = '/src'
   }
   if (util.isNEString(outputDir)) {
