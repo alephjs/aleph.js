@@ -149,7 +149,8 @@ export class Application implements ServerApplication {
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
     const configChecksum = computeHash(JSON.stringify({
       ...this.sharedCompileOptions,
-      plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name)
+      plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name),
+      postcssPlugins: postcssConfig.plugins.map(p => p.toString())
     }, (key: string, value: any) => {
       if (key === 'inlineStylePreprocess') {
         return void 0
