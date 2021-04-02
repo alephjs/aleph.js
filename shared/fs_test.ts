@@ -10,13 +10,13 @@ import {
 
 
 Deno.test(`fs existsDirSync`, () => {
+    // console.log('getStandardFolder', getStandardFolder())
     // true test cases
     assert(existsDirSync(getAbsolutePath(`.${SEP}shared`)))
     assert(existsDir(getAbsolutePath(getStandardFolder())))
     // false test cases
     assertEquals(existsDirSync(getAbsolutePath(`.${SEP}foobar`)), false)
     assertEquals(existsDirSync(getAbsolutePath(`.${SEP}shared${SEP}fs.ts`)), false)
-    assertEquals(existsDirSync(getAbsolutePath('&*^--%$#@')), false)
     // error test cases
     assertThrows(() => existsDirSync({} as string), Error)
 })
@@ -28,7 +28,6 @@ Deno.test(`fs async existsDir`, async () => {
     // false test cases
     assertEquals(await existsDir(getAbsolutePath(`.${SEP}foobar`)), false)
     assertEquals(await existsDir(getAbsolutePath(`.${SEP}shared${SEP}fs.ts`)), false)
-    assertEquals(await existsDir(getAbsolutePath('&*^--%$#@')), false)
     // error test cases
     existsDir({} as string).then(err => {
         assert(err instanceof Error)
@@ -120,7 +119,7 @@ Deno.test('getAbsolutePath', () => {
  *  '/tmp' for unix-based operating systems
  */
 const getStandardFolder = () => {
-    return Deno.build.os === 'windows' ? 'C:\Program Files' : '/tmp'
+    return Deno.build.os === 'windows' ? "C:\\Windows" : '/tmp'
 }
 
 
