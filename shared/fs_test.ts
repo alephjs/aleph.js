@@ -1,6 +1,12 @@
-import { assert, assertEquals, assertThrows } from 'https://deno.land/std@0.90.0/testing/asserts.ts'
+import {
+    assert, assertEquals, assertThrows,
+    assertExists, assertNotEquals
+} from 'https://deno.land/std@0.90.0/testing/asserts.ts'
 import { SEP } from "https://deno.land/std@0.90.0/path/separator.ts"
-import { existsDir, existsDirSync, existsFile, existsFileSync } from './fs.ts'
+import {
+    existsDir, existsDirSync, existsFile, existsFileSync,
+    ensureTextFile, lazyRemove
+} from './fs.ts'
 
 
 Deno.test(`fs existsDirSync`, () => {
@@ -45,16 +51,45 @@ Deno.test(`fs async existsFile`, async () => {
     // false test cases
     assertEquals(await existsFile(getAbsolutePath(`.${SEP}shared${SEP}foobar.ts`)), false)
     // error test cases
-    existsDir({} as string).then(err => {
+    existsFile({} as string).then(err => {
         assert(err instanceof Error)
     }).catch(e => console.error(e))
 })
 
-Deno.test('ensureTextFile', () => {
-
+Deno.test('ensureTextFile', async () => {
+    // true test case
+    const dirPath = await Deno.makeTempDir()
+    const textFilePath = `${dirPath}${SEP}test.txt`
+    const content = 'This is a test'
+    await ensureTextFile(textFilePath, content)
+    assert(await existsFile(textFilePath))
+    const testContent = await Deno.readTextFile(textFilePath)
+    assertEquals(testContent, content)
+    // FIXME: false test case
+    // illegal folder name
+    // const textFilePath2 = `${SEP}test2.txt`
+    // let testContent2 = ''
+    // try {
+    //     await ensureTextFile(textFilePath2, content)
+    //     testContent2 = await Deno.readTextFile(textFilePath2)
+    // } catch (error) {
+    //     assertNotEquals(testContent2, content)
+    // }
 })
 
-Deno.test('lazyRemove', () => {
+Deno.test('lazyRemove', async () => {
+    // true test
+    const filePath = await Deno.makeTempFile()
+    await lazyRemove(filePath)
+    assertEquals(existsFileSync(filePath), false)
+    // false test
+    const dirPath = await Deno.makeTempDir()
+    await lazyRemove(`${dirPath}${SEP}asdfsdf.txt`)
+    assert(await existsDir(dirPath))
+    // error test
+    lazyRemove({} as string).then(err => {
+        assert(err instanceof Error)
+    }).catch(e => console.error(e))
 
 })
 
