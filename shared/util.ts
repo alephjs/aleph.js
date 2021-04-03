@@ -75,8 +75,7 @@ export default {
       }, [] as Array<string>)
   },
   cleanPath(path: string): string {
-    return (Deno.build.os !== "windows" ? '/' : '') +
-      this.splitPath(path).join('/')
+    return '/' + this.splitPath(path).join('/')
   },
   debounce<T extends Function>(callback: T, delay: number): T {
     let timer: number | null = null
