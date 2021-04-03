@@ -9,7 +9,7 @@ import {
   join,
   resolve
 } from 'https://deno.land/std@0.90.0/path/mod.ts'
-import { CSSProcessor } from '../compiler/css.ts'
+import { Bundler, bundlerRuntimeCode } from '../bundler/mod.ts'
 import {
   buildChecksum,
   ImportMap,
@@ -23,7 +23,6 @@ import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.
 import { RouteModule, Routing } from '../framework/core/routing.ts'
 import {
   defaultReactEsmShBuildVersion, defaultReactVersion,
-
   minDenoVersion
 } from '../shared/constants.ts'
 import {
@@ -39,8 +38,8 @@ import type {
   ServerApplication
 } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { Bundler, bundlerRuntimeCode } from './bundler.ts'
 import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
+import { CSSProcessor } from './css.ts'
 import {
   computeHash,
   formatBytesWithColor,

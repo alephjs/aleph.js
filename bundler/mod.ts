@@ -3,18 +3,16 @@ import * as path from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
 import { parseExportNames, transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
-import { defaultReactVersion, defaultReactEsmShBuildVersion } from '../shared/constants.ts'
 import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
-import type { Application, Module } from './app.ts'
+import type { Application, Module } from '../server/app.ts'
 import {
   clearCompilation,
   computeHash,
   getAlephPkgUri,
-  isLoaderPlugin
-} from './helper.ts'
+} from '../server/helper.ts'
 
 export const bundlerRuntimeCode = (`
   window.__ALEPH = {
@@ -211,7 +209,7 @@ export class Bundler {
     const bundleFilename = `polyfill.bundle.${hash.slice(0, 8)}.js`
     const bundleFile = path.join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFile)) {
-      const rawPolyfillFile = `${alephPkgUri}/compiler/polyfills/${buildTarget}/mod.ts`
+      const rawPolyfillFile = `${alephPkgUri}/bundler/polyfills/${buildTarget}/mod.ts`
       await this._bundle(rawPolyfillFile, bundleFile)
     }
     this.#bundledFiles.set('polyfill', bundleFilename)
