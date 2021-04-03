@@ -1,6 +1,5 @@
 import {
-    assert, assertEquals, assertThrows,
-    assertExists, assertNotEquals
+    assert, assertEquals, assertThrows, assertNotEquals
 } from 'https://deno.land/std@0.90.0/testing/asserts.ts'
 import { SEP } from "https://deno.land/std@0.90.0/path/separator.ts"
 import {
@@ -10,24 +9,28 @@ import {
 
 
 Deno.test(`fs existsDirSync`, () => {
-    // console.log('getStandardFolder', getStandardFolder())
     // true test cases
-    assert(existsDirSync(getAbsolutePath(`.${SEP}shared`)))
-    assert(existsDir(getAbsolutePath(getStandardFolder())))
+    const dir = Deno.makeTempDirSync()
+    assert(existsDirSync(dir))
+    assert(existsDirSync(Deno.realPathSync(getStandardFolder())))
     // false test cases
-    assertEquals(existsDirSync(getAbsolutePath(`.${SEP}foobar`)), false)
-    assertEquals(existsDirSync(getAbsolutePath(`.${SEP}shared${SEP}fs.ts`)), false)
+    assertEquals(existsDirSync(`${dir}${SEP}foobar`), false)
+    const file = Deno.makeTempFileSync()
+    assertEquals(existsDirSync(file), false)
     // error test cases
     assertThrows(() => existsDirSync({} as string), Error)
 })
 
+
 Deno.test(`fs async existsDir`, async () => {
     // true test cases
-    assertEquals(await existsDir(getAbsolutePath(getStandardFolder())), true)
-    assertEquals(await existsDir(getAbsolutePath(`.${SEP}shared`)), true)
+    assert(await existsDir(await Deno.realPath(getStandardFolder())))
+    const dir = await Deno.makeTempDir()
+    assertEquals(await existsDir(dir), true)
     // false test cases
-    assertEquals(await existsDir(getAbsolutePath(`.${SEP}foobar`)), false)
-    assertEquals(await existsDir(getAbsolutePath(`.${SEP}shared${SEP}fs.ts`)), false)
+    assertEquals(await existsDir(`${dir}${SEP}foobar`), false)
+    const file = await Deno.makeTempFile()
+    assertEquals(await existsDir(file), false)
     // error test cases
     existsDir({} as string).then(err => {
         assert(err instanceof Error)
@@ -36,19 +39,24 @@ Deno.test(`fs async existsDir`, async () => {
 
 Deno.test(`fs existsFileSync`, () => {
     // true test cases
-    assert(existsFileSync(getAbsolutePath(`.${SEP}shared${SEP}fs.ts`)))
+    const file = Deno.makeTempFileSync()
+    assert(existsFileSync(file))
     // false test cases
-    assert(!existsFileSync(getAbsolutePath(`.${SEP}shared`)))
-    assert(!existsFileSync(getAbsolutePath(`.${SEP}shared${SEP}baz.ts`)))
+    const dir = Deno.makeTempDirSync()
+    assert(!existsFileSync(`${dir}`))
+    assert(!existsFileSync(`${dir}${SEP}llksdafzxc.ts`))
     // error test cases
     assertThrows(() => existsDirSync({} as string), Error)
 })
 
 Deno.test(`fs async existsFile`, async () => {
     // true test cases
-    assert(await existsFile(getAbsolutePath(`.${SEP}shared${SEP}fs.ts`)))
+    const file = await Deno.makeTempFile()
+    assert(await existsFile(file))
     // false test cases
-    assertEquals(await existsFile(getAbsolutePath(`.${SEP}shared${SEP}foobar.ts`)), false)
+    const dir = Deno.makeTempDirSync()
+    assertEquals(await existsFile(dir), false)
+    assertEquals(await existsFileSync(`${dir}${SEP}llksdafzxc.ts`), false)
     // error test cases
     existsFile({} as string).then(err => {
         assert(err instanceof Error)
@@ -64,24 +72,24 @@ Deno.test('ensureTextFile', async () => {
     assert(await existsFile(textFilePath))
     const testContent = await Deno.readTextFile(textFilePath)
     assertEquals(testContent, content)
-    // FIXME: false test case
+    // false test case
     // illegal folder name
-    // const textFilePath2 = `${SEP}test2.txt`
-    // let testContent2 = ''
-    // try {
-    //     await ensureTextFile(textFilePath2, content)
-    //     testContent2 = await Deno.readTextFile(textFilePath2)
-    // } catch (error) {
-    //     assertNotEquals(testContent2, content)
-    // }
+    const textFilePath2 = `${SEP}test2.txt`
+    let testContent2 = ''
+    try {
+        await ensureTextFile(textFilePath2, content)
+        testContent2 = await Deno.readTextFile(textFilePath2)
+    } catch (error) {
+        assertNotEquals(testContent2, content)
+    }
 })
 
 Deno.test('lazyRemove', async () => {
-    // true test
+    // true test case
     const filePath = await Deno.makeTempFile()
     await lazyRemove(filePath)
     assertEquals(existsFileSync(filePath), false)
-    // false test
+    // false test case
     const dirPath = await Deno.makeTempDir()
     await lazyRemove(`${dirPath}${SEP}asdfsdf.txt`)
     assert(await existsDir(dirPath))
@@ -92,79 +100,13 @@ Deno.test('lazyRemove', async () => {
 
 })
 
-/**
- * Test of local function getAbsolutePath
- */
-Deno.test('getAbsolutePath', () => {
-    // folder
-    let path = 'shared'
-    let absPath = getAbsolutePath(path)
-    assert(Deno.lstatSync(absPath).isDirectory)
-    path = `.${SEP}shared`
-    absPath = getAbsolutePath(path)
-    assert(Deno.lstatSync(absPath).isDirectory)
-    // file
-    path = `shared${SEP}fs.ts`
-    absPath = getAbsolutePath(path)
-    assert(Deno.lstatSync(absPath).isFile)
-    path = `.${SEP}shared${SEP}fs.ts`
-    absPath = getAbsolutePath(path)
-    assert(Deno.lstatSync(absPath).isFile)
-})
 
 /**
  * Returns an operating system-specific
  * example folder.
- * @returns 'C:\Program Files' for Windows or
+ * @returns 'C:\Windows' for Windows or
  *  '/tmp' for unix-based operating systems
  */
 const getStandardFolder = () => {
     return Deno.build.os === 'windows' ? "C:\\Windows" : '/tmp'
-}
-
-
-/**
- * This function is designed to be used in this module
- * for test cases involving a file or directory. It
- * takes a path to a folder or file and converts it to an
- * absolute path. Designed to be os-agnostic by using
- * the SEP path separator from the Deno standard (std)
- * library (separator module).
- *
- * <strong>Note:</strong> This function might need to
- * be modified when the test is run in a CI/CD environment
- * depending where the tests are run. The current
- * implementation assumes that the tests are being
- * run from the repo's root folder.
- *
- * @param path relative or absolute path string to a folder
- *  or file. If the string starts with a operating-system
- *  agnostic slash, then it is assumed to be a full path;
- *  if the path starts with a dot slash (./) or no
- *  slash, then the path argument is assumed to be
- *  a relative path
- * @returns the full path to the folder or file
- */
-const getAbsolutePath = (path: string): string => {
-    const cwd = Deno.cwd()
-    let fullRelativePath
-    let absolutePath
-    if (path.startsWith(`.${SEP}`)) { // dot slash
-        // path == local relative path
-        fullRelativePath = path.substring(1)
-        absolutePath = `${cwd}${fullRelativePath}`
-        // absolutePath = Deno.realPathSync(path)
-        // console.log('REAL PATH: ', absolutePath)
-    } else if (path.startsWith(SEP)) { // slash
-        // path === absolute path
-        absolutePath = Deno.realPathSync(path)
-    } else if (path.startsWith('C:\\')) { // windows full path
-        // path === absolute path
-        absolutePath = Deno.realPathSync(path)
-    } else { // no dot or slash at start of path
-        // path == local relative path
-        fullRelativePath = path
-        absolutePath = `${cwd}${SEP}${fullRelativePath}`
-    }
-    return absolutePath
 }
