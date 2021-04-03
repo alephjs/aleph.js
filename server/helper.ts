@@ -3,14 +3,14 @@ import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
 import { relative } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
-import type { Plugin, LoaderPlugin } from '../types.ts'
+import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
 
 /** check the plugin whether is a loader plugin. */
-export function isLoaderPlugin(plugin: Plugin): plugin is LoaderPlugin {
+export function isLoaderPlugin(plugin: LoaderPlugin | ServerPlugin): plugin is LoaderPlugin {
   return plugin.type === 'loader'
 }
 

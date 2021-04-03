@@ -1,10 +1,8 @@
-import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
 import util from '../shared/util.ts'
+import { PostCSSPlugin } from '../types.ts'
 
 const postcssVersion = '8.2.8'
 const productionOnlyPostcssPlugins = ['autoprefixer']
-
-export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
 
 export class CSSProcessor {
   #isProd: boolean
@@ -70,7 +68,7 @@ async function initCleanCSS() {
 
 async function initPostCSS(plugins: PostCSSPlugin[]) {
   const { default: PostCSS } = await import(`https://esm.sh/postcss@${postcssVersion}`)
-  const isDev = Deno.env.get('BUILD_MODE') === 'development'
+  const isDev = Deno.env.get('ALEPH_BUILD_MODE') === 'development'
   return PostCSS(await Promise.all(plugins.filter(p => {
     if (isDev) {
       if (util.isNEString(p) && productionOnlyPostcssPlugins.includes(p)) {

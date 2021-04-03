@@ -1,6 +1,6 @@
 import { bold, dim } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
-import { walk } from 'https://deno.land/std@0.90.0/fs/walk.ts'
 import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
+import { walk } from 'https://deno.land/std@0.90.0/fs/walk.ts'
 import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
 import {
   basename,
@@ -9,7 +9,7 @@ import {
   join,
   resolve
 } from 'https://deno.land/std@0.90.0/path/mod.ts'
-import { CSSProcessor } from '../compiler/css.ts'
+import { Bundler, bundlerRuntimeCode } from '../bundler/mod.ts'
 import {
   buildChecksum,
   ImportMap,
@@ -22,8 +22,7 @@ import { EventEmitter } from '../framework/core/events.ts'
 import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
 import { RouteModule, Routing } from '../framework/core/routing.ts'
 import {
-  defaultReactVersion,
-  defaultReactEsmShBuildVersion,
+  defaultReactEsmShBuildVersion, defaultReactVersion,
   minDenoVersion
 } from '../shared/constants.ts'
 import {
@@ -36,11 +35,11 @@ import util from '../shared/util.ts'
 import type {
   Config,
   RouterURL,
-  ServerApplication,
+  ServerApplication
 } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { Bundler, bundlerRuntimeCode } from './bundler.ts'
-import { defaultConfig, loadConfig, loadImportMap, loadPostCSSConfig } from './config.ts'
+import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
+import { CSSProcessor } from './css.ts'
 import {
   computeHash,
   formatBytesWithColor,
@@ -79,7 +78,6 @@ export class Application implements ServerApplication {
   readonly importMap: ImportMap
   readonly ready: Promise<void>
 
-  #dirs: Map<string, string> = new Map()
   #modules: Map<string, Module> = new Map()
   #pageRouting: Routing = new Routing({})
   #apiRouting: Routing = new Routing({})
@@ -109,20 +107,20 @@ export class Application implements ServerApplication {
   /** initiate application */
   private async init(reload: boolean) {
     let t = performance.now()
-    const [config, importMap, postcssConfig] = await Promise.all([
+    const [config, importMap,] = await Promise.all([
       loadConfig(this.workingDir),
       loadImportMap(this.workingDir),
-      loadPostCSSConfig(this.workingDir),
     ])
 
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
     this.#pageRouting.config(this.config)
-    this.#cssProcesser.config(!this.isDev, postcssConfig.plugins)
+    this.#cssProcesser.config(!this.isDev, this.config.postcss.plugins)
 
     // inject env variables
     Deno.env.set('ALEPH_VERSION', VERSION)
-    Deno.env.set('BUILD_MODE', this.mode)
+    Deno.env.set('ALEPH_BUILD_MODE', this.mode)
+    Deno.env.set('ALEPH_FRAMEWORK', this.framework)
 
     // inject browser navigator polyfill
     Object.assign((globalThis as any).navigator, {
@@ -149,7 +147,8 @@ export class Application implements ServerApplication {
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
     const configChecksum = computeHash(JSON.stringify({
       ...this.sharedCompileOptions,
-      plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name)
+      plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name),
+      postcssPlugins: this.config.postcss.plugins.map(p => p.toString())
     }, (key: string, value: any) => {
       if (key === 'inlineStylePreprocess') {
         return void 0
@@ -195,12 +194,12 @@ export class Application implements ServerApplication {
     }
 
     // init framework
-    const { init } = await import(`../framework/${this.config.framework}/init.ts`)
+    const { init } = await import(`../framework/${this.framework}/init.ts`)
     await init(this)
 
     // import framework renderer
     if (this.config.ssr) {
-      const { jsFile } = await this.compile(`${alephPkgUri}/framework/${this.config.framework}/renderer.ts`)
+      const { jsFile } = await this.compile(`${alephPkgUri}/framework/${this.framework}/renderer.ts`)
       const { render } = await import(`file://${jsFile}`)
       if (util.isFunction(render)) {
         this.#renderer.setFrameworkRenderer({ render })
@@ -210,7 +209,7 @@ export class Application implements ServerApplication {
     log.info('Compiling...')
 
     // pre-compile framework modules
-    await this.compile(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`)
+    await this.compile(`${alephPkgUri}/framework/${this.framework}/bootstrap.ts`)
     if (this.isDev) {
       await this.compile(`${alephPkgUri}/framework/core/hmr.ts`)
       await this.compile(`${alephPkgUri}/framework/core/nomodule.ts`)
@@ -405,16 +404,20 @@ export class Application implements ServerApplication {
     return this.mode === 'development'
   }
 
+  get framework() {
+    return this.config.framework
+  }
+
   get srcDir() {
-    return this.getDir('src', () => join(this.workingDir, this.config.srcDir))
+    return join(this.workingDir, this.config.srcDir)
   }
 
   get outputDir() {
-    return this.getDir('output', () => join(this.workingDir, this.config.outputDir))
+    return join(this.workingDir, this.config.outputDir)
   }
 
   get buildDir() {
-    return this.getDir('build', () => join(this.workingDir, '.aleph', this.mode))
+    return join(this.workingDir, '.aleph', this.mode)
   }
 
   get loaders() {
@@ -755,16 +758,6 @@ export class Application implements ServerApplication {
     }
 
     log.info(`Done in ${Math.round(performance.now() - start)}ms`)
-  }
-
-  private getDir(name: string, init: () => string) {
-    if (this.#dirs.has(name)) {
-      return this.#dirs.get(name)!
-    }
-
-    const dir = init()
-    this.#dirs.set(name, dir)
-    return dir
   }
 
   private createRouteUpdate(url: string): [string, string, { isIndex?: boolean, useDeno?: boolean }] {
@@ -1231,7 +1224,7 @@ export class Application implements ServerApplication {
 
     // add framwork bootstrap module as shared entry
     entryMods.set(
-      [`${getAlephPkgUri()}/framework/${this.config.framework}/bootstrap.ts`],
+      [`${getAlephPkgUri()}/framework/${this.framework}/bootstrap.ts`],
       true
     )
 

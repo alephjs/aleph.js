@@ -40,7 +40,7 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), revalidate?: 
     const dataUrl = 'pagedata://' + pathname
     const eventName = 'useDeno-' + dataUrl
     const key = dataUrl + '#' + id
-    const expires = revalidate ? Date.now() + revalidate * 1000 : 0
+    const expires = typeof revalidate === 'number' && !isNaN(revalidate) ? Date.now() + revalidate * 1000 : 0
     const renderingDataCache = global['rendering-' + dataUrl]
     if (renderingDataCache && key in renderingDataCache) {
       return renderingDataCache[key] // 2+ pass

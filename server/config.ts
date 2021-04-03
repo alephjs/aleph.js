@@ -1,11 +1,10 @@
 import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
-import type { PostCSSPlugin } from '../compiler/css.ts'
 import type { ImportMap } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config } from '../types.ts'
+import type { Config, PostCSSPlugin } from '../types.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
 export const defaultConfig: Readonly<Required<Config>> = {
@@ -19,6 +18,7 @@ export const defaultConfig: Readonly<Required<Config>> = {
   rewrites: {},
   ssr: {},
   plugins: [],
+  postcss: { plugins: ['autoprefixer'] },
   headers: {},
   env: {},
 }
@@ -60,6 +60,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     ssr,
     rewrites,
     plugins,
+    postcss,
     headers,
     env,
   } = data
@@ -68,7 +69,10 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (util.isNEString(srcDir)) {
     config.srcDir = util.cleanPath(srcDir)
-  } else if (existsDirSync(join(workingDir, 'src'))) {
+  } else if (
+    !existsDirSync(join(workingDir, 'pages')) &&
+    existsDirSync(join(workingDir, 'src', 'pages'))
+  ) {
     config.srcDir = '/src'
   }
   if (util.isNEString(outputDir)) {
@@ -107,32 +111,16 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   if (util.isNEArray(plugins)) {
     config.plugins = plugins
   }
+  if (isPostcssConfig(postcss)) {
+    config.postcss = postcss
+  } else {
+    config.postcss = await loadPostCSSConfig(workingDir)
+  }
 
   return config
 }
 
-export async function loadPostCSSConfig(workingDir: string): Promise<{ plugins: PostCSSPlugin[] }> {
-  for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
-    const p = join(workingDir, name)
-    if (existsFileSync(p)) {
-      let config: any = null
-      if (name.endsWith('.json')) {
-        config = JSON.parse(await Deno.readTextFile(p))
-      } else {
-        const mod = await import('file://' + p)
-        config = mod.default
-        if (util.isFunction(config)) {
-          config = await config()
-        }
-      }
-      if (isPostcssConfig(config)) {
-        return config
-      }
-    }
-  }
 
-  return { plugins: ['autoprefixer'] }
-}
 
 /** load import maps from `import_map.json` */
 export async function loadImportMap(workingDir: string): Promise<ImportMap> {
@@ -167,6 +155,29 @@ export async function loadImportMap(workingDir: string): Promise<ImportMap> {
   }
 
   return importMap
+}
+
+async function loadPostCSSConfig(workingDir: string): Promise<{ plugins: PostCSSPlugin[] }> {
+  for (const name of Array.from(['ts', 'js', 'json']).map(ext => `postcss.config.${ext}`)) {
+    const p = join(workingDir, name)
+    if (existsFileSync(p)) {
+      let config: any = null
+      if (name.endsWith('.json')) {
+        config = JSON.parse(await Deno.readTextFile(p))
+      } else {
+        const mod = await import('file://' + p)
+        config = mod.default
+        if (util.isFunction(config)) {
+          config = await config()
+        }
+      }
+      if (isPostcssConfig(config)) {
+        return config
+      }
+    }
+  }
+
+  return { plugins: ['autoprefixer'] }
 }
 
 function isFramework(v: any): v is 'react' {
