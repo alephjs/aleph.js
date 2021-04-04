@@ -2,7 +2,6 @@ import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
-import type { LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
 import init, { parseExportNamesSync, transformSync } from './dist/wasm-pack.js'
@@ -21,6 +20,11 @@ export type ImportMap = {
   scopes: Record<string, Record<string, string>>
 }
 
+export type ReactResolve = {
+  version: string,
+  esmShBuildVersion: number
+}
+
 export type SWCOptions = {
   sourceType?: SourceType
   target?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
@@ -31,8 +35,7 @@ export type SWCOptions = {
 export type TransformOptions = {
   importMap?: ImportMap
   alephPkgUri?: string
-  reactVersion?: string
-  fixedReactEsmShBuildVersion?: number
+  react?: ReactResolve
   swcOptions?: SWCOptions
   sourceMap?: boolean
   isDev?: boolean
@@ -145,7 +148,7 @@ export async function transform(url: string, code: string, options: TransformOpt
       .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
       .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
     if (inlineStylePreprocess !== undefined) {
-      tpl = await inlineStylePreprocess(key, style.type, tpl)
+      tpl = await inlineStylePreprocess('#' + key, style.type, tpl)
     }
     tpl = tpl.replace(
       /\: var\(--aleph-inline-style-expr-(\d+)\)/g,

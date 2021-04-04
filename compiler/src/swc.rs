@@ -334,7 +334,6 @@ pub fn st(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<R
     vec![],
     Some("https://deno.land/x/aleph@v0.3.0".into()),
     None,
-    None,
   )));
   let (code, _) = module
     .transform(resolver.clone(), &EmitOptions::default())

@@ -302,7 +302,7 @@ impl Fold for ResolveFold {
   // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
   // - `import("../components/logo.tsx")` -> `import("../components/logo.js#/components/logo.tsx@000000")`
   // - `import("../components/logo.tsx")` -> `__ALEPH.import("../components/logo.js#/components/logo.tsx@000000", "/pages/index.tsx")`
-  // - `useDeno(() => {})` -> `useDeno(() => {}, false, "useDeno.KEY")`
+  // - `useDeno(() => {})` -> `useDeno(() => {}, null, "useDeno.KEY")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
       let url = match call.args.first() {
@@ -359,10 +359,7 @@ impl Fold for ResolveFold {
         if call.args.len() == 1 {
           call.args.push(ExprOrSpread {
             spread: None,
-            expr: Box::new(Expr::Lit(Lit::Num(Number {
-              span: DUMMY_SP,
-              value: 0 as f64,
-            }))),
+            expr: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
           });
         }
         if call.args.len() > 2 {
@@ -570,7 +567,7 @@ fn new_str(str: String) -> Str {
 mod tests {
   use super::*;
   use crate::import_map::ImportHashMap;
-  use crate::resolve::Resolver;
+  use crate::resolve::{ReactResolve, Resolver};
   use crate::swc::{st, EmitOptions, SWC};
   use sha1::{Digest, Sha1};
   use std::collections::HashMap;
@@ -608,23 +605,25 @@ mod tests {
       false,
       vec![],
       Some("https://deno.land/x/aleph@v1.0.0".into()),
-      Some("17.0.1".into()),
-      None,
+      Some(ReactResolve {
+        version: "17.0.2".into(),
+        esm_sh_build_version: 2,
+      }),
     )));
     let (code, _) = module
       .transform(resolver.clone(), &EmitOptions::default())
       .expect("could not transform module");
     println!("{}", code);
-    assert!(code.contains("import React from \"../-/esm.sh/react@17.0.1.js\""));
+    assert!(code.contains("import React from \"../-/esm.sh/react@17.0.2.js\""));
     assert!(code.contains("import { redirect } from \"../-/deno.land/x/aleph@v1.0.0/mod.js\""));
     assert!(code.contains("import { useDeno } from \"../-/deno.land/x/aleph@v1.0.0/hooks.js\""));
-    assert!(code.contains("import { render } from \"../-/esm.sh/react-dom@17.0.1/server.js\""));
-    assert!(code.contains("import { render as _render } from \"../-/cdn.esm.sh/v1/react-dom@17.0.1/es2020/react-dom.js\""));
+    assert!(code.contains("import { render } from \"../-/esm.sh/react-dom@17.0.2/server.js\""));
+    assert!(code.contains("import { render as _render } from \"../-/cdn.esm.sh/v2/react-dom@17.0.2/es2020/react-dom.js\""));
     assert!(code.contains("import Logo from \"../component/logo.js#/component/logo.tsx@000000\""));
     assert!(code.contains("import Logo2 from \"../component/logo.js#/component/logo.tsx@000000\""));
     assert!(code.contains("import Logo3 from \"../component/logo.js#/component/logo.tsx@000000\""));
     assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000000\")"));
-    assert!(code.contains("export { useState } from \"../-/esm.sh/react@17.0.1.js\""));
+    assert!(code.contains("export { useState } from \"../-/esm.sh/react@17.0.2.js\""));
     assert!(code.contains("export * from \"../-/esm.sh/swr.js\""));
   }
 
@@ -665,10 +664,10 @@ mod tests {
 
     for _ in 0..3 {
       let (code, _) = st(specifer, source, false);
-      assert!(code.contains(format!("0, \"useDeno-{}\"", id_1).as_str()));
-      assert!(code.contains(format!("1000, \"useDeno-{}\"", id_2).as_str()));
+      assert!(code.contains(format!(", null, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!(", 1000, \"useDeno-{}\"", id_2).as_str()));
       let (code, _) = st(specifer, source, true);
-      assert!(code.contains(format!("null, 0, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!("null, null, \"useDeno-{}\"", id_1).as_str()));
       assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_2).as_str()));
     }
   }
@@ -724,7 +723,6 @@ mod tests {
         "/components/logo.tsx".into(),
         "/shared/iife.ts".into(),
       ],
-      None,
       None,
       None,
     )));
