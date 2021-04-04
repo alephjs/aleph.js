@@ -11,7 +11,7 @@ mod source_type;
 mod swc;
 
 use import_map::ImportHashMap;
-use resolve::{DependencyDescriptor, InlineStyle, Resolver};
+use resolve::{DependencyDescriptor, InlineStyle, ReactResolve, Resolver};
 use serde::{Deserialize, Serialize};
 use source_type::SourceType;
 use std::collections::HashMap;
@@ -30,10 +30,7 @@ pub struct Options {
   pub aleph_pkg_uri: String,
 
   #[serde(default)]
-  pub react_version: String,
-
-  #[serde(default)]
-  pub fixed_react_esm_sh_build_version: usize,
+  pub react: Option<ReactResolve>,
 
   #[serde(default)]
   pub swc_options: SWCOptions,
@@ -141,15 +138,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
       "" => None,
       _ => Some(options.aleph_pkg_uri),
     },
-    match options.react_version.as_str() {
-      "" => None,
-      _ => Some(options.react_version),
-    },
-    if options.fixed_react_esm_sh_build_version > 0 {
-      Some(options.fixed_react_esm_sh_build_version)
-    } else {
-      None
-    },
+    options.react,
   )));
   let module =
     SWC::parse(url, code, Some(options.swc_options.source_type)).expect("could not parse module");

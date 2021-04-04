@@ -5,7 +5,7 @@ use path_slash::PathBufExt;
 use pathdiff::diff_paths;
 use regex::Regex;
 use relative_path::RelativePath;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
   collections::HashMap,
   path::{Path, PathBuf},
@@ -39,6 +39,15 @@ pub struct InlineStyle {
   pub exprs: Vec<String>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ReactResolve {
+  #[serde(default)]
+  pub version: String,
+  #[serde(default)]
+  pub esm_sh_build_version: usize,
+}
+
 /// A Resolver to resolve aleph.js import/export URL.
 pub struct Resolver {
   /// the text specifier associated with the import/export statement.
@@ -63,8 +72,7 @@ pub struct Resolver {
   // private
   import_map: ImportMap,
   aleph_pkg_uri: Option<String>,
-  react_version: Option<String>,
-  fixed_react_esm_sh_build_version: Option<usize>,
+  react: Option<ReactResolve>,
 }
 
 impl Resolver {
@@ -74,8 +82,7 @@ impl Resolver {
     bundle_mode: bool,
     bundle_external: Vec<String>,
     aleph_pkg_uri: Option<String>,
-    react_version: Option<String>,
-    fixed_react_esm_sh_build_version: Option<usize>,
+    react: Option<ReactResolve>,
   ) -> Self {
     let mut set = IndexSet::<String>::new();
     for url in bundle_external {
@@ -93,8 +100,7 @@ impl Resolver {
       extra_imports: IndexSet::new(),
       import_map: ImportMap::from_hashmap(import_map),
       aleph_pkg_uri,
-      react_version,
-      fixed_react_esm_sh_build_version,
+      react,
     }
   }
 
@@ -243,7 +249,7 @@ impl Resolver {
       }
     }
     // fix react/react-dom url
-    if let Some(version) = &self.react_version {
+    if let Some(react) = &self.react {
       if RE_REACT_URL.is_match(fixed_url.as_str()) {
         let caps = RE_REACT_URL.captures(fixed_url.as_str()).unwrap();
         let mut host = caps.get(1).map_or("", |m| m.as_str());
@@ -253,21 +259,14 @@ impl Resolver {
         let dom = caps.get(3).map_or("", |m| m.as_str());
         let ver = caps.get(4).map_or("", |m| m.as_str());
         let path = caps.get(5).map_or("", |m| m.as_str());
-        let (target_build_version, should_replace_build_version) =
-          match self.fixed_react_esm_sh_build_version {
-            Some(v) => {
-              if build_version != "" && v > 0 && !build_version.eq(v.to_string().as_str()) {
-                (v.to_string(), true)
-              } else {
-                ("".to_owned(), false)
-              }
-            }
-            _ => ("".to_owned(), false),
-          };
-        println!(
-          "---{}-{}---",
-          target_build_version, should_replace_build_version
-        );
+        let (target_build_version, should_replace_build_version) = if build_version != ""
+          && react.esm_sh_build_version > 0
+          && !build_version.eq(react.esm_sh_build_version.to_string().as_str())
+        {
+          (react.esm_sh_build_version.to_string(), true)
+        } else {
+          ("".to_owned(), false)
+        };
         let non_esm_sh_cdn = match host {
           "esm.sh" | "cdn.esm.sh" | "cdn.esm.sh.cn" | "esm.x-static.io" => false,
           _ => true,
@@ -275,19 +274,19 @@ impl Resolver {
         if non_esm_sh_cdn {
           host = "esm.sh"
         }
-        if non_esm_sh_cdn || ver != version || should_replace_build_version {
+        if non_esm_sh_cdn || ver != react.version || should_replace_build_version {
           if should_replace_build_version {
             fixed_url = format!(
               "https://{}/v{}/react{}@{}{}",
-              host, target_build_version, dom, version, path
+              host, target_build_version, dom, react.version, path
             );
           } else if build_version != "" {
             fixed_url = format!(
               "https://{}/v{}/react{}@{}{}",
-              host, build_version, dom, version, path
+              host, build_version, dom, react.version, path
             );
           } else {
-            fixed_url = format!("https://{}/react{}@{}{}", host, dom, version, path);
+            fixed_url = format!("https://{}/react{}@{}{}", host, dom, react.version, path);
           }
         }
       }
@@ -420,7 +419,6 @@ mod tests {
       vec![],
       None,
       None,
-      None,
     );
     assert_eq!(
       resolver.fix_import_url("https://esm.sh/react"),
@@ -477,14 +475,16 @@ mod tests {
       false,
       vec![],
       None,
-      Some("17.0.1".into()),
-      None,
+      Some(ReactResolve {
+        version: "17.0.2".into(),
+        esm_sh_build_version: 2,
+      }),
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react", false),
       (
-        "../-/esm.sh/react@17.0.1.js".into(),
-        "https://esm.sh/react@17.0.1".into()
+        "../-/esm.sh/react@17.0.2.js".into(),
+        "https://esm.sh/react@17.0.2".into()
       )
     );
     assert_eq!(
@@ -504,50 +504,50 @@ mod tests {
     assert_eq!(
       resolver.resolve("https://esm.sh/react@16", false),
       (
-        "../-/esm.sh/react@17.0.1.js".into(),
-        "https://esm.sh/react@17.0.1".into()
+        "../-/esm.sh/react@17.0.2.js".into(),
+        "https://esm.sh/react@17.0.2".into()
       )
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react-dom", false),
       (
-        "../-/esm.sh/react-dom@17.0.1.js".into(),
-        "https://esm.sh/react-dom@17.0.1".into()
+        "../-/esm.sh/react-dom@17.0.2.js".into(),
+        "https://esm.sh/react-dom@17.0.2".into()
       )
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react-dom@16.14.0", false),
       (
-        "../-/esm.sh/react-dom@17.0.1.js".into(),
-        "https://esm.sh/react-dom@17.0.1".into()
+        "../-/esm.sh/react-dom@17.0.2.js".into(),
+        "https://esm.sh/react-dom@17.0.2".into()
       )
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react-dom/server", false),
       (
-        "../-/esm.sh/react-dom@17.0.1/server.js".into(),
-        "https://esm.sh/react-dom@17.0.1/server".into()
+        "../-/esm.sh/react-dom@17.0.2/server.js".into(),
+        "https://esm.sh/react-dom@17.0.2/server".into()
       )
     );
     assert_eq!(
       resolver.resolve("https://esm.sh/react-dom@16.13.1/server", false),
       (
-        "../-/esm.sh/react-dom@17.0.1/server.js".into(),
-        "https://esm.sh/react-dom@17.0.1/server".into()
+        "../-/esm.sh/react-dom@17.0.2/server.js".into(),
+        "https://esm.sh/react-dom@17.0.2/server".into()
       )
     );
     assert_eq!(
       resolver.resolve("react-dom/server", false),
       (
-        "../-/esm.sh/react-dom@17.0.1/server.js".into(),
-        "https://esm.sh/react-dom@17.0.1/server".into()
+        "../-/esm.sh/react-dom@17.0.2/server.js".into(),
+        "https://esm.sh/react-dom@17.0.2/server".into()
       )
     );
     assert_eq!(
       resolver.resolve("react", false),
       (
-        "../-/esm.sh/react@17.0.1.js".into(),
-        "https://esm.sh/react@17.0.1".into()
+        "../-/esm.sh/react@17.0.2.js".into(),
+        "https://esm.sh/react@17.0.2".into()
       )
     );
     assert_eq!(
@@ -602,14 +602,16 @@ mod tests {
       false,
       vec![],
       None,
-      Some("17.0.1".into()),
-      Some(2),
+      Some(ReactResolve {
+        version: "17.0.2".into(),
+        esm_sh_build_version: 2,
+      }),
     );
     assert_eq!(
       resolver.resolve("https://cdn.esm.sh/v1/react@17.0.1/es2020/react.js", false),
       (
-        "../cdn.esm.sh/v2/react@17.0.1/es2020/react.js".into(),
-        "https://cdn.esm.sh/v2/react@17.0.1/es2020/react.js".into()
+        "../cdn.esm.sh/v2/react@17.0.2/es2020/react.js".into(),
+        "https://cdn.esm.sh/v2/react@17.0.2/es2020/react.js".into()
       )
     );
     assert_eq!(
@@ -618,22 +620,22 @@ mod tests {
         false
       ),
       (
-        "../cdn.esm.sh/v2/react-dom@17.0.1/es2020/react.js".into(),
-        "https://cdn.esm.sh/v2/react-dom@17.0.1/es2020/react.js".into()
+        "../cdn.esm.sh/v2/react-dom@17.0.2/es2020/react.js".into(),
+        "https://cdn.esm.sh/v2/react-dom@17.0.2/es2020/react.js".into()
       )
     );
     assert_eq!(
       resolver.resolve("./react", false),
       (
-        "./react@17.0.1.js".into(),
-        "https://esm.sh/react@17.0.1".into()
+        "./react@17.0.2.js".into(),
+        "https://esm.sh/react@17.0.2".into()
       )
     );
     assert_eq!(
       resolver.resolve("/react", false),
       (
-        "./react@17.0.1.js".into(),
-        "https://esm.sh/react@17.0.1".into()
+        "./react@17.0.2.js".into(),
+        "https://esm.sh/react@17.0.2".into()
       )
     );
   }
@@ -646,8 +648,10 @@ mod tests {
       false,
       vec![],
       None,
-      None,
-      Some(2),
+      Some(ReactResolve {
+        version: "17.0.2".into(),
+        esm_sh_build_version: 2,
+      }),
     );
     assert_eq!(
       resolver.resolve(
