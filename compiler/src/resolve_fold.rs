@@ -302,7 +302,7 @@ impl Fold for ResolveFold {
   // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
   // - `import("../components/logo.tsx")` -> `import("../components/logo.js#/components/logo.tsx@000000")`
   // - `import("../components/logo.tsx")` -> `__ALEPH.import("../components/logo.js#/components/logo.tsx@000000", "/pages/index.tsx")`
-  // - `useDeno(() => {})` -> `useDeno(() => {}, false, "useDeno.KEY")`
+  // - `useDeno(() => {})` -> `useDeno(() => {}, null, "useDeno.KEY")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
       let url = match call.args.first() {
@@ -359,10 +359,7 @@ impl Fold for ResolveFold {
         if call.args.len() == 1 {
           call.args.push(ExprOrSpread {
             spread: None,
-            expr: Box::new(Expr::Lit(Lit::Num(Number {
-              span: DUMMY_SP,
-              value: 0 as f64,
-            }))),
+            expr: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
           });
         }
         if call.args.len() > 2 {
