@@ -664,10 +664,10 @@ mod tests {
 
     for _ in 0..3 {
       let (code, _) = st(specifer, source, false);
-      assert!(code.contains(format!("0, \"useDeno-{}\"", id_1).as_str()));
-      assert!(code.contains(format!("1000, \"useDeno-{}\"", id_2).as_str()));
+      assert!(code.contains(format!(", null, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!(", 1000, \"useDeno-{}\"", id_2).as_str()));
       let (code, _) = st(specifer, source, true);
-      assert!(code.contains(format!("null, 0, \"useDeno-{}\"", id_1).as_str()));
+      assert!(code.contains(format!("null, null, \"useDeno-{}\"", id_1).as_str()));
       assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_2).as_str()));
     }
   }
