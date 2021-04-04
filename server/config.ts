@@ -1,5 +1,5 @@
 import { join } from 'https://deno.land/std@0.90.0/path/mod.ts'
-import type { ImportMap } from '../compiler/mod.ts'
+import type { ImportMap, ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -7,7 +7,7 @@ import util from '../shared/util.ts'
 import type { Config, PostCSSPlugin } from '../types.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
-export const defaultConfig: Readonly<Required<Config>> = {
+export const defaultConfig: Readonly<Required<Config> & { react: ReactResolve }> = {
   framework: 'react',
   buildTarget: 'es2015',
   baseUrl: '/',
@@ -21,6 +21,10 @@ export const defaultConfig: Readonly<Required<Config>> = {
   postcss: { plugins: ['autoprefixer'] },
   headers: {},
   env: {},
+  react: {
+    version: defaultReactVersion,
+    esmShBuildVersion: 34,
+  }
 }
 
 /** load config from `aleph.config.(ts|js|json)` */

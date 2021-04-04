@@ -14,6 +14,7 @@ import {
   buildChecksum,
   ImportMap,
   parseExportNames,
+  ReactResolve,
   SourceType,
   transform,
   TransformOptions
@@ -21,10 +22,7 @@ import {
 import { EventEmitter } from '../framework/core/events.ts'
 import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
 import { RouteModule, Routing } from '../framework/core/routing.ts'
-import {
-  defaultReactEsmShBuildVersion, defaultReactVersion,
-  minDenoVersion
-} from '../shared/constants.ts'
+import { minDenoVersion } from '../shared/constants.ts'
 import {
   ensureTextFile,
   existsDirSync,
@@ -74,7 +72,7 @@ type TransformFn = (url: string, code: string) => string
 export class Application implements ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
-  readonly config: Required<Config>
+  readonly config: Required<Config & { react: ReactResolve }>
   readonly importMap: ImportMap
   readonly ready: Promise<void>
 
@@ -145,10 +143,18 @@ export class Application implements ServerApplication {
 
     const alephPkgUri = getAlephPkgUri()
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
-    const configChecksum = computeHash(JSON.stringify({
-      ...this.sharedCompileOptions,
+    const plugins = computeHash(JSON.stringify({
       plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name),
-      postcssPlugins: this.config.postcss.plugins.map(p => p.toString())
+      postcssPlugins: this.config.postcss.plugins.map(p => {
+        if (util.isString(p)) {
+          return p
+        } else if (util.isArray(p)) {
+          return p[0] + JSON.stringify(p[1])
+        } else {
+          p.toString()
+        }
+      }),
+      react: this.config.react,
     }, (key: string, value: any) => {
       if (key === 'inlineStylePreprocess') {
         return void 0
@@ -163,7 +169,7 @@ export class Application implements ServerApplication {
           typeof v !== 'object' ||
           v === null ||
           v.compiler !== buildChecksum ||
-          v.configChecksum !== configChecksum
+          v.plugins !== plugins
         )
       } catch (e) { }
     }
@@ -182,7 +188,7 @@ export class Application implements ServerApplication {
         aleph: VERSION,
         deno: Deno.version.deno,
         compiler: buildChecksum,
-        configChecksum,
+        plugins,
       }, undefined, 2))
     }
 
@@ -696,8 +702,7 @@ export class Application implements ServerApplication {
     return {
       importMap: this.importMap,
       alephPkgUri: getAlephPkgUri(),
-      reactVersion: defaultReactVersion,
-      fixedReactEsmShBuildVersion: defaultReactEsmShBuildVersion,
+      react: this.config.react,
       isDev: this.isDev,
       inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
         if (type !== 'css') {
