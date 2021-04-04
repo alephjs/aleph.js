@@ -1022,8 +1022,8 @@ export class Application implements ServerApplication {
   ): Promise<Module> {
     const isRemote = util.isLikelyHttpURL(url)
     const localUrl = toLocalUrl(url)
-    const name = trimModuleExt(basename(localUrl))
     const saveDir = join(this.buildDir, dirname(localUrl))
+    const name = trimModuleExt(basename(localUrl))
     const metaFile = join(saveDir, `${name}.meta.json`)
     const { sourceCode, forceCompile, once } = options
 
@@ -1039,7 +1039,7 @@ export class Application implements ServerApplication {
         deps: [],
         sourceHash: '',
         hash: '',
-        jsFile: util.cleanPath(`${saveDir}/${name}.js`),
+        jsFile: join(saveDir, `${name}.js`),
       }
       if (!once) {
         this.#modules.set(url, mod)
