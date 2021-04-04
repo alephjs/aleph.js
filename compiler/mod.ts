@@ -148,7 +148,7 @@ export async function transform(url: string, code: string, options: TransformOpt
       .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
       .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
     if (inlineStylePreprocess !== undefined) {
-      tpl = await inlineStylePreprocess(key, style.type, tpl)
+      tpl = await inlineStylePreprocess('#' + key, style.type, tpl)
     }
     tpl = tpl.replace(
       /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
