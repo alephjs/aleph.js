@@ -1,7 +1,7 @@
 import {
     assert, assertEquals, assertThrows, assertNotEquals
-} from 'https://deno.land/std@0.90.0/testing/asserts.ts'
-import { SEP } from "https://deno.land/std@0.90.0/path/separator.ts"
+} from '../deps.test.ts'
+import { SEP } from '../deps.test.ts'
 import {
     existsDir, existsDirSync, existsFile, existsFileSync,
     ensureTextFile, lazyRemove

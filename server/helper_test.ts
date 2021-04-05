@@ -1,4 +1,4 @@
-import { assertEquals } from 'https://deno.land/std@0.90.0/testing/asserts.ts'
+import { assertEquals } from '../deps.test.ts'
 import { toLocalUrl } from './helper.ts'
 
 Deno.test(`server/helper`, async () => {
