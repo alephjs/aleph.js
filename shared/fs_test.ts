@@ -1,7 +1,7 @@
 import {
     assert, assertEquals, assertThrows, assertNotEquals
-} from '../deps.test.ts'
-import { SEP } from '../deps.test.ts'
+} from 'std/testing/asserts.ts'
+import { SEP } from 'std/path/separator.ts'
 import {
     existsDir, existsDirSync, existsFile, existsFileSync,
     ensureTextFile, lazyRemove

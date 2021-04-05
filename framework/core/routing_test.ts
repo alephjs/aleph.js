@@ -1,4 +1,4 @@
-import { assertEquals } from '../../deps.test.ts'
+import { assertEquals } from 'std/testing/asserts.ts'
 import { Routing } from './routing.ts'
 
 Deno.test(`routing`, () => {

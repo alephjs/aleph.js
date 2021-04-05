@@ -1,4 +1,4 @@
-import { assertEquals } from '../deps.test.ts'
+import { assertEquals } from 'std/testing/asserts.ts'
 import markdownLoader from './markdown.ts'
 
 Deno.test('markdown loader', async () => {
