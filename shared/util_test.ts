@@ -1,5 +1,5 @@
-import { assertEquals } from 'https://deno.land/std@0.90.0/testing/asserts.ts'
-import { delay } from 'https://deno.land/std@0.90.0/async/delay.ts'
+import { assertEquals } from 'std/testing/asserts.ts'
+import { delay } from 'std/async/delay.ts'
 import util from './util.ts'
 
 Deno.test(`util`, async () => {

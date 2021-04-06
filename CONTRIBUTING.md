@@ -31,7 +31,7 @@ ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts start .
 ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts build ./examples/hello-world -L debug
 
 # run all tests
-deno test -A --unstable --location=http://localhost
+deno test -A --unstable --location=http://localhost --import-map=./import_map.json
 ```
 
 ## Project Structure
