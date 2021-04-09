@@ -1,10 +1,11 @@
 import type { BufReader, BufWriter } from 'https://deno.land/std@0.90.0/io/bufio.ts'
 import type { MultipartFormData } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
 import { MultipartReader } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
-import { compress as brotli } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
-import { gzipEncode as gzip } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
 import log from '../shared/log.ts'
 import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
+
+let brotli: ((data: Uint8Array) => Uint8Array) | null = null
+let gzip: ((data: Uint8Array) => Uint8Array) | null = null
 
 export class Request implements APIRequest {
   #req: ServerRequest
@@ -150,14 +151,23 @@ export class Request implements APIRequest {
         shouldCompress = true
       }
     }
-    if (shouldCompress && body.length > 1024) {
-      if (this.headers.get('accept-encoding')?.includes('br')) {
+    if (shouldCompress && Deno.env.get('ALEPH_BUILD_MODE') !== 'development' && body.length > 1024) {
+      const ae = this.headers.get('accept-encoding') || ''
+      if (ae.includes('br')) {
         this.#resp.headers.set('Vary', 'Origin')
         this.#resp.headers.set('Content-Encoding', 'br')
+        if (brotli === null) {
+          const { compress } = await import('https://deno.land/x/brotli@v0.1.4/mod.ts')
+          brotli = compress
+        }
         body = brotli(body)
-      } else if (this.headers.get('accept-encoding')?.includes('gzip')) {
+      } else if (ae.includes('gzip')) {
         this.#resp.headers.set('Vary', 'Origin')
         this.#resp.headers.set('Content-Encoding', 'gzip')
+        if (gzip === null) {
+          const { gzipEncode } = await import('https://deno.land/x/wasm_gzip@v1.0.0/mod.ts')
+          gzip = gzipEncode
+        }
         body = gzip(body)
       }
     }
