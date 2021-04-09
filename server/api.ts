@@ -146,7 +146,7 @@ export class Request implements APIRequest {
         shouldCompress = true
       } else if (/^application\/(javascript|typecript|wasm|json|xml)/i.test(contentType)) {
         shouldCompress = true
-      } else if (/^image\/svg+xml/i.test(contentType)) {
+      } else if (/^image\/svg\+xml/i.test(contentType)) {
         shouldCompress = true
       }
     }
