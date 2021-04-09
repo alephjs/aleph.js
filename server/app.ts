@@ -895,13 +895,11 @@ export class Application implements ServerApplication {
         if (!isLocalhost) {
           await ensureDir(cacheDir)
           Deno.writeFile(contentFile, content)
-          Deno.writeTextFile(metaFile, JSON.stringify({
-            headers: Array.from(resp.headers.entries()).reduce((m, [k, v]) => {
-              m[k] = v
-              return m
-            }, {} as Record<string, string>),
-            url
-          }, undefined, 2))
+          const headers: Record<string, string> = {}
+          resp.headers.forEach((val, key) => {
+            headers[key] = val
+          })
+          Deno.writeTextFile(metaFile, JSON.stringify({ headers, url }, undefined, 2))
         }
         return {
           content,

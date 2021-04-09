@@ -8,7 +8,7 @@ import {
   ReactPortal,
   useEffect,
   useState
-} from 'https://esm.sh/react'
+} from 'react'
 import { useDeno, useRouter } from './hooks.ts'
 
 type ReactNode = ReactChild | ReactFragment | ReactPortal

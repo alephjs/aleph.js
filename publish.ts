@@ -18,7 +18,8 @@ export async function prepublish(version: string) {
       'framework': `https://deno.land/x/aleph@v${version}/framework/core/mod.ts`,
       'framework/react': `https://deno.land/x/aleph@v${version}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
-      'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`
+      'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
+      'react-dom/server': `https://esm.sh/react-dom@${defaultReactVersion}/server`
     })
     await Deno.writeTextFile(
       './import_map.json',

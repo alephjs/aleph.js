@@ -23,7 +23,7 @@ export const defaultConfig: Readonly<Required<Config> & { react: ReactResolve }>
   env: {},
   react: {
     version: defaultReactVersion,
-    esmShBuildVersion: 34,
+    esmShBuildVersion: 38,
   }
 }
 
@@ -150,10 +150,12 @@ export async function loadImportMap(workingDir: string): Promise<ImportMap> {
   if (DEV_PORT) {
     const alephPkgUri = getAlephPkgUri()
     const imports = {
+      'aleph/': `${alephPkgUri}/`,
       'framework': `${alephPkgUri}/framework/core/mod.ts`,
       'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
       'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
+      'react-dom/server': `https://esm.sh/react-dom@${defaultReactVersion}/server`,
     }
     Object.assign(importMap.imports, imports)
   }

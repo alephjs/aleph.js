@@ -2,7 +2,7 @@ import {
   PropsWithChildren,
   ScriptHTMLAttributes,
   useContext
-} from 'https://esm.sh/react'
+} from 'react'
 import util from '../../shared/util.ts'
 import { SSRContext } from './context.ts'
 

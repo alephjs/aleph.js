@@ -1,4 +1,4 @@
-import runtime from 'https://esm.sh/react-refresh@0.9.0/runtime'
+import runtime from 'https://esm.sh/react-refresh@0.10.0/runtime'
 import util from '../../shared/util.ts'
 
 // react-refresh
