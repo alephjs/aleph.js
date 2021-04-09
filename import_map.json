@@ -1,6 +1,6 @@
 {
   "imports": {
-    "std/": "https://deno.land/std@0.90.0/",
+    "std/": "https://deno.land/std@0.92.0/",
     "brotli": "https://deno.land/x/brotli@v0.1.4/mod.ts",
     "gzip": "https://deno.land/x/wasm_gzip@v1.0.0/mod.ts",
     "aleph": "https://deno.land/x/aleph@v0.3.0-alpha.25/mod.ts",

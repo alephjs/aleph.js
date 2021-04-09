@@ -1,14 +1,14 @@
-import { bold, dim } from 'https://deno.land/std@0.90.0/fmt/colors.ts'
-import { ensureDir } from 'https://deno.land/std@0.90.0/fs/ensure_dir.ts'
-import { walk } from 'https://deno.land/std@0.90.0/fs/walk.ts'
-import { createHash } from 'https://deno.land/std@0.90.0/hash/mod.ts'
+import { bold, dim } from 'std/fmt/colors.ts'
+import { ensureDir } from 'std/fs/ensure_dir.ts'
+import { walk } from 'std/fs/walk.ts'
+import { createHash } from 'std/hash/mod.ts'
 import {
   basename,
   dirname,
   extname,
   join,
   resolve
-} from 'https://deno.land/std@0.90.0/path/mod.ts'
+} from 'std/path/mod.ts'
 import { Bundler, bundlerRuntimeCode } from '../bundler/mod.ts'
 import {
   buildChecksum,
