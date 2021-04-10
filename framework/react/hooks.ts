@@ -10,7 +10,7 @@ import { AsyncUseDenoError } from './components/ErrorBoundary.ts'
  *
  * ```tsx
  * export default function App() {
- *   const { locale, pathname, pagePath, params, query } = useRouter()
+ *   const { locale, pathname, routePath, params, query } = useRouter()
  *   return <p>{pathname}</p>
  * }
  * ```

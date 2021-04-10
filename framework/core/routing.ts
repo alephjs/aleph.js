@@ -132,8 +132,8 @@ export class Routing {
 
     let locale = this._defaultLocale
     let pathname = decodeURI(url.pathname)
-    let pagePath = ''
-    let params = new URLSearchParams()
+    let routePath = ''
+    let params = {} as Record<string, string>
     let nestedModules: RouteModule[] = []
 
     if (pathname !== '/' && this._locales.length > 0) {
@@ -145,35 +145,30 @@ export class Routing {
       }
     }
 
-    this._lookup(routePath => {
-      const path = routePath.map(r => r.path).join('')
+    this._lookup(route => {
+      const path = route.map(r => r.path).join('')
       const [p, ok] = matchPath(path, pathname)
       if (ok) {
-        nestedModules = routePath.map(r => r.module)
-        const c = routePath[routePath.length - 1].children?.find(c => c.path === '/')
+        nestedModules = route.map(r => r.module)
+        const c = route[route.length - 1].children?.find(c => c.path === '/')
         if (c) {
           nestedModules.push(c.module)
         }
-        pagePath = path
-        Object.entries(p).forEach(([key, value]) => {
-          params.append(key, value)
-        })
+        routePath = path
+        params = p
         return false
       }
     }, true)
-
-    for (const name of url.searchParams.keys()) {
-      const values = url.searchParams.getAll(name)
-      values.forEach(value => params.append(name, value))
-    }
+    url.searchParams.sort()
 
     return [
       {
         baseURL: this._baseURL,
         locale,
         pathname,
-        pagePath,
+        routePath,
         params,
+        query: url.searchParams,
         push: (url: string) => redirect(url),
         replace: (url: string) => redirect(url, true),
       },
@@ -244,9 +239,10 @@ export function createBlankRouterURL(baseURL = '/', locale = 'en'): RouterURL {
   return {
     baseURL,
     locale,
-    pagePath: '',
+    routePath: '',
     pathname: '/',
-    params: new URLSearchParams(),
+    params: {},
+    query: new URLSearchParams(),
     push: () => void 0,
     replace: () => void 0,
   }

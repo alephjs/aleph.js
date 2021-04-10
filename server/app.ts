@@ -322,20 +322,20 @@ export class Application implements ServerApplication {
                   if (trimModuleExt(url) === '/app') {
                     this.#renderer.clearCache()
                   } else if (url.startsWith('/pages/')) {
-                    const [pagePath] = this.createRouteUpdate(url)
-                    this.#renderer.clearCache(pagePath)
+                    const [routePath] = this.createRouteUpdate(url)
+                    this.#renderer.clearCache(routePath)
                     this.#pageRouting.update(...this.createRouteUpdate(url))
                   } else if (url.startsWith('/api/')) {
                     this.#apiRouting.update(...this.createRouteUpdate(url))
                   }
                 }
                 if (hmrable) {
-                  let pagePath: string | undefined = undefined
+                  let routePath: string | undefined = undefined
                   let useDeno: boolean | undefined = undefined
                   let isIndex: boolean | undefined = undefined
                   if (mod.url.startsWith('/pages/')) {
                     const [path, _, options] = this.createRouteUpdate(mod.url)
-                    pagePath = path
+                    routePath = path
                     useDeno = options.useDeno
                     isIndex = options.isIndex
                   } else {
@@ -350,7 +350,7 @@ export class Application implements ServerApplication {
                   }
                   if (type === 'add') {
                     this.#fsWatchListeners.forEach(e => {
-                      e.emit('add', { url: mod.url, pagePath, isIndex, useDeno })
+                      e.emit('add', { url: mod.url, routePath, isIndex, useDeno })
                     })
                   } else {
                     this.#fsWatchListeners.forEach(e => {
@@ -372,12 +372,12 @@ export class Application implements ServerApplication {
               if (trimModuleExt(url) === '/app') {
                 this.#renderer.clearCache()
               } else if (url.startsWith('/pages/')) {
-                const [pagePath] = this.createRouteUpdate(url)
-                this.#renderer.clearCache(pagePath)
-                this.#pageRouting.removeRoute(pagePath)
+                const [routePath] = this.createRouteUpdate(url)
+                this.#renderer.clearCache(routePath)
+                this.#pageRouting.removeRoute(routePath)
               } else if (url.startsWith('/api/')) {
-                const [pagePath] = this.createRouteUpdate(url)
-                this.#apiRouting.removeRoute(pagePath)
+                const [routePath] = this.createRouteUpdate(url)
+                this.#apiRouting.removeRoute(routePath)
               }
               this.#modules.delete(url)
               if (this.isHMRable(url)) {
@@ -483,7 +483,7 @@ export class Application implements ServerApplication {
     const router = this.#apiRouting.createRouter(location)
     if (router !== null) {
       const [url, nestedModules] = router
-      if (url.pagePath !== '') {
+      if (url.routePath !== '') {
         const { url: moduleUrl } = nestedModules.pop()!
         if (this.#modules.has(moduleUrl)) {
           return [url, this.#modules.get(moduleUrl)!]
@@ -520,13 +520,13 @@ export class Application implements ServerApplication {
     }
 
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
-    const { pagePath } = router
-    if (pagePath === '') {
+    const { routePath } = router
+    if (routePath === '') {
       return null
     }
 
     const path = loc.pathname + (loc.search || '')
-    const [_, data] = await this.#renderer.useCache(pagePath, path, async () => {
+    const [_, data] = await this.#renderer.useCache(routePath, path, async () => {
       return await this.#renderer.renderPage(router, nestedModules)
     })
     return data
@@ -535,8 +535,8 @@ export class Application implements ServerApplication {
   /** get ssr page */
   async getPageHTML(loc: { pathname: string, search?: string }): Promise<[number, string]> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
-    const { pagePath } = router
-    const status = pagePath !== '' ? 200 : 404
+    const { routePath } = router
+    const status = routePath !== '' ? 200 : 404
     const path = loc.pathname + (loc.search || '')
 
     if (!this.isSSRable(loc.pathname)) {
@@ -546,14 +546,14 @@ export class Application implements ServerApplication {
       return [status, html]
     }
 
-    if (pagePath === '') {
+    if (routePath === '') {
       const [html] = await this.#renderer.useCache('404', path, async () => {
         return [await this.#renderer.render404Page(router), null]
       })
       return [status, html]
     }
 
-    const [html] = await this.#renderer.useCache(pagePath, path, async () => {
+    const [html] = await this.#renderer.useCache(routePath, path, async () => {
       let [html, data] = await this.#renderer.renderPage(router, nestedModules)
       return [html, data]
     })
@@ -798,7 +798,7 @@ export class Application implements ServerApplication {
 
   private createRouteUpdate(url: string): [string, string, { isIndex?: boolean, useDeno?: boolean }] {
     const isBuiltinModule = moduleExts.some(ext => url.endsWith('.' + ext))
-    let pagePath = isBuiltinModule ? toPagePath(url) : util.trimSuffix(url, '/pages')
+    let routePath = isBuiltinModule ? toPagePath(url) : util.trimSuffix(url, '/pages')
     let useDeno: boolean | undefined = undefined
     let isIndex: boolean | undefined = undefined
 
@@ -818,14 +818,14 @@ export class Application implements ServerApplication {
           if (!util.isNEString(path)) {
             throw new Error(`bad pagePathResolve result of '${loader.name}' plugin`)
           }
-          pagePath = path
+          routePath = path
           if (!!_isIndex) {
             isIndex = true
           }
           break
         }
       }
-    } else if (pagePath !== '/') {
+    } else if (routePath !== '/') {
       for (const ext of moduleExts) {
         if (url.endsWith('/index.' + ext)) {
           isIndex = true
@@ -834,7 +834,7 @@ export class Application implements ServerApplication {
       }
     }
 
-    return [pagePath, url, { isIndex, useDeno }]
+    return [routePath, url, { isIndex, useDeno }]
   }
 
   /** fetch module content */
@@ -1339,7 +1339,7 @@ export class Application implements ServerApplication {
     await Promise.all(Array.from(paths).map(async pathname => {
       if (this.isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname })
-        if (router.pagePath !== '') {
+        if (router.routePath !== '') {
           let [html, data] = await this.#renderer.renderPage(router, nestedModules)
           this.#injects.get('ssr')?.forEach(transform => {
             html = transform(pathname, html)

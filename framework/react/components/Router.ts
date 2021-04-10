@@ -49,7 +49,7 @@ export default function Router({
   const onpopstate = useCallback(async (e: any) => {
     const { baseURL } = routing
     const [url, nestedModules] = routing.createRouter()
-    if (url.pagePath !== '') {
+    if (url.routePath !== '') {
       const imports = nestedModules.map(async mod => {
         const { default: Component } = await importModule(baseURL, mod.url, e.forceRefetch)
         return {
@@ -82,7 +82,7 @@ export default function Router({
   useEffect(() => {
     const isDev = !('__ALEPH' in window)
     const { baseURL } = routing
-    const onAddModule = async (mod: RouteModule & { pagePath?: string, isIndex?: boolean }) => {
+    const onAddModule = async (mod: RouteModule & { routePath?: string, isIndex?: boolean }) => {
       switch (mod.url) {
         case '/404.js': {
           const { default: Component } = await importModule(baseURL, mod.url, true)
@@ -103,9 +103,9 @@ export default function Router({
           break
         }
         default: {
-          const { pagePath, url, ...rest } = mod
-          if (pagePath) {
-            routing.update(pagePath, url, rest)
+          const { routePath, url, ...rest } = mod
+          if (routePath) {
+            routing.update(routePath, url, rest)
             events.emit('popstate', { type: 'popstate', forceRefetch: true })
           }
           break
@@ -131,7 +131,7 @@ export default function Router({
     const onFetchPageModule = async ({ href }: { href: string }) => {
       const [pathname] = href.split('?')
       const [url, nestedModules] = routing.createRouter({ pathname })
-      if (url.pagePath !== '') {
+      if (url.routePath !== '') {
         nestedModules.map(mod => {
           importModule(baseURL, mod.url)
         })

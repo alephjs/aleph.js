@@ -69,7 +69,7 @@ socket.addEventListener('message', ({ data }: { data?: string }) => {
         type,
         url,
         updateUrl,
-        pagePath,
+        routePath,
         isIndex,
         useDeno,
       } = JSON.parse(data)
@@ -77,7 +77,7 @@ socket.addEventListener('message', ({ data }: { data?: string }) => {
         case 'add':
           events.emit('add-module', {
             url,
-            pagePath,
+            routePath,
             isIndex,
             useDeno,
           })

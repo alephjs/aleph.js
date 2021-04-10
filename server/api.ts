@@ -9,7 +9,8 @@ let gzip: ((data: Uint8Array) => Uint8Array) | null = null
 
 export class Request implements APIRequest {
   #req: ServerRequest
-  #params: URLSearchParams
+  #params: Record<string, string>
+  #query: URLSearchParams
   #cookies: ReadonlyMap<string, string>
   #resp = {
     status: 200,
@@ -19,9 +20,10 @@ export class Request implements APIRequest {
     done: false
   }
 
-  constructor(req: ServerRequest, params: URLSearchParams) {
+  constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams) {
     this.#req = req
     this.#params = params
+    this.#query = query
     const cookies = new Map()
     this.headers.get('cookie')?.split(';').forEach(cookie => {
       const p = cookie.trim().split('=')
@@ -64,8 +66,12 @@ export class Request implements APIRequest {
     return this.#req.respond(r)
   }
 
-  get params(): URLSearchParams {
+  get params(): Record<string, string> {
     return this.#params
+  }
+
+  get query(): URLSearchParams {
+    return this.#query
   }
 
   get cookies(): ReadonlyMap<string, string> {

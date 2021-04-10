@@ -39,7 +39,7 @@ export default function Anchor(props: AnchorProps) {
   const prefetching = useMemo(() => relKeys.includes('prefetch'), [relKeys])
   const replace = useMemo(() => relKeys.includes('replace'), [relKeys])
   const isNav = useMemo(() => relKeys.includes('nav'), [relKeys])
-  const { pathname, params } = useRouter()
+  const { pathname, params, query } = useRouter()
   const href = useMemo(() => {
     if (!util.isNEString(propHref)) {
       return ''
@@ -66,17 +66,13 @@ export default function Anchor(props: AnchorProps) {
     }
     if (q) {
       const search = new URLSearchParams(q)
-      for (const key of search.keys()) {
-        if (
-          !params.has(key) ||
-          search.getAll(key).join(',') !== params.getAll(key).join(',')
-        ) {
-          return false
-        }
+      search.sort()
+      if (search.toString() !== query.toString()) {
+        return false
       }
     }
     return true
-  }, [pathname, params, propHref])
+  }, [pathname, params, query, propHref])
   const className = useMemo(() => {
     if (!isNav || !isCurrent) {
       return propClassName
