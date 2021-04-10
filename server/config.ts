@@ -124,8 +124,6 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   return config
 }
 
-
-
 /** load import maps from `import_map.json` */
 export async function loadImportMap(workingDir: string): Promise<ImportMap> {
   const importMap: ImportMap = { imports: {}, scopes: {} }

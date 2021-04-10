@@ -140,35 +140,38 @@ export class Request implements APIRequest {
       contentType = this.#resp.headers.get('Content-Type')!
     } else if (typeof data === 'string' && data.length > 0) {
       contentType = 'text/plain; charset=utf-8'
+      this.#resp.headers.set('Content-Type', contentType)
     }
-    let shouldCompress = false
-    if (contentType) {
-      if (contentType.startsWith('text/')) {
-        shouldCompress = true
-      } else if (/^application\/(javascript|typecript|wasm|json|xml)/i.test(contentType)) {
-        shouldCompress = true
-      } else if (/^image\/svg\+xml/i.test(contentType)) {
-        shouldCompress = true
+    if (Deno.env.get('ALEPH_BUILD_MODE') !== 'development') {
+      let shouldCompress = false
+      if (contentType) {
+        if (contentType.startsWith('text/')) {
+          shouldCompress = true
+        } else if (/^application\/(javascript|typecript|wasm|json|xml)/i.test(contentType)) {
+          shouldCompress = true
+        } else if (/^image\/svg\+xml/i.test(contentType)) {
+          shouldCompress = true
+        }
       }
-    }
-    if (shouldCompress && Deno.env.get('ALEPH_BUILD_MODE') !== 'development' && body.length > 1024) {
-      const ae = this.headers.get('accept-encoding') || ''
-      if (ae.includes('br')) {
-        this.#resp.headers.set('Vary', 'Origin')
-        this.#resp.headers.set('Content-Encoding', 'br')
-        if (brotli === null) {
-          const { compress } = await import('https://deno.land/x/brotli@v0.1.4/mod.ts')
-          brotli = compress
+      if (shouldCompress && body.length > 1024) {
+        const ae = this.headers.get('accept-encoding') || ''
+        if (ae.includes('br')) {
+          this.#resp.headers.set('Vary', 'Origin')
+          this.#resp.headers.set('Content-Encoding', 'br')
+          if (brotli === null) {
+            const { compress } = await import('https://deno.land/x/brotli@v0.1.4/mod.ts')
+            brotli = compress
+          }
+          body = brotli(body)
+        } else if (ae.includes('gzip')) {
+          this.#resp.headers.set('Vary', 'Origin')
+          this.#resp.headers.set('Content-Encoding', 'gzip')
+          if (gzip === null) {
+            const denoflate = await import('https://deno.land/x/denoflate@1.1/mod.ts')
+            gzip = (data: Uint8Array) => denoflate.gzip(data, undefined)
+          }
+          body = gzip(body)
         }
-        body = brotli(body)
-      } else if (ae.includes('gzip')) {
-        this.#resp.headers.set('Vary', 'Origin')
-        this.#resp.headers.set('Content-Encoding', 'gzip')
-        if (gzip === null) {
-          const { gzipEncode } = await import('https://deno.land/x/wasm_gzip@v1.0.0/mod.ts')
-          gzip = gzipEncode
-        }
-        body = gzip(body)
       }
     }
     this.#resp.headers.set('Date', (new Date).toUTCString())

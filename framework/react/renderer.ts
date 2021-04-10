@@ -12,7 +12,7 @@ import { createPageProps } from './pageprops.ts'
 
 export type RendererStorage = {
   headElements: Map<string, { type: string, props: Record<string, any> }>
-  scriptElements: Map<string, { props: Record<string, any> }>
+  scripts: Map<string, { props: Record<string, any> }>
 }
 
 export async function render(
@@ -29,7 +29,7 @@ export async function render(
   }
   const rendererStorage: RendererStorage = {
     headElements: new Map(),
-    scriptElements: new Map(),
+    scripts: new Map(),
   }
   const pagedataUrl = 'pagedata://' + url.pathname
   const asyncCalls: Array<Promise<any>> = []
@@ -124,7 +124,7 @@ export async function render(
   })
 
   // get script tags
-  rendererStorage.scriptElements.forEach(({ props }) => {
+  rendererStorage.scripts.forEach(({ props }) => {
     const { children, dangerouslySetInnerHTML, ...attrs } = props
     if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
       ret.scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
