@@ -4,12 +4,12 @@ import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, PostCSSPlugin, CSSOptions } from '../types.ts'
+import type { Config, CSSOptions, PostCSSPlugin } from '../types.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
 export interface RequiredConfig extends Required<Omit<Config, 'css'>> {
   react: ReactResolve,
-  css: CSSOptions
+  css: Required<CSSOptions>
 }
 
 export const defaultConfig: Readonly<RequiredConfig> = {

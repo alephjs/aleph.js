@@ -61,7 +61,9 @@ export class Routing {
 
   config(options: RoutingOptions) {
     Object.keys(options).forEach((key) => {
-      Object.assign(this, { ['_' + key]: options[key as keyof typeof options] })
+      if ('_' + key in this) {
+        Object.assign(this, { ['_' + key]: options[key as keyof typeof options] })
+      }
     })
   }
 

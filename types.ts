@@ -73,7 +73,7 @@ export type Config = {
   /** `plugins` specifies some plugins for the appliaction. */
   plugins?: (LoaderPlugin | ServerPlugin)[]
   /** `css` specifies the css processing options. */
-  css?: Partial<CSSOptions>
+  css?: CSSOptions
   /** `headers` appends custom headers for server requests. */
   headers?: Record<string, string>
   /** `rewrites` specifies the server rewrite map. */
@@ -87,9 +87,9 @@ export type Config = {
  */
 export type CSSOptions = {
   /** `module` enables the css module feature. */
-  modules: false | CSSModulesOptions
+  modules?: false | CSSModulesOptions
   /** `postcss` specifies the postcss plugins. */
-  postcss: { plugins: PostCSSPlugin[] }
+  postcss?: { plugins: PostCSSPlugin[] }
 }
 
 /**
