@@ -171,7 +171,7 @@ export async function loadAndUpgradeImportMap(workingDir: string): Promise<Impor
     upgrade.forEach(({ name, url }) => {
       importMap.imports[name] = url
     })
-    Deno.writeTextFile(importMapFile, JSON.stringify(importMap, undefined, 2))
+    await Deno.writeTextFile(importMapFile, JSON.stringify(importMap, undefined, 2))
   }
 
   return importMap
@@ -189,18 +189,6 @@ export function defaultImportMap(reactVersion: string): ImportMap {
       'react-dom/server': `https://esm.sh/react-dom@${reactVersion}/server`,
     },
     scopes: {}
-  }
-}
-
-export function updateImports(reactVersion: string): Record<string, string> {
-  const alephPkgUri = getAlephPkgUri()
-  return {
-    'aleph/': `${alephPkgUri}/`,
-    'framework': `${alephPkgUri}/framework/core/mod.ts`,
-    'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
-    'react': `https://esm.sh/react@${reactVersion}`,
-    'react-dom': `https://esm.sh/react-dom@${reactVersion}`,
-    'react-dom/server': `https://esm.sh/react-dom@${reactVersion}/server`,
   }
 }
 
