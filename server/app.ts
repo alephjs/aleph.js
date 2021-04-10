@@ -36,9 +36,9 @@ import type {
 import { VERSION } from '../version.ts'
 import {
   defaultConfig,
-  defaultImports,
+  defaultImportMap,
   loadConfig,
-  loadImportMap,
+  loadAndUpgradeImportMap,
   RequiredConfig
 } from './config.ts'
 import { CSSProcessor } from './css.ts'
@@ -112,18 +112,17 @@ export class Application implements ServerApplication {
     let t = performance.now()
     const [config, importMap,] = await Promise.all([
       loadConfig(this.workingDir),
-      loadImportMap(this.workingDir),
+      loadAndUpgradeImportMap(this.workingDir),
     ])
 
     Object.assign(this.config, config)
     Object.assign(this.importMap, {
       ...importMap,
       imports: Object.assign(
-        defaultImports(this.config.react.version),
+        defaultImportMap(this.config.react.version).imports,
         importMap.imports
       )
     })
-    console.log(this.importMap)
     this.#pageRouting.config(this.config)
     this.#cssProcesser.config(!this.isDev, this.config.css)
 
@@ -1317,7 +1316,6 @@ export class Application implements ServerApplication {
       })
     }
 
-    log.info('- bundle')
     await this.#bundler.bundle(concatAllEntries())
   }
 

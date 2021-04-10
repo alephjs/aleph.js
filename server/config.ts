@@ -1,10 +1,12 @@
-import { join } from 'https://deno.land/std@0.92.0/path/mod.ts'
+import { basename, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
+import { bold } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
 import type { ImportMap, ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Config, CSSOptions, PostCSSPlugin } from '../types.ts'
+import { VERSION } from '../version.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
 export interface RequiredConfig extends Required<Omit<Config, 'css'>> {
@@ -133,11 +135,12 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   return config
 }
 
-/** load import maps from `import_map.json` */
-export async function loadImportMap(workingDir: string): Promise<ImportMap> {
+/** load and upgrade the import maps from `import_map.json` */
+export async function loadAndUpgradeImportMap(workingDir: string): Promise<ImportMap> {
   const importMap: ImportMap = { imports: {}, scopes: {} }
+  let importMapFile = ''
   for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
-    const importMapFile = join(workingDir, filename)
+    importMapFile = join(workingDir, filename)
     if (existsFileSync(importMapFile)) {
       const data = JSON.parse(await Deno.readTextFile(importMapFile))
       const imports: Record<string, string> = toPlainStringRecord(data.imports)
@@ -152,10 +155,44 @@ export async function loadImportMap(workingDir: string): Promise<ImportMap> {
     }
   }
 
+  const upgrade: { name: string, url: string }[] = []
+  for (const [name, url] of Object.entries(importMap.imports)) {
+    if (url.startsWith('https://deno.land/x/aleph')) {
+      const a = url.split('aleph')[1].split('/')
+      const version = util.trimPrefix(a.shift()!, '@v')
+      if (version !== VERSION && a.length > 0) {
+        upgrade.push({ name, url: `https://deno.land/x/aleph@v${VERSION}/${a.join('/')}` })
+      }
+    }
+  }
+
+  if (upgrade.length > 0) {
+    log.info(`upgraded ${basename(importMapFile)} to ${bold(VERSION)}`)
+    upgrade.forEach(({ name, url }) => {
+      importMap.imports[name] = url
+    })
+    Deno.writeTextFile(importMapFile, JSON.stringify(importMap, undefined, 2))
+  }
+
   return importMap
 }
 
-export function defaultImports(reactVersion: string): Record<string, string> {
+export function defaultImportMap(reactVersion: string): ImportMap {
+  const alephPkgUri = getAlephPkgUri()
+  return {
+    imports: {
+      'aleph/': `${alephPkgUri}/`,
+      'framework': `${alephPkgUri}/framework/core/mod.ts`,
+      'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
+      'react': `https://esm.sh/react@${reactVersion}`,
+      'react-dom': `https://esm.sh/react-dom@${reactVersion}`,
+      'react-dom/server': `https://esm.sh/react-dom@${reactVersion}/server`,
+    },
+    scopes: {}
+  }
+}
+
+export function updateImports(reactVersion: string): Record<string, string> {
   const alephPkgUri = getAlephPkgUri()
   return {
     'aleph/': `${alephPkgUri}/`,
