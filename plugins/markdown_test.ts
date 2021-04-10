@@ -1,7 +1,8 @@
 import { assertEquals } from 'std/testing/asserts.ts'
 import markdownLoader from './markdown.ts'
 
-Deno.test('markdown loader', async () => {
+Deno.test('markdown loader for react ', async () => {
+  Deno.env.set('ALEPH_FRAMEWORK', 'react')
   const loader = markdownLoader()
   const { code } = await loader.transform!({
     url: '/test.md',
@@ -25,4 +26,5 @@ Deno.test('markdown loader', async () => {
   assertEquals(loader.pagePathResolve!('/pages/docs/index.md'), { path: '/docs', isIndex: true })
   assertEquals(code.includes('html: "<h1 id=\\"alephjs\\">Aleph.js</h1>\\n<p>The Full-stack Framework in Deno.</p>\\n"'), true)
   assertEquals(code.includes('MarkdownPage.meta = {"id":"mark-page-1","className":"mark-page","style":{"color":"#333"},"url":"https://alephjs.org"}'), true)
+  Deno.env.delete('ALEPH_FRAMEWORK')
 })
