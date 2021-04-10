@@ -28,7 +28,8 @@ export type FrameworkRenderer = {
   render(
     url: RouterURL,
     AppComponent: any,
-    nestedPageComponents: { url: string, Component?: any }[]
+    nestedPageComponents: { url: string, Component?: any }[],
+    styles: Record<string, string>
   ): Promise<FrameworkRenderResult>
 }
 
@@ -95,26 +96,31 @@ export class Renderer {
   async renderPage(url: RouterURL, nestedModules: RouteModule[]): Promise<[string, Record<string, SSRData> | null]> {
     const start = performance.now()
     const isDev = this.#app.isDev
+    const state = { entryFile: '' }
     const appModule = this.#app.findModuleByName('app')
     const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 6)}`) : {} as any
-
-    let entryFile = ''
     const nestedPageComponents = await Promise.all(nestedModules
       .filter(({ url }) => this.#app.getModule(url) !== null)
       .map(async ({ url }) => {
         const { jsFile, hash } = this.#app.getModule(url)!
         const { default: Component } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
-        entryFile = dirname(url) + '/' + basename(jsFile)
+        state.entryFile = dirname(url) + '/' + basename(jsFile)
         return {
           url,
           Component
         }
       })
     )
+    const styles = await this.lookupStyleModules(...[
+      appModule ? appModule.url : [],
+      nestedModules.map(({ url }) => url)
+    ].flat())
+
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
       App,
-      nestedPageComponents
+      nestedPageComponents,
+      styles
     )
 
     if (isDev) {
@@ -131,7 +137,7 @@ export class Renderer {
             type: 'application/json',
             innerText: JSON.stringify(data, undefined, isDev ? 2 : 0),
           } : '',
-          ...this.#app.getSSRHTMLScripts(entryFile),
+          ...this.#app.getSSRHTMLScripts(state.entryFile),
           ...scripts.map((script: Record<string, any>) => {
             if (script.innerText && !isDev) {
               return { ...script, innerText: script.innerText }
@@ -152,10 +158,15 @@ export class Renderer {
     const e404Module = this.#app.findModuleByName('404')
     const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 6)}`) : {} as any
     const { default: E404 } = e404Module ? await import(`file://${e404Module.jsFile}#${e404Module.hash.slice(0, 6)}`) : {} as any
+    const styles = await this.lookupStyleModules(...[
+      appModule ? appModule.url : [],
+      e404Module ? e404Module.url : []
+    ].flat())
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
       App,
-      e404Module ? [{ url: e404Module.url, Component: E404 }] : []
+      e404Module ? [{ url: e404Module.url, Component: E404 }] : [],
+      styles
     )
     return createHtml({
       lang: url.locale,
@@ -186,6 +197,7 @@ export class Renderer {
 
     if (loadingModule) {
       const { default: Loading } = await import(`file://${loadingModule.jsFile}#${loadingModule.hash.slice(0, 6)}`)
+      const styles = await this.lookupStyleModules(loadingModule.url)
       const {
         head,
         body,
@@ -193,7 +205,8 @@ export class Renderer {
       } = await this.#renderer.render(
         createBlankRouterURL(baseUrl, defaultLocale),
         undefined,
-        [{ url: loadingModule.url, Component: Loading }]
+        [{ url: loadingModule.url, Component: Loading }],
+        styles
       )
       return createHtml({
         lang: defaultLocale,
@@ -219,6 +232,16 @@ export class Renderer {
       body: '<div id="__aleph"></div>',
       minify: !this.#app.isDev
     })
+  }
+
+  private async lookupStyleModules(...urls: string[]): Promise<Record<string, string>> {
+    return (await Promise.all(this.#app.lookupStyleModules(...urls).map(async ({ jsFile, hash }) => {
+      const { default: { __url$: url, __css$: css } } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
+      return { url, css }
+    }))).reduce((styles, mod) => {
+      styles[mod.url] = mod.css
+      return styles
+    }, {} as Record<string, string>)
   }
 }
 

@@ -6,7 +6,7 @@ const productionOnlyPostcssPlugins = ['autoprefixer']
 
 export class CSSProcessor {
   #isProd: boolean
-  #options: CSSOptions
+  #options: Required<CSSOptions>
   #postcss: any
   #cleanCSS: any
   #modulesJSON: Record<string, Record<string, string>>
@@ -24,21 +24,24 @@ export class CSSProcessor {
 
   config(isProd: boolean, options: CSSOptions) {
     this.#isProd = isProd
+    if (util.isPlainObject(options.postcss) && Array.isArray(options.postcss.plugins)) {
+      this.#options.postcss.plugins = options.postcss.plugins
+    }
     if (util.isPlainObject(options.modules)) {
-      options.postcss.plugins = options.postcss.plugins.filter(p => {
+      const plugins = this.#options.postcss.plugins.filter(p => {
         if (p === 'postcss-modules' || (Array.isArray(p) && p[0] === 'postcss-modules')) {
           return false
         }
         return true
       })
-      options.postcss.plugins.push(['postcss-modules', {
+      plugins.push(['postcss-modules', {
         ...options.modules,
         getJSON: (url: string, json: Record<string, string>) => {
           this.#modulesJSON = { [url]: json }
         },
       }])
+      this.#options.postcss.plugins = plugins
     }
-    this.#options = options
   }
 
   private getModulesJSON(url: string) {

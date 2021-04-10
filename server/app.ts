@@ -51,10 +51,11 @@ import { Renderer } from './ssr.ts'
 /** A module includes the compilation details. */
 export type Module = {
   url: string
-  jsFile: string
+  deps: DependencyDescriptor[]
+  isStyle: boolean
   sourceHash: string
   hash: string
-  deps: DependencyDescriptor[]
+  jsFile: string
 }
 
 /** The dependency descriptor. */
@@ -449,6 +450,19 @@ export class Application implements ServerApplication {
     return null
   }
 
+  lookupStyleModules(...urls: string[]): Module[] {
+    const mods: Module[] = []
+    urls.forEach(url => {
+      this.lookupDeps(url, ({ url }) => {
+        const mod = this.#modules.get(url)
+        if (mod && mod.isStyle) {
+          mods.push({ ...mod, deps: [...mod.deps] })
+        }
+      })
+    })
+    return mods
+  }
+
   getPageRoute(location: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
     return this.#pageRouting.createRouter(location)
   }
@@ -565,6 +579,11 @@ export class Application implements ServerApplication {
           ['/app', '/404'].includes(util.trimSuffix(url, '.' + ext))
         )
       }
+    }
+
+    const mod = this.#modules.get(url)
+    if (mod && mod.isStyle) {
+      return true
     }
 
     return this.loaders.some(p => (
@@ -917,12 +936,18 @@ export class Application implements ServerApplication {
     url: string,
     sourceContent: Uint8Array,
     contentType: string | null
-  ): Promise<{ code: string, type: SourceType, map: string | null } | null> {
+  ): Promise<{
+    code: string
+    type: SourceType
+    isStyle: boolean
+    map?: string
+  } | null> {
     const encoder = new TextEncoder()
     const decoder = new TextDecoder()
 
     let sourceType: SourceType | null = null
     let sourceMap: Uint8Array | null = null
+    let isStyle = false
 
     if (contentType !== null) {
       switch (contentType.split(';')[0].trim()) {
@@ -1000,6 +1025,7 @@ export class Application implements ServerApplication {
       const { code, map } = await this.#cssProcesser.transform(url, (new TextDecoder).decode(sourceContent))
       sourceContent = encoder.encode(code)
       sourceType = SourceType.JS
+      isStyle = true
       if (map) {
         sourceMap = encoder.encode(map)
       }
@@ -1008,7 +1034,8 @@ export class Application implements ServerApplication {
     return {
       code: decoder.decode(sourceContent),
       type: sourceType,
-      map: sourceMap ? decoder.decode(sourceMap) : null
+      isStyle,
+      map: sourceMap ? decoder.decode(sourceMap) : undefined
     }
   }
 
@@ -1024,12 +1051,12 @@ export class Application implements ServerApplication {
       once?: boolean,
     } = {}
   ): Promise<Module> {
+    const { sourceCode, forceCompile, once } = options
     const isRemote = util.isLikelyHttpURL(url)
     const localUrl = toLocalUrl(url)
     const saveDir = join(this.buildDir, dirname(localUrl))
     const name = trimModuleExt(basename(localUrl))
     const metaFile = join(saveDir, `${name}.meta.json`)
-    const { sourceCode, forceCompile, once } = options
 
     let mod: Module
     if (this.#modules.has(url)) {
@@ -1041,6 +1068,7 @@ export class Application implements ServerApplication {
       mod = {
         url,
         deps: [],
+        isStyle: false,
         sourceHash: '',
         hash: '',
         jsFile: join(saveDir, `${name}.js`),
@@ -1050,10 +1078,11 @@ export class Application implements ServerApplication {
       }
       if (existsFileSync(metaFile)) {
         try {
-          const { url: __url, sourceHash, deps } = JSON.parse(await Deno.readTextFile(metaFile))
-          if (__url === url && util.isNEString(sourceHash) && util.isArray(deps)) {
+          const { url: _url, deps, isStyle, sourceHash } = JSON.parse(await Deno.readTextFile(metaFile))
+          if (_url === url && util.isNEString(sourceHash) && util.isArray(deps)) {
             mod.sourceHash = sourceHash
             mod.deps = deps
+            mod.isStyle = !!isStyle
           } else {
             log.warn(`removing invalid metadata '${name}.meta.json'`)
             Deno.remove(metaFile)
@@ -1145,6 +1174,7 @@ export class Application implements ServerApplication {
         }
       }
 
+      mod.isStyle = source.isStyle
       mod.deps = deps.map(({ specifier, isDynamic }) => {
         const dep: DependencyDescriptor = { url: specifier, hash: '' }
         if (isDynamic) {
@@ -1188,8 +1218,9 @@ export class Application implements ServerApplication {
       await Promise.all([
         ensureTextFile(metaFile, JSON.stringify({
           url,
-          sourceHash: mod.sourceHash,
           deps: mod.deps,
+          sourceHash: mod.sourceHash,
+          isStyle: mod.isStyle ? true : undefined
         }, undefined, 2)),
         ensureTextFile(mod.jsFile, jsContent + (jsSourceMap ? `//# sourceMappingURL=${basename(mod.jsFile)}.map` : '')),
         jsSourceMap ? ensureTextFile(mod.jsFile + '.map', jsSourceMap) : Promise.resolve(),
