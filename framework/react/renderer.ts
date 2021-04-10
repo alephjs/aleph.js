@@ -33,20 +33,21 @@ export async function render(
     scripts: new Map(),
     inlineStyles: new Map(),
   }
-  const pagedataUrl = 'pagedata://' + url.pathname
+  const qs = url.query.toString()
+  const dataUrl = 'pagedata://' + url.pathname + (qs ? '?' + qs : '')
   const asyncCalls: Array<Promise<any>> = []
   const data: Record<string, any> = {}
   const pageProps = createPageProps(nestedPageComponents)
   const defer = () => {
-    delete global['rendering-' + pagedataUrl]
-    events.removeAllListeners('useDeno-' + pagedataUrl)
+    delete global['rendering-' + dataUrl]
+    events.removeAllListeners('useDeno-' + dataUrl)
   }
 
   // rendering data cache
-  global['rendering-' + pagedataUrl] = {}
+  global['rendering-' + dataUrl] = {}
 
   // listen `useDeno-*` events to get hooks callback result.
-  events.on('useDeno-' + pagedataUrl, (id: string, v: any) => {
+  events.on('useDeno-' + dataUrl, (id: string, v: any) => {
     if (v instanceof Promise) {
       asyncCalls.push(v)
     } else {
