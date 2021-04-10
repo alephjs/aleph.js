@@ -220,7 +220,10 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
         server.handle(r)
       }
     } catch (err) {
-      if (err instanceof Deno.errors.AddrInUse && app.isDev) {
+      if (err instanceof Deno.errors.AddrInUse) {
+        if (!app.isDev) {
+          log.fatal(`port ${port} already in use!`)
+        }
         log.warn(`port ${port} already in use, try ${port + 1}...`)
         port++
       } else {
