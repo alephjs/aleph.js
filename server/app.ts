@@ -43,6 +43,7 @@ import {
 } from './config.ts'
 import { CSSProcessor } from './css.ts'
 import {
+  checkAlephDev,
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
@@ -100,6 +101,7 @@ export class Application implements ServerApplication {
       log.error(`Aleph.js needs Deno ${minDenoVersion}+, please upgrade Deno.`)
       Deno.exit(1)
     }
+    checkAlephDev()
     this.workingDir = resolve(workingDir)
     this.mode = mode
     this.config = { ...defaultConfig }
@@ -127,6 +129,19 @@ export class Application implements ServerApplication {
     this.#cssProcesser.config(!this.isDev, this.config.css)
 
     // inject env variables
+    // load .env
+    for await (const { path: p, } of walk(this.workingDir, { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
+      const text = await Deno.readTextFile(p)
+      text.split('\n').forEach(line => {
+        let [key, value] = util.splitBy(line, '=')
+        key = key.trim()
+        if (key) {
+          Deno.env.set(key, value.trim())
+        }
+      })
+      log.info('load env from', basename(p))
+    }
+
     Deno.env.set('ALEPH_VERSION', VERSION)
     Deno.env.set('ALEPH_BUILD_MODE', this.mode)
     Deno.env.set('ALEPH_FRAMEWORK', this.framework)

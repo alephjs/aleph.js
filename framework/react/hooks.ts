@@ -38,7 +38,7 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), revalidate?: 
   return useMemo(() => {
     const global = globalThis as any
     const qs = query.toString()
-    const dataUrl = 'pagedata://' + pathname + (qs ? '?' + qs : '')
+    const dataUrl = 'pagedata://' + [pathname, qs].filter(Boolean).join('?')
     const eventName = 'useDeno-' + dataUrl
     const key = dataUrl + '#' + id
     const expires = typeof revalidate === 'number' && !isNaN(revalidate) ? Date.now() + revalidate * 1000 : 0

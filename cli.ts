@@ -1,9 +1,7 @@
-import { resolve, basename } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { walk } from 'https://deno.land/std@0.92.0/fs/walk.ts'
+import { resolve } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import { parse } from 'https://deno.land/std@0.92.0/flags/mod.ts'
 import { existsDirSync } from './shared/fs.ts'
-import type { LevelNames } from './shared/log.ts'
-import log from './shared/log.ts'
+import log, { LevelNames } from './shared/log.ts'
 import util from './shared/util.ts'
 import { VERSION } from './version.ts'
 
@@ -92,31 +90,10 @@ async function main() {
     log.setLevel(l.toLowerCase() as LevelNames)
   }
 
-  // proxy https://deno.land/x/aleph on localhost
-  const v = Deno.env.get('ALEPH_DEV')
-  if (v !== undefined) {
-    const { localProxy } = await import('./server/localproxy.ts')
-    localProxy(Deno.cwd(), 2020)
-  }
-
   // check working dir
   const workingDir = resolve(String(args[0] || '.'))
   if (!existsDirSync(workingDir)) {
     log.fatal('No such directory:', workingDir)
-  }
-  Deno.chdir(workingDir)
-
-  // load .env
-  for await (const { path: p, } of walk(workingDir, { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
-    const text = await Deno.readTextFile(p)
-    text.split('\n').forEach(line => {
-      let [key, value] = util.splitBy(line, '=')
-      key = key.trim()
-      if (key) {
-        Deno.env.set(key, value.trim())
-      }
-    })
-    log.info('load env from', basename(p))
   }
 
   await cmd(workingDir, options)

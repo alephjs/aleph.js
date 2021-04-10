@@ -34,7 +34,7 @@ export async function render(
     inlineStyles: new Map(),
   }
   const qs = url.query.toString()
-  const dataUrl = 'pagedata://' + url.pathname + (qs ? '?' + qs : '')
+  const dataUrl = 'pagedata://' + [url.pathname, qs].filter(Boolean).join('?')
   const asyncCalls: Array<Promise<any>> = []
   const data: Record<string, any> = {}
   const pageProps = createPageProps(nestedPageComponents)

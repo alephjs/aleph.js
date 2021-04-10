@@ -116,6 +116,8 @@ export class Renderer {
       nestedModules.map(({ url }) => url)
     ].flat())
 
+
+    Deno.chdir(this.#app.workingDir)
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
       App,
