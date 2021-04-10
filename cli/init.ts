@@ -2,7 +2,7 @@ import { Untar } from 'https://deno.land/std@0.92.0/archive/tar.ts'
 import { green, dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
 import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { gzipDecode } from 'https://deno.land/x/wasm_gzip@v1.0.0/mod.ts'
+import { gunzip } from 'https://deno.land/x/denoflate@1.1/mod.ts'
 import { ensureTextFile } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
@@ -35,7 +35,7 @@ export default async function (nameArg?: string) {
   const gzData = await Deno.readAll(new Deno.Buffer(await resp.arrayBuffer()))
 
   console.log('Saving template...')
-  const tarData = gzipDecode(gzData)
+  const tarData = gunzip(gzData)
   const entryList = new Untar(new Deno.Buffer(tarData))
 
   for await (const entry of entryList) {
