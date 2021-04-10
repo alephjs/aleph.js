@@ -28,9 +28,9 @@ pub fn aleph_jsx_fold(
 /// - add `__sourceFile` prop in development mode
 /// - resolve `a` to `Anchor`
 /// - resolve `head` to `Head`
-/// - resolve `link` to `Link`
-/// - resolve `style` to `Style`
-/// - resolve `script` to `Script`
+/// - resolve `link` to `StyleLink`
+/// - resolve `style` to `InlineStyle`
+/// - resolve `script` to `CustomScript`
 /// - optimize `img` in producation mode
 struct AlephJsxFold {
   resolver: Rc<RefCell<Resolver>>,
