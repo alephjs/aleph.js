@@ -68,5 +68,5 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), revalidate?: 
       return global[key].value
     }
     return null
-  }, [id, pathname])
+  }, [id, pathname, query])
 }
