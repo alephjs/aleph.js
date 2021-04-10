@@ -117,5 +117,3 @@ export function StatusError({ status, message }: { status: number, message: stri
     )
   )
 }
-
-export class AsyncUseDenoError extends Error { }

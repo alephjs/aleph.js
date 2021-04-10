@@ -5,7 +5,8 @@ import type { FrameworkRenderResult } from '../../server/renderer.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouterContext, SSRContext } from './context.ts'
-import { AsyncUseDenoError, E400MissingComponent, E404Page } from './components/ErrorBoundary.ts'
+import { E400MissingComponent, E404Page } from './components/ErrorBoundary.ts'
+import { AsyncUseDenoError } from './hooks.ts'
 import { isLikelyReactComponent } from './helper.ts'
 import { createPageProps } from './pageprops.ts'
 
@@ -35,23 +36,24 @@ export async function render(
   }
   const qs = url.query.toString()
   const dataUrl = 'pagedata://' + [url.pathname, qs].filter(Boolean).join('?')
-  const asyncCalls: Array<Promise<any>> = []
+  const asyncCalls: Array<[string, number, Promise<any>]> = []
   const data: Record<string, any> = {}
+  const renderingData: Record<string, any> = {}
   const pageProps = createPageProps(nestedPageComponents)
   const defer = () => {
     delete global['rendering-' + dataUrl]
     events.removeAllListeners('useDeno-' + dataUrl)
   }
 
-  // rendering data cache
-  global['rendering-' + dataUrl] = {}
+  // share rendering data
+  global['rendering-' + dataUrl] = renderingData
 
   // listen `useDeno-*` events to get hooks callback result.
-  events.on('useDeno-' + dataUrl, (id: string, v: any) => {
-    if (v instanceof Promise) {
-      asyncCalls.push(v)
+  events.on('useDeno-' + dataUrl, ({ id, value, expires }: { id: string, value: any, expires: number }) => {
+    if (value instanceof Promise) {
+      asyncCalls.push([id, expires, value])
     } else {
-      data[id] = v
+      data[id] = { value, expires }
     }
   })
 
@@ -78,7 +80,13 @@ export async function render(
   while (true) {
     try {
       if (asyncCalls.length > 0) {
-        await Promise.all(asyncCalls.splice(0, asyncCalls.length))
+        const calls = asyncCalls.splice(0, asyncCalls.length)
+        const datas = await Promise.all(calls.map(a => a[2]))
+        calls.forEach(([id, expires], i) => {
+          const value = datas[i]
+          renderingData[id] = value
+          data[id] = { value, expires }
+        })
       }
       ret.body = renderToString(createElement(
         SSRContext.Provider,

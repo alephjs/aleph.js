@@ -3,7 +3,8 @@ import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouterContext } from './context.ts'
-import { AsyncUseDenoError } from './components/ErrorBoundary.ts'
+
+export class AsyncUseDenoError extends Error { }
 
 /**
  * `useRouter` allows you to use `RouterURL` obeject of routing
@@ -39,34 +40,26 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), revalidate?: 
     const global = globalThis as any
     const qs = query.toString()
     const dataUrl = 'pagedata://' + [pathname, qs].filter(Boolean).join('?')
-    const eventName = 'useDeno-' + dataUrl
-    const key = dataUrl + '#' + id
     const expires = typeof revalidate === 'number' && !isNaN(revalidate) ? Date.now() + revalidate * 1000 : 0
-    const renderingDataCache = global['rendering-' + dataUrl]
-    if (renderingDataCache && key in renderingDataCache) {
-      return renderingDataCache[key] // 2+ pass
-    } else if (util.inDeno) {
-      const v = callback()
-      if (v instanceof Promise) {
-        events.emit(eventName, id, v.then(value => {
-          if (renderingDataCache) {
-            renderingDataCache[key] = value
-          }
-          events.emit(eventName, id, { value, expires })
-        }))
-        // thow an `AsyncUseDenoError` to break current rendering, then re-render
-        throw new AsyncUseDenoError()
-      } else {
-        if (renderingDataCache) {
-          renderingDataCache[key] = v
-        }
-        events.emit(eventName, id, { value: v, expires })
-        return v
+
+    if (util.inDeno) {
+      const renderingData = global['rendering-' + dataUrl]
+
+      if (renderingData && id in renderingData) {
+        return renderingData[id]  // 2+ pass
       }
+
+      const v = callback()
+      events.emit('useDeno-' + dataUrl, { id, value: v, expires })
+      // thow an `AsyncUseDenoError` to break current rendering, then re-render
+      if (v instanceof Promise) {
+        throw new AsyncUseDenoError()
+      }
+
+      renderingData[id] = v
+      return v
     }
-    if (key in global) {
-      return global[key].value
-    }
-    return null
+
+    return global[dataUrl + '#' + id].value ?? null
   }, [id, pathname, query])
 }
