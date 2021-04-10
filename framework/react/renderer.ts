@@ -139,9 +139,6 @@ export async function render(
     }
   })
 
-  console.log(styles)
-  console.log(Array.from(rendererStorage.inlineStyles.entries()))
-
   // insert styles
   Object.entries(styles).forEach(([url, css]) => {
     if (css) {
