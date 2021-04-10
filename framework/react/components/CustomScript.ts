@@ -3,10 +3,10 @@ import {
   ScriptHTMLAttributes,
   useContext
 } from 'react'
-import util from '../../shared/util.ts'
-import { SSRContext } from './context.ts'
+import util from '../../../shared/util.ts'
+import { SSRContext } from '../context.ts'
 
-export default function Script(props: PropsWithChildren<ScriptHTMLAttributes<{}>>) {
+export default function CustomScript(props: PropsWithChildren<ScriptHTMLAttributes<{}>>) {
   const { scripts } = useContext(SSRContext)
 
   if (util.inDeno) {

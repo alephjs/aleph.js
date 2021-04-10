@@ -8,10 +8,10 @@ import {
   useEffect,
   useMemo,
 } from 'react'
-import util from '../../shared/util.ts'
-import events from '../core/events.ts'
-import { redirect } from '../core/redirect.ts'
-import { useRouter } from './hooks.ts'
+import util from '../../../shared/util.ts'
+import events from '../../core/events.ts'
+import { redirect } from '../../core/redirect.ts'
+import { useRouter } from '../hooks.ts'
 
 const prefetchedPages = new Set<string>()
 

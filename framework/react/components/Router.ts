@@ -5,15 +5,15 @@ import {
   useEffect,
   useState,
 } from 'react'
-import events from '../core/events.ts'
-import { importModule } from '../core/module.ts'
-import { RouteModule, Routing } from '../core/routing.ts'
-import { RouterContext } from './context.ts'
-import { E400MissingComponent, E404Page, ErrorBoundary } from './error.ts'
-import { isLikelyReactComponent } from './helper.ts'
-import { loadPageData } from './pagedata.ts'
+import events from '../../core/events.ts'
+import { importModule } from '../../core/module.ts'
+import { RouteModule, Routing } from '../../core/routing.ts'
+import { RouterContext } from '../context.ts'
+import { isLikelyReactComponent } from '../helper.ts'
+import { loadPageData } from '../pagedata.ts'
+import { createPageProps } from '../pageprops.ts'
+import { E400MissingComponent, E404Page, ErrorBoundary } from './ErrorBoundary.ts'
 import type { PageRoute } from './pageprops.ts'
-import { createPageProps } from './pageprops.ts'
 
 export default function Router({
   customComponents,

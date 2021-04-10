@@ -9,18 +9,18 @@ import {
   useEffect,
   useMemo
 } from 'react'
-import util from '../../shared/util.ts'
-import { SSRContext } from './context.ts'
-import Script from './script.ts'
-import Style from './style.ts'
-import StyleLink from './stylelink.ts'
+import util from '../../../shared/util.ts'
+import { SSRContext } from '../context.ts'
+import CustomScript from './CustomScript.ts'
+import InlineStyle from './InlineStyle.ts'
+import StyleLink from './StyleLink.ts'
 
 export default function Head(props: PropsWithChildren<{}>) {
-  const renderer = useContext(SSRContext)
+  const { headElements } = useContext(SSRContext)
   const [els, forwardNodes] = useMemo(() => parse(props.children), [props.children])
 
   if (util.inDeno) {
-    els.forEach(({ type, props }, key) => renderer.headElements.set(key, { type, props }))
+    els.forEach(({ type, props }, key) => headElements.set(key, { type, props }))
   }
 
   useEffect(() => {
@@ -90,11 +90,11 @@ function parse(node: ReactNode): [Map<string, { type: string, props: Record<stri
         case StyleLink:
           forwardNodes.push(createElement(StyleLink, props))
           break
-        case Style:
-          forwardNodes.push(createElement(Style, props))
+        case InlineStyle:
+          forwardNodes.push(createElement(InlineStyle, props))
           break
-        case Script:
-          forwardNodes.push(createElement(Script, props))
+        case CustomScript:
+          forwardNodes.push(createElement(CustomScript, props))
           break
         case 'base':
         case 'title':

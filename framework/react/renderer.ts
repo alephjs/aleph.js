@@ -4,21 +4,22 @@ import util from '../../shared/util.ts'
 import type { FrameworkRenderResult } from '../../server/renderer.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
-import { serverStyles } from '../core/style.ts'
 import { RouterContext, SSRContext } from './context.ts'
-import { AsyncUseDenoError, E400MissingComponent, E404Page } from './error.ts'
+import { AsyncUseDenoError, E400MissingComponent, E404Page } from './components/ErrorBoundary.ts'
 import { isLikelyReactComponent } from './helper.ts'
 import { createPageProps } from './pageprops.ts'
 
 export type RendererStorage = {
   headElements: Map<string, { type: string, props: Record<string, any> }>
   scripts: Map<string, { props: Record<string, any> }>
+  inlineStyles: Map<string, string>
 }
 
 export async function render(
   url: RouterURL,
   App: ComponentType<any> | undefined,
-  nestedPageComponents: { url: string, Component?: any }[]
+  nestedPageComponents: { url: string, Component?: any }[],
+  styles: Record<string, string>
 ): Promise<FrameworkRenderResult> {
   const global = globalThis as any
   const ret: FrameworkRenderResult = {
@@ -30,6 +31,7 @@ export async function render(
   const rendererStorage: RendererStorage = {
     headElements: new Map(),
     scripts: new Map(),
+    inlineStyles: new Map(),
   }
   const pagedataUrl = 'pagedata://' + url.pathname
   const asyncCalls: Array<Promise<any>> = []
@@ -100,7 +102,7 @@ export async function render(
     }
   }
 
-  // get head child tags
+  // insert head child tags
   rendererStorage.headElements.forEach(({ type, props }) => {
     const { children, ...rest } = props
     if (type === 'title') {
@@ -123,7 +125,7 @@ export async function render(
     }
   })
 
-  // get script tags
+  // insert script tags
   rendererStorage.scripts.forEach(({ props }) => {
     const { children, dangerouslySetInnerHTML, ...attrs } = props
     if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
@@ -137,14 +139,20 @@ export async function render(
     }
   })
 
-  // get styles
-  serverStyles.forEach((css, url) => {
+  console.log(styles)
+  console.log(Array.from(rendererStorage.inlineStyles.entries()))
+
+  // insert styles
+  Object.entries(styles).forEach(([url, css]) => {
     if (css) {
       ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
     } else if (util.isLikelyHttpURL(url)) {
       ret.head.push(`<link rel="stylesheet" href="${url}" data-module-id=${JSON.stringify(url)} ssr />`)
     }
   })
+  for (const [url, css] of rendererStorage.inlineStyles.entries()) {
+    ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
+  }
 
   defer()
   return ret

@@ -8,5 +8,6 @@ export const RouterContext = createNamedContext<RouterURL>(createBlankRouterURL(
 
 export const SSRContext = createContext<RendererStorage>({
   headElements: new Map(),
-  scriptElements: new Map(),
+  scripts: new Map(),
+  inlineStyles: new Map(),
 })

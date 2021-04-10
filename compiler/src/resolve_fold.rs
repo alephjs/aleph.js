@@ -719,7 +719,7 @@ mod tests {
       vec![
         "https://esm.sh/react".into(),
         "https://esm.sh/react-dom".into(),
-        "https://deno.land/x/aleph/framework/react/head.ts".into(),
+        "https://deno.land/x/aleph/framework/react/components/Head.ts".into(),
         "/components/logo.tsx".into(),
         "/shared/iife.ts".into(),
       ],
@@ -742,10 +742,10 @@ mod tests {
       code.contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"/components/async-logo.tsx\"")
     );
     assert!(code.contains(
-      "const { default: __ALEPH_Head  } = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/head.ts\"]"
+      "const { default: __ALEPH_Head  } = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/components/Head.ts\"]"
     ));
     assert!(code.contains(
-      "import __ALEPH_Stylelink from \"../-/deno.land/x/aleph/framework/react/stylelink.bundling.js\""
+      "import __ALEPH_StyleLink from \"../-/deno.land/x/aleph/framework/react/components/StyleLink.bundling.js\""
     ));
     assert!(code.contains("import   \"../-/esm.sh/tailwindcss/dist/tailwind.min.css.bundling.js\""));
     assert!(code.contains("import   \"../style/index.css.bundling.js#/style/index.css@000000\""));

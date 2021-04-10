@@ -67,10 +67,16 @@ impl AlephJsxFold {
       JSXElementName::Ident(id) => {
         let name = id.sym.as_ref();
         match name {
-          "head" | "script" => {
+          "head" => {
             let mut resolver = self.resolver.borrow_mut();
-            resolver.used_builtin_jsx_tags.insert(name.into());
-            el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+            resolver.used_builtin_jsx_tags.insert("Head".into());
+            el.name = JSXElementName::Ident(quote_ident!("__ALEPH_Head"));
+          }
+
+          "script" => {
+            let mut resolver = self.resolver.borrow_mut();
+            resolver.used_builtin_jsx_tags.insert("CustomScript".into());
+            el.name = JSXElementName::Ident(quote_ident!("__ALEPH_CustomScript"));
           }
 
           "a" => {
@@ -97,12 +103,12 @@ impl AlephJsxFold {
             }
 
             if should_replace {
-              resolver.used_builtin_jsx_tags.insert(name.into());
-              el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+              resolver.used_builtin_jsx_tags.insert("Anchor".into());
+              el.name = JSXElementName::Ident(quote_ident!("__ALEPH_Anchor"));
             }
           }
 
-          "link" | "StyleLink" => {
+          "link" => {
             let mut should_replace = false;
 
             for attr in &el.attrs {
@@ -112,9 +118,7 @@ impl AlephJsxFold {
                   value: Some(JSXAttrValue::Lit(Lit::Str(Str { value, .. }))),
                   ..
                 }) => {
-                  if name.eq("StyleLink")
-                    || (id.sym.eq("rel") && (value.eq("stylesheet") || value.eq("style")))
-                  {
+                  if id.sym.eq("rel") && (value.eq("stylesheet") || value.eq("style")) {
                     should_replace = true;
                     break;
                   }
@@ -162,8 +166,8 @@ impl AlephJsxFold {
               }
 
               if name.eq("link") {
-                resolver.used_builtin_jsx_tags.insert("stylelink".into());
-                el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag("stylelink")));
+                resolver.used_builtin_jsx_tags.insert("StyleLink".into());
+                el.name = JSXElementName::Ident(quote_ident!("__ALEPH_StyleLink"));
               }
             }
           }
@@ -213,8 +217,8 @@ impl AlephJsxFold {
               specifier: "#".to_owned() + id.as_str(),
               is_dynamic: false,
             });
-            resolver.used_builtin_jsx_tags.insert(name.into());
-            el.name = JSXElementName::Ident(quote_ident!(rename_builtin_tag(name)));
+            resolver.used_builtin_jsx_tags.insert("InlineStyle".into());
+            el.name = JSXElementName::Ident(quote_ident!("__ALEPH_InlineStyle"));
             inline_style = Some((type_prop_value, id.into()));
           }
 
@@ -363,9 +367,11 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
       if name.eq("a") {
         name = "anchor".to_owned()
       }
-      let id = quote_ident!(rename_builtin_tag(name.as_str()));
+      let mut id_name = "__ALEPH_".to_owned();
+      id_name.push_str(name.as_str());
+      let id = quote_ident!(id_name);
       let (resolved_path, fixed_url) = resolver.resolve(
-        format!("{}/framework/react/{}.ts", aleph_pkg_uri, name).as_str(),
+        format!("{}/framework/react/components/{}.ts", aleph_pkg_uri, name).as_str(),
         false,
       );
       if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
@@ -419,18 +425,6 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
   }
 }
 
-fn rename_builtin_tag(name: &str) -> String {
-  let mut c = name.chars();
-  let mut name = match c.next() {
-    None => String::new(),
-    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-  };
-  if name.eq("A") {
-    name = "Anchor".into();
-  }
-  "__ALEPH_".to_owned() + name.as_str()
-}
-
 #[cfg(test)]
 mod tests {
   use crate::resolve::DependencyDescriptor;
@@ -465,21 +459,22 @@ mod tests {
     "#;
     let (code, resolver) = st("/pages/index.tsx", source, false);
     assert!(code.contains(
-      "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/anchor.js\""
+      "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.js\""
     ));
     assert!(code.contains(
-      "import __ALEPH_Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/head.js\""
+      "import __ALEPH_Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/Head.js\""
     ));
     assert!(code.contains(
-      "import __ALEPH_Stylelink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/stylelink.js\""
+      "import __ALEPH_StyleLink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.js\""
     ));
     assert!(code.contains(
-      "import __ALEPH_Script from \"../-/deno.land/x/aleph@v0.3.0/framework/react/script.js\""
+      "import __ALEPH_CustomScript from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/CustomScript.js\""
     ));
     assert!(code.contains("React.createElement(\"a\","));
     assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
     assert!(code.contains("React.createElement(__ALEPH_Head,"));
-    assert!(code.contains("React.createElement(__ALEPH_Stylelink,"));
+    assert!(code.contains("React.createElement(__ALEPH_StyleLink,"));
+    assert!(code.contains("React.createElement(__ALEPH_CustomScript,"));
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
@@ -488,7 +483,6 @@ mod tests {
       )
       .as_str()
     ));
-    assert!(code.contains("React.createElement(__ALEPH_Script,"));
     let r = resolver.borrow_mut();
     assert_eq!(
       r.dep_graph,
@@ -502,19 +496,21 @@ mod tests {
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/head.ts".into(),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/components/Head.ts".into(),
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/stylelink.ts".into(),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.ts"
+            .into(),
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/anchor.ts".into(),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.ts".into(),
           is_dynamic: false,
         },
         DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/script.ts".into(),
+          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/components/CustomScript.ts"
+            .into(),
           is_dynamic: false,
         }
       ]
@@ -545,9 +541,9 @@ mod tests {
     "#;
     let (code, resolver) = st("/pages/index.tsx", source, false);
     assert!(code.contains(
-      "import __ALEPH_Style from \"../-/deno.land/x/aleph@v0.3.0/framework/react/style.js\""
+      "import __ALEPH_InlineStyle from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/InlineStyle.js\""
     ));
-    assert!(code.contains("React.createElement(__ALEPH_Style,"));
+    assert!(code.contains("React.createElement(__ALEPH_InlineStyle,"));
     assert!(code.contains("__styleId: \"inline-style-"));
     let r = resolver.borrow_mut();
     assert!(r.inline_styles.len() == 2);

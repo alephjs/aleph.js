@@ -3,7 +3,7 @@ import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouterContext } from './context.ts'
-import { AsyncUseDenoError } from './error.ts'
+import { AsyncUseDenoError } from './components/ErrorBoundary.ts'
 
 /**
  * `useRouter` allows you to use `RouterURL` obeject of routing

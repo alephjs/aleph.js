@@ -2,9 +2,9 @@ import { ComponentType, createElement } from 'react'
 import { hydrate, render } from 'react-dom'
 import { importModule, trimModuleExt } from '../core/module.ts'
 import { RouteModule, Routing, RoutingOptions } from '../core/routing.ts'
+import Router from './components/Router.ts'
 import { loadPageDataFromTag } from './pagedata.ts'
 import { createPageProps, PageRoute } from './pageprops.ts'
-import Router from './router.ts'
 
 type BootstrapOptions = Required<RoutingOptions> & {
   sharedModules: RouteModule[],

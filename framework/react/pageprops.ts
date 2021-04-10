@@ -1,6 +1,6 @@
 import { ComponentType } from 'react'
 import type { RouterURL } from '../../types.ts'
-import { E400MissingComponent } from './error.ts'
+import { E400MissingComponent } from './components/ErrorBoundary.ts'
 import { isLikelyReactComponent } from './helper.ts'
 
 export type PageProps = {

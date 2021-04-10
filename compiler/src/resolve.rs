@@ -495,10 +495,13 @@ mod tests {
       )
     );
     assert_eq!(
-      resolver.resolve("https://deno.land/x/aleph/framework/react/link.ts", false),
+      resolver.resolve(
+        "https://deno.land/x/aleph/framework/react/components/Link.ts",
+        false
+      ),
       (
-        "../-/http_localhost_2020/framework/react/link.js".into(),
-        "http://localhost:2020/framework/react/link.ts".into()
+        "../-/http_localhost_2020/framework/react/components/Link.js".into(),
+        "http://localhost:2020/framework/react/components/Link.ts".into()
       )
     );
     assert_eq!(
