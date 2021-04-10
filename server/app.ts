@@ -34,7 +34,13 @@ import type {
   ServerApplication
 } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { defaultConfig, loadConfig, loadImportMap, RequiredConfig } from './config.ts'
+import {
+  defaultConfig,
+  defaultImports,
+  loadConfig,
+  loadImportMap,
+  RequiredConfig
+} from './config.ts'
 import { CSSProcessor } from './css.ts'
 import {
   computeHash,
@@ -110,7 +116,14 @@ export class Application implements ServerApplication {
     ])
 
     Object.assign(this.config, config)
-    Object.assign(this.importMap, importMap)
+    Object.assign(this.importMap, {
+      ...importMap,
+      imports: Object.assign(
+        defaultImports(this.config.react.version),
+        importMap.imports
+      )
+    })
+    console.log(this.importMap)
     this.#pageRouting.config(this.config)
     this.#cssProcesser.config(!this.isDev, this.config.css)
 
