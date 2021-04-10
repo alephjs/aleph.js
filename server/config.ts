@@ -174,23 +174,27 @@ export async function loadAndUpgradeImportMap(workingDir: string): Promise<Impor
     await Deno.writeTextFile(importMapFile, JSON.stringify(importMap, undefined, 2))
   }
 
+  const v = Deno.env.get('ALEPH_DEV')
+  const alephPkgUri = getAlephPkgUri()
+  const defaultImports: Record<string, string> = {
+    'aleph/': `${alephPkgUri}/`,
+    'framework': `${alephPkgUri}/framework/core/mod.ts`,
+    'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
+    'react': `https://esm.sh/react@${defaultReactVersion}`,
+    'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
+    'react-dom/server': `https://esm.sh/react-dom@${defaultReactVersion}/server`,
+  }
+  // in aleph dev mode, use default imports instead of app settings
+  if (v !== undefined) {
+    Object.assign(importMap.imports, defaultImports)
+  } else {
+    importMap.imports = Object.assign(defaultImports, importMap.imports,)
+  }
+
   return importMap
 }
 
-export function defaultImportMap(reactVersion: string): ImportMap {
-  const alephPkgUri = getAlephPkgUri()
-  return {
-    imports: {
-      'aleph/': `${alephPkgUri}/`,
-      'framework': `${alephPkgUri}/framework/core/mod.ts`,
-      'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
-      'react': `https://esm.sh/react@${reactVersion}`,
-      'react-dom': `https://esm.sh/react-dom@${reactVersion}`,
-      'react-dom/server': `https://esm.sh/react-dom@${reactVersion}/server`,
-    },
-    scopes: {}
-  }
-}
+
 
 function isFramework(v: any): v is 'react' {
   switch (v) {

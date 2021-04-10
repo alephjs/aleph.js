@@ -36,7 +36,6 @@ import type {
 import { VERSION } from '../version.ts'
 import {
   defaultConfig,
-  defaultImportMap,
   loadConfig,
   loadAndUpgradeImportMap,
   RequiredConfig
@@ -118,13 +117,7 @@ export class Application implements ServerApplication {
     ])
 
     Object.assign(this.config, config)
-    Object.assign(this.importMap, {
-      ...importMap,
-      imports: Object.assign(
-        defaultImportMap(this.config.react.version).imports,
-        importMap.imports
-      )
-    })
+    Object.assign(this.importMap, importMap)
     this.#pageRouting.config(this.config)
     this.#cssProcesser.config(!this.isDev, this.config.css)
 
