@@ -1,6 +1,6 @@
-import type { BufReader, BufWriter } from 'https://deno.land/std@0.90.0/io/bufio.ts'
-import type { MultipartFormData } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
-import { MultipartReader } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
+import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
+import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
+import { MultipartReader } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
 import log from '../shared/log.ts'
 import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 

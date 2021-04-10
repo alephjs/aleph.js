@@ -1,5 +1,5 @@
 import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
-import { dirname, basename } from 'https://deno.land/std@0.90.0/path/mod.ts'
+import { dirname, basename } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'

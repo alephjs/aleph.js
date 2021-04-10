@@ -1,5 +1,5 @@
-import type { BufReader, BufWriter } from 'https://deno.land/std@0.90.0/io/bufio.ts'
-import type { MultipartFormData } from 'https://deno.land/std@0.90.0/mime/multipart.ts'
+import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
+import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
 import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
 
 /**
