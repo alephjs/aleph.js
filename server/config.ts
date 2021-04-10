@@ -4,10 +4,15 @@ import { defaultReactVersion } from '../shared/constants.ts'
 import { existsFileSync, existsDirSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, PostCSSPlugin } from '../types.ts'
+import type { Config, PostCSSPlugin, CSSOptions } from '../types.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
-export const defaultConfig: Readonly<Required<Config> & { react: ReactResolve }> = {
+export interface RequiredConfig extends Required<Omit<Config, 'css'>> {
+  react: ReactResolve,
+  css: CSSOptions
+}
+
+export const defaultConfig: Readonly<RequiredConfig> = {
   framework: 'react',
   buildTarget: 'es2015',
   baseUrl: '/',
@@ -18,12 +23,15 @@ export const defaultConfig: Readonly<Required<Config> & { react: ReactResolve }>
   rewrites: {},
   ssr: {},
   plugins: [],
-  postcss: { plugins: ['autoprefixer'] },
+  css: {
+    modules: false,
+    postcss: { plugins: ['autoprefixer'] },
+  },
   headers: {},
   env: {},
   react: {
     version: defaultReactVersion,
-    esmShBuildVersion: 38,
+    esmShBuildVersion: 39,
   }
 }
 
@@ -64,7 +72,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     ssr,
     rewrites,
     plugins,
-    postcss,
+    css,
     headers,
     env,
   } = data
@@ -115,10 +123,11 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   if (util.isNEArray(plugins)) {
     config.plugins = plugins
   }
-  if (isPostcssConfig(postcss)) {
-    config.postcss = postcss
-  } else {
-    config.postcss = await loadPostCSSConfig(workingDir)
+  if (util.isPlainObject(css)) {
+    config.css = {
+      modules: util.isPlainObject(css.modules) ? css.modules : false,
+      postcss: isPostcssConfig(css.postcss) ? css.postcss : defaultConfig.css.postcss
+    }
   }
 
   return config

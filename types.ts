@@ -72,14 +72,36 @@ export type Config = {
   ssr?: boolean | SSROptions
   /** `plugins` specifies some plugins for the appliaction. */
   plugins?: (LoaderPlugin | ServerPlugin)[]
-  /** `postcss` specifies the postcss plugins. */
-  postcss?: { plugins: PostCSSPlugin[] }
+  /** `css` specifies the css processing options. */
+  css?: Partial<CSSOptions>
   /** `headers` appends custom headers for server requests. */
   headers?: Record<string, string>
   /** `rewrites` specifies the server rewrite map. */
   rewrites?: Record<string, string>
   /** `env` appends system env variables. */
   env?: Record<string, string>
+}
+
+/**
+ * The config for CSS resolve.
+ */
+export type CSSOptions = {
+  /** `module` enables the css module feature. */
+  modules: false | CSSModulesOptions
+  /** `postcss` specifies the postcss plugins. */
+  postcss: { plugins: PostCSSPlugin[] }
+}
+
+/**
+ * The options are passed on to postcss-modules.
+ */
+export type CSSModulesOptions = {
+  exportGlobals?: boolean
+  generateScopedName?: string | ((name: string, filename: string, css: string) => string)
+  globalModulePaths?: string[]
+  hashPrefix?: string
+  localsConvention?: 'camelCase' | 'camelCaseOnly' | 'dashes' | 'dashesOnly'
+  scopeBehaviour?: 'global' | 'local'
 }
 
 /**

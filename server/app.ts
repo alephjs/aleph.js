@@ -14,7 +14,6 @@ import {
   buildChecksum,
   ImportMap,
   parseExportNames,
-  ReactResolve,
   SourceType,
   transform,
   TransformOptions
@@ -31,12 +30,11 @@ import {
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type {
-  Config,
   RouterURL,
   ServerApplication
 } from '../types.ts'
 import { VERSION } from '../version.ts'
-import { defaultConfig, loadConfig, loadImportMap } from './config.ts'
+import { defaultConfig, loadConfig, loadImportMap, RequiredConfig } from './config.ts'
 import { CSSProcessor } from './css.ts'
 import {
   computeHash,
@@ -72,7 +70,7 @@ type TransformFn = (url: string, code: string) => string
 export class Application implements ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
-  readonly config: Required<Config & { react: ReactResolve }>
+  readonly config: RequiredConfig
   readonly importMap: ImportMap
   readonly ready: Promise<void>
 
@@ -113,7 +111,7 @@ export class Application implements ServerApplication {
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
     this.#pageRouting.config(this.config)
-    this.#cssProcesser.config(!this.isDev, this.config.postcss.plugins)
+    this.#cssProcesser.config(!this.isDev, this.config.css)
 
     // inject env variables
     Deno.env.set('ALEPH_VERSION', VERSION)
@@ -145,15 +143,18 @@ export class Application implements ServerApplication {
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
     const plugins = computeHash(JSON.stringify({
       plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name),
-      postcssPlugins: this.config.postcss.plugins.map(p => {
-        if (util.isString(p)) {
-          return p
-        } else if (util.isArray(p)) {
-          return p[0] + JSON.stringify(p[1])
-        } else {
-          p.toString()
-        }
-      }),
+      css: {
+        modules: this.config.css.modules,
+        postcss: this.config.css.postcss.plugins.map(p => {
+          if (util.isString(p)) {
+            return p
+          } else if (util.isArray(p)) {
+            return p[0] + JSON.stringify(p[1])
+          } else {
+            p.toString()
+          }
+        })
+      },
       react: this.config.react,
     }, (key: string, value: any) => {
       if (key === 'inlineStylePreprocess') {
@@ -711,7 +712,6 @@ export class Application implements ServerApplication {
               const { code, type } = await loader.transform({ url: key, content: (new TextEncoder).encode(tpl) })
               if (type === 'css') {
                 tpl = code
-                break
               }
             }
           }
@@ -918,9 +918,11 @@ export class Application implements ServerApplication {
     sourceContent: Uint8Array,
     contentType: string | null
   ): Promise<{ code: string, type: SourceType, map: string | null } | null> {
-    let sourceCode = (new TextDecoder).decode(sourceContent)
+    const encoder = new TextEncoder()
+    const decoder = new TextDecoder()
+
     let sourceType: SourceType | null = null
-    let sourceMap: string | null = null
+    let sourceMap: Uint8Array | null = null
 
     if (contentType !== null) {
       switch (contentType.split(';')[0].trim()) {
@@ -944,10 +946,10 @@ export class Application implements ServerApplication {
 
     for (const loader of this.loaders) {
       if (loader.test.test(url) && loader.transform) {
-        const { code, type = 'js', map } = await loader.transform({ url, content: sourceContent })
-        sourceCode = code
+        const { code, type = 'js', map } = await loader.transform({ url, content: sourceContent, map: sourceMap ?? undefined })
+        sourceContent = encoder.encode(code)
         if (map) {
-          sourceMap = map
+          sourceMap = encoder.encode(map)
         }
         switch (type) {
           case 'js':
@@ -966,7 +968,6 @@ export class Application implements ServerApplication {
             sourceType = SourceType.CSS
             break
         }
-        break
       }
     }
 
@@ -985,6 +986,7 @@ export class Application implements ServerApplication {
         case 'tsx':
           sourceType = SourceType.TSX
           break
+        case 'postcss':
         case 'pcss':
         case 'css':
           sourceType = SourceType.CSS
@@ -995,15 +997,19 @@ export class Application implements ServerApplication {
     }
 
     if (sourceType === SourceType.CSS) {
-      const { code, map } = await this.#cssProcesser.transform(url, sourceCode)
-      sourceCode = code
+      const { code, map } = await this.#cssProcesser.transform(url, (new TextDecoder).decode(sourceContent))
+      sourceContent = encoder.encode(code)
       sourceType = SourceType.JS
       if (map) {
-        sourceMap = map
+        sourceMap = encoder.encode(map)
       }
     }
 
-    return { code: sourceCode, type: sourceType, map: sourceMap }
+    return {
+      code: decoder.decode(sourceContent),
+      type: sourceType,
+      map: sourceMap ? decoder.decode(sourceMap) : null
+    }
   }
 
   /** compile a moudle by given url, then cache on the disk. */
