@@ -763,11 +763,12 @@ export class Application implements ServerApplication {
   /** build the application to a static site(SSG) */
   async build() {
     const start = performance.now()
-    const outputDir = this.outputDir
-    const distDir = join(outputDir, '_aleph')
 
     // wait for app ready
     await this.ready
+
+    const outputDir = this.outputDir
+    const distDir = join(outputDir, '_aleph')
 
     // clear previous build
     if (existsDirSync(outputDir)) {
