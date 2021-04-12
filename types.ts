@@ -1,5 +1,6 @@
 import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
 import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
+import type { Status } from "https://deno.land/std@0.92.0/http/http_status.ts"
 import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
 
 /**
@@ -181,6 +182,8 @@ export interface APIRequest extends ServerRequest {
   send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
   /** `json` replies to the request with a json content. */
   json(data: any): Promise<void>
+  /** `redirect` replies to redirect the client to another URL with optional response `status` defaulting to 302. */
+  redirect(url: string, status?: Status): this
 }
 
 /**

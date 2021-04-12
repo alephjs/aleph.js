@@ -1,6 +1,7 @@
 import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
 import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
 import { MultipartReader } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
+import { Status } from "https://deno.land/std@0.92.0/http/http_status.ts";
 import log from '../shared/log.ts'
 import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 
@@ -123,6 +124,16 @@ export class Request implements APIRequest {
 
   status(code: number): this {
     this.#resp.status = code
+    return this
+  }
+
+  redirect(url: string, status: Status = Status.Found): this {
+    // "back" is an alias for the referrer.
+    if (url == "back") {
+      url = this.#resp.headers.get("Referrer") || "/"
+    }
+    this.#resp.status = status
+    this.#resp.headers.set("Location", encodeURI(url))
     return this
   }
 
