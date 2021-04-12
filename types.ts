@@ -1,6 +1,6 @@
+import type { Status } from 'https://deno.land/std@0.92.0/http/http_status.ts'
 import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
 import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
-import type { Status } from "https://deno.land/std@0.92.0/http/http_status.ts"
 import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
 
 /**
