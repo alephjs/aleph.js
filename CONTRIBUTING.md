@@ -18,7 +18,7 @@ You will need [Deno](https://deno.land/) 1.8+.
 4. Change code then run the examples.
 5. Push your branch to Github after all tests passed.
 6. Make a [pull request](https://github.com/alephjs/aleph.js/pulls).
-7. Marge to master branch by our maintainers.
+7. Merge to master branch by our maintainers.
 
 ```bash
 # ssr/development with HMR
@@ -31,7 +31,7 @@ ALEPH_DEV=true deno run -A --unstable --import-map=./import_map.json cli.ts star
 ALEPH_DEV=true deno run -A --unstable --import-map=./import_map.json cli.ts build ./examples/hello-world -L debug
 
 # run all tests
-deno test -A --unstable --import-map=./import_map.json
+deno test -A --unstable --location=http://localhost --import-map=./import_map.json
 ```
 
 ## Project Structure
