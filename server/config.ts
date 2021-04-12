@@ -1,8 +1,8 @@
-import { basename, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import { bold } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
+import { basename, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import type { ImportMap, ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
-import { existsFileSync, existsDirSync } from '../shared/fs.ts'
+import { existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Config, CSSOptions, PostCSSPlugin } from '../types.ts'
@@ -33,7 +33,7 @@ export const defaultConfig: Readonly<RequiredConfig> = {
   env: {},
   react: {
     version: defaultReactVersion,
-    esmShBuildVersion: 39,
+    esmShBuildVersion: 40,
   }
 }
 
