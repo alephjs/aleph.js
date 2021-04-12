@@ -36,6 +36,7 @@ deno test -A --import-map=./import_map.json
 
 ## Project Structure
 
+- **/bundler** bundler for production mode
 - **/cli** commands code
 - **/compiler** compiler in rust powered by swc
 - **/framework**
