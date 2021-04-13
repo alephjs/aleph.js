@@ -135,6 +135,7 @@ export interface ServerApplication {
 export interface ServerRequest {
   readonly url: string
   readonly method: string
+  readonly host: string
   readonly headers: Headers
   readonly conn: Deno.Conn
   readonly r: BufReader
