@@ -43,7 +43,7 @@ export class Request implements APIRequest {
     return this.#req.method
   }
 
-  get host(): string {
+  get hostname(): string {
     return this.#req.headers.get("X-Forwarded-Host") || this.#req.headers.get("Host") || "0.0.0.0"
   }
 
