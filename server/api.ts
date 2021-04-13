@@ -52,6 +52,10 @@ export class Request implements APIRequest {
     return this.#req.method
   }
 
+  get hostname(): string {
+    return (this.#req.conn.remoteAddr as Deno.NetAddr).hostname;
+  }
+
   get headers(): Headers {
     return this.#req.headers
   }
