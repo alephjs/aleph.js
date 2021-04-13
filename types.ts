@@ -135,7 +135,6 @@ export interface ServerApplication {
 export interface ServerRequest {
   readonly url: string
   readonly method: string
-  readonly host: string
   readonly headers: Headers
   readonly conn: Deno.Conn
   readonly r: BufReader
@@ -160,6 +159,7 @@ export interface APIRequest extends ServerRequest {
   readonly params: Record<string, string>
   readonly query: URLSearchParams
   readonly cookies: ReadonlyMap<string, string>
+  readonly host: string
   /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
   readBody(type?: 'raw'): Promise<Uint8Array>
   readBody(type: 'text'): Promise<string>
