@@ -59,8 +59,8 @@ export type Config = {
   framework?: 'react'
   /** `buildTarget` specifies the build target in production mode (default is **es2015**). */
   buildTarget?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
-  /** `baseUrl` specifies the path prefix for the application (default is '/'). */
-  baseUrl?: string
+  /** `basePath` specifies the path prefix for the application (default is '/'). */
+  basePath?: string
   /** `srcDir` specifies the **src** dir (default is '/'). */
   srcDir?: string
   /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
@@ -201,10 +201,10 @@ export type APIHandler = {
  * The router url object of the routing, you can access it with `useRouter()` hook.
  */
 export type RouterURL = {
-  readonly baseURL: string
+  readonly basePath: string
+  readonly routePath: string
   readonly locale: string
   readonly pathname: string
-  readonly routePath: string
   readonly params: Record<string, string>
   readonly query: URLSearchParams
   push(url: string): void

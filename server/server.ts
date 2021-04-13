@@ -28,8 +28,8 @@ export class Server {
     }
 
     const app = this.#app
-    const { baseUrl, compress, headers, rewrites } = app.config
-    const url = rewriteURL(r.url, baseUrl, rewrites)
+    const { basePath, compress, headers, rewrites } = app.config
+    const url = rewriteURL(r.url, basePath, rewrites)
     const pathname = decodeURI(url.pathname)
     const req = new Request(r, {}, url.searchParams, !app.isDev && compress)
 
@@ -63,7 +63,7 @@ export class Server {
                     socket.send(JSON.stringify({
                       type: 'update',
                       url: mod.url,
-                      updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.js`),
+                      updateUrl: util.cleanPath(`${basePath}/_aleph/${trimModuleExt(mod.url)}.js`),
                       hash,
                     }))
                   })
@@ -215,7 +215,7 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
       } else {
         s = stdServe({ port, hostname })
       }
-      log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.baseUrl}`)
+      log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.basePath}`)
       for await (const r of s) {
         server.handle(r)
       }

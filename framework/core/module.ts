@@ -25,14 +25,14 @@ export function trimModuleExt(url: string) {
   return url
 }
 
-export function importModule(baseUrl: string, url: string, forceRefetch = false): Promise<any> {
+export function importModule(basePath: string, url: string, forceRefetch = false): Promise<any> {
   const { __ALEPH: ALEPH } = window as any
 
   if (ALEPH) {
     return ALEPH.import(url, forceRefetch)
   }
 
-  let src = util.cleanPath(baseUrl + '/_aleph/' + trimModuleExt(url) + '.js')
+  let src = util.cleanPath(basePath + '/_aleph/' + trimModuleExt(url) + '.js')
   if (forceRefetch) {
     src += '?t=' + Date.now()
   }

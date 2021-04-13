@@ -194,7 +194,7 @@ export class Renderer {
 
   /** render custom loading page for SPA mode. */
   async renderSPAIndexPage(): Promise<string> {
-    const { baseUrl, defaultLocale } = this.#app.config
+    const { basePath, defaultLocale } = this.#app.config
     const loadingModule = this.#app.findModuleByName('loading')
 
     if (loadingModule) {
@@ -205,7 +205,7 @@ export class Renderer {
         body,
         scripts
       } = await this.#renderer.render(
-        createBlankRouterURL(baseUrl, defaultLocale),
+        createBlankRouterURL(basePath, defaultLocale),
         undefined,
         [{ url: loadingModule.url, Component: Loading }],
         styles

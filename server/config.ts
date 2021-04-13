@@ -17,7 +17,7 @@ export interface RequiredConfig extends Required<Omit<Config, 'css'>> {
 export const defaultConfig: Readonly<RequiredConfig> = {
   framework: 'react',
   buildTarget: 'es2015',
-  baseUrl: '/',
+  basePath: '/',
   srcDir: '/',
   outputDir: '/dist',
   defaultLocale: 'en',
@@ -40,7 +40,7 @@ export const defaultConfig: Readonly<RequiredConfig> = {
 
 /** load config from `aleph.config.(ts|js|json)` */
 export async function loadConfig(workingDir: string): Promise<Config> {
-  let data: Config = {}
+  let data: Record<string, any> = {}
   for (const name of ['ts', 'js', 'json'].map(ext => 'aleph.config.' + ext)) {
     const p = join(workingDir, name)
     if (existsFileSync(p)) {
@@ -68,7 +68,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     framework,
     srcDir,
     outputDir,
-    baseUrl,
+    basePath,
     buildTarget,
     defaultLocale,
     locales,
@@ -94,8 +94,8 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   if (util.isNEString(outputDir)) {
     config.outputDir = util.cleanPath(outputDir)
   }
-  if (util.isNEString(baseUrl)) {
-    config.baseUrl = util.cleanPath(baseUrl)
+  if (util.isNEString(basePath)) {
+    config.basePath = util.cleanPath(basePath)
   }
   if (isBuildTarget(buildTarget)) {
     config.buildTarget = buildTarget
