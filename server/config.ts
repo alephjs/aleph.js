@@ -30,6 +30,7 @@ export const defaultConfig: Readonly<RequiredConfig> = {
     postcss: { plugins: ['autoprefixer'] },
   },
   headers: {},
+  compress: true,
   env: {},
   react: {
     version: defaultReactVersion,
@@ -76,6 +77,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     plugins,
     css,
     headers,
+    compress,
     env,
   } = data
   if (isFramework(framework)) {
@@ -117,6 +119,9 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (util.isPlainObject(headers)) {
     config.headers = toPlainStringRecord(headers)
+  }
+  if (typeof compress === 'boolean') {
+    config.compress = compress
   }
   if (util.isPlainObject(env)) {
     config.env = toPlainStringRecord(env)

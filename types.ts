@@ -79,6 +79,8 @@ export type Config = {
   headers?: Record<string, string>
   /** `rewrites` specifies the server rewrite map. */
   rewrites?: Record<string, string>
+  /** `compress` enbles gzip/brotli compression for static files and SSR content. */
+  compress?: boolean
   /** `env` appends system env variables. */
   env?: Record<string, string>
 }

@@ -8,31 +8,40 @@ import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 let brotli: ((data: Uint8Array) => Uint8Array) | null = null
 let gzip: ((data: Uint8Array) => Uint8Array) | null = null
 
+type Response = {
+  status: number
+  headers: Headers
+  compress: boolean
+  done: boolean
+}
+
 export class Request implements APIRequest {
   #req: ServerRequest
   #params: Record<string, string>
   #query: URLSearchParams
   #cookies: ReadonlyMap<string, string>
-  #resp = {
-    status: 200,
-    headers: new Headers({
-      Server: 'Aleph.js',
-    }),
-    done: false
-  }
+  #resp: Response
 
-  constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams) {
+  constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams, compress: boolean = true) {
     this.#req = req
     this.#params = params
     this.#query = query
     const cookies = new Map()
     this.headers.get('cookie')?.split(';').forEach(cookie => {
-      const p = cookie.trim().split('=')
+      const p = cookie.split('=')
       if (p.length >= 2) {
-        cookies.set(p.shift()!.trim(), decodeURI(p.join('=')))
+        cookies.set(p.shift()!, decodeURI(p.join('=')))
       }
     })
     this.#cookies = cookies
+    this.#resp = {
+      status: 200,
+      headers: new Headers({
+        Server: 'Aleph.js',
+      }),
+      compress,
+      done: false
+    }
   }
 
   get url(): string {
@@ -159,12 +168,12 @@ export class Request implements APIRequest {
       contentType = 'text/plain; charset=utf-8'
       this.#resp.headers.set('Content-Type', contentType)
     }
-    if (Deno.env.get('ALEPH_BUILD_MODE') !== 'development') {
+    if (this.#resp.compress) {
       let shouldCompress = false
       if (contentType) {
         if (contentType.startsWith('text/')) {
           shouldCompress = true
-        } else if (/^application\/(javascript|typecript|wasm|json|xml)/i.test(contentType)) {
+        } else if (/^application\/(javascript|json|xml|wasm)/i.test(contentType)) {
           shouldCompress = true
         } else if (/^image\/svg\+xml/i.test(contentType)) {
           shouldCompress = true
