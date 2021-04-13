@@ -28,14 +28,14 @@ export class Server {
     }
 
     const app = this.#app
-    const { baseUrl, rewrites } = app.config
-    const url = rewriteURL(r.url, baseUrl, rewrites)
+    const { basePath, compress, headers, rewrites } = app.config
+    const url = rewriteURL(r.url, basePath, rewrites)
     const pathname = decodeURI(url.pathname)
-    const req = new Request(r, {}, url.searchParams)
+    const req = new Request(r, {}, url.searchParams, !app.isDev && compress)
 
     // set custom headers
-    for (const key in app.config.headers) {
-      req.setHeader(key, app.config.headers[key])
+    for (const key in headers) {
+      req.setHeader(key, headers[key])
     }
     if (app.isDev) {
       req.setHeader('Cache-Control', 'max-age=0')
@@ -63,7 +63,7 @@ export class Server {
                     socket.send(JSON.stringify({
                       type: 'update',
                       url: mod.url,
-                      updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.js`),
+                      updateUrl: util.cleanPath(`${basePath}/_aleph/${trimModuleExt(mod.url)}.js`),
                       hash,
                     }))
                   })
@@ -158,7 +158,7 @@ export class Server {
             const [{ params, query }, { jsFile, hash }] = route
             const { default: handle } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
             if (util.isFunction(handle)) {
-              await handle(new Request(req, params, query))
+              await handle(new Request(req, params, query, !app.isDev && compress))
             } else {
               req.status(500).json({ status: 500, message: 'bad api handler' })
             }
@@ -215,7 +215,7 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
       } else {
         s = stdServe({ port, hostname })
       }
-      log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.baseUrl}`)
+      log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.basePath}`)
       for await (const r of s) {
         server.handle(r)
       }

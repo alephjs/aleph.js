@@ -1,5 +1,5 @@
+import { basename, dirname } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
-import { dirname, basename } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
@@ -98,12 +98,12 @@ export class Renderer {
     const isDev = this.#app.isDev
     const state = { entryFile: '' }
     const appModule = this.#app.findModuleByName('app')
-    const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 6)}`) : {} as any
+    const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 8)}`) : {} as any
     const nestedPageComponents = await Promise.all(nestedModules
       .filter(({ url }) => this.#app.getModule(url) !== null)
       .map(async ({ url }) => {
         const { jsFile, hash } = this.#app.getModule(url)!
-        const { default: Component } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
+        const { default: Component } = await import(`file://${jsFile}#${hash.slice(0, 8)}`)
         state.entryFile = dirname(url) + '/' + basename(jsFile)
         return {
           url,
@@ -158,8 +158,8 @@ export class Renderer {
   async render404Page(url: RouterURL): Promise<string> {
     const appModule = this.#app.findModuleByName('app')
     const e404Module = this.#app.findModuleByName('404')
-    const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 6)}`) : {} as any
-    const { default: E404 } = e404Module ? await import(`file://${e404Module.jsFile}#${e404Module.hash.slice(0, 6)}`) : {} as any
+    const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 8)}`) : {} as any
+    const { default: E404 } = e404Module ? await import(`file://${e404Module.jsFile}#${e404Module.hash.slice(0, 8)}`) : {} as any
     const styles = await this.lookupStyleModules(...[
       appModule ? appModule.url : [],
       e404Module ? e404Module.url : []
@@ -194,18 +194,18 @@ export class Renderer {
 
   /** render custom loading page for SPA mode. */
   async renderSPAIndexPage(): Promise<string> {
-    const { baseUrl, defaultLocale } = this.#app.config
+    const { basePath, defaultLocale } = this.#app.config
     const loadingModule = this.#app.findModuleByName('loading')
 
     if (loadingModule) {
-      const { default: Loading } = await import(`file://${loadingModule.jsFile}#${loadingModule.hash.slice(0, 6)}`)
+      const { default: Loading } = await import(`file://${loadingModule.jsFile}#${loadingModule.hash.slice(0, 8)}`)
       const styles = await this.lookupStyleModules(loadingModule.url)
       const {
         head,
         body,
         scripts
       } = await this.#renderer.render(
-        createBlankRouterURL(baseUrl, defaultLocale),
+        createBlankRouterURL(basePath, defaultLocale),
         undefined,
         [{ url: loadingModule.url, Component: Loading }],
         styles
@@ -238,7 +238,7 @@ export class Renderer {
 
   private async lookupStyleModules(...urls: string[]): Promise<Record<string, string>> {
     return (await Promise.all(this.#app.lookupStyleModules(...urls).map(async ({ jsFile, hash }) => {
-      const { default: { __url$: url, __css$: css } } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
+      const { default: { __url$: url, __css$: css } } = await import(`file://${jsFile}#${hash.slice(0, 8)}`)
       return { url, css }
     }))).reduce((styles, mod) => {
       styles[mod.url] = mod.css

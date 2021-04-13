@@ -3,7 +3,7 @@ import type { RouterURL } from '../../types.ts'
 
 const global = window as any
 
-export async function loadPageData({ baseURL, pathname }: RouterURL) {
+export async function loadPageData({ basePath, pathname }: RouterURL) {
   const url = `pagedata://${pathname}`
   if (url in global) {
     const { expires, keys } = global[url]
@@ -15,7 +15,7 @@ export async function loadPageData({ baseURL, pathname }: RouterURL) {
       delete global[`${url}#${key}`]
     })
   }
-  const dataUrl = `${util.trimSuffix(baseURL, '/')}/_aleph/data${pathname === '/' ? '/index' : pathname}.json`
+  const dataUrl = `${util.trimSuffix(basePath, '/')}/_aleph/data${pathname === '/' ? '/index' : pathname}.json`
   const data = await (await fetch(dataUrl)).json()
   if (util.isPlainObject(data)) {
     storeData(data, pathname)

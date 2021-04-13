@@ -16,7 +16,7 @@ export type RouteModule = {
 }
 
 export type RoutingOptions = {
-  baseURL?: string
+  basePath?: string
   defaultLocale?: string
   locales?: string[]
   routes?: Route[]
@@ -24,28 +24,28 @@ export type RoutingOptions = {
 }
 
 export class Routing {
-  private _baseURL: string
+  private _basePath: string
   private _defaultLocale: string
   private _locales: string[]
   private _routes: Route[]
   private _rewrites: Record<string, string>
 
   constructor({
-    baseURL = '/',
+    basePath = '/',
     defaultLocale = 'en',
     locales = [],
     routes = [],
     rewrites = {}
   }: RoutingOptions) {
-    this._baseURL = baseURL
+    this._basePath = basePath
     this._defaultLocale = defaultLocale
     this._locales = locales
     this._routes = routes
     this._rewrites = rewrites
   }
 
-  get baseURL() {
-    return this._baseURL
+  get basePath() {
+    return this._basePath
   }
 
   get paths() {
@@ -128,7 +128,7 @@ export class Routing {
 
   createRouter(location?: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
     const loc = location || (window as any).location || { pathname: '/' }
-    const url = rewriteURL(loc.pathname + (loc.search || ''), this._baseURL, this._rewrites)
+    const url = rewriteURL(loc.pathname + (loc.search || ''), this._basePath, this._rewrites)
 
     let locale = this._defaultLocale
     let pathname = decodeURI(url.pathname)
@@ -163,7 +163,7 @@ export class Routing {
 
     return [
       {
-        baseURL: this._baseURL,
+        basePath: this._basePath,
         locale,
         pathname,
         routePath,
@@ -235,9 +235,9 @@ function matchPath(routePath: string, locPath: string): [Record<string, string>,
   return [params, true]
 }
 
-export function createBlankRouterURL(baseURL = '/', locale = 'en'): RouterURL {
+export function createBlankRouterURL(basePath = '/', locale = 'en'): RouterURL {
   return {
-    baseURL,
+    basePath,
     locale,
     routePath: '',
     pathname: '/',
@@ -249,10 +249,10 @@ export function createBlankRouterURL(baseURL = '/', locale = 'en'): RouterURL {
 }
 
 /** `rewriteURL` returns a rewrited URL */
-export function rewriteURL(reqUrl: string, baseURL: string, rewrites: Record<string, string>): URL {
+export function rewriteURL(reqUrl: string, basePath: string, rewrites: Record<string, string>): URL {
   const url = new URL('http://localhost' + reqUrl)
-  if (baseURL !== '/') {
-    url.pathname = util.trimPrefix(decodeURI(url.pathname), baseURL)
+  if (basePath !== '/') {
+    url.pathname = util.trimPrefix(decodeURI(url.pathname), basePath)
   }
   for (const path in rewrites) {
     const to = rewrites[path]

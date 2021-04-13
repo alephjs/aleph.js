@@ -1,3 +1,4 @@
+import { Status } from 'https://deno.land/std@0.92.0/http/http_status.ts'
 import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
 import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
 import { MultipartReader } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
@@ -7,31 +8,40 @@ import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
 let brotli: ((data: Uint8Array) => Uint8Array) | null = null
 let gzip: ((data: Uint8Array) => Uint8Array) | null = null
 
+type Response = {
+  status: number
+  headers: Headers
+  compress: boolean
+  done: boolean
+}
+
 export class Request implements APIRequest {
   #req: ServerRequest
   #params: Record<string, string>
   #query: URLSearchParams
   #cookies: ReadonlyMap<string, string>
-  #resp = {
-    status: 200,
-    headers: new Headers({
-      Server: 'Aleph.js',
-    }),
-    done: false
-  }
+  #resp: Response
 
-  constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams) {
+  constructor(req: ServerRequest, params: Record<string, string>, query: URLSearchParams, compress: boolean = true) {
     this.#req = req
     this.#params = params
     this.#query = query
     const cookies = new Map()
     this.headers.get('cookie')?.split(';').forEach(cookie => {
-      const p = cookie.trim().split('=')
+      const p = cookie.split('=')
       if (p.length >= 2) {
-        cookies.set(p.shift()!.trim(), decodeURI(p.join('=')))
+        cookies.set(p.shift()!, decodeURI(p.join('=')))
       }
     })
     this.#cookies = cookies
+    this.#resp = {
+      status: 200,
+      headers: new Headers({
+        Server: 'Aleph.js',
+      }),
+      compress,
+      done: false
+    }
   }
 
   get url(): string {
@@ -40,6 +50,10 @@ export class Request implements APIRequest {
 
   get method(): string {
     return this.#req.method
+  }
+
+  get hostname(): string {
+    return (this.#req.conn.remoteAddr as Deno.NetAddr).hostname;
   }
 
   get headers(): Headers {
@@ -126,6 +140,16 @@ export class Request implements APIRequest {
     return this
   }
 
+  redirect(url: string, status: Status = Status.Found): this {
+    // "back" is an alias for the referrer.
+    if (url == "back") {
+      url = this.#resp.headers.get("Referrer") || "/"
+    }
+    this.#resp.status = status
+    this.#resp.headers.set("Location", encodeURI(url))
+    return this
+  }
+
   async send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void> {
     if (this.#resp.done) {
       log.warn('ServerRequest: repeat respond calls')
@@ -148,12 +172,12 @@ export class Request implements APIRequest {
       contentType = 'text/plain; charset=utf-8'
       this.#resp.headers.set('Content-Type', contentType)
     }
-    if (Deno.env.get('ALEPH_BUILD_MODE') !== 'development') {
+    if (this.#resp.compress) {
       let shouldCompress = false
       if (contentType) {
         if (contentType.startsWith('text/')) {
           shouldCompress = true
-        } else if (/^application\/(javascript|typecript|wasm|json|xml)/i.test(contentType)) {
+        } else if (/^application\/(javascript|json|xml|wasm)/i.test(contentType)) {
           shouldCompress = true
         } else if (/^image\/svg\+xml/i.test(contentType)) {
           shouldCompress = true

@@ -1,8 +1,8 @@
-import { basename, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import { bold } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
+import { basename, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import type { ImportMap, ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
-import { existsFileSync, existsDirSync } from '../shared/fs.ts'
+import { existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Config, CSSOptions, PostCSSPlugin } from '../types.ts'
@@ -17,7 +17,7 @@ export interface RequiredConfig extends Required<Omit<Config, 'css'>> {
 export const defaultConfig: Readonly<RequiredConfig> = {
   framework: 'react',
   buildTarget: 'es2015',
-  baseUrl: '/',
+  basePath: '/',
   srcDir: '/',
   outputDir: '/dist',
   defaultLocale: 'en',
@@ -30,16 +30,17 @@ export const defaultConfig: Readonly<RequiredConfig> = {
     postcss: { plugins: ['autoprefixer'] },
   },
   headers: {},
+  compress: true,
   env: {},
   react: {
     version: defaultReactVersion,
-    esmShBuildVersion: 39,
+    esmShBuildVersion: 40,
   }
 }
 
 /** load config from `aleph.config.(ts|js|json)` */
 export async function loadConfig(workingDir: string): Promise<Config> {
-  let data: Config = {}
+  let data: Record<string, any> = {}
   for (const name of ['ts', 'js', 'json'].map(ext => 'aleph.config.' + ext)) {
     const p = join(workingDir, name)
     if (existsFileSync(p)) {
@@ -67,7 +68,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     framework,
     srcDir,
     outputDir,
-    baseUrl,
+    basePath,
     buildTarget,
     defaultLocale,
     locales,
@@ -76,6 +77,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     plugins,
     css,
     headers,
+    compress,
     env,
   } = data
   if (isFramework(framework)) {
@@ -92,8 +94,8 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   if (util.isNEString(outputDir)) {
     config.outputDir = util.cleanPath(outputDir)
   }
-  if (util.isNEString(baseUrl)) {
-    config.baseUrl = util.cleanPath(baseUrl)
+  if (util.isNEString(basePath)) {
+    config.basePath = util.cleanPath(basePath)
   }
   if (isBuildTarget(buildTarget)) {
     config.buildTarget = buildTarget
@@ -117,6 +119,9 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (util.isPlainObject(headers)) {
     config.headers = toPlainStringRecord(headers)
+  }
+  if (typeof compress === 'boolean') {
+    config.compress = compress
   }
   if (util.isPlainObject(env)) {
     config.env = toPlainStringRecord(env)

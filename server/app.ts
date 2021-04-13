@@ -638,9 +638,9 @@ export class Application implements ServerApplication {
   getMainJS(bundleMode = false): string {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
-    const { baseUrl: baseURL, defaultLocale, framework } = this.config
+    const { basePath: basePath, defaultLocale, framework } = this.config
     const config: Record<string, any> = {
-      baseURL,
+      basePath,
       defaultLocale,
       locales: [],
       routes: this.#pageRouting.routes,
@@ -664,13 +664,15 @@ export class Application implements ServerApplication {
 
     if (bundleMode) {
       return [
-        `__ALEPH.baseURL = ${JSON.stringify(baseURL)};`,
+        `__ALEPH.basePath = ${JSON.stringify(basePath)};`,
         `__ALEPH.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default(${JSON.stringify(config)});`
       ].join('')
     }
 
     let code = [
+      this.isDev && `import { connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
       `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js";`,
+      this.isDev && `connect(${JSON.stringify(basePath)});`,
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
     ].filter(Boolean).join('\n')
     this.#injects.get('compilation')?.forEach(transform => {
@@ -682,9 +684,9 @@ export class Application implements ServerApplication {
   /** get ssr html scripts */
   getSSRHTMLScripts(entryFile?: string) {
     const { framework } = this.config
-    const baseUrl = util.trimSuffix(this.config.baseUrl, '/')
+    const basePath = util.trimSuffix(this.config.basePath, '/')
     const alephPkgPath = getAlephPkgUri().replace('https://', '').replace('http://localhost:', 'http_localhost_')
-    const fullAlephPkgPath = `${baseUrl}/_aleph/-/${alephPkgPath}`
+    const fullAlephPkgPath = `${basePath}/_aleph/-/${alephPkgPath}`
 
     if (this.isDev) {
       const preload: string[] = [
@@ -699,21 +701,21 @@ export class Application implements ServerApplication {
       Array.from(this.#modules.keys()).forEach(url => {
         switch (trimModuleExt(url)) {
           case '/app':
-            preload.push(`${baseUrl}/_aleph/app.js`)
+            preload.push(`${basePath}/_aleph/app.js`)
             break
           case '/404':
-            preload.push(`${baseUrl}/_aleph/404.js`)
+            preload.push(`${basePath}/_aleph/404.js`)
             break
         }
       })
 
       if (entryFile) {
-        preload.push(`${baseUrl}/_aleph${entryFile}`)
+        preload.push(`${basePath}/_aleph${entryFile}`)
       }
 
       return [
         ...preload.map(src => ({ src, type: 'module', preload: true })),
-        { src: `${baseUrl}/_aleph/main.js`, type: 'module' },
+        { src: `${basePath}/_aleph/main.js`, type: 'module' },
         { src: `${fullAlephPkgPath}/nomodule.js`, nomodule: true },
       ]
     }
@@ -723,7 +725,7 @@ export class Application implements ServerApplication {
       ...['polyfill', 'deps', 'shared', 'main', entryFile ? util.trimSuffix(entryFile, '.js') : '']
         .filter(name => name !== "" && this.#bundler.getBundledFile(name) !== null)
         .map(name => ({
-          src: `${baseUrl}/_aleph/${this.#bundler.getBundledFile(name)}`
+          src: `${basePath}/_aleph/${this.#bundler.getBundledFile(name)}`
         }))
     ]
   }

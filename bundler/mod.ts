@@ -16,11 +16,11 @@ import {
 
 export const bundlerRuntimeCode = (`
   window.__ALEPH = {
-    baseURL: '/',
+    basePath: '/',
     pack: {},
     bundledFiles: {},
     import: function(u, F) {
-      var b = this.baseURL,
+      var b = this.basePath,
           a = this.pack,
           l = this.bundledFiles;
       if (u in a) {

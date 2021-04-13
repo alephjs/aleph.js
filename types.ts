@@ -1,3 +1,4 @@
+import type { Status } from 'https://deno.land/std@0.92.0/http/http_status.ts'
 import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
 import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
 import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
@@ -58,8 +59,8 @@ export type Config = {
   framework?: 'react'
   /** `buildTarget` specifies the build target in production mode (default is **es2015**). */
   buildTarget?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
-  /** `baseUrl` specifies the path prefix for the application (default is '/'). */
-  baseUrl?: string
+  /** `basePath` specifies the path prefix for the application (default is '/'). */
+  basePath?: string
   /** `srcDir` specifies the **src** dir (default is '/'). */
   srcDir?: string
   /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
@@ -78,6 +79,8 @@ export type Config = {
   headers?: Record<string, string>
   /** `rewrites` specifies the server rewrite map. */
   rewrites?: Record<string, string>
+  /** `compress` enbles gzip/brotli compression for static files and SSR content. */
+  compress?: boolean
   /** `env` appends system env variables. */
   env?: Record<string, string>
 }
@@ -158,6 +161,7 @@ export interface APIRequest extends ServerRequest {
   readonly params: Record<string, string>
   readonly query: URLSearchParams
   readonly cookies: ReadonlyMap<string, string>
+  readonly hostname: string
   /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
   readBody(type?: 'raw'): Promise<Uint8Array>
   readBody(type: 'text'): Promise<string>
@@ -181,6 +185,8 @@ export interface APIRequest extends ServerRequest {
   send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
   /** `json` replies to the request with a json content. */
   json(data: any): Promise<void>
+  /** `redirect` replies to redirect the client to another URL with optional response `status` defaulting to 302. */
+  redirect(url: string, status?: Status): this
 }
 
 /**
@@ -196,10 +202,10 @@ export type APIHandler = {
  * The router url object of the routing, you can access it with `useRouter()` hook.
  */
 export type RouterURL = {
-  readonly baseURL: string
+  readonly basePath: string
+  readonly routePath: string
   readonly locale: string
   readonly pathname: string
-  readonly routePath: string
   readonly params: Record<string, string>
   readonly query: URLSearchParams
   push(url: string): void
