@@ -44,7 +44,7 @@ export class Request implements APIRequest {
   }
 
   get hostname(): string {
-    return this.#req.headers.get("X-Forwarded-Host") || this.#req.headers.get("Host") || "0.0.0.0"
+    return (this.#req.conn.remoteAddr as Deno.NetAddr).hostname;
   }
 
   get headers(): Headers {
