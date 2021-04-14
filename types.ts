@@ -185,6 +185,9 @@ export interface APIRequest extends ServerRequest {
   json(data: any): Promise<void>
   /** `redirect` replies to redirect the client to another URL with optional response `status` defaulting to 302. */
   redirect(url: string, status?: Status): this
+  /** `acceptsLanguages` replies to return languages, accepted by the requestor. */
+  acceptsLanguages(): string[] | undefined
+  acceptsLanguages(...langs: string[]): string[] | string | undefined
 }
 
 /**
