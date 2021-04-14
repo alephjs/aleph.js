@@ -12,11 +12,11 @@ type BootstrapOptions = Required<RoutingOptions> & {
 }
 
 export default async function bootstrap(options: BootstrapOptions) {
-  const { baseURL, defaultLocale, locales, routes, rewrites, sharedModules, renderMode } = options
+  const { basePath, defaultLocale, locales, routes, rewrites, sharedModules, renderMode } = options
   const { document } = window as any
   const customComponents: Record<string, { C: ComponentType, useDeno?: boolean }> = {}
   await Promise.all(sharedModules.map(async ({ url, useDeno }) => {
-    const { default: C } = await importModule(baseURL, url)
+    const { default: C } = await importModule(basePath, url)
     switch (trimModuleExt(url)) {
       case '/404':
         customComponents['E404'] = { C, useDeno }
@@ -26,10 +26,10 @@ export default async function bootstrap(options: BootstrapOptions) {
         break
     }
   }))
-  const routing = new Routing({ routes, rewrites, baseURL, defaultLocale, locales })
+  const routing = new Routing({ routes, rewrites, basePath, defaultLocale, locales })
   const [url, nestedModules] = routing.createRouter()
   const imports = nestedModules.map(async mod => {
-    const { default: Component } = await importModule(baseURL, mod.url)
+    const { default: Component } = await importModule(basePath, mod.url)
     return {
       url: mod.url,
       Component

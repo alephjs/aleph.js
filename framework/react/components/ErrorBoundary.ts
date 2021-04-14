@@ -1,8 +1,6 @@
 import { Component, createElement, CSSProperties } from 'react'
 
-export class ErrorBoundary extends Component {
-  state: { error: Error | null }
-
+export class ErrorBoundary extends Component<{}, { error: Error | null }> {
   constructor(props: any) {
     super(props)
     this.state = { error: null }
