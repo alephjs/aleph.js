@@ -1,132 +1,143 @@
-import type { Status } from 'https://deno.land/std@0.92.0/http/http_status.ts'
-import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
-import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
-import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
+import type { Status } from "https://deno.land/std@0.92.0/http/http_status.ts"
+import type {
+  BufReader,
+  BufWriter
+} from "https://deno.land/std@0.92.0/io/bufio.ts"
+import type { MultipartFormData } from "https://deno.land/std@0.92.0/mime/multipart.ts"
+import { Plugin, PluginCreator } from "https://esm.sh/postcss@8.2.8"
 
 /**
  * A loader plugin to load source media.
  */
 export type LoaderPlugin = {
   /** `name` gives the plugin a name. */
-  name: string
+  name: string;
   /** `type` specifies the plugin type. */
-  type: 'loader'
+  type: "loader";
   /** `test` matches the import url. */
-  test: RegExp
+  test: RegExp;
   /** `acceptHMR` enables the HMR. */
-  acceptHMR?: boolean
+  acceptHMR?: boolean;
   /** allowPage` allows the loaded module as a page. */
-  allowPage?: boolean
+  allowPage?: boolean;
   /** `pagePathReoslve` resolves the page path. */
-  pagePathResolve?(url: string): { path: string, isIndex?: boolean }
+  pagePathResolve?(url: string): { path: string; isIndex?: boolean };
   /** `resolve` resolves the module content. */
-  resolve?(url: string): Uint8Array | Promise<Uint8Array>
+  resolve?(url: string): Uint8Array | Promise<Uint8Array>;
   /** `transform` transforms the source content. */
-  transform?(input: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformOutput | Promise<LoaderTransformOutput>
-}
+  transform?(
+    input: { url: string; content: Uint8Array; map?: Uint8Array },
+  ): LoaderTransformOutput | Promise<LoaderTransformOutput>
+};
 
 /**
  * The result of loader transform.
  */
 export type LoaderTransformOutput = {
   /** The transformed code type (default is 'js'). */
-  type?: 'css' | 'js' | 'jsx' | 'ts' | 'tsx'
+  type?: "css" | "js" | "jsx" | "ts" | "tsx";
   /** The transformed code. */
-  code: string
+  code: string;
   /** The source map. */
   map?: string
-}
+};
 
 /**
  * A server plugin to enhance the aleph server application.
  */
 export type ServerPlugin = {
   /** `name` gives the plugin a name. */
-  name: string
+  name: string;
   /** `type` specifies the plugin type. */
-  type: 'server'
+  type: "server";
   /** `onInit` will be invoked after the server initiated. */
   onInit(app: ServerApplication): Promise<void> | void
-}
+};
 
-export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
+export type PostCSSPlugin =
+  | string
+  | [string, any]
+  | Plugin
+  | PluginCreator<any>;
 
 /**
  * The config for the aleph server application.
  */
 export type Config = {
   /** `framework` specifies the framework (default is 'react'). */
-  framework?: 'react'
+  framework?: "react";
   /** `buildTarget` specifies the build target in production mode (default is **es2015**). */
-  buildTarget?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
+  buildTarget?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020";
   /** `baseUrl` specifies the path prefix for the application (default is '/'). */
-  baseUrl?: string
+  baseUrl?: string;
   /** `srcDir` specifies the **src** dir (default is '/'). */
-  srcDir?: string
+  srcDir?: string;
   /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
-  outputDir?: string
+  outputDir?: string;
   /** `defaultLocale` specifies the default locale of the application (default is '**en**'). */
-  defaultLocale?: string
+  defaultLocale?: string;
   /** `locales` specifies the available locales. */
-  locales?: string[]
+  locales?: string[];
   /** `ssr` specifies the options for **SSR**. */
-  ssr?: boolean | SSROptions
+  ssr?: boolean | SSROptions;
   /** `plugins` specifies some plugins for the appliaction. */
-  plugins?: (LoaderPlugin | ServerPlugin)[]
+  plugins?: (LoaderPlugin | ServerPlugin)[];
   /** `css` specifies the css processing options. */
-  css?: CSSOptions
+  css?: CSSOptions;
   /** `headers` appends custom headers for server requests. */
-  headers?: Record<string, string>
+  headers?: Record<string, string>;
   /** `rewrites` specifies the server rewrite map. */
-  rewrites?: Record<string, string>
+  rewrites?: Record<string, string>;
   /** `env` appends system env variables. */
   env?: Record<string, string>
-}
+};
 
 /**
  * The config for CSS resolve.
  */
 export type CSSOptions = {
   /** `module` enables the css module feature. */
-  modules?: false | CSSModulesOptions
+  modules?: false | CSSModulesOptions;
   /** `postcss` specifies the postcss plugins. */
   postcss?: { plugins: PostCSSPlugin[] }
-}
+};
 
 /**
  * The options are passed on to postcss-modules.
  */
 export type CSSModulesOptions = {
   exportGlobals?: boolean
-  generateScopedName?: string | ((name: string, filename: string, css: string) => string)
+  generateScopedName?:
+  | string
+  | ((name: string, filename: string, css: string) => string)
   globalModulePaths?: string[]
   hashPrefix?: string
-  localsConvention?: 'camelCase' | 'camelCaseOnly' | 'dashes' | 'dashesOnly'
-  scopeBehaviour?: 'global' | 'local'
-}
+  localsConvention?: "camelCase" | "camelCaseOnly" | "dashes" | "dashesOnly"
+  scopeBehaviour?: "global" | "local"
+};
 
 /**
  * The options for **SSR**.
  */
 export type SSROptions = {
   /** A list of RegExp for paths to use **SSR**. */
-  include?: RegExp[]
+  include?: RegExp[];
   /** A list of RegExp for paths to skip **SSR**. */
   exclude?: RegExp[]
-}
+};
 
 /**
  * An interface that aligns to the parts of the aleph server's `Application`.
  */
 export interface ServerApplication {
   readonly workingDir: string
-  readonly mode: 'development' | 'production'
+  readonly mode: "development" | "production"
   readonly config: Required<Config>
-  addModule(url: string, options?: { code?: string }): Promise<void>
+  addModule(url: string, options?: { code?: string }): Promise<void>;
   injectCode(
-    stage: 'compilation' | 'hmr' | 'ssr',
-    transform: (url: string, code: string) => string
-  ): void
+    stage: "compilation" | "hmr" | "ssr",
+    transform: (url: string, code: string) => string,
+  ): void;
 }
 
 /**
@@ -140,7 +151,7 @@ export interface ServerRequest {
   readonly r: BufReader
   readonly w: BufWriter
   readonly body: Deno.Reader
-  respond(r: ServerResponse): Promise<void>
+  respond(r: ServerResponse): Promise<void>;
 }
 
 /**
@@ -149,7 +160,7 @@ export interface ServerRequest {
 export interface ServerResponse {
   status?: number
   headers?: Headers
-  body?: Uint8Array | Deno.Reader | string
+  body?: Uint8Array | Deno.Reader | string;
 }
 
 /**
@@ -159,35 +170,38 @@ export interface APIRequest extends ServerRequest {
   readonly params: Record<string, string>
   readonly query: URLSearchParams
   readonly cookies: ReadonlyMap<string, string>
-  readonly hostname: string
+  readonly hostname: string;
   /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
-  readBody(type?: 'raw'): Promise<Uint8Array>
-  readBody(type: 'text'): Promise<string>
-  readBody(type: 'json'): Promise<any>
-  readBody(type: 'form'): Promise<MultipartFormData>
+  readBody(type?: "raw"): Promise<Uint8Array>
+  readBody(type: "text"): Promise<string>
+  readBody(type: "json"): Promise<any>
+  readBody(type: "form"): Promise<MultipartFormData>;
   /**
    * `addHeader` adds a new value onto an existing response header of the request, or
    * adds the header if it does not already exist.
    */
-  addHeader(key: string, value: string): this
+  addHeader(key: string, value: string): this;
   /**
    * `setHeader` sets a new value for an existing response header of the request, or adds
    * the header if it does not already exist.
    */
-  setHeader(key: string, value: string): this
+  setHeader(key: string, value: string): this;
   /** `removeHeader` removes the value for an existing response header of the request. */
-  removeHeader(key: string): this
+  removeHeader(key: string): this;
   /** `status` sets response status of the request. */
-  status(code: number): this
+  status(code: number): this;
   /** `send` replies to the request with any content with type. */
-  send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
+  send(
+    data?: string | Uint8Array | ArrayBuffer,
+    contentType?: string,
+  ): Promise<void>;
   /** `json` replies to the request with a json content. */
-  json(data: any): Promise<void>
+  json(data: any): Promise<void>;
   /** `redirect` replies to redirect the client to another URL with optional response `status` defaulting to 302. */
   redirect(url: string, status?: Status): this
-  /** `acceptsLanguages` replies to return languages, accepted by the requestor. */
-  acceptsLanguages(): string[] | undefined
-  acceptsLanguages(...langs: string[]): string[] | string | undefined
+  /**  `acceptsEncodings` returns encodings, accepted by the requestor. */
+  acceptsEncodings(...encodings: string[]): string | undefined
+  acceptsEncodings(...encodings: string[]): string[] | string | undefined
 }
 
 /**
@@ -197,7 +211,7 @@ export interface APIRequest extends ServerRequest {
  */
 export type APIHandler = {
   (req: APIRequest): void
-}
+};
 
 /**
  * The router url object of the routing, you can access it with `useRouter()` hook.
@@ -211,4 +225,4 @@ export type RouterURL = {
   readonly query: URLSearchParams
   push(url: string): void
   replace(url: string): void
-}
+};
