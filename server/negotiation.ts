@@ -24,17 +24,11 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-interface LanaguageSpecificity extends Specificity {
-  prefix: string
-  suffix?: string
-  full: string
-}
-
 interface Specificity {
   i: number
   o?: number
   q: number
-  s?: number
+  s?: number;
 }
 
 function compareSpecs(a: Specificity, b: Specificity): number {
@@ -44,115 +38,133 @@ function compareSpecs(a: Specificity, b: Specificity): number {
     (a.o ?? 0) - (b.o ?? 0) ||
     a.i - b.i ||
     0
-  )
+  );
 }
 
 function isQuality(spec: Specificity): boolean {
-  return spec.q > 0
+  return spec.q > 0;
 }
 
-const SIMPLE_LANGUAGE_REGEXP = /^\s*([^\s\-;]+)(?:-([^\s;]+))?\s*(?:;(.*))?$/
+interface EncodingSpecificty extends Specificity {
+  encoding?: string
+}
 
-function parseLanguage(
-  str: string,
-  i: number,
-): LanaguageSpecificity | undefined {
-  const match = SIMPLE_LANGUAGE_REGEXP.exec(str)
+const simpleEncodingRegExp = /^\s*([^\s;]+)\s*(?:;(.*))?$/
+
+function parseEncoding(str: string, i: number): EncodingSpecificty | undefined {
+  const match = simpleEncodingRegExp.exec(str);
   if (!match) {
-    return undefined
+    return undefined;
   }
 
-  const [, prefix, suffix] = match
-  const full = suffix ? `${prefix}-${suffix}` : prefix
-
+  const encoding = match[1]
   let q = 1
-  if (match[3]) {
-    const params = match[3].split(";")
+  if (match[2]) {
+    const params = match[2].split(";");
     for (const param of params) {
-      const [key, value] = param.trim().split("=")
-      if (key === "q") {
-        q = parseFloat(value)
-        break
+      const p = param.trim().split("=")
+      if (p[0] === "q") {
+        q = parseFloat(p[1])
+        break;
       }
     }
   }
 
-  return { prefix, suffix, full, q, i }
-}
-
-function parseAcceptLanguage(accept: string): LanaguageSpecificity[] {
-  const accepts = accept.split(",")
-  const result: LanaguageSpecificity[] = []
-
-  for (let i = 0; i < accepts.length; i++) {
-    const language = parseLanguage(accepts[i].trim(), i)
-    if (language) {
-      result.push(language)
-    }
-  }
-  return result
+  return { encoding, q, i };
 }
 
 function specify(
-  language: string,
-  spec: LanaguageSpecificity,
-  i: number,
+  encoding: string,
+  spec: EncodingSpecificty,
+  i = -1,
 ): Specificity | undefined {
-  const p = parseLanguage(language, i)
-  if (!p) {
-    return undefined
+  if (!spec.encoding) {
+    return
   }
   let s = 0
-  if (spec.full.toLowerCase() === p.full.toLowerCase()) {
-    s |= 4
-  } else if (spec.prefix.toLowerCase() === p.prefix.toLowerCase()) {
-    s |= 2
-  } else if (spec.full.toLowerCase() === p.prefix.toLowerCase()) {
-    s |= 1
-  } else if (spec.full !== "*") {
+  if (spec.encoding.toLocaleLowerCase() === encoding.toLocaleLowerCase()) {
+    s = 1
+  } else if (spec.encoding !== "*") {
     return
   }
 
-  return { i, o: spec.i, q: spec.q, s }
+  return {
+    i,
+    o: spec.i,
+    q: spec.q,
+    s,
+  }
 }
 
-function getLanguagePriority(
-  language: string,
-  accepted: LanaguageSpecificity[],
-  index: number,
-): Specificity {
-  let priority: Specificity = { i: -1, o: -1, q: 0, s: 0 }
-  for (const accepts of accepted) {
-    const spec = specify(language, accepts, index)
-    if (
-      spec &&
-      ((priority.s ?? 0) - (spec.s ?? 0) || priority.q - spec.q ||
-        (priority.o ?? 0) - (spec.o ?? 0)) < 0
-    ) {
-      priority = spec
+function parseAcceptEncoding(accept: string): EncodingSpecificty[] {
+  const accepts = accept.split(",")
+  const parsedAccepts: EncodingSpecificty[] = []
+  let hasIdentity = false
+  let minQuality = 1;
+
+  for (let i = 0; i < accepts.length; i++) {
+    const encoding = parseEncoding(accepts[i].trim(), i)
+
+    if (encoding) {
+      parsedAccepts.push(encoding)
+      hasIdentity = hasIdentity || !!specify("identity", encoding)
+      minQuality = Math.min(minQuality, encoding.q || 1);
     }
   }
-  return priority
+
+  if (!hasIdentity) {
+    parsedAccepts.push({
+      encoding: "identity",
+      q: minQuality,
+      i: accepts.length - 1,
+    });
+  }
+
+  return parsedAccepts;
 }
 
-export function preferredLanguages(
-  accept = "*",
+function getEncodingPriority(
+  encoding: string,
+  accepted: Specificity[],
+  index: number,
+): Specificity {
+  let priority: Specificity = { o: -1, q: 0, s: 0, i: 0 }
+
+  for (const s of accepted) {
+    const spec = specify(encoding, s, index);
+
+    if (
+      spec &&
+      (priority.s! - spec.s! || priority.q - spec.q ||
+        priority.o! - spec.o!) <
+      0
+    ) {
+      priority = spec;
+    }
+  }
+
+  return priority;
+}
+
+export function preferredEncodings(
+  accept: string,
   provided?: string[],
 ): string[] {
-  const accepts = parseAcceptLanguage(accept)
+  const accepts = parseAcceptEncoding(accept);
 
   if (!provided) {
     return accepts
       .filter(isQuality)
       .sort(compareSpecs)
-      .map((spec) => spec.full)
+      .map((spec) => spec.encoding!);
   }
 
-  const priorities = provided
-    .map((type, index) => getLanguagePriority(type, accepts, index))
+  const priorities = provided.map((type, index) =>
+    getEncodingPriority(type, accepts, index)
+  );
 
   return priorities
     .filter(isQuality)
     .sort(compareSpecs)
-    .map((priority) => provided[priorities.indexOf(priority)])
+    .map((priority) => provided[priorities.indexOf(priority)]);
 }
