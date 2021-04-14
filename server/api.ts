@@ -4,6 +4,7 @@ import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multip
 import { MultipartReader } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
 import log from '../shared/log.ts'
 import type { APIRequest, ServerRequest, ServerResponse } from '../types.ts'
+import { preferredLanguages } from './negotiation.ts'
 
 let brotli: ((data: Uint8Array) => Uint8Array) | null = null
 let gzip: ((data: Uint8Array) => Uint8Array) | null = null
@@ -139,6 +140,20 @@ export class Request implements APIRequest {
     this.#resp.status = status
     this.#resp.headers.set("Location", encodeURI(url))
     return this
+  }
+
+  acceptsLanguages(): string[] | undefined
+  acceptsLanguages(...langs: string[]): string[] | string | undefined {
+    const acceptLanguageValue = this.#req.headers.get(
+      "Accept-Language",
+    )
+    if (!acceptLanguageValue) {
+      return
+    }
+    if (langs.length) {
+      return preferredLanguages(acceptLanguageValue, langs)[0]
+    }
+    return preferredLanguages(acceptLanguageValue)
   }
 
   async send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void> {
