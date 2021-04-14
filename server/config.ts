@@ -147,15 +147,22 @@ export async function loadAndUpgradeImportMap(workingDir: string): Promise<Impor
   for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
     importMapFile = join(workingDir, filename)
     if (existsFileSync(importMapFile)) {
-      const data = JSON.parse(await Deno.readTextFile(importMapFile))
-      const imports: Record<string, string> = toPlainStringRecord(data.imports)
-      const scopes: Record<string, Record<string, string>> = {}
-      if (util.isPlainObject(data.scopes)) {
-        Object.entries(data.scopes).forEach(([scope, imports]) => {
-          scopes[scope] = toPlainStringRecord(imports)
-        })
+      try {
+        const data = JSON.parse(await Deno.readTextFile(importMapFile))
+        const imports: Record<string, string> = toPlainStringRecord(data.imports)
+        const scopes: Record<string, Record<string, string>> = {}
+        if (util.isPlainObject(data.scopes)) {
+          Object.entries(data.scopes).forEach(([scope, imports]) => {
+            scopes[scope] = toPlainStringRecord(imports)
+          })
+        }
+        Object.assign(importMap, { imports, scopes })
+      } catch (e) {
+        log.error(`invalid '${filename}':`, e.message)
+        if (!confirm('Continue?')) {
+          Deno.exit(1)
+        }
       }
-      Object.assign(importMap, { imports, scopes })
       break
     }
   }

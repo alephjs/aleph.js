@@ -1,4 +1,4 @@
-import { Application } from '../server/mod.ts'
+import { Application } from '../server/app.ts'
 
 export const helpMessage = `
 Usage:
