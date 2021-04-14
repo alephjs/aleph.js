@@ -1,4 +1,4 @@
-import { serve as stdServe, serveTLS } from 'https://deno.land/std@0.92.0/http/server.ts'
+import { serve as stdServe, serveTLS, Server as StdServer } from 'https://deno.land/std@0.92.0/http/server.ts'
 import log from '../shared/log.ts'
 import type { ServerRequest } from '../types.ts'
 import { Application } from './app.ts'
@@ -18,16 +18,14 @@ export type ServeOptions = {
   certFile?: string
   /** Server public key file. */
   keyFile?: string
+  /* The signal to close the server. */
+  signal?: AbortSignal
 }
 
 /** Create a standard Aleph server. */
-export async function serve({ app, port, hostname, certFile, keyFile }: ServeOptions) {
+export async function serve({ app, port, hostname, certFile, keyFile, signal }: ServeOptions) {
   const server = new Server(app)
   await app.ready
-
-  if (!app.isDev && app.config.compress) {
-    await compress.init()
-  }
 
   while (true) {
     try {
@@ -36,6 +34,12 @@ export async function serve({ app, port, hostname, certFile, keyFile }: ServeOpt
         s = serveTLS({ port, hostname, certFile, keyFile })
       } else {
         s = stdServe({ port, hostname })
+      }
+      signal?.addEventListener('abort', () => {
+        (s as StdServer).close()
+      })
+      if (!app.isDev && app.config.compress) {
+        await compress.init()
       }
       log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.basePath}`)
       for await (const r of s) {
