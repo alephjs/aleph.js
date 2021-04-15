@@ -32,7 +32,7 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
       const { headers = {} } = JSON.parse(meta)
       return {
         content,
-        contentType: headers['Content-Type'] || null
+        contentType: headers['content-type'] || null
       }
     } catch (e) { }
   }
@@ -66,7 +66,7 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
       }
       return {
         content,
-        contentType: resp.headers.get('Content-Type')
+        contentType: resp.headers.get('content-type')
       }
     } catch (e) {
       err = e
