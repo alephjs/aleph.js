@@ -1,5 +1,4 @@
 import { join } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { serve as stdServe, serveTLS } from 'https://deno.land/std@0.92.0/http/server.ts'
 import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.92.0/ws/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { rewriteURL } from '../framework/core/routing.ts'
@@ -28,14 +27,14 @@ export class Server {
     }
 
     const app = this.#app
-    const { baseUrl, rewrites } = app.config
-    const url = rewriteURL(r.url, baseUrl, rewrites)
+    const { basePath, headers, rewrites } = app.config
+    const url = rewriteURL(r.url, basePath, rewrites)
     const pathname = decodeURI(url.pathname)
     const req = new Request(r, {}, url.searchParams)
 
     // set custom headers
-    for (const key in app.config.headers) {
-      req.setHeader(key, app.config.headers[key])
+    for (const key in headers) {
+      req.setHeader(key, headers[key])
     }
     if (app.isDev) {
       req.setHeader('Cache-Control', 'max-age=0')
@@ -63,7 +62,7 @@ export class Server {
                     socket.send(JSON.stringify({
                       type: 'update',
                       url: mod.url,
-                      updateUrl: util.cleanPath(`${baseUrl}/_aleph/${trimModuleExt(mod.url)}.js`),
+                      updateUrl: util.cleanPath(`${basePath}/_aleph/${trimModuleExt(mod.url)}.js`),
                       hash,
                     }))
                   })
@@ -183,52 +182,6 @@ export class Server {
         `<!DOCTYPE html><title>500 - internal server error</title><p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`,
         'text/html; charset=utf-8'
       )
-    }
-  }
-}
-
-/** Options for creating a standard Aleph server. */
-export type ServeOptions = {
-  /** The Aleph Server Application to serve. */
-  app: Application
-  /** The port to listen on. */
-  port: number
-  /** A literal IP address or host name that can be resolved to an IP address.
-   * If not specified, defaults to `0.0.0.0`. */
-  hostname?: string
-  /** Server certificate file. */
-  certFile?: string
-  /** Server public key file. */
-  keyFile?: string
-}
-
-/** Create a standard Aleph server. */
-export async function serve({ app, port, hostname, certFile, keyFile }: ServeOptions) {
-  const server = new Server(app)
-  await app.ready
-
-  while (true) {
-    try {
-      let s: AsyncIterable<ServerRequest>
-      if (certFile && keyFile) {
-        s = serveTLS({ port, hostname, certFile, keyFile })
-      } else {
-        s = stdServe({ port, hostname })
-      }
-      log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.baseUrl}`)
-      for await (const r of s) {
-        server.handle(r)
-      }
-    } catch (err) {
-      if (err instanceof Deno.errors.AddrInUse) {
-        if (!app.isDev) {
-          log.fatal(`port ${port} already in use!`)
-        }
-        log.warn(`port ${port} already in use, try ${port + 1}...`)
-        port++
-      } else {
-        log.fatal(err.message)
-      }
     }
   }
 }

@@ -22,7 +22,7 @@ class Module {
     this._isLocked = true
   }
 
-  accept(callback?: () => void): void {
+  accept(callback?: Callback): void {
     if (this._isLocked) {
       return
     }
@@ -45,69 +45,94 @@ class Module {
   }
 }
 
-const { location } = window as any
-const { protocol, host } = location
 const modules: Map<string, Module> = new Map()
-const messageQueue: any[] = []
-const url = (protocol === 'https:' ? 'wss' : 'ws') + '://' + host + '/_hmr'
-const socket = new WebSocket(url)
-
-socket.addEventListener('open', () => {
-  messageQueue.forEach(msg => socket.send(JSON.stringify(msg)))
-  messageQueue.splice(0, messageQueue.length)
-  console.log('[HMR] listening for file changes...')
-})
-
-socket.addEventListener('close', () => {
-  location.reload()
-})
-
-socket.addEventListener('message', ({ data }: { data?: string }) => {
-  if (data) {
-    try {
-      const {
-        type,
-        url,
-        updateUrl,
-        routePath,
-        isIndex,
-        useDeno,
-      } = JSON.parse(data)
-      switch (type) {
-        case 'add':
-          events.emit('add-module', {
-            url,
-            routePath,
-            isIndex,
-            useDeno,
-          })
-          break
-        case 'update':
-          const mod = modules.get(url)
-          if (mod) {
-            mod.applyUpdate(updateUrl)
-          }
-          break
-        case 'remove':
-          if (modules.has(url)) {
-            modules.delete(url)
-            events.emit('remove-module', url)
-          }
-          break
-      }
-      console.log(`[HMR] ${type} module '${url}'`)
-    } catch (err) {
-      console.warn(err)
-    }
-  }
-})
+const state: {
+  socket: WebSocket | null
+  messageQueue: string[]
+} = {
+  socket: null,
+  messageQueue: []
+}
 
 function sendMessage(msg: any) {
-  if (socket.readyState !== socket.OPEN) {
-    messageQueue.push(msg)
+  const json = JSON.stringify(msg)
+  if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
+    state.messageQueue.push(json)
   } else {
-    socket.send(JSON.stringify(msg))
+    state.socket.send(json)
   }
+}
+
+export function connect(basePath: string) {
+  const { location } = window as any
+  const { protocol, host } = location
+  const url = (protocol === 'https:' ? 'wss' : 'ws') + '://' + host + basePath.replace(/\/+$/, '') + '/_hmr'
+  const ws = new WebSocket(url)
+
+  ws.addEventListener('open', () => {
+    state.socket = ws
+    state.messageQueue.splice(0, state.messageQueue.length).forEach(msg => ws.send(msg))
+    console.log('[HMR] listening for file changes...')
+  })
+
+  ws.addEventListener('close', () => {
+    if (state.socket === null) {
+      // re-connect
+      setTimeout(() => {
+        connect(basePath)
+      }, 300)
+    } else {
+      state.socket = null
+      console.log('[HMR] closed.')
+      // reload the page when re-connected
+      setInterval(() => {
+        const ws = new WebSocket(url)
+        ws.addEventListener('open', () => {
+          location.reload()
+        })
+      }, 300)
+    }
+  })
+
+  ws.addEventListener('message', ({ data }: { data?: string }) => {
+    if (data) {
+      try {
+        const {
+          type,
+          url,
+          updateUrl,
+          routePath,
+          isIndex,
+          useDeno,
+        } = JSON.parse(data)
+        switch (type) {
+          case 'add':
+            events.emit('add-module', {
+              url,
+              routePath,
+              isIndex,
+              useDeno,
+            })
+            break
+          case 'update':
+            const mod = modules.get(url)
+            if (mod) {
+              mod.applyUpdate(updateUrl)
+            }
+            break
+          case 'remove':
+            if (modules.has(url)) {
+              modules.delete(url)
+              events.emit('remove-module', url)
+            }
+            break
+        }
+        console.log(`[HMR] ${type} module '${url}'`)
+      } catch (err) {
+        console.warn(err)
+      }
+    }
+  })
 }
 
 export function createHotContext(url: string) {
