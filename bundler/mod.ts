@@ -1,6 +1,8 @@
 import { dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import * as path from 'https://deno.land/std@0.92.0/path/mod.ts'
+import { dirname, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
+// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
+import { build } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
 import { parseExportNames, transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
@@ -8,11 +10,8 @@ import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 import type { Application, Module } from '../server/app.ts'
-import {
-  clearCompilation,
-  computeHash,
-  getAlephPkgUri,
-} from '../server/helper.ts'
+import { computeHash, getAlephPkgUri } from '../server/helper.ts'
+import { cache } from '../server/cache.ts'
 
 export const bundlerRuntimeCode = (`
   window.__ALEPH = {
@@ -121,9 +120,9 @@ export class Bundler {
 
   private async copyBundleFile(jsFilename: string) {
     const { buildDir, outputDir } = this.#app
-    const bundleFile = path.join(buildDir, jsFilename)
-    const saveAs = path.join(outputDir, '_aleph', jsFilename)
-    await ensureDir(path.dirname(saveAs))
+    const bundleFile = join(buildDir, jsFilename)
+    const saveAs = join(outputDir, '_aleph', jsFilename)
+    await ensureDir(dirname(saveAs))
     await Deno.copyFile(bundleFile, saveAs)
   }
 
@@ -195,7 +194,7 @@ export class Bundler {
     const mainJS = `__ALEPH.bundledFiles=${JSON.stringify(bundledFiles)};` + this.#app.getMainJS(true)
     const hash = computeHash(mainJS)
     const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
-    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
+    const bundleFile = join(this.#app.buildDir, bundleFilename)
     await Deno.writeTextFile(bundleFile, mainJS)
     this.#bundledFiles.set('main', bundleFilename)
     log.info(`  {} main.js ${dim('• ' + util.formatBytes(mainJS.length))}`)
@@ -207,7 +206,7 @@ export class Bundler {
     const { buildTarget } = this.#app.config
     const hash = computeHash(buildTarget + Deno.version.deno + VERSION)
     const bundleFilename = `polyfill.bundle.${hash.slice(0, 8)}.js`
-    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
+    const bundleFile = join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFile)) {
       const rawPolyfillFile = `${alephPkgUri}/bundler/polyfills/${buildTarget}/mod.ts`
       await this._bundle(rawPolyfillFile, bundleFile)
@@ -238,8 +237,8 @@ export class Bundler {
     }))).flat().join('\n')
     const hash = computeHash(entryCode + VERSION + Deno.version.deno)
     const bundleFilename = `${name}.bundle.${hash.slice(0, 8)}.js`
-    const bundleEntryFile = path.join(this.#app.buildDir, `${name}.bundle.entry.js`)
-    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
+    const bundleEntryFile = join(this.#app.buildDir, `${name}.bundle.entry.js`)
+    const bundleFile = join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFile)) {
       await Deno.writeTextFile(bundleEntryFile, entryCode)
       await this._bundle(bundleEntryFile, bundleFile)
@@ -250,66 +249,51 @@ export class Bundler {
   }
 
   /** run deno bundle and compress the output using terser. */
-  private async _bundle(bundleEntryFile: string, bundleFile: string) {
-    // todo: use Deno.emit()
-    const p = Deno.run({
-      cmd: [Deno.execPath(), 'bundle', '--no-check', bundleEntryFile, bundleFile],
-      stdout: 'null',
-      stderr: 'piped'
-    })
-    const data = await p.stderrOutput()
-    p.close()
-    if (!existsFileSync(bundleFile)) {
-      const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.#app.buildDir, '/_aleph')
-      await Deno.stderr.write((new TextEncoder).encode(msg))
-      Deno.exit(1)
-    }
+  private async _bundle(entryFile: string, bundleFile: string) {
+    const { buildTarget, browserslist } = this.#app.config
 
-    // transpile bundle code to `buildTarget`
-    const { buildTarget } = this.#app.config
-
-    let { code } = await transform(
-      '/bundle.js',
-      await Deno.readTextFile(bundleFile),
-      {
-        transpileOnly: true,
-        swcOptions: {
-          target: buildTarget
+    await clearBundle(bundleFile)
+    await build({
+      entryPoints: [entryFile],
+      outfile: bundleFile,
+      platform: 'browser',
+      target: [String(buildTarget)].concat(browserslist.map(({ name, version }) => {
+        return `${name.toLowerCase()}${version}`
+      })),
+      bundle: true,
+      minify: true,
+      plugins: [{
+        name: 'http-loader',
+        setup(build) {
+          build.onResolve({ filter: /.*/ }, async (args) => {
+            if (util.isLikelyHttpURL(args.path)) {
+              return {
+                path: args.path,
+                namespace: 'http-module',
+              }
+            }
+            if (args.namespace === 'http-module') {
+              return {
+                path: (new URL(args.path, args.importer)).toString(),
+                namespace: 'http-module',
+              }
+            }
+            const [path] = util.splitBy(util.trimPrefix(args.path, 'file://'), '#')
+            if (path.startsWith('.')) {
+              return { path: join(args.resolveDir, path) }
+            }
+            return { path }
+          })
+          build.onLoad({ filter: /.*/, namespace: 'http-module' }, async (args) => {
+            const { content } = await cache(args.path)
+            return { contents: content }
+          })
         }
-      }
-    )
-
-    // IIFEify
-    code = `(() => { ${code} })()`
-
-    // minify code
-    // todo: use swc minify instead (https://github.com/swc-project/swc/pull/1302)
-    const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')))
-    if (mini !== undefined) {
-      code = mini
-    }
-
-    await clearCompilation(bundleFile)
-    await Deno.writeTextFile(bundleFile, code)
+      }],
+    })
   }
 }
 
-interface Minify {
-  (code: string, options: any): Promise<{ code: string }>
-}
+async function clearBundle(filename: string) {
 
-let terser: Minify | null = null
-
-async function minify(code: string, ecma: number = 2015) {
-  if (terser === null) {
-    const { minify } = await import('https://esm.sh/terser@5.6.1?no-check')
-    terser = minify as Minify
-  }
-  const ret = await terser(code, {
-    compress: true,
-    mangle: true,
-    ecma,
-    sourceMap: false
-  })
-  return ret.code
 }

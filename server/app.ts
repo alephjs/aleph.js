@@ -1,7 +1,6 @@
 import { bold, dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
 import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
 import { walk } from 'https://deno.land/std@0.92.0/fs/walk.ts'
-import { createHash } from 'https://deno.land/std@0.92.0/hash/mod.ts'
 import {
   basename,
   dirname,
@@ -40,13 +39,13 @@ import {
   loadAndUpgradeImportMap,
   RequiredConfig
 } from './config.ts'
+import { cache } from './cache.ts'
 import { CSSProcessor } from './css.ts'
 import {
   checkAlephDev,
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
-  getDenoDir,
   getRelativePath,
   isLoaderPlugin,
   reFullVersion,
@@ -880,79 +879,16 @@ export class Application implements ServerApplication {
       return { content: new Uint8Array(), contentType: 'text/css' }
     }
 
-    const u = new URL(url)
     if (url.startsWith('https://esm.sh/')) {
+      const u = new URL(url)
       if (this.isDev && !u.searchParams.has('dev')) {
         u.searchParams.set('dev', '')
         u.search = u.search.replace('dev=', 'dev')
+        url = u.toString()
       }
     }
 
-    const { protocol, hostname, port, pathname, search } = u
-    const isLocalhost = hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '172.0.0.1'
-    const versioned = reFullVersion.test(pathname)
-    const reload = this.#reloading || !versioned
-    const cacheDir = join(
-      await getDenoDir(),
-      'deps',
-      util.trimSuffix(protocol, ':'),
-      hostname + (port ? '_PORT' + port : '')
-    )
-    const hash = createHash('sha256').update(pathname + search).toString()
-    const contentFile = join(cacheDir, hash)
-    const metaFile = join(cacheDir, hash + '.metadata.json')
-
-    if (!reload && !isLocalhost && existsFileSync(contentFile) && existsFileSync(metaFile)) {
-      const [content, meta] = await Promise.all([
-        Deno.readFile(contentFile),
-        Deno.readTextFile(metaFile),
-      ])
-      try {
-        const { headers } = JSON.parse(meta)
-        return {
-          content,
-          contentType: headers['content-type'] || null
-        }
-      } catch (e) { }
-    }
-
-    // download dep when deno cache failed
-    let err = new Error('Unknown')
-    for (let i = 0; i < 10; i++) {
-      if (i === 0) {
-        if (!isLocalhost) {
-          log.info('Download', url)
-        }
-      } else {
-        log.debug('Download error:', err)
-        log.warn(`Download ${url} failed, retrying...`)
-      }
-      try {
-        const resp = await fetch(u.toString())
-        if (resp.status >= 400) {
-          return Promise.reject(new Error(resp.statusText))
-        }
-        const buffer = await resp.arrayBuffer()
-        const content = await Deno.readAll(new Deno.Buffer(buffer))
-        if (!isLocalhost) {
-          await ensureDir(cacheDir)
-          Deno.writeFile(contentFile, content)
-          const headers: Record<string, string> = {}
-          resp.headers.forEach((val, key) => {
-            headers[key] = val
-          })
-          Deno.writeTextFile(metaFile, JSON.stringify({ headers, url }, undefined, 2))
-        }
-        return {
-          content,
-          contentType: resp.headers.get('content-type')
-        }
-      } catch (e) {
-        err = e
-      }
-    }
-
-    return Promise.reject(err)
+    return await cache(url, { forceRefresh: this.#reloading, retryTimes: 10 })
   }
 
   private async precompile(
