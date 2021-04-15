@@ -8,7 +8,7 @@ import {
 } from './fs.ts'
 
 
-Deno.test(`fs existsDirSync`, () => {
+Deno.test(`fs: existsDirSync`, () => {
     // true test cases
     const dir = Deno.makeTempDirSync()
     assert(existsDirSync(dir))
@@ -22,7 +22,7 @@ Deno.test(`fs existsDirSync`, () => {
 })
 
 
-Deno.test(`fs async existsDir`, async () => {
+Deno.test(`fs: async existsDir`, async () => {
     // true test cases
     assert(await existsDir(await Deno.realPath(getStandardFolder())))
     const dir = await Deno.makeTempDir()
@@ -31,13 +31,9 @@ Deno.test(`fs async existsDir`, async () => {
     assertEquals(await existsDir(`${dir}${SEP}foobar`), false)
     const file = await Deno.makeTempFile()
     assertEquals(await existsDir(file), false)
-    // error test cases
-    existsDir({} as string).then(err => {
-        assert(err instanceof Error)
-    }).catch(e => console.error(e))
 })
 
-Deno.test(`fs existsFileSync`, () => {
+Deno.test(`fs: existsFileSync`, () => {
     // true test cases
     const file = Deno.makeTempFileSync()
     assert(existsFileSync(file))
@@ -49,7 +45,7 @@ Deno.test(`fs existsFileSync`, () => {
     assertThrows(() => existsDirSync({} as string), Error)
 })
 
-Deno.test(`fs async existsFile`, async () => {
+Deno.test(`fs: async existsFile`, async () => {
     // true test cases
     const file = await Deno.makeTempFile()
     assert(await existsFile(file))
@@ -57,13 +53,9 @@ Deno.test(`fs async existsFile`, async () => {
     const dir = Deno.makeTempDirSync()
     assertEquals(await existsFile(dir), false)
     assertEquals(await existsFileSync(`${dir}${SEP}llksdafzxc.ts`), false)
-    // error test cases
-    existsFile({} as string).then(err => {
-        assert(err instanceof Error)
-    }).catch(e => console.error(e))
 })
 
-Deno.test('ensureTextFile', async () => {
+Deno.test('fs: ensureTextFile', async () => {
     // true test case
     const dirPath = await Deno.makeTempDir()
     const textFilePath = `${dirPath}${SEP}test.txt`
@@ -84,7 +76,7 @@ Deno.test('ensureTextFile', async () => {
     }
 })
 
-Deno.test('lazyRemove', async () => {
+Deno.test('fs: lazyRemove', async () => {
     // true test case
     const filePath = await Deno.makeTempFile()
     await lazyRemove(filePath)
@@ -93,11 +85,6 @@ Deno.test('lazyRemove', async () => {
     const dirPath = await Deno.makeTempDir()
     await lazyRemove(`${dirPath}${SEP}asdfsdf.txt`)
     assert(await existsDir(dirPath))
-    // error test
-    lazyRemove({} as string).then(err => {
-        assert(err instanceof Error)
-    }).catch(e => console.error(e))
-
 })
 
 
