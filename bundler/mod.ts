@@ -210,7 +210,7 @@ export class Bundler {
     const bundleFile = join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFile)) {
       const rawPolyfillFile = `${alephPkgUri}/bundler/polyfills/${buildTarget}/mod.ts`
-      await this._bundle(rawPolyfillFile, bundleFile)
+      await this.build(rawPolyfillFile, bundleFile)
     }
     this.#bundledFiles.set('polyfill', bundleFilename)
     log.info(`  {} polyfill.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
@@ -242,7 +242,7 @@ export class Bundler {
     const bundleFile = join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFile)) {
       await Deno.writeTextFile(bundleEntryFile, entryCode)
-      await this._bundle(bundleEntryFile, bundleFile)
+      await this.build(bundleEntryFile, bundleFile)
       lazyRemove(bundleEntryFile)
     }
     this.#bundledFiles.set(name, bundleFilename)
@@ -250,7 +250,7 @@ export class Bundler {
   }
 
   /** run deno bundle and compress the output using terser. */
-  private async _bundle(entryFile: string, bundleFile: string) {
+  private async build(entryFile: string, bundleFile: string) {
     const { buildTarget, browserslist } = this.#app.config
 
     await clearBundle(bundleFile)
@@ -266,7 +266,7 @@ export class Bundler {
       plugins: [{
         name: 'http-loader',
         setup(build) {
-          build.onResolve({ filter: /.*/ }, async (args) => {
+          build.onResolve({ filter: /.*/ }, args => {
             if (util.isLikelyHttpURL(args.path)) {
               return {
                 path: args.path,
@@ -285,7 +285,7 @@ export class Bundler {
             }
             return { path }
           })
-          build.onLoad({ filter: /.*/, namespace: 'http-module' }, async (args) => {
+          build.onLoad({ filter: /.*/, namespace: 'http-module' }, async args => {
             const { content } = await cache(args.path)
             return { contents: content }
           })
