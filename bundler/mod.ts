@@ -2,7 +2,7 @@ import { dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
 import { dirname, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
 // @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
-import { build } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
+import { build, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
 import { parseExportNames, transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
@@ -106,6 +106,7 @@ export class Bundler {
       )
     }
     await this.createMainJS()
+    stopEsbuild()
   }
 
   getBundledFile(name: string): string | null {
