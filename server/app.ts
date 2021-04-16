@@ -1,13 +1,13 @@
-import { bold, dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
-import { walk } from 'https://deno.land/std@0.92.0/fs/walk.ts'
+import { bold, dim } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { ensureDir } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
+import { walk } from 'https://deno.land/std@0.93.0/fs/walk.ts'
 import {
   basename,
   dirname,
   extname,
   join,
   resolve
-} from 'https://deno.land/std@0.92.0/path/mod.ts'
+} from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
 import {
   buildChecksum,

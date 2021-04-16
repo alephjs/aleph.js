@@ -1,8 +1,8 @@
 import { compile, CompileOptions } from 'https://deno.land/x/aleph@v0.2.28/tsc/compile.ts'
-import { walk } from 'https://deno.land/std@0.92.0/fs/walk.ts'
-import { resolve } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { green, red, yellow } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import { createHash } from 'https://deno.land/std@0.92.0/hash/mod.ts'
+import { walk } from 'https://deno.land/std@0.93.0/fs/walk.ts'
+import { resolve } from 'https://deno.land/std@0.93.0/path/mod.ts'
+import { green, red, yellow } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { createHash } from 'https://deno.land/std@0.93.0/hash/mod.ts'
 import init, { transformSync } from './dist/wasm-pack.js'
 import getWasmData from './dist/wasm.js'
 

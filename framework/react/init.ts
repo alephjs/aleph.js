@@ -1,4 +1,4 @@
-import { dirname } from 'https://deno.land/std@0.92.0/path/mod.ts'
+import { dirname } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { getAlephPkgUri, getRelativePath, toLocalUrl } from '../../server/helper.ts'
 import util from '../../shared/util.ts'
 import type { ServerApplication } from '../../types.ts'

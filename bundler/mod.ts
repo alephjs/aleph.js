@@ -1,8 +1,8 @@
 // @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
 import { build, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
-import { dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import { basename, dirname, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { ensureDir, } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
+import { dim } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { basename, dirname, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
+import { ensureDir, } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
 import { parseExportNames, transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
