@@ -1,5 +1,5 @@
-import { join } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
+import { join } from 'https://deno.land/std@0.93.0/path/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import { VERSION } from '../version.ts'

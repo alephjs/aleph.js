@@ -1,6 +1,6 @@
-import { getFlag, parsePortNumber } from '../server/helper.ts'
 import { Application } from '../server/app.ts'
 import { serve } from '../server/stdserver.ts'
+import { getFlag, parsePortNumber } from '../shared/flags.ts'
 import log from '../shared/log.ts'
 
 export const helpMessage = `

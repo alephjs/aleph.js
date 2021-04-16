@@ -1,5 +1,5 @@
-import { join } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.92.0/ws/mod.ts'
+import { join } from 'https://deno.land/std@0.93.0/path/mod.ts'
+import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.93.0/ws/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { rewriteURL } from '../framework/core/routing.ts'
 import { existsFileSync } from '../shared/fs.ts'

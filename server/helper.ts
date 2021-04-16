@@ -1,6 +1,8 @@
-import { dim, red, yellow } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import { createHash } from 'https://deno.land/std@0.92.0/hash/mod.ts'
-import { relative } from 'https://deno.land/std@0.92.0/path/mod.ts'
+// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
+export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
+import { dim, red, yellow } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { createHash } from 'https://deno.land/std@0.93.0/hash/mod.ts'
+import { relative } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { ServerPlugin, LoaderPlugin } from '../types.ts'
@@ -95,34 +97,6 @@ export function toLocalUrl(url: string): string {
 /** compute hash of the content */
 export function computeHash(content: string | Uint8Array): string {
   return createHash('sha1').update(content).toString()
-}
-
-/** clear the previous compilation cache */
-export async function clearCompilation(jsFile: string) {
-
-}
-
-/** parse port number */
-export function parsePortNumber(v: string): number {
-  const num = parseInt(v)
-  if (isNaN(num) || !Number.isInteger(num) || num <= 0 || num >= 1 << 16) {
-    throw new Error(`invalid port '${v}'`)
-  }
-  return num
-}
-
-/** get flag value by given keys. */
-export function getFlag(flags: Record<string, any>, keys: string[]): string | undefined
-export function getFlag(flags: Record<string, any>, keys: string[], defaultValue: string): string
-export function getFlag(flags: Record<string, any>, keys: string[], defaultValue?: string): string | undefined {
-  let value = defaultValue
-  for (const key of keys) {
-    if (key in flags) {
-      value = String(flags[key])
-      break
-    }
-  }
-  return value
 }
 
 /**
