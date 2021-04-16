@@ -168,7 +168,7 @@ export class Bundler {
         const depMod = this.#app.getModule(dep.url)
         if (depMod !== null) {
           const s = `.bundling.js#${dep.url}@`
-          await this.compile(depMod, external)
+          await this.compile(depMod, [dep.url, external].flat())
           code = code.split(s).map((p, i) => {
             if (i > 0 && p.charAt(6) === '"') {
               return dep.hash.slice(0, 6) + p.slice(6)
