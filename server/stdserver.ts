@@ -39,7 +39,7 @@ export async function serve({ app, port, hostname, certFile, keyFile, signal }: 
         (s as StdServer).close()
       })
       if (!app.isDev && app.config.compress) {
-        await compress.init()
+        compress.init()
       }
       log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.basePath}`)
       for await (const r of s) {
