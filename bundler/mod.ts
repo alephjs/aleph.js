@@ -1,5 +1,3 @@
-// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
-import { build, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
 import { dim } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
 import { basename, dirname, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { ensureDir, } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
@@ -11,7 +9,7 @@ import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 import type { Application, Module } from '../server/app.ts'
 import { cache } from '../server/cache.ts'
-import { computeHash, getAlephPkgUri } from '../server/helper.ts'
+import { computeHash, esbuild, stopEsbuild, getAlephPkgUri } from '../server/helper.ts'
 
 const hashShort = 8
 const reHashJS = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
@@ -254,7 +252,7 @@ export class Bundler {
     const { buildTarget, browserslist } = this.#app.config
 
     await clearBuildCache(bundleFile)
-    await build({
+    await esbuild({
       entryPoints: [entryFile],
       outfile: bundleFile,
       platform: 'browser',

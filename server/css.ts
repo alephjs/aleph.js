@@ -1,7 +1,6 @@
-// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
-import { build } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
 import util from '../shared/util.ts'
 import { PostCSSPlugin, CSSOptions } from '../types.ts'
+import { esbuild } from './helper.ts'
 
 const postcssVersion = '8.2.8'
 const productionOnlyPostcssPlugins = ['autoprefixer']
@@ -72,7 +71,7 @@ export class CSSProcessor {
 
     let css = pcss
     if (this.#isProd) {
-      const ret = await build({
+      const ret = await esbuild({
         stdin: {
           loader: 'css',
           sourcefile: url,
@@ -102,11 +101,6 @@ export class CSSProcessor {
       // todo: generate map
     }
   }
-}
-
-async function initCleanCSS() {
-  const { default: CleanCSS } = await import('https://esm.sh/clean-css@5.1.2?no-check')
-  return new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
 }
 
 async function initPostCSS(plugins: PostCSSPlugin[]) {

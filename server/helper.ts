@@ -1,3 +1,5 @@
+// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
+export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
 import { dim, red, yellow } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.93.0/hash/mod.ts'
 import { relative } from 'https://deno.land/std@0.93.0/path/mod.ts'
