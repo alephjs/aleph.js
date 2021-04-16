@@ -1,3 +1,5 @@
+// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
+import { build } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
 import util from '../shared/util.ts'
 import { PostCSSPlugin, CSSOptions } from '../types.ts'
 
@@ -8,7 +10,6 @@ export class CSSProcessor {
   #isProd: boolean
   #options: Required<CSSOptions>
   #postcss: any
-  #cleanCSS: any
   #modulesJSON: Record<string, Record<string, string>>
 
   constructor() {
@@ -18,7 +19,6 @@ export class CSSProcessor {
       postcss: { plugins: ['autoprefixer'] },
     }
     this.#postcss = null
-    this.#cleanCSS = null
     this.#modulesJSON = {}
   }
 
@@ -64,17 +64,26 @@ export class CSSProcessor {
     }
 
     if (this.#postcss == null) {
-      const [postcss, cleanCSS] = await Promise.all([
-        initPostCSS(this.#options.postcss.plugins),
-        this.#isProd ? initCleanCSS() : Promise.resolve(null)
-      ])
-      this.#postcss = postcss
-      this.#cleanCSS = cleanCSS
+      this.#postcss = await initPostCSS(this.#options.postcss.plugins)
     }
 
     const { content: pcss } = await this.#postcss.process(content, { from: url }).async()
     const modulesJSON = this.getModulesJSON(url)
-    const css = this.#isProd ? this.#cleanCSS.minify(pcss).styles : pcss
+
+    let css = pcss
+    if (this.#isProd) {
+      const ret = await build({
+        stdin: {
+          loader: 'css',
+          sourcefile: url,
+          contents: pcss
+        },
+        minify: true,
+        write: false,
+        sourcemap: false,
+      })
+      css = ret.outputFiles[0].text
+    }
 
     if (url.startsWith('#inline-style-')) {
       return {
