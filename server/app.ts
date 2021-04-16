@@ -1174,6 +1174,7 @@ export class Application implements ServerApplication {
     }
 
     if (fsync) {
+      await Deno.remove(util.trimSuffix(mod.jsFile, '.js') + '.bundling.js')
       await Promise.all([
         ensureTextFile(metaFile, JSON.stringify({
           url,

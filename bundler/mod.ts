@@ -129,8 +129,7 @@ export class Bundler {
   }
 
   private async compile(mod: Module, external: string[]): Promise<string> {
-    const hash = mod.deps.length > 0 ? computeHash(mod.sourceHash + mod.deps.map(({ hash }) => hash).join('')) : mod.sourceHash
-    const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + `.bundling.${hash.slice(0, hashShort)}.js`
+    const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
 
     if (existsFileSync(bundlingFile)) {
       return bundlingFile
@@ -181,7 +180,6 @@ export class Bundler {
       }
     }
 
-    await clearBuildCache(bundlingFile)
     await ensureTextFile(bundlingFile, code)
 
     return bundlingFile
