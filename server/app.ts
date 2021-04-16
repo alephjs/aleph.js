@@ -24,7 +24,8 @@ import { minDenoVersion } from '../shared/constants.ts'
 import {
   ensureTextFile,
   existsDirSync,
-  existsFileSync
+  existsFileSync,
+  lazyRemove
 } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -1174,7 +1175,7 @@ export class Application implements ServerApplication {
     }
 
     if (fsync) {
-      await Deno.remove(util.trimSuffix(mod.jsFile, '.js') + '.bundling.js')
+      await lazyRemove(util.trimSuffix(mod.jsFile, '.js') + '.bundling.js')
       await Promise.all([
         ensureTextFile(metaFile, JSON.stringify({
           url,
