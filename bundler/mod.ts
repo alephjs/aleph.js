@@ -1,19 +1,22 @@
-import { dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import { dirname, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
 // @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
 import { build, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
+import { dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
+import { basename, dirname, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
+import { ensureDir, } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
 import { parseExportNames, transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
-import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
+import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 import type { Application, Module } from '../server/app.ts'
-import { computeHash, getAlephPkgUri } from '../server/helper.ts'
 import { cache } from '../server/cache.ts'
+import { computeHash, getAlephPkgUri } from '../server/helper.ts'
 
-export const bundlerRuntimeCode = (`
+const hashShort = 8
+const reHashJS = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
+
+export const bundlerRuntimeCode = `
   window.__ALEPH = {
     basePath: '/',
     pack: {},
@@ -46,22 +49,15 @@ export const bundlerRuntimeCode = (`
       })
     }
   }
-`).split('\n')
-  .map(l => l.trim()
-    .replaceAll(') {', '){')
-    .replace(/\s*([,:=|+]{1,2})\s+/g, '$1')
-  )
-  .join('')
+`
 
 /** The bundler class for aleph server. */
 export class Bundler {
   #app: Application
-  #compiledModules: Set<string>
   #bundledFiles: Map<string, string>
 
   constructor(app: Application) {
     this.#app = app
-    this.#compiledModules = new Set()
     this.#bundledFiles = new Map()
   }
 
@@ -82,21 +78,21 @@ export class Bundler {
       }
     })
 
-    await this.createPolyfillBundle()
-    await this.createBundleChunk(
+    await this.bundlePolyfillChunck()
+    await this.bundleChunk(
       'deps',
       Array.from(remoteEntries),
       []
     )
     if (sharedEntries.size > 0) {
-      await this.createBundleChunk(
+      await this.bundleChunk(
         'shared',
         Array.from(sharedEntries),
         Array.from(remoteEntries)
       )
     }
     for (const url of entries) {
-      await this.createBundleChunk(
+      await this.bundleChunk(
         trimModuleExt(url),
         [url],
         [
@@ -105,7 +101,12 @@ export class Bundler {
         ].flat()
       )
     }
+
+    // create main.js after all chunks are bundled
     await this.createMainJS()
+
+    // unlike nodejs, Deno doesn't provide the necessary APIs to allow Deno to
+    // exit while esbuild's internal child process is still running.
     stopEsbuild()
   }
 
@@ -128,9 +129,10 @@ export class Bundler {
   }
 
   private async compile(mod: Module, external: string[]): Promise<string> {
-    const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
+    const hash = mod.deps.length > 0 ? computeHash(mod.sourceHash + mod.deps.map(({ hash }) => hash).join('')) : mod.sourceHash
+    const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + `.bundling.${hash.slice(0, hashShort)}.js`
 
-    if (this.#compiledModules.has(mod.url)) {
+    if (existsFileSync(bundlingFile)) {
       return bundlingFile
     }
 
@@ -179,8 +181,8 @@ export class Bundler {
       }
     }
 
+    await clearBuildCache(bundlingFile)
     await ensureTextFile(bundlingFile, code)
-    this.#compiledModules.add(mod.url)
 
     return bundlingFile
   }
@@ -194,30 +196,30 @@ export class Bundler {
       }, {} as Record<string, string>)
     const mainJS = `__ALEPH.bundledFiles=${JSON.stringify(bundledFiles)};` + this.#app.getMainJS(true)
     const hash = computeHash(mainJS)
-    const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
-    const bundleFile = join(this.#app.buildDir, bundleFilename)
-    await Deno.writeTextFile(bundleFile, mainJS)
+    const bundleFilename = `main.bundle.${hash.slice(0, hashShort)}.js`
+    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    await Deno.writeTextFile(bundleFilePath, mainJS)
     this.#bundledFiles.set('main', bundleFilename)
     log.info(`  {} main.js ${dim('• ' + util.formatBytes(mainJS.length))}`)
   }
 
   /** create polyfill bundle. */
-  private async createPolyfillBundle() {
+  private async bundlePolyfillChunck() {
     const alephPkgUri = getAlephPkgUri()
     const { buildTarget } = this.#app.config
     const hash = computeHash(buildTarget + Deno.version.deno + VERSION)
-    const bundleFilename = `polyfill.bundle.${hash.slice(0, 8)}.js`
-    const bundleFile = join(this.#app.buildDir, bundleFilename)
-    if (!existsFileSync(bundleFile)) {
+    const bundleFilename = `polyfill.bundle.${hash.slice(0, hashShort)}.js`
+    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    if (!existsFileSync(bundleFilePath)) {
       const rawPolyfillFile = `${alephPkgUri}/bundler/polyfills/${buildTarget}/mod.ts`
-      await this.build(rawPolyfillFile, bundleFile)
+      await this.build(rawPolyfillFile, bundleFilePath)
     }
     this.#bundledFiles.set('polyfill', bundleFilename)
-    log.info(`  {} polyfill.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+    log.info(`  {} polyfill.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
   /** create bundle chunk. */
-  private async createBundleChunk(name: string, entry: string[], external: string[]) {
+  private async bundleChunk(name: string, entry: string[], external: string[]) {
     const entryCode = (await Promise.all(entry.map(async (url, i) => {
       let mod = this.#app.getModule(url)
       if (mod && mod.jsFile !== '') {
@@ -237,23 +239,23 @@ export class Bundler {
       return []
     }))).flat().join('\n')
     const hash = computeHash(entryCode + VERSION + Deno.version.deno)
-    const bundleFilename = `${name}.bundle.${hash.slice(0, 8)}.js`
+    const bundleFilename = `${name}.bundle.${hash.slice(0, hashShort)}.js`
     const bundleEntryFile = join(this.#app.buildDir, `${name}.bundle.entry.js`)
-    const bundleFile = join(this.#app.buildDir, bundleFilename)
-    if (!existsFileSync(bundleFile)) {
+    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    if (!existsFileSync(bundleFilePath)) {
       await Deno.writeTextFile(bundleEntryFile, entryCode)
-      await this.build(bundleEntryFile, bundleFile)
+      await this.build(bundleEntryFile, bundleFilePath)
       lazyRemove(bundleEntryFile)
     }
     this.#bundledFiles.set(name, bundleFilename)
-    log.info(`  {} ${name}.js ${dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+    log.info(`  {} ${name}.js ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
   /** run deno bundle and compress the output using terser. */
   private async build(entryFile: string, bundleFile: string) {
     const { buildTarget, browserslist } = this.#app.config
 
-    await clearBundle(bundleFile)
+    await clearBuildCache(bundleFile)
     await build({
       entryPoints: [entryFile],
       outfile: bundleFile,
@@ -263,6 +265,8 @@ export class Bundler {
       })),
       bundle: true,
       minify: true,
+      treeShaking: true,
+      sourcemap: false,
       plugins: [{
         name: 'http-loader',
         setup(build) {
@@ -295,6 +299,27 @@ export class Bundler {
   }
 }
 
-async function clearBundle(filename: string) {
+export function simpleJSMinify(code: string) {
+  return code.split('\n').map(l => l.trim()
+    .replace(/\s*([,:=|+]{1,2})\s+/g, '$1')
+    .replaceAll(') {', '){')
+  ).join('')
+}
 
+async function clearBuildCache(filename: string) {
+  const dir = dirname(filename)
+  const hashname = basename(filename)
+  if (!reHashJS.test(hashname) || !existsDirSync(dir)) {
+    return
+  }
+
+  const jsName = hashname.split('.').slice(0, -2).join('.') + '.js'
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isFile && reHashJS.test(entry.name)) {
+      const _jsName = entry.name.split('.').slice(0, -2).join('.') + '.js'
+      if (_jsName === jsName && hashname !== entry.name) {
+        await Deno.remove(join(dir, entry.name))
+      }
+    }
+  }
 }

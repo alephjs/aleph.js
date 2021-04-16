@@ -8,7 +8,7 @@ import {
   join,
   resolve
 } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { Bundler, bundlerRuntimeCode } from '../bundler/mod.ts'
+import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
 import {
   buildChecksum,
   ImportMap,
@@ -720,7 +720,7 @@ export class Application implements ServerApplication {
     }
 
     return [
-      bundlerRuntimeCode,
+      simpleJSMinify(bundlerRuntimeCode),
       ...['polyfill', 'deps', 'shared', 'main', entryFile ? util.trimSuffix(entryFile, '.js') : '']
         .filter(name => name !== "" && this.#bundler.getBundledFile(name) !== null)
         .map(name => ({
