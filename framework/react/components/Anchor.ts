@@ -113,7 +113,7 @@ export default function Anchor(props: AnchorProps) {
     if (util.isFunction(props.onMouseEnter)) {
       props.onMouseEnter(e)
     }
-    if (e.defaultPrevented) {
+    if (e.defaultPrevented || isModifiedEvent(e)) {
       return
     }
     e.preventDefault()
@@ -140,5 +140,18 @@ export default function Anchor(props: AnchorProps) {
       'aria-current': ariaCurrent
     },
     children
+  )
+}
+
+function isModifiedEvent(event: React.MouseEvent): boolean {
+  const { target } = event.currentTarget as any
+  const nativeEvent = event.nativeEvent as any
+  return (
+    (target && target !== '_self') ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey || // triggers resource download
+    (nativeEvent && nativeEvent.which === 2)
   )
 }
