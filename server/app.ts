@@ -889,7 +889,10 @@ export class Application implements ServerApplication {
       }
     }
 
-    return await cache(url, { forceRefresh: this.#reloading, retryTimes: 10 })
+    return await cache(url, {
+      forceRefresh: this.#reloading,
+      retryTimes: 10
+    })
   }
 
   private async precompile(

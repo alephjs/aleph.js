@@ -4,15 +4,13 @@ import { join } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { existsFileSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import log from '../shared/log.ts'
-import { getDenoDir, reFullVersion } from './helper.ts'
+import { getDenoDir } from './helper.ts'
 
 /** download and cache remote content */
 export async function cache(url: string, options?: { forceRefresh?: boolean, retryTimes?: number }) {
   const u = new URL(url)
   const { protocol, hostname, port, pathname, search } = u
   const isLocalhost = hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '172.0.0.1'
-  const versioned = reFullVersion.test(pathname)
-  const reload = !!options?.forceRefresh || !versioned
   const cacheDir = join(
     await getDenoDir(),
     'deps',
@@ -23,7 +21,7 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
   const contentFile = join(cacheDir, hash)
   const metaFile = join(cacheDir, hash + '.metadata.json')
 
-  if (!reload && !isLocalhost && existsFileSync(contentFile) && existsFileSync(metaFile)) {
+  if (!options?.forceRefresh && !isLocalhost && existsFileSync(contentFile) && existsFileSync(metaFile)) {
     const [content, meta] = await Promise.all([
       Deno.readFile(contentFile),
       Deno.readTextFile(metaFile),
