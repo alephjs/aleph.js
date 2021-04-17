@@ -17,7 +17,6 @@ use source_type::SourceType;
 use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, SWC};
-use swc_ecmascript::parser::JscTarget;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
 #[derive(Deserialize)]
@@ -42,9 +41,6 @@ pub struct Options {
   pub is_dev: bool,
 
   #[serde(default)]
-  pub transpile_only: bool,
-
-  #[serde(default)]
   pub bundle_mode: bool,
 
   #[serde(default)]
@@ -57,9 +53,6 @@ pub struct SWCOptions {
   #[serde(default)]
   pub source_type: SourceType,
 
-  #[serde(default = "default_target")]
-  pub target: JscTarget,
-
   #[serde(default = "default_pragma")]
   pub jsx_factory: String,
 
@@ -71,15 +64,10 @@ impl Default for SWCOptions {
   fn default() -> Self {
     SWCOptions {
       source_type: SourceType::default(),
-      target: default_target(),
       jsx_factory: default_pragma(),
       jsx_fragment_factory: default_pragma_frag(),
     }
   }
-}
-
-fn default_target() -> JscTarget {
-  JscTarget::Es2020
 }
 
 fn default_pragma() -> String {
@@ -143,12 +131,10 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
     .transform(
       resolver.clone(),
       &EmitOptions {
-        target: options.swc_options.target,
         jsx_factory: options.swc_options.jsx_factory.clone(),
         jsx_fragment_factory: options.swc_options.jsx_fragment_factory.clone(),
         source_map: options.source_map,
         is_dev: options.is_dev,
-        transpile_only: options.transpile_only,
       },
     )
     .expect("could not transform module");

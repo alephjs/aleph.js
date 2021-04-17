@@ -229,7 +229,10 @@ impl Fold for ResolveFold {
                 }))
               } else {
                 if self.resolve_star_exports {
-                  let mut src = fixed_url.to_owned();
+                  let mut src = "".to_owned();
+                  src.push('[');
+                  src.push_str(fixed_url.as_str());
+                  src.push(']');
                   src.push(':');
                   src.push_str(resolved_path.as_str());
                   resolver.star_exports.push(fixed_url.clone());
@@ -624,7 +627,7 @@ mod tests {
     assert!(code.contains("import Logo3 from \"../component/logo.js#/component/logo.tsx@000000\""));
     assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000000\")"));
     assert!(code.contains("export { useState } from \"../-/esm.sh/react@17.0.2.js\""));
-    assert!(code.contains("export * from \"../-/esm.sh/swr.js\""));
+    assert!(code.contains("export * from \"[https://esm.sh/swr]:../-/esm.sh/swr.js\""));
   }
 
   #[test]
