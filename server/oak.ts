@@ -1,4 +1,5 @@
-import type { Middleware, Context } from 'https://deno.land/x/oak/mod.ts'
+import type { Context } from 'https://deno.land/x/oak@v7.2.0/context.ts'
+import type { Middleware } from 'https://deno.land/x/oak@v7.2.0/middleware.ts'
 import { Application } from './app.ts'
 import { Server } from './server.ts'
 
@@ -7,8 +8,7 @@ export function alephOak(app: Application): Middleware {
   const server = new Server(app)
 
   return (ctx: Context) => {
-    const req = ctx.request as any
-    server.handle(req.originalRequest || req.serverRequest)
+    server.handle(ctx.request.originalRequest)
     ctx.respond = false
   }
 }

@@ -1,5 +1,3 @@
-// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
-export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
 import { dim, red, yellow } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.93.0/hash/mod.ts'
 import { relative } from 'https://deno.land/std@0.93.0/path/mod.ts'
@@ -9,13 +7,16 @@ import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
 
+// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
+export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
+
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
 
 let __denoDir: string | null = null
 let __localProxy = false
 
-/** check whether should proxy https://deno.land/x/aleph on local. */
+/** check whether should proxy https://deno.land/x/aleph on localhost. */
 export function checkAlephDev() {
   const v = Deno.env.get('ALEPH_DEV')
   if (v !== undefined && !__localProxy) {
@@ -24,12 +25,12 @@ export function checkAlephDev() {
   }
 }
 
-/** check the plugin whether is a loader plugin. */
+/** check the plugin whether it is a loader. */
 export function isLoaderPlugin(plugin: LoaderPlugin | ServerPlugin): plugin is LoaderPlugin {
   return plugin.type === 'loader'
 }
 
-/** get deno dir. */
+/** get the deno cache dir. */
 export async function getDenoDir() {
   if (__denoDir !== null) {
     return __denoDir
@@ -100,7 +101,7 @@ export function computeHash(content: string | Uint8Array): string {
 }
 
 /**
- * colorful the bytes string
+ * coloring the bytes string
  * - dim: 0 - 1MB
  * - yellow: 1MB - 10MB
  * - red: > 10MB

@@ -12,7 +12,8 @@ export type ServeOptions = {
   /** The port to listen on. */
   port: number
   /** A literal IP address or host name that can be resolved to an IP address.
-   * If not specified, defaults to `0.0.0.0`. */
+   * If not specified, defaults to `0.0.0.0`.
+   */
   hostname?: string
   /** Server certificate file. */
   certFile?: string

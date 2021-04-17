@@ -2,29 +2,28 @@ import { ensureDir } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
 import { createHash } from 'https://deno.land/std@0.93.0/hash/mod.ts'
 import { join } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { existsFileSync } from '../shared/fs.ts'
-import util from '../shared/util.ts'
 import log from '../shared/log.ts'
+import util from '../shared/util.ts'
 import { getDenoDir } from './helper.ts'
 
-/** download and cache remote content */
+/** download and cache remote contents */
 export async function cache(url: string, options?: { forceRefresh?: boolean, retryTimes?: number }) {
-  const u = new URL(url)
-  const { protocol, hostname, port, pathname, search } = u
-  const isLocalhost = hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '172.0.0.1'
+  const { protocol, hostname, port, pathname, search } = new URL(url)
+  const hashname = createHash('sha256').update(pathname + search).toString()
+  const isLocalhost = hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '127.0.0.1'
   const cacheDir = join(
     await getDenoDir(),
     'deps',
     util.trimSuffix(protocol, ':'),
     hostname + (port ? '_PORT' + port : '')
   )
-  const hash = createHash('sha256').update(pathname + search).toString()
-  const contentFile = join(cacheDir, hash)
-  const metaFile = join(cacheDir, hash + '.metadata.json')
+  const contentFilepath = join(cacheDir, hashname)
+  const metaFilepath = join(cacheDir, hashname + '.metadata.json')
 
-  if (!options?.forceRefresh && !isLocalhost && existsFileSync(contentFile) && existsFileSync(metaFile)) {
+  if (!options?.forceRefresh && !isLocalhost && existsFileSync(contentFilepath) && existsFileSync(metaFilepath)) {
     const [content, meta] = await Promise.all([
-      Deno.readFile(contentFile),
-      Deno.readTextFile(metaFile),
+      Deno.readFile(contentFilepath),
+      Deno.readTextFile(metaFilepath),
     ])
     try {
       const { headers = {} } = JSON.parse(meta)
@@ -47,7 +46,7 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
       log.warn(`Download ${url} failed, retrying...`)
     }
     try {
-      const resp = await fetch(u.toString())
+      const resp = await fetch(url)
       if (resp.status >= 400) {
         return Promise.reject(new Error(resp.statusText))
       }
@@ -59,8 +58,8 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
           headers[key] = val
         })
         await ensureDir(cacheDir)
-        Deno.writeFile(contentFile, content)
-        Deno.writeTextFile(metaFile, JSON.stringify({ headers, url }, undefined, 2))
+        Deno.writeFile(contentFilepath, content)
+        Deno.writeTextFile(metaFilepath, JSON.stringify({ headers, url }, undefined, 2))
       }
       return {
         content,
