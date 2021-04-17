@@ -1,5 +1,6 @@
 import util from '../shared/util.ts'
 import { PostCSSPlugin, CSSOptions } from '../types.ts'
+import { esbuild } from './helper.ts'
 
 const postcssVersion = '8.2.8'
 const productionOnlyPostcssPlugins = ['autoprefixer']
@@ -8,8 +9,7 @@ export class CSSProcessor {
   #isProd: boolean
   #options: Required<CSSOptions>
   #postcss: any
-  #cleanCSS: any
-  #modulesJSON: Record<string, Record<string, string>>
+  #modulesJSON: Map<string, Record<string, string>>
 
   constructor() {
     this.#isProd = false
@@ -18,8 +18,7 @@ export class CSSProcessor {
       postcss: { plugins: ['autoprefixer'] },
     }
     this.#postcss = null
-    this.#cleanCSS = null
-    this.#modulesJSON = {}
+    this.#modulesJSON = new Map()
   }
 
   config(isProd: boolean, options: CSSOptions) {
@@ -37,19 +36,11 @@ export class CSSProcessor {
       plugins.push(['postcss-modules', {
         ...options.modules,
         getJSON: (url: string, json: Record<string, string>) => {
-          this.#modulesJSON = { [url]: json }
+          this.#modulesJSON.set(url, json)
         },
       }])
       this.#options.postcss.plugins = plugins
     }
-  }
-
-  private getModulesJSON(url: string) {
-    const json = this.#modulesJSON[url] || {}
-    if (url in this.#modulesJSON) {
-      delete this.#modulesJSON[url]
-    }
-    return json
   }
 
   async transform(url: string, content: string): Promise<{ code: string, map?: string, classNames?: Record<string, string> }> {
@@ -64,17 +55,25 @@ export class CSSProcessor {
     }
 
     if (this.#postcss == null) {
-      const [postcss, cleanCSS] = await Promise.all([
-        initPostCSS(this.#options.postcss.plugins),
-        this.#isProd ? initCleanCSS() : Promise.resolve(null)
-      ])
-      this.#postcss = postcss
-      this.#cleanCSS = cleanCSS
+      this.#postcss = await initPostCSS(this.#options.postcss.plugins)
     }
 
     const { content: pcss } = await this.#postcss.process(content, { from: url }).async()
-    const modulesJSON = this.getModulesJSON(url)
-    const css = this.#isProd ? this.#cleanCSS.minify(pcss).styles : pcss
+
+    let css = pcss
+    if (this.#isProd) {
+      const ret = await esbuild({
+        stdin: {
+          loader: 'css',
+          sourcefile: url,
+          contents: pcss
+        },
+        minify: true,
+        write: false,
+        sourcemap: false,
+      })
+      css = ret.outputFiles[0].text
+    }
 
     if (url.startsWith('#inline-style-')) {
       return {
@@ -82,6 +81,9 @@ export class CSSProcessor {
         map: undefined
       }
     }
+
+    const modulesJSON = this.#modulesJSON.get(url) || {}
+    this.#modulesJSON.delete(url)
 
     return {
       code: [
@@ -93,11 +95,6 @@ export class CSSProcessor {
       // todo: generate map
     }
   }
-}
-
-async function initCleanCSS() {
-  const { default: CleanCSS } = await import('https://esm.sh/clean-css@5.1.2?no-check')
-  return new CleanCSS({ compatibility: '*' /* Internet Explorer 10+ */ })
 }
 
 async function initPostCSS(plugins: PostCSSPlugin[]) {

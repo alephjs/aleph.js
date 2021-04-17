@@ -13,7 +13,6 @@ use swc_common::{
   errors::{Handler, HandlerFlags},
   FileName, Globals, SourceMap,
 };
-use swc_ecma_transforms_compat::{es2016, es2017, es2018, es2020};
 use swc_ecma_transforms_proposal::decorators;
 use swc_ecma_transforms_typescript::strip;
 use swc_ecmascript::{
@@ -27,24 +26,18 @@ use swc_ecmascript::{
 /// Options for transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
-  pub target: JscTarget,
   pub jsx_factory: String,
   pub jsx_fragment_factory: String,
-  pub is_dev: bool,
-  pub transpile_only: bool,
-  pub resolve_star_exports: bool,
   pub source_map: bool,
+  pub is_dev: bool,
 }
 
 impl Default for EmitOptions {
   fn default() -> Self {
     EmitOptions {
-      target: JscTarget::Es2020,
       jsx_factory: "React.createElement".into(),
       jsx_fragment_factory: "React.Fragment".into(),
       is_dev: false,
-      transpile_only: false,
-      resolve_star_exports: false,
       source_map: false,
     }
   }
@@ -132,7 +125,6 @@ impl SWC {
   ) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
-      let transpile_only = options.transpile_only;
       let is_ts = match self.source_type {
         SourceType::TS => true,
         SourceType::TSX => true,
@@ -146,16 +138,9 @@ impl SWC {
       let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) =
         aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev);
       let mut passes = chain!(
-        Optional::new(
-          resolve_fold(
-            resolver.clone(),
-            self.source_map.clone(),
-            options.resolve_star_exports,
-          ),
-          !transpile_only
-        ),
-        Optional::new(aleph_jsx_fold, is_jsx && !transpile_only),
-        Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx && !transpile_only),
+        resolve_fold(resolver.clone(), self.source_map.clone(), !options.is_dev),
+        Optional::new(aleph_jsx_fold, is_jsx),
+        Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
         Optional::new(
           react_refresh_fold(
             "$RefreshReg$",
@@ -163,7 +148,7 @@ impl SWC {
             false,
             self.source_map.clone()
           ),
-          options.is_dev && !specifier_is_remote && !transpile_only
+          options.is_dev && !specifier_is_remote
         ),
         Optional::new(
           react::jsx(
@@ -177,26 +162,16 @@ impl SWC {
               ..Default::default()
             },
           ),
-          is_jsx && !transpile_only
+          is_jsx
         ),
-        Optional::new(
-          decorators::decorators(decorators::Config {
-            legacy: true,
-            emit_metadata: false
-          }),
-          !transpile_only
-        ),
+        decorators::decorators(decorators::Config {
+          legacy: true,
+          emit_metadata: false
+        }),
+        helpers::inject_helpers(),
         Optional::new(strip(), is_ts),
-        Optional::new(es2020(), options.target < JscTarget::Es2020),
-        Optional::new(es2018(), options.target < JscTarget::Es2018),
-        Optional::new(es2017(), options.target < JscTarget::Es2017),
-        Optional::new(es2016(), options.target < JscTarget::Es2016),
-        Optional::new(
-          helpers::inject_helpers(),
-          options.target < JscTarget::Es2020
-        ),
-        Optional::new(hygiene(), options.target < JscTarget::Es2020),
         fixer(Some(&self.comments)),
+        hygiene()
       );
 
       self.apply_transform(&mut passes, options.source_map)

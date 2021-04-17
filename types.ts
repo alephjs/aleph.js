@@ -1,6 +1,6 @@
-import type { Status } from 'https://deno.land/std@0.92.0/http/http_status.ts'
-import type { BufReader, BufWriter } from 'https://deno.land/std@0.92.0/io/bufio.ts'
-import type { MultipartFormData } from 'https://deno.land/std@0.92.0/mime/multipart.ts'
+import type { Status } from 'https://deno.land/std@0.93.0/http/http_status.ts'
+import type { BufReader, BufWriter } from 'https://deno.land/std@0.93.0/io/bufio.ts'
+import type { MultipartFormData } from 'https://deno.land/std@0.93.0/mime/multipart.ts'
 import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
 
 /**
@@ -51,14 +51,23 @@ export type ServerPlugin = {
 
 export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
 
+export type BuildTarget = 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' | 'esnext'
+
+export type BrowserTarget = {
+  name: 'chrome' | 'edge' | 'firefox' | 'ios' | 'Safari'
+  version: string
+}
+
 /**
  * The config for the aleph server application.
  */
 export type Config = {
   /** `framework` specifies the framework (default is 'react'). */
   framework?: 'react'
-  /** `buildTarget` specifies the build target in production mode (default is **es2015**). */
-  buildTarget?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
+  /** `buildTarget` specifies the build target in production mode (default is [**es2015**]). */
+  buildTarget?: BuildTarget
+  /** `browserslist` specifies the target browsers for esbuild. */
+  browserslist?: BrowserTarget[]
   /** `basePath` specifies the path prefix for the application (default is '/'). */
   basePath?: string
   /** `srcDir` specifies the **src** dir (default is '/'). */

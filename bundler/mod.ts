@@ -1,28 +1,28 @@
-import { dim } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import * as path from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
-import { parseExportNames, transform } from '../compiler/mod.ts'
+import { dim } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { basename, dirname, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
+import { ensureDir, } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
+import { transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
-import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
+import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 import type { Application, Module } from '../server/app.ts'
-import {
-  clearCompilation,
-  computeHash,
-  getAlephPkgUri,
-} from '../server/helper.ts'
+import { cache } from '../server/cache.ts'
+import { computeHash, esbuild, stopEsbuild, getAlephPkgUri } from '../server/helper.ts'
 
-export const bundlerRuntimeCode = (`
+const hashShort = 8
+const reHashJS = new RegExp(`\\.[0-9a-f]{${hashShort}}\\.js$`, 'i')
+
+export const bundlerRuntimeCode = `
   window.__ALEPH = {
     basePath: '/',
     pack: {},
-    bundledFiles: {},
+    bundled: {},
     import: function(u, F) {
       var b = this.basePath,
           a = this.pack,
-          l = this.bundledFiles;
+          l = this.bundled;
       if (u in a) {
         return Promise.resolve(a[u]);
       }
@@ -47,23 +47,18 @@ export const bundlerRuntimeCode = (`
       })
     }
   }
-`).split('\n')
-  .map(l => l.trim()
-    .replaceAll(') {', '){')
-    .replace(/\s*([,:=|+]{1,2})\s+/g, '$1')
-  )
-  .join('')
+`
 
 /** The bundler class for aleph server. */
 export class Bundler {
   #app: Application
-  #compiledModules: Set<string>
-  #bundledFiles: Map<string, string>
+  #bundled: Map<string, string>
+  #compiled: Map<string, string>
 
   constructor(app: Application) {
     this.#app = app
-    this.#compiledModules = new Set()
-    this.#bundledFiles = new Map()
+    this.#bundled = new Map()
+    this.#compiled = new Map()
   }
 
   async bundle(entryMods: Array<{ url: string, shared: boolean }>) {
@@ -83,21 +78,23 @@ export class Bundler {
       }
     })
 
-    await this.createPolyfillBundle()
-    await this.createBundleChunk(
+    if (this.#app.config.buildTarget !== 'esnext') {
+      await this.bundlePolyfillsChunck()
+    }
+    await this.bundleChunk(
       'deps',
       Array.from(remoteEntries),
       []
     )
     if (sharedEntries.size > 0) {
-      await this.createBundleChunk(
+      await this.bundleChunk(
         'shared',
         Array.from(sharedEntries),
         Array.from(remoteEntries)
       )
     }
     for (const url of entries) {
-      await this.createBundleChunk(
+      await this.bundleChunk(
         trimModuleExt(url),
         [url],
         [
@@ -106,118 +103,126 @@ export class Bundler {
         ].flat()
       )
     }
+
+    // create main.js after all chunks are bundled
     await this.createMainJS()
+
+    // unlike nodejs, Deno doesn't provide the necessary APIs to allow Deno to
+    // exit while esbuild's internal child process is still running.
+    stopEsbuild()
   }
 
   getBundledFile(name: string): string | null {
-    return this.#bundledFiles.get(name) || null
+    return this.#bundled.get(name) || null
   }
 
   async copyDist() {
     await Promise.all(
-      Array.from(this.#bundledFiles.values()).map(jsFile => this.copyBundleFile(jsFile))
+      Array.from(this.#bundled.values()).map(jsFile => this.copyBundleFile(jsFile))
     )
   }
 
   private async copyBundleFile(jsFilename: string) {
     const { buildDir, outputDir } = this.#app
-    const bundleFile = path.join(buildDir, jsFilename)
-    const saveAs = path.join(outputDir, '_aleph', jsFilename)
-    await ensureDir(path.dirname(saveAs))
+    const bundleFile = join(buildDir, jsFilename)
+    const saveAs = join(outputDir, '_aleph', jsFilename)
+    await ensureDir(dirname(saveAs))
     await Deno.copyFile(bundleFile, saveAs)
   }
 
   private async compile(mod: Module, external: string[]): Promise<string> {
-    const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
+    if (this.#compiled.has(mod.url)) {
+      return this.#compiled.get(mod.url)!
+    }
 
-    if (this.#compiledModules.has(mod.url)) {
+    const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
+    this.#compiled.set(mod.url, bundlingFile)
+
+    if (existsFileSync(bundlingFile)) {
       return bundlingFile
     }
 
-    const source = await this.#app.resolveModule(mod.url)
+    const source = await this.#app.readModule(mod.url)
     if (source === null) {
+      this.#compiled.delete(mod.url)
       throw new Error(`Unsupported module '${mod.url}'`)
     }
 
-    let { code, starExports } = await transform(
-      mod.url,
-      source.code,
-      {
-        ...this.#app.sharedCompileOptions,
-        swcOptions: {
-          target: 'es2020',
-          sourceType: source.type,
-        },
-        bundleMode: true,
-        bundleExternal: external,
-      }
-    )
+    try {
+      let { code, starExports } = await transform(
+        mod.url,
+        source.code,
+        {
+          ...this.#app.sharedCompileOptions,
+          swcOptions: {
+            sourceType: source.type,
+          },
+          bundleMode: true,
+          bundleExternal: external,
+        }
+      )
 
-    if (starExports && starExports.length > 0) {
-      for (let index = 0; index < starExports.length; index++) {
-        const url = starExports[index]
-        const source = await this.#app.resolveModule(url)
-        const names = await parseExportNames(url, source.code, { sourceType: source.type })
-        code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
-      }
-    }
-
-    // compile deps
-    for (const dep of mod.deps) {
-      if (!dep.url.startsWith('#') && !external.includes(dep.url)) {
-        const depMod = this.#app.getModule(dep.url)
-        if (depMod !== null) {
-          const s = `.bundling.js#${dep.url}@`
-          await this.compile(depMod, external)
-          code = code.split(s).map((p, i) => {
-            if (i > 0 && p.charAt(6) === '"') {
-              return dep.hash.slice(0, 6) + p.slice(6)
-            }
-            return p
-          }).join(s)
+      if (starExports && starExports.length > 0) {
+        for (let index = 0; index < starExports.length; index++) {
+          const url = starExports[index]
+          const names = await this.#app.parseModuleExportNames(url)
+          code = code.replace(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+          code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
         }
       }
+
+      // compile deps
+      await Promise.all(mod.deps.map(async dep => {
+        if (!dep.url.startsWith('#') && !external.includes(dep.url)) {
+          const depMod = this.#app.getModule(dep.url)
+          if (depMod !== null) {
+            await this.compile(depMod, external)
+          }
+        }
+      }))
+
+      await ensureTextFile(bundlingFile, code)
+      return bundlingFile
+    } catch (e) {
+      this.#compiled.delete(mod.url)
+      throw new Error(`Can't compile module '${mod.url}': ${e.message}`)
     }
-
-    await ensureTextFile(bundlingFile, code)
-    this.#compiledModules.add(mod.url)
-
-    return bundlingFile
   }
 
   private async createMainJS() {
-    const bundledFiles = Array.from(this.#bundledFiles.entries())
-      .filter(([name]) => !['polyfill', 'deps', 'shared'].includes(name))
+    const bundled = Array.from(this.#bundled.entries())
+      .filter(([name]) => !['polyfills', 'deps', 'shared'].includes(name))
       .reduce((r, [name, filename]) => {
         r[name] = filename
         return r
       }, {} as Record<string, string>)
-    const mainJS = `__ALEPH.bundledFiles=${JSON.stringify(bundledFiles)};` + this.#app.getMainJS(true)
+    const mainJS = `__ALEPH.bundled=${JSON.stringify(bundled)};` + this.#app.getMainJS(true)
     const hash = computeHash(mainJS)
-    const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
-    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
-    await Deno.writeTextFile(bundleFile, mainJS)
-    this.#bundledFiles.set('main', bundleFilename)
+    const bundleFilename = `main.bundle.${hash.slice(0, hashShort)}.js`
+    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    await Deno.writeTextFile(bundleFilePath, mainJS)
+    this.#bundled.set('main', bundleFilename)
     log.info(`  {} main.js ${dim('• ' + util.formatBytes(mainJS.length))}`)
   }
 
-  /** create polyfill bundle. */
-  private async createPolyfillBundle() {
+  /** create polyfills bundle. */
+  private async bundlePolyfillsChunck() {
     const alephPkgUri = getAlephPkgUri()
     const { buildTarget } = this.#app.config
-    const hash = computeHash(buildTarget + Deno.version.deno + VERSION)
-    const bundleFilename = `polyfill.bundle.${hash.slice(0, 8)}.js`
-    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
-    if (!existsFileSync(bundleFile)) {
-      const rawPolyfillFile = `${alephPkgUri}/bundler/polyfills/${buildTarget}/mod.ts`
-      await this._bundle(rawPolyfillFile, bundleFile)
+    const polyfillTarget = 'es' + (parseInt(buildTarget.slice(2)) + 1) // buildTarget + 1
+    const hash = computeHash(polyfillTarget + '/esbuild@v0.11.11/' + VERSION)
+    const bundleFilename = `polyfills.bundle.${hash.slice(0, hashShort)}.js`
+    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    if (!existsFileSync(bundleFilePath)) {
+      const rawPolyfillsFile = `${alephPkgUri}/bundler/polyfills/${polyfillTarget}/mod.ts`
+      await this.build(rawPolyfillsFile, bundleFilePath)
     }
-    this.#bundledFiles.set('polyfill', bundleFilename)
-    log.info(`  {} polyfill.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+    this.#bundled.set('polyfills', bundleFilename)
+    log.info(`  {} polyfills.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
   /** create bundle chunk. */
-  private async createBundleChunk(name: string, entry: string[], external: string[]) {
+  private async bundleChunk(name: string, entry: string[], external: string[]) {
     const entryCode = (await Promise.all(entry.map(async (url, i) => {
       let mod = this.#app.getModule(url)
       if (mod && mod.jsFile !== '') {
@@ -237,79 +242,87 @@ export class Bundler {
       return []
     }))).flat().join('\n')
     const hash = computeHash(entryCode + VERSION + Deno.version.deno)
-    const bundleFilename = `${name}.bundle.${hash.slice(0, 8)}.js`
-    const bundleEntryFile = path.join(this.#app.buildDir, `${name}.bundle.entry.js`)
-    const bundleFile = path.join(this.#app.buildDir, bundleFilename)
-    if (!existsFileSync(bundleFile)) {
+    const bundleFilename = `${name}.bundle.${hash.slice(0, hashShort)}.js`
+    const bundleEntryFile = join(this.#app.buildDir, `${name}.bundle.entry.js`)
+    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    if (!existsFileSync(bundleFilePath)) {
       await Deno.writeTextFile(bundleEntryFile, entryCode)
-      await this._bundle(bundleEntryFile, bundleFile)
+      await this.build(bundleEntryFile, bundleFilePath)
       lazyRemove(bundleEntryFile)
     }
-    this.#bundledFiles.set(name, bundleFilename)
-    log.info(`  {} ${name}.js ${dim('• ' + util.formatBytes(Deno.statSync(bundleFile).size))}`)
+    this.#bundled.set(name, bundleFilename)
+    log.info(`  {} ${name}.js ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
   /** run deno bundle and compress the output using terser. */
-  private async _bundle(bundleEntryFile: string, bundleFile: string) {
-    // todo: use Deno.emit()
-    const p = Deno.run({
-      cmd: [Deno.execPath(), 'bundle', '--no-check', bundleEntryFile, bundleFile],
-      stdout: 'null',
-      stderr: 'piped'
-    })
-    const data = await p.stderrOutput()
-    p.close()
-    if (!existsFileSync(bundleFile)) {
-      const msg = (new TextDecoder).decode(data).replaceAll('file://', '').replaceAll(this.#app.buildDir, '/_aleph')
-      await Deno.stderr.write((new TextEncoder).encode(msg))
-      Deno.exit(1)
-    }
+  private async build(entryFile: string, bundleFile: string) {
+    const { buildTarget, browserslist } = this.#app.config
 
-    // transpile bundle code to `buildTarget`
-    const { buildTarget } = this.#app.config
-
-    let { code } = await transform(
-      '/bundle.js',
-      await Deno.readTextFile(bundleFile),
-      {
-        transpileOnly: true,
-        swcOptions: {
-          target: buildTarget
+    await clearBuildCache(bundleFile)
+    await esbuild({
+      entryPoints: [entryFile],
+      outfile: bundleFile,
+      platform: 'browser',
+      target: [String(buildTarget)].concat(browserslist.map(({ name, version }) => {
+        return `${name.toLowerCase()}${version}`
+      })),
+      bundle: true,
+      minify: true,
+      treeShaking: true,
+      sourcemap: false,
+      plugins: [{
+        name: 'http-loader',
+        setup(build) {
+          build.onResolve({ filter: /.*/ }, args => {
+            if (util.isLikelyHttpURL(args.path)) {
+              return {
+                path: args.path,
+                namespace: 'http-module',
+              }
+            }
+            if (args.namespace === 'http-module') {
+              return {
+                path: (new URL(args.path, args.importer)).toString(),
+                namespace: 'http-module',
+              }
+            }
+            const [path] = util.splitBy(util.trimPrefix(args.path, 'file://'), '#')
+            if (path.startsWith('.')) {
+              return { path: join(args.resolveDir, path) }
+            }
+            return { path }
+          })
+          build.onLoad({ filter: /.*/, namespace: 'http-module' }, async args => {
+            const { content } = await cache(args.path)
+            return { contents: content }
+          })
         }
+      }],
+    })
+  }
+}
+
+export function simpleJSMinify(code: string) {
+  return code.split('\n').map(l => l.trim()
+    .replace(/\s*([,:=|+]{1,2})\s+/g, '$1')
+    .replaceAll(') {', '){')
+  ).join('')
+}
+
+async function clearBuildCache(filename: string) {
+  const dir = dirname(filename)
+  const hashname = basename(filename)
+  if (!reHashJS.test(hashname) || !existsDirSync(dir)) {
+    return
+  }
+
+  const jsName = hashname.split('.').slice(0, -2).join('.') + '.js'
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isFile && reHashJS.test(entry.name)) {
+      const _jsName = entry.name.split('.').slice(0, -2).join('.') + '.js'
+      if (_jsName === jsName && hashname !== entry.name) {
+        await Deno.remove(join(dir, entry.name))
       }
-    )
-
-    // IIFEify
-    code = `(() => { ${code} })()`
-
-    // minify code
-    // todo: use swc minify instead (https://github.com/swc-project/swc/pull/1302)
-    const mini = await minify(code, parseInt(util.trimPrefix(buildTarget, 'es')))
-    if (mini !== undefined) {
-      code = mini
     }
-
-    await clearCompilation(bundleFile)
-    await Deno.writeTextFile(bundleFile, code)
   }
-}
-
-interface Minify {
-  (code: string, options: any): Promise<{ code: string }>
-}
-
-let terser: Minify | null = null
-
-async function minify(code: string, ecma: number = 2015) {
-  if (terser === null) {
-    const { minify } = await import('https://esm.sh/terser@5.6.1?no-check')
-    terser = minify as Minify
-  }
-  const ret = await terser(code, {
-    compress: true,
-    mangle: true,
-    ecma,
-    sourceMap: false
-  })
-  return ret.code
 }

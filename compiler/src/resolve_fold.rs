@@ -53,14 +53,14 @@ impl Fold for ResolveFold {
 
   // resolve import/export url
   // [/pages/index.tsx]
-  // - es6 mode:
+  // - dev mode:
   //   - `import React, { useState } from "https://esm.sh/react"` -> `import React, {useState} from "/-/esm.sh/react.js"`
   //   - `import * as React from "https://esm.sh/react"` -> `import * as React from "/-/esm.sh/react.js"`
   //   - `import Logo from "../components/logo.tsx"` -> `import Logo from "/components/logo.js"`
   //   - `import "../style/index.css" -> `import "/style/index.css.js"`
   //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
   //   - `export * from "https://esm.sh/react"` -> `export * from "/-/esm.sh/react.js"`
-  // - bundling mode:
+  // - bundle mode:
   //   - `import React, { useState } from "https://esm.sh/react"` -> `const { default: React, useState } = __ALEPH.pack["https://esm.sh/react"];`
   //   - `import * as React from "https://esm.sh/react"` -> `const React = __ALEPH.pack["https://esm.sh/react"]`
   //   - `import Logo from "../components/logo.tsx"` -> `const { default: Logo } = __ALEPH.pack["/components/logo.tsx"]`
@@ -229,7 +229,10 @@ impl Fold for ResolveFold {
                 }))
               } else {
                 if self.resolve_star_exports {
-                  let mut src = fixed_url.to_owned();
+                  let mut src = "".to_owned();
+                  src.push('[');
+                  src.push_str(fixed_url.as_str());
+                  src.push(']');
                   src.push(':');
                   src.push_str(resolved_path.as_str());
                   resolver.star_exports.push(fixed_url.clone());
@@ -624,7 +627,7 @@ mod tests {
     assert!(code.contains("import Logo3 from \"../component/logo.js#/component/logo.tsx@000000\""));
     assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000000\")"));
     assert!(code.contains("export { useState } from \"../-/esm.sh/react@17.0.2.js\""));
-    assert!(code.contains("export * from \"../-/esm.sh/swr.js\""));
+    assert!(code.contains("export * from \"[https://esm.sh/swr]:../-/esm.sh/swr.js\""));
   }
 
   #[test]
@@ -733,11 +736,9 @@ mod tests {
     assert!(code.contains("const { default: React , useState , useEffect: useEffect_  } = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("const React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("const { default: Logo  } = __ALEPH.pack[\"/components/logo.tsx\"]"));
-    assert!(
-      code.contains("import Nav from \"../components/nav.bundling.js#/components/nav.tsx@000000\"")
-    );
+    assert!(code.contains("import Nav from \"../components/nav.bundling.js\""));
     assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
-    assert!(code.contains("import   \"../shared/iife2.bundling.js#/shared/iife2.ts@000000\""));
+    assert!(code.contains("import   \"../shared/iife2.bundling.js\""));
     assert!(
       code.contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"/components/async-logo.tsx\"")
     );
@@ -748,7 +749,7 @@ mod tests {
       "import __ALEPH_StyleLink from \"../-/deno.land/x/aleph/framework/react/components/StyleLink.bundling.js\""
     ));
     assert!(code.contains("import   \"../-/esm.sh/tailwindcss/dist/tailwind.min.css.bundling.js\""));
-    assert!(code.contains("import   \"../style/index.css.bundling.js#/style/index.css@000000\""));
+    assert!(code.contains("import   \"../style/index.css.bundling.js\""));
     assert!(code.contains("export const $$star_0 = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
     assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));

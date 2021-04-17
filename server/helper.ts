@@ -1,19 +1,49 @@
-import { dim, red, yellow } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import { createHash } from 'https://deno.land/std@0.92.0/hash/mod.ts'
-import { relative } from 'https://deno.land/std@0.92.0/path/mod.ts'
+import { dim, red, yellow } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { createHash } from 'https://deno.land/std@0.93.0/hash/mod.ts'
+import { relative } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
 
+// @deno-types="https://deno.land/x/esbuild@v0.11.12/mod.d.ts"
+export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.12/mod.js'
+
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
+
+export const moduleWalkOptions = {
+  includeDirs: false,
+  skip: [
+    /(^|\/|\\)\./,
+    /\.d\.ts$/i,
+    /(\.|_)(test|spec|e2e)\.[a-z]+$/i
+  ]
+}
+
+// inject browser navigator polyfill
+Object.assign((globalThis as any).navigator, {
+  connection: {
+    downlink: 10,
+    effectiveType: '4g',
+    onchange: null,
+    rtt: 50,
+    saveData: false,
+  },
+  cookieEnabled: false,
+  language: 'en',
+  languages: ['en'],
+  onLine: true,
+  platform: Deno.build.os,
+  userAgent: `Deno/${Deno.version.deno}`,
+  vendor: 'Deno Land'
+})
 
 let __denoDir: string | null = null
 let __localProxy = false
 
-/** check whether should proxy https://deno.land/x/aleph on local. */
+/** check whether should proxy https://deno.land/x/aleph on localhost. */
 export function checkAlephDev() {
   const v = Deno.env.get('ALEPH_DEV')
   if (v !== undefined && !__localProxy) {
@@ -22,12 +52,12 @@ export function checkAlephDev() {
   }
 }
 
-/** check the plugin whether is a loader plugin. */
+/** check the plugin whether it is a loader. */
 export function isLoaderPlugin(plugin: LoaderPlugin | ServerPlugin): plugin is LoaderPlugin {
   return plugin.type === 'loader'
 }
 
-/** get deno dir. */
+/** get the deno cache dir. */
 export async function getDenoDir() {
   if (__denoDir !== null) {
     return __denoDir
@@ -97,36 +127,8 @@ export function computeHash(content: string | Uint8Array): string {
   return createHash('sha1').update(content).toString()
 }
 
-/** clear the previous compilation cache */
-export async function clearCompilation(jsFile: string) {
-
-}
-
-/** parse port number */
-export function parsePortNumber(v: string): number {
-  const num = parseInt(v)
-  if (isNaN(num) || !Number.isInteger(num) || num <= 0 || num >= 1 << 16) {
-    throw new Error(`invalid port '${v}'`)
-  }
-  return num
-}
-
-/** get flag value by given keys. */
-export function getFlag(flags: Record<string, any>, keys: string[]): string | undefined
-export function getFlag(flags: Record<string, any>, keys: string[], defaultValue: string): string
-export function getFlag(flags: Record<string, any>, keys: string[], defaultValue?: string): string | undefined {
-  let value = defaultValue
-  for (const key of keys) {
-    if (key in flags) {
-      value = String(flags[key])
-      break
-    }
-  }
-  return value
-}
-
 /**
- * colorful the bytes string
+ * coloring the bytes string
  * - dim: 0 - 1MB
  * - yellow: 1MB - 10MB
  * - red: > 10MB

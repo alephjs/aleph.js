@@ -1,7 +1,7 @@
-import { join } from 'https://deno.land/std@0.92.0/path/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.92.0/fs/ensure_dir.ts'
+import { join } from 'https://deno.land/std@0.93.0/path/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
 import { existsFileSync } from '../shared/fs.ts'
-import log from '../shared/log.ts'
+import log, { Measure } from '../shared/log.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
 import init, { parseExportNamesSync, transformSync } from './dist/wasm-pack.js'
@@ -27,7 +27,6 @@ export type ReactResolve = {
 
 export type SWCOptions = {
   sourceType?: SourceType
-  target?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
   jsxFactory?: string
   jsxFragmentFactory?: string
 }
@@ -39,8 +38,6 @@ export type TransformOptions = {
   swcOptions?: SWCOptions
   sourceMap?: boolean
   isDev?: boolean
-  transpileOnly?: boolean
-  resolveStarExports?: boolean
   bundleMode?: boolean
   bundleExternal?: string[]
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>
@@ -88,6 +85,21 @@ export async function initWasm() {
   }
 }
 
+async function checkWasmReady() {
+  let ms: Measure | null = null
+  if (wasmReady === false) {
+    ms = new Measure()
+    wasmReady = initWasm()
+  }
+  if (wasmReady instanceof Promise) {
+    await wasmReady
+    wasmReady = true
+  }
+  if (ms !== null) {
+    ms.stop('init compiler wasm')
+  }
+}
+
 /**
  * transform module by swc.
  *
@@ -113,21 +125,9 @@ export async function initWasm() {
  * @param {object} options - the transform options.
  */
 export async function transform(url: string, code: string, options: TransformOptions = {}): Promise<TransformResult> {
-  let t: number | null = null
-  if (wasmReady === false) {
-    t = performance.now()
-    wasmReady = initWasm()
-  }
-  if (wasmReady instanceof Promise) {
-    await wasmReady
-    wasmReady = true
-  }
-  if (t !== null) {
-    log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
-  }
+  await checkWasmReady()
 
   const { inlineStylePreprocess, ...transformOptions } = options
-
   let {
     code: jsContent,
     deps,
@@ -165,19 +165,7 @@ export async function transform(url: string, code: string, options: TransformOpt
 
 /* parse export names of the module */
 export async function parseExportNames(url: string, code: string, options: SWCOptions = {}): Promise<string[]> {
-  let t: number | null = null
-  if (wasmReady === false) {
-    t = performance.now()
-    wasmReady = initWasm()
-  }
-  if (wasmReady instanceof Promise) {
-    await wasmReady
-    wasmReady = true
-  }
-  if (t !== null) {
-    log.debug(`init compiler wasm in ${Math.round(performance.now() - t)}ms`)
-  }
-
+  await checkWasmReady()
   return parseExportNamesSync(url, code, options)
 }
 

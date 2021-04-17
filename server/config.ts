@@ -1,5 +1,5 @@
-import { bold } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import { basename, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
+import { bold } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { basename, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import type { ImportMap, ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDirSync, existsFileSync } from '../shared/fs.ts'
@@ -9,14 +9,14 @@ import type { Config, CSSOptions, PostCSSPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
-export interface RequiredConfig extends Required<Omit<Config, 'css'>> {
-  react: ReactResolve,
-  css: Required<CSSOptions>
+export type RequiredConfig = Required<Config> & {
+  react: ReactResolve
 }
 
 export const defaultConfig: Readonly<RequiredConfig> = {
   framework: 'react',
   buildTarget: 'es2015',
+  browserslist: [],
   basePath: '/',
   srcDir: '/',
   outputDir: '/dist',
@@ -25,10 +25,7 @@ export const defaultConfig: Readonly<RequiredConfig> = {
   rewrites: {},
   ssr: {},
   plugins: [],
-  css: {
-    modules: false,
-    postcss: { plugins: ['autoprefixer'] },
-  },
+  css: {},
   headers: {},
   compress: true,
   env: {},
@@ -70,6 +67,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     outputDir,
     basePath,
     buildTarget,
+    browserslist,
     defaultLocale,
     locales,
     ssr,
@@ -99,6 +97,9 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (isBuildTarget(buildTarget)) {
     config.buildTarget = buildTarget
+  }
+  if (util.isNEArray(browserslist)) {
+    config.browserslist = browserslist
   }
   if (isLocaleID(defaultLocale)) {
     config.defaultLocale = defaultLocale
@@ -147,15 +148,22 @@ export async function loadAndUpgradeImportMap(workingDir: string): Promise<Impor
   for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
     importMapFile = join(workingDir, filename)
     if (existsFileSync(importMapFile)) {
-      const data = JSON.parse(await Deno.readTextFile(importMapFile))
-      const imports: Record<string, string> = toPlainStringRecord(data.imports)
-      const scopes: Record<string, Record<string, string>> = {}
-      if (util.isPlainObject(data.scopes)) {
-        Object.entries(data.scopes).forEach(([scope, imports]) => {
-          scopes[scope] = toPlainStringRecord(imports)
-        })
+      try {
+        const data = JSON.parse(await Deno.readTextFile(importMapFile))
+        const imports: Record<string, string> = toPlainStringRecord(data.imports)
+        const scopes: Record<string, Record<string, string>> = {}
+        if (util.isPlainObject(data.scopes)) {
+          Object.entries(data.scopes).forEach(([scope, imports]) => {
+            scopes[scope] = toPlainStringRecord(imports)
+          })
+        }
+        Object.assign(importMap, { imports, scopes })
+      } catch (e) {
+        log.error(`invalid '${filename}':`, e.message)
+        if (!confirm('Continue?')) {
+          Deno.exit(1)
+        }
       }
-      Object.assign(importMap, { imports, scopes })
       break
     }
   }
@@ -210,7 +218,7 @@ function isFramework(v: any): v is 'react' {
   }
 }
 
-function isBuildTarget(v: any): v is 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' {
+function isBuildTarget(v: any): v is 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' | 'esnext' {
   switch (v) {
     case 'es2015':
     case 'es2016':
@@ -218,6 +226,7 @@ function isBuildTarget(v: any): v is 'es2015' | 'es2016' | 'es2017' | 'es2018' |
     case 'es2018':
     case 'es2019':
     case 'es2020':
+    case 'esnext':
       return true
     default:
       return false
