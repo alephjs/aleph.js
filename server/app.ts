@@ -452,6 +452,10 @@ export class Application implements ServerApplication {
     return this.config.plugins.filter(isLoaderPlugin)
   }
 
+  get bundlerCompileCounter() {
+    return this.#bundler.compileCounter
+  }
+
   /** returns the module by given url. */
   getModule(url: string): Module | null {
     if (this.#modules.has(url)) {
