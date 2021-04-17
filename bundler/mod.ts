@@ -1,7 +1,7 @@
 import { dim } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
 import { basename, dirname, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { ensureDir, } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
-import { parseExportNames, transform } from '../compiler/mod.ts'
+import { transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -12,17 +12,17 @@ import { cache } from '../server/cache.ts'
 import { computeHash, esbuild, stopEsbuild, getAlephPkgUri } from '../server/helper.ts'
 
 const hashShort = 8
-const reHashJS = new RegExp(`\\.[0-9a-fx]{${hashShort}}\\.js$`, 'i')
+const reHashJS = new RegExp(`\\.[0-9a-f]{${hashShort}}\\.js$`, 'i')
 
 export const bundlerRuntimeCode = `
   window.__ALEPH = {
     basePath: '/',
     pack: {},
-    bundledFiles: {},
+    bundled: {},
     import: function(u, F) {
       var b = this.basePath,
           a = this.pack,
-          l = this.bundledFiles;
+          l = this.bundled;
       if (u in a) {
         return Promise.resolve(a[u]);
       }
@@ -52,11 +52,13 @@ export const bundlerRuntimeCode = `
 /** The bundler class for aleph server. */
 export class Bundler {
   #app: Application
-  #bundledFiles: Map<string, string>
+  #bundled: Map<string, string>
+  #compiled: Map<string, string>
 
   constructor(app: Application) {
     this.#app = app
-    this.#bundledFiles = new Map()
+    this.#bundled = new Map()
+    this.#compiled = new Map()
   }
 
   async bundle(entryMods: Array<{ url: string, shared: boolean }>) {
@@ -111,12 +113,12 @@ export class Bundler {
   }
 
   getBundledFile(name: string): string | null {
-    return this.#bundledFiles.get(name) || null
+    return this.#bundled.get(name) || null
   }
 
   async copyDist() {
     await Promise.all(
-      Array.from(this.#bundledFiles.values()).map(jsFile => this.copyBundleFile(jsFile))
+      Array.from(this.#bundled.values()).map(jsFile => this.copyBundleFile(jsFile))
     )
   }
 
@@ -129,6 +131,10 @@ export class Bundler {
   }
 
   private async compile(mod: Module, external: string[]): Promise<string> {
+    if (this.#compiled.has(mod.url)) {
+      return this.#compiled.get(mod.url)!
+    }
+
     const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
 
     if (existsFileSync(bundlingFile)) {
@@ -162,6 +168,8 @@ export class Bundler {
       }
     }
 
+    this.#compiled.set(mod.url, bundlingFile)!
+
     // compile deps
     for (const dep of mod.deps) {
       if (!dep.url.startsWith('#') && !external.includes(dep.url)) {
@@ -178,18 +186,18 @@ export class Bundler {
   }
 
   private async createMainJS() {
-    const bundledFiles = Array.from(this.#bundledFiles.entries())
+    const bundled = Array.from(this.#bundled.entries())
       .filter(([name]) => !['polyfill', 'deps', 'shared'].includes(name))
       .reduce((r, [name, filename]) => {
         r[name] = filename
         return r
       }, {} as Record<string, string>)
-    const mainJS = `__ALEPH.bundledFiles=${JSON.stringify(bundledFiles)};` + this.#app.getMainJS(true)
+    const mainJS = `__ALEPH.bundled=${JSON.stringify(bundled)};` + this.#app.getMainJS(true)
     const hash = computeHash(mainJS)
     const bundleFilename = `main.bundle.${hash.slice(0, hashShort)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
     await Deno.writeTextFile(bundleFilePath, mainJS)
-    this.#bundledFiles.set('main', bundleFilename)
+    this.#bundled.set('main', bundleFilename)
     log.info(`  {} main.js ${dim('• ' + util.formatBytes(mainJS.length))}`)
   }
 
@@ -205,7 +213,7 @@ export class Bundler {
       const rawPolyfillsFile = `${alephPkgUri}/bundler/polyfills/${polyfillTarget}/mod.ts`
       await this.build(rawPolyfillsFile, bundleFilePath)
     }
-    this.#bundledFiles.set('polyfills', bundleFilename)
+    this.#bundled.set('polyfills', bundleFilename)
     log.info(`  {} polyfills.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
@@ -238,7 +246,7 @@ export class Bundler {
       await this.build(bundleEntryFile, bundleFilePath)
       lazyRemove(bundleEntryFile)
     }
-    this.#bundledFiles.set(name, bundleFilename)
+    this.#bundled.set(name, bundleFilename)
     log.info(`  {} ${name}.js ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
