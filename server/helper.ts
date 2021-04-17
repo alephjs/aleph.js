@@ -7,8 +7,8 @@ import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
 
-// @deno-types="https://deno.land/x/esbuild@v0.11.11/mod.d.ts"
-export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.11/mod.js'
+// @deno-types="https://deno.land/x/esbuild@v0.11.12/mod.d.ts"
+export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.12/mod.js'
 
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
