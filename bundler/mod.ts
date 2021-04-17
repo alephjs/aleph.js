@@ -136,14 +136,15 @@ export class Bundler {
     }
 
     const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
-    this.#compiled.set(mod.url, bundlingFile)!
+    this.#compiled.set(mod.url, bundlingFile)
+
     if (existsFileSync(bundlingFile)) {
       return bundlingFile
     }
 
     const source = await this.#app.readModule(mod.url)
     if (source === null) {
-      this.#compiled.delete(mod.url)!
+      this.#compiled.delete(mod.url)
       throw new Error(`Unsupported module '${mod.url}'`)
     }
 
@@ -183,7 +184,7 @@ export class Bundler {
       await ensureTextFile(bundlingFile, code)
       return bundlingFile
     } catch (e) {
-      this.#compiled.delete(mod.url)!
+      this.#compiled.delete(mod.url)
       throw new Error(`Can't compile module '${mod.url}': ${e.message}`)
     }
   }

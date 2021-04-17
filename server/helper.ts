@@ -13,6 +13,33 @@ export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbui
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
 
+export const moduleWalkOptions = {
+  includeDirs: false,
+  skip: [
+    /(^|\/|\\)\./,
+    /\.d\.ts$/i,
+    /(\.|_)(test|spec|e2e)\.[a-z]+$/i
+  ]
+}
+
+// inject browser navigator polyfill
+Object.assign((globalThis as any).navigator, {
+  connection: {
+    downlink: 10,
+    effectiveType: '4g',
+    onchange: null,
+    rtt: 50,
+    saveData: false,
+  },
+  cookieEnabled: false,
+  language: 'en',
+  languages: ['en'],
+  onLine: true,
+  platform: Deno.build.os,
+  userAgent: `Deno/${Deno.version.deno}`,
+  vendor: 'Deno Land'
+})
+
 let __denoDir: string | null = null
 let __localProxy = false
 

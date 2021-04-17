@@ -65,4 +65,29 @@ export class Logger {
   }
 }
 
-export default new Logger()
+export class Measure {
+  #t: number
+
+  constructor() {
+    this.#t = performance.now()
+  }
+
+  stop(message?: string) {
+    const now = performance.now()
+    if (message) {
+      const d = Math.round(now - this.#t)
+      let cf = green
+      if (d > 10000) {
+        cf = red
+      } else if (d > 1000) {
+        cf = yellow
+      }
+      logger.debug(message, 'in', cf(d + 'ms'))
+    }
+    this.#t = now
+  }
+}
+
+const logger = new Logger()
+
+export default logger
