@@ -76,7 +76,9 @@ export class Bundler {
       }
     })
 
-    await this.bundlePolyfillChunck()
+    if (this.#app.config.buildTarget !== 'esnext') {
+      await this.bundlePolyfillChunck()
+    }
     await this.bundleChunk(
       'deps',
       Array.from(remoteEntries),
@@ -203,11 +205,12 @@ export class Bundler {
   private async bundlePolyfillChunck() {
     const alephPkgUri = getAlephPkgUri()
     const { buildTarget } = this.#app.config
-    const hash = computeHash(buildTarget + Deno.version.deno + VERSION)
+    const polyfillTarget = 'es' + (parseInt(buildTarget.slice(2)) + 1)
+    const hash = computeHash(polyfillTarget + '/esbuild@v0.11.11/' + VERSION)
     const bundleFilename = `polyfill.bundle.${hash.slice(0, hashShort)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFilePath)) {
-      const rawPolyfillFile = `${alephPkgUri}/bundler/polyfills/${buildTarget}/mod.ts`
+      const rawPolyfillFile = `${alephPkgUri}/bundler/polyfills/${polyfillTarget}/mod.ts`
       await this.build(rawPolyfillFile, bundleFilePath)
     }
     this.#bundledFiles.set('polyfill', bundleFilename)

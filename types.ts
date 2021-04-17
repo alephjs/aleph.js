@@ -51,7 +51,7 @@ export type ServerPlugin = {
 
 export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
 
-export type BuildTarget = 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
+export type BuildTarget = 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' | 'esnext'
 
 export type BrowserTarget = {
   name: 'chrome' | 'edge' | 'firefox' | 'ios' | 'Safari'
