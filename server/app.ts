@@ -731,7 +731,7 @@ export class Application implements ServerApplication {
 
     return [
       simpleJSMinify(bundlerRuntimeCode),
-      ...['polyfill', 'deps', 'shared', 'main', entryFile ? util.trimSuffix(entryFile, '.js') : '']
+      ...['polyfills', 'deps', 'shared', 'main', entryFile ? util.trimSuffix(entryFile, '.js') : '']
         .filter(name => name !== "" && this.#bundler.getBundledFile(name) !== null)
         .map(name => ({
           src: `${basePath}/_aleph/${this.#bundler.getBundledFile(name)}`
@@ -1176,7 +1176,7 @@ export class Application implements ServerApplication {
     }
 
     // compile deps
-    for (const dep of mod.deps) {
+    await Promise.all(mod.deps.map(async dep => {
       if (!dep.url.startsWith('#')) {
         const depMod = await this.compile(dep.url, { once })
         if (dep.hash === '' || dep.hash !== depMod.hash) {
@@ -1192,7 +1192,7 @@ export class Application implements ServerApplication {
           }
         }
       }
-    }
+    }))
 
     // update hash using deps status
     if (mod.deps.length > 0) {

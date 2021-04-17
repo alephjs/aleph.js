@@ -9,7 +9,7 @@ import type { Config, CSSOptions, PostCSSPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
-export interface RequiredConfig extends Required<Config> {
+export type RequiredConfig = Required<Config> & {
   react: ReactResolve
 }
 
@@ -25,10 +25,7 @@ export const defaultConfig: Readonly<RequiredConfig> = {
   rewrites: {},
   ssr: {},
   plugins: [],
-  css: {
-    modules: false,
-    postcss: { plugins: ['autoprefixer'] },
-  },
+  css: {},
   headers: {},
   compress: true,
   env: {},

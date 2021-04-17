@@ -136,58 +136,61 @@ export class Bundler {
     }
 
     const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
-
+    this.#compiled.set(mod.url, bundlingFile)!
     if (existsFileSync(bundlingFile)) {
       return bundlingFile
     }
 
     const source = await this.#app.readModule(mod.url)
     if (source === null) {
+      this.#compiled.delete(mod.url)!
       throw new Error(`Unsupported module '${mod.url}'`)
     }
 
-    let { code, starExports } = await transform(
-      mod.url,
-      source.code,
-      {
-        ...this.#app.sharedCompileOptions,
-        swcOptions: {
-          sourceType: source.type,
-        },
-        bundleMode: true,
-        bundleExternal: external,
-      }
-    )
+    try {
+      let { code, starExports } = await transform(
+        mod.url,
+        source.code,
+        {
+          ...this.#app.sharedCompileOptions,
+          swcOptions: {
+            sourceType: source.type,
+          },
+          bundleMode: true,
+          bundleExternal: external,
+        }
+      )
 
-    if (starExports && starExports.length > 0) {
-      for (let index = 0; index < starExports.length; index++) {
-        const url = starExports[index]
-        const names = await this.#app.parseModuleExportNames(url)
-        code = code.replace(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
-        code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
-      }
-    }
-
-    this.#compiled.set(mod.url, bundlingFile)!
-
-    // compile deps
-    for (const dep of mod.deps) {
-      if (!dep.url.startsWith('#') && !external.includes(dep.url)) {
-        const depMod = this.#app.getModule(dep.url)
-        if (depMod !== null) {
-          await this.compile(depMod, external)
+      if (starExports && starExports.length > 0) {
+        for (let index = 0; index < starExports.length; index++) {
+          const url = starExports[index]
+          const names = await this.#app.parseModuleExportNames(url)
+          code = code.replace(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+          code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
         }
       }
+
+      // compile deps
+      await Promise.all(mod.deps.map(async dep => {
+        if (!dep.url.startsWith('#') && !external.includes(dep.url)) {
+          const depMod = this.#app.getModule(dep.url)
+          if (depMod !== null) {
+            await this.compile(depMod, external)
+          }
+        }
+      }))
+
+      await ensureTextFile(bundlingFile, code)
+      return bundlingFile
+    } catch (e) {
+      this.#compiled.delete(mod.url)!
+      throw new Error(`Can't compile module '${mod.url}': ${e.message}`)
     }
-
-    await ensureTextFile(bundlingFile, code)
-
-    return bundlingFile
   }
 
   private async createMainJS() {
     const bundled = Array.from(this.#bundled.entries())
-      .filter(([name]) => !['polyfill', 'deps', 'shared'].includes(name))
+      .filter(([name]) => !['polyfills', 'deps', 'shared'].includes(name))
       .reduce((r, [name, filename]) => {
         r[name] = filename
         return r
