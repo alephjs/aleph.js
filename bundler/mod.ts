@@ -76,7 +76,9 @@ export class Bundler {
       }
     })
 
-    await this.bundlePolyfillChunck()
+    if (this.#app.config.buildTarget !== 'esnext') {
+      await this.bundlePolyfillsChunck()
+    }
     await this.bundleChunk(
       'deps',
       Array.from(remoteEntries),
@@ -144,7 +146,6 @@ export class Bundler {
       {
         ...this.#app.sharedCompileOptions,
         swcOptions: {
-          target: 'es2020',
           sourceType: source.type,
         },
         bundleMode: true,
@@ -155,8 +156,8 @@ export class Bundler {
     if (starExports && starExports.length > 0) {
       for (let index = 0; index < starExports.length; index++) {
         const url = starExports[index]
-        const source = await this.#app.resolveModule(url)
-        const names = await parseExportNames(url, source.code, { sourceType: source.type })
+        const names = await this.#app.parseModuleExportNames(url)
+        code = code.replace(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
         code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
       }
     }
@@ -166,14 +167,7 @@ export class Bundler {
       if (!dep.url.startsWith('#') && !external.includes(dep.url)) {
         const depMod = this.#app.getModule(dep.url)
         if (depMod !== null) {
-          const s = `.bundling.js#${dep.url}@`
           await this.compile(depMod, external)
-          code = code.split(s).map((p, i) => {
-            if (i > 0 && p.charAt(6) === '"') {
-              return dep.hash.slice(0, 6) + p.slice(6)
-            }
-            return p
-          }).join(s)
         }
       }
     }
@@ -199,19 +193,20 @@ export class Bundler {
     log.info(`  {} main.js ${dim('• ' + util.formatBytes(mainJS.length))}`)
   }
 
-  /** create polyfill bundle. */
-  private async bundlePolyfillChunck() {
+  /** create polyfills bundle. */
+  private async bundlePolyfillsChunck() {
     const alephPkgUri = getAlephPkgUri()
     const { buildTarget } = this.#app.config
-    const hash = computeHash(buildTarget + Deno.version.deno + VERSION)
-    const bundleFilename = `polyfill.bundle.${hash.slice(0, hashShort)}.js`
+    const polyfillTarget = 'es' + (parseInt(buildTarget.slice(2)) + 1) // buildTarget + 1
+    const hash = computeHash(polyfillTarget + '/esbuild@v0.11.11/' + VERSION)
+    const bundleFilename = `polyfills.bundle.${hash.slice(0, hashShort)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFilePath)) {
-      const rawPolyfillFile = `${alephPkgUri}/bundler/polyfills/${buildTarget}/mod.ts`
-      await this.build(rawPolyfillFile, bundleFilePath)
+      const rawPolyfillsFile = `${alephPkgUri}/bundler/polyfills/${polyfillTarget}/mod.ts`
+      await this.build(rawPolyfillsFile, bundleFilePath)
     }
-    this.#bundledFiles.set('polyfill', bundleFilename)
-    log.info(`  {} polyfill.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
+    this.#bundledFiles.set('polyfills', bundleFilename)
+    log.info(`  {} polyfills.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
   /** create bundle chunk. */

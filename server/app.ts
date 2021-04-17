@@ -1002,6 +1002,17 @@ export class Application implements ServerApplication {
     }
   }
 
+  async parseModuleExportNames(url: string): Promise<string[]> {
+    const source = await this.resolveModule(url)
+    const names = await parseExportNames(url, source.code, { sourceType: source.type })
+    return (await Promise.all(names.map(async name => {
+      if (name.startsWith('{') && name.startsWith('}')) {
+        return await this.parseModuleExportNames(name.slice(1, -1))
+      }
+      return name
+    }))).flat()
+  }
+
   /** compile a moudle by given url, then cache on the disk. */
   private async compile(
     url: string,
@@ -1115,11 +1126,8 @@ export class Application implements ServerApplication {
         ...this.sharedCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
-          target: 'es2020',
           sourceType: source.type
         },
-        // workaround for https://github.com/denoland/deno/issues/9849
-        resolveStarExports: !this.isDev && Deno.version.deno.replace(/\.\d+$/, '') === '1.8',
       })
 
       jsContent = code
@@ -1127,13 +1135,12 @@ export class Application implements ServerApplication {
         jsSourceMap = map
       }
 
-      // workaround for https://github.com/denoland/deno/issues/9849
+      // in production/bundle mode we need to replace the star export with names
       if (starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
           const url = starExports[index]
-          const source = await this.resolveModule(url)
-          const names = await parseExportNames(url, source.code, { sourceType: source.type })
-          jsContent = jsContent.replace(`export * from "${url}:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+          const names = await this.parseModuleExportNames(url)
+          jsContent = jsContent.replace(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
         }
       }
 

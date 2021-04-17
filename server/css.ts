@@ -9,7 +9,7 @@ export class CSSProcessor {
   #isProd: boolean
   #options: Required<CSSOptions>
   #postcss: any
-  #modulesJSON: Record<string, Record<string, string>>
+  #modulesJSON: Map<string, Record<string, string>>
 
   constructor() {
     this.#isProd = false
@@ -18,7 +18,7 @@ export class CSSProcessor {
       postcss: { plugins: ['autoprefixer'] },
     }
     this.#postcss = null
-    this.#modulesJSON = {}
+    this.#modulesJSON = new Map()
   }
 
   config(isProd: boolean, options: CSSOptions) {
@@ -36,19 +36,11 @@ export class CSSProcessor {
       plugins.push(['postcss-modules', {
         ...options.modules,
         getJSON: (url: string, json: Record<string, string>) => {
-          this.#modulesJSON = { [url]: json }
+          this.#modulesJSON.set(url, json)
         },
       }])
       this.#options.postcss.plugins = plugins
     }
-  }
-
-  private getModulesJSON(url: string) {
-    const json = this.#modulesJSON[url] || {}
-    if (url in this.#modulesJSON) {
-      delete this.#modulesJSON[url]
-    }
-    return json
   }
 
   async transform(url: string, content: string): Promise<{ code: string, map?: string, classNames?: Record<string, string> }> {
@@ -67,7 +59,6 @@ export class CSSProcessor {
     }
 
     const { content: pcss } = await this.#postcss.process(content, { from: url }).async()
-    const modulesJSON = this.getModulesJSON(url)
 
     let css = pcss
     if (this.#isProd) {
@@ -90,6 +81,9 @@ export class CSSProcessor {
         map: undefined
       }
     }
+
+    const modulesJSON = this.#modulesJSON.get(url) || {}
+    this.#modulesJSON.delete(url)
 
     return {
       code: [

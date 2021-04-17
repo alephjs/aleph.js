@@ -27,7 +27,6 @@ export type ReactResolve = {
 
 export type SWCOptions = {
   sourceType?: SourceType
-  target?: 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020'
   jsxFactory?: string
   jsxFragmentFactory?: string
 }
@@ -39,8 +38,6 @@ export type TransformOptions = {
   swcOptions?: SWCOptions
   sourceMap?: boolean
   isDev?: boolean
-  transpileOnly?: boolean
-  resolveStarExports?: boolean
   bundleMode?: boolean
   bundleExternal?: string[]
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>

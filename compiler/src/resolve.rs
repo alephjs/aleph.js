@@ -358,7 +358,7 @@ impl Resolver {
               filename.push_str("bundling.");
             }
             filename.push_str("js");
-            if !is_remote && !self.specifier_is_remote {
+            if !(self.bundle_mode && !is_dynamic) && !is_remote && !self.specifier_is_remote {
               filename.push_str("#");
               filename.push_str(fixed_url.as_str());
               filename.push_str("@000000");
@@ -376,7 +376,7 @@ impl Resolver {
               filename.push_str(".bundling");
             }
             filename.push_str(".js");
-            if !is_remote && !self.specifier_is_remote {
+            if !(self.bundle_mode && !is_dynamic) && !is_remote && !self.specifier_is_remote {
               filename.push('#');
               filename.push_str(fixed_url.as_str());
               filename.push_str("@000000");
