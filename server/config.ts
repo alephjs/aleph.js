@@ -1,5 +1,5 @@
-import { bold } from 'https://deno.land/std@0.92.0/fmt/colors.ts'
-import { basename, join } from 'https://deno.land/std@0.92.0/path/mod.ts'
+import { bold } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { basename, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import type { ImportMap, ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDirSync, existsFileSync } from '../shared/fs.ts'
@@ -17,6 +17,7 @@ export interface RequiredConfig extends Required<Omit<Config, 'css'>> {
 export const defaultConfig: Readonly<RequiredConfig> = {
   framework: 'react',
   buildTarget: 'es2015',
+  browserslist: [],
   basePath: '/',
   srcDir: '/',
   outputDir: '/dist',
@@ -70,6 +71,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     outputDir,
     basePath,
     buildTarget,
+    browserslist,
     defaultLocale,
     locales,
     ssr,
@@ -99,6 +101,9 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   }
   if (isBuildTarget(buildTarget)) {
     config.buildTarget = buildTarget
+  }
+  if (util.isNEArray(browserslist)) {
+    config.browserslist = browserslist
   }
   if (isLocaleID(defaultLocale)) {
     config.defaultLocale = defaultLocale

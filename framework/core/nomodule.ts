@@ -1,8 +1,9 @@
-(function (document: any) {
+/// <reference lib="dom" />
+(function (document: Document) {
   var contarinEl = document.createElement('div')
   var hEl = document.createElement('h2')
   var pEl = document.createElement('p')
-  var style: Record<string, string> = {
+  var style: Partial<CSSStyleDeclaration> = {
     position: 'fixed',
     top: '0',
     left: '0',
@@ -17,7 +18,7 @@
     textAlign: 'center',
     boxShadow: '0 1px 5px rgba(0,0,0,0.1)'
   }
-  var hStyle: Record<string, string> = {
+  var hStyle: Partial<CSSStyleDeclaration> = {
     padding: '0',
     margin: '0',
     lineHeight: '1.2',
@@ -25,12 +26,8 @@
     fontWeight: '700',
     color: '#000',
   }
-  for (var key in style) {
-    contarinEl.style[key] = style[key]
-  }
-  for (var key in hStyle) {
-    hEl[key] = hStyle[key]
-  }
+  Object.assign(contarinEl.style, style)
+  Object.assign(hEl.style, hStyle)
   // todo: i18n
   // todo: add browser info
   hEl.innerText = 'Your browser is out of date.'
@@ -38,4 +35,4 @@
   contarinEl.appendChild(hEl)
   contarinEl.appendChild(pEl)
   document.body.appendChild(contarinEl)
-})((window as any).document)
+})(window.document)

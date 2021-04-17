@@ -1,5 +1,6 @@
 import { assertEquals } from 'std/testing/asserts.ts'
 import { CSSProcessor } from './css.ts'
+import { stopEsbuild } from './helper.ts'
 
 Deno.test('css processor', async () => {
   const processor = new CSSProcessor()
@@ -15,20 +16,26 @@ Deno.test('css processor', async () => {
   ].join('\n'))
 })
 
-Deno.test('css processor in production mode', async () => {
-  const processor = new CSSProcessor()
-  processor.config(true, { modules: false, postcss: { plugins: [] } })
-  const { code } = await processor.transform(
-    '/test.css',
-    'h1 { font-size: 18px; }'
-  )
+Deno.test({
+  name: 'css processor in production mode',
+  sanitizeResources: false,
+  fn: async () => {
+    const processor = new CSSProcessor()
+    processor.config(true, { modules: false, postcss: { plugins: [] } })
+    const { code } = await processor.transform(
+      '/test.css',
+      'h1 { font-size: 18px; }'
+    )
 
-  assertEquals(code, [
-    'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-    'const css = "h1{font-size:18px}"',
-    'applyCSS("/test.css", css)',
-    'export default { __url$: "/test.css", __css$: css, }'
-  ].join('\n'))
+    assertEquals(code, [
+      'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
+      'const css = "h1{font-size:18px}\\n"',
+      'applyCSS("/test.css", css)',
+      'export default { __url$: "/test.css", __css$: css, }'
+    ].join('\n'))
+
+    stopEsbuild()
+  }
 })
 
 Deno.test('css processor of remote CSS', async () => {

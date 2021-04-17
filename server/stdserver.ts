@@ -1,4 +1,4 @@
-import { serve as stdServe, serveTLS, Server as StdServer } from 'https://deno.land/std@0.92.0/http/server.ts'
+import { serve as stdServe, serveTLS, Server as StdServer } from 'https://deno.land/std@0.93.0/http/server.ts'
 import log from '../shared/log.ts'
 import type { ServerRequest } from '../types.ts'
 import { Application } from './app.ts'
@@ -39,7 +39,7 @@ export async function serve({ app, port, hostname, certFile, keyFile, signal }: 
         (s as StdServer).close()
       })
       if (!app.isDev && app.config.compress) {
-        await compress.init()
+        compress.init()
       }
       log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.basePath}`)
       for await (const r of s) {
