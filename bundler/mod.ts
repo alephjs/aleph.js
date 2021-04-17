@@ -57,13 +57,19 @@ export const bundlerRuntimeCode = (`
 /** The bundler class for aleph server. */
 export class Bundler {
   #app: Application
+  #compileCounter: number
   #compiledModules: Set<string>
   #bundledFiles: Map<string, string>
 
   constructor(app: Application) {
     this.#app = app
+    this.#compileCounter = 0
     this.#compiledModules = new Set()
     this.#bundledFiles = new Map()
+  }
+
+  get compileCounter() {
+    return this.#compileCounter
   }
 
   async bundle(entryMods: Array<{ url: string, shared: boolean }>) {
@@ -128,6 +134,7 @@ export class Bundler {
   }
 
   private async compile(mod: Module, external: string[]): Promise<string> {
+    this.#compileCounter++
     const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
 
     if (this.#compiledModules.has(mod.url)) {
