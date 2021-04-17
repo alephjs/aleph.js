@@ -163,16 +163,16 @@ export class Application implements ServerApplication {
     const alephPkgUri = getAlephPkgUri()
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
     const plugins = computeHash(JSON.stringify({
-      plugins: this.config.plugins.filter(isLoaderPlugin).map(({ name }) => name),
+      plugins: this.config.plugins.map(({ name }) => name),
       css: {
         modules: this.config.css.modules,
-        postcss: this.config.css.postcss.plugins.map(p => {
+        postcssPlugins: this.config.css.postcss?.plugins.map(p => {
           if (util.isString(p)) {
             return p
           } else if (util.isArray(p)) {
-            return p[0] + JSON.stringify(p[1])
+            return p[0]
           } else {
-            p.toString()
+            return 'Plugin'
           }
         })
       },

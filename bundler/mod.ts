@@ -141,7 +141,7 @@ export class Bundler {
       return bundlingFile
     }
 
-    const source = await this.#app.resolveModule(mod.url)
+    const source = await this.#app.readModule(mod.url)
     if (source === null) {
       throw new Error(`Unsupported module '${mod.url}'`)
     }
