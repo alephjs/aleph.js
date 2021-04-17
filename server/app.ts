@@ -1118,8 +1118,6 @@ export class Application implements ServerApplication {
           target: 'es2020',
           sourceType: source.type
         },
-        // workaround for https://github.com/denoland/deno/issues/9849
-        resolveStarExports: !this.isDev && Deno.version.deno.replace(/\.\d+$/, '') === '1.8',
       })
 
       jsContent = code
@@ -1127,7 +1125,7 @@ export class Application implements ServerApplication {
         jsSourceMap = map
       }
 
-      // workaround for https://github.com/denoland/deno/issues/9849
+      // in bundle mode we replace the star export with names
       if (starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
           const url = starExports[index]

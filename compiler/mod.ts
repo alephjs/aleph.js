@@ -40,7 +40,6 @@ export type TransformOptions = {
   sourceMap?: boolean
   isDev?: boolean
   transpileOnly?: boolean
-  resolveStarExports?: boolean
   bundleMode?: boolean
   bundleExternal?: string[]
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>

@@ -32,7 +32,6 @@ pub struct EmitOptions {
   pub jsx_fragment_factory: String,
   pub is_dev: bool,
   pub transpile_only: bool,
-  pub resolve_star_exports: bool,
   pub source_map: bool,
 }
 
@@ -44,7 +43,6 @@ impl Default for EmitOptions {
       jsx_fragment_factory: "React.Fragment".into(),
       is_dev: false,
       transpile_only: false,
-      resolve_star_exports: false,
       source_map: false,
     }
   }
@@ -147,11 +145,7 @@ impl SWC {
         aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev);
       let mut passes = chain!(
         Optional::new(
-          resolve_fold(
-            resolver.clone(),
-            self.source_map.clone(),
-            options.resolve_star_exports,
-          ),
+          resolve_fold(resolver.clone(), self.source_map.clone(), !options.is_dev,),
           !transpile_only
         ),
         Optional::new(aleph_jsx_fold, is_jsx && !transpile_only),

@@ -45,9 +45,6 @@ pub struct Options {
   pub transpile_only: bool,
 
   #[serde(default)]
-  pub resolve_star_exports: bool,
-
-  #[serde(default)]
   pub bundle_mode: bool,
 
   #[serde(default)]
@@ -152,7 +149,6 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
         source_map: options.source_map,
         is_dev: options.is_dev,
         transpile_only: options.transpile_only,
-        resolve_star_exports: options.resolve_star_exports,
       },
     )
     .expect("could not transform module");
