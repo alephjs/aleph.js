@@ -2,7 +2,7 @@ import util from '../shared/util.ts'
 import { PostCSSPlugin, CSSOptions } from '../types.ts'
 import { esbuild } from './helper.ts'
 
-const postcssVersion = '8.2.8'
+const postcssVersion = '8.2.10'
 const productionOnlyPostcssPlugins = ['autoprefixer']
 
 export class CSSProcessor {
@@ -125,7 +125,7 @@ async function initPostCSS(plugins: PostCSSPlugin[]) {
 }
 
 async function importPostcssPluginByName(name: string) {
-  const url = `https://esm.sh/${name}?external=postcss@${postcssVersion}&no-check`
+  const url = `https://esm.sh/${name}?deps=postcss@${postcssVersion}&no-check`
   const { default: Plugin } = await import(url)
   return Plugin
 }

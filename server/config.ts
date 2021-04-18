@@ -31,7 +31,7 @@ export const defaultConfig: Readonly<RequiredConfig> = {
   env: {},
   react: {
     version: defaultReactVersion,
-    esmShBuildVersion: 40,
+    esmShBuildVersion: 41,
   }
 }
 
