@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from 'std/testing/asserts.ts'
+import { assert, assertEquals } from 'std/testing/asserts.ts'
 import {
   computeHash,
   formatBytesWithColor,
@@ -10,7 +10,7 @@ import {
 import { LoaderPlugin } from '.././types.ts'
 import { VERSION } from '../version.ts'
 
-Deno.test(`server/helper: toLocalUrl`, async () => {
+Deno.test(`server/helper: toLocalUrl`, () => {
   // test toLocalUrl
   assertEquals(
     toLocalUrl('https://esm.sh/react@17.0.1'),
