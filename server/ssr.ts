@@ -268,9 +268,9 @@ function createHtml({
   const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
     if (!util.isString(v) && util.isNEString(v.src)) {
       if (v.type === 'module') {
-        return `<link rel="modulepreload" href=${JSON.stringify(util.cleanPath(v.src))} />`
+        return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
       } else if (!v.nomodule) {
-        return `<link rel="preload" href=${JSON.stringify(util.cleanPath(v.src))} as="script" />`
+        return `<link rel="preload" href=${JSON.stringify(v.src)} as="script" />`
       }
     }
     return ''
@@ -282,7 +282,7 @@ function createHtml({
       const { innerText, ...rest } = v
       return `<script${formatAttrs(rest)}>${eol}${innerText}${eol}${indent}</script>`
     } else if (util.isNEString(v.src) && !v.preload) {
-      return `<script${formatAttrs({ ...v, src: util.cleanPath(v.src) })}></script>`
+      return `<script${formatAttrs(v)}></script>`
     } else {
       return ''
     }
