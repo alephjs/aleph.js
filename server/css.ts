@@ -98,9 +98,8 @@ export class CSSProcessor {
 }
 
 async function initPostCSS(plugins: PostCSSPlugin[]) {
-  const { default: PostCSS } = await import(`https://esm.sh/postcss@${postcssVersion}`)
   const isDev = Deno.env.get('ALEPH_BUILD_MODE') === 'development'
-  return PostCSS(await Promise.all(plugins.filter(p => {
+  const pluginObjects = await Promise.all(plugins.filter(p => {
     if (isDev) {
       if (util.isNEString(p) && productionOnlyPostcssPlugins.includes(p)) {
         return false
@@ -121,7 +120,20 @@ async function initPostCSS(plugins: PostCSSPlugin[]) {
     } else {
       return p
     }
-  })))
+  }))
+
+  if (pluginObjects.length === 0) {
+    return {
+      process: (content: string) => ({
+        async: async () => {
+          return { content }
+        }
+      })
+    }
+  }
+
+  const { default: PostCSS } = await import(`https://esm.sh/postcss@${postcssVersion}`)
+  return PostCSS(pluginObjects)
 }
 
 async function importPostcssPluginByName(name: string) {
