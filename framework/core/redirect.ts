@@ -3,11 +3,11 @@ import events from './events.ts'
 
 const routerState = {
   ready: false,
-  hasDeferredRedirect: false,
+  hasPreRedirect: false,
 }
 
 events.once('routerstate', state => {
-  if (routerState.hasDeferredRedirect) {
+  if (routerState.hasPreRedirect) {
     events.emit('popstate', { type: 'popstate', resetScroll: true })
   }
   Object.assign(routerState, state)
@@ -34,7 +34,7 @@ export async function redirect(url: string, replace?: boolean) {
 
   if (routerState.ready) {
     events.emit('popstate', { type: 'popstate', resetScroll: true })
-  } else if (!routerState.hasDeferredRedirect) {
-    routerState.hasDeferredRedirect = true
+  } else if (!routerState.hasPreRedirect) {
+    routerState.hasPreRedirect = true
   }
 }
