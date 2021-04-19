@@ -3,67 +3,76 @@
  * see https://github.com/denoland/deno/blob/main/docs/runtime/location_api.md
  * and explanation below.
  */
+
 import { assertEquals } from 'std/testing/asserts.ts'
+import events from './events.ts'
 import { redirect } from './redirect.ts'
 
 // mock history functions used in redirect()
-interface MockWindow extends Window {
-    history: {
-        replaceState: (state: object | null, title: string | '', url?: string) => void,
-        pushState: (state: object | null, title: string | '', url?: string) => void
-    }
-}
-declare let window: MockWindow
+Object.assign(window, {
+  history: {
+    replaceState: (url: string) => { stacks.replaceCalls++ },
+    pushState: (url: string) => { stacks.pushCalls++ }
+  }
+})
 
 // track calls to history functions
-const calls = {
-    pushCalls: 0, // tracks calls to pushState()
-    replaceCalls: 0 // tracks calls to replaceState()
-}
-// create mock history impl
-window.history = {
-    replaceState: (url) => { calls.replaceCalls++; return null },
-    pushState: (url) => { calls.pushCalls++; return null }
+const stacks = {
+  pushCalls: 0, // tracks calls to pushState()
+  replaceCalls: 0 // tracks calls to replaceState()
 }
 
-const resetCallCount = () => {
-    calls.pushCalls = 0
-    calls.replaceCalls = 0
+const resetStacks = () => {
+  stacks.pushCalls = 0
+  stacks.replaceCalls = 0
 }
 
-Deno.test('redirect: replace=false should call history.pushState', () => {
-    const url = '/foo/bar.ts'
+Deno.test('fw/core/redirect: replace=false should call history.pushState', () => {
+  const url = '/foo/bar'
 
-    redirect(url)
-    assertEquals(calls.pushCalls, 1)
-    redirect(url)
-    assertEquals(calls.pushCalls, 2)
-    redirect(url)
-    assertEquals(calls.pushCalls, 3)
+  redirect(url)
+  assertEquals(stacks.pushCalls, 1)
+  redirect(url)
+  assertEquals(stacks.pushCalls, 2)
+  redirect(url)
+  assertEquals(stacks.pushCalls, 3)
 
-    resetCallCount()
+  resetStacks()
 })
 
-Deno.test('redirect: replace=true should call history.replaceState', () => {
-    const url = '/foo/bar2.ts'
+Deno.test('fw/core/redirect: replace=true should call history.replaceState', () => {
+  const url = '/foo/bar'
 
-    redirect(url, true)
-    assertEquals(calls.replaceCalls, 1)
-    redirect(url, true)
+  redirect(url, true)
+  assertEquals(stacks.replaceCalls, 1)
+  redirect(url, true)
+  assertEquals(stacks.replaceCalls, 2)
 
-    assertEquals(calls.replaceCalls, 2)
 
-    resetCallCount()
+  resetStacks()
 })
 
-Deno.test('redirect: empty string url should not call history methods', () => {
-    const url = ''
+Deno.test('fw/core/redirect: empty string url should not call history methods', () => {
+  redirect('')
 
-    redirect(url)
+  assertEquals(stacks.pushCalls, 0)
+  assertEquals(stacks.replaceCalls, 0)
+})
 
-    assertEquals(calls.pushCalls, 0)
-    assertEquals(calls.replaceCalls, 0)
+Deno.test('fw/core/redirect: pre-redirect should emit "popstate" event deferredly', () => {
+  let popstate: any = null
 
+  redirect('/foo/bar', true)
+
+  events.on('popstate', (e) => { popstate = e })
+  assertEquals(popstate, null)
+
+  events.emit('routerstate', { ready: true })
+  assertEquals(popstate, { type: 'popstate', resetScroll: true })
+  assertEquals(stacks.pushCalls, 0)
+  assertEquals(stacks.replaceCalls, 1)
+
+  resetStacks()
 })
 
 /**
@@ -72,7 +81,7 @@ Deno.test('redirect: empty string url should not call history methods', () => {
  * https://github.com/denoland/deno/blob/main/docs/runtime/location_api.md
  * This errors out on line 12 of redirect().
  */
-// Deno.test('redirect: file url should set location.href', () => {
+// Deno.test('fw/core/redirect: file url should set location.href', () => {
 //     const url = 'file://foo/file.ts'
 
 //     redirect(url)
@@ -81,5 +90,5 @@ Deno.test('redirect: empty string url should not call history methods', () => {
 //     assertEquals(calls.pushCalls, 0)
 //     assertEquals(calls.replaceCalls, 0)
 
-//     resetCallCount()
+//     resetStacks()
 // })

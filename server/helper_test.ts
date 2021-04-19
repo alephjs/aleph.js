@@ -46,21 +46,21 @@ Deno.test(`server/helper: toLocalUrl`, () => {
   )
 })
 
-Deno.test('server/helper isLoaderPlugin false', () => {
+Deno.test('server/helper: isLoaderPlugin false', () => {
   const loader = {} as LoaderPlugin
   loader.type = 'foobar' as 'loader'
 
   assert(!isLoaderPlugin(loader))
 })
 
-Deno.test('server/helper isLoaderPlugin true', () => {
+Deno.test('server/helper: isLoaderPlugin true', () => {
   const loader = {} as LoaderPlugin
   loader.type = 'loader'
 
   assert(isLoaderPlugin(loader))
 })
 
-Deno.test('server/helper getAlephPkgUri dev', () => {
+Deno.test('server/helper: getAlephPkgUri dev', () => {
   const port = 1234
   Deno.env.set('ALEPH_DEV_PORT', port.toString())
 
@@ -83,7 +83,6 @@ Deno.test('server/helper: getRelativePath', () => {
   assertEquals(getRelativePath('/baz/foobar', '/baz/aleph'), '../aleph')
   assertEquals(getRelativePath('baz/foobar', 'baz/aleph'), '../aleph')
   assertEquals(getRelativePath('baz/foobar', 'baz/foobar/aleph'), './aleph')
-
 })
 
 Deno.test('server/helper: toLocalUrl()', () => {
@@ -99,8 +98,7 @@ Deno.test('server/helper: computeHash', () => {
   assertEquals(computeHash(new Uint8Array([21, 31])), 'b0d04c3ac51b86296251d73c20f348e9ae0042a4')
 })
 
-Deno.test('server/helper formatBytesWithColor', () => {
-
+Deno.test('server/helper: formatBytesWithColor', () => {
   // 10 << 20 = 10485760 (10MB)
   const TenLeftShift20 = 10485760
   // 1 << 20 = 1048576 (1MB)
@@ -109,9 +107,11 @@ Deno.test('server/helper formatBytesWithColor', () => {
   const OneMb = OneLeftShift20
   // "\x1b[2m1018KB\x1b[22m"
   assertEquals(formatBytesWithColor(OneMb), "\x1b[2m1MB\x1b[22m")
+
   const TwoMb = OneLeftShift20 + 1024
   // "\x1b[33m2MB\x1b[39m"
   assertEquals(formatBytesWithColor(TwoMb), "\x1b[33m2MB\x1b[39m")
+
   const ElevenMb = TenLeftShift20 + 1024
   // "\x1b[31m11MB\x1b[39m"
   assertEquals(formatBytesWithColor(ElevenMb), "\x1b[31m11MB\x1b[39m")
