@@ -72,6 +72,7 @@ export default function Router({
   useEffect(() => {
     window.addEventListener('popstate', onpopstate)
     events.on('popstate', onpopstate)
+    events.emit('routerstate', { ready: true })
 
     return () => {
       window.removeEventListener('popstate', onpopstate)
