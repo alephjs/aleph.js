@@ -143,7 +143,7 @@ export default function Anchor(props: AnchorProps) {
   )
 }
 
-function isModifiedEvent(event: React.MouseEvent): boolean {
+function isModifiedEvent(event: MouseEvent): boolean {
   const { target } = event.currentTarget as any
   const nativeEvent = event.nativeEvent as any
   return (
