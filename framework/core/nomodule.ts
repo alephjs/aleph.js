@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+
 (function (document: Document) {
   var contarinEl = document.createElement('div')
   var hEl = document.createElement('h2')
