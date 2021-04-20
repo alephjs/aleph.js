@@ -130,8 +130,7 @@ export default function Router({
       }
     }
     const onFetchPageModule = async ({ href }: { href: string }) => {
-      const [pathname] = href.split('?')
-      const [url, nestedModules] = routing.createRouter({ pathname })
+      const [url, nestedModules] = routing.createRouter({ pathname: href })
       if (url.routePath !== '') {
         nestedModules.map(mod => {
           importModule(basePath, mod.url)

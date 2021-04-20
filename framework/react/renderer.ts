@@ -34,8 +34,7 @@ export async function render(
     scripts: new Map(),
     inlineStyles: new Map(),
   }
-  const qs = url.query.toString()
-  const dataUrl = 'pagedata://' + [url.pathname, qs].filter(Boolean).join('?')
+  const dataUrl = 'pagedata://' + url.slug
   const asyncCalls: Array<[string, number, Promise<any>]> = []
   const data: Record<string, any> = {}
   const renderingData: Record<string, any> = {}
