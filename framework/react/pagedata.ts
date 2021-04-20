@@ -15,7 +15,7 @@ export async function loadPageData({ basePath, slug }: RouterURL) {
       delete global[`${url}#${key}`]
     })
   }
-  const dataUrl = `${util.trimSuffix(basePath, '/')}/_aleph/data/${slug}.json`
+  const dataUrl = `${util.trimSuffix(basePath, '/')}/_aleph/data/${encodeURIComponent(slug)}.json`
   const data = await (await fetch(dataUrl)).json()
   if (util.isPlainObject(data)) {
     storeData(data, slug)
