@@ -1162,23 +1162,24 @@ export class Application implements ServerApplication {
       // in production/bundle mode we need to replace the star export with names
       if (starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
-          const url = starExports[index]
-          const names = await this.parseModuleExportNames(url)
-          jsContent = jsContent.replace(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+          const exportUrl = starExports[index]
+          const names = await this.parseModuleExportNames(exportUrl)
+          jsContent = jsContent.replace(`export * from "[${exportUrl}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
         }
       }
 
       mod.isStyle = source.isStyle
-      mod.deps = deps.map(({ specifier, isDynamic }) => {
-        const dep: DependencyDescriptor = { url: specifier, hash: '' }
-        if (isDynamic) {
-          dep.isDynamic = true
-        }
-        if (dep.url.startsWith('#useDeno-') && !this.config.ssr) {
-          log.warn(`use 'useDeno' hook in SPA mode: ${url}`)
-        }
-        return dep
-      })
+      mod.deps = deps.filter(({ specifier }) => specifier != mod.url)
+        .map(({ specifier, isDynamic }) => {
+          const dep: DependencyDescriptor = { url: specifier, hash: '' }
+          if (isDynamic) {
+            dep.isDynamic = true
+          }
+          if (dep.url.startsWith('#useDeno-') && !this.config.ssr) {
+            log.warn(`use 'useDeno' hook in SPA mode: ${url}`)
+          }
+          return dep
+        })
 
       fsync = true
       ms.stop(`compile '${url}'`)
