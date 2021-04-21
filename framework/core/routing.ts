@@ -129,7 +129,6 @@ export class Routing {
   createRouter(location?: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
     const loc = location || (window as any).location || { pathname: '/' }
     const url = rewriteURL(loc.pathname + (loc.search || ''), this._basePath, this._rewrites)
-    const slug = loc.pathname + (loc.search || '')
 
     let locale = this._defaultLocale
     let pathname = decodeURI(url.pathname)
@@ -170,7 +169,6 @@ export class Routing {
         routePath,
         params,
         query: url.searchParams,
-        slug,
         push: (url: string) => redirect(url),
         replace: (url: string) => redirect(url, true),
       },
@@ -245,7 +243,6 @@ export function createBlankRouterURL(basePath = '/', locale = 'en'): RouterURL {
     pathname: '/',
     params: {},
     query: new URLSearchParams(),
-    slug: '/',
     push: () => void 0,
     replace: () => void 0,
   }

@@ -34,7 +34,7 @@ export async function render(
     scripts: new Map(),
     inlineStyles: new Map(),
   }
-  const dataUrl = 'pagedata://' + url.slug
+  const dataUrl = 'pagedata://' + util.fullPath(url)
   const asyncCalls: Array<[string, number, Promise<any>]> = []
   const data: Record<string, any> = {}
   const renderingData: Record<string, any> = {}

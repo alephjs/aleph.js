@@ -217,7 +217,6 @@ export type RouterURL = {
   readonly pathname: string
   readonly params: Record<string, string>
   readonly query: URLSearchParams
-  readonly slug: string
   push(url: string): void
   replace(url: string): void
 }
