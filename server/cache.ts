@@ -48,7 +48,8 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
     try {
       const resp = await fetch(url)
       if (resp.status >= 400) {
-        return Promise.reject(new Error(resp.statusText))
+        err = new Error(resp.statusText)
+        continue
       }
       const buffer = await resp.arrayBuffer()
       const content = new Uint8Array(buffer)
