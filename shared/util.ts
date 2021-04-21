@@ -1,4 +1,4 @@
-import { RouterURL } from "../types.ts"
+import type { RouterURL } from "../types.ts"
 
 export default {
   inDeno: typeof Deno !== 'undefined' && typeof Deno.version?.deno === 'string',
