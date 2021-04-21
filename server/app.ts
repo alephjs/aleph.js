@@ -1347,7 +1347,7 @@ export class Application implements ServerApplication {
           if (data) {
             const dataFile = join(
               outputDir,
-              `_aleph/data/${encodeURIComponent(pathname)}.json`
+              `_aleph/data/${btoa(pathname)}.json`
             )
             await ensureTextFile(dataFile, JSON.stringify(data))
           }

@@ -81,7 +81,7 @@ export class Server {
       if (pathname.startsWith('/_aleph/')) {
         if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('.json')) {
           let p = util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json')
-          p = decodeURIComponent(p)
+          p = atob(p)
           const data = await app.getSSRData({ pathname: p })
           if (data === null) {
             req.status(404).send('null', 'application/json; charset=utf-8')

@@ -17,7 +17,7 @@ export async function loadPageData(url: RouterURL) {
     })
   }
   const basePath = util.trimSuffix(url.basePath, '/')
-  const dataUrl = `${basePath}/_aleph/data/${encodeURIComponent(fullPath)}.json`
+  const dataUrl = `${basePath}/_aleph/data/${btoa(fullPath)}.json`
   const data = await (await fetch(dataUrl)).json()
   if (util.isPlainObject(data)) {
     storeData(data, fullPath)
