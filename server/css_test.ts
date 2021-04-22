@@ -1,3 +1,4 @@
+import { delay } from 'std/async/delay.ts'
 import { assertEquals } from 'std/testing/asserts.ts'
 import { CSSProcessor } from './css.ts'
 import { stopEsbuild } from './helper.ts'
@@ -35,12 +36,15 @@ Deno.test({
     ].join('\n'))
 
     stopEsbuild()
+
+    // wait esbuild
+    await delay(100)
   }
 })
 
 Deno.test('css processor of remote CSS', async () => {
   const processor = new CSSProcessor()
-  processor.config(true, { modules: false, postcss: { plugins: [] } })
+  processor.config(false, { modules: false, postcss: { plugins: [] } })
   const { code } = await processor.transform(
     'https://esm.sh/tailwindcss/dist/tailwind.min.css',
     ''
