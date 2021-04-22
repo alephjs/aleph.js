@@ -14,7 +14,7 @@ const commands = {
 }
 
 const helpMessage = `Aleph.js v${VERSION}
-The Full-stack Framework for React and other in Deno.
+The Full-stack Framework in Deno.
 
 Docs: https://alephjs.org/docs
 Bugs: https://github.com/alephjs/aleph.js/issues

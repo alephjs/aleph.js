@@ -1,14 +1,14 @@
 import { assert, assertEquals } from 'std/testing/asserts.ts'
+import type { LoaderPlugin } from '../types.ts'
+import { VERSION } from '../version.ts'
 import {
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
   getRelativePath,
   isLoaderPlugin,
-  toLocalUrl,
+  toLocalUrl
 } from './helper.ts'
-import { LoaderPlugin } from '.././types.ts'
-import { VERSION } from '../version.ts'
 
 Deno.test(`server/helper: toLocalUrl`, () => {
   // test toLocalUrl

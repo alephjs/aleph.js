@@ -1,11 +1,11 @@
 import { bold } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
 import { basename, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
-import type { ImportMap, ReactResolve } from '../compiler/mod.ts'
+import type { ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Config, CSSOptions, PostCSSPlugin } from '../types.ts'
+import type { Config, ImportMap, PostCSSPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
 
@@ -16,7 +16,7 @@ export type RequiredConfig = Required<Config> & {
 export const defaultConfig: Readonly<RequiredConfig> = {
   framework: 'react',
   buildTarget: 'es2015',
-  browserslist: [],
+  browserslist: {},
   basePath: '/',
   srcDir: '/',
   outputDir: '/dist',
@@ -98,7 +98,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   if (isBuildTarget(buildTarget)) {
     config.buildTarget = buildTarget
   }
-  if (util.isNEArray(browserslist)) {
+  if (util.isPlainObject(browserslist)) {
     config.browserslist = browserslist
   }
   if (isLocaleID(defaultLocale)) {

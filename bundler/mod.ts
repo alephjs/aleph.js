@@ -6,6 +6,7 @@ import { trimModuleExt } from '../framework/core/module.ts'
 import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
+import type { BrowserNames } from '../types.ts'
 import { VERSION } from '../version.ts'
 import type { Application, Module } from '../server/app.ts'
 import { cache } from '../server/cache.ts'
@@ -263,8 +264,9 @@ export class Bundler {
       entryPoints: [entryFile],
       outfile: bundleFile,
       platform: 'browser',
-      target: [String(buildTarget)].concat(browserslist.map(({ name, version }) => {
-        return `${name.toLowerCase()}${version}`
+      format: 'iife',
+      target: [String(buildTarget)].concat(Object.keys(browserslist).map(name => {
+        return `${name}${browserslist[name as BrowserNames]}`
       })),
       bundle: true,
       minify: true,

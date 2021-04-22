@@ -11,7 +11,6 @@ import {
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
 import {
   buildChecksum,
-  ImportMap,
   parseExportNames,
   SourceType,
   transform,
@@ -30,8 +29,9 @@ import {
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type {
+  ImportMap,
   RouterURL,
-  ServerApplication,
+  ServerPluginContext,
 } from '../types.ts'
 import { VERSION } from '../version.ts'
 import {
@@ -76,7 +76,7 @@ export type DependencyDescriptor = {
 type TransformFn = (url: string, code: string) => string
 
 /** The application class for aleph server. */
-export class Application implements ServerApplication {
+export class Application implements ServerPluginContext {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
   readonly config: RequiredConfig
@@ -209,7 +209,7 @@ export class Application implements ServerApplication {
     await Promise.all(
       this.config.plugins.map(async plugin => {
         if (plugin.type === 'server') {
-          await plugin.onInit(this)
+          await plugin.setup(this)
         }
       })
     )

@@ -1,7 +1,8 @@
 import { join } from 'https://deno.land/std@0.93.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.93.0/fs/ensure_dir.ts'
 import { existsFileSync } from '../shared/fs.ts'
-import log, { Measure } from '../shared/log.ts'
+import { Measure } from '../shared/log.ts'
+import type { ImportMap } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { checksum } from './dist/wasm-checksum.js'
 import init, { parseExportNamesSync, transformSync } from './dist/wasm-pack.js'
@@ -13,11 +14,6 @@ export enum SourceType {
   TSX = 'tsx',
   CSS = 'css',
   Unknown = '??',
-}
-
-export type ImportMap = {
-  imports: Record<string, string>
-  scopes: Record<string, Record<string, string>>
 }
 
 export type ReactResolve = {
