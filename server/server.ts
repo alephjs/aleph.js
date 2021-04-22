@@ -80,9 +80,9 @@ export class Server {
       // serve dist files
       if (pathname.startsWith('/_aleph/')) {
         if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('.json')) {
-          let p = util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json')
-          p = atob(p)
-          const data = await app.getSSRData({ pathname: p })
+          const base64 = util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json')
+          const path = atob(base64)
+          const data = await app.getSSRData({ pathname: path })
           if (data === null) {
             req.status(404).send('null', 'application/json; charset=utf-8')
           } else {
@@ -177,7 +177,12 @@ export class Server {
       req.status(status).send(html, 'text/html; charset=utf-8')
     } catch (err) {
       req.status(500).send(
-        `<!DOCTYPE html><title>500 - internal server error</title><p><strong><code>500</code></strong><small> - </small><span>${err.message}</span></p>`,
+        [
+          `<!DOCTYPE html>`,
+          `<title>Server Error</title>`,
+          `<h1>Error: ${err.message}</h1>`,
+          `<p><pre>${err.stack}</pre></p>`
+        ].join('\n'),
         'text/html; charset=utf-8'
       )
     }

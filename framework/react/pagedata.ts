@@ -4,8 +4,8 @@ import type { RouterURL } from '../../types.ts'
 const global = window as any
 
 export async function loadPageData(url: RouterURL) {
-  const fullPath = util.fullPath(url)
-  const pagedataUrl = 'pagedata://' + fullPath
+  const href = url.toString()
+  const pagedataUrl = 'pagedata://' + href
   if (pagedataUrl in global) {
     const { expires, keys } = global[pagedataUrl]
     if (expires === 0 || Date.now() < expires) {
@@ -17,21 +17,21 @@ export async function loadPageData(url: RouterURL) {
     })
   }
   const basePath = util.trimSuffix(url.basePath, '/')
-  const dataUrl = `${basePath}/_aleph/data/${btoa(fullPath)}.json`
+  const dataUrl = `${basePath}/_aleph/data/${btoa(href)}.json`
   const data = await (await fetch(dataUrl)).json()
   if (util.isPlainObject(data)) {
-    storeData(data, fullPath)
+    storeData(data, href)
   }
 }
 
 export async function loadPageDataFromTag(url: RouterURL) {
-  const fullPath = util.fullPath(url)
+  const href = url.toString()
   const ssrDataEl = global.document.getElementById('ssr-data')
   if (ssrDataEl) {
     try {
       const ssrData = JSON.parse(ssrDataEl.innerText)
       if (util.isPlainObject(ssrData)) {
-        storeData(ssrData, fullPath)
+        storeData(ssrData, href)
         return
       }
     } catch (e) { }
@@ -39,14 +39,14 @@ export async function loadPageDataFromTag(url: RouterURL) {
   await loadPageData(url)
 }
 
-function storeData(data: any, fullPath: string) {
+function storeData(data: any, href: string) {
   let expires = 0
   for (const key in data) {
     const { expires: _expires } = data[key]
     if (expires === 0 || (_expires > 0 && _expires < expires)) {
       expires = _expires
     }
-    global[`pagedata://${fullPath}#${key}`] = data[key]
+    global[`pagedata://${href}#${key}`] = data[key]
   }
-  global[`pagedata://${fullPath}`] = { expires, keys: Object.keys(data) }
+  global[`pagedata://${href}`] = { expires, keys: Object.keys(data) }
 }

@@ -77,10 +77,6 @@ export default {
   cleanPath(path: string): string {
     return '/' + this.splitPath(path).join('/')
   },
-  fullPath(url: RouterURL): string {
-    const qs = url.query.toString()
-    return [url.pathname, qs].filter(Boolean).join('?')
-  },
   debounce<T extends Function>(callback: T, delay: number): T {
     let timer: number | null = null
     return ((...args: any[]) => {

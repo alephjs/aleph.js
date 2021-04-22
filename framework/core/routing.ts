@@ -159,6 +159,8 @@ export class Routing {
         return false
       }
     }, true)
+
+    // sort search params
     url.searchParams.sort()
 
     return [
@@ -169,6 +171,10 @@ export class Routing {
         routePath,
         params,
         query: url.searchParams,
+        toString(): string {
+          const qs = this.query.toString()
+          return [this.pathname, qs].filter(Boolean).join('?')
+        },
         push: (url: string) => redirect(url),
         replace: (url: string) => redirect(url, true),
       },
