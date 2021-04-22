@@ -64,13 +64,13 @@ export default function Anchor(props: AnchorProps) {
     if (p !== pathname) {
       return false
     }
-    if (q) {
-      const search = new URLSearchParams(q)
-      search.sort()
-      if (search.toString() !== query.toString()) {
-        return false
-      }
+
+    const search = new URLSearchParams(q)
+    search.sort()
+    if (search.toString() !== query.toString()) {
+      return false
     }
+
     return true
   }, [pathname, params, query, propHref])
   const className = useMemo(() => {
