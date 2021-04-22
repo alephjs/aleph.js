@@ -1,6 +1,7 @@
 import util from '../../shared/util.ts'
 
-export const clientStyles = new Map<string, string>()
+const clientStyles = new Map<string, string>()
+const inDeno = typeof Deno !== 'undefined' && typeof Deno.version?.deno === 'string'
 
 export function removeCSS(url: string, recoverable?: boolean) {
   const { document } = window as any
@@ -31,7 +32,7 @@ export function recoverCSS(url: string) {
 }
 
 export function applyCSS(url: string, css?: string) {
-  if (!util.inDeno) {
+  if (!inDeno) {
     const { document } = window as any
     const ssr = Array.from<any>(document.head.children).find((el: any) => {
       return el.getAttribute('data-module-id') === url && el.hasAttribute('ssr')

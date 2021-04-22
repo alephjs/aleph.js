@@ -1,8 +1,8 @@
 import { useContext, useMemo } from 'react'
-import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import events from '../core/events.ts'
 import { RouterContext } from './context.ts'
+import { inDeno } from './helper.ts'
 
 export class AsyncUseDenoError extends Error { }
 
@@ -43,7 +43,7 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), revalidate?: 
     const dataUrl = 'pagedata://' + fullPath
     const expires = typeof revalidate === 'number' && !isNaN(revalidate) ? Date.now() + revalidate * 1000 : 0
 
-    if (util.inDeno) {
+    if (inDeno) {
       const renderingData = store['rendering-' + dataUrl]
 
       if (renderingData && id in renderingData) {

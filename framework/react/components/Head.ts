@@ -14,12 +14,13 @@ import { SSRContext } from '../context.ts'
 import CustomScript from './CustomScript.ts'
 import InlineStyle from './InlineStyle.ts'
 import StyleLink from './StyleLink.ts'
+import { inDeno } from '../helper.ts'
 
 export default function Head(props: PropsWithChildren<{}>) {
   const { headElements } = useContext(SSRContext)
   const [els, forwardNodes] = useMemo(() => parse(props.children), [props.children])
 
-  if (util.inDeno) {
+  if (inDeno) {
     els.forEach(({ type, props }, key) => headElements.set(key, { type, props }))
   }
 

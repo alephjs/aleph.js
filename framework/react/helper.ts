@@ -1,8 +1,10 @@
 import { createContext } from 'react'
-import util from '../../shared/util.ts'
 
-const REACT_FORWARD_REF_TYPE = util.supportSymbolFor ? Symbol.for('react.forward_ref') : 0xead0
-const REACT_MEMO_TYPE = util.supportSymbolFor ? Symbol.for('react.memo') : 0xead3
+const symbolFor = typeof Symbol === 'function' && typeof Symbol.for === 'function'
+const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0
+const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
+
+export const inDeno = typeof Deno !== 'undefined' && typeof Deno.version?.deno === 'string'
 
 export function isLikelyReactComponent(type: any): Boolean {
   switch (typeof type) {

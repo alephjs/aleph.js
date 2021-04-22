@@ -1,7 +1,7 @@
 import { StyleHTMLAttributes, useContext, useEffect } from 'react'
-import util from '../../../shared/util.ts'
 import { applyCSS, removeCSS } from '../../core/style.ts'
 import { SSRContext } from '../context.ts'
+import { inDeno } from '../helper.ts'
 
 export default function InlineStyle({ children, ...rest }: StyleHTMLAttributes<{}>) {
   const { inlineStyles } = useContext(SSRContext)
@@ -9,7 +9,7 @@ export default function InlineStyle({ children, ...rest }: StyleHTMLAttributes<{
   const css = children?.toLocaleString()
 
   if (id && css) {
-    if (util.inDeno) {
+    if (inDeno) {
       inlineStyles.set('#' + id, css)
     } else {
       applyCSS('#' + id, css)
