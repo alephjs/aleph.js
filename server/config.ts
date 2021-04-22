@@ -1,5 +1,5 @@
-import { bold } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
-import { basename, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
+import { bold } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
+import { basename, join } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import type { ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDirSync, existsFileSync } from '../shared/fs.ts'

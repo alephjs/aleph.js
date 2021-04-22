@@ -1,6 +1,6 @@
-import { red } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
-import { dirname, join } from 'https://deno.land/std@0.93.0/path/mod.ts'
-import { existsSync } from 'https://deno.land/std@0.93.0/fs/exists.ts'
+import { red } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
+import { dirname, join } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { existsSync } from 'https://deno.land/std@0.94.0/fs/exists.ts'
 import { VERSION } from '../version.ts'
 
 const versionMetaUrl = 'https://cdn.deno.land/aleph/meta/versions.json'

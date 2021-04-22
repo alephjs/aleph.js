@@ -1,5 +1,3 @@
-import type { RouterURL } from "../types.ts"
-
 export default {
   isString(a: any): a is string {
     return typeof a === 'string'

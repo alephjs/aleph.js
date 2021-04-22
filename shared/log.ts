@@ -1,4 +1,4 @@
-import { blue, green, yellow, red } from 'https://deno.land/std@0.93.0/fmt/colors.ts'
+import { blue, green, yellow, red } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
 
 export type LevelNames = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
 
