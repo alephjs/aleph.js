@@ -1,4 +1,4 @@
-import { blue, green, yellow, red } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
+import { blue, green, yellow, red, dim } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
 
 export type LevelNames = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
 
@@ -13,7 +13,11 @@ export enum Level {
 export class Logger {
   #level: Level = Level.Info
 
-  setLevel(level: LevelNames) {
+  get level(): Level {
+    return this.#level
+  }
+
+  setLevel(level: LevelNames): void {
     switch (level) {
       case 'debug':
         this.#level = Level.Debug
@@ -33,33 +37,33 @@ export class Logger {
     }
   }
 
-  debug(...args: unknown[]) {
+  debug(...args: unknown[]): void {
     if (this.#level <= Level.Debug) {
-      console.log(blue('DEBUG'), ...args)
+      console.debug(blue('DEBUG'), ...args)
     }
   }
 
-  info(...args: unknown[]) {
+  info(...args: unknown[]): void {
     if (this.#level <= Level.Info) {
       console.log(green('INFO'), ...args)
     }
   }
 
-  warn(...args: unknown[]) {
+  warn(...args: unknown[]): void {
     if (this.#level <= Level.Warn) {
-      console.log(yellow('WARN'), ...args)
+      console.warn(yellow('WARN'), ...args)
     }
   }
 
-  error(...args: unknown[]) {
+  error(...args: unknown[]): void {
     if (this.#level <= Level.Error) {
-      console.log(red('ERROR'), ...args)
+      console.error(red('ERROR'), ...args)
     }
   }
 
-  fatal(...args: unknown[]) {
+  fatal(...args: unknown[]): void {
     if (this.#level <= Level.Fatal) {
-      console.log(red('FATAL'), ...args)
+      console.error(red('FATAL'), ...args)
       Deno.exit(1)
     }
   }
@@ -69,22 +73,24 @@ export class Measure {
   #t: number
 
   constructor() {
-    this.#t = performance.now()
+    this.#t = logger.level === Level.Debug ? performance.now() : 0
   }
 
   stop(message?: string) {
-    const now = performance.now()
-    if (message) {
-      const d = Math.round(now - this.#t)
-      let cf = green
-      if (d > 10000) {
-        cf = red
-      } else if (d > 1000) {
-        cf = yellow
+    if (this.#t > 0) {
+      const now = performance.now()
+      if (message) {
+        const d = Math.round(now - this.#t)
+        let cf = green
+        if (d > 10000) {
+          cf = red
+        } else if (d > 1000) {
+          cf = yellow
+        }
+        console.debug(dim('TIMING'), message, 'in', cf(d + 'ms'))
       }
-      logger.debug(message, 'in', cf(d + 'ms'))
+      this.#t = now
     }
-    this.#t = now
   }
 }
 
