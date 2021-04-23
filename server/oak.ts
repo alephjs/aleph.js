@@ -1,6 +1,6 @@
-import type { Context } from 'https://deno.land/x/oak@v7.2.0/context.ts'
-import type { Middleware } from 'https://deno.land/x/oak@v7.2.0/middleware.ts'
-import { NativeRequest } from 'https://deno.land/x/oak@v7.2.0/http_server_native.ts'
+import type { Context } from 'https://deno.land/x/oak@v7.3.0/context.ts'
+import type { Middleware } from 'https://deno.land/x/oak@v7.3.0/middleware.ts'
+import { NativeRequest } from 'https://deno.land/x/oak@v7.3.0/http_server_native.ts'
 import { Application } from './app.ts'
 import { Server } from './server.ts'
 
