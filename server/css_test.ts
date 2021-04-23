@@ -1,7 +1,7 @@
 import { delay } from 'std/async/delay.ts'
 import { assertEquals } from 'std/testing/asserts.ts'
 import { CSSProcessor } from './css.ts'
-import { stopEsbuild } from './helper.ts'
+import { stopEsbuild } from '../bundler/esbuild.ts'
 
 Deno.test('css processor', async () => {
   const processor = new CSSProcessor()

@@ -1,6 +1,6 @@
 import util from '../shared/util.ts'
 import { PostCSSPlugin, CSSOptions } from '../types.ts'
-import { esbuild } from './helper.ts'
+import { esbuild } from '../bundler/esbuild.ts'
 
 const postcssVersion = '8.2.10'
 const productionOnlyPostcssPlugins = ['autoprefixer']

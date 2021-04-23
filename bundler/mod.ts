@@ -10,7 +10,8 @@ import type { BrowserNames } from '../types.ts'
 import { VERSION } from '../version.ts'
 import type { Application, Module } from '../server/app.ts'
 import { cache } from '../server/cache.ts'
-import { computeHash, esbuild, stopEsbuild, getAlephPkgUri } from '../server/helper.ts'
+import { computeHash, getAlephPkgUri } from '../server/helper.ts'
+import { esbuild, stopEsbuild, esbuildHTTPLoader } from './esbuild.ts'
 
 const hashShort = 8
 const reHashJS = new RegExp(`\\.[0-9a-f]{${hashShort}}\\.js$`, 'i')
@@ -272,34 +273,7 @@ export class Bundler {
       minify: true,
       treeShaking: true,
       sourcemap: false,
-      plugins: [{
-        name: 'http-loader',
-        setup(build) {
-          build.onResolve({ filter: /.*/ }, args => {
-            if (util.isLikelyHttpURL(args.path)) {
-              return {
-                path: args.path,
-                namespace: 'http-module',
-              }
-            }
-            if (args.namespace === 'http-module') {
-              return {
-                path: (new URL(args.path, args.importer)).toString(),
-                namespace: 'http-module',
-              }
-            }
-            const [path] = util.splitBy(util.trimPrefix(args.path, 'file://'), '#')
-            if (path.startsWith('.')) {
-              return { path: join(args.resolveDir, path) }
-            }
-            return { path }
-          })
-          build.onLoad({ filter: /.*/, namespace: 'http-module' }, async args => {
-            const { content } = await cache(args.path)
-            return { contents: content }
-          })
-        }
-      }],
+      plugins: [esbuildHTTPLoader],
     })
   }
 }

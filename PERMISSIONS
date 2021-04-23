@@ -1,3 +1,5 @@
+# Permissions for https://deno.land/x/land
+
 --allow-env
 --allow-net
 --allow-read
