@@ -1,12 +1,12 @@
 import { dim, red, yellow } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.94.0/hash/mod.ts'
-import { relative } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { relative, extname } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
+import { SourceType } from '../compiler/mod.ts'
 import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
-
 
 export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 export const reFullVersion = /@v?\d+\.\d+\.\d+/i
@@ -85,7 +85,7 @@ export function getAlephPkgUri() {
   return `https://deno.land/x/aleph@v${VERSION}`
 }
 
-/** get relative the path of `to` to `from`. */
+/** get the relative path from `from` to `to`. */
 export function getRelativePath(from: string, to: string): string {
   const r = relative(from, to).split('\\').join('/')
   if (!r.startsWith('.') && !r.startsWith('/')) {
@@ -94,8 +94,42 @@ export function getRelativePath(from: string, to: string): string {
   return r
 }
 
-/** fix remote import url to local */
-export function toLocalUrl(url: string): string {
+/** get source type by given url and content type. */
+export function getSourceType(url: string, contentType: string): SourceType {
+  switch (contentType.split(';')[0].trim()) {
+    case 'application/javascript':
+    case 'text/javascript':
+      return SourceType.JS
+    case 'text/jsx':
+      return SourceType.JSX
+    case 'text/typescript':
+      return SourceType.TS
+    case 'text/tsx':
+      return SourceType.TSX
+    case 'text/css':
+      return SourceType.CSS
+  }
+  switch (extname(url)) {
+    case '.mjs':
+    case '.js':
+      return SourceType.JS
+    case '.jsx':
+      return SourceType.JSX
+    case '.ts':
+      return SourceType.TS
+    case '.tsx':
+      return SourceType.TSX
+    case '.css':
+      return SourceType.CSS
+  }
+  return SourceType.Unknown
+}
+
+/**
+ * fix remote import url to local
+ * https://esm.sh/react.js?bundle -> /-/esm.sh/react.YnVuZGxl.js
+ */
+export function toLocalPath(url: string): string {
   if (util.isLikelyHttpURL(url)) {
     let { hostname, pathname, port, protocol, search } = new URL(url)
     const isHttp = protocol === 'http:'
@@ -104,9 +138,10 @@ export function toLocalUrl(url: string): string {
     }
     if (search !== '') {
       const a = util.splitPath(pathname)
-      const searchKey = btoa(search.slice(1)).replace(/[+/=]/g, '')
-      const basename = `[${searchKey}]${a.pop()}`
-      a.push(basename)
+      const basename = a.pop()!
+      const ext = extname(basename)
+      const search64 = util.btoaUrl(search.slice(1))
+      a.push(util.trimSuffix(basename, ext) + `.${search64}` + ext)
       pathname = '/' + a.join('/')
     }
     return [

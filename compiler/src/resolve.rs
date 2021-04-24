@@ -117,7 +117,7 @@ impl Resolver {
 
   /// fix import/export url.
   //  - `https://esm.sh/react` -> `/-/esm.sh/react.js`
-  //  - `https://esm.sh/react@17.0.1?target=es2015&dev` -> `/-/esm.sh/[base64('target=es2015&dev')]react@17.0.1.js`
+  //  - `https://esm.sh/react@17.0.1?target=es2015&dev` -> `/-/esm.sh/react@17.0.1.[base64('target=es2015&dev')].js`
   //  - `http://localhost:8080/mod` -> `/-/http_localhost_8080/mod.js`
   //  - `/components/x/./logo.tsx` -> `/components/x/logo.tsx`
   //  - `/components/x/../logo.tsx` -> `/components/logo.tsx`
@@ -143,8 +143,8 @@ impl Resolver {
     let url = Url::from_str(url).unwrap();
     let path = Path::new(url.path());
     let mut path_buf = path.to_owned();
-    let mut ext = ".".to_owned();
-    ext.push_str(match path.extension() {
+    let mut extname = ".".to_owned();
+    extname.push_str(match path.extension() {
       Some(os_str) => match os_str.to_str() {
         Some(s) => {
           if RE_ENDS_WITH_VERSION.is_match(url.path()) {
@@ -159,22 +159,24 @@ impl Resolver {
     });
     if let Some(os_str) = path.file_name() {
       if let Some(s) = os_str.to_str() {
+        let extname = extname.as_str();
         let mut file_name = "".to_owned();
+        if s.ends_with(extname) {
+          file_name.push_str(s.trim_end_matches(extname));
+        } else {
+          file_name.push_str(s);
+        }
         if let Some(q) = url.query() {
-          file_name.push('[');
+          file_name.push('.');
           file_name.push_str(
             base64::encode(q)
-              .replace("+", "")
-              .replace("/", "")
+              .replace("+", "-")
+              .replace("/", "_")
               .replace("=", "")
               .as_str(),
           );
-          file_name.push(']');
         }
-        file_name.push_str(s);
-        if !file_name.ends_with(ext.as_str()) {
-          file_name.push_str(ext.as_str());
-        }
+        file_name.push_str(extname);
         path_buf.set_file_name(file_name);
       }
     }
@@ -426,7 +428,11 @@ mod tests {
     );
     assert_eq!(
       resolver.fix_import_url("https://esm.sh/react@17.0.1?target=es2015&dev"),
-      "/-/esm.sh/[dGFyZ2V0PWVzMjAxNSZkZXY]react@17.0.1.js"
+      "/-/esm.sh/react@17.0.1.dGFyZ2V0PWVzMjAxNSZkZXY.js"
+    );
+    assert_eq!(
+      resolver.fix_import_url("https://cdn.esm.sh/v1/react@17.0.1/deno/react.js?target=es2015&dev"),
+      "/-/cdn.esm.sh/v1/react@17.0.1/deno/react.dGFyZ2V0PWVzMjAxNSZkZXY.js"
     );
     assert_eq!(
       resolver.fix_import_url("http://localhost:8080/mod"),
