@@ -80,8 +80,7 @@ export class Server {
       // serve dist files
       if (pathname.startsWith('/_aleph/')) {
         if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('.json')) {
-          const base64 = util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json')
-          const path = atob(base64)
+          const path = util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json'))
           const data = await app.getSSRData({ pathname: path })
           if (data === null) {
             req.status(404).send('null', 'application/json; charset=utf-8')

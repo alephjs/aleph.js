@@ -5,6 +5,7 @@ import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDirSync, existsFileSync } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
+import cssLoader from '../plugins/css.ts'
 import type { Config, ImportMap, PostCSSPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { getAlephPkgUri, reLocaleID } from './helper.ts'
@@ -13,25 +14,27 @@ export type RequiredConfig = Required<Config> & {
   react: ReactResolve
 }
 
-export const defaultConfig: Readonly<RequiredConfig> = {
-  framework: 'react',
-  buildTarget: 'es2015',
-  browserslist: {},
-  basePath: '/',
-  srcDir: '/',
-  outputDir: '/dist',
-  defaultLocale: 'en',
-  locales: [],
-  rewrites: {},
-  ssr: {},
-  plugins: [],
-  css: {},
-  headers: {},
-  compress: true,
-  env: {},
-  react: {
-    version: defaultReactVersion,
-    esmShBuildVersion: 41,
+export function getDefaultConfig(): Readonly<RequiredConfig> {
+  return {
+    framework: 'react',
+    buildTarget: 'es2015',
+    browserslist: {},
+    basePath: '/',
+    srcDir: '/',
+    outputDir: '/dist',
+    defaultLocale: 'en',
+    locales: [],
+    rewrites: {},
+    ssr: {},
+    plugins: [],
+    css: {},
+    headers: {},
+    compress: true,
+    env: {},
+    react: {
+      version: defaultReactVersion,
+      esmShBuildVersion: 41,
+    }
   }
 }
 
@@ -129,12 +132,16 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
   }
   if (util.isNEArray(plugins)) {
-    config.plugins = plugins
+    config.plugins = [cssLoader(), ...plugins.filter(v => v && util.isNEString(v.type))]
+  } else {
+    config.plugins = [cssLoader()]
   }
   if (util.isPlainObject(css)) {
+    const { modules, postcss } = css
     config.css = {
-      modules: util.isPlainObject(css.modules) ? css.modules : false,
-      postcss: isPostcssConfig(css.postcss) ? css.postcss : defaultConfig.css.postcss
+      remoteExternal: false,
+      modules: util.isPlainObject(modules) ? modules : Boolean(modules),
+      postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }
   }
 

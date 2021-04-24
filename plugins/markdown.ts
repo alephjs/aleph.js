@@ -3,29 +3,28 @@ import marked from 'https://esm.sh/marked@2.0.1'
 import { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.1'
 import util from '../shared/util.ts'
 
-const decoder = new TextDecoder()
-
 export default (): LoaderPlugin => {
   return {
     name: 'markdown-loader',
     type: 'loader',
     test: /\.(md|markdown)$/i,
     allowPage: true,
-    pagePathResolve: (url) => {
-      let path = util.trimPrefix(url.replace(/\.(md|markdown)$/i, ''), '/pages')
-      let isIndex = path.endsWith('/index')
+    resolve: (url) => {
+      let pagePath = util.trimPrefix(url.replace(/\.(md|markdown)$/i, ''), '/pages')
+      let isIndex = pagePath.endsWith('/index')
       if (isIndex) {
-        path = util.trimSuffix(path, '/index')
-        if (path === '') {
-          path = '/'
+        pagePath = util.trimSuffix(pagePath, '/index')
+        if (pagePath === '') {
+          pagePath = '/'
         }
       }
-      return { path, isIndex }
+      return { url, pagePath, isIndex }
     },
-    transform: ({ content }) => {
-      const { __content, ...meta } = safeLoadFront(decoder.decode(content))
+    load: async ({ url }, app) => {
+      const { framework } = app.config
+      const { content } = await app.fetchModule(url)
+      const { __content, ...meta } = safeLoadFront((new TextDecoder).decode(content))
       const html = marked.parse(__content)
-      const framework = Deno.env.get('ALEPH_FRAMEWORK')
       const props = {
         id: util.isString(meta.id) ? meta.id : undefined,
         className: util.isString(meta.id) ? meta.className : undefined,

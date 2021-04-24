@@ -40,6 +40,21 @@ export default {
     }
     return [s, '']
   },
+  btoaUrl(s: string) {
+    return btoa(s).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+  },
+  atobUrl(b64: string) {
+    const b = b64.length % 4
+    if (b === 3) {
+      b64 += '='
+    } else if (b === 2) {
+      b64 += '=='
+    } else if (b === 1) {
+      throw new TypeError('Illegal base64 Url String')
+    }
+    b64 = b64.replace(/\-/g, '+').replace(/_/g, '/')
+    return atob(b64)
+  },
   formatBytes(bytes: number) {
     if (bytes < 1024) {
       return bytes.toString() + 'B'

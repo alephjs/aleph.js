@@ -7,7 +7,7 @@ import util from '../shared/util.ts'
 import { getDenoDir } from './helper.ts'
 
 /** download and cache remote contents */
-export async function cache(url: string, options?: { forceRefresh?: boolean, retryTimes?: number }) {
+export async function cache(url: string, options?: { forceRefresh?: boolean, retryTimes?: number }): Promise<{ content: Uint8Array, contentType: string | null }> {
   const { protocol, hostname, port, pathname, search } = new URL(url)
   const hashname = createHash('sha256').update(pathname + search).toString()
   const isLocalhost = hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '127.0.0.1'

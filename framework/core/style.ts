@@ -1,18 +1,23 @@
+/// <reference lib="dom" />
+
 import util from '../../shared/util.ts'
 
-const clientStyles = new Map<string, string>()
+const clientStyles = new Map<string, { css?: string, href?: string }>()
 const inDeno = typeof Deno !== 'undefined' && typeof Deno.version?.deno === 'string'
 
 export function removeCSS(url: string, recoverable?: boolean) {
-  const { document } = window as any
-  Array.from(document.head.children).forEach((el: any) => {
+  const { document } = window
+  Array.from(document.head.children).forEach(el => {
     if (el.getAttribute('data-module-id') === url) {
       if (recoverable) {
         const tag = el.tagName.toLowerCase()
         if (tag === 'style') {
-          clientStyles.set(url, el.innerHTML)
+          clientStyles.set(url, { css: el.innerHTML })
         } else if (tag === 'link') {
-          clientStyles.set(url, '')
+          const href = el.getAttribute('href')
+          if (href) {
+            clientStyles.set(url, { href })
+          }
         }
       }
       document.head.removeChild(el)
@@ -22,16 +27,11 @@ export function removeCSS(url: string, recoverable?: boolean) {
 
 export function recoverCSS(url: string) {
   if (clientStyles.has(url)) {
-    const css = clientStyles.get(url)!
-    if (css === '' && util.isLikelyHttpURL(url)) {
-      applyCSS(url)
-    } else {
-      applyCSS(url, css)
-    }
+    applyCSS(url, clientStyles.get(url)!)
   }
 }
 
-export function applyCSS(url: string, css?: string) {
+export function applyCSS(url: string, { css, href }: { css?: string, href?: string }) {
   if (!inDeno) {
     const { document } = window as any
     const ssr = Array.from<any>(document.head.children).find((el: any) => {
@@ -45,14 +45,14 @@ export function applyCSS(url: string, css?: string) {
         return el.getAttribute('data-module-id') === url
       })
       let el: any
-      if (css !== undefined) {
+      if (util.isNEString(css)) {
         el = document.createElement('style')
         el.type = 'text/css'
         el.appendChild(document.createTextNode(css))
-      } else if (util.isLikelyHttpURL(url)) {
+      } else if (util.isNEString(href)) {
         el = document.createElement('link')
         el.rel = 'stylesheet'
-        el.href = url
+        el.href = href
       } else {
         throw new Error('applyCSS: missing css')
       }

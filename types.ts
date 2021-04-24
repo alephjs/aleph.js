@@ -51,14 +51,12 @@ export type LoaderPlugin = {
   test: RegExp
   /** `acceptHMR` enables the HMR. */
   acceptHMR?: boolean
-  /** allowPage` allows the loaded module as a page. */
+  /** allowPage` allows to load the module as a page. */
   allowPage?: boolean
-  /** `pagePathReoslve` resolves the page path. */
-  pagePathResolve?(url: string): { path: string, isIndex?: boolean }
-  /** `resolve` resolves the module content. */
-  resolve?(url: string): Uint8Array | Promise<Uint8Array>
-  /** `transform` transforms the source content. */
-  transform?(input: { url: string, content: Uint8Array, map?: Uint8Array }): LoaderTransformOutput | Promise<LoaderTransformOutput>
+  /** `resove` resolves the module url. */
+  resolve?(url: string): ResolveResult
+  /** `load` loads the source content. */
+  load?(input: { url: string, data?: any }, app: ServerApplication): LoaderOutput | Promise<LoaderOutput>
 }
 
 /**
@@ -70,7 +68,7 @@ export type ServerPlugin = {
   /** `type` specifies the plugin type. */
   type: 'server'
   /** `setup` setups the plugin. */
-  setup(plugin: ServerPluginContext): Promise<void> | void
+  setup(app: ServerApplication): Promise<void> | void
 }
 
 /**
@@ -79,9 +77,20 @@ export type ServerPlugin = {
 export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
 
 /**
- * The result of loader transform.
+ * The result of loader resove.
  */
-export type LoaderTransformOutput = {
+export type ResolveResult = {
+  url: string,
+  external?: boolean,
+  pagePath?: string,
+  isIndex?: boolean
+  data?: any,
+}
+
+/**
+ * The output of loader.
+ */
+export type LoaderOutput = {
   /** The transformed code type (default is 'js'). */
   type?: 'css' | 'js' | 'jsx' | 'ts' | 'tsx'
   /** The transformed code. */
@@ -116,11 +125,12 @@ export type ImportMap = {
 }
 
 /**
- * The config for CSS resolve.
+ * The config for CSS loader.
  */
 export type CSSOptions = {
+  remoteExternal?: boolean
   /** `module` enables the css module feature. */
-  modules?: false | CSSModulesOptions
+  modules?: boolean | CSSModulesOptions
   /** `postcss` specifies the postcss plugins. */
   postcss?: { plugins: PostCSSPlugin[] }
 }
@@ -150,12 +160,13 @@ export type SSROptions = {
 /**
  * An interface that aligns to the parts of the aleph server's `Application`.
  */
-export interface ServerPluginContext {
+export interface ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
   readonly config: Required<Config>
   readonly importMap: ImportMap
-  addModule(url: string, options?: { code?: string }): Promise<void>
+  addModule(url: string, options?: { sourceCode?: string }): Promise<void>
+  fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }>
   injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: (url: string, code: string) => string): void
 }
 

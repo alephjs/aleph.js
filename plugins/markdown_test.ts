@@ -1,12 +1,17 @@
-import { assertEquals } from 'std/testing/asserts.ts'
+import { join } from 'std/path/mod.ts'
+import { assert, assertEquals } from 'std/testing/asserts.ts'
+import { Application } from '../server/app.ts'
+import { ensureTextFile } from '../shared/fs.ts'
 import markdownLoader from './markdown.ts'
 
-Deno.test('markdown loader for react ', async () => {
-  Deno.env.set('ALEPH_FRAMEWORK', 'react')
+Deno.test('plugin: markdown loader', async () => {
+  Deno.env.set('DENO_TESTING', 'true')
+  const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
+  const app = new Application(dir)
   const loader = markdownLoader()
-  const { code } = await loader.transform!({
-    url: '/test.md',
-    content: (new TextEncoder).encode([
+  await ensureTextFile(
+    join(dir, '/pages/docs/index.md'),
+    [
       '---',
       'id: mark-page-1',
       'className: mark-page',
@@ -17,14 +22,17 @@ Deno.test('markdown loader for react ', async () => {
       '',
       '# Aleph.js',
       'The Full-stack Framework in Deno.'
-    ].join('\n')),
-  })
-  assertEquals(loader.test.test('/test.md'), true)
-  assertEquals(loader.test.test('/test.markdown'), true)
-  assertEquals(loader.allowPage, true)
-  assertEquals(loader.pagePathResolve!('/pages/docs/get-started.md'), { path: '/docs/get-started', isIndex: false })
-  assertEquals(loader.pagePathResolve!('/pages/docs/index.md'), { path: '/docs', isIndex: true })
-  assertEquals(code.includes('html: "<h1 id=\\"alephjs\\">Aleph.js</h1>\\n<p>The Full-stack Framework in Deno.</p>\\n"'), true)
-  assertEquals(code.includes('MarkdownPage.meta = {"id":"mark-page-1","className":"mark-page","style":{"color":"#333"},"url":"https://alephjs.org"}'), true)
-  Deno.env.delete('ALEPH_FRAMEWORK')
+    ].join('\n')
+  )
+  const { code } = await loader.load!({ url: '/pages/docs/index.md', }, app)
+  assert(loader.type === 'loader')
+  assert(loader.test.test('/test.md'))
+  assert(loader.test.test('/test.markdown'))
+  assert(loader.allowPage)
+  assertEquals(loader.resolve!('/pages/docs/get-started.md').pagePath, '/docs/get-started')
+  assert(!loader.resolve!('/pages/docs/get-started.md').isIndex)
+  assertEquals(loader.resolve!('/pages/docs/index.md').pagePath, '/docs')
+  assert(loader.resolve!('/pages/docs/index.md').isIndex)
+  assert(code.includes('html: "<h1 id=\\"alephjs\\">Aleph.js</h1>\\n<p>The Full-stack Framework in Deno.</p>\\n"'))
+  assert(code.includes('MarkdownPage.meta = {"id":"mark-page-1","className":"mark-page","style":{"color":"#333"},"url":"https://alephjs.org"}'))
 })

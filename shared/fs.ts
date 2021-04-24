@@ -2,23 +2,7 @@ import { dirname } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.94.0/fs/ensure_dir.ts'
 
 /* check whether or not the given path exists as a directory. */
-export async function existsDir(path: string): Promise<boolean | Error> {
-  try {
-    const fi = await Deno.lstat(path)
-    if (fi.isDirectory) {
-      return true
-    }
-    return false
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) {
-      return false
-    }
-    return Promise.reject(err)
-  }
-}
-
-/* check whether or not the given path exists as a directory. */
-export function existsDirSync(path: string): boolean | Error {
+export function existsDirSync(path: string): boolean {
   try {
     const fi = Deno.lstatSync(path)
     if (fi.isDirectory) {
@@ -30,22 +14,6 @@ export function existsDirSync(path: string): boolean | Error {
       return false
     }
     throw err
-  }
-}
-
-/* check whether or not the given path exists as regular file. */
-export async function existsFile(path: string): Promise<boolean | Error> {
-  try {
-    const fi = await Deno.lstat(path)
-    if (fi.isFile) {
-      return true
-    }
-    return false
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) {
-      return false
-    }
-    return Promise.reject(err)
   }
 }
 

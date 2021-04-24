@@ -12,7 +12,8 @@ const mimeTypes: Record<string, string[]> = {
   'text/html': ['html', 'htm'],
   'text/markdown': ['md', 'markdown'],
   'text/mdx': ['mdx'],
-  'text/typescript': ['ts', 'tsx'],
+  'text/typescript': ['ts'],
+  'text/tsx': ['tsx'],
   'text/jsx': ['jsx'],
   'text/css': ['css'],
   'text/less': ['less'],
@@ -46,7 +47,8 @@ const mimeTypes: Record<string, string[]> = {
   'video/ogg': ['ogv'],
   'video/webm': ['webm'],
 }
-const defaultType = 'application/octet-stream'
+
+// types map
 const typesMap = Object.keys(mimeTypes).reduce((map, contentType) => {
   mimeTypes[contentType].forEach(ext => map.set(ext, contentType))
   return map
@@ -55,5 +57,5 @@ const typesMap = Object.keys(mimeTypes).reduce((map, contentType) => {
 /** get content type by file name */
 export function getContentType(filename: string): string {
   const ext = filename.split('.').pop()!.toLowerCase()
-  return typesMap.get(ext) ?? defaultType
+  return typesMap.get(ext) ?? 'application/octet-stream'
 }

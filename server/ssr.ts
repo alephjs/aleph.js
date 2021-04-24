@@ -116,8 +116,9 @@ export class Renderer {
       nestedModules.map(({ url }) => url)
     ].flat())
 
-
+    // ensure working directory
     Deno.chdir(this.#app.workingDir)
+
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
       App,
@@ -237,8 +238,8 @@ export class Renderer {
   }
 
   private async lookupStyleModules(...urls: string[]): Promise<Record<string, string>> {
-    return (await Promise.all(this.#app.lookupStyleModules(...urls).map(async ({ jsFile, hash }) => {
-      const { default: { __url$: url, __css$: css } } = await import(`file://${jsFile}#${hash.slice(0, 8)}`)
+    return (await Promise.all(this.#app.lookupStyleModules(...urls).map(async ({ url, jsFile, hash }) => {
+      const { css } = await import(`file://${jsFile}#${hash.slice(0, 8)}`)
       return { url, css }
     }))).reduce((styles, mod) => {
       styles[mod.url] = mod.css

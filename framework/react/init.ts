@@ -1,16 +1,16 @@
 import { dirname } from 'https://deno.land/std@0.94.0/path/mod.ts'
-import { getAlephPkgUri, getRelativePath, toLocalUrl } from '../../server/helper.ts'
+import { getAlephPkgUri, getRelativePath, toLocalPath } from '../../server/helper.ts'
 import util from '../../shared/util.ts'
-import type { ServerPluginContext } from '../../types.ts'
+import type { ServerApplication } from '../../types.ts'
 
-export async function init(app: ServerPluginContext) {
+export async function init(app: ServerApplication) {
   if (app.mode === 'development') {
     const alephPkgUri = getAlephPkgUri()
     app.injectCode('hmr', (url: string, code: string) => {
       if (code.includes('$RefreshReg$(')) {
         const refreshModuleUrl = getRelativePath(
-          dirname(toLocalUrl(url)),
-          toLocalUrl(`${alephPkgUri}/framework/react/refresh.js`)
+          dirname(toLocalPath(url)),
+          toLocalPath(`${alephPkgUri}/framework/react/refresh.js`)
         )
         return [
           `import { RefreshRuntime, performReactRefresh } from ${JSON.stringify(refreshModuleUrl)};`,
@@ -31,7 +31,7 @@ export async function init(app: ServerPluginContext) {
     app.injectCode('compilation', (url: string, code: string) => {
       if (url === '/main.js') {
         return [
-          `import ".${toLocalUrl(`${alephPkgUri}/framework/react/refresh.js`)}";`,
+          `import ".${toLocalPath(`${alephPkgUri}/framework/react/refresh.js`)}";`,
           code
         ].join('\n')
       }

@@ -137,14 +137,14 @@ export class Bundler {
       return this.#compiled.get(mod.url)!
     }
 
-    const bundlingFile = util.trimSuffix(mod.jsFile, '.js') + '.bundling.js'
-    this.#compiled.set(mod.url, bundlingFile)
+    const jsFile = util.trimSuffix(mod.jsFile, '.js') + '.client.js'
+    this.#compiled.set(mod.url, jsFile)
 
-    if (existsFileSync(bundlingFile)) {
-      return bundlingFile
+    if (existsFileSync(jsFile)) {
+      return jsFile
     }
 
-    const source = await this.#app.readModule(mod.url)
+    const source = await this.#app.loadModule(mod.url)
     if (source === null) {
       this.#compiled.delete(mod.url)
       throw new Error(`Unsupported module '${mod.url}'`)
@@ -155,7 +155,7 @@ export class Bundler {
         mod.url,
         source.code,
         {
-          ...this.#app.sharedCompileOptions,
+          ...this.#app.commonCompileOptions,
           swcOptions: {
             sourceType: source.type,
           },
@@ -183,8 +183,8 @@ export class Bundler {
         }
       }))
 
-      await ensureTextFile(bundlingFile, code)
-      return bundlingFile
+      await ensureTextFile(jsFile, code)
+      return jsFile
     } catch (e) {
       this.#compiled.delete(mod.url)
       throw new Error(`Can't compile module '${mod.url}': ${e.message}`)
