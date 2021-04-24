@@ -300,12 +300,12 @@ pub fn t<T: Fold>(specifier: &str, source: &str, tr: T, expect: &str) -> bool {
 }
 
 #[allow(dead_code)]
-pub fn st(specifer: &str, source: &str, bundling: bool) -> (String, Rc<RefCell<Resolver>>) {
+pub fn st(specifer: &str, source: &str, bundle_mode: bool) -> (String, Rc<RefCell<Resolver>>) {
   let module = SWC::parse(specifer, source, None).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
     ImportHashMap::default(),
-    bundling,
+    bundle_mode,
     vec![],
     Some("https://deno.land/x/aleph@v0.3.0".into()),
     None,
