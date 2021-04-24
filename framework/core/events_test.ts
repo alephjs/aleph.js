@@ -13,7 +13,7 @@ const shouldNeverBeEmitted = () => {
 
 Deno.test({
     name:
-        'When adding a new event, "eventListener" event is fired before adding the listener',
+        'fw/core/events When adding a new event, "eventListener" event is fired before adding the listener',
     fn() {
         let eventsFired: string[] = []
         const testEmitter = new EventEmitter()
@@ -34,7 +34,7 @@ Deno.test({
 
 Deno.test({
     name:
-        'When removing a listenert, "removeListener" event is fired after removal',
+        'fw/core/events When removing a listenert, "removeListener" event is fired after removal',
     fn() {
         const eventsFired: string[] = []
         const testEmitter = new EventEmitter()
@@ -54,7 +54,7 @@ Deno.test({
 
 Deno.test({
     name:
-        "Default max listeners is 10, but can be changed by direct assignment only",
+        "fw/core/events Default max listeners is 10, but can be changed by direct assignment only",
     fn() {
         assertEquals(EventEmitter.defaultMaxListeners, 10)
         new EventEmitter().setMaxListeners(20)
@@ -91,7 +91,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "addListener adds a listener, and listener count is correct",
+    name: "fw/core/events addListener adds a listener, and listener count is correct",
     fn() {
         const testEmitter = new EventEmitter()
         testEmitter.on("event", shouldNeverBeEmitted)
@@ -102,7 +102,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Emitted events are called synchronously in the order they were added",
+    name: "fw/core/events Emitted events are called synchronously in the order they were added",
     fn() {
         const testEmitter = new EventEmitter()
         const eventsFired: string[] = []
@@ -129,7 +129,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Registered event names are returned as strings or Sybols",
+    name: "fw/core/events Registered event names are returned as strings or Sybols",
     fn() {
         const testEmitter = new EventEmitter()
         testEmitter.on("event", shouldNeverBeEmitted)
@@ -141,7 +141,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "You can set and get max listeners",
+    name: "fw/core/events You can set and get max listeners",
     fn() {
         const testEmitter = new EventEmitter()
         assertEquals(testEmitter.getMaxListeners(), 10)
@@ -151,7 +151,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "You can retrieve registered functions for an event",
+    name: "fw/core/events You can retrieve registered functions for an event",
     fn() {
         const testEmitter = new EventEmitter()
         testEmitter.on("someOtherEvent", shouldNeverBeEmitted)
@@ -166,7 +166,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Off is alias for removeListener",
+    name: "fw/core/events Off is alias for removeListener",
     fn() {
         const testEmitter = new EventEmitter()
         testEmitter.on("event", shouldNeverBeEmitted)
@@ -177,7 +177,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Event registration can be chained",
+    name: "fw/core/events Event registration can be chained",
     fn() {
         const testEmitter = new EventEmitter()
         testEmitter
@@ -188,7 +188,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Events can be registered to only fire once",
+    name: "fw/core/events Events can be registered to only fire once",
     fn() {
         let eventsFired: string[] = []
         const testEmitter = new EventEmitter()
@@ -213,7 +213,7 @@ Deno.test({
 
 Deno.test({
     name:
-        "You can inject a listener into the start of the stack, rather than at the end",
+        "fw/core/events You can inject a listener into the start of the stack, rather than at the end",
     fn() {
         const eventsFired: string[] = []
         const testEmitter = new EventEmitter()
@@ -232,7 +232,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: 'You can prepend a "once" listener',
+    name: 'fw/core/events You can prepend a "once" listener',
     fn() {
         const eventsFired: string[] = []
         const testEmitter = new EventEmitter()
@@ -252,7 +252,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Remove all listeners, which can also be chained",
+    name: "fw/core/events Remove all listeners, which can also be chained",
     fn() {
         const testEmitter = new EventEmitter()
         testEmitter.on("event", shouldNeverBeEmitted)
@@ -271,7 +271,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Provide a non-existent event to removeAllListeners will do nothing",
+    name: "fw/core/events Provide a non-existent event to removeAllListeners will do nothing",
     fn() {
         const testEmitter = new EventEmitter()
         testEmitter.on("event", shouldNeverBeEmitted)
@@ -290,7 +290,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Remove individual listeners, which can also be chained",
+    name: "fw/core/events Remove individual listeners, which can also be chained",
     fn() {
         const testEmitter = new EventEmitter()
         testEmitter.on("event", shouldNeverBeEmitted)
@@ -313,7 +313,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "It is OK to try to remove non-existent listener",
+    name: "fw/core/events It is OK to try to remove non-existent listener",
     fn() {
         const testEmitter = new EventEmitter()
 
@@ -332,7 +332,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "all listeners complete execution even if removed before execution",
+    name: "fw/core/events all listeners complete execution even if removed before execution",
     fn() {
         const testEmitter = new EventEmitter()
         let eventsProcessed: string[] = []
@@ -355,7 +355,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: 'Raw listener will return event listener or wrapped "once" function',
+    name: 'fw/core/events Raw listener will return event listener or wrapped "once" function',
     fn() {
         const testEmitter = new EventEmitter()
         const eventsProcessed: string[] = []
@@ -379,7 +379,7 @@ Deno.test({
 
 Deno.test({
     name:
-        "Once wrapped raw listeners may be executed multiple times, until the wrapper is executed",
+        "fw/core/events Once wrapped raw listeners may be executed multiple times, until the wrapper is executed",
     fn() {
         const testEmitter = new EventEmitter()
         let eventsProcessed: string[] = []
@@ -402,7 +402,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Can add once event listener to EventEmitter via standalone function",
+    name: "fw/core/events Can add once event listener to EventEmitter via standalone function",
     async fn() {
         const ee = new EventEmitter()
         setTimeout(() => {
@@ -415,7 +415,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Can add once event listener to EventTarget via standalone function",
+    name: "fw/core/events Can add once event listener to EventTarget via standalone function",
     async fn() {
         const et: EventTarget = new EventTarget()
         setTimeout(() => {
@@ -429,7 +429,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "Only valid integers are allowed for max listeners",
+    name: "fw/core/events Only valid integers are allowed for max listeners",
     fn() {
         const ee = new EventEmitter()
         ee.setMaxListeners(0)
@@ -451,7 +451,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "ErrorMonitor can spy on error events without consuming them",
+    name: "fw/core/events ErrorMonitor can spy on error events without consuming them",
     fn() {
         const ee = new EventEmitter()
         let events: string[] = []
@@ -489,7 +489,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "asynchronous iteration of events are handled as expected",
+    name: "fw/core/events asynchronous iteration of events are handled as expected",
     async fn() {
         const ee = new EventEmitter()
         setTimeout(() => {
@@ -517,7 +517,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "asynchronous error handling of emitted events works as expected",
+    name: "fw/core/events asynchronous error handling of emitted events works as expected",
     async fn() {
         const ee = new EventEmitter()
         const _err = new Error("kaboom")
@@ -542,7 +542,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "error thrown during asynchronous processing of events is handled",
+    name: "fw/core/events error thrown during asynchronous processing of events is handled",
     async fn() {
         const ee = new EventEmitter()
         const _err = new Error("kaboom")
@@ -572,7 +572,7 @@ Deno.test({
 
 Deno.test({
     name:
-        "error thrown in processing loop of asynchronous event prevents processing of additional events",
+        "fw/core/events error thrown in processing loop of asynchronous event prevents processing of additional events",
     async fn() {
         const ee = new EventEmitter()
         const _err = new Error("kaboom")
@@ -597,7 +597,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "asynchronous iterator next() works as expected",
+    name: "fw/core/events asynchronous iterator next() works as expected",
     async fn() {
         const ee = new EventEmitter()
         const iterable = on(ee, "foo")
@@ -637,7 +637,7 @@ Deno.test({
 })
 
 Deno.test({
-    name: "async iterable throw handles various scenarios",
+    name: "fw/core/events async iterable throw handles various scenarios",
     async fn() {
         const ee = new EventEmitter()
         const iterable = on(ee, "foo")
@@ -671,7 +671,7 @@ Deno.test({
 // Event emitter's `on` previously referenced addListener internally, so overriding addListener
 // would cause a deadlock
 // This is a regression test
-Deno.test("Elements that extend EventEmitter listener alias don't end up in a deadlock", () => {
+Deno.test("fw/core/events Elements that extend EventEmitter listener alias don't end up in a deadlock", () => {
     class X extends EventEmitter {
         addListener(eventName: string, listener: () => void) {
             return super.on(eventName, listener)
