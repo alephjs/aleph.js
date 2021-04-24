@@ -375,6 +375,13 @@ export class EventEmitter {
     if (n !== Infinity) {
       if (n === 0) {
         n = Infinity
+      } else {
+        if (!Number.isInteger(n)) {
+          throw new Error('The max number of listeners must be an integer')
+        }
+        if (n < 0) {
+          throw new Error('The max number of listeners must be >= 0')
+        }
       }
     }
 
