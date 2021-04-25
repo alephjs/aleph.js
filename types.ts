@@ -128,6 +128,9 @@ export type ImportMap = {
  * The config for CSS loader.
  */
 export type CSSOptions = {
+  /** `extractSize` specifies the extract size (default is 4k). */
+  extractSize?: number
+  /** `remoteExternal` load remote css as external when it is true. */
   remoteExternal?: boolean
   /** `module` enables the css module feature. */
   modules?: boolean | CSSModulesOptions
@@ -161,11 +164,13 @@ export type SSROptions = {
  * An interface that aligns to the parts of the aleph server's `Application`.
  */
 export interface ServerApplication {
-  readonly workingDir: string
   readonly mode: 'development' | 'production'
+  readonly workingDir: string
+  readonly buildDir: string
   readonly config: Required<Config>
   readonly importMap: ImportMap
   addModule(url: string, options?: { sourceCode?: string }): Promise<void>
+  addDist(path: string, content: Uint8Array): Promise<void>
   fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }>
   injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: (url: string, code: string) => string): void
 }

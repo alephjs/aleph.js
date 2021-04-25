@@ -29,7 +29,7 @@ export type FrameworkRenderer = {
     url: RouterURL,
     AppComponent: any,
     nestedPageComponents: { url: string, Component?: any }[],
-    styles: Record<string, string>
+    styles: Record<string, { css?: string, href?: string }>
   ): Promise<FrameworkRenderResult>
 }
 
@@ -237,14 +237,14 @@ export class Renderer {
     })
   }
 
-  private async lookupStyleModules(...urls: string[]): Promise<Record<string, string>> {
+  private async lookupStyleModules(...urls: string[]): Promise<Record<string, { css?: string, href?: string }>> {
     return (await Promise.all(this.#app.lookupStyleModules(...urls).map(async ({ url, jsFile, hash }) => {
-      const { css } = await import(`file://${jsFile}#${hash.slice(0, 8)}`)
-      return { url, css }
-    }))).reduce((styles, mod) => {
-      styles[mod.url] = mod.css
+      const { css, href } = await import(`file://${jsFile}#${hash.slice(0, 8)}`)
+      return { url, css, href }
+    }))).reduce((styles, { url, css, href }) => {
+      styles[url] = { css, href }
       return styles
-    }, {} as Record<string, string>)
+    }, {} as Record<string, { css?: string, href?: string }>)
   }
 }
 

@@ -1,6 +1,6 @@
 import { dim, red, yellow } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.94.0/hash/mod.ts'
-import { relative, extname } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { existsDirSync } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { SourceType } from '../compiler/mod.ts'
@@ -174,4 +174,23 @@ export function formatBytesWithColor(bytes: number) {
     cf = yellow
   }
   return cf(util.formatBytes(bytes))
+}
+
+export async function clearBuildCache(filename: string, ext = 'js') {
+  const dir = dirname(filename)
+  const hashname = basename(filename)
+  const regHashExt = new RegExp(`\\.[0-9a-f]+\\.${ext}$`, 'i')
+  if (ext && !regHashExt.test(hashname) || !existsDirSync(dir)) {
+    return
+  }
+
+  const jsName = hashname.split('.').slice(0, -2).join('.') + '.' + ext
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isFile && regHashExt.test(entry.name)) {
+      const _jsName = entry.name.split('.').slice(0, -2).join('.') + '.' + ext
+      if (_jsName === jsName && hashname !== entry.name) {
+        await Deno.remove(join(dir, entry.name))
+      }
+    }
+  }
 }

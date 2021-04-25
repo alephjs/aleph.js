@@ -1,20 +1,16 @@
 import { dim } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
-import { basename, dirname, join } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { dirname, join } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { ensureDir, } from 'https://deno.land/std@0.94.0/fs/ensure_dir.ts'
 import { transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
-import { ensureTextFile, existsDirSync, existsFileSync, lazyRemove } from '../shared/fs.ts'
+import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { BrowserNames } from '../types.ts'
 import { VERSION } from '../version.ts'
 import type { Application, Module } from '../server/app.ts'
-import { cache } from '../server/cache.ts'
-import { computeHash, getAlephPkgUri } from '../server/helper.ts'
+import { clearBuildCache, computeHash, getAlephPkgUri } from '../server/helper.ts'
 import { esbuild, stopEsbuild, esbuildHTTPLoader } from './esbuild.ts'
-
-const hashShort = 8
-const reHashJS = new RegExp(`\\.[0-9a-f]{${hashShort}}\\.js$`, 'i')
 
 export const bundlerRuntimeCode = `
   window.__ALEPH = {
@@ -125,7 +121,8 @@ export class Bundler {
   }
 
   private async copyBundleFile(jsFilename: string) {
-    const { buildDir, outputDir } = this.#app
+    const { workingDir, buildDir, config } = this.#app
+    const outputDir = join(workingDir, config.outputDir)
     const bundleFile = join(buildDir, jsFilename)
     const saveAs = join(outputDir, '_aleph', jsFilename)
     await ensureDir(dirname(saveAs))
@@ -200,7 +197,7 @@ export class Bundler {
       }, {} as Record<string, string>)
     const mainJS = `__ALEPH.bundled=${JSON.stringify(bundled)};` + this.#app.getMainJS(true)
     const hash = computeHash(mainJS)
-    const bundleFilename = `main.bundle.${hash.slice(0, hashShort)}.js`
+    const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
     await Deno.writeTextFile(bundleFilePath, mainJS)
     this.#bundled.set('main', bundleFilename)
@@ -213,7 +210,7 @@ export class Bundler {
     const { buildTarget } = this.#app.config
     const polyfillTarget = 'es' + (parseInt(buildTarget.slice(2)) + 1) // buildTarget + 1
     const hash = computeHash(polyfillTarget + '/esbuild@v0.11.11/' + VERSION)
-    const bundleFilename = `polyfills.bundle.${hash.slice(0, hashShort)}.js`
+    const bundleFilename = `polyfills.bundle.${hash.slice(0, 8)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFilePath)) {
       const rawPolyfillsFile = `${alephPkgUri}/bundler/polyfills/${polyfillTarget}/mod.ts`
@@ -244,7 +241,7 @@ export class Bundler {
       return []
     }))).flat().join('\n')
     const hash = computeHash(entryCode + VERSION + Deno.version.deno)
-    const bundleFilename = `${name}.bundle.${hash.slice(0, hashShort)}.js`
+    const bundleFilename = `${name}.bundle.${hash.slice(0, 8)}.js`
     const bundleEntryFile = join(this.#app.buildDir, `${name}.bundle.entry.js`)
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
     if (!existsFileSync(bundleFilePath)) {
@@ -285,20 +282,4 @@ export function simpleJSMinify(code: string) {
   ).join('')
 }
 
-async function clearBuildCache(filename: string) {
-  const dir = dirname(filename)
-  const hashname = basename(filename)
-  if (!reHashJS.test(hashname) || !existsDirSync(dir)) {
-    return
-  }
 
-  const jsName = hashname.split('.').slice(0, -2).join('.') + '.js'
-  for await (const entry of Deno.readDir(dir)) {
-    if (entry.isFile && reHashJS.test(entry.name)) {
-      const _jsName = entry.name.split('.').slice(0, -2).join('.') + '.js'
-      if (_jsName === jsName && hashname !== entry.name) {
-        await Deno.remove(join(dir, entry.name))
-      }
-    }
-  }
-}
