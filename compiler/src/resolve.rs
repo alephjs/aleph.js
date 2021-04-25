@@ -194,7 +194,7 @@ impl Resolver {
         p.push_str(port.to_string().as_str());
       }
     }
-    p.push_str(path_buf.to_str().unwrap());
+    p.push_str(path_buf.to_slash().unwrap().as_str());
     p
   }
 
