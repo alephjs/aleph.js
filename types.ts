@@ -128,9 +128,9 @@ export type ImportMap = {
  * The config for CSS loader.
  */
 export type CSSOptions = {
-  /** `extractSize` specifies the extract size (default is 4k). */
+  /** `extractSize` specifies the extract size (default is 8k). */
   extractSize?: number
-  /** `remoteExternal` load remote css as external when it is true. */
+  /** `remoteExternal` loads remote css as external when it is true. */
   remoteExternal?: boolean
   /** `module` enables the css module feature. */
   modules?: boolean | CSSModulesOptions
