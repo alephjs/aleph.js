@@ -137,9 +137,10 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     config.plugins = [cssLoader()]
   }
   if (util.isPlainObject(css)) {
-    const { modules, postcss } = css
+    const { extractSize, remoteExternal, modules, postcss } = css
     config.css = {
-      remoteExternal: false,
+      extractSize: typeof extractSize === 'number' && !Number.isNaN(extractSize) ? extractSize : 8 * 1024,
+      remoteExternal: Boolean(remoteExternal),
       modules: util.isPlainObject(modules) ? modules : Boolean(modules),
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }

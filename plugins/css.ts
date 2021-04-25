@@ -93,7 +93,8 @@ export default (): LoaderPlugin => {
         return { type: 'css', code: css }
       }
 
-      if (css.length > (cssConfig.extractSize || 4 * 1024)) {
+      const { extractSize = 8 * 1024 } = cssConfig
+      if (css.length > extractSize) {
         const ext = extname(url)
         const hash = computeHash(css).slice(0, 8)
         const path = util.trimSuffix(isRemote ? toLocalPath(url) : url, ext) + '.' + hash + ext
