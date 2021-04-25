@@ -3,6 +3,7 @@ import { join } from 'std/path/mod.ts'
 import { assert, assertEquals } from 'std/testing/asserts.ts'
 import { stopEsbuild } from '../bundler/esbuild.ts'
 import { Application } from '../server/app.ts'
+import { computeHash } from '../server/helper.ts'
 import { ensureTextFile } from '../shared/fs.ts'
 import cssLoader from './css.ts'
 
@@ -56,6 +57,27 @@ Deno.test({
   sanitizeResources: false,
 })
 
+
+Deno.test('plugin: css loader with extract size option', async () => {
+  Deno.env.set('DENO_TESTING', 'true')
+  const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
+  const app = new Application(dir, 'development')
+  app.config.css.extractSize = 10
+  await ensureTextFile(
+    join(dir, '/style/index.css'),
+    'h1 { font-size: 18px; }'
+  )
+  const loader = cssLoader()
+  const { code } = await loader.load!({ url: '/style/index.css', }, app)
+  assertEquals(code, [
+    'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
+    `export const href = "/_aleph/style/index.${computeHash('h1 { font-size: 18px; }').slice(0, 8)}.css"`,
+    'export default {}',
+    'applyCSS("/style/index.css", { href })',
+  ].join('\n'))
+})
+
+
 Deno.test('plugin: css loader for remote external', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
@@ -65,9 +87,9 @@ Deno.test('plugin: css loader for remote external', async () => {
   const { code } = await loader.load!({ url: 'https://esm.sh/tailwindcss/dist/tailwind.min.css', }, app)
   assertEquals(code, [
     'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-    'export const css = null',
+    'export const href = "https://esm.sh/tailwindcss/dist/tailwind.min.css"',
     'export default {}',
-    'applyCSS("https://esm.sh/tailwindcss/dist/tailwind.min.css", { href: "https://esm.sh/tailwindcss/dist/tailwind.min.css" })',
+    'applyCSS("https://esm.sh/tailwindcss/dist/tailwind.min.css", { href })',
   ].join('\n'))
 })
 

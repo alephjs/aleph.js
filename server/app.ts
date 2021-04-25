@@ -4,6 +4,7 @@ import { walk } from 'https://deno.land/std@0.94.0/fs/walk.ts'
 import {
   basename,
   dirname,
+  extname,
   join,
   resolve
 } from 'https://deno.land/std@0.94.0/path/mod.ts'
@@ -43,6 +44,7 @@ import {
 import { cache } from './cache.ts'
 import {
   checkAlephDev,
+  clearBuildCache,
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
@@ -81,6 +83,7 @@ type TransformFn = (url: string, code: string) => string
 export class Application implements ServerApplication {
   readonly workingDir: string
   readonly mode: 'development' | 'production'
+  readonly buildDir: string
   readonly config: RequiredConfig
   readonly importMap: ImportMap
   readonly ready: Promise<void>
@@ -91,6 +94,7 @@ export class Application implements ServerApplication {
   #fsWatchListeners: Array<EventEmitter> = []
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
+  #dists: Set<string> = new Set()
   #injects: Map<'compilation' | 'hmr' | 'ssr', TransformFn[]> = new Map()
   #reloading = false
 
@@ -106,6 +110,7 @@ export class Application implements ServerApplication {
     checkAlephDev()
     this.workingDir = resolve(workingDir)
     this.mode = mode
+    this.buildDir = join(this.workingDir, '.aleph', mode)
     this.config = { ...getDefaultConfig() }
     this.importMap = { imports: {}, scopes: {} }
     this.ready = Deno.env.get('DENO_TESTING') ? Promise.resolve() : this.init(reload)
@@ -140,9 +145,10 @@ export class Application implements ServerApplication {
 
     Deno.env.set('ALEPH_VERSION', VERSION)
     Deno.env.set('ALEPH_BUILD_MODE', this.mode)
-    Deno.env.set('ALEPH_FRAMEWORK', this.framework)
+    Deno.env.set('ALEPH_FRAMEWORK', this.config.framework)
 
     const alephPkgUri = getAlephPkgUri()
+    const srcDir = join(this.workingDir, this.config.srcDir)
     const compileTasks: Array<Promise<Module>> = []
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
     const plugins = computeHash(JSON.stringify({
@@ -200,7 +206,7 @@ export class Application implements ServerApplication {
     ms.stop()
 
     // init framework
-    const { init } = await import(`../framework/${this.framework}/init.ts`)
+    const { init } = await import(`../framework/${this.config.framework}/init.ts`)
     await init(this)
 
     ms.stop('init framework')
@@ -219,7 +225,7 @@ export class Application implements ServerApplication {
     // compile & import framework renderer
     if (this.config.ssr) {
       compileTasks.push((async () => {
-        const mod = await this.compile(`${alephPkgUri}/framework/${this.framework}/renderer.ts`)
+        const mod = await this.compile(`${alephPkgUri}/framework/${this.config.framework}/renderer.ts`)
         const { render } = await import(`file://${mod.jsFile}`)
         if (util.isFunction(render)) {
           this.#renderer.setFrameworkRenderer({ render })
@@ -229,7 +235,7 @@ export class Application implements ServerApplication {
     }
 
     // pre-compile framework modules
-    compileTasks.push(this.compile(`${alephPkgUri}/framework/${this.framework}/bootstrap.ts`))
+    compileTasks.push(this.compile(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`))
     if (this.isDev) {
       compileTasks.push(this.compile(`${alephPkgUri}/framework/core/hmr.ts`))
       compileTasks.push(this.compile(`${alephPkgUri}/framework/core/nomodule.ts`))
@@ -238,7 +244,7 @@ export class Application implements ServerApplication {
     // compile custom components
     for (const name of ['app', '404', 'loading']) {
       for (const ext of moduleExts) {
-        if (existsFileSync(join(this.srcDir, `${name}.${ext}`))) {
+        if (existsFileSync(join(srcDir, `${name}.${ext}`))) {
           compileTasks.push(this.compile(`/${name}.${ext}`))
           break
         }
@@ -247,8 +253,8 @@ export class Application implements ServerApplication {
 
     const apiModules: string[] = []
     const pageModules: string[] = []
-    const apiDir = join(this.srcDir, 'api')
-    const pagesDir = join(this.srcDir, 'pages')
+    const apiDir = join(srcDir, 'api')
+    const pagesDir = join(srcDir, 'pages')
 
     if (existsDirSync(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...moduleWalkOptions, exts: moduleExts })) {
@@ -304,11 +310,12 @@ export class Application implements ServerApplication {
 
   /** watch file changes, re-compile modules and send HMR signal. */
   private async watch() {
-    const w = Deno.watchFs(this.srcDir, { recursive: true })
+    const srcDir = join(this.workingDir, this.config.srcDir)
+    const w = Deno.watchFs(srcDir, { recursive: true })
     log.info('Start watching code changes...')
     for await (const event of w) {
       for (const p of event.paths) {
-        const url = util.cleanPath(util.trimPrefix(p, this.srcDir))
+        const url = util.cleanPath(util.trimPrefix(p, srcDir))
         if (this.isScopedModule(url)) {
           util.debounceX(url, () => {
             if (existsFileSync(p)) {
@@ -426,22 +433,6 @@ export class Application implements ServerApplication {
     return this.mode === 'development'
   }
 
-  get framework() {
-    return this.config.framework
-  }
-
-  get srcDir() {
-    return join(this.workingDir, this.config.srcDir)
-  }
-
-  get outputDir() {
-    return join(this.workingDir, this.config.outputDir)
-  }
-
-  get buildDir() {
-    return join(this.workingDir, '.aleph', this.mode)
-  }
-
   get loaders() {
     return this.config.plugins.filter(isLoaderPlugin)
   }
@@ -508,6 +499,19 @@ export class Application implements ServerApplication {
       this.#apiRouting.update(...this.createRouteUpdate(url))
     }
     return
+  }
+
+  /** add a dist. */
+  async addDist(path: string, content: Uint8Array): Promise<void> {
+    const pathname = util.cleanPath(path)
+    const savePath = join(this.buildDir, pathname)
+    if (!existsFileSync(savePath)) {
+      const saveDir = dirname(savePath)
+      await ensureDir(saveDir)
+      await clearBuildCache(savePath, extname(savePath).slice(1))
+      await Deno.writeFile(savePath, content)
+    }
+    this.#dists.add(pathname)
   }
 
   /** inject code */
@@ -787,7 +791,7 @@ export class Application implements ServerApplication {
     // wait for app ready
     await this.ready
 
-    const outputDir = this.outputDir
+    const outputDir = join(this.workingDir, this.config.outputDir)
     const distDir = join(outputDir, '_aleph')
 
     // clear previous build
@@ -795,8 +799,20 @@ export class Application implements ServerApplication {
       for await (const entry of Deno.readDir(outputDir)) {
         await Deno.remove(join(outputDir, entry.name), { recursive: entry.isDirectory })
       }
+    } else {
+      await Deno.mkdir(distDir)
     }
-    await ensureDir(distDir)
+
+    if (this.#dists.size > 0) {
+      Promise.all(Array.from(this.#dists.values()).map(async path => {
+        const src = join(this.buildDir, path)
+        if (existsFileSync(src)) {
+          const dest = join(distDir, path)
+          await ensureDir(dirname(dest))
+          return Deno.copyFile(src, dest)
+        }
+      }))
+    }
 
     // copy bundle dist
     await this.#bundler.copyDist()
@@ -868,7 +884,7 @@ export class Application implements ServerApplication {
   /** fetch module content */
   async fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
     if (!util.isLikelyHttpURL(url)) {
-      const filepath = join(this.srcDir, util.trimPrefix(url, 'file://'))
+      const filepath = join(this.workingDir, this.config.srcDir, util.trimPrefix(url, 'file://'))
       if (existsFileSync(filepath)) {
         const content = await Deno.readFile(filepath)
         return { content, contentType: getContentType(filepath) }
@@ -1251,7 +1267,7 @@ export class Application implements ServerApplication {
 
     // add framwork bootstrap module as shared entry
     entryMods.set(
-      [`${getAlephPkgUri()}/framework/${this.framework}/bootstrap.ts`],
+      [`${getAlephPkgUri()}/framework/${this.config.framework}/bootstrap.ts`],
       true
     )
 
@@ -1297,7 +1313,7 @@ export class Application implements ServerApplication {
   /** render all pages in routing. */
   private async ssg() {
     const { ssr } = this.config
-    const outputDir = this.outputDir
+    const outputDir = join(this.workingDir, this.config.outputDir)
 
     if (ssr === false) {
       const html = await this.#renderer.renderSPAIndexPage()

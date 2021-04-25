@@ -20,7 +20,7 @@ export async function render(
   url: RouterURL,
   App: ComponentType<any> | undefined,
   nestedPageComponents: { url: string, Component?: any }[],
-  styles: Record<string, string>
+  styles: Record<string, { css?: string, href?: string }>
 ): Promise<FrameworkRenderResult> {
   const global = globalThis as any
   const ret: FrameworkRenderResult = {
@@ -148,11 +148,11 @@ export async function render(
   })
 
   // insert styles
-  Object.entries(styles).forEach(([url, css]) => {
+  Object.entries(styles).forEach(([url, { css, href }]) => {
     if (css) {
       ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
-    } else if (util.isLikelyHttpURL(url)) {
-      ret.head.push(`<link rel="stylesheet" href="${url}" data-module-id=${JSON.stringify(url)} ssr />`)
+    } else if (href) {
+      ret.head.push(`<link rel="stylesheet" href=${JSON.stringify(href)} data-module-id=${JSON.stringify(url)} ssr />`)
     }
   })
   for (const [url, css] of rendererStorage.inlineStyles.entries()) {

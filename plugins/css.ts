@@ -1,6 +1,6 @@
-import { join } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { extname } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { esbuild } from '../bundler/esbuild.ts'
-import { toLocalPath } from '../server/helper.ts'
+import { toLocalPath, computeHash } from '../server/helper.ts'
 import util from '../shared/util.ts'
 import type { LoaderPlugin, PostCSSPlugin } from '../types.ts'
 
@@ -24,9 +24,9 @@ export default (): LoaderPlugin => {
         return {
           code: [
             `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
-            `export const css = null`,
+            `export const href = ${JSON.stringify(url)}`,
             `export default {}`,
-            `applyCSS(${JSON.stringify(url)}, { href: ${JSON.stringify(url)} })`,
+            `applyCSS(${JSON.stringify(url)}, { href })`,
           ].join('\n')
         }
       }
@@ -93,16 +93,17 @@ export default (): LoaderPlugin => {
         return { type: 'css', code: css }
       }
 
-      if (css.length > 4 * 1024) {
-        const path = isRemote ? toLocalPath(url) : url
-        const savePath = join(app.workingDir, '.aleph', app.mode, path)
-        await Deno.writeTextFile(savePath, css)
+      if (css.length > (cssConfig.extractSize || 4 * 1024)) {
+        const ext = extname(url)
+        const hash = computeHash(css).slice(0, 8)
+        const path = util.trimSuffix(isRemote ? toLocalPath(url) : url, ext) + '.' + hash + ext
+        await app.addDist(path, (new TextEncoder).encode(css))
         return {
           code: [
             `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
-            `export const css = null`,
+            `export const href = ${JSON.stringify('/_aleph/' + util.trimPrefix(path, '/'))}`,
             `export default ${JSON.stringify(modules)}`,
-            `applyCSS(${JSON.stringify(url)}, { href: ${JSON.stringify(path)} })`
+            `applyCSS(${JSON.stringify(url)}, { href })`
           ].join('\n'),
           // todo: generate map
         }
