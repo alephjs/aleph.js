@@ -209,6 +209,15 @@ export class Application implements ServerApplication {
     const { init } = await import(`../framework/${this.config.framework}/init.ts`)
     await init(this)
 
+    // compile & import framework renderer
+    if (this.config.ssr) {
+      const mod = await this.compile(`${alephPkgUri}/framework/${this.config.framework}/renderer.ts`)
+      const { render } = await import(`file://${mod.jsFile}`)
+      if (util.isFunction(render)) {
+        this.#renderer.setFrameworkRenderer({ render })
+      }
+    }
+
     ms.stop('init framework')
 
     // apply server plugins
@@ -221,18 +230,6 @@ export class Application implements ServerApplication {
     )
 
     ms.stop('apply plugins')
-
-    // compile & import framework renderer
-    if (this.config.ssr) {
-      compileTasks.push((async () => {
-        const mod = await this.compile(`${alephPkgUri}/framework/${this.config.framework}/renderer.ts`)
-        const { render } = await import(`file://${mod.jsFile}`)
-        if (util.isFunction(render)) {
-          this.#renderer.setFrameworkRenderer({ render })
-        }
-        return mod
-      })())
-    }
 
     // pre-compile framework modules
     compileTasks.push(this.compile(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`))
@@ -738,7 +735,7 @@ export class Application implements ServerApplication {
 
   /** parse the export names of the module. */
   async parseModuleExportNames(url: string): Promise<string[]> {
-    const { content, contentType } = await this.fetchModule(url)
+    const { content, contentType } = await this.fetch(url)
     const sourceType = getSourceType(url, contentType || '')
     if (sourceType === SourceType.Unknown || sourceType === SourceType.CSS) {
       return []
@@ -881,8 +878,8 @@ export class Application implements ServerApplication {
     return [routePath, url, { isIndex, useDeno }]
   }
 
-  /** fetch module content */
-  async fetchModule(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
+  /** fetch resource by the url. */
+  async fetch(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
     if (!util.isLikelyHttpURL(url)) {
       const filepath = join(this.workingDir, this.config.srcDir, util.trimPrefix(url, 'file://'))
       if (existsFileSync(filepath)) {
@@ -965,7 +962,7 @@ export class Application implements ServerApplication {
           break
       }
     } else {
-      const source = await this.fetchModule(url)
+      const source = await this.fetch(url)
       sourceType = getSourceType(url, source.contentType || '')
       if (sourceType !== SourceType.Unknown) {
         sourceCode = (new TextDecoder).decode(source.content)

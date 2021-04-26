@@ -1,7 +1,8 @@
-import { extname } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { basename, extname, join } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { esbuild } from '../bundler/esbuild.ts'
 import { toLocalPath, computeHash } from '../server/helper.ts'
 import util from '../shared/util.ts'
+import { Measure } from '../shared/log.ts'
 import type { LoaderPlugin, PostCSSPlugin } from '../types.ts'
 
 const postcssVersion = '8.2.12'
@@ -17,10 +18,12 @@ export default (): LoaderPlugin => {
     test: /\.(css|pcss|postcss)$/i,
     acceptHMR: true,
     load: async ({ url, data }, app) => {
+      const ms = new Measure()
       const { css: cssConfig } = app.config
       const isRemote = util.isLikelyHttpURL(url)
 
       if (isRemote && url.endsWith('.css') && cssConfig.remoteExternal) {
+        ms.stop(`[css] load ${url}`)
         return {
           code: [
             `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
@@ -48,6 +51,7 @@ export default (): LoaderPlugin => {
           }])
         }
         postcss = await initPostCSS(plugins, app.mode === 'development')
+        ms.stop('init postcss')
       }
 
       let sourceCode = ''
@@ -59,7 +63,7 @@ export default (): LoaderPlugin => {
       } else if (util.isNEString(data)) {
         sourceCode = data
       } else {
-        const { content } = await app.fetchModule(url)
+        const { content } = await app.fetch(url)
         sourceCode = (new TextDecoder).decode(content)
       }
 
@@ -92,6 +96,8 @@ export default (): LoaderPlugin => {
       if (url.startsWith('#inline-style-')) {
         return { type: 'css', code: css }
       }
+
+      ms.stop(`process ${url}`)
 
       const { extractSize = 8 * 1024 } = cssConfig
       if (css.length > extractSize) {
