@@ -6,7 +6,8 @@ const REACT_MEMO_TYPE = symbolFor ? Symbol.for('react.memo') : 0xead3
 
 export const inDeno = typeof Deno !== 'undefined' && typeof Deno.version?.deno === 'string'
 
-export function isLikelyReactComponent(type: any): Boolean {
+
+export function isLikelyReactComponent(type: any, strict = true): Boolean {
   switch (typeof type) {
     case 'function':
       if (type.prototype != null) {
@@ -17,6 +18,10 @@ export function isLikelyReactComponent(type: any): Boolean {
         if (ownNames.length > 1 || ownNames[0] !== 'constructor') {
           return false
         }
+      }
+      if (!strict) {
+        // don't check component name
+        return true
       }
       const { __ALEPH: ALEPH } = window as any
       if (ALEPH) {
