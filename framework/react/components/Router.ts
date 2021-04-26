@@ -4,7 +4,7 @@ import {
   useCallback,
   useEffect,
   useState,
-} from 'react'
+} from 'https://esm.sh/react@17.0.2'
 import events from '../../core/events.ts'
 import { importModule } from '../../core/module.ts'
 import { RouteModule, Routing } from '../../core/routing.ts'

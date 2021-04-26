@@ -1,7 +1,7 @@
 import { assert, assertEquals } from 'std/testing/asserts.ts'
+import util from '../shared/util.ts'
 import type { LoaderPlugin, ServerPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
-import util from '../shared/util.ts'
 import {
   computeHash,
   formatBytesWithColor,
@@ -37,7 +37,7 @@ Deno.test('server/helper: getRelativePath', () => {
   assertEquals(getRelativePath('baz/foobar', 'baz/foobar/aleph'), './aleph')
 })
 
-Deno.test('server/helper: toLocalPath()', () => {
+Deno.test('server/helper: toLocalPath', () => {
   assertEquals(toLocalPath('https://deno.land/x/aleph@v0.3.0-alpha.29/'), '/-/deno.land/x/aleph@v0.3.0-alpha.29/')
   assertEquals(toLocalPath('http://foo.com/bar?lang=us-en'), `/-/http_foo.com/bar.${util.btoaUrl('lang=us-en')}`)
   assertEquals(toLocalPath('http://foo.com:8080/bar'), '/-/http_foo.com_8080/bar')

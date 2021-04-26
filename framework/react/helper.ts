@@ -1,4 +1,4 @@
-import { createContext } from 'react'
+import { createContext } from 'https://esm.sh/react@17.0.2'
 
 const symbolFor = typeof Symbol === 'function' && typeof Symbol.for === 'function'
 const REACT_FORWARD_REF_TYPE = symbolFor ? Symbol.for('react.forward_ref') : 0xead0

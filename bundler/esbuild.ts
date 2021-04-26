@@ -2,10 +2,14 @@ import { join } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { cache } from '../server/cache.ts'
 import util from '../shared/util.ts'
 // @deno-types="https://deno.land/x/esbuild@v0.11.14/mod.d.ts"
-import { Plugin } from 'https://deno.land/x/esbuild@v0.11.14/mod.js'
-export { build as esbuild, stop as stopEsbuild } from 'https://deno.land/x/esbuild@v0.11.14/mod.js'
+import { build, stop, Plugin } from 'https://deno.land/x/esbuild@v0.11.14/mod.js'
 
-export const esbuildHTTPLoader: Plugin = {
+export {
+  build as esbuild,
+  stop as stopEsbuild
+}
+
+export const esbuildUrlLoader: Plugin = {
   name: 'http-loader',
   setup(build) {
     build.onResolve({ filter: /.*/ }, args => {

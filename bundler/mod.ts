@@ -10,7 +10,7 @@ import type { BrowserNames } from '../types.ts'
 import { VERSION } from '../version.ts'
 import type { Application, Module } from '../server/app.ts'
 import { clearBuildCache, computeHash, getAlephPkgUri } from '../server/helper.ts'
-import { esbuild, stopEsbuild, esbuildHTTPLoader } from './esbuild.ts'
+import { esbuild, stopEsbuild, esbuildUrlLoader } from './esbuild.ts'
 
 export const bundlerRuntimeCode = `
   window.__ALEPH = {
@@ -270,7 +270,7 @@ export class Bundler {
       minify: true,
       treeShaking: true,
       sourcemap: false,
-      plugins: [esbuildHTTPLoader],
+      plugins: [esbuildUrlLoader],
     })
   }
 }

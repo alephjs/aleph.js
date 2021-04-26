@@ -2,7 +2,7 @@ import {
   PropsWithChildren,
   ScriptHTMLAttributes,
   useContext
-} from 'react'
+} from 'https://esm.sh/react@17.0.2'
 import { SSRContext } from '../context.ts'
 import { inDeno } from '../helper.ts'
 

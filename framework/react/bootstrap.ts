@@ -1,5 +1,5 @@
-import { ComponentType, createElement } from 'react'
-import { hydrate, render } from 'react-dom'
+import { ComponentType, createElement } from 'https://esm.sh/react@17.0.2'
+import { hydrate, render } from 'https://esm.sh/react-dom@17.0.2'
 import { importModule, trimModuleExt } from '../core/module.ts'
 import { RouteModule, Routing, RoutingOptions } from '../core/routing.ts'
 import Router from './components/Router.ts'

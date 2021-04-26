@@ -1,5 +1,4 @@
-
-import { assertEquals, assertThrows } from 'https://deno.land/std@0.94.0/testing/asserts.ts'
+import { assertEquals, assertThrows } from 'std/testing/asserts.ts'
 import { trimModuleExt, toPagePath, importModule } from './module.ts'
 
 // Augment the window object

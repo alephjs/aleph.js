@@ -202,8 +202,7 @@ export async function loadAndUpgradeImportMap(workingDir: string): Promise<Impor
     'framework': `${alephPkgUri}/framework/core/mod.ts`,
     'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
     'react': `https://esm.sh/react@${defaultReactVersion}`,
-    'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
-    'react-dom/server': `https://esm.sh/react-dom@${defaultReactVersion}/server`,
+    'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`
   }
   // in aleph dev mode, use default imports instead of app settings
   if (v !== undefined) {

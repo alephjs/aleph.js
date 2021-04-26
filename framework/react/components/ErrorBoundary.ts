@@ -1,4 +1,4 @@
-import { Component, createElement, CSSProperties } from 'react'
+import { Component, createElement, CSSProperties } from 'https://esm.sh/react@17.0.2'
 
 export class ErrorBoundary extends Component<{}, { error: Error | null }> {
   constructor(props: any) {
