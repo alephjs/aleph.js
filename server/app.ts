@@ -1181,28 +1181,26 @@ export class Application implements ServerApplication {
       ms.stop(`compile '${url}'`)
     }
 
+    // marks the module status to ready to avoid dead loop cased by self-import
+    // before check deps.
+    defer()
+
     // compile deps
-    try {
-      await Promise.all(mod.deps.filter(dep => !dep.url.startsWith('#')).map(async dep => {
-        const { external, hash } = await this.compile(dep.url, { once })
-        if (dep.hash === '' || dep.hash !== hash) {
-          dep.hash = hash
-          if (!util.isLikelyHttpURL(dep.url)) {
-            if (jsContent === '') {
-              jsContent = await Deno.readTextFile(jsFile)
-            }
-            jsContent = this.updateImportUrls(jsContent, dep, external)
-            if (!fsync) {
-              fsync = true
-            }
+    await Promise.all(mod.deps.filter(dep => !dep.url.startsWith('#')).map(async dep => {
+      const { external, hash } = await this.compile(dep.url, { once })
+      if (dep.hash === '' || dep.hash !== hash) {
+        dep.hash = hash
+        if (!util.isLikelyHttpURL(dep.url)) {
+          if (jsContent === '') {
+            jsContent = await Deno.readTextFile(jsFile)
+          }
+          jsContent = this.updateImportUrls(jsContent, dep, external)
+          if (!fsync) {
+            fsync = true
           }
         }
-      }))
-    } catch (err) {
-      log.error(`Write module '${url}' to JS:`, err.message)
-      defer(err)
-      return mod
-    }
+      }
+    }))
 
     // update hash using deps status
     if (mod.deps.length > 0) {
@@ -1210,26 +1208,19 @@ export class Application implements ServerApplication {
     }
 
     if (fsync) {
-      try {
-        await Promise.all([
-          ensureTextFile(metaFile, JSON.stringify({
-            url,
-            deps: mod.deps,
-            sourceHash: mod.sourceHash,
-            isStyle: mod.isStyle ? true : undefined
-          }, undefined, 2)),
-          ensureTextFile(jsFile, jsContent),
-          jsSourceMap ? ensureTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
-        ])
-        await lazyRemove(util.trimSuffix(jsFile, '.js') + '.client.js')
-      } catch (err) {
-        log.error(`Write module '${url}' to JS:`, err.message)
-        defer(err)
-        return mod
-      }
+      await lazyRemove(util.trimSuffix(jsFile, '.js') + '.client.js')
+      await Promise.all([
+        ensureTextFile(metaFile, JSON.stringify({
+          url,
+          deps: mod.deps,
+          sourceHash: mod.sourceHash,
+          isStyle: mod.isStyle ? true : undefined
+        }, undefined, 2)),
+        ensureTextFile(jsFile, jsContent),
+        jsSourceMap ? ensureTextFile(jsFile + '.map', jsSourceMap) : Promise.resolve(),
+      ])
     }
 
-    defer()
     return mod
   }
 
