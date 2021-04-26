@@ -80,16 +80,17 @@ export default (): LoaderPlugin => {
       }
 
       if (app.mode === 'production') {
+        // workaround for https://github.com/esbuild/deno-esbuild/issues/1
+        const dir = await Deno.makeTempDir()
+        const tempFile = join(dir, basename(url))
+        await Deno.writeTextFile(tempFile, css)
         const ret = await esbuild({
-          stdin: {
-            loader: 'css',
-            sourcefile: url,
-            contents: css
-          },
+          entryPoints: [tempFile],
+          bundle: false,
           minify: true,
-          write: false,
-          sourcemap: false,
+          write: false
         })
+        Deno.remove(tempFile)
         css = util.trimSuffix(ret.outputFiles[0].text, '\n')
       }
 
