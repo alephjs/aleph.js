@@ -6,17 +6,27 @@ use swc_common::{
 
 /// A buffer for collecting errors from the AST parser.
 #[derive(Debug, Clone)]
-pub struct ErrorBuffer(Arc<RwLock<Vec<Diagnostic>>>);
+pub struct ErrorBuffer {
+  specifier: String,
+  diagnostics: Arc<RwLock<Vec<Diagnostic>>>,
+}
 
 impl ErrorBuffer {
-  pub fn new() -> Self {
-    Self(Arc::new(RwLock::new(Vec::new())))
+  pub fn new(specifier: &str) -> Self {
+    Self {
+      specifier: specifier.into(),
+      diagnostics: Arc::new(RwLock::new(Vec::new())),
+    }
   }
 }
 
 impl Emitter for ErrorBuffer {
   fn emit(&mut self, diagnostic_builder: &DiagnosticBuilder) {
-    self.0.write().unwrap().push((**diagnostic_builder).clone());
+    self
+      .diagnostics
+      .write()
+      .unwrap()
+      .push((**diagnostic_builder).clone());
   }
 }
 
@@ -35,14 +45,17 @@ impl DiagnosticBuffer {
   where
     F: Fn(Span) -> Loc,
   {
-    let diagnostics = error_buffer.0.read().unwrap().clone();
+    let diagnostics = error_buffer.diagnostics.read().unwrap().clone();
     let diagnostics = diagnostics
       .iter()
       .map(|d| {
         let mut message = d.message();
         if let Some(span) = d.span.primary_span() {
           let loc = get_loc(span);
-          message = format!("{} at {}:{}", message, loc.line, loc.col_display);
+          message = format!(
+            "{} at {}:{}:{}",
+            message, error_buffer.specifier, loc.line, loc.col_display
+          );
         }
         message
       })

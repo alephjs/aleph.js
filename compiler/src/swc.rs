@@ -72,7 +72,7 @@ impl SWC {
       source.into(),
     );
     let sm = &source_map;
-    let error_buffer = ErrorBuffer::new();
+    let error_buffer = ErrorBuffer::new(specifier);
     let source_type = match source_type {
       Some(source_type) => match source_type {
         SourceType::Unknown => SourceType::from(Path::new(specifier)),
@@ -243,21 +243,22 @@ fn get_es_config(jsx: bool) -> EsConfig {
     dynamic_import: true,
     export_default_from: true,
     export_namespace_from: true,
-    import_meta: true,
-    jsx,
-    nullish_coalescing: true,
     num_sep: true,
+    nullish_coalescing: true,
     optional_chaining: true,
     top_level_await: true,
+    import_meta: true,
+    import_assertions: true,
+    jsx,
     ..EsConfig::default()
   }
 }
 
 fn get_ts_config(tsx: bool) -> TsConfig {
   TsConfig {
-    tsx,
     decorators: true,
     dynamic_import: true,
+    tsx,
     ..TsConfig::default()
   }
 }
