@@ -1,5 +1,0 @@
-{
-    "imports": {
-        "https://deno.land/x/aleph/": "https://denopkg.com/alephjs/aleph.js/"
-    }
-}

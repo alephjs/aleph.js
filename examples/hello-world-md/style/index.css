@@ -1,0 +1,69 @@
+* {
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 100%;
+  vertical-align: baseline;
+  background: transparent;
+}
+
+body {
+  font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size: 16px;
+}
+
+main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+h1 {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 18px;
+  font-weight: 400;
+  text-align: center;
+  color: #000;
+}
+
+p {
+  margin: 0;
+  line-height: 1.5;
+  text-align: center;
+  color: #333;
+}
+
+P + p {
+  margin-top: 6px;
+}
+
+p img {
+  width: auto;
+  height: 75px;
+}
+
+p span,
+p a {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+p span {
+  color: #999;
+}
+
+p a {
+  margin: 0 9px;
+  color: #777;
+  text-decoration: none;
+  border-bottom: 1px dashed #ccc;
+}
+
+p a:hover {
+  color: #333;
+  border-bottom-color: transparent;
+}

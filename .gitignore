@@ -1,6 +1,8 @@
 .DS_Store
+.env
+.env.*
 Thumbs.db
-.aleph/
-dist/
-
-.vscode/launch.json
+compiler/target/
+compiler/pkg/
+examples/**/.aleph/
+examples/**/dist/
