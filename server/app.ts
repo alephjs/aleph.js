@@ -36,9 +36,10 @@ import type {
 } from '../types.ts'
 import { VERSION } from '../version.ts'
 import {
-  getDefaultConfig,
+  defaultConfig,
   loadConfig,
-  loadAndUpgradeImportMap,
+  loadImportMap,
+  fixConfigAndImportMap,
   RequiredConfig
 } from './config.ts'
 import { cache } from './cache.ts'
@@ -111,7 +112,7 @@ export class Application implements ServerApplication {
     this.workingDir = resolve(workingDir)
     this.mode = mode
     this.buildDir = join(this.workingDir, '.aleph', mode)
-    this.config = { ...getDefaultConfig() }
+    this.config = { ...defaultConfig() }
     this.importMap = { imports: {}, scopes: {} }
     this.ready = Deno.env.get('DENO_TESTING') ? Promise.resolve() : this.init(reload)
   }
@@ -121,12 +122,12 @@ export class Application implements ServerApplication {
     const ms = new Measure()
     const [config, importMap] = await Promise.all([
       loadConfig(this.workingDir),
-      loadAndUpgradeImportMap(this.workingDir),
+      loadImportMap(this.workingDir),
     ])
 
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
-    this.#pageRouting.config(this.config)
+    fixConfigAndImportMap(this.config, this.importMap)
 
     // load .env files
     for await (const { path: p, } of walk(this.workingDir, { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
@@ -281,6 +282,7 @@ export class Application implements ServerApplication {
     await Promise.all(compileTasks)
 
     // update routing
+    this.#pageRouting.config(this.config)
     apiModules.forEach(url => {
       this.#apiRouting.update(...this.createRouteUpdate(url))
     })
