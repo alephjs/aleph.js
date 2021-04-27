@@ -3,6 +3,7 @@ import { defaultReactVersion } from './shared/constants.ts'
 /** `VERSION` managed by https://deno.land/x/publish */
 export const VERSION = '0.3.0-alpha.32'
 
+/** `prepublish` will be invoked before publish */
 export async function prepublish(version: string) {
   const p = Deno.run({
     cmd: ['deno', 'run', '-A', 'build.ts'],

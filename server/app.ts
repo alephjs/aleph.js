@@ -444,17 +444,6 @@ export class Application implements ServerApplication {
     return null
   }
 
-  /** find the module by given name. */
-  findModuleByName(name: string): Module | null {
-    for (const ext of moduleExts) {
-      const url = `/${util.trimPrefix(name, '/')}.${ext}`
-      if (this.#modules.has(url)) {
-        return this.#modules.get(url)!
-      }
-    }
-    return null
-  }
-
   /** lookup style deps of given modules. */
   lookupStyleModules(...urls: string[]): Module[] {
     const mods: Module[] = []
@@ -467,11 +456,6 @@ export class Application implements ServerApplication {
       })
     })
     return mods
-  }
-
-  /** get page route by given location. */
-  getPageRoute(location: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
-    return this.#pageRouting.createRouter(location)
   }
 
   /** get api route by given location. */

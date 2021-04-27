@@ -281,5 +281,3 @@ export function simpleJSMinify(code: string) {
     .replaceAll(') {', '){')
   ).join('')
 }
-
-

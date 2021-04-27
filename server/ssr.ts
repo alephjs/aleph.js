@@ -1,9 +1,10 @@
 import { basename, dirname } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { moduleExts } from '../framework/core/module.ts'
 import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
-import type { Application } from './app.ts'
+import type { Application, Module } from './app.ts'
 
 export type SSRData = {
   expires: number
@@ -47,6 +48,17 @@ export class Renderer {
 
   setFrameworkRenderer(renderer: FrameworkRenderer) {
     this.#renderer = renderer
+  }
+
+  private findModuleByName(name: string): Module | null {
+    for (const ext of moduleExts) {
+      const url = `/${name}.${ext}`
+      const mod = this.#app.getModule(url)
+      if (mod) {
+        return mod
+      }
+    }
+    return null
   }
 
   async useCache(
@@ -97,7 +109,7 @@ export class Renderer {
     const start = performance.now()
     const isDev = this.#app.isDev
     const state = { entryFile: '' }
-    const appModule = this.#app.findModuleByName('app')
+    const appModule = this.findModuleByName('app')
     const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 8)}`) : {} as any
     const nestedPageComponents = await Promise.all(nestedModules
       .filter(({ url }) => this.#app.getModule(url) !== null)
@@ -157,8 +169,8 @@ export class Renderer {
 
   /** render custom 404 page. */
   async render404Page(url: RouterURL): Promise<string> {
-    const appModule = this.#app.findModuleByName('app')
-    const e404Module = this.#app.findModuleByName('404')
+    const appModule = this.findModuleByName('app')
+    const e404Module = this.findModuleByName('404')
     const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 8)}`) : {} as any
     const { default: E404 } = e404Module ? await import(`file://${e404Module.jsFile}#${e404Module.hash.slice(0, 8)}`) : {} as any
     const styles = await this.lookupStyleModules(...[
@@ -196,7 +208,7 @@ export class Renderer {
   /** render custom loading page for SPA mode. */
   async renderSPAIndexPage(): Promise<string> {
     const { basePath, defaultLocale } = this.#app.config
-    const loadingModule = this.#app.findModuleByName('loading')
+    const loadingModule = this.findModuleByName('loading')
 
     if (loadingModule) {
       const { default: Loading } = await import(`file://${loadingModule.jsFile}#${loadingModule.hash.slice(0, 8)}`)

@@ -1,7 +1,7 @@
 import type { Status } from 'https://deno.land/std@0.94.0/http/http_status.ts'
 import type { BufReader, BufWriter } from 'https://deno.land/std@0.94.0/io/bufio.ts'
 import type { MultipartFormData } from 'https://deno.land/std@0.94.0/mime/multipart.ts'
-import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.8'
+import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.12'
 
 /**
  * The config for the aleph server application.

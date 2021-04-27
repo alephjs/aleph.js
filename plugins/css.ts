@@ -23,7 +23,6 @@ export default (): LoaderPlugin => {
       const isRemote = util.isLikelyHttpURL(url)
 
       if (isRemote && url.endsWith('.css') && cssConfig.remoteExternal) {
-        ms.stop(`[css] load ${url}`)
         return {
           code: [
             `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
@@ -94,11 +93,11 @@ export default (): LoaderPlugin => {
         css = util.trimSuffix(ret.outputFiles[0].text, '\n')
       }
 
+      ms.stop(`process ${url}`)
+
       if (url.startsWith('#inline-style-')) {
         return { type: 'css', code: css }
       }
-
-      ms.stop(`process ${url}`)
 
       const { extractSize = 8 * 1024 } = cssConfig
       if (css.length > extractSize) {
