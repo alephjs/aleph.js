@@ -782,8 +782,6 @@ export class Application implements ServerApplication {
       for await (const entry of Deno.readDir(outputDir)) {
         await Deno.remove(join(outputDir, entry.name), { recursive: entry.isDirectory })
       }
-    } else {
-      await Deno.mkdir(distDir)
     }
 
     if (this.#dists.size > 0) {
