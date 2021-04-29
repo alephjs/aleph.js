@@ -12,7 +12,7 @@ export const helpMessage = `
 Usage:
     aleph init <name> [...options]
 
-<name> represents the name of Aleph.js app.
+<name> represents the name of new app.
 
 Options:
     -h, --help  Prints help message

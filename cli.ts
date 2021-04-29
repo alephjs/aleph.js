@@ -6,10 +6,11 @@ import util from './shared/util.ts'
 import { VERSION } from './version.ts'
 
 const commands = {
-  'init': 'Create a new application',
+  'init': 'Create a new app',
   'dev': 'Start the app in development mode',
   'start': 'Start the app in production mode',
   'build': 'Build the app to a static site (SSG)',
+  'analyze': 'Analyze the app deps',
   'upgrade': 'Upgrade Aleph.js command'
 }
 

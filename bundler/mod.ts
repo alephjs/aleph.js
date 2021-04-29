@@ -201,7 +201,6 @@ export class Bundler {
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
     await Deno.writeTextFile(bundleFilePath, mainJS)
     this.#bundled.set('main', bundleFilename)
-    log.info(`  {} main.js ${dim('• ' + util.formatBytes(mainJS.length))}`)
   }
 
   /** create polyfills bundle. */
@@ -217,7 +216,6 @@ export class Bundler {
       await this.build(rawPolyfillsFile, bundleFilePath)
     }
     this.#bundled.set('polyfills', bundleFilename)
-    log.info(`  {} polyfills.js (${buildTarget.toUpperCase()}) ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
   /** create bundle chunk. */
@@ -250,7 +248,6 @@ export class Bundler {
       lazyRemove(bundleEntryFile)
     }
     this.#bundled.set(name, bundleFilename)
-    log.info(`  {} ${name}.js ${dim('• ' + util.formatBytes(Deno.statSync(bundleFilePath).size))}`)
   }
 
   /** run deno bundle and compress the output using terser. */

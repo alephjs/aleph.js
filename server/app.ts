@@ -277,8 +277,6 @@ export class Application implements ServerApplication {
       }
     }
 
-    log.info('Compiling...')
-
     // wait all compilation tasks are done
     await Promise.all(compileTasks)
 
@@ -1226,6 +1224,12 @@ export class Application implements ServerApplication {
         }
       }
     }
+  }
+
+  async analyze(): Promise<void> {
+    await this.ready
+    this.#modules.size
+    console.log('todo: analyze deps...')
   }
 
   /** create bundle chunks for production. */
