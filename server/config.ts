@@ -1,12 +1,12 @@
 import { join } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import type { ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
-import { existsDirSync, existsFileSync } from '../shared/fs.ts'
+import { existsDir, existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import cssLoader from '../plugins/css.ts'
 import type { Config, ImportMap, PostCSSPlugin } from '../types.ts'
-import { getAlephPkgUri, reLocaleID } from './helper.ts'
+import { getAlephPkgUri } from './helper.ts'
 
 export type RequiredConfig = Required<Config> & {
   react: ReactResolve
@@ -46,7 +46,7 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   let data: Record<string, any> = {}
   for (const name of ['ts', 'js', 'json'].map(ext => 'aleph.config.' + ext)) {
     const p = join(workingDir, name)
-    if (existsFileSync(p)) {
+    if (await existsFile(p)) {
       if (name.endsWith('.json')) {
         const v = JSON.parse(await Deno.readTextFile(p))
         if (util.isPlainObject(v)) {
@@ -90,8 +90,8 @@ export async function loadConfig(workingDir: string): Promise<Config> {
   if (util.isNEString(srcDir)) {
     config.srcDir = util.cleanPath(srcDir)
   } else if (
-    !existsDirSync(join(workingDir, 'pages')) &&
-    existsDirSync(join(workingDir, 'src', 'pages'))
+    !await existsDir(join(workingDir, 'pages')) &&
+    await existsDir(join(workingDir, 'src', 'pages'))
   ) {
     config.srcDir = '/src'
   }
@@ -158,7 +158,7 @@ export async function loadImportMap(workingDir: string): Promise<ImportMap> {
   let importMapFile = ''
   for (const filename of Array.from(['import_map', 'import-map', 'importmap']).map(name => `${name}.json`)) {
     importMapFile = join(workingDir, filename)
-    if (existsFileSync(importMapFile)) {
+    if (await existsFile(importMapFile)) {
       try {
         const data = JSON.parse(await Deno.readTextFile(importMapFile))
         const imports: Record<string, string> = toStringRecord(data.imports)
@@ -243,6 +243,7 @@ function isPostcssConfig(v: any): v is { plugins: PostCSSPlugin[] } {
   return util.isPlainObject(v) && util.isArray(v.plugins)
 }
 
+const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 function isLocaleID(v: any): v is string {
   return util.isNEString(v) && reLocaleID.test(v)
 }

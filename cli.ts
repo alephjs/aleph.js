@@ -1,6 +1,6 @@
 import { resolve } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { parse } from 'https://deno.land/std@0.94.0/flags/mod.ts'
-import { existsDirSync } from './shared/fs.ts'
+import { existsDir } from './shared/fs.ts'
 import log, { LevelNames } from './shared/log.ts'
 import util from './shared/util.ts'
 import { VERSION } from './version.ts'
@@ -93,7 +93,7 @@ async function main() {
 
   // check working dir
   const workingDir = resolve(String(args[0] || '.'))
-  if (!existsDirSync(workingDir)) {
+  if (!await existsDir(workingDir)) {
     log.fatal('No such directory:', workingDir)
   }
 

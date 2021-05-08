@@ -2,7 +2,7 @@ import { join } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.94.0/ws/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { rewriteURL } from '../framework/core/routing.ts'
-import { existsFileSync } from '../shared/fs.ts'
+import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ServerRequest } from '../types.ts'
@@ -96,7 +96,7 @@ export class Server {
         }
 
         const filePath = join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
-        if (existsFileSync(filePath)) {
+        if (await existsFile(filePath)) {
           const info = Deno.lstatSync(filePath)
           const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
           if (lastModified === r.headers.get('If-Modified-Since')) {
@@ -107,7 +107,7 @@ export class Server {
           let content = await Deno.readTextFile(filePath)
           if (app.isDev && filePath.endsWith('.js')) {
             const metaFile = util.trimSuffix(filePath, '.js') + '.meta.json'
-            if (existsFileSync(metaFile)) {
+            if (await existsFile(metaFile)) {
               try {
                 const { url } = JSON.parse(await Deno.readTextFile(metaFile))
                 const mod = app.getModule(url)
@@ -129,7 +129,7 @@ export class Server {
 
       // serve public files
       const filePath = join(app.workingDir, 'public', pathname)
-      if (existsFileSync(filePath)) {
+      if (await existsFile(filePath)) {
         const info = Deno.lstatSync(filePath)
         const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
         if (lastModified === r.headers.get('If-Modified-Since')) {

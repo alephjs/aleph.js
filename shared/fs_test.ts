@@ -1,44 +1,36 @@
 import {
   assert,
   assertEquals,
-  assertThrows,
   assertNotEquals
 } from 'std/testing/asserts.ts'
 import { SEP } from 'std/path/separator.ts'
 import {
-  existsDirSync,
-  existsFileSync,
+  existsDir,
+  existsFile,
   ensureTextFile,
   lazyRemove
 } from './fs.ts'
 
-Deno.test(`fs: existsDirSync`, () => {
+Deno.test(`fs: existsDir`, async () => {
   // true test cases
-  const dir = Deno.makeTempDirSync()
-  assert(existsDirSync(dir))
-  assert(existsDirSync(Deno.realPathSync(getStandardFolder())))
+  const dir = await Deno.makeTempDir()
+  assert(await existsDir(dir))
+  assert(await existsDir(await Deno.realPath(getStandardFolder())))
   // false test cases
-  assertEquals(existsDirSync(`${dir}${SEP}foobar`), false)
-  const file = Deno.makeTempFileSync()
-  assertEquals(existsDirSync(file), false)
-  // error test cases
-  assertThrows(() => existsDirSync({} as string), Error)
+  const file = await Deno.makeTempFile()
+  assertEquals(await existsDir(file), false)
+  assertEquals(await existsDir(`${dir}${SEP}foo${SEP}bar`), false)
 })
 
-
-
-Deno.test(`fs: existsFileSync`, () => {
+Deno.test(`fs: existsFile`, async () => {
   // true test cases
-  const file = Deno.makeTempFileSync()
-  assert(existsFileSync(file))
+  const file = await Deno.makeTempFile()
+  assert(await existsFile(file))
   // false test cases
-  const dir = Deno.makeTempDirSync()
-  assert(!existsFileSync(`${dir}`))
-  assert(!existsFileSync(`${dir}${SEP}llksdafzxc.ts`))
-  // error test cases
-  assertThrows(() => existsDirSync({} as string), Error)
+  const dir = await Deno.makeTempDir()
+  assert(!await existsFile(`${dir}`))
+  assert(!await existsFile(`${dir}${SEP}foo${SEP}bar`))
 })
-
 
 Deno.test('fs: ensureTextFile', async () => {
   // true test case
@@ -46,7 +38,7 @@ Deno.test('fs: ensureTextFile', async () => {
   const textFilePath = `${dirPath}${SEP}test.txt`
   const content = 'This is a test'
   await ensureTextFile(textFilePath, content)
-  assert(existsFileSync(textFilePath))
+  assert(await existsFile(textFilePath))
   const testContent = await Deno.readTextFile(textFilePath)
   assertEquals(testContent, content)
   // false test case
@@ -65,11 +57,11 @@ Deno.test('fs: lazyRemove', async () => {
   // true test case
   const filePath = await Deno.makeTempFile()
   await lazyRemove(filePath)
-  assertEquals(existsFileSync(filePath), false)
+  assertEquals(await existsFile(filePath), false)
   // false test case
   const dirPath = await Deno.makeTempDir()
-  await lazyRemove(`${dirPath}${SEP}asdfsdf.txt`)
-  assert(existsDirSync(dirPath))
+  await lazyRemove(`${dirPath}${SEP}foo${SEP}bar.bin`)
+  assert(await existsDir(dirPath))
 })
 
 /**

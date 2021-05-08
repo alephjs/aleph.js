@@ -1,15 +1,12 @@
 import { dim, red, yellow } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.94.0/hash/mod.ts'
 import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.94.0/path/mod.ts'
-import { existsDirSync } from '../shared/fs.ts'
+import { existsDir } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { SourceType } from '../compiler/mod.ts'
 import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
-
-export const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
-export const reFullVersion = /@v?\d+\.\d+\.\d+/i
 
 export const moduleWalkOptions = {
   includeDirs: false,
@@ -69,7 +66,7 @@ export async function getDenoDir() {
   const output = (new TextDecoder).decode(await p.output())
   const { denoDir } = JSON.parse(output)
   p.close()
-  if (denoDir === undefined || !existsDirSync(denoDir)) {
+  if (denoDir === undefined || !await existsDir(denoDir)) {
     throw new Error(`can't find the deno dir`)
   }
   __denoDir = denoDir
@@ -180,7 +177,7 @@ export async function clearBuildCache(filename: string, ext = 'js') {
   const dir = dirname(filename)
   const hashname = basename(filename)
   const regHashExt = new RegExp(`\\.[0-9a-f]+\\.${ext}$`, 'i')
-  if (ext && !regHashExt.test(hashname) || !existsDirSync(dir)) {
+  if (ext && !regHashExt.test(hashname) || !await existsDir(dir)) {
     return
   }
 

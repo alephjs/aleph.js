@@ -1,10 +1,8 @@
-import { dim } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
 import { dirname, join } from 'https://deno.land/std@0.94.0/path/mod.ts'
-import { ensureDir, } from 'https://deno.land/std@0.94.0/fs/ensure_dir.ts'
+import { ensureDir } from 'https://deno.land/std@0.94.0/fs/ensure_dir.ts'
 import { transform } from '../compiler/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
-import { ensureTextFile, existsFileSync, lazyRemove } from '../shared/fs.ts'
-import log from '../shared/log.ts'
+import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { BrowserNames } from '../types.ts'
 import { VERSION } from '../version.ts'
@@ -137,7 +135,7 @@ export class Bundler {
     const jsFile = util.trimSuffix(mod.jsFile, '.js') + '.client.js'
     this.#compiled.set(mod.url, jsFile)
 
-    if (existsFileSync(jsFile)) {
+    if (await existsFile(jsFile)) {
       return jsFile
     }
 
@@ -211,7 +209,7 @@ export class Bundler {
     const hash = computeHash(polyfillTarget + '/esbuild@v0.11.11/' + VERSION)
     const bundleFilename = `polyfills.bundle.${hash.slice(0, 8)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
-    if (!existsFileSync(bundleFilePath)) {
+    if (!await existsFile(bundleFilePath)) {
       const rawPolyfillsFile = `${alephPkgUri}/bundler/polyfills/${polyfillTarget}/mod.ts`
       await this.build(rawPolyfillsFile, bundleFilePath)
     }
@@ -242,7 +240,7 @@ export class Bundler {
     const bundleFilename = `${name}.bundle.${hash.slice(0, 8)}.js`
     const bundleEntryFile = join(this.#app.buildDir, `${name}.bundle.entry.js`)
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
-    if (!existsFileSync(bundleFilePath)) {
+    if (!await existsFile(bundleFilePath)) {
       await Deno.writeTextFile(bundleEntryFile, entryCode)
       await this.build(bundleEntryFile, bundleFilePath)
       lazyRemove(bundleEntryFile)
