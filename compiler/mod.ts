@@ -1,6 +1,6 @@
 import { join } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.94.0/fs/ensure_dir.ts'
-import { existsFileSync } from '../shared/fs.ts'
+import { existsFile } from '../shared/fs.ts'
 import { Measure } from '../shared/log.ts'
 import type { ImportMap } from '../types.ts'
 import { VERSION } from '../version.ts'
@@ -41,17 +41,16 @@ export type TransformOptions = {
 
 export type TransformResult = {
   code: string
-  deps: DependencyDescriptor[]
+  deps: Array<{
+    specifier: string
+    importIndex: string
+    isDynamic: boolean
+  }>
   starExports: string[] | null
   map: string | null
 }
 
-type InlineStyles = Record<string, { type: string, quasis: string[], exprs: string[] }>
-
-type DependencyDescriptor = {
-  specifier: string
-  isDynamic: boolean
-}
+export type InlineStyles = Record<string, { type: string, quasis: string[], exprs: string[] }>
 
 let wasmReady: Promise<void> | boolean = false
 
@@ -69,7 +68,7 @@ async function getDenoDir() {
 export async function initWasm() {
   const cacheDir = join(await getDenoDir(), `deps/https/deno.land/aleph@v${VERSION}`)
   const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
-  if (existsFileSync(cachePath)) {
+  if (await existsFile(cachePath)) {
     const wasmData = await Deno.readFile(cachePath)
     await init(wasmData)
   } else {

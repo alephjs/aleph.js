@@ -33,10 +33,10 @@ pub struct ImportMap {
 
 impl ImportMap {
   pub fn from_hashmap(map: ImportHashMap) -> Self {
-    let mut imports: SpecifierMap = IndexMap::new();
+    let mut imports = IndexMap::new();
     let mut scopes = IndexMap::new();
     for (k, v) in map.imports.iter() {
-      if k.eq("@/") || k.eq("~/") {
+      if v.starts_with("./") {
         imports.insert(
           k.into(),
           RelativePath::new(v)
@@ -51,10 +51,10 @@ impl ImportMap {
       }
     }
     for (k, v) in map.scopes.iter() {
-      let mut map: SpecifierMap = IndexMap::new();
+      let mut map = IndexMap::new();
       for (k, v) in v.iter() {
-        if k.eq("@/") || k.eq("~/") {
-          imports.insert(
+        if v.starts_with("./") {
+          map.insert(
             k.into(),
             RelativePath::new(v)
               .normalize()

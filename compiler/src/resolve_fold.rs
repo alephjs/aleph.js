@@ -13,7 +13,7 @@ pub fn resolve_fold(
   resolve_star_exports: bool,
 ) -> impl Fold {
   ResolveFold {
-    deno_hooks_idx: 0,
+    use_deno_idx: 0,
     resolver,
     source,
     resolve_star_exports,
@@ -21,7 +21,7 @@ pub fn resolve_fold(
 }
 
 pub struct ResolveFold {
-  deno_hooks_idx: i32,
+  use_deno_idx: i32,
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
   resolve_star_exports: bool,
@@ -30,12 +30,12 @@ pub struct ResolveFold {
 impl ResolveFold {
   fn new_use_deno_hook_ident(&mut self, callback_span: &Span) -> String {
     let resolver = self.resolver.borrow_mut();
-    self.deno_hooks_idx = self.deno_hooks_idx + 1;
+    self.use_deno_idx = self.use_deno_idx + 1;
     let mut ident: String = "useDeno-".to_owned();
     let mut hasher = Sha1::new();
     let callback_code = self.source.span_to_snippet(callback_span.clone()).unwrap();
     hasher.update(resolver.specifier.clone());
-    hasher.update(self.deno_hooks_idx.to_string());
+    hasher.update(self.use_deno_idx.to_string());
     hasher.update(callback_code.clone());
     ident.push_str(
       base64::encode(hasher.finalize())
@@ -379,6 +379,7 @@ impl Fold for ResolveFold {
         let mut resolver = self.resolver.borrow_mut();
         resolver.dep_graph.push(DependencyDescriptor {
           specifier: "#".to_owned() + id.clone().as_str(),
+          import_index: "".into(),
           is_dynamic: false,
         });
       }
@@ -622,10 +623,10 @@ mod tests {
     assert!(code.contains("import { useDeno } from \"../-/deno.land/x/aleph@v1.0.0/hooks.js\""));
     assert!(code.contains("import { render } from \"../-/esm.sh/react-dom@17.0.2/server.js\""));
     assert!(code.contains("import { render as _render } from \"../-/cdn.esm.sh/v2/react-dom@17.0.2/es2020/react-dom.js\""));
-    assert!(code.contains("import Logo from \"../component/logo.js#/component/logo.tsx@000000\""));
-    assert!(code.contains("import Logo2 from \"../component/logo.js#/component/logo.tsx@000000\""));
-    assert!(code.contains("import Logo3 from \"../component/logo.js#/component/logo.tsx@000000\""));
-    assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000000\")"));
+    assert!(code.contains("import Logo from \"../component/logo.js#/component/logo.tsx@000006\""));
+    assert!(code.contains("import Logo2 from \"../component/logo.js#/component/logo.tsx@000007\""));
+    assert!(code.contains("import Logo3 from \"../component/logo.js#/component/logo.tsx@000008\""));
+    assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000009\")"));
     assert!(code.contains("export { useState } from \"../-/esm.sh/react@17.0.2.js\""));
     assert!(code.contains("export * from \"[https://esm.sh/swr]:../-/esm.sh/swr.js\""));
   }

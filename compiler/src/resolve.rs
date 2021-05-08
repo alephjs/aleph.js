@@ -28,6 +28,7 @@ lazy_static! {
 #[serde(rename_all = "camelCase")]
 pub struct DependencyDescriptor {
   pub specifier: String,
+  pub import_index: String,
   pub is_dynamic: bool,
 }
 
@@ -70,6 +71,7 @@ pub struct Resolver {
   pub used_builtin_jsx_tags: IndexSet<String>,
 
   // private
+  import_idx: i32,
   import_map: ImportMap,
   aleph_pkg_uri: Option<String>,
   react: Option<ReactResolve>,
@@ -98,6 +100,7 @@ impl Resolver {
       bundle_mode,
       bundle_external: set,
       extra_imports: IndexSet::new(),
+      import_idx: 0,
       import_map: ImportMap::from_hashmap(import_map),
       aleph_pkg_uri,
       react,
@@ -344,6 +347,8 @@ impl Resolver {
         }
       }
     };
+    self.import_idx = self.import_idx + 1;
+    let import_index = format!("{:0>6}", self.import_idx.to_string());
     // fix extension & add hash placeholder
     match resolved_path.extension() {
       Some(os_str) => match os_str.to_str() {
@@ -361,9 +366,10 @@ impl Resolver {
             }
             filename.push_str("js");
             if !(self.bundle_mode && !is_dynamic) && !is_remote && !self.specifier_is_remote {
-              filename.push_str("#");
+              filename.push('#');
               filename.push_str(fixed_url.as_str());
-              filename.push_str("@000000");
+              filename.push('@');
+              filename.push_str(import_index.as_str());
             }
             resolved_path.set_file_name(filename);
           }
@@ -381,7 +387,8 @@ impl Resolver {
             if !(self.bundle_mode && !is_dynamic) && !is_remote && !self.specifier_is_remote {
               filename.push('#');
               filename.push_str(fixed_url.as_str());
-              filename.push_str("@000000");
+              filename.push('@');
+              filename.push_str(import_index.as_str());
             }
             resolved_path.set_file_name(filename);
           }
@@ -392,6 +399,7 @@ impl Resolver {
     };
     self.dep_graph.push(DependencyDescriptor {
       specifier: fixed_url.clone(),
+      import_index,
       is_dynamic,
     });
     let path = resolved_path.to_slash().unwrap();
@@ -569,14 +577,14 @@ mod tests {
     assert_eq!(
       resolver.resolve("../components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000000".into(),
+        "../components/logo.js#/components/logo.tsx@000012".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("../styles/app.css", false),
       (
-        "../styles/app.css.js#/styles/app.css@000000".into(),
+        "../styles/app.css.js#/styles/app.css@000013".into(),
         "/styles/app.css".into()
       )
     );
@@ -590,14 +598,14 @@ mod tests {
     assert_eq!(
       resolver.resolve("@/components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000000".into(),
+        "../components/logo.js#/components/logo.tsx@000015".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("~/components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000000".into(),
+        "../components/logo.js#/components/logo.tsx@000016".into(),
         "/components/logo.tsx".into()
       )
     );

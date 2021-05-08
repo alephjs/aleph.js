@@ -215,6 +215,7 @@ impl AlephJsxFold {
             let mut resolver = self.resolver.borrow_mut();
             resolver.dep_graph.push(DependencyDescriptor {
               specifier: "#".to_owned() + id.as_str(),
+              import_index: "".into(),
               is_dynamic: false,
             });
             resolver.used_builtin_jsx_tags.insert("InlineStyle".into());
@@ -427,7 +428,6 @@ impl Fold for AlephJsxBuiltinModuleResolveFold {
 
 #[cfg(test)]
 mod tests {
-  use crate::resolve::DependencyDescriptor;
   use crate::swc::st;
 
   #[test]
@@ -478,41 +478,24 @@ mod tests {
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
-        "import   \"../style/index.css.js#{}@000000\"",
+        "import   \"../style/index.css.js#{}@000002\"",
         "/style/index.css"
       )
       .as_str()
     ));
     let r = resolver.borrow_mut();
     assert_eq!(
-      r.dep_graph,
+      r.dep_graph
+        .iter()
+        .map(|g| { g.specifier.as_str() })
+        .collect::<Vec<&str>>(),
       vec![
-        DependencyDescriptor {
-          specifier: "https://esm.sh/react".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "/style/index.css".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/components/Head.ts".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.ts"
-            .into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.ts".into(),
-          is_dynamic: false,
-        },
-        DependencyDescriptor {
-          specifier: "https://deno.land/x/aleph@v0.3.0/framework/react/components/CustomScript.ts"
-            .into(),
-          is_dynamic: false,
-        }
+        "https://esm.sh/react",
+        "/style/index.css",
+        "https://deno.land/x/aleph@v0.3.0/framework/react/components/Head.ts",
+        "https://deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.ts",
+        "https://deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.ts",
+        "https://deno.land/x/aleph@v0.3.0/framework/react/components/CustomScript.ts",
       ]
     );
   }
