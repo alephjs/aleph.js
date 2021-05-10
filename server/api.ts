@@ -35,6 +35,7 @@ export class Request implements APIRequest {
       status: 200,
       headers: new Headers({
         Server: 'Aleph.js',
+        'X-Powered-By': 'Aleph'
       }),
       done: false
     }
