@@ -27,7 +27,7 @@ export default (): LoaderPlugin => {
       const html = marked.parse(__content)
       const props = {
         id: util.isString(meta.id) ? meta.id : undefined,
-        className: util.isString(meta.id) ? meta.className : undefined,
+        className: util.isString(meta.className) ? meta.className : undefined,
         style: util.isPlainObject(meta.style) ? meta.style : undefined,
       }
 
