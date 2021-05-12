@@ -1,5 +1,4 @@
-use crate::resolve::{DependencyDescriptor, Resolver};
-
+use crate::resolve::Resolver;
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, rc::Rc};
 use swc_common::{SourceMap, Span, DUMMY_SP};
@@ -345,6 +344,7 @@ impl Fold for ResolveFold {
             ..
           }) => Some(span),
           Expr::Arrow(ArrowExpr { span, .. }) => Some(span),
+          Expr::Ident(Ident { span, .. }) => Some(span),
           _ => None,
         },
         _ => None,
@@ -377,11 +377,9 @@ impl Fold for ResolveFold {
           });
         }
         let mut resolver = self.resolver.borrow_mut();
-        resolver.dep_graph.push(DependencyDescriptor {
-          specifier: "#".to_owned() + id.clone().as_str(),
-          import_index: "".into(),
-          is_dynamic: false,
-        });
+        resolver
+          .use_deno_hooks
+          .push("#".to_owned() + id.clone().as_str());
       }
     }
 

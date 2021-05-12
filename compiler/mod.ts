@@ -46,11 +46,18 @@ export type TransformResult = {
     importIndex: string
     isDynamic: boolean
   }>
-  starExports: string[] | null
-  map: string | null
+  useDenoHooks?: string[]
+  starExports?: string[]
+  map?: string
 }
 
-export type InlineStyles = Record<string, { type: string, quasis: string[], exprs: string[] }>
+type InlineStyle = {
+  type: string,
+  quasis: string[],
+  exprs: string[]
+}
+
+type InlineStyleRecord = Record<string, InlineStyle>
 
 let wasmReady: Promise<void> | boolean = false
 
@@ -126,36 +133,45 @@ export async function transform(url: string, code: string, options: TransformOpt
   let {
     code: jsContent,
     deps,
-    map,
     inlineStyles,
-    starExports
+    useDenoHooks,
+    starExports,
+    map,
   } = transformSync(url, code, transformOptions)
 
   // resolve inline-style
-  await Promise.all(Object.entries(inlineStyles as InlineStyles).map(async ([key, style]) => {
-    let tpl = style.quasis.reduce((tpl, quais, i, a) => {
-      tpl += quais
-      if (i < a.length - 1) {
-        tpl += `%%aleph-inline-style-expr-${i}%%`
+  if (inlineStyles) {
+    await Promise.all(Object.entries(inlineStyles as InlineStyleRecord).map(async ([key, style]) => {
+      let tpl = style.quasis.reduce((tpl, quais, i, a) => {
+        tpl += quais
+        if (i < a.length - 1) {
+          tpl += `%%aleph-inline-style-expr-${i}%%`
+        }
+        return tpl
+      }, '')
+        .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
+        .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
+      if (inlineStylePreprocess !== undefined) {
+        tpl = await inlineStylePreprocess('#' + key, style.type, tpl)
       }
-      return tpl
-    }, '')
-      .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
-      .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`)
-    if (inlineStylePreprocess !== undefined) {
-      tpl = await inlineStylePreprocess('#' + key, style.type, tpl)
-    }
-    tpl = tpl.replace(
-      /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
-      (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'
-    ).replace(
-      /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
-      (_, id) => '${' + style.exprs[parseInt(id)] + '}'
-    )
-    jsContent = jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
-  }))
+      tpl = tpl.replace(
+        /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
+        (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'
+      ).replace(
+        /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
+        (_, id) => '${' + style.exprs[parseInt(id)] + '}'
+      )
+      jsContent = jsContent.replace(`"%%${key}-placeholder%%"`, '`' + tpl + '`')
+    }))
+  }
 
-  return { code: jsContent, deps, map, starExports }
+  return {
+    code: jsContent,
+    deps,
+    useDenoHooks,
+    starExports,
+    map
+  }
 }
 
 /* parse export names of the module */

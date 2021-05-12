@@ -1,5 +1,4 @@
 use crate::import_map::{ImportHashMap, ImportMap};
-
 use indexmap::IndexSet;
 use path_slash::PathBufExt;
 use pathdiff::diff_paths;
@@ -57,8 +56,10 @@ pub struct Resolver {
   pub specifier_is_remote: bool,
   /// dependency graph
   pub dep_graph: Vec<DependencyDescriptor>,
-  /// inline styles
+  /// jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
+  /// use deno hooks
+  pub use_deno_hooks: Vec<String>,
   /// bundle mode
   pub bundle_mode: bool,
   /// bundled modules
@@ -68,7 +69,7 @@ pub struct Resolver {
   /// extra imports
   pub extra_imports: IndexSet<String>,
   /// builtin jsx tags like `a`, `link`, `head`, etc
-  pub used_builtin_jsx_tags: IndexSet<String>,
+  pub builtin_jsx_tags: IndexSet<String>,
 
   // private
   import_idx: i32,
@@ -93,13 +94,14 @@ impl Resolver {
     Resolver {
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
-      used_builtin_jsx_tags: IndexSet::new(),
       dep_graph: Vec::new(),
-      star_exports: Vec::new(),
       inline_styles: HashMap::new(),
+      use_deno_hooks: Vec::new(),
       bundle_mode,
       bundle_external: set,
+      star_exports: Vec::new(),
       extra_imports: IndexSet::new(),
+      builtin_jsx_tags: IndexSet::new(),
       import_idx: 0,
       import_map: ImportMap::from_hashmap(import_map),
       aleph_pkg_uri,

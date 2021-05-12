@@ -82,11 +82,15 @@ fn default_pragma_frag() -> String {
 #[serde(rename_all = "camelCase")]
 pub struct TransformOutput {
   pub code: String,
+  pub deps: Vec<DependencyDescriptor>,
+  #[serde(skip_serializing_if = "HashMap::is_empty")]
+  pub inline_styles: HashMap<String, InlineStyle>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub use_deno_hooks: Vec<String>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub star_exports: Vec<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub map: Option<String>,
-  pub deps: Vec<DependencyDescriptor>,
-  pub inline_styles: HashMap<String, InlineStyle>,
-  pub star_exports: Option<Vec<String>>,
 }
 
 #[wasm_bindgen(js_name = "parseExportNamesSync")]
@@ -142,14 +146,11 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
   Ok(
     JsValue::from_serde(&TransformOutput {
       code,
-      map,
       deps: r.dep_graph.clone(),
       inline_styles: r.inline_styles.clone(),
-      star_exports: if r.star_exports.len() > 0 {
-        Some(r.star_exports.clone())
-      } else {
-        None
-      },
+      star_exports: r.star_exports.clone(),
+      use_deno_hooks: r.use_deno_hooks.clone(),
+      map,
     })
     .unwrap(),
   )
