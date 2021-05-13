@@ -28,6 +28,7 @@ import {
 } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
+import { compareVersions } from "https://deno.land/x/compare_versions/mod.ts"
 import type {
   LoaderPlugin,
   ImportMap,
@@ -104,7 +105,7 @@ export class Application implements ServerApplication {
     mode: 'development' | 'production' = 'production',
     reload = false
   ) {
-    if (Deno.version.deno < minDenoVersion) {
+    if (compareVersions.compare(Deno.version.deno, minDenoVersion, '<')) {
       log.error(`Aleph.js needs Deno ${minDenoVersion}+, please upgrade Deno.`)
       Deno.exit(1)
     }
