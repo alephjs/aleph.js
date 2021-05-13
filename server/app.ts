@@ -28,6 +28,7 @@ import {
 } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
+import * as semver from 'https://deno.land/x/semver@v1.3.0/mod.ts'
 import type {
   LoaderPlugin,
   ImportMap,
@@ -104,7 +105,7 @@ export class Application implements ServerApplication {
     mode: 'development' | 'production' = 'production',
     reload = false
   ) {
-    if (Deno.version.deno < minDenoVersion) {
+    if (semver.lt(Deno.version.deno, minDenoVersion)) {
       log.error(`Aleph.js needs Deno ${minDenoVersion}+, please upgrade Deno.`)
       Deno.exit(1)
     }
