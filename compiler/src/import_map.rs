@@ -39,12 +39,14 @@ impl ImportMap {
       if v.starts_with("./") {
         imports.insert(
           k.into(),
-          RelativePath::new(v)
-            .normalize()
-            .to_path(Path::new("/"))
-            .to_slash()
-            .unwrap()
-            .into(),
+          format!(
+            "/{}",
+            RelativePath::new(v)
+              .normalize()
+              .to_relative_path_buf()
+              .join("/")
+              .to_string()
+          ),
         );
       } else {
         imports.insert(k.into(), v.into());
@@ -118,6 +120,7 @@ mod tests {
     let mut scope_imports: SpecifierHashMap = HashMap::new();
     imports.insert("@/".into(), "./".into());
     imports.insert("~/".into(), "./".into());
+    imports.insert("comps/".into(), "./components/".into());
     imports.insert("react".into(), "https://esm.sh/react".into());
     imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
     imports.insert(
@@ -133,6 +136,10 @@ mod tests {
     );
     assert_eq!(
       import_map.resolve("/pages/index.tsx", "~/components/logo.tsx"),
+      "/components/logo.tsx"
+    );
+    assert_eq!(
+      import_map.resolve("/pages/index.tsx", "comps/logo.tsx"),
       "/components/logo.tsx"
     );
     assert_eq!(
