@@ -55,7 +55,7 @@ export default (): LoaderPlugin => {
 
       let sourceCode = ''
       let css = ''
-      let modules: Record<string, string> = {}
+      let cssModules: Record<string, string> = {}
 
       if (data instanceof Uint8Array) {
         sourceCode = (new TextDecoder).decode(data)
@@ -73,7 +73,7 @@ export default (): LoaderPlugin => {
         const ret = await postcss.process(sourceCode, { from: url }).async()
         css = ret.css
         if (modulesJSON.has(url)) {
-          modules = modulesJSON.get(url)!
+          cssModules = modulesJSON.get(url)!
           modulesJSON.delete(url)
         }
       }
@@ -109,7 +109,7 @@ export default (): LoaderPlugin => {
           code: [
             `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
             `export const href = ${JSON.stringify('/_aleph/' + util.trimPrefix(path, '/'))}`,
-            `export default ${JSON.stringify(modules)}`,
+            `export default ${JSON.stringify(cssModules)}`,
             `applyCSS(${JSON.stringify(url)}, { href })`
           ].join('\n'),
           // todo: generate map
@@ -120,7 +120,7 @@ export default (): LoaderPlugin => {
         code: [
           `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
           `export const css = ${JSON.stringify(css)}`,
-          `export default ${JSON.stringify(modules)}`,
+          `export default ${JSON.stringify(cssModules)}`,
           `applyCSS(${JSON.stringify(url)}, { css })`,
         ].join('\n'),
         // todo: generate map

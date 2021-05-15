@@ -1,6 +1,5 @@
 import { dirname } from 'https://deno.land/std@0.94.0/path/mod.ts'
-import { getAlephPkgUri, getRelativePath, toLocalPath } from '../../server/helper.ts'
-import util from '../../shared/util.ts'
+import { getAlephPkgUri, toRelativePath, toLocalPath } from '../../server/helper.ts'
 import type { ServerApplication } from '../../types.ts'
 
 export async function init(app: ServerApplication) {
@@ -8,7 +7,7 @@ export async function init(app: ServerApplication) {
     const alephPkgUri = getAlephPkgUri()
     app.injectCode('hmr', (url: string, code: string) => {
       if (code.includes('$RefreshReg$(')) {
-        const refreshModuleUrl = getRelativePath(
+        const refreshModuleUrl = toRelativePath(
           dirname(toLocalPath(url)),
           toLocalPath(`${alephPkgUri}/framework/react/refresh.js`)
         )
@@ -20,7 +19,7 @@ export async function init(app: ServerApplication) {
           `window.$RefreshReg$ = (type, id) => RefreshRuntime.register(type, ${JSON.stringify(url)} + "#" + id);`,
           'window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;',
           '',
-          util.trimSuffix(code.trim(), 'import.meta.hot.accept();'),
+          code,
           'window.$RefreshReg$ = prevRefreshReg;',
           'window.$RefreshSig$ = prevRefreshSig;',
           'import.meta.hot.accept(performReactRefresh);'
