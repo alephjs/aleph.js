@@ -1,7 +1,7 @@
 import type { ServerRequest, ServerResponse } from '../types.ts'
 
-const brotliMod = 'https://deno.land/x/brotli@v0.1.4/mod.ts'
-const flateMod = 'https://deno.land/x/denoflate@1.2.1/mod.ts'
+export const x_brotli = 'https://deno.land/x/brotli@v0.1.4/mod.ts'
+export const x_flate = 'https://deno.land/x/denoflate@1.2.1/mod.ts'
 
 class Compression {
   #brotli: ((data: Uint8Array) => Uint8Array) | null = null
@@ -10,11 +10,11 @@ class Compression {
 
   async init() {
     if (this.#brotli === null) {
-      const { compress } = await import(brotliMod)
+      const { compress } = await import(x_brotli)
       this.#brotli = compress
     }
     if (this.#gzip === null) {
-      const denoflate = await import(flateMod)
+      const denoflate = await import(x_flate)
       this.#gzip = (data: Uint8Array) => denoflate.gzip(data, undefined)
     }
     this.#ready = true

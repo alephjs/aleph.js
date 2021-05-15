@@ -2,11 +2,12 @@ import { Untar } from 'https://deno.land/std@0.96.0/archive/tar.ts'
 import { green, dim } from 'https://deno.land/std@0.96.0/fmt/colors.ts'
 import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import { gunzip } from 'https://deno.land/x/denoflate@1.1/mod.ts'
+import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
 import { ensureTextFile } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
+import { x_brotli, x_flate } from '../server/compress.ts'
 
 export const helpMessage = `
 Usage:
@@ -61,6 +62,7 @@ export default async function (nameArg?: string) {
     imports: {
       '~/': './',
       'aleph/': `https://deno.land/x/aleph@v${VERSION}/`,
+      'aleph/types': `https://deno.land/x/aleph@v${VERSION}/types.ts`,
       'framework': `https://deno.land/x/aleph@v${VERSION}/framework/core/mod.ts`,
       'framework/react': `https://deno.land/x/aleph@v${VERSION}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
@@ -72,6 +74,13 @@ export default async function (nameArg?: string) {
     Deno.writeTextFile(join(cwd, name, '.gitignore'), gitignore.join('\n')),
     Deno.writeTextFile(join(cwd, name, 'import_map.json'), JSON.stringify(importMap, undefined, 2))
   ])
+
+  const urls = Object.values(importMap.imports).filter(v => !v.endsWith('/'))
+  const p = Deno.run({
+    cmd: [Deno.execPath(), 'cache', ...urls, x_brotli, x_flate]
+  })
+  await p.status()
+  p.close()
 
   if (vscode) {
     const extensions = {
