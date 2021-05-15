@@ -1,7 +1,6 @@
 import type { APIRequest } from 'aleph/types.ts'
 
-const store = globalThis as any
-
 export default async function handler(req: APIRequest) {
-  req.json({ count: store.$count || 0 })
+  const count = parseInt(localStorage.getItem('count') || '0')
+  req.json({ count })
 }
