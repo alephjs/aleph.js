@@ -1,7 +1,7 @@
 import type { ServerRequest, ServerResponse } from '../types.ts'
 
 const brotliMod = 'https://deno.land/x/brotli@v0.1.4/mod.ts'
-const flateMod = 'https://deno.land/x/denoflate@1.1/mod.ts'
+const flateMod = 'https://deno.land/x/denoflate@1.2.1/mod.ts'
 
 class Compression {
   #brotli: ((data: Uint8Array) => Uint8Array) | null = null
