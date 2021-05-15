@@ -745,7 +745,7 @@ mod tests {
       .transform(resolver.clone(), &EmitOptions::default())
       .expect("could not transform module");
     println!("{}", code);
-    assert!(code.contains("const { default: React , useState , useEffect: useEffect_  } = __ALEPH.pack[\"https://esm.sh/react\"]"));
+    assert!(code.contains("const { /*#__PURE__*/ default: React , useState , useEffect: useEffect_  } = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("const React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("const { default: Logo  } = __ALEPH.pack[\"/components/logo.tsx\"]"));
     assert!(code.contains("import Nav from \"../components/nav.client.js\""));
