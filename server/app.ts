@@ -301,19 +301,8 @@ export class Application implements ServerApplication {
               log.info(type, url)
               try {
                 const module = await this.initModule(url, { forceRefresh: true })
+                const hmrable = this.isHMRable(url)
                 await this.transpileModule(module, true)
-                const hmrable = this.isHMRable(module.url)
-                const updateRouting = (url: string) => {
-                  if (trimModuleExt(url) === '/app') {
-                    this.#renderer.clearCache()
-                  } else if (url.startsWith('/pages/')) {
-                    const [routePath] = this.createRouteUpdate(url)
-                    this.#renderer.clearCache(routePath)
-                    this.#pageRouting.update(...this.createRouteUpdate(url))
-                  } else if (url.startsWith('/api/')) {
-                    this.#apiRouting.update(...this.createRouteUpdate(url))
-                  }
-                }
                 if (hmrable) {
                   let routePath: string | undefined = undefined
                   let withData: boolean | undefined = undefined
@@ -340,10 +329,9 @@ export class Application implements ServerApplication {
                     })
                   }
                 }
-                updateRouting(module.url)
                 this.applyCompilationSideEffect(module, ({ url: effectUrl }) => {
-                  updateRouting(effectUrl)
                   if (!hmrable && this.isHMRable(effectUrl)) {
+                    log.debug('compilation side-effect:', effectUrl, dim('<-'), module.url)
                     this.#fsWatchListeners.forEach(w => w.emit('modify-' + effectUrl))
                   }
                 })
@@ -1210,6 +1198,7 @@ export class Application implements ServerApplication {
   private async applyCompilationSideEffect(by: Module, callback: (mod: Module) => void) {
     const hash = by.hash || by.sourceHash
     const hashData = (new TextEncoder()).encode(hash.substr(0, 6))
+    this.applyModuleSideEffect(by.url)
     for (const mod of this.#modules.values()) {
       const { deps } = mod
       if (deps.length > 0) {
@@ -1228,7 +1217,6 @@ export class Application implements ServerApplication {
           }
         }
         if (fsync) {
-          log.debug('compilation side-effect:', mod.url, dim('<-'), by.url)
           const hasher = createHash('md5').update(mod.sourceHash)
           deps.forEach(({ url }) => {
             const depMod = url === by.url ? by : this.#modules.get(url)
@@ -1238,10 +1226,23 @@ export class Application implements ServerApplication {
           })
           mod.hash = hasher.toString()
           await this.cacheModule(mod)
+          this.applyModuleSideEffect(mod.url)
           callback(mod)
           await this.applyCompilationSideEffect(mod, callback)
         }
       }
+    }
+  }
+
+  private applyModuleSideEffect(url: string) {
+    if (trimModuleExt(url) === '/app') {
+      this.#renderer.clearCache()
+    } else if (url.startsWith('/pages/')) {
+      const [routePath] = this.createRouteUpdate(url)
+      this.#renderer.clearCache(routePath)
+      this.#pageRouting.update(...this.createRouteUpdate(url))
+    } else if (url.startsWith('/api/')) {
+      this.#apiRouting.update(...this.createRouteUpdate(url))
     }
   }
 
