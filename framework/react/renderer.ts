@@ -10,10 +10,10 @@ import { AsyncUseDenoError } from './hooks.ts'
 import { isLikelyReactComponent } from './helper.ts'
 import { createPageProps } from './pageprops.ts'
 
-export type RendererStorage = {
+export type RendererStore = {
   headElements: Map<string, { type: string, props: Record<string, any> }>
-  scripts: Map<string, { props: Record<string, any> }>
   inlineStyles: Map<string, string>
+  scripts: Map<string, { props: Record<string, any> }>
 }
 
 export async function render(
@@ -29,10 +29,10 @@ export async function render(
     scripts: [],
     data: null,
   }
-  const rendererStorage: RendererStorage = {
+  const rendererStore: RendererStore = {
     headElements: new Map(),
-    scripts: new Map(),
     inlineStyles: new Map(),
+    scripts: new Map(),
   }
   const dataUrl = 'pagedata://' + url.toString()
   const asyncCalls: Array<[string, number, Promise<any>]> = []
@@ -87,9 +87,10 @@ export async function render(
           data[id] = { value, expires }
         })
       }
+      Object.keys(rendererStore).forEach(key => rendererStore[key as keyof typeof rendererStore].clear())
       ret.body = renderToString(createElement(
         SSRContext.Provider,
-        { value: rendererStorage },
+        { value: rendererStore },
         createElement(
           RouterContext.Provider,
           { value: url },
@@ -111,7 +112,7 @@ export async function render(
   }
 
   // insert head child tags
-  rendererStorage.headElements.forEach(({ type, props }) => {
+  rendererStore.headElements.forEach(({ type, props }) => {
     const { children, ...rest } = props
     if (type === 'title') {
       if (util.isNEString(children)) {
@@ -134,7 +135,7 @@ export async function render(
   })
 
   // insert script tags
-  rendererStorage.scripts.forEach(({ props }) => {
+  rendererStore.scripts.forEach(({ props }) => {
     const { children, dangerouslySetInnerHTML, ...attrs } = props
     if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
       ret.scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
@@ -155,7 +156,7 @@ export async function render(
       ret.head.push(`<link rel="stylesheet" href=${JSON.stringify(href)} data-module-id=${JSON.stringify(url)} ssr />`)
     }
   })
-  for (const [url, css] of rendererStorage.inlineStyles.entries()) {
+  for (const [url, css] of rendererStore.inlineStyles.entries()) {
     ret.head.push(`<style type="text/css" data-module-id=${JSON.stringify(url)} ssr>${css}</style>`)
   }
 

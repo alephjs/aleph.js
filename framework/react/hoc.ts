@@ -9,10 +9,10 @@ import {
 } from 'https://esm.sh/react@17.0.2'
 import { FallbackContext } from './context.ts'
 import { isLikelyReactComponent } from './helper.ts'
-import { useDeno, useRouter } from './hooks.ts'
+import { useRouter } from './hooks.ts'
 
 /**
- * `withRouter` allows you to use `useRouter` hook with class component.
+ * `withRouter` injects the prop as current `RouterURL` of page routing.
  *
  * ```tsx
  * class MyComponent extends React.Component {
@@ -31,31 +31,7 @@ export function withRouter<P>(Component: ComponentType<P>) {
 }
 
 /**
- * `withDeno` allows you to use `useDeno` hook with class component.
- *
- * ```tsx
- * class MyComponent extends React.Component {
- *   render() {
- *     return <p>{this.props.version}</p>
- *   }
- * }
- * export default withDeno(() => ({ version: Deno.version.deno }))(MyComponent)
- * ```
- *
- * @param {Function} callback - hook callback.
- * @param {number} revalidate - revalidate duration in seconds.
- */
-export function withDeno<T>(callback: () => (T | Promise<T>), revalidate?: number) {
-  return function <P extends T>(Component: ComponentType<P>): ComponentType<Exclude<P, keyof T>> {
-    return function WithDeno(props: Exclude<P, keyof T>) {
-      const deno = useDeno<T>(callback, revalidate)
-      return createElement(Component, { ...props, ...deno })
-    }
-  }
-}
-
-/**
- * `dynamic` allows you to load a component asynchronously with SSR support.
+ * `dynamic` loads a component asynchronously that is ignored at build time(SSR).
  *
  * ```jsx
  * const MyLogo = dynamic(() => import('~/components/logo.tsx'))
@@ -67,8 +43,6 @@ export function withDeno<T>(callback: () => (T | Promise<T>), revalidate?: numbe
  *   )
  * }
  * ```
- *
- * @param {Function} factory - dynamic loading factory.
  */
 export function dynamic<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>
