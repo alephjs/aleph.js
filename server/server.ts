@@ -1,13 +1,16 @@
-import { join } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { createHash } from 'https://deno.land/std@0.94.0/hash/mod.ts'
+import { dirname, join } from 'https://deno.land/std@0.94.0/path/mod.ts'
 import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.94.0/ws/mod.ts'
 import { trimModuleExt } from '../framework/core/module.ts'
 import { rewriteURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
+import { VERSION } from '../version.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
+import { getAlephPkgUri, toRelativePath, toLocalPath } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */
@@ -90,36 +93,65 @@ export class Server {
           return
         }
 
-        if (pathname == '/_aleph/main.js') {
+        const relPath = util.trimPrefix(pathname, '/_aleph')
+
+        if (relPath == '/main.js') {
           req.send(app.getMainJS(false), 'application/javascript; charset=utf-8')
           return
         }
 
-        const filePath = join(app.buildDir, util.trimPrefix(pathname, '/_aleph/'))
+        if (relPath.endsWith('.js')) {
+          const module = app.findModule(({ jsFile }) => jsFile === relPath)
+          if (module) {
+            const content = await app.getModuleJSCode(module)
+            if (content) {
+              const etag = createHash('md5').update(VERSION).update(module.hash || module.sourceHash).toString()
+              if (etag === r.headers.get('If-None-Match')) {
+                req.status(304).send()
+                return
+              }
+
+              req.setHeader('ETag', etag)
+              if (app.isHMRable(module.url)) {
+                let code = new TextDecoder().decode(content)
+                app.getCodeInjects('hmr')?.forEach(transform => {
+                  code = transform(module.url, code)
+                })
+                const hmrModuleImportUrl = toRelativePath(
+                  dirname(toLocalPath(module.url)),
+                  toLocalPath(`${getAlephPkgUri()}/framework/core/hmr.js`)
+                )
+                const lines = [
+                  `import { createHotContext } from ${JSON.stringify(hmrModuleImportUrl)};`,
+                  `import.meta.hot = createHotContext(${JSON.stringify(module.url)});`,
+                  '',
+                  code,
+                  '',
+                  'import.meta.hot.accept();'
+                ]
+                req.send(lines.join('\n'), 'application/javascript; charset=utf-8')
+              } else {
+                req.send(content, 'application/javascript; charset=utf-8')
+              }
+              return
+            }
+          }
+        }
+
+        const filePath = join(app.buildDir, relPath)
         if (await existsFile(filePath)) {
           const info = Deno.lstatSync(filePath)
           const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
           if (lastModified === r.headers.get('If-Modified-Since')) {
-            req.status(304).send('')
+            req.status(304).send()
             return
           }
 
-          let content = await Deno.readTextFile(filePath)
-          if (app.isDev && filePath.endsWith('.js')) {
-            const metaFile = util.trimSuffix(filePath, '.js') + '.meta.json'
-            if (await existsFile(metaFile)) {
-              try {
-                const { url } = JSON.parse(await Deno.readTextFile(metaFile))
-                const mod = app.getModule(url)
-                if (mod && app.isHMRable(mod.url)) {
-                  content = app.injectHMRCode(mod, content)
-                }
-              } catch (e) { }
-            }
-          }
-
           req.setHeader('Last-Modified', lastModified)
-          req.send(content, getContentType(filePath))
+          req.send(
+            await Deno.readTextFile(filePath),
+            getContentType(filePath)
+          )
           return
         }
 
@@ -133,7 +165,7 @@ export class Server {
         const info = Deno.lstatSync(filePath)
         const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
         if (lastModified === r.headers.get('If-Modified-Since')) {
-          req.status(304).send('')
+          req.status(304).send()
           return
         }
 
@@ -151,8 +183,8 @@ export class Server {
         })
         if (route !== null) {
           try {
-            const [{ params, query }, { jsFile, hash }] = route
-            const { default: handle } = await import(`file://${jsFile}#${hash.slice(0, 6)}`)
+            const [{ params, query }, module] = route
+            const { default: handle } = await app.importModule(module)
             if (util.isFunction(handle)) {
               await handle(new Request(req, params, query))
             } else {

@@ -6,7 +6,7 @@ import {
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
-  getRelativePath,
+  toRelativePath,
   isLoaderPlugin,
   toLocalPath
 } from './helper.ts'
@@ -31,10 +31,10 @@ Deno.test('server/helper: getAlephPkgUri non-dev', () => {
   assert(getAlephPkgUri().endsWith(VERSION))
 })
 
-Deno.test('server/helper: getRelativePath', () => {
-  assertEquals(getRelativePath('/baz/foobar', '/baz/aleph'), '../aleph')
-  assertEquals(getRelativePath('baz/foobar', 'baz/aleph'), '../aleph')
-  assertEquals(getRelativePath('baz/foobar', 'baz/foobar/aleph'), './aleph')
+Deno.test('server/helper: toRelativePath', () => {
+  assertEquals(toRelativePath('/baz/foobar', '/baz/aleph'), '../aleph')
+  assertEquals(toRelativePath('baz/foobar', 'baz/aleph'), '../aleph')
+  assertEquals(toRelativePath('baz/foobar', 'baz/foobar/aleph'), './aleph')
 })
 
 Deno.test('server/helper: toLocalPath', () => {

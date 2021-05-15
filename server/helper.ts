@@ -1,21 +1,14 @@
 import { dim, red, yellow } from 'https://deno.land/std@0.94.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.94.0/hash/mod.ts'
 import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { minDenoVersion } from '../shared/constants.ts'
 import { existsDir } from '../shared/fs.ts'
+import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { SourceType } from '../compiler/mod.ts'
 import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
-
-export const moduleWalkOptions = {
-  includeDirs: false,
-  skip: [
-    /(^|\/|\\)\./,
-    /\.d\.ts$/i,
-    /(\.|_)(test|spec|e2e)\.[a-z]+$/i
-  ]
-}
 
 // inject browser navigator polyfill
 Object.assign((globalThis as any).navigator, {
@@ -35,16 +28,43 @@ Object.assign((globalThis as any).navigator, {
   vendor: 'Deno Land'
 })
 
-let __denoDir: string | null = null
-let __localProxy = false
+let _denoDir: string | null = null
+let _localProxy = false
 
-/** check whether should proxy https://deno.land/x/aleph on localhost. */
+export const moduleWalkOptions = {
+  includeDirs: false,
+  skip: [
+    /(^|\/|\\)\./,
+    /\.d\.ts$/i,
+    /(\.|_)(test|spec|e2e)\.[a-z]+$/i
+  ]
+}
+
+export function checkDenoVersion() {
+  const [currentMajor, currentMinor, currentPatch] = Deno.version.deno.split('.').map(p => parseInt(p))
+  const [major, minor, patch] = minDenoVersion.split('.').map(p => parseInt(p))
+
+  if (currentMajor > major) return
+  if (currentMajor === major && currentMinor > minor) return
+  if (currentMajor === major && currentMinor === minor && currentPatch >= patch) return
+
+  log.error(`Aleph.js needs Deno ${minDenoVersion}+, please upgrade Deno.`)
+  Deno.exit(1)
+}
+
 export function checkAlephDev() {
   const v = Deno.env.get('ALEPH_DEV')
-  if (v !== undefined && !__localProxy) {
+  if (v !== undefined && !_localProxy) {
     localProxy(Deno.cwd(), 2020)
-    __localProxy = true
+    _localProxy = true
   }
+}
+
+const reLocalUrl = /^https?:\/\/(localhost|0\.0\.0\.0|127\.0\.0\.1)(\:|\/|$)/
+
+/** check whether it is a localhost url. */
+export function isLocalUrl(url: string): boolean {
+  return reLocalUrl.test(url)
 }
 
 /** check the plugin whether it is a loader. */
@@ -54,8 +74,8 @@ export function isLoaderPlugin(plugin: LoaderPlugin | ServerPlugin): plugin is L
 
 /** get the deno cache dir. */
 export async function getDenoDir() {
-  if (__denoDir !== null) {
-    return __denoDir
+  if (_denoDir !== null) {
+    return _denoDir
   }
 
   const p = Deno.run({
@@ -69,7 +89,7 @@ export async function getDenoDir() {
   if (denoDir === undefined || !await existsDir(denoDir)) {
     throw new Error(`can't find the deno dir`)
   }
-  __denoDir = denoDir
+  _denoDir = denoDir
   return denoDir
 }
 
@@ -83,7 +103,7 @@ export function getAlephPkgUri() {
 }
 
 /** get the relative path from `from` to `to`. */
-export function getRelativePath(from: string, to: string): string {
+export function toRelativePath(from: string, to: string): string {
   const r = relative(from, to).split('\\').join('/')
   if (!r.startsWith('.') && !r.startsWith('/')) {
     return './' + r
@@ -92,19 +112,24 @@ export function getRelativePath(from: string, to: string): string {
 }
 
 /** get source type by given url and content type. */
-export function getSourceType(url: string, contentType: string): SourceType {
-  switch (contentType.split(';')[0].trim()) {
-    case 'application/javascript':
-    case 'text/javascript':
-      return SourceType.JS
-    case 'text/jsx':
-      return SourceType.JSX
-    case 'text/typescript':
-      return SourceType.TS
-    case 'text/tsx':
-      return SourceType.TSX
-    case 'text/css':
-      return SourceType.CSS
+export function getSourceType(url: string, contentType?: string): SourceType {
+  if (util.isNEString(contentType)) {
+    switch (contentType.split(';')[0].trim()) {
+      case 'application/javascript':
+      case 'text/javascript':
+        return SourceType.JS
+      case 'text/jsx':
+        return SourceType.JSX
+      case 'text/typescript':
+        if (url.endsWith('.tsx')) {
+          return SourceType.TSX
+        }
+        return SourceType.TS
+      case 'text/tsx':
+        return SourceType.TSX
+      case 'text/css':
+        return SourceType.CSS
+    }
   }
   switch (extname(url)) {
     case '.mjs':

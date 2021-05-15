@@ -5,8 +5,10 @@ import { existsDir, existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import cssLoader from '../plugins/css.ts'
-import type { Config, ImportMap, PostCSSPlugin } from '../types.ts'
+import type { Config, ImportMap, PostCSSPlugin, LoaderPlugin } from '../types.ts'
 import { getAlephPkgUri } from './helper.ts'
+
+const builtinCSSLoader = cssLoader()
 
 export type RequiredConfig = Required<Config> & {
   react: ReactResolve
@@ -135,9 +137,9 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
   }
   if (util.isNEArray(plugins)) {
-    config.plugins = [cssLoader(), ...plugins.filter(v => v && util.isNEString(v.type))]
+    config.plugins = [builtinCSSLoader, ...plugins.filter(v => v && util.isNEString(v.type))]
   } else {
-    config.plugins = [cssLoader()]
+    config.plugins = [builtinCSSLoader]
   }
   if (util.isPlainObject(css)) {
     const { extractSize, remoteExternal, modules, postcss } = css
@@ -213,6 +215,11 @@ export function fixConfigAndImportMap(config: RequiredConfig, importMap: ImportM
       config.react.version = url.split('@').pop()!
     }
   })
+}
+
+/** checks whether the loader is builtin css loader */
+export function isBuiltinCSSLoader(loader: LoaderPlugin): boolean {
+  return loader === builtinCSSLoader
 }
 
 function isFramework(v: any): v is 'react' {

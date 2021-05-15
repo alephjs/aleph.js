@@ -110,13 +110,13 @@ export class Renderer {
     const isDev = this.#app.isDev
     const state = { entryFile: '' }
     const appModule = this.findModuleByName('app')
-    const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 8)}`) : {} as any
+    const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
     const nestedPageComponents = await Promise.all(nestedModules
       .filter(({ url }) => this.#app.getModule(url) !== null)
       .map(async ({ url }) => {
-        const { jsFile, hash } = this.#app.getModule(url)!
-        const { default: Component } = await import(`file://${jsFile}#${hash.slice(0, 8)}`)
-        state.entryFile = dirname(url) + '/' + basename(jsFile)
+        const module = this.#app.getModule(url)!
+        const { default: Component } = await this.#app.importModule(module)
+        state.entryFile = dirname(url) + '/' + basename(module.jsFile)
         return {
           url,
           Component
@@ -171,8 +171,8 @@ export class Renderer {
   async render404Page(url: RouterURL): Promise<string> {
     const appModule = this.findModuleByName('app')
     const e404Module = this.findModuleByName('404')
-    const { default: App } = appModule ? await import(`file://${appModule.jsFile}#${appModule.hash.slice(0, 8)}`) : {} as any
-    const { default: E404 } = e404Module ? await import(`file://${e404Module.jsFile}#${e404Module.hash.slice(0, 8)}`) : {} as any
+    const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
+    const { default: E404 } = e404Module ? await this.#app.importModule(e404Module) : {} as any
     const styles = await this.lookupStyleModules(...[
       appModule ? appModule.url : [],
       e404Module ? e404Module.url : []
@@ -211,7 +211,7 @@ export class Renderer {
     const loadingModule = this.findModuleByName('loading')
 
     if (loadingModule) {
-      const { default: Loading } = await import(`file://${loadingModule.jsFile}#${loadingModule.hash.slice(0, 8)}`)
+      const { default: Loading } = await this.#app.importModule(loadingModule)
       const styles = await this.lookupStyleModules(loadingModule.url)
       const {
         head,
@@ -250,9 +250,18 @@ export class Renderer {
   }
 
   private async lookupStyleModules(...urls: string[]): Promise<Record<string, { css?: string, href?: string }>> {
-    return (await Promise.all(this.#app.lookupStyleModules(...urls).map(async ({ url, jsFile, hash }) => {
-      const { css, href } = await import(`file://${jsFile}#${hash.slice(0, 8)}`)
-      return { url, css, href }
+    const mods: Module[] = []
+    urls.forEach(url => {
+      this.#app.lookupDeps(url, ({ url }) => {
+        const mod = this.#app.getModule(url)
+        if (mod && mod.isStyle) {
+          mods.push({ ...mod, deps: [...mod.deps] })
+        }
+      })
+    })
+    return (await Promise.all(mods.map(async module => {
+      const { css, href } = await this.#app.importModule(module)
+      return { url: module.url, css, href }
     }))).reduce((styles, { url, css, href }) => {
       styles[url] = { css, href }
       return styles

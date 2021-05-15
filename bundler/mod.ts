@@ -132,7 +132,7 @@ export class Bundler {
       return this.#compiled.get(mod.url)!
     }
 
-    const jsFile = util.trimSuffix(mod.jsFile, '.js') + '.client.js'
+    const jsFile = join(this.#app.buildDir, mod.jsFile.slice(0, -3) + '.client.js')
     this.#compiled.set(mod.url, jsFile)
 
     if (await existsFile(jsFile)) {
@@ -163,8 +163,8 @@ export class Bundler {
         for (let index = 0; index < starExports.length; index++) {
           const url = starExports[index]
           const names = await this.#app.parseModuleExportNames(url)
-          code = code.replace(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
-          code = code.replace(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
+          code = code.replaceAll(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+          code = code.replaceAll(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
         }
       }
 
@@ -219,11 +219,12 @@ export class Bundler {
   /** create bundle chunk. */
   private async bundleChunk(name: string, entry: string[], external: string[]) {
     const entryCode = (await Promise.all(entry.map(async (url, i) => {
+      const { buildDir } = this.#app
       let mod = this.#app.getModule(url)
       if (mod && mod.jsFile !== '') {
         if (external.length === 0) {
           return [
-            `import * as mod_${i} from ${JSON.stringify('file://' + mod.jsFile)}`,
+            `import * as mod_${i} from ${JSON.stringify('file://' + join(buildDir, mod.jsFile))}`,
             `__ALEPH.pack[${JSON.stringify(url)}] = mod_${i}`
           ]
         } else {

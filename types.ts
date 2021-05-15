@@ -169,7 +169,7 @@ export interface ServerApplication {
   readonly buildDir: string
   readonly config: Required<Config>
   readonly importMap: ImportMap
-  addModule(url: string, options?: { sourceCode?: string }): Promise<void>
+  addModule(url: string, sourceCode?: string): Promise<void>
   addDist(path: string, content: Uint8Array): Promise<void>
   fetch(url: string): Promise<{ content: Uint8Array, contentType: string | null }>
   injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: (url: string, code: string) => string): void
