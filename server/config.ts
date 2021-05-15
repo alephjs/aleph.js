@@ -181,7 +181,6 @@ export async function loadImportMap(workingDir: string): Promise<ImportMap> {
     }
   }
 
-  const v = Deno.env.get('ALEPH_DEV')
   const alephPkgUri = getAlephPkgUri()
   const defaultImports: Record<string, string> = {
     'aleph/': `${alephPkgUri}/`,
@@ -191,7 +190,7 @@ export async function loadImportMap(workingDir: string): Promise<ImportMap> {
     'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`
   }
   // in aleph dev mode, use default imports instead of app settings
-  if (v !== undefined) {
+  if (Deno.env.get('ALEPH_DEV') !== undefined) {
     Object.assign(importMap.imports, defaultImports)
   } else {
     importMap.imports = Object.assign(defaultImports, importMap.imports,)
