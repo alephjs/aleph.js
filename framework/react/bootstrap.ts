@@ -14,15 +14,15 @@ type BootstrapOptions = Required<RoutingOptions> & {
 export default async function bootstrap(options: BootstrapOptions) {
   const { basePath, defaultLocale, locales, routes, rewrites, sharedModules, renderMode } = options
   const { document } = window as any
-  const customComponents: Record<string, { C: ComponentType, useDeno?: boolean }> = {}
-  await Promise.all(sharedModules.map(async ({ url, useDeno }) => {
+  const customComponents: Record<string, { C: ComponentType, withData?: boolean }> = {}
+  await Promise.all(sharedModules.map(async ({ url, withData }) => {
     const { default: C } = await importModule(basePath, url)
     switch (trimModuleExt(url)) {
       case '/404':
-        customComponents['E404'] = { C, useDeno }
+        customComponents['E404'] = { C, withData }
         break
       case '/app':
-        customComponents['App'] = { C, useDeno }
+        customComponents['App'] = { C, withData }
         break
     }
   }))
@@ -35,7 +35,7 @@ export default async function bootstrap(options: BootstrapOptions) {
       Component
     }
   })
-  if (!!customComponents.App?.useDeno || nestedModules.findIndex(mod => !!mod.useDeno) > -1) {
+  if (!!customComponents.App?.withData || nestedModules.findIndex(mod => !!mod.withData) > -1) {
     await loadPageDataFromTag(url)
   }
   const pageRoute: PageRoute = { ...createPageProps(await Promise.all(imports)), url }

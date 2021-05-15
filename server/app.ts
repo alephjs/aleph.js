@@ -316,30 +316,27 @@ export class Application implements ServerApplication {
                 }
                 if (hmrable) {
                   let routePath: string | undefined = undefined
-                  let useDeno: boolean | undefined = undefined
+                  let withData: boolean | undefined = undefined
                   let isIndex: boolean | undefined = undefined
                   if (module.url.startsWith('/pages/')) {
                     const [path, _, options] = this.createRouteUpdate(module.url)
                     routePath = path
-                    useDeno = options.useDeno
+                    withData = options.withData
                     isIndex = options.isIndex
                   } else {
                     if (['/app', '/404'].includes(trimModuleExt(module.url))) {
-                      this.lookupDeps(module.url, dep => {
-                        if (this.getModule(dep.url)?.useDenoHook) {
-                          useDeno = true
-                          return false
-                        }
-                      })
+                      if (this.hasSSRData(module.url)) {
+                        withData = true
+                      }
                     }
                   }
                   if (type === 'add') {
                     this.#fsWatchListeners.forEach(e => {
-                      e.emit('add', { url: module.url, routePath, isIndex, useDeno })
+                      e.emit('add', { url: module.url, routePath, isIndex, withData })
                     })
                   } else {
                     this.#fsWatchListeners.forEach(e => {
-                      e.emit('modify-' + module.url, { useDeno })
+                      e.emit('modify-' + module.url, { withData })
                     })
                   }
                 }
@@ -603,16 +600,13 @@ export class Application implements ServerApplication {
       sharedModules: Array.from(this.#modules.values()).filter(({ url }) => {
         return ['/app', '/404'].includes(trimModuleExt(url))
       }).map(({ url }) => {
-        let useDeno: boolean | undefined = undefined
+        let withData: boolean | undefined = undefined
         if (this.config.ssr !== false) {
-          this.lookupDeps(url, dep => {
-            if (this.getModule(dep.url)?.useDenoHook) {
-              useDeno = true
-              return false
-            }
-          })
+          if (this.hasSSRData(url)) {
+            withData = true
+          }
         }
-        return { url, useDeno }
+        return { url, withData }
       }),
       renderMode: this.config.ssr ? 'ssr' : 'spa'
     }
@@ -786,19 +780,16 @@ export class Application implements ServerApplication {
     log.info(`Done in ${Math.round(performance.now() - start)}ms`)
   }
 
-  private createRouteUpdate(url: string): [string, string, { isIndex?: boolean, useDeno?: boolean }] {
+  private createRouteUpdate(url: string): [string, string, { isIndex?: boolean, withData?: boolean }] {
     const isBuiltinModule = moduleExts.some(ext => url.endsWith('.' + ext))
     let routePath = isBuiltinModule ? toPagePath(url) : util.trimSuffix(url, '/pages')
-    let useDeno: boolean | undefined = undefined
+    let withData: boolean | undefined = undefined
     let isIndex: boolean | undefined = undefined
 
-    if (this.config.ssr !== false) {
-      this.lookupDeps(url, dep => {
-        if (this.getModule(dep.url)?.useDenoHook) {
-          useDeno = true
-          return false
-        }
-      })
+    if (this.config.ssr !== false && !url.startsWith('/api/')) {
+      if (this.hasSSRData(url)) {
+        withData = true
+      }
     }
 
     if (!isBuiltinModule) {
@@ -823,7 +814,7 @@ export class Application implements ServerApplication {
       }
     }
 
-    return [routePath, url, { isIndex, useDeno }]
+    return [routePath, url, { isIndex, withData }]
   }
 
   /** fetch resource by the url. */
@@ -1401,6 +1392,21 @@ export class Application implements ServerApplication {
       return true
     }
     return ssr
+  }
+
+  private hasSSRData(url: string) {
+    let hasData = false
+    if (this.getModule(url)?.useDenoHook) {
+      hasData = true
+    } else {
+      this.lookupDeps(url, dep => {
+        if (this.getModule(dep.url)?.useDenoHook) {
+          hasData = true
+          return false
+        }
+      })
+    }
+    return hasData
   }
 
   /** lookup app deps recurively. */

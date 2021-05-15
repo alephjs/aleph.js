@@ -20,11 +20,11 @@ export default function Router({
   pageRoute,
   routing,
 }: {
-  customComponents: Record<'E404' | 'App', { C: ComponentType, useDeno?: boolean }>
+  customComponents: Record<'E404' | 'App', { C: ComponentType, withData?: boolean }>
   pageRoute: PageRoute,
   routing: Routing
 }) {
-  const appUseDeno = !!customComponents.App?.useDeno
+  const appWithData = !!customComponents.App?.withData
   const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
     const { E404 } = customComponents
     if (E404) {
@@ -57,7 +57,7 @@ export default function Router({
           Component
         }
       })
-      if (appUseDeno || nestedModules.findIndex(mod => !!mod.useDeno) > -1) {
+      if (appWithData || nestedModules.findIndex(mod => !!mod.withData) > -1) {
         await loadPageData(url)
       }
       setRoute({ ...createPageProps(await Promise.all(imports)), url })
@@ -135,7 +135,7 @@ export default function Router({
         nestedModules.map(mod => {
           importModule(basePath, mod.url)
         })
-        if (appUseDeno || nestedModules.findIndex(mod => !!mod.useDeno) > -1) {
+        if (appWithData || nestedModules.findIndex(mod => !!mod.withData) > -1) {
           loadPageData(url)
         }
       }
