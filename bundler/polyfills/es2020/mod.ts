@@ -1,9 +1,30 @@
 import '../es2021/mod.ts'
 
-import matchallShim from 'https://esm.sh/string.prototype.matchall/shim'
-import globalthisShim from 'https://esm.sh/globalthis/shim'
-import allsettledShim from 'https://esm.sh/promise.allsettled/shim'
+// todo: add string.prototype.matchall shim
 
-matchallShim()
-globalthisShim()
-allsettledShim()
+// globalThis
+// Copied from https://mathiasbynens.be/notes/globalthis
+if (typeof globalThis !== 'object') {
+  Object.defineProperty(Object.prototype, '__magic__', {
+    get: function () {
+      return this
+    },
+    configurable: true // This makes it possible to `delete` the getter later.
+  })
+  __magic__.globalThis = __magic__ // lolwat
+  delete Object.prototype.__magic__
+}
+
+// Promise.allSettled
+if (!Promise.allSettled) {
+  Promise.allSettled = (promises) => Promise.all(promises.map(p => p
+    .then(value => ({
+      status: 'fulfilled',
+      value,
+    }))
+    .catch(reason => ({
+      status: 'rejected',
+      reason,
+    }))
+  ))
+}
