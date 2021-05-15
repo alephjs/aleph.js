@@ -1,4 +1,4 @@
-import { join } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import type { ReactResolve } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDir, existsFile } from '../shared/fs.ts'

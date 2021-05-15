@@ -1,6 +1,6 @@
 {
   "imports": {
-    "std/": "https://deno.land/std@0.94.0/",
+    "std/": "https://deno.land/std@0.96.0/",
     "aleph/": "https://deno.land/x/aleph@v0.3.0-alpha.32/",
     "framework": "https://deno.land/x/aleph@v0.3.0-alpha.32/framework/core/mod.ts",
     "framework/react": "https://deno.land/x/aleph@v0.3.0-alpha.32/framework/react/mod.ts",

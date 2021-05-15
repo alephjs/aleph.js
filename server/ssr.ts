@@ -1,4 +1,4 @@
-import { basename, dirname } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { basename, dirname } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { moduleExts } from '../framework/core/module.ts'
 import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'

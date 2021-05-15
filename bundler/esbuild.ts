@@ -1,4 +1,4 @@
-import { join } from 'https://deno.land/std@0.94.0/path/mod.ts'
+import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { cache } from '../server/cache.ts'
 import util from '../shared/util.ts'
 // @deno-types="https://deno.land/x/esbuild@v0.11.22/mod.d.ts"
