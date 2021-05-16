@@ -1,11 +1,11 @@
-import { basename, extname, join } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { extname } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { esbuild } from '../bundler/esbuild.ts'
 import { toLocalPath, computeHash } from '../server/helper.ts'
 import util from '../shared/util.ts'
 import { Measure } from '../shared/log.ts'
 import type { LoaderPlugin, PostCSSPlugin } from '../types.ts'
 
-const postcssVersion = '8.2.12'
+const postcssVersion = '8.2.15'
 const productionOnlyPostcssPlugins = ['autoprefixer']
 
 export default (): LoaderPlugin => {
@@ -83,7 +83,7 @@ export default (): LoaderPlugin => {
           stdin: {
             loader: 'css',
             sourcefile: url,
-            contents: css // 3.6mb, tailwind.css
+            contents: css
           },
           bundle: false,
           minify: true,
