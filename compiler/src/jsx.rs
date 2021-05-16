@@ -1,4 +1,4 @@
-use crate::resolve::{is_remote_url, DependencyDescriptor, InlineStyle, Resolver};
+use crate::resolve::{is_remote_url, InlineStyle, Resolver};
 use crate::resolve_fold::create_aleph_pack_var_decl_member;
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, rc::Rc};
@@ -212,11 +212,6 @@ impl AlephJsxFold {
             }
 
             let mut resolver = self.resolver.borrow_mut();
-            resolver.dep_graph.push(DependencyDescriptor {
-              specifier: "#".to_owned() + id.as_str(),
-              import_index: "".into(),
-              is_dynamic: false,
-            });
             resolver.builtin_jsx_tags.insert("InlineStyle".into());
             el.name = JSXElementName::Ident(quote_ident!("__ALEPH_InlineStyle"));
             inline_style = Some((type_prop_value, id.into()));
