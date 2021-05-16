@@ -1,7 +1,5 @@
-import { encode } from 'https://deno.land/std@0.96.0/encoding/base64.ts'
 import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
 import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
-import { compress } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 
 async function run(cmd: string[]) {
   const p = Deno.run({
@@ -15,29 +13,23 @@ async function run(cmd: string[]) {
 }
 
 if (import.meta.main) {
-  if (await run(['wasm-pack', 'build', '--target', 'web'])) {
+  const packed = await run(['wasm-pack', 'build', '--target', 'web'])
+  if (packed) {
     const wasmData = await Deno.readFile('./pkg/aleph_compiler_bg.wasm')
-    const wasmPackJS = await Deno.readTextFile('./pkg/aleph_compiler.js')
-    const data = compress(wasmData)
-    const dataBase64 = encode(data)
-    const hash = createHash('sha1').update(data).toString()
+    const jsCode = await Deno.readTextFile('./pkg/aleph_compiler.js')
+    const hash = createHash('sha1').update(wasmData).toString()
     await ensureDir('./dist')
-    await Deno.writeTextFile(
-      './dist/wasm.js',
-      [
-        `import { decode } from "https://deno.land/std@0.96.0/encoding/base64.ts";`,
-        `import { decompress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";`,
-        `const dataRaw = "${dataBase64}";`,
-        `export default () => decompress(decode(dataRaw));`
-      ].join('\n')
+    await Deno.writeFile(
+      './dist/compiler.wasm',
+      wasmData
     )
     await Deno.writeTextFile(
-      './dist/wasm-checksum.js',
+      './dist/checksum.js',
       `export const checksum = ${JSON.stringify(hash)};`
     )
     await Deno.writeTextFile(
-      './dist/wasm-pack.js',
-      `import { red } from 'https://deno.land/std@0.96.0/fmt/colors.ts';` + wasmPackJS.replace('console.error(getStringFromWasm0(arg0, arg1));', `
+      './dist/compiler.js',
+      `import { red } from 'https://deno.land/std@0.96.0/fmt/colors.ts';` + jsCode.replace('console.error(getStringFromWasm0(arg0, arg1));', `
         const msg = getStringFromWasm0(arg0, arg1);
         if (msg.includes('DiagnosticBuffer(["')) {
           const diagnostic = msg.split('DiagnosticBuffer(["')[1].split('"])')[0]
@@ -47,6 +39,6 @@ if (import.meta.main) {
         }
       `)
     )
-    await run(['deno', 'fmt', '-q', './dist/wasm-pack.js'])
+    await run(['deno', 'fmt', '-q', './dist/compiler.js'])
   }
 }

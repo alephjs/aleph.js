@@ -1,11 +1,9 @@
 import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
-import { existsFile } from '../shared/fs.ts'
 import { Measure } from '../shared/log.ts'
 import type { ImportMap } from '../types.ts'
-import { VERSION } from '../version.ts'
-import { checksum } from './dist/wasm-checksum.js'
-import init, { parseExportNamesSync, transformSync } from './dist/wasm-pack.js'
+import { cache } from '../server/cache.ts'
+import { checksum } from './dist/checksum.js'
+import init, { parseExportNamesSync, transformSync } from './dist/compiler.js'
 
 export enum SourceType {
   JS = 'js',
@@ -73,17 +71,15 @@ async function getDenoDir() {
 }
 
 export async function initWasm() {
-  const cacheDir = join(await getDenoDir(), `deps/https/deno.land/aleph@v${VERSION}`)
-  const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
-  if (await existsFile(cachePath)) {
-    const wasmData = await Deno.readFile(cachePath)
+  const { url } = import.meta
+  if (url.startsWith('file://')) {
+    const wasmPath = join(url.slice(7, -7), 'dist', 'compiler.wasm')
+    const wasmData = await Deno.readFile(wasmPath)
     await init(wasmData)
   } else {
-    const { default: getWasmData } = await import('./dist/wasm.js')
-    const wasmData = getWasmData()
-    await init(wasmData)
-    await ensureDir(cacheDir)
-    await Deno.writeFile(cachePath, wasmData)
+    const wasmUrl = url.slice(0, -7) + '/dist/compiler.wasm'
+    const { content } = await cache(wasmUrl)
+    await init(content)
   }
 }
 
