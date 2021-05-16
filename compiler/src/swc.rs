@@ -1,5 +1,4 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
-use crate::fast_refresh::react_refresh_fold;
 use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve::Resolver;
@@ -53,14 +52,7 @@ pub struct SWC {
 }
 
 impl SWC {
-  /// parse the source of the module.
-  ///
-  /// ### Arguments
-  ///
-  /// - `specifier` - The module specifier for the module.
-  /// - `source` - The source code for the module.
-  /// - `target` - The target for the module.
-  ///
+  /// parse source code.
   pub fn parse(
     specifier: &str,
     source: &str,
@@ -116,7 +108,7 @@ impl SWC {
   /// ### Arguments
   ///
   /// - `resolver` - a resolver to resolve import/export url.
-  /// - `options` - the options for emit code.
+  /// - `options`  - the options for emit code.
   ///
   pub fn transform(
     self,
@@ -142,11 +134,15 @@ impl SWC {
         Optional::new(aleph_jsx_fold, is_jsx),
         Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
         Optional::new(
-          react_refresh_fold(
-            "$RefreshReg$",
-            "$RefreshSig$",
-            false,
-            self.source_map.clone()
+          react::refresh(
+            true,
+            Some(react::RefreshOptions {
+              refresh_reg: "$RefreshReg$".into(),
+              refresh_sig: "$RefreshSig$".into(),
+              emit_full_signatures: false,
+            }),
+            self.source_map.clone(),
+            Some(&self.comments),
           ),
           options.is_dev && !specifier_is_remote
         ),
@@ -178,6 +174,7 @@ impl SWC {
     })
   }
 
+  /// parse export names of the module.
   pub fn parse_export_names(&self) -> Result<Vec<String>, anyhow::Error> {
     let program = Program::Module(self.module.clone());
     let mut parser = ExportsParser { names: vec![] };
@@ -185,15 +182,16 @@ impl SWC {
     Ok(parser.names)
   }
 
-  /// Apply transform with fold.
+  /// Apply transform with the fold.
   pub fn apply_transform<T: Fold>(
     &self,
-    mut tr: T,
+    mut fold: T,
     source_map: bool,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     let program = Program::Module(self.module.clone());
-    let program =
-      helpers::HELPERS.set(&helpers::Helpers::new(false), || program.fold_with(&mut tr));
+    let program = helpers::HELPERS.set(&helpers::Helpers::new(false), || {
+      program.fold_with(&mut fold)
+    });
     let mut buf = Vec::new();
     let mut src_map_buf = Vec::new();
     let src_map = if source_map {

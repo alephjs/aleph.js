@@ -2,7 +2,6 @@
 extern crate lazy_static;
 
 mod error;
-mod fast_refresh;
 mod import_map;
 mod jsx;
 mod resolve;
