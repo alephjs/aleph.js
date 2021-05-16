@@ -4,7 +4,7 @@ import { defaultReactVersion } from './shared/constants.ts'
 export const VERSION = '0.3.0-alpha.33'
 
 /** `prepublish` will be invoked before publish */
-export async function prepublish(version: string) {
+export async function prepublish(version: string): Promise<boolean> {
   const p = Deno.run({
     cmd: ['deno', 'run', '-A', 'build.ts'],
     cwd: './compiler',
@@ -18,6 +18,7 @@ export async function prepublish(version: string) {
     const importMap = JSON.parse(data)
     Object.assign(importMap.imports, {
       'aleph/': `https://deno.land/x/aleph@v${version}/`,
+      'aleph/types': `https://deno.land/x/aleph@v${version}/types.ts`,
       'framework': `https://deno.land/x/aleph@v${version}/framework/core/mod.ts`,
       'framework/react': `https://deno.land/x/aleph@v${version}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
