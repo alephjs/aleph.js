@@ -1,4 +1,5 @@
 import { delay } from 'std/async/delay.ts'
+import { exists } from 'std/fs/exists.ts'
 import { join } from 'std/path/mod.ts'
 import { assert, assertEquals } from 'std/testing/asserts.ts'
 import { stopEsbuild } from '../bundler/esbuild.ts'
@@ -57,7 +58,6 @@ Deno.test({
   sanitizeResources: false,
 })
 
-
 Deno.test('plugin: css loader with extract size option', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
@@ -69,14 +69,15 @@ Deno.test('plugin: css loader with extract size option', async () => {
   )
   const loader = cssLoader()
   const { code } = await loader.load!({ url: '/style/index.css', }, app)
+  const distPath = `/style/index.${computeHash('h1 { font-size: 18px; }').slice(0, 8)}.css`
   assertEquals(code, [
     'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-    `export const href = "/_aleph/style/index.${computeHash('h1 { font-size: 18px; }').slice(0, 8)}.css"`,
+    `export const href = "/_aleph${distPath}"`,
     'export default {}',
     'applyCSS("/style/index.css", { href })',
   ].join('\n'))
+  assert(await exists(join(app.buildDir, distPath)))
 })
-
 
 Deno.test('plugin: css loader for remote external', async () => {
   Deno.env.set('DENO_TESTING', 'true')
@@ -106,26 +107,30 @@ Deno.test('plugin: css loader for inline styles', async () => {
   assertEquals(type, 'css')
 })
 
-Deno.test('plugin: css loader enables modules feature', async () => {
-  Deno.env.set('DENO_TESTING', 'true')
-  const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const app = new Application(dir, 'development')
-  app.config.css.modules = {
-    scopeBehaviour: 'local',
-    generateScopedName: '[name]_[local]'
-  }
-  await ensureTextFile(
-    join(dir, '/style/index.css'),
-    '.name { font-size: 18px; }'
-  )
-  const loader = cssLoader()
-  const { code } = await loader.load!({ url: '/style/index.css', }, app)
-  assertEquals(code, [
-    'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-    'export const css = ".index_name { font-size: 18px; }"',
-    'export default {"name":"index_name"}',
-    'applyCSS("/style/index.css", { css })',
-  ].join('\n'))
+Deno.test({
+  name: 'plugin: css loader enables css modules feature',
+  fn: async () => {
+    Deno.env.set('DENO_TESTING', 'true')
+    const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
+    const app = new Application(dir, 'development')
+    app.config.css.modules = {
+      scopeBehaviour: 'local',
+      generateScopedName: '[name]_[local]'
+    }
+    await ensureTextFile(
+      join(dir, '/style/index.css'),
+      '.name { font-size: 18px; }'
+    )
+    const loader = cssLoader()
+    const { code } = await loader.load!({ url: '/style/index.css', }, app)
+    assertEquals(code, [
+      'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
+      'export const css = ".index_name { font-size: 18px; }"',
+      'export default {"name":"index_name"}',
+      'applyCSS("/style/index.css", { css })',
+    ].join('\n'))
+  },
+  sanitizeResources: false
 })
 
 Deno.test('plugin: css loader with postcss plugins', async () => {
