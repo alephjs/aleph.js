@@ -40,7 +40,7 @@ export default async function (version = 'latest', forceUpgrade = false) {
       'install',
       '-A',
       '--unstable',
-      '--location', 'http://0.0.0.0/',
+      '--location', 'http://localhost',
       '-n', 'aleph',
       '-f',
       `https://deno.land/x/aleph@${version}/cli.ts`
