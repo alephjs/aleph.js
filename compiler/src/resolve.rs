@@ -58,8 +58,6 @@ pub struct Resolver {
   pub dep_graph: Vec<DependencyDescriptor>,
   /// jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
-  /// use deno hooks
-  pub use_deno_hooks: Vec<String>,
   /// bundle mode
   pub bundle_mode: bool,
   /// bundled modules
@@ -96,7 +94,6 @@ impl Resolver {
       specifier_is_remote: is_remote_url(specifier),
       dep_graph: Vec::new(),
       inline_styles: HashMap::new(),
-      use_deno_hooks: Vec::new(),
       bundle_mode,
       bundle_external: set,
       star_exports: Vec::new(),

@@ -376,8 +376,6 @@ impl Fold for ResolveFold {
             expr: Box::new(Expr::Lit(Lit::Str(new_str(id.clone())))),
           });
         }
-        let mut resolver = self.resolver.borrow_mut();
-        resolver.use_deno_hooks.push(id.into());
       }
     }
 
