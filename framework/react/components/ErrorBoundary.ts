@@ -1,30 +1,45 @@
 import { Component, createElement, CSSProperties } from 'https://esm.sh/react@17.0.2'
 
-export class ErrorBoundary extends Component<{}, { error: Error | null }> {
-  constructor(props: any) {
+export class ErrorBoundary extends Component<{}, { error: any }> {
+  constructor(props: {}) {
     super(props)
     this.state = { error: null }
+    Object.assign(window, { recover: () => this.setState({ error: null }) })
   }
 
-  static getDerivedStateFromError(e: any) {
-    return { error: e }
+  static getDerivedStateFromError(error: any) {
+    return { error }
   }
 
-  componentDidCatch(e: any) {
-    console.error(e)
+  componentDidCatch(error: any, info: any) {
+    if (error instanceof Promise) {
+      error
+        .then(() => this.setState({ error: null }))
+        .catch(error => this.setState({ error }))
+    } else {
+      const event = new CustomEvent('componentDidCatch', { detail: { error, info } })
+      window.dispatchEvent(event)
+    }
   }
 
   render() {
     const { error } = this.state
 
-    if (error) {
-      return (
-        createElement(
-          'pre',
-          null,
-          error.stack || error.message || error.toString()
+    if (error !== null) {
+      if (error instanceof Promise) {
+        // todo: render fallback UI
+        return null
+      }
+
+      if (error instanceof Error) {
+        return (
+          createElement(
+            'pre',
+            null,
+            error.stack || error.message
+          )
         )
-      )
+      }
     }
 
     return this.props.children
@@ -46,7 +61,7 @@ export function E400MissingComponent({ name }: { name: string }) {
     StatusError,
     {
       status: 400,
-      message: `Module "${name}" should export a React Component as default`,
+      message: `Module '${name}' should export a React Component as default`,
       showRefreshButton: true
     }
   )

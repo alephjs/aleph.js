@@ -103,7 +103,6 @@ export function connect(basePath: string) {
           updateUrl,
           routePath,
           isIndex,
-          useDeno,
         } = JSON.parse(data)
         switch (type) {
           case 'add':
@@ -111,7 +110,6 @@ export function connect(basePath: string) {
               url,
               routePath,
               isIndex,
-              useDeno,
             })
             break
           case 'update':

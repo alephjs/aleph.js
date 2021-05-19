@@ -32,7 +32,6 @@ export type Module = {
   deps: DependencyDescriptor[]
   external: boolean
   isStyle: boolean
-  useDenoHook: boolean,
   hash?: string
   sourceHash: string
   sourceType?: SourceType
@@ -305,27 +304,19 @@ export class Application implements ServerApplication {
                 await this.transpileModule(module, true)
                 if (hmrable) {
                   let routePath: string | undefined = undefined
-                  let withData: boolean | undefined = undefined
                   let isIndex: boolean | undefined = undefined
                   if (module.url.startsWith('/pages/')) {
-                    const [path, _, options] = this.createRouteUpdate(module.url)
+                    const [path, _, index] = this.createRouteUpdate(module.url)
                     routePath = path
-                    withData = options.withData
-                    isIndex = options.isIndex
-                  } else {
-                    if (['/app', '/404'].includes(trimModuleExt(module.url))) {
-                      if (this.hasSSRData(module.url)) {
-                        withData = true
-                      }
-                    }
+                    isIndex = index
                   }
                   if (type === 'add') {
                     this.#fsWatchListeners.forEach(e => {
-                      e.emit('add', { url: module.url, routePath, isIndex, withData })
+                      e.emit('add', { url: module.url, routePath, isIndex })
                     })
                   } else {
                     this.#fsWatchListeners.forEach(e => {
-                      e.emit('modify-' + module.url, { withData })
+                      e.emit('modify-' + module.url)
                     })
                   }
                 }
@@ -424,7 +415,7 @@ export class Application implements ServerApplication {
     if (router !== null) {
       const [url, nestedModules] = router
       if (url.routePath !== '') {
-        const { url: moduleUrl } = nestedModules.pop()!
+        const moduleUrl = nestedModules.pop()!
         if (this.#modules.has(moduleUrl)) {
           return [url, this.#modules.get(moduleUrl)!]
         }
@@ -587,15 +578,10 @@ export class Application implements ServerApplication {
       rewrites: this.config.rewrites,
       sharedModules: Array.from(this.#modules.values()).filter(({ url }) => {
         return ['/app', '/404'].includes(trimModuleExt(url))
-      }).map(({ url }) => {
-        let withData: boolean | undefined = undefined
-        if (this.config.ssr !== false) {
-          if (this.hasSSRData(url)) {
-            withData = true
-          }
-        }
-        return { url, withData }
-      }),
+      }).reduce((records, { url }) => {
+        records[trimModuleExt(url).slice(1)] = url
+        return records
+      }, {} as Record<string, string>),
       renderMode: this.config.ssr ? 'ssr' : 'spa'
     }
 
@@ -730,7 +716,7 @@ export class Application implements ServerApplication {
     const outputDir = join(this.workingDir, this.config.outputDir)
     const distDir = join(outputDir, '_aleph')
 
-    // clear previous build
+    // clean previous build
     if (await existsDir(outputDir)) {
       for await (const entry of Deno.readDir(outputDir)) {
         await Deno.remove(join(outputDir, entry.name), { recursive: entry.isDirectory })
@@ -768,19 +754,12 @@ export class Application implements ServerApplication {
     log.info(`Done in ${Math.round(performance.now() - start)}ms`)
   }
 
-  private createRouteUpdate(url: string): [string, string, { isIndex?: boolean, withData?: boolean }] {
-    const isBuiltinModule = moduleExts.some(ext => url.endsWith('.' + ext))
-    let routePath = isBuiltinModule ? toPagePath(url) : util.trimSuffix(url, '/pages')
-    let withData: boolean | undefined = undefined
+  private createRouteUpdate(url: string): [string, string, boolean | undefined] {
+    const isBuiltinModuleType = moduleExts.some(ext => url.endsWith('.' + ext))
+    let routePath = isBuiltinModuleType ? toPagePath(url) : util.trimSuffix(url, '/pages')
     let isIndex: boolean | undefined = undefined
 
-    if (this.config.ssr !== false && !url.startsWith('/api/')) {
-      if (this.hasSSRData(url)) {
-        withData = true
-      }
-    }
-
-    if (!isBuiltinModule) {
+    if (!isBuiltinModuleType) {
       for (const loader of this.loaders) {
         if (loader.test.test(url) && loader.allowPage && loader.resolve) {
           const { pagePath, isIndex: _isIndex } = loader.resolve(url)
@@ -802,7 +781,7 @@ export class Application implements ServerApplication {
       }
     }
 
-    return [routePath, url, { isIndex, withData }]
+    return [routePath, url, isIndex]
   }
 
   /** fetch resource by the url. */
@@ -941,7 +920,6 @@ export class Application implements ServerApplication {
         deps: [],
         external,
         isStyle: false,
-        useDenoHook: false,
         sourceHash: '',
         jsFile: '',
         ready: Promise.resolve()
@@ -967,7 +945,6 @@ export class Application implements ServerApplication {
       deps: [],
       external: false,
       isStyle: false,
-      useDenoHook: false,
       sourceHash: '',
       jsFile,
       ready: new Promise((resolve, reject) => {
@@ -999,12 +976,11 @@ export class Application implements ServerApplication {
 
     if (await existsFile(metaFilepath)) {
       try {
-        const { url: _url, sourceHash, deps, isStyle, useDenoHook } = JSON.parse(await Deno.readTextFile(metaFilepath))
+        const { url: _url, sourceHash, deps, isStyle } = JSON.parse(await Deno.readTextFile(metaFilepath))
         if (_url === url && util.isNEString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
           mod.isStyle = Boolean(isStyle)
-          mod.useDenoHook = Boolean(useDenoHook)
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
           Deno.remove(metaFilepath)
@@ -1058,7 +1034,7 @@ export class Application implements ServerApplication {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, useDenoHooks, starExports, map } = await transform(url, sourceCode, {
+      const { code, deps, starExports, map } = await transform(url, sourceCode, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
@@ -1121,12 +1097,6 @@ export class Application implements ServerApplication {
         }
         return dep
       })
-      if (useDenoHooks && useDenoHooks.length > 0) {
-        module.useDenoHook = true
-        if (!this.config.ssr) {
-          log.error(`'useDeno' hook in SPA mode is illegal: ${url}`)
-        }
-      }
 
       ms.stop(`transpile '${url}'`)
 
@@ -1136,7 +1106,6 @@ export class Application implements ServerApplication {
         url,
         sourceHash: module.sourceHash,
         isStyle: module.isStyle ? true : undefined,
-        useDenoHook: module.useDenoHook ? true : undefined,
         deps: module.deps,
       }, undefined, 2)
       await ensureDir(dirname(cacheFilepath))
@@ -1258,7 +1227,6 @@ export class Application implements ServerApplication {
           url,
           sourceHash: module.sourceHash,
           isStyle: module.isStyle ? true : undefined,
-          useDenoHook: module.useDenoHook ? true : undefined,
           deps: module.deps,
         }, undefined, 2)),
         lazyRemove(cacheFilepath.slice(0, -3) + '.client.js'),
@@ -1287,7 +1255,7 @@ export class Application implements ServerApplication {
 
     // add page module entries
     this.#pageRouting.lookup(routes => {
-      routes.forEach(({ module: { url } }) => entryMods.set([url], false))
+      routes.forEach(({ module }) => entryMods.set([module], false))
     })
 
     // add dynamic imported module as entry
@@ -1393,21 +1361,6 @@ export class Application implements ServerApplication {
       return true
     }
     return ssr
-  }
-
-  private hasSSRData(url: string) {
-    let hasData = false
-    if (this.getModule(url)?.useDenoHook) {
-      hasData = true
-    } else {
-      this.lookupDeps(url, dep => {
-        if (this.getModule(dep.url)?.useDenoHook) {
-          hasData = true
-          return false
-        }
-      })
-    }
-    return hasData
   }
 
   /** lookup app deps recurively. */

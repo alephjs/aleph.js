@@ -24,7 +24,7 @@ export async function loadPageData(url: RouterURL) {
   }
 }
 
-export async function loadPageDataFromTag(url: RouterURL) {
+export function loadSSRDataFromTag(url: RouterURL) {
   const href = url.toString()
   const ssrDataEl = global.document.getElementById('ssr-data')
   if (ssrDataEl) {
@@ -36,7 +36,6 @@ export async function loadPageDataFromTag(url: RouterURL) {
       }
     } catch (e) { }
   }
-  await loadPageData(url)
 }
 
 function storeData(data: any, href: string) {

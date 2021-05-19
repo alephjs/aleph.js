@@ -184,6 +184,7 @@ export async function loadImportMap(workingDir: string): Promise<ImportMap> {
   const alephPkgUri = getAlephPkgUri()
   const defaultImports: Record<string, string> = {
     'aleph/': `${alephPkgUri}/`,
+    'aleph/types': `${alephPkgUri}/types.ts`,
     'framework': `${alephPkgUri}/framework/core/mod.ts`,
     'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
     'react': `https://esm.sh/react@${defaultReactVersion}`,

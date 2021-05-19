@@ -1,16 +1,16 @@
 import {
   ComponentType,
   createElement,
+  Suspense,
   useCallback,
   useEffect,
   useState,
 } from 'https://esm.sh/react@17.0.2'
 import events from '../../core/events.ts'
 import { importModule } from '../../core/module.ts'
-import { RouteModule, Routing } from '../../core/routing.ts'
+import { Routing } from '../../core/routing.ts'
 import { RouterContext } from '../context.ts'
 import { isLikelyReactComponent } from '../helper.ts'
-import { loadPageData } from '../pagedata.ts'
 import { createPageProps } from '../pageprops.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './ErrorBoundary.ts'
 import type { PageRoute } from './pageprops.ts'
@@ -20,16 +20,15 @@ export default function Router({
   pageRoute,
   routing,
 }: {
-  customComponents: Record<'E404' | 'App', { C: ComponentType, withData?: boolean }>
+  customComponents: Record<'E404' | 'App', ComponentType>
   pageRoute: PageRoute,
   routing: Routing
 }) {
-  const appWithData = !!customComponents.App?.withData
   const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
     const { E404 } = customComponents
     if (E404) {
-      if (isLikelyReactComponent(E404.C)) {
-        return { Component: E404.C }
+      if (isLikelyReactComponent(E404)) {
+        return { Component: E404 }
       }
       return { Component: E400MissingComponent, props: { name: 'Custom 404 Page' } }
     }
@@ -38,8 +37,8 @@ export default function Router({
   const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
     const { App } = customComponents
     if (App) {
-      if (isLikelyReactComponent(App.C)) {
-        return { Component: App.C }
+      if (isLikelyReactComponent(App)) {
+        return { Component: App }
       }
       return { Component: E400MissingComponent, props: { name: 'Custom App' } }
     }
@@ -50,16 +49,13 @@ export default function Router({
     const { basePath } = routing
     const [url, nestedModules] = routing.createRouter()
     if (url.routePath !== '') {
-      const imports = nestedModules.map(async mod => {
-        const { default: Component } = await importModule(basePath, mod.url, e.forceRefetch)
+      const imports = nestedModules.map(async url => {
+        const { default: Component } = await importModule(basePath, url, e.forceRefetch)
         return {
-          url: mod.url,
+          url: url,
           Component
         }
       })
-      if (appWithData || nestedModules.findIndex(mod => !!mod.withData) > -1) {
-        await loadPageData(url)
-      }
       setRoute({ ...createPageProps(await Promise.all(imports)), url })
       if (e.resetScroll) {
         (window as any).scrollTo(0, 0)
@@ -83,7 +79,7 @@ export default function Router({
   useEffect(() => {
     const isDev = !('__ALEPH' in window)
     const { basePath } = routing
-    const onAddModule = async (mod: RouteModule & { routePath?: string, isIndex?: boolean }) => {
+    const onAddModule = async (mod: { url: string, routePath?: string, isIndex?: boolean }) => {
       switch (mod.url) {
         case '/404.js': {
           const { default: Component } = await importModule(basePath, mod.url, true)
@@ -104,9 +100,9 @@ export default function Router({
           break
         }
         default: {
-          const { routePath, url, ...rest } = mod
+          const { routePath, url, isIndex } = mod
           if (routePath) {
-            routing.update(routePath, url, rest)
+            routing.update(routePath, url, isIndex)
             events.emit('popstate', { type: 'popstate', forceRefetch: true })
           }
           break
@@ -132,12 +128,9 @@ export default function Router({
     const onFetchPageModule = async ({ href }: { href: string }) => {
       const [url, nestedModules] = routing.createRouter({ pathname: href })
       if (url.routePath !== '') {
-        nestedModules.map(mod => {
-          importModule(basePath, mod.url)
+        nestedModules.map(modUrl => {
+          importModule(basePath, modUrl)
         })
-        if (appWithData || nestedModules.findIndex(mod => !!mod.withData) > -1) {
-          loadPageData(url)
-        }
       }
     }
 

@@ -1,6 +1,6 @@
 import { basename, dirname } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { moduleExts } from '../framework/core/module.ts'
-import { createBlankRouterURL, RouteModule } from '../framework/core/routing.ts'
+import { createBlankRouterURL } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
@@ -105,15 +105,15 @@ export class Renderer {
   }
 
   /** render page base the given location. */
-  async renderPage(url: RouterURL, nestedModules: RouteModule[]): Promise<[string, Record<string, SSRData> | null]> {
+  async renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
     const start = performance.now()
     const isDev = this.#app.isDev
     const state = { entryFile: '' }
     const appModule = this.findModuleByName('app')
     const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
     const nestedPageComponents = await Promise.all(nestedModules
-      .filter(({ url }) => this.#app.getModule(url) !== null)
-      .map(async ({ url }) => {
+      .filter(url => this.#app.getModule(url) !== null)
+      .map(async url => {
         const module = this.#app.getModule(url)!
         const { default: Component } = await this.#app.importModule(module)
         state.entryFile = dirname(url) + '/' + basename(module.jsFile)
@@ -125,7 +125,7 @@ export class Renderer {
     )
     const styles = await this.lookupStyleModules(...[
       appModule ? appModule.url : [],
-      nestedModules.map(({ url }) => url)
+      nestedModules
     ].flat())
 
     // ensure working directory

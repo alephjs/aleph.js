@@ -2,17 +2,12 @@ import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 import { redirect } from './redirect.ts'
 
-const ghostRoute: Route = { path: '', module: { url: '' } }
+const ghostRoute: Route = { path: '', module: '' }
 
 export type Route = {
   path: string
-  module: RouteModule
+  module: string
   children?: Route[]
-}
-
-export type RouteModule = {
-  readonly url: string
-  readonly withData?: boolean
 }
 
 export type RoutingOptions = {
@@ -67,11 +62,10 @@ export class Routing {
     })
   }
 
-  update(path: string, moduleUrl: string, options: { isIndex?: boolean, withData?: boolean } = {}) {
-    const { isIndex, ...rest } = options
+  update(path: string, moduleUrl: string, isIndex?: boolean) {
     const newRoute: Route = {
-      path: path === '/' ? path : util.trimSuffix(path, '/') + (options.isIndex ? '/' : ''),
-      module: { url: moduleUrl, ...rest }
+      path: path === '/' ? path : util.trimSuffix(path, '/') + (isIndex ? '/' : ''),
+      module: moduleUrl
     }
     const dirtyRoutes: Set<Route[]> = new Set()
     let exists = false
@@ -80,7 +74,7 @@ export class Routing {
       const path = routePath.map(r => r.path).join('')
       const route = routePath[routePath.length - 1]
       const parentRoute = routePath[routePath.length - 2]
-      if (route.module.url === newRoute.module.url) {
+      if (route.module === newRoute.module) {
         Object.assign(route.module, newRoute.module)
         exists = true
         return false
@@ -114,7 +108,7 @@ export class Routing {
   removeRoute(url: string) {
     this._lookup(path => {
       const route = path[path.length - 1]
-      if (route.module.url === url) {
+      if (route.module === url) {
         const parentRoute = path[path.length - 2]
         const routes = parentRoute ? parentRoute.children! : this._routes
         const index = routes.indexOf(route)
@@ -126,7 +120,7 @@ export class Routing {
     })
   }
 
-  createRouter(location?: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
+  createRouter(location?: { pathname: string, search?: string }): [RouterURL, string[]] {
     const loc = location || (window as any).location || { pathname: '/' }
     const url = rewriteURL(loc.pathname + (loc.search || ''), this._basePath, this._rewrites)
 
@@ -134,7 +128,7 @@ export class Routing {
     let pathname = decodeURI(url.pathname)
     let routePath = ''
     let params = {} as Record<string, string>
-    let nestedModules: RouteModule[] = []
+    let nestedModules: string[] = []
 
     if (pathname !== '/' && this._locales.length > 0) {
       const a = pathname.split('/')
