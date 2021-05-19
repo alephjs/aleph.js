@@ -28,7 +28,14 @@ export default function App({ Page, pageProps }: { Page: ComponentType<any>, pag
         `}</style>
       </head>
       <nav>
-        {Object.entries(links).map(([name, link]) => <a key={name} href={link} data-active-style={{ fontWeight: 'bold' }}>{name}</a>)}
+        {Object.entries(links).map(([name, link]) => (
+          <a
+            rel="nav"
+            href={link}
+            data-active-style={{ fontWeight: 'bold' }}
+            key={name}
+          >{name}</a>
+        ))}
       </nav>
       <Page {...pageProps} />
     </main>
