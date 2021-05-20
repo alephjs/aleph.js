@@ -85,6 +85,8 @@ pub struct TransformOutput {
   #[serde(skip_serializing_if = "HashMap::is_empty")]
   pub inline_styles: HashMap<String, InlineStyle>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub use_deno_hooks: Vec<String>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
   pub star_exports: Vec<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub map: Option<String>,
@@ -146,6 +148,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
       deps: r.dep_graph.clone(),
       inline_styles: r.inline_styles.clone(),
       star_exports: r.star_exports.clone(),
+      use_deno_hooks: r.use_deno_hooks.clone(),
       map,
     })
     .unwrap(),
