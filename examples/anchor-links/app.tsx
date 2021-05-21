@@ -3,9 +3,9 @@ import React, { ComponentType } from 'react'
 const links = {
   'Home': '/',
   'About': '/about',
-  'Query 0': '/query',
-  'Query 1': '/query?q=hello',
-  'Query 2': '/query?q=hello&limit=10&offset=20',
+  'Query #0': '/query',
+  'Query #1': '/query?q=hello',
+  'Query #2': '/query?q=hello&limit=10&offset=20',
   'Pink': '/colors/pink',
   'Orange': '/colors/orange',
   'Teal': '/colors/teal',
