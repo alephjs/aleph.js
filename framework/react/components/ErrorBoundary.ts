@@ -1,6 +1,6 @@
 import { Component, createElement, CSSProperties } from 'https://esm.sh/react@17.0.2'
 
-export class ErrorBoundary extends Component<{}, { error: any }> {
+export class ErrorBoundary extends Component<{}, { error: Error | null }> {
   constructor(props: {}) {
     super(props)
     this.state = { error: null }
@@ -12,31 +12,20 @@ export class ErrorBoundary extends Component<{}, { error: any }> {
   }
 
   componentDidCatch(error: any, info: any) {
-    if (error instanceof Promise) {
-      error
-        .then(() => this.setState({ error: null }))
-        .catch(error => this.setState({ error }))
-    } else {
-      const event = new CustomEvent('componentDidCatch', { detail: { error, info } })
-      window.dispatchEvent(event)
-    }
+    const event = new CustomEvent('componentDidCatch', { detail: { error, info } })
+    window.dispatchEvent(event)
   }
 
   render() {
     const { error } = this.state
 
     if (error !== null) {
-      if (error instanceof Promise) {
-        // todo: render fallback UI
-        return null
-      }
-
       if (error instanceof Error) {
         return (
           createElement(
             'pre',
             null,
-            error.stack || error.message
+            error.stack || error.message || error.toString()
           )
         )
       }

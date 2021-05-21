@@ -1,7 +1,6 @@
 import {
   ComponentType,
   createElement,
-  Suspense,
   useCallback,
   useEffect,
   useState,
@@ -11,21 +10,22 @@ import { importModule } from '../../core/module.ts'
 import { Routing } from '../../core/routing.ts'
 import { RouterContext } from '../context.ts'
 import { isLikelyReactComponent } from '../helper.ts'
+import { loadPageData } from '../pagedata.ts'
 import { createPageProps } from '../pageprops.ts'
+import type { PageRoute } from '../pageprops.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './ErrorBoundary.ts'
-import type { PageRoute } from './pageprops.ts'
 
 export default function Router({
-  customComponents,
+  globalComponents,
   pageRoute,
   routing,
 }: {
-  customComponents: Record<'E404' | 'App', ComponentType>
+  globalComponents: Record<string, ComponentType>
   pageRoute: PageRoute,
   routing: Routing
 }) {
   const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
-    const { E404 } = customComponents
+    const E404 = globalComponents['404']
     if (E404) {
       if (isLikelyReactComponent(E404)) {
         return { Component: E404 }
@@ -35,7 +35,7 @@ export default function Router({
     return { Component: E404Page }
   })
   const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
-    const { App } = customComponents
+    const App = globalComponents['app']
     if (App) {
       if (isLikelyReactComponent(App)) {
         return { Component: App }
@@ -56,7 +56,9 @@ export default function Router({
           Component
         }
       })
-      setRoute({ ...createPageProps(await Promise.all(imports)), url })
+      const pageProps = createPageProps(await Promise.all(imports))
+      await loadPageData(url)
+      setRoute({ ...pageProps, url })
       if (e.resetScroll) {
         (window as any).scrollTo(0, 0)
       }

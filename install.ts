@@ -22,7 +22,7 @@ export async function checkVersion(version: string): Promise<string> {
   return version
 }
 
-export async function install(version = 'latest', forceUpgrade = false) {
+export async function install(version: string, forceUpgrade = false) {
   const denoExecPath = Deno.execPath()
   const cmdExists = existsSync(join(dirname(denoExecPath), 'aleph'))
   const p = Deno.run({

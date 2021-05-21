@@ -3,7 +3,7 @@ import type { RouterURL } from '../../types.ts'
 
 const global = window as any
 
-export async function loadPageData(url: RouterURL) {
+export async function loadPageData(url: RouterURL): Promise<void> {
   const href = url.toString()
   const pagedataUrl = 'pagedata://' + href
   if (pagedataUrl in global) {
@@ -18,7 +18,7 @@ export async function loadPageData(url: RouterURL) {
   }
   const basePath = util.trimSuffix(url.basePath, '/')
   const dataUrl = `${basePath}/_aleph/data/${util.btoaUrl(href)}.json`
-  const data = await (await fetch(dataUrl)).json()
+  const data = await fetch(dataUrl).then(resp => resp.json())
   if (util.isPlainObject(data)) {
     storeData(data, href)
   }

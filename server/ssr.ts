@@ -1,5 +1,5 @@
 import { basename, dirname } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import { moduleExts } from '../framework/core/module.ts'
+import { builtinModuleExts } from '../framework/core/module.ts'
 import { createBlankRouterURL } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -51,7 +51,7 @@ export class Renderer {
   }
 
   private findModuleByName(name: string): Module | null {
-    for (const ext of moduleExts) {
+    for (const ext of builtinModuleExts) {
       const url = `/${name}.${ext}`
       const mod = this.#app.getModule(url)
       if (mod) {
@@ -61,7 +61,7 @@ export class Renderer {
     return null
   }
 
-  async useCache(
+  async cache(
     namespace: string,
     key: string,
     render: () => Promise<[string, Record<string, SSRData> | null]>

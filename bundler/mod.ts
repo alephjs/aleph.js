@@ -1,7 +1,7 @@
 import { dirname, join } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
 import { transform } from '../compiler/mod.ts'
-import { trimModuleExt } from '../framework/core/module.ts'
+import { trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { BrowserNames } from '../types.ts'
@@ -91,7 +91,7 @@ export class Bundler {
     }
     for (const url of entries) {
       await this.bundleChunk(
-        trimModuleExt(url),
+        trimBuiltinModuleExts(url),
         [url],
         [
           Array.from(remoteEntries),
@@ -193,7 +193,7 @@ export class Bundler {
         r[name] = filename
         return r
       }, {} as Record<string, string>)
-    const mainJS = `__ALEPH.bundled=${JSON.stringify(bundled)};` + this.#app.getMainJS(true)
+    const mainJS = `__ALEPH.bundled=${JSON.stringify(bundled)};` + this.#app.createMainJS(true)
     const hash = computeHash(mainJS)
     const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)

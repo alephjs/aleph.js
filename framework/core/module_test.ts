@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from 'std/testing/asserts.ts'
-import { trimModuleExt, toPagePath, importModule } from './module.ts'
+import { trimBuiltinModuleExts, toPagePath, importModule } from './module.ts'
 
 // Augment the window object
 interface MockWindow extends Window {
@@ -16,18 +16,18 @@ Deno.test('module toPagePath', () => {
     assertThrows(() => toPagePath({} as string))
 })
 
-Deno.test('module trimModuleExt', () => {
-    assertEquals(trimModuleExt('foobar.ts'), 'foobar')
+Deno.test('module trimBuiltinModuleExts', () => {
+    assertEquals(trimBuiltinModuleExts('foobar.ts'), 'foobar')
 
-    assertEquals(trimModuleExt('baz.zip'), 'baz.zip')
+    assertEquals(trimBuiltinModuleExts('baz.zip'), 'baz.zip')
 
-    assertEquals(trimModuleExt('barbaz.jsx.ts'), 'barbaz.jsx')
+    assertEquals(trimBuiltinModuleExts('barbaz.jsx.ts'), 'barbaz.jsx')
 
-    assertEquals(trimModuleExt('/index.ts'), '/index')
+    assertEquals(trimBuiltinModuleExts('/index.ts'), '/index')
 
-    assertThrows(() => trimModuleExt({} as string))
+    assertThrows(() => trimBuiltinModuleExts({} as string))
 
-    assertEquals(trimModuleExt('😀'), '😀')
+    assertEquals(trimBuiltinModuleExts('😀'), '😀')
 
 })
 

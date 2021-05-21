@@ -1,7 +1,7 @@
 import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
 import { dirname, join } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.96.0/ws/mod.ts'
-import { trimModuleExt } from '../framework/core/module.ts'
+import { trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { rewriteURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -65,7 +65,7 @@ export class Server {
                     socket.send(JSON.stringify({
                       type: 'update',
                       url: mod.url,
-                      updateUrl: util.cleanPath(`${basePath}/_aleph/${trimModuleExt(mod.url)}.js`),
+                      updateUrl: util.cleanPath(`${basePath}/_aleph/${trimBuiltinModuleExts(mod.url)}.js`),
                       hash,
                     }))
                   })
@@ -96,7 +96,7 @@ export class Server {
         const relPath = util.trimPrefix(pathname, '/_aleph')
 
         if (relPath == '/main.js') {
-          req.send(app.getMainJS(false), 'application/javascript; charset=utf-8')
+          req.send(app.createMainJS(false), 'application/javascript; charset=utf-8')
           return
         }
 

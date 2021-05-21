@@ -8,7 +8,7 @@ import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
 import type { TransformOptions } from '../compiler/mod.ts'
 import { buildChecksum, parseExportNames, SourceType, transform } from '../compiler/mod.ts'
 import { EventEmitter } from '../framework/core/events.ts'
-import { moduleExts, toPagePath, trimModuleExt } from '../framework/core/module.ts'
+import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
@@ -32,6 +32,7 @@ export type Module = {
   deps: DependencyDescriptor[]
   external: boolean
   isStyle: boolean
+  useDenoHook: boolean
   hash?: string
   sourceHash: string
   sourceType?: SourceType
@@ -221,7 +222,7 @@ export class Application implements ServerApplication {
 
     // compile custom components
     for (const name of ['app', '404', 'loading']) {
-      for (const ext of moduleExts) {
+      for (const ext of builtinModuleExts) {
         if (await existsFile(join(srcDir, `${name}.${ext}`))) {
           modules.push(`/${name}.${ext}`)
           break
@@ -230,7 +231,7 @@ export class Application implements ServerApplication {
     }
 
     if (await existsDir(apiDir)) {
-      for await (const { path: p } of walk(apiDir, { ...moduleWalkOptions, exts: moduleExts })) {
+      for await (const { path: p } of walk(apiDir, { ...moduleWalkOptions, exts: builtinModuleExts })) {
         const url = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
         apiModules.push(url)
         modules.push(url)
@@ -240,7 +241,7 @@ export class Application implements ServerApplication {
     if (await existsDir(pagesDir)) {
       for await (const { path: p } of walk(pagesDir, moduleWalkOptions)) {
         const url = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
-        let validated = moduleExts.some(ext => p.endsWith('.' + ext))
+        let validated = builtinModuleExts.some(ext => p.endsWith('.' + ext))
         if (!validated) {
           validated = this.loaders.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)
         }
@@ -330,7 +331,7 @@ export class Application implements ServerApplication {
                 log.error(`compile(${url}):`, err.message)
               }
             } else if (this.#modules.has(url)) {
-              if (trimModuleExt(url) === '/app') {
+              if (trimBuiltinModuleExts(url) === '/app') {
                 this.#renderer.clearCache()
               } else if (url.startsWith('/pages/')) {
                 const [routePath] = this.createRouteUpdate(url)
@@ -354,12 +355,12 @@ export class Application implements ServerApplication {
 
   /** check the changed file whether it is a scoped module that can emit the HMR event. */
   private isScopedModule(url: string) {
-    for (const ext of moduleExts) {
+    for (const ext of builtinModuleExts) {
       if (url.endsWith('.' + ext)) {
         if (url.startsWith('/pages/') || url.startsWith('/api/')) {
           return true
         }
-        switch (trimModuleExt(url)) {
+        switch (trimBuiltinModuleExts(url)) {
           case '/404':
           case '/app':
             return true
@@ -472,18 +473,38 @@ export class Application implements ServerApplication {
 
   /** get ssr data */
   async getSSRData(loc: { pathname: string, search?: string }): Promise<any> {
-    if (!this.isSSRable(loc.pathname)) {
+    const [router, nestedModules] = this.#pageRouting.createRouter(loc)
+    const { routePath } = router
+    if (routePath === '' || !this.isSSRable(router.pathname)) {
       return null
     }
 
-    const [router, nestedModules] = this.#pageRouting.createRouter(loc)
-    const { routePath } = router
-    if (routePath === '') {
-      return null
+    let useDeno = false
+    for (const url of [...builtinModuleExts.map(ext => `/app.${ext}`), ...nestedModules]) {
+      const mod = this.getModule(url)
+      if (mod) {
+        if (mod.useDenoHook) {
+          useDeno = true
+        } else {
+          this.lookupDeps(mod.url, dep => {
+            const depMod = this.getModule(dep.url)
+            if (depMod?.useDenoHook) {
+              useDeno = true
+              return false
+            }
+          })
+        }
+        if (useDeno) {
+          break
+        }
+      }
+    }
+    if (!useDeno) {
+      return {}
     }
 
     const path = loc.pathname + (loc.search || '')
-    const [_, data] = await this.#renderer.useCache(routePath, path, async () => {
+    const [_, data] = await this.#renderer.cache(routePath, path, async () => {
       return await this.#renderer.renderPage(router, nestedModules)
     })
     return data
@@ -497,20 +518,20 @@ export class Application implements ServerApplication {
     const path = loc.pathname + (loc.search || '')
 
     if (!this.isSSRable(loc.pathname)) {
-      const [html] = await this.#renderer.useCache('-', 'spa-index', async () => {
+      const [html] = await this.#renderer.cache('-', 'spa-index', async () => {
         return [await this.#renderer.renderSPAIndexPage(), null]
       })
       return [status, html]
     }
 
     if (routePath === '') {
-      const [html] = await this.#renderer.useCache('404', path, async () => {
+      const [html] = await this.#renderer.cache('404', path, async () => {
         return [await this.#renderer.render404Page(router), null]
       })
       return [status, html]
     }
 
-    const [html] = await this.#renderer.useCache(routePath, path, async () => {
+    const [html] = await this.#renderer.cache(routePath, path, async () => {
       let [html, data] = await this.#renderer.renderPage(router, nestedModules)
       return [html, data]
     })
@@ -544,7 +565,7 @@ export class Application implements ServerApplication {
       return false
     }
 
-    for (const ext of moduleExts) {
+    for (const ext of builtinModuleExts) {
       if (url.endsWith('.' + ext)) {
         return (
           url.startsWith('/pages/') ||
@@ -565,21 +586,22 @@ export class Application implements ServerApplication {
     ))
   }
 
-  /** get main code in javascript. */
-  getMainJS(bundleMode = false): string {
+  /** create main bootstrap script in javascript. */
+  createMainJS(bundleMode = false): string {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
     const { basePath: basePath, defaultLocale, framework } = this.config
+    const { routes } = this.#pageRouting
     const config: Record<string, any> = {
       basePath,
       defaultLocale,
       locales: [],
-      routes: this.#pageRouting.routes,
+      routes,
       rewrites: this.config.rewrites,
-      sharedModules: Array.from(this.#modules.values()).filter(({ url }) => {
-        return ['/app', '/404'].includes(trimModuleExt(url))
+      globalComponents: Array.from(this.#modules.values()).filter(({ url }) => {
+        return ['/app', '/404'].includes(trimBuiltinModuleExts(url))
       }).reduce((records, { url }) => {
-        records[trimModuleExt(url).slice(1)] = url
+        records[trimBuiltinModuleExts(url).slice(1)] = url
         return records
       }, {} as Record<string, string>),
       renderMode: this.config.ssr ? 'ssr' : 'spa'
@@ -621,7 +643,7 @@ export class Application implements ServerApplication {
       ].map(p => `${basePath}/_aleph/-/${alephPkgPath}${p}`)
 
       Array.from(this.#modules.keys()).forEach(url => {
-        switch (trimModuleExt(url)) {
+        switch (trimBuiltinModuleExts(url)) {
           case '/app':
             preload.push(`${basePath}/_aleph/app.js`)
             break
@@ -755,7 +777,7 @@ export class Application implements ServerApplication {
   }
 
   private createRouteUpdate(url: string): [string, string, boolean | undefined] {
-    const isBuiltinModuleType = moduleExts.some(ext => url.endsWith('.' + ext))
+    const isBuiltinModuleType = builtinModuleExts.some(ext => url.endsWith('.' + ext))
     let routePath = isBuiltinModuleType ? toPagePath(url) : util.trimSuffix(url, '/pages')
     let isIndex: boolean | undefined = undefined
 
@@ -773,7 +795,7 @@ export class Application implements ServerApplication {
         }
       }
     } else if (routePath !== '/') {
-      for (const ext of moduleExts) {
+      for (const ext of builtinModuleExts) {
         if (url.endsWith('/index.' + ext)) {
           isIndex = true
           break
@@ -822,9 +844,9 @@ export class Application implements ServerApplication {
       return jsCode
     }
 
-    const cacheFilePath = join(this.buildDir, jsFile)
-    if (await existsFile(cacheFilePath)) {
-      const content = await Deno.readFile(cacheFilePath)
+    const cacheFp = join(this.buildDir, jsFile)
+    if (await existsFile(cacheFp)) {
+      const content = await Deno.readFile(cacheFp)
       module.jsCode = content
       log.debug(`read cached '${jsFile}'` + dim(' • ' + util.formatBytes(content.length)))
       return content
@@ -920,6 +942,7 @@ export class Application implements ServerApplication {
         deps: [],
         external,
         isStyle: false,
+        useDenoHook: false,
         sourceHash: '',
         jsFile: '',
         ready: Promise.resolve()
@@ -934,10 +957,10 @@ export class Application implements ServerApplication {
 
     const isRemote = util.isLikelyHttpURL(url) && !isLocalUrl(url)
     const localUrl = toLocalPath(url)
-    const name = trimModuleExt(basename(localUrl))
+    const name = trimBuiltinModuleExts(basename(localUrl))
     const jsFile = join(dirname(localUrl), `${name}.js`)
-    const cacheFilepath = join(this.buildDir, jsFile)
-    const metaFilepath = cacheFilepath.slice(0, -3) + '.meta.json'
+    const cacheFp = join(this.buildDir, jsFile)
+    const metaFp = cacheFp.slice(0, -3) + '.meta.json'
 
     let defer = (err?: Error) => { }
     mod = {
@@ -945,6 +968,7 @@ export class Application implements ServerApplication {
       deps: [],
       external: false,
       isStyle: false,
+      useDenoHook: false,
       sourceHash: '',
       jsFile,
       ready: new Promise((resolve, reject) => {
@@ -961,36 +985,40 @@ export class Application implements ServerApplication {
     this.#modules.set(url, mod)
 
     if (isRemote && !this.#reloading) {
-      if (!await existsFile(metaFilepath) || !await existsFile(cacheFilepath)) {
-        const globalCacheFilepath = join(await getDenoDir(), 'gen/aleph', jsFile)
-        const globalMetaFilepath = globalCacheFilepath.slice(0, -3) + '.meta.json'
-        if (await existsFile(globalCacheFilepath) && await existsFile(globalMetaFilepath)) {
-          await ensureDir(dirname(cacheFilepath))
+      if (!await existsFile(metaFp) || !await existsFile(cacheFp)) {
+        const globalCacheFp = join(await getDenoDir(), 'gen/aleph', jsFile)
+        const globalMetaFp = globalCacheFp.slice(0, -3) + '.meta.json'
+        if (await existsFile(globalCacheFp) && await existsFile(globalMetaFp)) {
+          await ensureDir(dirname(cacheFp))
           await Promise.all([
-            Deno.copyFile(globalCacheFilepath, cacheFilepath),
-            Deno.copyFile(globalMetaFilepath, metaFilepath)
+            Deno.copyFile(globalCacheFp, cacheFp),
+            Deno.copyFile(globalMetaFp, metaFp)
           ])
+          if (await existsFile(`${globalCacheFp}.map`)) {
+            await Deno.copyFile(`${globalCacheFp}.map`, `${cacheFp}.map`)
+          }
         }
       }
     }
 
-    if (await existsFile(metaFilepath)) {
+    if (await existsFile(metaFp)) {
       try {
-        const { url: _url, sourceHash, deps, isStyle } = JSON.parse(await Deno.readTextFile(metaFilepath))
+        const { url: _url, sourceHash, deps, isStyle, useDenoHook } = JSON.parse(await Deno.readTextFile(metaFp))
         if (_url === url && util.isNEString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
           mod.isStyle = Boolean(isStyle)
+          mod.useDenoHook = Boolean(useDenoHook)
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
-          Deno.remove(metaFilepath)
+          Deno.remove(metaFp)
         }
       } catch (e) { }
     }
 
     const shouldLoad = !(
       (isRemote && !this.#reloading && mod.sourceHash !== '') &&
-      await existsFile(cacheFilepath)
+      await existsFile(cacheFp)
     )
     if (shouldLoad) {
       try {
@@ -1034,7 +1062,7 @@ export class Application implements ServerApplication {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, starExports, map } = await transform(url, sourceCode, {
+      const { code, deps, useDenoHooks, starExports, map } = await transform(url, sourceCode, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
@@ -1097,30 +1125,37 @@ export class Application implements ServerApplication {
         }
         return dep
       })
+      if (useDenoHooks && useDenoHooks.length > 0) {
+        module.useDenoHook = true
+        if (!this.config.ssr) {
+          log.error(`'useDeno' hook in SPA mode is illegal: ${url}`)
+        }
+      }
 
       ms.stop(`transpile '${url}'`)
 
-      const cacheFilepath = join(this.buildDir, jsFile)
-      const metaFilepath = cacheFilepath.slice(0, -3) + '.meta.json'
+      const cacheFp = join(this.buildDir, jsFile)
+      const metaFp = cacheFp.slice(0, -3) + '.meta.json'
       const metaJSON = JSON.stringify({
         url,
         sourceHash: module.sourceHash,
         isStyle: module.isStyle ? true : undefined,
         deps: module.deps,
       }, undefined, 2)
-      await ensureDir(dirname(cacheFilepath))
+      await ensureDir(dirname(cacheFp))
       await Promise.all([
-        Deno.writeFile(cacheFilepath, module.jsCode),
-        Deno.writeTextFile(metaFilepath, metaJSON),
-        map ? Deno.writeTextFile(`${cacheFilepath}.map`, map) : Promise.resolve(),
+        Deno.writeFile(cacheFp, module.jsCode),
+        Deno.writeTextFile(metaFp, metaJSON),
+        map ? Deno.writeTextFile(`${cacheFp}.map`, map) : Promise.resolve(),
       ])
       if (util.isLikelyHttpURL(url) && !isLocalUrl(url)) {
-        const globalCacheFilepath = join(await getDenoDir(), 'gen/aleph', jsFile)
-        const globalMetaFilepath = globalCacheFilepath.slice(0, -3) + '.meta.json'
-        await ensureDir(dirname(globalCacheFilepath))
+        const globalCacheFp = join(await getDenoDir(), 'gen/aleph', jsFile)
+        const globalMetaFp = globalCacheFp.slice(0, -3) + '.meta.json'
+        await ensureDir(dirname(globalCacheFp))
         await Promise.all([
-          Deno.writeFile(globalCacheFilepath, module.jsCode),
-          Deno.writeTextFile(globalMetaFilepath, metaJSON),
+          Deno.writeFile(globalCacheFp, module.jsCode),
+          Deno.writeTextFile(globalMetaFp, metaJSON),
+          map ? Deno.writeTextFile(`${globalCacheFp}.map`, map) : Promise.resolve(),
         ])
       }
     }
@@ -1204,7 +1239,7 @@ export class Application implements ServerApplication {
   }
 
   private applyModuleSideEffect(url: string) {
-    if (trimModuleExt(url) === '/app') {
+    if (trimBuiltinModuleExts(url) === '/app') {
       this.#renderer.clearCache()
     } else if (url.startsWith('/pages/')) {
       const [routePath] = this.createRouteUpdate(url)
@@ -1218,18 +1253,18 @@ export class Application implements ServerApplication {
   private async cacheModule(module: Module) {
     const { url, jsCode, jsFile } = module
     if (jsCode) {
-      const cacheFilepath = join(this.buildDir, jsFile)
-      const metaFilepath = cacheFilepath.slice(0, -3) + '.meta.json'
-      await ensureDir(dirname(cacheFilepath))
+      const cacheFp = join(this.buildDir, jsFile)
+      const metaFp = cacheFp.slice(0, -3) + '.meta.json'
+      await ensureDir(dirname(cacheFp))
       await Promise.all([
-        Deno.writeFile(cacheFilepath, jsCode),
-        Deno.writeTextFile(metaFilepath, JSON.stringify({
+        Deno.writeFile(cacheFp, jsCode),
+        Deno.writeTextFile(metaFp, JSON.stringify({
           url,
           sourceHash: module.sourceHash,
           isStyle: module.isStyle ? true : undefined,
           deps: module.deps,
         }, undefined, 2)),
-        lazyRemove(cacheFilepath.slice(0, -3) + '.client.js'),
+        lazyRemove(cacheFp.slice(0, -3) + '.client.js'),
       ])
     }
   }
@@ -1251,7 +1286,7 @@ export class Application implements ServerApplication {
     )
 
     // add app/404 modules as shared entry
-    entryMods.set(Array.from(this.#modules.keys()).filter(url => ['/app', '/404'].includes(trimModuleExt(url))), true)
+    entryMods.set(Array.from(this.#modules.keys()).filter(url => ['/app', '/404'].includes(trimBuiltinModuleExts(url))), true)
 
     // add page module entries
     this.#pageRouting.lookup(routes => {
