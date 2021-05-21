@@ -27,7 +27,7 @@ export const bundlerRuntimeCode = `
             f = l[u] || l[u.replace(/\\.[a-zA-Z0-9]+$/, '')],
             p = (b + '/_aleph').replace('//', '/');
         if (!f) {
-          n(new Error('invalid url: ' + u));
+          n(new Error('invalid specifier: ' + u));
           return;
         }
         s.onload = function() {
@@ -57,20 +57,20 @@ export class Bundler {
     this.#compiled = new Map()
   }
 
-  async bundle(entryMods: Array<{ url: string, shared: boolean }>) {
+  async bundle(entryMods: Array<{ specifier: string, shared: boolean }>) {
     const remoteEntries = new Set<string>()
     const sharedEntries = new Set<string>()
     const entries = new Set<string>()
 
-    entryMods.forEach(({ url, shared }) => {
+    entryMods.forEach(({ specifier, shared }) => {
       if (shared) {
-        if (util.isLikelyHttpURL(url)) {
-          remoteEntries.add(url)
+        if (util.isLikelyHttpURL(specifier)) {
+          remoteEntries.add(specifier)
         } else {
-          sharedEntries.add(url)
+          sharedEntries.add(specifier)
         }
       } else {
-        entries.add(url)
+        entries.add(specifier)
       }
     })
 
@@ -89,10 +89,10 @@ export class Bundler {
         Array.from(remoteEntries)
       )
     }
-    for (const url of entries) {
+    for (const specifier of entries) {
       await this.bundleChunk(
-        trimBuiltinModuleExts(url),
-        [url],
+        trimBuiltinModuleExts(specifier),
+        [specifier],
         [
           Array.from(remoteEntries),
           Array.from(sharedEntries)
@@ -128,26 +128,26 @@ export class Bundler {
   }
 
   private async compile(mod: Module, external: string[]): Promise<string> {
-    if (this.#compiled.has(mod.url)) {
-      return this.#compiled.get(mod.url)!
+    if (this.#compiled.has(mod.specifier)) {
+      return this.#compiled.get(mod.specifier)!
     }
 
     const jsFile = join(this.#app.buildDir, mod.jsFile.slice(0, -3) + '.client.js')
-    this.#compiled.set(mod.url, jsFile)
+    this.#compiled.set(mod.specifier, jsFile)
 
     if (await existsFile(jsFile)) {
       return jsFile
     }
 
-    const source = await this.#app.loadModule(mod.url)
+    const source = await this.#app.loadModule(mod.specifier)
     if (source === null) {
-      this.#compiled.delete(mod.url)
-      throw new Error(`Unsupported module '${mod.url}'`)
+      this.#compiled.delete(mod.specifier)
+      throw new Error(`Unsupported module '${mod.specifier}'`)
     }
 
     try {
       let { code, starExports } = await transform(
-        mod.url,
+        mod.specifier,
         source.code,
         {
           ...this.#app.commonCompileOptions,
@@ -161,17 +161,17 @@ export class Bundler {
 
       if (starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
-          const url = starExports[index]
-          const names = await this.#app.parseModuleExportNames(url)
-          code = code.replaceAll(`export * from "[${url}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+          const specifier = starExports[index]
+          const names = await this.#app.parseModuleExportNames(specifier)
+          code = code.replaceAll(`export * from "[${specifier}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
           code = code.replaceAll(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
         }
       }
 
       // compile deps
       await Promise.all(mod.deps.map(async dep => {
-        if (!dep.url.startsWith('#') && !external.includes(dep.url)) {
-          const depMod = this.#app.getModule(dep.url)
+        if (!dep.specifier.startsWith('#') && !external.includes(dep.specifier)) {
+          const depMod = this.#app.getModule(dep.specifier)
           if (depMod !== null) {
             await this.compile(depMod, external)
           }
@@ -181,8 +181,8 @@ export class Bundler {
       await ensureTextFile(jsFile, code)
       return jsFile
     } catch (e) {
-      this.#compiled.delete(mod.url)
-      throw new Error(`Can't compile module '${mod.url}': ${e.message}`)
+      this.#compiled.delete(mod.specifier)
+      throw new Error(`Can't compile module '${mod.specifier}': ${e.message}`)
     }
   }
 
@@ -218,20 +218,20 @@ export class Bundler {
 
   /** create bundle chunk. */
   private async bundleChunk(name: string, entry: string[], external: string[]) {
-    const entryCode = (await Promise.all(entry.map(async (url, i) => {
+    const entryCode = (await Promise.all(entry.map(async (specifier, i) => {
       const { buildDir } = this.#app
-      let mod = this.#app.getModule(url)
+      let mod = this.#app.getModule(specifier)
       if (mod && mod.jsFile !== '') {
         if (external.length === 0) {
           return [
             `import * as mod_${i} from ${JSON.stringify('file://' + join(buildDir, mod.jsFile))}`,
-            `__ALEPH.pack[${JSON.stringify(url)}] = mod_${i}`
+            `__ALEPH.pack[${JSON.stringify(specifier)}] = mod_${i}`
           ]
         } else {
           const jsFile = await this.compile(mod, external)
           return [
             `import * as mod_${i} from ${JSON.stringify('file://' + jsFile)}`,
-            `__ALEPH.pack[${JSON.stringify(url)}] = mod_${i}`
+            `__ALEPH.pack[${JSON.stringify(specifier)}] = mod_${i}`
           ]
         }
       }

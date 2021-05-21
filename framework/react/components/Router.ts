@@ -49,10 +49,10 @@ export default function Router({
     const { basePath } = routing
     const [url, nestedModules] = routing.createRouter()
     if (url.routePath !== '') {
-      const imports = nestedModules.map(async url => {
-        const { default: Component } = await importModule(basePath, url, e.forceRefetch)
+      const imports = nestedModules.map(async specifier => {
+        const { default: Component } = await importModule(basePath, specifier, e.forceRefetch)
         return {
-          url: url,
+          specifier,
           Component
         }
       })
@@ -81,10 +81,10 @@ export default function Router({
   useEffect(() => {
     const isDev = !('__ALEPH' in window)
     const { basePath } = routing
-    const onAddModule = async (mod: { url: string, routePath?: string, isIndex?: boolean }) => {
-      switch (mod.url) {
+    const onAddModule = async (mod: { specifier: string, routePath?: string, isIndex?: boolean }) => {
+      switch (mod.specifier) {
         case '/404.js': {
-          const { default: Component } = await importModule(basePath, mod.url, true)
+          const { default: Component } = await importModule(basePath, mod.specifier, true)
           if (isLikelyReactComponent(Component)) {
             setE404({ Component })
           } else {
@@ -93,7 +93,7 @@ export default function Router({
           break
         }
         case '/app.js': {
-          const { default: Component } = await importModule(basePath, mod.url, true)
+          const { default: Component } = await importModule(basePath, mod.specifier, true)
           if (isLikelyReactComponent(Component)) {
             setApp({ Component })
           } else {
@@ -102,17 +102,17 @@ export default function Router({
           break
         }
         default: {
-          const { routePath, url, isIndex } = mod
+          const { routePath, specifier, isIndex } = mod
           if (routePath) {
-            routing.update(routePath, url, isIndex)
+            routing.update(routePath, specifier, isIndex)
             events.emit('popstate', { type: 'popstate', forceRefetch: true })
           }
           break
         }
       }
     }
-    const onRemoveModule = (url: string) => {
-      switch (url) {
+    const onRemoveModule = (specifier: string) => {
+      switch (specifier) {
         case '/404.js':
           setE404({ Component: E404Page })
           break
@@ -120,8 +120,8 @@ export default function Router({
           setApp({ Component: null })
           break
         default:
-          if (url.startsWith('/pages/')) {
-            routing.removeRoute(url)
+          if (specifier.startsWith('/pages/')) {
+            routing.removeRoute(specifier)
             events.emit('popstate', { type: 'popstate' })
           }
           break

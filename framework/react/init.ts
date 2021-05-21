@@ -5,18 +5,18 @@ import type { ServerApplication } from '../../types.ts'
 export async function init(app: ServerApplication) {
   if (app.mode === 'development') {
     const alephPkgUri = getAlephPkgUri()
-    app.injectCode('hmr', (url: string, code: string) => {
+    app.injectCode('hmr', (specifier: string, code: string) => {
       if (code.includes('$RefreshReg$(')) {
-        const refreshModuleUrl = toRelativePath(
-          dirname(toLocalPath(url)),
+        const refreshModuleSpecifier = toRelativePath(
+          dirname(toLocalPath(specifier)),
           toLocalPath(`${alephPkgUri}/framework/react/refresh.js`)
         )
         return [
-          `import { RefreshRuntime, performReactRefresh } from ${JSON.stringify(refreshModuleUrl)};`,
+          `import { RefreshRuntime, performReactRefresh } from ${JSON.stringify(refreshModuleSpecifier)};`,
           '',
           'const prevRefreshReg = window.$RefreshReg$;',
           'const prevRefreshSig = window.$RefreshSig$;',
-          `window.$RefreshReg$ = (type, id) => RefreshRuntime.register(type, ${JSON.stringify(url)} + "#" + id);`,
+          `window.$RefreshReg$ = (type, id) => RefreshRuntime.register(type, ${JSON.stringify(specifier)} + "#" + id);`,
           'window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;',
           '',
           code,
@@ -27,8 +27,8 @@ export async function init(app: ServerApplication) {
       }
       return code
     })
-    app.injectCode('compilation', (url: string, code: string) => {
-      if (url === '/main.js') {
+    app.injectCode('compilation', (specifier: string, code: string) => {
+      if (specifier === '/main.js') {
         return [
           `import ".${toLocalPath(`${alephPkgUri}/framework/react/refresh.js`)}";`,
           code

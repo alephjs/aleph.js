@@ -29,7 +29,7 @@ export type FrameworkRenderer = {
   render(
     url: RouterURL,
     AppComponent: any,
-    nestedPageComponents: { url: string, Component?: any }[],
+    nestedPageComponents: { specifier: string, Component?: any }[],
     styles: Record<string, { css?: string, href?: string }>
   ): Promise<FrameworkRenderResult>
 }
@@ -112,19 +112,19 @@ export class Renderer {
     const appModule = this.findModuleByName('app')
     const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
     const nestedPageComponents = await Promise.all(nestedModules
-      .filter(url => this.#app.getModule(url) !== null)
-      .map(async url => {
-        const module = this.#app.getModule(url)!
+      .filter(specifier => this.#app.getModule(specifier) !== null)
+      .map(async specifier => {
+        const module = this.#app.getModule(specifier)!
         const { default: Component } = await this.#app.importModule(module)
-        state.entryFile = dirname(url) + '/' + basename(module.jsFile)
+        state.entryFile = dirname(specifier) + '/' + basename(module.jsFile)
         return {
-          url,
+          specifier,
           Component
         }
       })
     )
     const styles = await this.lookupStyleModules(...[
-      appModule ? appModule.url : [],
+      appModule ? appModule.specifier : [],
       nestedModules
     ].flat())
 
@@ -139,7 +139,7 @@ export class Renderer {
     )
 
     if (isDev) {
-      log.info(`render '${url.pathname}' in ${Math.round(performance.now() - start)}ms`)
+      log.info(`render '${url.toString()}' in ${Math.round(performance.now() - start)}ms`)
     }
 
     return [
@@ -174,13 +174,13 @@ export class Renderer {
     const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
     const { default: E404 } = e404Module ? await this.#app.importModule(e404Module) : {} as any
     const styles = await this.lookupStyleModules(...[
-      appModule ? appModule.url : [],
-      e404Module ? e404Module.url : []
+      appModule ? appModule.specifier : [],
+      e404Module ? e404Module.specifier : []
     ].flat())
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
       App,
-      e404Module ? [{ url: e404Module.url, Component: E404 }] : [],
+      e404Module ? [{ specifier: e404Module.specifier, Component: E404 }] : [],
       styles
     )
     return createHtml({
@@ -212,7 +212,7 @@ export class Renderer {
 
     if (loadingModule) {
       const { default: Loading } = await this.#app.importModule(loadingModule)
-      const styles = await this.lookupStyleModules(loadingModule.url)
+      const styles = await this.lookupStyleModules(loadingModule.specifier)
       const {
         head,
         body,
@@ -220,7 +220,7 @@ export class Renderer {
       } = await this.#renderer.render(
         createBlankRouterURL(basePath, defaultLocale),
         undefined,
-        [{ url: loadingModule.url, Component: Loading }],
+        [{ specifier: loadingModule.specifier, Component: Loading }],
         styles
       )
       return createHtml({
@@ -249,11 +249,11 @@ export class Renderer {
     })
   }
 
-  private async lookupStyleModules(...urls: string[]): Promise<Record<string, { css?: string, href?: string }>> {
+  private async lookupStyleModules(...specifiers: string[]): Promise<Record<string, { css?: string, href?: string }>> {
     const mods: Module[] = []
-    urls.forEach(url => {
-      this.#app.lookupDeps(url, ({ url }) => {
-        const mod = this.#app.getModule(url)
+    specifiers.forEach(specifier => {
+      this.#app.lookupDeps(specifier, ({ specifier }) => {
+        const mod = this.#app.getModule(specifier)
         if (mod && mod.isStyle) {
           mods.push({ ...mod, deps: [...mod.deps] })
         }
@@ -261,9 +261,9 @@ export class Renderer {
     })
     return (await Promise.all(mods.map(async module => {
       const { css, href } = await this.#app.importModule(module)
-      return { url: module.url, css, href }
-    }))).reduce((styles, { url, css, href }) => {
-      styles[url] = { css, href }
+      return { specifier: module.specifier, css, href }
+    }))).reduce((styles, { specifier, css, href }) => {
+      styles[specifier] = { css, href }
       return styles
     }, {} as Record<string, { css?: string, href?: string }>)
   }

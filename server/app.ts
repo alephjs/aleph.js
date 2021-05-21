@@ -15,9 +15,12 @@ import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ImportMap, RouterURL, ServerApplication } from '../types.ts'
 import { VERSION } from '../version.ts'
-import type { RequiredConfig } from './config.ts'
-import { defaultConfig, fixConfigAndImportMap, isBuiltinCSSLoader, loadConfig, loadImportMap } from './config.ts'
 import { cache } from './cache.ts'
+import type { RequiredConfig } from './config.ts'
+import {
+  defaultConfig, fixConfigAndImportMap, isBuiltinCSSLoader,
+  loadConfig, loadImportMap
+} from './config.ts'
 import {
   checkAlephDev, checkDenoVersion, clearBuildCache, computeHash,
   getAlephPkgUri, getDenoDir, toRelativePath, getSourceType,
@@ -28,26 +31,34 @@ import { Renderer } from './ssr.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
-  url: string
+  specifier: string
   deps: DependencyDescriptor[]
-  external: boolean
-  isStyle: boolean
-  useDenoHook: boolean
+  external?: boolean
+  isStyle?: boolean
+  useDenoHooks?: string[]
   hash?: string
   sourceHash: string
   sourceType?: SourceType
   sourceCode?: string
-  jsCode?: Uint8Array
   jsFile: string
+  jsCode?: Uint8Array
   ready: Promise<void>
 }
 
 /** The dependency descriptor. */
 type DependencyDescriptor = {
-  url: string
-  hash?: string
+  specifier: string
   isDynamic?: boolean
+  hash?: string
   hashLoc?: number
+}
+
+/** The dependency graph. */
+type DependencyGraph = {
+  specifier: string
+  isShared?: boolean
+  isDynamic?: boolean
+  deps: Array<DependencyGraph>
 }
 
 type Source = {
@@ -57,7 +68,7 @@ type Source = {
   map?: string
 }
 
-type TransformFn = (url: string, code: string) => string
+type TransformFn = (specifier: string, code: string) => string
 
 /** The application class for aleph server. */
 export class Application implements ServerApplication {
@@ -68,6 +79,7 @@ export class Application implements ServerApplication {
   readonly importMap: ImportMap
   readonly ready: Promise<void>
 
+  #graphs: DependencyGraph[] = []
   #modules: Map<string, Module> = new Map()
   #pageRouting: Routing = new Routing({})
   #apiRouting: Routing = new Routing({})
@@ -232,36 +244,36 @@ export class Application implements ServerApplication {
 
     if (await existsDir(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...moduleWalkOptions, exts: builtinModuleExts })) {
-        const url = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
-        apiModules.push(url)
-        modules.push(url)
+        const specifier = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
+        apiModules.push(specifier)
+        modules.push(specifier)
       }
     }
 
     if (await existsDir(pagesDir)) {
       for await (const { path: p } of walk(pagesDir, moduleWalkOptions)) {
-        const url = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
+        const specifier = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
         let validated = builtinModuleExts.some(ext => p.endsWith('.' + ext))
         if (!validated) {
-          validated = this.loaders.some(p => p.type === 'loader' && p.test.test(url) && p.allowPage)
+          validated = this.loaders.some(p => p.type === 'loader' && p.test.test(specifier) && p.allowPage)
         }
         if (validated) {
-          pageModules.push(url)
-          modules.push(url)
+          pageModules.push(specifier)
+          modules.push(specifier)
         }
       }
     }
 
     // wait all compilation tasks are done
-    await Promise.all(modules.map(url => this.compile(url)))
+    await Promise.all(modules.map(specifier => this.compile(specifier)))
 
     // update routing
     this.#pageRouting.config(this.config)
-    apiModules.forEach(url => {
-      this.#apiRouting.update(...this.createRouteUpdate(url))
+    apiModules.forEach(specifier => {
+      this.#apiRouting.update(...this.createRouteUpdate(specifier))
     })
-    pageModules.forEach(url => {
-      this.#pageRouting.update(...this.createRouteUpdate(url))
+    pageModules.forEach(specifier => {
+      this.#pageRouting.update(...this.createRouteUpdate(specifier))
     })
 
     // bundle
@@ -288,64 +300,71 @@ export class Application implements ServerApplication {
     log.info('Start watching code changes...')
     for await (const event of w) {
       for (const p of event.paths) {
-        const url = util.cleanPath(util.trimPrefix(p, srcDir))
-        if (this.isScopedModule(url)) {
-          util.debounceX(url, async () => {
+        const specifier = util.cleanPath(util.trimPrefix(p, srcDir))
+        if (this.isScopedModule(specifier)) {
+          util.debounceX(specifier, async () => {
             if (await existsFile(p)) {
-              let type = 'modify'
-              if (!this.#modules.has(url)) {
-                type = 'add'
-              } else {
-                this.#modules.delete(url)
-              }
-              log.info(type, url)
+              let type = this.#modules.has(specifier) ? 'modify' : 'add'
+              log.info(type, specifier)
               try {
-                const module = await this.initModule(url, { forceRefresh: true })
-                const hmrable = this.isHMRable(url)
+                const prevModule = this.#modules.get(specifier)
+                const module = await this.initModule(specifier, { forceRefresh: true })
                 await this.transpileModule(module, true)
+                const hmrable = this.isHMRable(specifier)
+                const refetchPage = (
+                  this.config.ssr &&
+                  prevModule &&
+                  !(
+                    util.isNEArray(prevModule.useDenoHooks) &&
+                    util.isNEArray(module.useDenoHooks) &&
+                    prevModule.useDenoHooks.join(' ') === module.useDenoHooks.join(' ')
+                  )
+                )
                 if (hmrable) {
                   let routePath: string | undefined = undefined
                   let isIndex: boolean | undefined = undefined
-                  if (module.url.startsWith('/pages/')) {
-                    const [path, _, index] = this.createRouteUpdate(module.url)
+                  if (module.specifier.startsWith('/pages/')) {
+                    const [path, _, index] = this.createRouteUpdate(module.specifier)
                     routePath = path
                     isIndex = index
                   }
                   if (type === 'add') {
                     this.#fsWatchListeners.forEach(e => {
-                      e.emit('add', { url: module.url, routePath, isIndex })
+                      e.emit('add', { specifier: module.specifier, routePath, isIndex })
                     })
                   } else {
                     this.#fsWatchListeners.forEach(e => {
-                      e.emit('modify-' + module.url)
+                      e.emit('modify-' + module.specifier, { refetchPage: refetchPage || undefined })
                     })
                   }
                 }
-                this.applyCompilationSideEffect(module, ({ url: effectUrl }) => {
-                  if (!hmrable && this.isHMRable(effectUrl)) {
-                    log.debug('compilation side-effect:', effectUrl, dim('<-'), module.url)
-                    this.#fsWatchListeners.forEach(w => w.emit('modify-' + effectUrl))
+                this.applyCompilationSideEffect(module, ({ specifier }) => {
+                  if (!hmrable && this.isHMRable(specifier)) {
+                    log.debug('compilation side-effect:', specifier, dim('<-'), module.specifier)
+                    this.#fsWatchListeners.forEach(e => {
+                      e.emit('modify-' + specifier, { refetchPage: refetchPage || undefined })
+                    })
                   }
                 })
               } catch (err) {
-                log.error(`compile(${url}):`, err.message)
+                log.error(`compile(${specifier}):`, err.message)
               }
-            } else if (this.#modules.has(url)) {
-              if (trimBuiltinModuleExts(url) === '/app') {
+            } else if (this.#modules.has(specifier)) {
+              if (trimBuiltinModuleExts(specifier) === '/app') {
                 this.#renderer.clearCache()
-              } else if (url.startsWith('/pages/')) {
-                const [routePath] = this.createRouteUpdate(url)
+              } else if (specifier.startsWith('/pages/')) {
+                const [routePath] = this.createRouteUpdate(specifier)
                 this.#renderer.clearCache(routePath)
                 this.#pageRouting.removeRoute(routePath)
-              } else if (url.startsWith('/api/')) {
-                const [routePath] = this.createRouteUpdate(url)
+              } else if (specifier.startsWith('/api/')) {
+                const [routePath] = this.createRouteUpdate(specifier)
                 this.#apiRouting.removeRoute(routePath)
               }
-              this.#modules.delete(url)
-              if (this.isHMRable(url)) {
-                this.#fsWatchListeners.forEach(e => e.emit('remove', url))
+              this.#modules.delete(specifier)
+              if (this.isHMRable(specifier)) {
+                this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
               }
-              log.info('remove', url)
+              log.info('remove', specifier)
             }
           }, 50)
         }
@@ -354,13 +373,13 @@ export class Application implements ServerApplication {
   }
 
   /** check the changed file whether it is a scoped module that can emit the HMR event. */
-  private isScopedModule(url: string) {
+  private isScopedModule(specifier: string) {
     for (const ext of builtinModuleExts) {
-      if (url.endsWith('.' + ext)) {
-        if (url.startsWith('/pages/') || url.startsWith('/api/')) {
+      if (specifier.endsWith('.' + ext)) {
+        if (specifier.startsWith('/pages/') || specifier.startsWith('/api/')) {
           return true
         }
-        switch (trimBuiltinModuleExts(url)) {
+        switch (trimBuiltinModuleExts(specifier)) {
           case '/404':
           case '/app':
             return true
@@ -369,13 +388,13 @@ export class Application implements ServerApplication {
     }
 
     // is page module by plugin
-    if (this.loaders.some(p => p.test.test(url) && p.allowPage)) {
+    if (this.loaders.some(p => p.test.test(specifier) && p.allowPage)) {
       return true
     }
 
     // is dep
     for (const { deps } of this.#modules.values()) {
-      if (deps.some(dep => dep.url === url)) {
+      if (deps.some(dep => dep.specifier === specifier)) {
         return true
       }
     }
@@ -391,18 +410,18 @@ export class Application implements ServerApplication {
     return this.config.plugins.filter(isLoaderPlugin)
   }
 
-  /** get the module by given url. */
-  getModule(url: string): Module | null {
-    if (this.#modules.has(url)) {
-      return this.#modules.get(url)!
+  /** get the module by given specifier. */
+  getModule(specifier: string): Module | null {
+    if (this.#modules.has(specifier)) {
+      return this.#modules.get(specifier)!
     }
     return null
   }
 
   /** returns the module of the first one in the modules where predicate is true, and null otherwise.. */
   findModule(predicate: (module: Module) => boolean): Module | null {
-    for (const url of this.#modules.keys()) {
-      const module = this.#modules.get(url)!
+    for (const specifier of this.#modules.keys()) {
+      const module = this.#modules.get(specifier)!
       if (predicate(module)) {
         return module
       }
@@ -416,9 +435,9 @@ export class Application implements ServerApplication {
     if (router !== null) {
       const [url, nestedModules] = router
       if (url.routePath !== '') {
-        const moduleUrl = nestedModules.pop()!
-        if (this.#modules.has(moduleUrl)) {
-          return [url, this.#modules.get(moduleUrl)!]
+        const specifier = nestedModules.pop()!
+        if (this.#modules.has(specifier)) {
+          return [url, this.#modules.get(specifier)!]
         }
       }
     }
@@ -426,7 +445,7 @@ export class Application implements ServerApplication {
   }
 
   /** add a module by given path and optional source code. */
-  async addModule(url: string, sourceCode?: string): Promise<void> {
+  async addModule(specifier: string, sourceCode?: string): Promise<void> {
     const source = sourceCode ? {
       code: sourceCode,
       type: SourceType.TSX,
@@ -434,17 +453,17 @@ export class Application implements ServerApplication {
       isStyle: false,
     } : undefined
     if (source !== undefined) {
-      const type = getSourceType(url)
+      const type = getSourceType(specifier)
       if (type !== SourceType.Unknown) {
         source.type = type
       }
     }
-    const module = await this.initModule(url, { source })
+    const module = await this.initModule(specifier, { source })
     await this.transpileModule(module)
-    if (url.startsWith('/pages/')) {
-      this.#pageRouting.update(...this.createRouteUpdate(url))
-    } else if (url.startsWith('/api/')) {
-      this.#apiRouting.update(...this.createRouteUpdate(url))
+    if (specifier.startsWith('/pages/')) {
+      this.#pageRouting.update(...this.createRouteUpdate(specifier))
+    } else if (specifier.startsWith('/api/')) {
+      this.#apiRouting.update(...this.createRouteUpdate(specifier))
     }
     return
   }
@@ -480,15 +499,15 @@ export class Application implements ServerApplication {
     }
 
     let useDeno = false
-    for (const url of [...builtinModuleExts.map(ext => `/app.${ext}`), ...nestedModules]) {
-      const mod = this.getModule(url)
+    for (const specifier of [...builtinModuleExts.map(ext => `/app.${ext}`), ...nestedModules]) {
+      const mod = this.getModule(specifier)
       if (mod) {
-        if (mod.useDenoHook) {
+        if (mod.useDenoHooks?.length) {
           useDeno = true
         } else {
-          this.lookupDeps(mod.url, dep => {
-            const depMod = this.getModule(dep.url)
-            if (depMod?.useDenoHook) {
+          this.lookupDeps(mod.specifier, dep => {
+            const depMod = this.getModule(dep.specifier)
+            if (depMod?.useDenoHooks?.length) {
               useDeno = true
               return false
             }
@@ -560,28 +579,28 @@ export class Application implements ServerApplication {
   }
 
   /** check the module whether it is hmrable. */
-  isHMRable(url: string) {
-    if (!this.isDev || util.isLikelyHttpURL(url)) {
+  isHMRable(specifier: string) {
+    if (!this.isDev || util.isLikelyHttpURL(specifier)) {
       return false
     }
 
     for (const ext of builtinModuleExts) {
-      if (url.endsWith('.' + ext)) {
+      if (specifier.endsWith('.' + ext)) {
         return (
-          url.startsWith('/pages/') ||
-          url.startsWith('/components/') ||
-          ['/app', '/404'].includes(util.trimSuffix(url, '.' + ext))
+          specifier.startsWith('/pages/') ||
+          specifier.startsWith('/components/') ||
+          ['/app', '/404'].includes(util.trimSuffix(specifier, '.' + ext))
         )
       }
     }
 
-    const mod = this.#modules.get(url)
+    const mod = this.#modules.get(specifier)
     if (mod && mod.isStyle) {
       return true
     }
 
     return this.loaders.some(p => (
-      p.test.test(url) &&
+      p.test.test(specifier) &&
       (p.acceptHMR || p.allowPage)
     ))
   }
@@ -598,10 +617,10 @@ export class Application implements ServerApplication {
       locales: [],
       routes,
       rewrites: this.config.rewrites,
-      globalComponents: Array.from(this.#modules.values()).filter(({ url }) => {
-        return ['/app', '/404'].includes(trimBuiltinModuleExts(url))
-      }).reduce((records, { url }) => {
-        records[trimBuiltinModuleExts(url).slice(1)] = url
+      globalComponents: Array.from(this.#modules.values()).filter(({ specifier }) => {
+        return ['/app', '/404'].includes(trimBuiltinModuleExts(specifier))
+      }).reduce((records, { specifier }) => {
+        records[trimBuiltinModuleExts(specifier).slice(1)] = specifier
         return records
       }, {} as Record<string, string>),
       renderMode: this.config.ssr ? 'ssr' : 'spa'
@@ -642,8 +661,8 @@ export class Application implements ServerApplication {
         `/shared/util.js`,
       ].map(p => `${basePath}/_aleph/-/${alephPkgPath}${p}`)
 
-      Array.from(this.#modules.keys()).forEach(url => {
-        switch (trimBuiltinModuleExts(url)) {
+      Array.from(this.#modules.keys()).forEach(specifier => {
+        switch (trimBuiltinModuleExts(specifier)) {
           case '/app':
             preload.push(`${basePath}/_aleph/app.js`)
             break
@@ -675,14 +694,14 @@ export class Application implements ServerApplication {
   }
 
   /** parse the export names of the module. */
-  async parseModuleExportNames(url: string): Promise<string[]> {
-    const { content, contentType } = await this.fetch(url)
-    const sourceType = getSourceType(url, contentType || undefined)
+  async parseModuleExportNames(specifier: string): Promise<string[]> {
+    const { content, contentType } = await this.fetch(specifier)
+    const sourceType = getSourceType(specifier, contentType || undefined)
     if (sourceType === SourceType.Unknown || sourceType === SourceType.CSS) {
       return []
     }
     const code = (new TextDecoder).decode(content)
-    const names = await parseExportNames(url, code, { sourceType })
+    const names = await parseExportNames(specifier, code, { sourceType })
     return (await Promise.all(names.map(async name => {
       if (name.startsWith('{') && name.startsWith('}')) {
         return await this.parseModuleExportNames(name.slice(1, -1))
@@ -700,7 +719,7 @@ export class Application implements ServerApplication {
         if (type !== 'css') {
           for (const loader of this.loaders) {
             if (loader.test.test(`.${type}`) && loader.load) {
-              const { code, type } = await loader.load({ url: key, data: (new TextEncoder).encode(tpl) }, this)
+              const { code, type } = await loader.load({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
               if (type === 'css') {
                 tpl = code
               }
@@ -709,7 +728,7 @@ export class Application implements ServerApplication {
         }
         for (const loader of this.loaders) {
           if (loader.test.test('.css') && loader.load) {
-            const { code, type } = await loader.load({ url: key, data: (new TextEncoder).encode(tpl) }, this)
+            const { code, type } = await loader.load({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
             if (type === 'css') {
               return code
             }
@@ -722,10 +741,36 @@ export class Application implements ServerApplication {
     }
   }
 
-  async analyze(): Promise<void> {
+  async analyze(): Promise<DependencyGraph[]> {
     await this.ready
-    this.#modules.size
-    console.log('todo: analyze deps...')
+
+    // add page module entries
+    this.#pageRouting.lookup(routes => {
+      const finalRoute = routes.pop()
+      if (finalRoute) {
+        const finalRouteModule = this.getModule(finalRoute.module)
+        if (finalRouteModule) {
+          this.#graphs.push(this.createDependencyGraph(
+            finalRouteModule,
+            undefined,
+            undefined,
+            routes.map(({ module }) => module)
+          ))
+        }
+      }
+    })
+
+    return this.#graphs
+  }
+
+  private createDependencyGraph({ specifier, deps }: Module, isShared?: boolean, isDynamic?: boolean, extraDeps?: string[]): DependencyGraph {
+    const graph = {
+      specifier,
+      isShared,
+      isDynamic,
+      deps: []
+    }
+    return graph
   }
 
   /** build the application to a static site(SSG) */
@@ -776,15 +821,15 @@ export class Application implements ServerApplication {
     log.info(`Done in ${Math.round(performance.now() - start)}ms`)
   }
 
-  private createRouteUpdate(url: string): [string, string, boolean | undefined] {
-    const isBuiltinModuleType = builtinModuleExts.some(ext => url.endsWith('.' + ext))
-    let routePath = isBuiltinModuleType ? toPagePath(url) : util.trimSuffix(url, '/pages')
+  private createRouteUpdate(specifier: string): [string, string, boolean | undefined] {
+    const isBuiltinModuleType = builtinModuleExts.some(ext => specifier.endsWith('.' + ext))
+    let routePath = isBuiltinModuleType ? toPagePath(specifier) : util.trimSuffix(specifier, '/pages')
     let isIndex: boolean | undefined = undefined
 
     if (!isBuiltinModuleType) {
       for (const loader of this.loaders) {
-        if (loader.test.test(url) && loader.allowPage && loader.resolve) {
-          const { pagePath, isIndex: _isIndex } = loader.resolve(url)
+        if (loader.test.test(specifier) && loader.allowPage && loader.resolve) {
+          const { pagePath, isIndex: _isIndex } = loader.resolve(specifier)
           if (util.isNEString(pagePath)) {
             routePath = pagePath
             if (!!_isIndex) {
@@ -796,14 +841,14 @@ export class Application implements ServerApplication {
       }
     } else if (routePath !== '/') {
       for (const ext of builtinModuleExts) {
-        if (url.endsWith('/index.' + ext)) {
+        if (specifier.endsWith('/index.' + ext)) {
           isIndex = true
           break
         }
       }
     }
 
-    return [routePath, url, isIndex]
+    return [routePath, specifier, isIndex]
   }
 
   /** fetch resource by the url. */
@@ -839,7 +884,7 @@ export class Application implements ServerApplication {
   }
 
   async getModuleJSCode(module: Module): Promise<Uint8Array | null> {
-    const { jsFile, jsCode } = module
+    const { specifier, jsFile, jsCode } = module
     if (jsCode) {
       return jsCode
     }
@@ -848,22 +893,22 @@ export class Application implements ServerApplication {
     if (await existsFile(cacheFp)) {
       const content = await Deno.readFile(cacheFp)
       module.jsCode = content
-      log.debug(`read cached '${jsFile}'` + dim(' • ' + util.formatBytes(content.length)))
+      log.debug(`load jsCode of ${specifier}` + dim(' • ' + util.formatBytes(content.length)))
       return content
     }
 
     return null
   }
 
-  async loadModule(url: string, data?: any): Promise<Source> {
+  async loadModule(specifier: string, data?: any): Promise<Source> {
     let sourceCode: string = ''
     let sourceType: SourceType = SourceType.Unknown
     let sourceMap: string | null = null
-    let loader = this.loaders.find(l => l.test.test(url))
+    let loader = this.loaders.find(l => l.test.test(specifier))
     let isStyle = loader !== undefined && isBuiltinCSSLoader(loader)
 
     if (loader && util.isFunction(loader.load)) {
-      const { code, type = 'js', map } = await loader.load({ url, data }, this)
+      const { code, type = 'js', map } = await loader.load({ specifier, data }, this)
       switch (type) {
         case 'js':
           sourceType = SourceType.JS
@@ -884,8 +929,8 @@ export class Application implements ServerApplication {
       sourceCode = code
       sourceMap = map || null
     } else {
-      const source = await this.fetch(url)
-      sourceType = getSourceType(url, source.contentType || undefined)
+      const source = await this.fetch(specifier)
+      sourceType = getSourceType(specifier, source.contentType || undefined)
       if (sourceType !== SourceType.Unknown) {
         sourceCode = (new TextDecoder).decode(source.content)
       }
@@ -896,7 +941,7 @@ export class Application implements ServerApplication {
       for (const loader of this.loaders) {
         if (loader.test.test('.css') && util.isFunction(loader.load)) {
           // todo: covert source map
-          const { code, type = 'js' } = await loader.load({ url, data: sourceCode }, this)
+          const { code, type = 'js' } = await loader.load({ specifier, data: sourceCode }, this)
           if (type === 'js') {
             sourceCode = code
             sourceType = SourceType.JS
@@ -913,22 +958,22 @@ export class Application implements ServerApplication {
     }
   }
 
-  /** compile the module by given url */
-  private async compile(url: string) {
-    const module = await this.initModule(url)
+  /** compile the module by given specifier */
+  private async compile(specifier: string) {
+    const module = await this.initModule(specifier)
     await this.transpileModule(module)
     return module
   }
 
-  private async initModule(url: string, { source, forceRefresh }: { source?: Source, forceRefresh?: boolean } = {}): Promise<Module> {
+  private async initModule(specifier: string, { source, forceRefresh }: { source?: Source, forceRefresh?: boolean } = {}): Promise<Module> {
     let external = false
     let data: any = null
 
     if (source === undefined) {
       for (const l of this.loaders) {
-        if (util.isFunction(l.resolve) && l.test.test(url)) {
-          const ret = l.resolve(url)
-          url = ret.url
+        if (util.isFunction(l.resolve) && l.test.test(specifier)) {
+          const ret = l.resolve(specifier)
+          specifier = ret.specifier
           external = Boolean(ret.external)
           data = ret.data
           break
@@ -938,43 +983,38 @@ export class Application implements ServerApplication {
 
     if (external) {
       return {
-        url,
+        specifier,
         deps: [],
         external,
-        isStyle: false,
-        useDenoHook: false,
         sourceHash: '',
         jsFile: '',
         ready: Promise.resolve()
       }
     }
 
-    let mod = this.#modules.get(url)
+    let mod = this.#modules.get(specifier)
     if (mod && !forceRefresh) {
       await mod.ready
       return mod
     }
 
-    const isRemote = util.isLikelyHttpURL(url) && !isLocalUrl(url)
-    const localUrl = toLocalPath(url)
-    const name = trimBuiltinModuleExts(basename(localUrl))
-    const jsFile = join(dirname(localUrl), `${name}.js`)
+    const isRemote = util.isLikelyHttpURL(specifier) && !isLocalUrl(specifier)
+    const localPath = toLocalPath(specifier)
+    const name = trimBuiltinModuleExts(basename(localPath))
+    const jsFile = join(dirname(localPath), `${name}.js`)
     const cacheFp = join(this.buildDir, jsFile)
     const metaFp = cacheFp.slice(0, -3) + '.meta.json'
 
     let defer = (err?: Error) => { }
     mod = {
-      url,
+      specifier,
       deps: [],
-      external: false,
-      isStyle: false,
-      useDenoHook: false,
       sourceHash: '',
       jsFile,
       ready: new Promise((resolve, reject) => {
         defer = (err?: Error) => {
           if (err) {
-            this.#modules.delete(url)
+            this.#modules.delete(specifier)
             reject(err)
           } else {
             resolve()
@@ -982,7 +1022,7 @@ export class Application implements ServerApplication {
         }
       })
     }
-    this.#modules.set(url, mod)
+    this.#modules.set(specifier, mod)
 
     if (isRemote && !this.#reloading) {
       if (!await existsFile(metaFp) || !await existsFile(cacheFp)) {
@@ -1003,12 +1043,12 @@ export class Application implements ServerApplication {
 
     if (await existsFile(metaFp)) {
       try {
-        const { url: _url, sourceHash, deps, isStyle, useDenoHook } = JSON.parse(await Deno.readTextFile(metaFp))
-        if (_url === url && util.isNEString(sourceHash) && util.isArray(deps)) {
+        const { specifier: _specifier, sourceHash, deps, isStyle, useDenoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
+        if (_specifier === specifier && util.isNEString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
-          mod.isStyle = Boolean(isStyle)
-          mod.useDenoHook = Boolean(useDenoHook)
+          mod.isStyle = isStyle || undefined
+          mod.useDenoHooks = util.isNEArray(useDenoHooks) ? useDenoHooks : undefined
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
           Deno.remove(metaFp)
@@ -1022,7 +1062,7 @@ export class Application implements ServerApplication {
     )
     if (shouldLoad) {
       try {
-        const { code, type, isStyle } = source || await this.loadModule(url, data)
+        const { code, type, isStyle } = source || await this.loadModule(specifier, data)
         const sourceHash = computeHash(code)
         if (mod.sourceHash !== sourceHash) {
           mod.sourceCode = code
@@ -1032,7 +1072,7 @@ export class Application implements ServerApplication {
         mod.isStyle = isStyle
       } catch (err) {
         defer(err)
-        log.error(`Load module '${url}':`, err.message)
+        log.error(`load module '${specifier}':`, err.message)
         return mod
       }
     }
@@ -1042,18 +1082,18 @@ export class Application implements ServerApplication {
   }
 
   private async transpileModule(module: Module, ignoreDeps = false, __tracing: Set<string> = new Set()): Promise<void> {
-    const { url, sourceType, sourceCode, jsFile } = module
+    const { specifier, sourceType, sourceCode, jsFile } = module
 
     // ensure the module only be transppiled once in current compilation context,
     // to avoid dead-loop caused by cicular imports
-    if (__tracing.has(url)) {
+    if (__tracing.has(specifier)) {
       return
     }
-    __tracing.add(url)
+    __tracing.add(specifier)
 
     if (sourceType !== undefined && sourceCode !== undefined) {
       if (sourceType === SourceType.Unknown) {
-        log.error(`Unsupported module '${url}'`)
+        log.error(`Unsupported module '${specifier}'`)
         return
       }
 
@@ -1062,7 +1102,7 @@ export class Application implements ServerApplication {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, useDenoHooks, starExports, map } = await transform(url, sourceCode, {
+      const { code, deps, useDenoHooks, starExports, map } = await transform(specifier, sourceCode, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
@@ -1075,31 +1115,31 @@ export class Application implements ServerApplication {
       // in production/bundle mode we need to replace the star export with names
       if (starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
-          const exportUrl = starExports[index]
-          const names = await this.parseModuleExportNames(exportUrl)
-          jsCode = jsCode.replace(`export * from "[${exportUrl}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+          const exportSpecifier = starExports[index]
+          const names = await this.parseModuleExportNames(exportSpecifier)
+          jsCode = jsCode.replace(`export * from "[${exportSpecifier}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
         }
       }
 
       // revert external imports
       if (this.loaders.length > 0) {
         deps.forEach(({ specifier }) => {
-          if (specifier !== module.url && util.isLikelyHttpURL(specifier)) {
+          if (specifier !== module.specifier && util.isLikelyHttpURL(specifier)) {
             let external = false
             for (const l of this.loaders) {
               if (util.isFunction(l.resolve) && l.test.test(specifier)) {
                 const ret = l.resolve(specifier)
                 external = Boolean(ret.external)
-                specifier = ret.url
+                specifier = ret.specifier
                 break
               }
             }
             if (external) {
-              const importUrl = toRelativePath(
-                dirname(toLocalPath(module.url)),
+              const importSpecifier = toRelativePath(
+                dirname(toLocalPath(module.specifier)),
                 toLocalPath(specifier)
               )
-              jsCode.replaceAll(`"${importUrl}"`, `"${specifier}"`)
+              jsCode.replaceAll(`"${importSpecifier}"`, `"${specifier}"`)
             }
           }
         })
@@ -1111,8 +1151,8 @@ export class Application implements ServerApplication {
       }
 
       module.jsCode = encoder.encode(jsCode)
-      module.deps = deps.filter(({ specifier }) => specifier != module.url).map(({ specifier, isDynamic, importIndex }) => {
-        const dep: DependencyDescriptor = { url: specifier }
+      module.deps = deps.filter(({ specifier }) => specifier != module.specifier).map(({ specifier, isDynamic, importIndex }) => {
+        const dep: DependencyDescriptor = { specifier }
         if (isDynamic) {
           dep.isDynamic = true
         }
@@ -1125,21 +1165,22 @@ export class Application implements ServerApplication {
         }
         return dep
       })
-      if (useDenoHooks && useDenoHooks.length > 0) {
-        module.useDenoHook = true
+      if (util.isNEArray(useDenoHooks)) {
+        module.useDenoHooks = useDenoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.config.ssr) {
-          log.error(`'useDeno' hook in SPA mode is illegal: ${url}`)
+          log.error(`'useDeno' hook in SPA mode is illegal: ${specifier}`)
         }
       }
 
-      ms.stop(`transpile '${url}'`)
+      ms.stop(`transpile '${specifier}'`)
 
       const cacheFp = join(this.buildDir, jsFile)
       const metaFp = cacheFp.slice(0, -3) + '.meta.json'
       const metaJSON = JSON.stringify({
-        url,
+        specifier,
         sourceHash: module.sourceHash,
-        isStyle: module.isStyle ? true : undefined,
+        isStyle: module.isStyle || undefined,
+        useDenoHooks: util.isNEArray(module.useDenoHooks) ? module.useDenoHooks : undefined,
         deps: module.deps,
       }, undefined, 2)
       await ensureDir(dirname(cacheFp))
@@ -1148,7 +1189,7 @@ export class Application implements ServerApplication {
         Deno.writeTextFile(metaFp, metaJSON),
         map ? Deno.writeTextFile(`${cacheFp}.map`, map) : Promise.resolve(),
       ])
-      if (util.isLikelyHttpURL(url) && !isLocalUrl(url)) {
+      if (util.isLikelyHttpURL(specifier) && !isLocalUrl(specifier)) {
         const globalCacheFp = join(await getDenoDir(), 'gen/aleph', jsFile)
         const globalMetaFp = globalCacheFp.slice(0, -3) + '.meta.json'
         await ensureDir(dirname(globalCacheFp))
@@ -1169,8 +1210,8 @@ export class Application implements ServerApplication {
       const hasher = createHash('md5').update(module.sourceHash)
       let fsync = false
       await Promise.all(module.deps.map(async dep => {
-        const { url, hash: prevHash, hashLoc } = dep
-        const depModule = await this.initModule(url)
+        const { specifier, hash: prevHash, hashLoc } = dep
+        const depModule = await this.initModule(specifier)
         if (!depModule.external) {
           await this.transpileModule(depModule, false, __tracing)
         }
@@ -1202,14 +1243,14 @@ export class Application implements ServerApplication {
   private async applyCompilationSideEffect(by: Module, callback: (mod: Module) => void) {
     const hash = by.hash || by.sourceHash
     const hashData = (new TextEncoder()).encode(hash.substr(0, 6))
-    this.applyModuleSideEffect(by.url)
+    this.applyModuleSideEffect(by.specifier)
     for (const mod of this.#modules.values()) {
       const { deps } = mod
       if (deps.length > 0) {
         let fsync = false
         for (const dep of deps) {
-          const { url, hash: prevHash, hashLoc } = dep
-          if (url === by.url && hashLoc && prevHash !== hash) {
+          const { specifier, hash: prevHash, hashLoc } = dep
+          if (specifier === by.specifier && hashLoc && prevHash !== hash) {
             const jsCode = await this.getModuleJSCode(mod)
             dep.hash = hash
             if (jsCode) {
@@ -1222,15 +1263,15 @@ export class Application implements ServerApplication {
         }
         if (fsync) {
           const hasher = createHash('md5').update(mod.sourceHash)
-          deps.forEach(({ url }) => {
-            const depMod = url === by.url ? by : this.#modules.get(url)
+          deps.forEach(({ specifier }) => {
+            const depMod = specifier === by.specifier ? by : this.#modules.get(specifier)
             if (depMod) {
               hasher.update(depMod.hash || depMod.sourceHash)
             }
           })
           mod.hash = hasher.toString()
           await this.cacheModule(mod)
-          this.applyModuleSideEffect(mod.url)
+          this.applyModuleSideEffect(mod.specifier)
           callback(mod)
           await this.applyCompilationSideEffect(mod, callback)
         }
@@ -1238,20 +1279,20 @@ export class Application implements ServerApplication {
     }
   }
 
-  private applyModuleSideEffect(url: string) {
-    if (trimBuiltinModuleExts(url) === '/app') {
+  private applyModuleSideEffect(specifier: string) {
+    if (trimBuiltinModuleExts(specifier) === '/app') {
       this.#renderer.clearCache()
-    } else if (url.startsWith('/pages/')) {
-      const [routePath] = this.createRouteUpdate(url)
+    } else if (specifier.startsWith('/pages/')) {
+      const [routePath] = this.createRouteUpdate(specifier)
       this.#renderer.clearCache(routePath)
-      this.#pageRouting.update(...this.createRouteUpdate(url))
-    } else if (url.startsWith('/api/')) {
-      this.#apiRouting.update(...this.createRouteUpdate(url))
+      this.#pageRouting.update(...this.createRouteUpdate(specifier))
+    } else if (specifier.startsWith('/api/')) {
+      this.#apiRouting.update(...this.createRouteUpdate(specifier))
     }
   }
 
   private async cacheModule(module: Module) {
-    const { url, jsCode, jsFile } = module
+    const { specifier, jsCode, jsFile } = module
     if (jsCode) {
       const cacheFp = join(this.buildDir, jsFile)
       const metaFp = cacheFp.slice(0, -3) + '.meta.json'
@@ -1259,9 +1300,10 @@ export class Application implements ServerApplication {
       await Promise.all([
         Deno.writeFile(cacheFp, jsCode),
         Deno.writeTextFile(metaFp, JSON.stringify({
-          url,
+          specifier,
           sourceHash: module.sourceHash,
-          isStyle: module.isStyle ? true : undefined,
+          isStyle: module.isStyle || undefined,
+          useDenoHooks: util.isNEArray(module.useDenoHooks) ? module.useDenoHooks : undefined,
           deps: module.deps,
         }, undefined, 2)),
         lazyRemove(cacheFp.slice(0, -3) + '.client.js'),
@@ -1271,57 +1313,7 @@ export class Application implements ServerApplication {
 
   /** create bundle chunks for production. */
   private async bundle() {
-    const sharedEntryMods = new Set<string>()
-    const entryMods = new Map<string[], boolean>()
-    const refCounter = new Set<string>()
-    const concatAllEntries = () => [
-      Array.from(entryMods.entries()).map(([urls, shared]) => urls.map(url => ({ url, shared }))),
-      Array.from(sharedEntryMods).map(url => ({ url, shared: true })),
-    ].flat(2)
-
-    // add framwork bootstrap module as shared entry
-    entryMods.set(
-      [`${getAlephPkgUri()}/framework/${this.config.framework}/bootstrap.ts`],
-      true
-    )
-
-    // add app/404 modules as shared entry
-    entryMods.set(Array.from(this.#modules.keys()).filter(url => ['/app', '/404'].includes(trimBuiltinModuleExts(url))), true)
-
-    // add page module entries
-    this.#pageRouting.lookup(routes => {
-      routes.forEach(({ module }) => entryMods.set([module], false))
-    })
-
-    // add dynamic imported module as entry
-    this.#modules.forEach(mod => {
-      mod.deps.forEach(({ url, isDynamic }) => {
-        if (isDynamic) {
-          entryMods.set([url], false)
-        }
-        return url
-      })
-    })
-
-    for (const mods of entryMods.keys()) {
-      const deps = new Set<string>()
-      mods.forEach(url => {
-        this.lookupDeps(url, dep => {
-          if (!dep.isDynamic) {
-            deps.add(dep.url)
-          }
-        })
-      })
-      deps.forEach(url => {
-        if (refCounter.has(url)) {
-          sharedEntryMods.add(url)
-        } else {
-          refCounter.add(url)
-        }
-      })
-    }
-
-    await this.#bundler.bundle(concatAllEntries())
+    // await this.#bundler.bundle(concatAllEntries())
   }
 
   /** render all pages in routing. */
@@ -1400,25 +1392,25 @@ export class Application implements ServerApplication {
 
   /** lookup app deps recurively. */
   lookupDeps(
-    url: string,
+    specifier: string,
     callback: (dep: DependencyDescriptor) => false | void,
     __tracing: Set<string> = new Set()
   ) {
-    const mod = this.getModule(url)
+    const mod = this.getModule(specifier)
     if (mod === null) {
       return
     }
-    if (__tracing.has(url)) {
+    if (__tracing.has(specifier)) {
       return
     }
-    __tracing.add(url)
+    __tracing.add(specifier)
     for (const dep of mod.deps) {
       if (callback(dep) === false) {
         return false
       }
     }
-    for (const { url } of mod.deps) {
-      if ((this.lookupDeps(url, callback, __tracing)) === false) {
+    for (const { specifier } of mod.deps) {
+      if ((this.lookupDeps(specifier, callback, __tracing)) === false) {
         return false
       }
     }

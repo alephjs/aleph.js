@@ -59,17 +59,6 @@ type InlineStyleRecord = Record<string, InlineStyle>
 
 let wasmReady: Promise<void> | boolean = false
 
-async function getDenoDir() {
-  const p = Deno.run({
-    cmd: [Deno.execPath(), 'info', '--json', '--unstable'],
-    stdout: 'piped',
-    stderr: 'null'
-  })
-  const output = (new TextDecoder).decode(await p.output())
-  p.close()
-  return JSON.parse(output).denoDir
-}
-
 export async function initWasm() {
   const { url } = import.meta
   if (url.startsWith('file://')) {
@@ -108,21 +97,11 @@ async function checkWasmReady() {
  *     export default App() {
  *       return <h1>Hello World</h1>
  *     }
- *   `,
- *   {
- *     url: '/app.tsx'
- *     swcOptions: {
- *       target: 'es2020'
- *     }
- *   }
+ *   `
  * )
  * ```
- *
- * @param {string} url - the module URL.
- * @param {string} code - the mocule code.
- * @param {object} options - the transform options.
  */
-export async function transform(url: string, code: string, options: TransformOptions = {}): Promise<TransformResult> {
+export async function transform(specifier: string, code: string, options: TransformOptions = {}): Promise<TransformResult> {
   await checkWasmReady()
 
   const { inlineStylePreprocess, ...transformOptions } = options
@@ -133,7 +112,7 @@ export async function transform(url: string, code: string, options: TransformOpt
     useDenoHooks,
     starExports,
     map,
-  } = transformSync(url, code, transformOptions)
+  } = transformSync(specifier, code, transformOptions)
 
   // resolve inline-style
   if (inlineStyles) {
@@ -171,9 +150,9 @@ export async function transform(url: string, code: string, options: TransformOpt
 }
 
 /* parse export names of the module */
-export async function parseExportNames(url: string, code: string, options: SWCOptions = {}): Promise<string[]> {
+export async function parseExportNames(specifier: string, code: string, options: SWCOptions = {}): Promise<string[]> {
   await checkWasmReady()
-  return parseExportNamesSync(url, code, options)
+  return parseExportNamesSync(specifier, code, options)
 }
 
 /**

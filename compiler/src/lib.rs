@@ -94,7 +94,7 @@ pub struct TransformOutput {
 
 #[wasm_bindgen(js_name = "parseExportNamesSync")]
 pub fn parse_export_names_sync(
-  url: &str,
+  specifier: &str,
   code: &str,
   options: JsValue,
 ) -> Result<JsValue, JsValue> {
@@ -104,13 +104,14 @@ pub fn parse_export_names_sync(
     .into_serde()
     .map_err(|err| format!("failed to parse options: {}", err))
     .unwrap();
-  let module = SWC::parse(url, code, Some(options.source_type)).expect("could not parse module");
+  let module =
+    SWC::parse(specifier, code, Some(options.source_type)).expect("could not parse module");
   let export_names = module.parse_export_names().unwrap();
   Ok(JsValue::from_serde(&export_names).unwrap())
 }
 
 #[wasm_bindgen(js_name = "transformSync")]
-pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
+pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
   console_error_panic_hook::set_once();
 
   let options: Options = options
@@ -118,7 +119,7 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
     .map_err(|err| format!("failed to parse options: {}", err))
     .unwrap();
   let resolver = Rc::new(RefCell::new(Resolver::new(
-    url,
+    specifier,
     options.import_map,
     options.bundle_mode,
     options.bundle_external,
@@ -128,8 +129,8 @@ pub fn transform_sync(url: &str, code: &str, options: JsValue) -> Result<JsValue
     },
     options.react,
   )));
-  let module =
-    SWC::parse(url, code, Some(options.swc_options.source_type)).expect("could not parse module");
+  let module = SWC::parse(specifier, code, Some(options.swc_options.source_type))
+    .expect("could not parse module");
   let (code, map) = module
     .transform(
       resolver.clone(),

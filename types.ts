@@ -47,16 +47,16 @@ export type LoaderPlugin = {
   name: string
   /** `type` specifies the plugin type. */
   type: 'loader'
-  /** `test` matches the import url. */
+  /** `test` matches the import specifier. */
   test: RegExp
   /** `acceptHMR` enables the HMR. */
   acceptHMR?: boolean
   /** allowPage` allows to load the module as a page. */
   allowPage?: boolean
-  /** `resove` resolves the module url. */
-  resolve?(url: string): ResolveResult
+  /** `resove` resolves the module specifier. */
+  resolve?(specifier: string): ResolveResult
   /** `load` loads the source content. */
-  load?(input: { url: string, data?: any }, app: ServerApplication): LoaderOutput | Promise<LoaderOutput>
+  load?(input: { specifier: string, data?: any }, app: ServerApplication): LoaderOutput | Promise<LoaderOutput>
 }
 
 /**
@@ -80,7 +80,7 @@ export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
  * The result of loader resove.
  */
 export type ResolveResult = {
-  url: string,
+  specifier: string,
   external?: boolean,
   pagePath?: string,
   isIndex?: boolean
@@ -169,10 +169,10 @@ export interface ServerApplication {
   readonly buildDir: string
   readonly config: Required<Config>
   readonly importMap: ImportMap
-  addModule(url: string, sourceCode?: string): Promise<void>
+  addModule(specifier: string, sourceCode?: string): Promise<void>
   addDist(path: string, content: Uint8Array): Promise<void>
   fetch(url: string): Promise<{ content: Uint8Array, contentType: string | null }>
-  injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: (url: string, code: string) => string): void
+  injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: (specifier: string, code: string) => string): void
 }
 
 /**

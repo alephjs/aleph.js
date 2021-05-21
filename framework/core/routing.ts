@@ -75,7 +75,7 @@ export class Routing {
       const route = routePath[routePath.length - 1]
       const parentRoute = routePath[routePath.length - 2]
       if (route.module === newRoute.module) {
-        Object.assign(route.module, newRoute.module)
+        route.module = newRoute.module
         exists = true
         return false
       }

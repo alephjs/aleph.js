@@ -50,23 +50,25 @@ export class Server {
         const socket = await acceptWebSocket({ conn, bufReader, bufWriter, headers })
         const watcher = app.createFSWatcher()
         watcher.on('add', (mod: any) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
-        watcher.on('remove', (url: string) => {
-          watcher.removeAllListeners('modify-' + url)
-          socket.send(JSON.stringify({ type: 'remove', url }))
+        watcher.on('remove', (specifier: string) => {
+          watcher.removeAllListeners('modify-' + specifier)
+          socket.send(JSON.stringify({ type: 'remove', specifier }))
         })
+        log.debug('hmr opened')
         for await (const e of socket) {
           if (util.isNEString(e)) {
             try {
               const data = JSON.parse(e)
-              if (data.type === 'hotAccept' && util.isNEString(data.url)) {
-                const mod = app.getModule(data.url)
+              if (data.type === 'hotAccept' && util.isNEString(data.specifier)) {
+                const mod = app.getModule(data.specifier)
                 if (mod) {
-                  watcher.on('modify-' + mod.url, (hash: string) => {
+                  log.debug('hmr on', mod.specifier)
+                  watcher.on(`modify-${mod.specifier}`, (data) => {
                     socket.send(JSON.stringify({
+                      ...data,
                       type: 'update',
-                      url: mod.url,
-                      updateUrl: util.cleanPath(`${basePath}/_aleph/${trimBuiltinModuleExts(mod.url)}.js`),
-                      hash,
+                      specifier: mod.specifier,
+                      updateUrl: util.cleanPath(`${basePath}/_aleph/${trimBuiltinModuleExts(mod.specifier)}.js`),
                     }))
                   })
                 }
@@ -77,6 +79,7 @@ export class Server {
           }
         }
         app.removeFSWatcher(watcher)
+        log.debug('hmr closed')
         return
       }
 
@@ -112,18 +115,18 @@ export class Server {
               }
 
               req.setHeader('ETag', etag)
-              if (app.isHMRable(module.url)) {
+              if (app.isHMRable(module.specifier)) {
                 let code = new TextDecoder().decode(content)
                 app.getCodeInjects('hmr')?.forEach(transform => {
-                  code = transform(module.url, code)
+                  code = transform(module.specifier, code)
                 })
-                const hmrModuleImportUrl = toRelativePath(
-                  dirname(toLocalPath(module.url)),
+                const hmrModuleSpecifier = toRelativePath(
+                  dirname(toLocalPath(module.specifier)),
                   toLocalPath(`${getAlephPkgUri()}/framework/core/hmr.js`)
                 )
                 const lines = [
-                  `import { createHotContext } from ${JSON.stringify(hmrModuleImportUrl)};`,
-                  `import.meta.hot = createHotContext(${JSON.stringify(module.url)});`,
+                  `import { createHotContext } from ${JSON.stringify(hmrModuleSpecifier)};`,
+                  `import.meta.hot = createHotContext(${JSON.stringify(module.specifier)});`,
                   '',
                   code,
                   '',
