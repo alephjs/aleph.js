@@ -105,10 +105,10 @@ export class Routing {
     targetRoutes.push(newRoute)
   }
 
-  removeRoute(url: string) {
+  removeRouteByModule(specifier: string) {
     this._lookup(path => {
       const route = path[path.length - 1]
-      if (route.module === url) {
+      if (route.module === specifier) {
         const parentRoute = path[path.length - 2]
         const routes = parentRoute ? parentRoute.children! : this._routes
         const index = routes.indexOf(route)

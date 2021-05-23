@@ -81,6 +81,7 @@ export class Application implements ServerApplication {
 
   #chunks: DependencyGraph[] = []
   #modules: Map<string, Module> = new Map()
+  #appModule: Module | null = null
   #pageRouting: Routing = new Routing({})
   #apiRouting: Routing = new Routing({})
   #fsWatchListeners: Array<EventEmitter> = []
@@ -232,13 +233,11 @@ export class Application implements ServerApplication {
       modules.push(`${alephPkgUri}/framework/core/nomodule.ts`)
     }
 
-    // compile custom components
-    for (const name of ['app', '404', 'loading']) {
-      for (const ext of builtinModuleExts) {
-        if (await existsFile(join(srcDir, `${name}.${ext}`))) {
-          modules.push(`/${name}.${ext}`)
-          break
-        }
+    // compile app module
+    for (const ext of builtinModuleExts) {
+      if (await existsFile(join(srcDir, `app.${ext}`))) {
+        modules.push(`/app.${ext}`)
+        break
       }
     }
 
@@ -355,10 +354,9 @@ export class Application implements ServerApplication {
               } else if (specifier.startsWith('/pages/')) {
                 const [routePath] = this.createRouteUpdate(specifier)
                 this.#renderer.clearCache(routePath)
-                this.#pageRouting.removeRoute(routePath)
+                this.#pageRouting.removeRouteByModule(specifier)
               } else if (specifier.startsWith('/api/')) {
-                const [routePath] = this.createRouteUpdate(specifier)
-                this.#apiRouting.removeRoute(routePath)
+                this.#apiRouting.removeRouteByModule(specifier)
               }
               this.#modules.delete(specifier)
               if (this.isHMRable(specifier)) {
@@ -376,14 +374,11 @@ export class Application implements ServerApplication {
   private isScopedModule(specifier: string) {
     for (const ext of builtinModuleExts) {
       if (specifier.endsWith('.' + ext)) {
-        if (specifier.startsWith('/pages/') || specifier.startsWith('/api/')) {
-          return true
-        }
-        switch (trimBuiltinModuleExts(specifier)) {
-          case '/404':
-          case '/app':
-            return true
-        }
+        return (
+          specifier.startsWith('/pages/') ||
+          specifier.startsWith('/api/') ||
+          util.trimSuffix(specifier, '.' + ext) === '/app'
+        )
       }
     }
 
@@ -589,7 +584,7 @@ export class Application implements ServerApplication {
         return (
           specifier.startsWith('/pages/') ||
           specifier.startsWith('/components/') ||
-          ['/app', '/404'].includes(util.trimSuffix(specifier, '.' + ext))
+          util.trimSuffix(specifier, '.' + ext) === '/app'
         )
       }
     }
@@ -613,17 +608,12 @@ export class Application implements ServerApplication {
     const { routes } = this.#pageRouting
     const config: Record<string, any> = {
       basePath,
+      appModule: this.#appModule?.specifier,
+      routes,
+      renderMode: this.config.ssr ? 'ssr' : 'spa',
       defaultLocale,
       locales: [],
-      routes,
       rewrites: this.config.rewrites,
-      globalComponents: Array.from(this.#modules.values()).filter(({ specifier }) => {
-        return ['/app', '/404'].includes(trimBuiltinModuleExts(specifier))
-      }).reduce((records, { specifier }) => {
-        records[trimBuiltinModuleExts(specifier).slice(1)] = specifier
-        return records
-      }, {} as Record<string, string>),
-      renderMode: this.config.ssr ? 'ssr' : 'spa'
     }
 
     if (bundleMode) {
@@ -661,16 +651,9 @@ export class Application implements ServerApplication {
         `/shared/util.js`,
       ].map(p => `${basePath}/_aleph/-/${alephPkgPath}${p}`)
 
-      Array.from(this.#modules.keys()).forEach(specifier => {
-        switch (trimBuiltinModuleExts(specifier)) {
-          case '/app':
-            preload.push(`${basePath}/_aleph/app.js`)
-            break
-          case '/404':
-            preload.push(`${basePath}/_aleph/404.js`)
-            break
-        }
-      })
+      if (this.#appModule) {
+        preload.push(`${basePath}/_aleph/app.js`)
+      }
 
       if (entryFile) {
         preload.push(`${basePath}/_aleph${entryFile}`)
@@ -741,13 +724,47 @@ export class Application implements ServerApplication {
     }
   }
 
-  async analyze(): Promise<DependencyDescriptor[]> {
+  async analyze(): Promise<DependencyGraph[]> {
     await this.ready
+
+    const bootstrapModuelUrl = `${getAlephPkgUri()}/framework/${this.config.framework}/bootstrap.ts`
 
     // reset
     this.#chunks = []
 
-    // add page module entries
+    // vendor.js
+    this.#chunks.push(this.createDependencyGraph(
+      {
+        specifier: '/vendor.js',
+        deps: [{
+          specifier: bootstrapModuelUrl
+        }],
+      }
+    ))
+
+    // app.tsx -> common.js
+    if (this.#appModule) {
+      this.#chunks.push(this.createDependencyGraph(
+        {
+          specifier: '/common.js',
+          deps: [{
+            specifier: this.#appModule.specifier
+          }],
+        }
+      ))
+    }
+
+    // main.js
+    this.#chunks.push(this.createDependencyGraph(
+      {
+        specifier: '/main.js',
+        deps: [{
+          specifier: bootstrapModuelUrl
+        }],
+      }
+    ))
+
+    // page entries
     this.#pageRouting.lookup(routes => {
       const finalRoute = routes.pop()
       if (finalRoute) {
@@ -765,12 +782,17 @@ export class Application implements ServerApplication {
     return this.#chunks
   }
 
-  private createDependencyGraph({ specifier, deps }: Module, isDynamic?: boolean, extraDeps?: string[]): DependencyGraph {
-    const graph = {
+  private createDependencyGraph(module: Pick<Module, 'specifier' | 'deps'>, isDynamic?: boolean, extraDeps?: string[]): DependencyGraph {
+    const { specifier } = module
+    const graph: DependencyGraph = {
       specifier,
       isShared: false,
       isDynamic,
       deps: []
+    }
+    const deps = module.deps.map(({ specifier, isDynamic }) => ({ specifier, isDynamic }))
+    if (extraDeps) {
+      deps.push(...extraDeps.map(specifier => ({ specifier, isDynamic: false })))
     }
     return graph
   }
@@ -1024,7 +1046,11 @@ export class Application implements ServerApplication {
         }
       })
     }
+
     this.#modules.set(specifier, mod)
+    if (trimBuiltinModuleExts(specifier) === '/app') {
+      this.#appModule = mod
+    }
 
     if (isRemote && !this.#reloading) {
       if (!await existsFile(metaFp) || !await existsFile(cacheFp)) {

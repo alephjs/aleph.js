@@ -170,7 +170,7 @@ export class Renderer {
   /** render custom 404 page. */
   async render404Page(url: RouterURL): Promise<string> {
     const appModule = this.findModuleByName('app')
-    const e404Module = this.findModuleByName('404')
+    const e404Module = this.findModuleByName('pages/404')
     const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
     const { default: E404 } = e404Module ? await this.#app.importModule(e404Module) : {} as any
     const styles = await this.lookupStyleModules(...[
@@ -208,11 +208,11 @@ export class Renderer {
   /** render custom loading page for SPA mode. */
   async renderSPAIndexPage(): Promise<string> {
     const { basePath, defaultLocale } = this.#app.config
-    const loadingModule = this.findModuleByName('loading')
+    const appModule = this.findModuleByName('app')
 
-    if (loadingModule) {
-      const { default: Loading } = await this.#app.importModule(loadingModule)
-      const styles = await this.lookupStyleModules(loadingModule.specifier)
+    if (appModule) {
+      const { Loading } = await this.#app.importModule(appModule)
+      const styles = await this.lookupStyleModules(appModule.specifier)
       const {
         head,
         body,
@@ -220,7 +220,7 @@ export class Renderer {
       } = await this.#renderer.render(
         createBlankRouterURL(basePath, defaultLocale),
         undefined,
-        [{ specifier: loadingModule.specifier, Component: Loading }],
+        [{ specifier: appModule.specifier, Component: Loading }],
         styles
       )
       return createHtml({
