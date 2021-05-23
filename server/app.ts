@@ -35,7 +35,7 @@ export type Module = {
   deps: DependencyDescriptor[]
   external?: boolean
   isStyle?: boolean
-  useDenoHooks?: string[]
+  denoHooks?: string[]
   hash?: string
   sourceHash: string
   sourceType?: SourceType
@@ -58,7 +58,7 @@ type DependencyGraph = {
   specifier: string
   isShared?: boolean
   isDynamic?: boolean
-  deps: Array<DependencyGraph>
+  deps: DependencyGraph[]
 }
 
 type Source = {
@@ -79,7 +79,7 @@ export class Application implements ServerApplication {
   readonly importMap: ImportMap
   readonly ready: Promise<void>
 
-  #graphs: DependencyGraph[] = []
+  #chunks: DependencyGraph[] = []
   #modules: Map<string, Module> = new Map()
   #pageRouting: Routing = new Routing({})
   #apiRouting: Routing = new Routing({})
@@ -315,9 +315,9 @@ export class Application implements ServerApplication {
                   this.config.ssr &&
                   prevModule &&
                   !(
-                    util.isNEArray(prevModule.useDenoHooks) &&
-                    util.isNEArray(module.useDenoHooks) &&
-                    prevModule.useDenoHooks.join(' ') === module.useDenoHooks.join(' ')
+                    util.isNEArray(prevModule.denoHooks) &&
+                    util.isNEArray(module.denoHooks) &&
+                    prevModule.denoHooks.join(' ') === module.denoHooks.join(' ')
                   )
                 )
                 if (hmrable) {
@@ -502,12 +502,12 @@ export class Application implements ServerApplication {
     for (const specifier of [...builtinModuleExts.map(ext => `/app.${ext}`), ...nestedModules]) {
       const mod = this.getModule(specifier)
       if (mod) {
-        if (mod.useDenoHooks?.length) {
+        if (mod.denoHooks?.length) {
           useDeno = true
         } else {
           this.lookupDeps(mod.specifier, dep => {
             const depMod = this.getModule(dep.specifier)
-            if (depMod?.useDenoHooks?.length) {
+            if (depMod?.denoHooks?.length) {
               useDeno = true
               return false
             }
@@ -741,8 +741,11 @@ export class Application implements ServerApplication {
     }
   }
 
-  async analyze(): Promise<DependencyGraph[]> {
+  async analyze(): Promise<DependencyDescriptor[]> {
     await this.ready
+
+    // reset
+    this.#chunks = []
 
     // add page module entries
     this.#pageRouting.lookup(routes => {
@@ -750,9 +753,8 @@ export class Application implements ServerApplication {
       if (finalRoute) {
         const finalRouteModule = this.getModule(finalRoute.module)
         if (finalRouteModule) {
-          this.#graphs.push(this.createDependencyGraph(
+          this.#chunks.push(this.createDependencyGraph(
             finalRouteModule,
-            undefined,
             undefined,
             routes.map(({ module }) => module)
           ))
@@ -760,13 +762,13 @@ export class Application implements ServerApplication {
       }
     })
 
-    return this.#graphs
+    return this.#chunks
   }
 
-  private createDependencyGraph({ specifier, deps }: Module, isShared?: boolean, isDynamic?: boolean, extraDeps?: string[]): DependencyGraph {
+  private createDependencyGraph({ specifier, deps }: Module, isDynamic?: boolean, extraDeps?: string[]): DependencyGraph {
     const graph = {
       specifier,
-      isShared,
+      isShared: false,
       isDynamic,
       deps: []
     }
@@ -1043,12 +1045,12 @@ export class Application implements ServerApplication {
 
     if (await existsFile(metaFp)) {
       try {
-        const { specifier: _specifier, sourceHash, deps, isStyle, useDenoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
+        const { specifier: _specifier, sourceHash, deps, isStyle, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
         if (_specifier === specifier && util.isNEString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
           mod.isStyle = isStyle || undefined
-          mod.useDenoHooks = util.isNEArray(useDenoHooks) ? useDenoHooks : undefined
+          mod.denoHooks = util.isNEArray(denoHooks) ? denoHooks : undefined
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
           Deno.remove(metaFp)
@@ -1102,7 +1104,7 @@ export class Application implements ServerApplication {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, useDenoHooks, starExports, map } = await transform(specifier, sourceCode, {
+      const { code, deps, denoHooks, starExports, map } = await transform(specifier, sourceCode, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
@@ -1117,7 +1119,10 @@ export class Application implements ServerApplication {
         for (let index = 0; index < starExports.length; index++) {
           const exportSpecifier = starExports[index]
           const names = await this.parseModuleExportNames(exportSpecifier)
-          jsCode = jsCode.replace(`export * from "[${exportSpecifier}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
+          jsCode = jsCode.replace(
+            `export * from "[${exportSpecifier}]:`,
+            `export {${names.filter(name => name !== 'default').join(',')}} from "`
+          )
         }
       }
 
@@ -1165,8 +1170,8 @@ export class Application implements ServerApplication {
         }
         return dep
       })
-      if (util.isNEArray(useDenoHooks)) {
-        module.useDenoHooks = useDenoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
+      if (util.isNEArray(denoHooks)) {
+        module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.config.ssr) {
           log.error(`'useDeno' hook in SPA mode is illegal: ${specifier}`)
         }
@@ -1180,7 +1185,7 @@ export class Application implements ServerApplication {
         specifier,
         sourceHash: module.sourceHash,
         isStyle: module.isStyle || undefined,
-        useDenoHooks: util.isNEArray(module.useDenoHooks) ? module.useDenoHooks : undefined,
+        denoHooks: util.isNEArray(module.denoHooks) ? module.denoHooks : undefined,
         deps: module.deps,
       }, undefined, 2)
       await ensureDir(dirname(cacheFp))
@@ -1303,7 +1308,7 @@ export class Application implements ServerApplication {
           specifier,
           sourceHash: module.sourceHash,
           isStyle: module.isStyle || undefined,
-          useDenoHooks: util.isNEArray(module.useDenoHooks) ? module.useDenoHooks : undefined,
+          denoHooks: util.isNEArray(module.denoHooks) ? module.denoHooks : undefined,
           deps: module.deps,
         }, undefined, 2)),
         lazyRemove(cacheFp.slice(0, -3) + '.client.js'),

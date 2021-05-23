@@ -44,7 +44,7 @@ export type TransformResult = {
     importIndex: string
     isDynamic: boolean
   }>
-  useDenoHooks?: string[]
+  denoHooks?: string[]
   starExports?: string[]
   map?: string
 }
@@ -109,7 +109,7 @@ export async function transform(specifier: string, code: string, options: Transf
     code: jsContent,
     deps,
     inlineStyles,
-    useDenoHooks,
+    denoHooks,
     starExports,
     map,
   } = transformSync(specifier, code, transformOptions)
@@ -143,7 +143,7 @@ export async function transform(specifier: string, code: string, options: Transf
   return {
     code: jsContent,
     deps,
-    useDenoHooks,
+    denoHooks,
     starExports,
     map
   }

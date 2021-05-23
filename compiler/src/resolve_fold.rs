@@ -377,7 +377,7 @@ impl Fold for ResolveFold {
           });
         }
         let mut resolver = self.resolver.borrow_mut();
-        resolver.use_deno_hooks.push(id.into());
+        resolver.deno_hooks.push(id.into());
       }
     }
 

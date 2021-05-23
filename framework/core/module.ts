@@ -2,6 +2,20 @@ import util from '../../shared/util.ts'
 
 export const builtinModuleExts = ['tsx', 'jsx', 'ts', 'js', 'mjs']
 
+export function importModule(basePath: string, url: string, forceRefetch = false): Promise<any> {
+  const { __ALEPH: ALEPH } = window as any
+
+  if (ALEPH) {
+    return ALEPH.import(url, forceRefetch)
+  }
+
+  let src = util.cleanPath(basePath + '/_aleph/' + trimBuiltinModuleExts(url) + '.js')
+  if (forceRefetch) {
+    src += '?t=' + Date.now()
+  }
+  return import(src)
+}
+
 export function toPagePath(url: string): string {
   let pathname = trimBuiltinModuleExts(url)
   if (pathname.startsWith('/pages/')) {
@@ -23,18 +37,4 @@ export function trimBuiltinModuleExts(url: string) {
     }
   }
   return url
-}
-
-export function importModule(basePath: string, url: string, forceRefetch = false): Promise<any> {
-  const { __ALEPH: ALEPH } = window as any
-
-  if (ALEPH) {
-    return ALEPH.import(url, forceRefetch)
-  }
-
-  let src = util.cleanPath(basePath + '/_aleph/' + trimBuiltinModuleExts(url) + '.js')
-  if (forceRefetch) {
-    src += '?t=' + Date.now()
-  }
-  return import(src)
 }
