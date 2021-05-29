@@ -31,15 +31,6 @@ Object.assign((globalThis as any).navigator, {
 let _denoDir: string | null = null
 let _localProxy = false
 
-export const moduleWalkOptions = {
-  includeDirs: false,
-  skip: [
-    /(^|\/|\\)\./,
-    /\.d\.ts$/i,
-    /(\.|_)(test|spec|e2e)\.[a-z]+$/i
-  ]
-}
-
 export function checkDenoVersion() {
   const [currentMajor, currentMinor, currentPatch] = Deno.version.deno.split('.').map(p => parseInt(p))
   const [major, minor, patch] = minDenoVersion.split('.').map(p => parseInt(p))

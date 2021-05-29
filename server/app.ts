@@ -15,6 +15,7 @@ import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { ImportMap, RouterURL, ServerApplication } from '../types.ts'
 import { VERSION } from '../version.ts'
+import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import type { RequiredConfig } from './config.ts'
 import {
@@ -24,7 +25,7 @@ import {
 import {
   checkAlephDev, checkDenoVersion, clearBuildCache, computeHash,
   getAlephPkgUri, getDenoDir, toRelativePath, getSourceType,
-  isLoaderPlugin, isLocalUrl, moduleWalkOptions, toLocalPath
+  isLoaderPlugin, isLocalUrl, toLocalPath
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { Renderer } from './ssr.ts'
@@ -53,14 +54,6 @@ type DependencyDescriptor = {
   hashLoc?: number
 }
 
-/** The dependency graph. */
-type DependencyGraph = {
-  specifier: string
-  isShared?: boolean
-  isDynamic?: boolean
-  deps: DependencyGraph[]
-}
-
 type Source = {
   code: string
   type: SourceType
@@ -72,19 +65,19 @@ type TransformFn = (specifier: string, code: string) => string
 
 /** The application class for aleph server. */
 export class Application implements ServerApplication {
-  readonly workingDir: string
   readonly mode: 'development' | 'production'
+  readonly workingDir: string
   readonly buildDir: string
   readonly config: RequiredConfig
   readonly importMap: ImportMap
   readonly ready: Promise<void>
 
-  #chunks: DependencyGraph[] = []
   #modules: Map<string, Module> = new Map()
   #appModule: Module | null = null
   #pageRouting: Routing = new Routing({})
   #apiRouting: Routing = new Routing({})
   #fsWatchListeners: Array<EventEmitter> = []
+  #analyzer: Analyzer = new Analyzer(this)
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
   #dists: Set<string> = new Set()
@@ -98,8 +91,8 @@ export class Application implements ServerApplication {
   ) {
     checkDenoVersion()
     checkAlephDev()
-    this.workingDir = resolve(workingDir)
     this.mode = mode
+    this.workingDir = resolve(workingDir)
     this.buildDir = join(this.workingDir, '.aleph', mode)
     this.config = { ...defaultConfig() }
     this.importMap = { imports: {}, scopes: {} }
@@ -225,6 +218,14 @@ export class Application implements ServerApplication {
     const modules: string[] = []
     const apiModules: string[] = []
     const pageModules: string[] = []
+    const moduleWalkOptions = {
+      includeDirs: false,
+      skip: [
+        /(^|\/|\\)\./,
+        /\.d\.ts$/i,
+        /(\.|_)(test|spec|e2e)\.[a-z]+$/i
+      ]
+    }
 
     // pre-compile framework modules
     modules.push(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`)
@@ -407,6 +408,9 @@ export class Application implements ServerApplication {
 
   /** get the module by given specifier. */
   getModule(specifier: string): Module | null {
+    if (specifier === 'app') {
+      return this.#appModule
+    }
     if (this.#modules.has(specifier)) {
       return this.#modules.get(specifier)!
     }
@@ -724,77 +728,24 @@ export class Application implements ServerApplication {
     }
   }
 
-  async analyze(): Promise<DependencyGraph[]> {
+  async analyze() {
     await this.ready
 
-    const bootstrapModuelUrl = `${getAlephPkgUri()}/framework/${this.config.framework}/bootstrap.ts`
-
-    // reset
-    this.#chunks = []
-
-    // vendor.js
-    this.#chunks.push(this.createDependencyGraph(
-      {
-        specifier: '/vendor.js',
-        deps: [{
-          specifier: bootstrapModuelUrl
-        }],
-      }
-    ))
-
-    // app.tsx -> common.js
-    if (this.#appModule) {
-      this.#chunks.push(this.createDependencyGraph(
-        {
-          specifier: '/common.js',
-          deps: [{
-            specifier: this.#appModule.specifier
-          }],
-        }
-      ))
-    }
-
-    // main.js
-    this.#chunks.push(this.createDependencyGraph(
-      {
-        specifier: '/main.js',
-        deps: [{
-          specifier: bootstrapModuelUrl
-        }],
-      }
-    ))
-
-    // page entries
+    this.#analyzer.reset()
     this.#pageRouting.lookup(routes => {
       const finalRoute = routes.pop()
       if (finalRoute) {
         const finalRouteModule = this.getModule(finalRoute.module)
         if (finalRouteModule) {
-          this.#chunks.push(this.createDependencyGraph(
+          this.#analyzer.addEntry(
             finalRouteModule,
-            undefined,
             routes.map(({ module }) => module)
-          ))
+          )
         }
       }
     })
 
-    return this.#chunks
-  }
-
-  private createDependencyGraph(module: Pick<Module, 'specifier' | 'deps'>, isDynamic?: boolean, extraDeps?: string[]): DependencyGraph {
-    const { specifier } = module
-    const graph: DependencyGraph = {
-      specifier,
-      isShared: false,
-      isDynamic,
-      deps: []
-    }
-    const deps = module.deps.map(({ specifier, isDynamic }) => ({ specifier, isDynamic }))
-    if (extraDeps) {
-      deps.push(...extraDeps.map(specifier => ({ specifier, isDynamic: false })))
-    }
-    return graph
+    return this.#analyzer.entries
   }
 
   /** build the application to a static site(SSG) */
@@ -924,7 +875,7 @@ export class Application implements ServerApplication {
     return null
   }
 
-  async loadModule(specifier: string, data?: any): Promise<Source> {
+  async loadModuleSource(specifier: string, data?: any): Promise<Source> {
     let sourceCode: string = ''
     let sourceType: SourceType = SourceType.Unknown
     let sourceMap: string | null = null
@@ -1090,7 +1041,7 @@ export class Application implements ServerApplication {
     )
     if (shouldLoad) {
       try {
-        const { code, type, isStyle } = source || await this.loadModule(specifier, data)
+        const { code, type, isStyle } = source || await this.loadModuleSource(specifier, data)
         const sourceHash = computeHash(code)
         if (mod.sourceHash !== sourceHash) {
           mod.sourceCode = code
@@ -1125,8 +1076,8 @@ export class Application implements ServerApplication {
         return
       }
 
-      delete module.sourceType
-      delete module.sourceCode
+      module.sourceType = undefined
+      module.sourceCode = undefined
 
       const ms = new Measure()
       const encoder = new TextEncoder()
