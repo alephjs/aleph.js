@@ -15,31 +15,32 @@ export const bundlerRuntimeCode = `
     basePath: '/',
     pack: {},
     bundled: {},
-    import: function(u, F) {
-      var b = this.basePath,
-          a = this.pack,
+    import: function(s, r) {
+      var a = this.pack,
+          b = this.basePath,
+          d = document,
           l = this.bundled;
-      if (u in a) {
-        return Promise.resolve(a[u]);
+      if (s in a) {
+        return Promise.resolve(a[s]);
       }
       return new Promise(function(y, n) {
-        var s = document.createElement('script'),
-            f = l[u] || l[u.replace(/\\.[a-zA-Z0-9]+$/, '')],
-            p = (b + '/_aleph').replace('//', '/');
+        var e = d.createElement('script'),
+            f = l[s] || l[s.replace(/\\.[a-zA-Z0-9]+$/, '')],
+            p = b.replace(/\\/+$/, '') + '/_aleph';
         if (!f) {
-          n(new Error('invalid specifier: ' + u));
+          n(new Error('invalid specifier: ' + s));
           return;
         }
-        s.onload = function() {
-          y(a[u]);
+        e.onload = function() {
+          y(a[s]);
         };
-        s.onerror = n;
+        e.onerror = n;
         p += f;
-        if (F) {
+        if (r) {
           p += '?t=' + (new Date).getTime();
         }
-        s.src = p;
-        document.body.appendChild(s);
+        e.src = p;
+        d.body.appendChild(e);
       })
     }
   }

@@ -16,7 +16,7 @@ export type SSROutput = {
   data: Record<string, SSRData> | null
 }
 
-/** The framework render result of SSR. */
+/** The render result of framework SSR. */
 export type FrameworkRenderResult = {
   head: string[]
   body: string
@@ -24,7 +24,7 @@ export type FrameworkRenderResult = {
   data: Record<string, SSRData> | null
 }
 
-/** The framework renderer for SSR. */
+/** The renderer of framework SSR. */
 export type FrameworkRenderer = {
   render(
     url: RouterURL,
@@ -34,7 +34,7 @@ export type FrameworkRenderer = {
   ): Promise<FrameworkRenderResult>
 }
 
-/** The renderer class for aleph server. */
+/** The renderer class for SSR. */
 export class Renderer {
   #app: Application
   #renderer: FrameworkRenderer
@@ -48,17 +48,6 @@ export class Renderer {
 
   setFrameworkRenderer(renderer: FrameworkRenderer) {
     this.#renderer = renderer
-  }
-
-  private findModuleByName(name: string): Module | null {
-    for (const ext of builtinModuleExts) {
-      const url = `/${name}.${ext}`
-      const mod = this.#app.getModule(url)
-      if (mod) {
-        return mod
-      }
-    }
-    return null
   }
 
   async cache(
@@ -109,7 +98,7 @@ export class Renderer {
     const start = performance.now()
     const isDev = this.#app.isDev
     const state = { entryFile: '' }
-    const appModule = this.findModuleByName('app')
+    const appModule = this.#app.getModule('app')
     const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
     const nestedPageComponents = await Promise.all(nestedModules
       .filter(specifier => this.#app.getModule(specifier) !== null)
@@ -169,8 +158,8 @@ export class Renderer {
 
   /** render custom 404 page. */
   async render404Page(url: RouterURL): Promise<string> {
-    const appModule = this.findModuleByName('app')
-    const e404Module = this.findModuleByName('pages/404')
+    const appModule = this.#app.getModule('app')
+    const e404Module = this.find404PageModule()
     const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
     const { default: E404 } = e404Module ? await this.#app.importModule(e404Module) : {} as any
     const styles = await this.lookupStyleModules(...[
@@ -205,10 +194,21 @@ export class Renderer {
     })
   }
 
+  private find404PageModule(): Module | null {
+    for (const ext of builtinModuleExts) {
+      const url = `/pages/404.${ext}`
+      const mod = this.#app.getModule(url)
+      if (mod) {
+        return mod
+      }
+    }
+    return null
+  }
+
   /** render custom loading page for SPA mode. */
   async renderSPAIndexPage(): Promise<string> {
     const { basePath, defaultLocale } = this.#app.config
-    const appModule = this.findModuleByName('app')
+    const appModule = this.#app.getModule('app')
 
     if (appModule) {
       const { Loading } = await this.#app.importModule(appModule)

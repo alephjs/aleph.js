@@ -33,7 +33,7 @@ export async function existsFile(path: string): Promise<boolean> {
   }
 }
 
-/** ensure and write a text file. */
+/** ensure and write text file. */
 export async function ensureTextFile(name: string, content: string): Promise<void> {
   const dir = dirname(name)
   await ensureDir(dir)

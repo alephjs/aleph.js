@@ -39,6 +39,8 @@ export class Server {
     for (const key in headers) {
       req.setHeader(key, headers[key])
     }
+
+    // in dev mode, we use `Last-Modified` and `ETag` header to control cache
     if (app.isDev) {
       req.setHeader('Cache-Control', 'max-age=0')
     }
