@@ -4,7 +4,7 @@ import type { MultipartFormData } from 'https://deno.land/std@0.96.0/mime/multip
 import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.15'
 
 /**
- * The config for the aleph server application.
+ * The config for aleph server.
  */
 export type Config = {
   /** `framework` specifies the framework (default is 'react'). */
@@ -33,7 +33,7 @@ export type Config = {
   headers?: Record<string, string>
   /** `rewrites` specifies the server rewrite map. */
   rewrites?: Record<string, string>
-  /** `compress` enbles gzip/brotli compression for static files and SSR content. */
+  /** `compress` enbles gzip/brotli compression for static files and SSR content (default is **true**). */
   compress?: boolean
   /** `env` appends system env variables. */
   env?: Record<string, string>
@@ -60,7 +60,7 @@ export type LoaderPlugin = {
 }
 
 /**
- * A server plugin to enhance the aleph server application.
+ * A server plugin to enhance aleph server.
  */
 export type ServerPlugin = {
   /** `name` gives the plugin a name. */
@@ -77,7 +77,7 @@ export type ServerPlugin = {
 export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
 
 /**
- * The result of loader resove.
+ * The result of loader's resolve method.
  */
 export type ResolveResult = {
   specifier: string,
@@ -88,7 +88,7 @@ export type ResolveResult = {
 }
 
 /**
- * The output of loader.
+ * The output of loader's load method.
  */
 export type LoaderOutput = {
   /** The transformed code type (default is 'js'). */
