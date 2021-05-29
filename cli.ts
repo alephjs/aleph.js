@@ -62,7 +62,7 @@ async function main() {
 
   // prints command help message
   if (options.h || options.help) {
-    import(`./cli/${command}.ts`).then(({ helpMessage }) => {
+    import(`./commands/${command}.ts`).then(({ helpMessage }) => {
       console.log(commands[command])
       console.log(helpMessage)
       Deno.exit(0)
@@ -71,7 +71,7 @@ async function main() {
   }
 
   // import command module
-  const { default: cmd } = await import(`./cli/${command}.ts`)
+  const { default: cmd } = await import(`./commands/${command}.ts`)
 
   // execute `init` command
   if (command === 'init') {
