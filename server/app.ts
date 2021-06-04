@@ -373,6 +373,11 @@ export class Application implements ServerApplication {
 
   /** check the changed file whether it is a scoped module that can emit the HMR event. */
   private isScopedModule(specifier: string) {
+    // is parsed module
+    if (this.#modules.has(specifier)) {
+      return true
+    }
+
     for (const ext of builtinModuleExts) {
       if (specifier.endsWith('.' + ext)) {
         return (
@@ -384,15 +389,8 @@ export class Application implements ServerApplication {
     }
 
     // is page module by plugin
-    if (this.loaders.some(p => p.test.test(specifier) && p.allowPage)) {
+    if (specifier.startsWith('/pages/') && this.loaders.some(p => p.test.test(specifier) && p.allowPage)) {
       return true
-    }
-
-    // is dep
-    for (const { deps } of this.#modules.values()) {
-      if (deps.some(dep => dep.specifier === specifier)) {
-        return true
-      }
     }
 
     return false
@@ -628,8 +626,8 @@ export class Application implements ServerApplication {
     }
 
     let code = [
-      this.isDev && `import { connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
       `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js";`,
+      this.isDev && `import { connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
       this.isDev && `connect(${JSON.stringify(basePath)});`,
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
     ].filter(Boolean).join('\n')
@@ -728,23 +726,16 @@ export class Application implements ServerApplication {
     }
   }
 
-  async analyze() {
-    await this.ready
-
+  analyze() {
     this.#analyzer.reset()
     this.#pageRouting.lookup(routes => {
-      const finalRoute = routes.pop()
-      if (finalRoute) {
-        const finalRouteModule = this.getModule(finalRoute.module)
-        if (finalRouteModule) {
-          this.#analyzer.addEntry(
-            finalRouteModule,
-            routes.map(({ module }) => module)
-          )
+      routes.forEach(({ module: specifier }) => {
+        const module = this.getModule(specifier)
+        if (module) {
+          this.#analyzer.addEntry(module)
         }
-      }
+      })
     })
-
     return this.#analyzer.entries
   }
 
