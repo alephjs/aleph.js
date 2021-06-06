@@ -140,7 +140,7 @@ export class Bundler {
       return jsFile
     }
 
-    const source = await this.#app.loadModule(mod.specifier)
+    const source = await this.#app.loadModuleSource(mod.specifier)
     if (source === null) {
       this.#compiled.delete(mod.specifier)
       throw new Error(`Unsupported module '${mod.specifier}'`)
