@@ -39,26 +39,23 @@ export type Module = {
   denoHooks?: string[]
   hash?: string
   sourceHash: string
-  sourceType?: SourceType
-  sourceCode?: string
   jsFile: string
-  jsCode?: Uint8Array
+  jsBuffer?: Uint8Array
   ready: Promise<void>
 }
 
-/** The dependency descriptor. */
+type ModuleSource = {
+  code: string
+  type: SourceType
+  isStyle: boolean
+  map?: string
+}
+
 type DependencyDescriptor = {
   specifier: string
   isDynamic?: boolean
   hash?: string
   hashLoc?: number
-}
-
-type Source = {
-  code: string
-  type: SourceType
-  isStyle: boolean
-  map?: string
 }
 
 type TransformFn = (specifier: string, code: string) => string
@@ -308,8 +305,7 @@ export class Application implements ServerApplication {
               log.info(type, specifier)
               try {
                 const prevModule = this.#modules.get(specifier)
-                const module = await this.initModule(specifier, { forceRefresh: true })
-                await this.transpileModule(module, true)
+                const module = await this.compile(specifier, { forceRefresh: true, ignoreDeps: true })
                 const hmrable = this.isHMRable(specifier)
                 const refetchPage = (
                   this.config.ssr &&
@@ -455,8 +451,7 @@ export class Application implements ServerApplication {
         source.type = type
       }
     }
-    const module = await this.initModule(specifier, { source })
-    await this.transpileModule(module)
+    await this.compile(specifier, { source })
     if (specifier.startsWith('/pages/')) {
       this.#pageRouting.update(...this.createRouteUpdate(specifier))
     } else if (specifier.startsWith('/api/')) {
@@ -850,15 +845,15 @@ export class Application implements ServerApplication {
   }
 
   async getModuleJSCode(module: Module): Promise<Uint8Array | null> {
-    const { specifier, jsFile, jsCode } = module
-    if (jsCode) {
-      return jsCode
+    const { specifier, jsFile, jsBuffer } = module
+    if (jsBuffer) {
+      return jsBuffer
     }
 
     const cacheFp = join(this.buildDir, jsFile)
     if (await existsFile(cacheFp)) {
       const content = await Deno.readFile(cacheFp)
-      module.jsCode = content
+      module.jsBuffer = content
       log.debug(`load jsCode of ${specifier}` + dim(' • ' + util.formatBytes(content.length)))
       return content
     }
@@ -866,7 +861,7 @@ export class Application implements ServerApplication {
     return null
   }
 
-  async loadModuleSource(specifier: string, data?: any): Promise<Source> {
+  async loadModuleSource(specifier: string, data?: any): Promise<ModuleSource> {
     let sourceCode: string = ''
     let sourceType: SourceType = SourceType.Unknown
     let sourceMap: string | null = null
@@ -925,13 +920,15 @@ export class Application implements ServerApplication {
   }
 
   /** compile the module by given specifier */
-  private async compile(specifier: string) {
-    const module = await this.initModule(specifier)
-    await this.transpileModule(module)
+  private async compile(specifier: string, options: { source?: ModuleSource, forceRefresh?: boolean, ignoreDeps?: boolean } = {}) {
+    const [module, source] = await this.initModule(specifier, options)
+    if (!module.external) {
+      await this.transpileModule(module, source, options.ignoreDeps)
+    }
     return module
   }
 
-  private async initModule(specifier: string, { source, forceRefresh }: { source?: Source, forceRefresh?: boolean } = {}): Promise<Module> {
+  private async initModule(specifier: string, { source, forceRefresh }: { source?: ModuleSource, forceRefresh?: boolean } = {}): Promise<[Module, ModuleSource | null]> {
     let external = false
     let data: any = null
 
@@ -948,20 +945,20 @@ export class Application implements ServerApplication {
     }
 
     if (external) {
-      return {
+      return [{
         specifier,
         deps: [],
         external,
         sourceHash: '',
         jsFile: '',
         ready: Promise.resolve()
-      }
+      }, null]
     }
 
     let mod = this.#modules.get(specifier)
     if (mod && !forceRefresh) {
       await mod.ready
-      return mod
+      return [mod, null]
     }
 
     const isRemote = util.isLikelyHttpURL(specifier) && !isLocalUrl(specifier)
@@ -1032,27 +1029,27 @@ export class Application implements ServerApplication {
     )
     if (shouldLoad) {
       try {
-        const { code, type, isStyle } = source || await this.loadModuleSource(specifier, data)
-        const sourceHash = computeHash(code)
-        if (mod.sourceHash !== sourceHash) {
-          mod.sourceCode = code
-          mod.sourceType = type
+        const src = source || await this.loadModuleSource(specifier, data)
+        const sourceHash = computeHash(src.code)
+        if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
           mod.sourceHash = sourceHash
         }
-        mod.isStyle = isStyle
+        mod.isStyle = src.isStyle
+        defer()
+        return [mod, src]
       } catch (err) {
-        defer(err)
         log.error(`load module '${specifier}':`, err.message)
-        return mod
+        defer(err)
+        return [mod, null]
       }
     }
 
     defer()
-    return mod
+    return [mod, null]
   }
 
-  private async transpileModule(module: Module, ignoreDeps = false, __tracing: Set<string> = new Set()): Promise<void> {
-    const { specifier, sourceType, sourceCode, jsFile } = module
+  private async transpileModule(module: Module, source: ModuleSource | null, ignoreDeps = false, __tracing: Set<string> = new Set()): Promise<void> {
+    const { specifier, jsFile } = module
 
     // ensure the module only be transppiled once in current compilation context,
     // to avoid dead-loop caused by cicular imports
@@ -1061,22 +1058,19 @@ export class Application implements ServerApplication {
     }
     __tracing.add(specifier)
 
-    if (sourceType !== undefined && sourceCode !== undefined) {
-      if (sourceType === SourceType.Unknown) {
+    if (source) {
+      if (source.type === SourceType.Unknown) {
         log.error(`Unsupported module '${specifier}'`)
         return
       }
 
-      module.sourceType = undefined
-      module.sourceCode = undefined
-
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, denoHooks, starExports, map } = await transform(specifier, sourceCode, {
+      const { code, deps, denoHooks, starExports, map } = await transform(specifier, source.code, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
-          sourceType
+          sourceType: source.type
         },
       })
 
@@ -1123,7 +1117,7 @@ export class Application implements ServerApplication {
         jsCode += `\n//# sourceMappingURL=${basename(jsFile)}.map`
       }
 
-      module.jsCode = encoder.encode(jsCode)
+      module.jsBuffer = encoder.encode(jsCode)
       module.deps = deps.filter(({ specifier }) => specifier != module.specifier).map(({ specifier, isDynamic, importIndex }) => {
         const dep: DependencyDescriptor = { specifier }
         if (isDynamic) {
@@ -1131,7 +1125,7 @@ export class Application implements ServerApplication {
         }
         if (specifier.startsWith('/')) {
           const mark = encoder.encode(`.js#${specifier}@${importIndex}`)
-          const idx = indexOf(module.jsCode!, mark)
+          const idx = indexOf(module.jsBuffer!, mark)
           if (idx > 0) {
             dep.hashLoc = idx + mark.length - importIndex.length
           }
@@ -1158,7 +1152,7 @@ export class Application implements ServerApplication {
       }, undefined, 2)
       await ensureDir(dirname(cacheFp))
       await Promise.all([
-        Deno.writeFile(cacheFp, module.jsCode),
+        Deno.writeFile(cacheFp, module.jsBuffer),
         Deno.writeTextFile(metaFp, metaJSON),
         map ? Deno.writeTextFile(`${cacheFp}.map`, map) : Promise.resolve(),
       ])
@@ -1167,7 +1161,7 @@ export class Application implements ServerApplication {
         const globalMetaFp = globalCacheFp.slice(0, -3) + '.meta.json'
         await ensureDir(dirname(globalCacheFp))
         await Promise.all([
-          Deno.writeFile(globalCacheFp, module.jsCode),
+          Deno.writeFile(globalCacheFp, module.jsBuffer),
           Deno.writeTextFile(globalMetaFp, metaJSON),
           map ? Deno.writeTextFile(`${globalCacheFp}.map`, map) : Promise.resolve(),
         ])
@@ -1184,9 +1178,9 @@ export class Application implements ServerApplication {
       let fsync = false
       await Promise.all(module.deps.map(async dep => {
         const { specifier, hash: prevHash, hashLoc } = dep
-        const depModule = await this.initModule(specifier)
+        const [depModule, depSource] = await this.initModule(specifier)
         if (!depModule.external) {
-          await this.transpileModule(depModule, false, __tracing)
+          await this.transpileModule(depModule, depSource, false, __tracing)
         }
         const hash = depModule.hash || depModule.sourceHash
         if (hashLoc && prevHash !== hash) {
@@ -1265,13 +1259,13 @@ export class Application implements ServerApplication {
   }
 
   private async cacheModule(module: Module) {
-    const { specifier, jsCode, jsFile } = module
-    if (jsCode) {
+    const { specifier, jsBuffer, jsFile } = module
+    if (jsBuffer) {
       const cacheFp = join(this.buildDir, jsFile)
       const metaFp = cacheFp.slice(0, -3) + '.meta.json'
       await ensureDir(dirname(cacheFp))
       await Promise.all([
-        Deno.writeFile(cacheFp, jsCode),
+        Deno.writeFile(cacheFp, jsBuffer),
         Deno.writeTextFile(metaFp, JSON.stringify({
           specifier,
           sourceHash: module.sourceHash,
