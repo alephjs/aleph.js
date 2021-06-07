@@ -43,6 +43,7 @@ export type TransformResult = {
     specifier: string
     importIndex: string
     isDynamic: boolean
+    ssrOnly: boolean
   }>
   denoHooks?: string[]
   starExports?: string[]

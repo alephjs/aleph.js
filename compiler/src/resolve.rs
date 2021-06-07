@@ -29,6 +29,9 @@ pub struct DependencyDescriptor {
   pub specifier: String,
   pub import_index: String,
   pub is_dynamic: bool,
+  pub ssr_only: bool,
+  #[serde(skip)]
+  pub relative_path: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -399,15 +402,26 @@ impl Resolver {
       },
       None => {}
     };
-    self.dep_graph.push(DependencyDescriptor {
-      specifier: fixed_url.clone(),
-      import_index,
-      is_dynamic,
-    });
-    let path = resolved_path.to_slash().unwrap();
+    let mut path = resolved_path.to_slash().unwrap();
     if !path.starts_with("./") && !path.starts_with("../") && !path.starts_with("/") {
-      return (format!("./{}", path), fixed_url);
+      path = "./".to_owned() + path.as_str();
     }
+    if let Some(_) = self
+      .dep_graph
+      .iter()
+      .find(|&g| g.specifier == fixed_url.clone() && g.is_dynamic == is_dynamic)
+    {
+      // don't record
+    } else {
+      self.dep_graph.push(DependencyDescriptor {
+        specifier: fixed_url.clone(),
+        import_index,
+        is_dynamic,
+        ssr_only: false,
+        relative_path: path.clone(),
+      });
+    }
+
     (path, fixed_url)
   }
 }

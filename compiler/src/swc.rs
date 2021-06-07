@@ -127,12 +127,11 @@ impl SWC {
         SourceType::TSX => true,
         _ => false,
       };
-      let (aleph_jsx_fold, aleph_jsx_builtin_resolve_fold) =
-        aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev);
       let mut passes = chain!(
-        resolve_fold(resolver.clone(), self.source_map.clone(), !options.is_dev),
-        Optional::new(aleph_jsx_fold, is_jsx),
-        Optional::new(aleph_jsx_builtin_resolve_fold, is_jsx),
+        Optional::new(
+          aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+          is_jsx
+        ),
         Optional::new(
           react::refresh(
             true,
@@ -160,6 +159,7 @@ impl SWC {
           ),
           is_jsx
         ),
+        resolve_fold(resolver.clone(), self.source_map.clone(), !options.is_dev),
         decorators::decorators(decorators::Config {
           legacy: true,
           emit_metadata: false

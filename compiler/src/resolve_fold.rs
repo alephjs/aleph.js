@@ -20,10 +20,10 @@ pub fn resolve_fold(
 }
 
 pub struct ResolveFold {
-  use_deno_idx: i32,
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
   resolve_star_exports: bool,
+  use_deno_idx: i32,
 }
 
 impl ResolveFold {
@@ -67,6 +67,65 @@ impl Fold for ResolveFold {
   //   - `export * from "https://esm.sh/react"` -> `export const $$star_N = __ALEPH.pack["https://esm.sh/react"]`
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
+    let aleph_pkg_uri = self.resolver.borrow().get_aleph_pkg_uri();
+    let builtin_jsx_tags = self.resolver.borrow().builtin_jsx_tags.clone();
+    let extra_imports = self.resolver.borrow().extra_imports.clone();
+
+    for name in builtin_jsx_tags.clone() {
+      let mut resolver = self.resolver.borrow_mut();
+      let id_name = if name.eq("a") {
+        "__ALEPH_anchor".to_owned()
+      } else {
+        "__ALEPH_".to_owned() + name.as_str()
+      };
+      let id = quote_ident!(id_name);
+      let (resolved_path, fixed_url) = resolver.resolve(
+        format!("{}/framework/react/components/{}.ts", aleph_pkg_uri, name).as_str(),
+        false,
+      );
+      if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
+        items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
+          span: DUMMY_SP,
+          kind: VarDeclKind::Const,
+          declare: false,
+          decls: vec![create_aleph_pack_var_decl_member(
+            fixed_url.as_str(),
+            vec![(id, Some("default".into()))],
+          )],
+        }))));
+      } else {
+        items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+          span: DUMMY_SP,
+          specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+            span: DUMMY_SP,
+            local: id,
+          })],
+          src: Str {
+            span: DUMMY_SP,
+            value: resolved_path.into(),
+            has_escape: false,
+            kind: Default::default(),
+          },
+          type_only: false,
+          asserts: None,
+        })));
+      }
+    }
+
+    for imp in extra_imports {
+      items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+        span: DUMMY_SP,
+        specifiers: vec![],
+        src: Str {
+          span: DUMMY_SP,
+          value: imp.into(),
+          has_escape: false,
+          kind: Default::default(),
+        },
+        type_only: false,
+        asserts: None,
+      })));
+    }
 
     for item in module_items {
       match item {
