@@ -308,6 +308,39 @@ impl Fold for ResolveFold {
                 }
               }
             }
+            // export ssr = {}
+            ModuleDecl::ExportDecl(ExportDecl{ decl:Decl::Var(var),..})=>{
+              let mut resolver = self.resolver.borrow_mut();
+              let specifier = resolver.specifier.clone();
+              let bundle_mode = resolver.bundle_mode;
+              let ssr_export = var.decls.iter().position(|decl| {
+                if let Pat::Ident(ref binding) = decl.name {
+                  specifier.starts_with("/pages/") && binding.id.sym.eq("ssr")
+                } else {
+                  false
+                }
+              });
+              if let Some(_) = ssr_export {
+                resolver.ssr_opts_export = true;
+              }
+              ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
+                span: DUMMY_SP,
+                decl: Decl::Var(if bundle_mode {
+                  if let Some(i) = ssr_export {
+                    VarDecl{
+                      span: DUMMY_SP,
+                      kind: var.kind,
+                      declare: var.declare,
+                      decls: var.decls.into_iter().skip(i).collect(),
+                    }
+                  } else {
+                    var
+                  }
+                } else {
+                  var
+                }),
+              }))
+            }
             _ => ModuleItem::ModuleDecl(decl),
           };
           items.push(item.fold_children_with(self));
@@ -321,6 +354,7 @@ impl Fold for ResolveFold {
     items
   }
 
+  // resolve `import.meta.url`
   fn fold_expr(&mut self, expr: Expr) -> Expr {
     let specifier = self.resolver.borrow().specifier.clone();
     let expr = match expr {
@@ -363,7 +397,7 @@ impl Fold for ResolveFold {
   // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
   // - `import("../components/logo.tsx")` -> `import("../components/logo.js#/components/logo.tsx@000000")`
   // - `import("../components/logo.tsx")` -> `__ALEPH.import("../components/logo.js#/components/logo.tsx@000000", "/pages/index.tsx")`
-  // - `useDeno(() => {})` -> `useDeno(() => {}, null, "useDeno.KEY")`
+  // - `useDeno(() => {})` -> `useDeno(() => {}, null, "{KEY}")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
       let url = match call.args.first() {

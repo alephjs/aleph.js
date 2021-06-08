@@ -29,7 +29,6 @@ pub struct DependencyDescriptor {
   pub specifier: String,
   pub import_index: String,
   pub is_dynamic: bool,
-  pub ssr_only: bool,
   #[serde(skip)]
   pub relative_path: String,
 }
@@ -61,6 +60,8 @@ pub struct Resolver {
   pub dep_graph: Vec<DependencyDescriptor>,
   /// jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
+  /// `ssr` options export
+  pub ssr_opts_export: bool,
   /// `useDeno` hooks
   pub deno_hooks: Vec<String>,
   /// bundle mode
@@ -99,6 +100,7 @@ impl Resolver {
       specifier_is_remote: is_remote_url(specifier),
       dep_graph: Vec::new(),
       inline_styles: HashMap::new(),
+      ssr_opts_export: false,
       deno_hooks: Vec::new(),
       bundle_mode,
       bundle_externals: tmp,
@@ -411,17 +413,15 @@ impl Resolver {
       .iter()
       .find(|&g| g.specifier == fixed_url.clone() && g.is_dynamic == is_dynamic)
     {
-      // don't record
+      // ignore repeated dependency
     } else {
       self.dep_graph.push(DependencyDescriptor {
         specifier: fixed_url.clone(),
         import_index,
         is_dynamic,
-        ssr_only: false,
         relative_path: path.clone(),
       });
     }
-
     (path, fixed_url)
   }
 }
