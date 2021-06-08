@@ -68,10 +68,10 @@ impl Fold for ResolveFold {
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
     let aleph_pkg_uri = self.resolver.borrow().get_aleph_pkg_uri();
-    let builtin_jsx_tags = self.resolver.borrow().builtin_jsx_tags.clone();
+    let used_builtin_jsx_tags = self.resolver.borrow().used_builtin_jsx_tags.clone();
     let extra_imports = self.resolver.borrow().extra_imports.clone();
 
-    for name in builtin_jsx_tags.clone() {
+    for name in used_builtin_jsx_tags.clone() {
       let mut resolver = self.resolver.borrow_mut();
       let id_name = if name.eq("a") {
         "__ALEPH_anchor".to_owned()
@@ -83,7 +83,7 @@ impl Fold for ResolveFold {
         format!("{}/framework/react/components/{}.ts", aleph_pkg_uri, name).as_str(),
         false,
       );
-      if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
+      if resolver.bundle_mode && resolver.bundle_externals.contains(fixed_url.as_str()) {
         items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
           span: DUMMY_SP,
           kind: VarDeclKind::Const,
@@ -140,7 +140,7 @@ impl Fold for ResolveFold {
                 let mut resolver = self.resolver.borrow_mut();
                 let (resolved_path, fixed_url) =
                   resolver.resolve(import_decl.src.value.as_ref(), false);
-                if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
+                if resolver.bundle_mode && resolver.bundle_externals.contains(fixed_url.as_str()) {
                   let mut names: Vec<(Ident, Option<String>)> = vec![];
                   let mut ns: Option<Ident> = None;
                   import_decl
@@ -211,7 +211,7 @@ impl Fold for ResolveFold {
               } else {
                 let mut resolver = self.resolver.borrow_mut();
                 let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
-                if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
+                if resolver.bundle_mode && resolver.bundle_externals.contains(fixed_url.as_str()) {
                   let mut names: Vec<(Ident, Option<String>)> = vec![];
                   let mut ns: Option<Ident> = None;
                   specifiers
@@ -271,7 +271,7 @@ impl Fold for ResolveFold {
             ModuleDecl::ExportAll(ExportAll { src, .. }) => {
               let mut resolver = self.resolver.borrow_mut();
               let (resolved_path, fixed_url) = resolver.resolve(src.value.as_ref(), false);
-              if resolver.bundle_mode && resolver.bundle_external.contains(fixed_url.as_str()) {
+              if resolver.bundle_mode && resolver.bundle_externals.contains(fixed_url.as_str()) {
                 resolver.star_exports.push(fixed_url.clone());
                 ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                   span: DUMMY_SP,

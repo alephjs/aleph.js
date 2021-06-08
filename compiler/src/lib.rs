@@ -43,7 +43,7 @@ pub struct Options {
   pub bundle_mode: bool,
 
   #[serde(default)]
-  pub bundle_external: Vec<String>,
+  pub bundle_externals: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -122,7 +122,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
     specifier,
     options.import_map,
     options.bundle_mode,
-    options.bundle_external,
+    options.bundle_externals,
     match options.aleph_pkg_uri.as_str() {
       "" => None,
       _ => Some(options.aleph_pkg_uri),

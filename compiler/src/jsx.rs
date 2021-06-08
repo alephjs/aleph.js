@@ -64,13 +64,13 @@ impl AlephJsxFold {
         match name {
           "head" => {
             let mut resolver = self.resolver.borrow_mut();
-            resolver.builtin_jsx_tags.insert("Head".into());
+            resolver.used_builtin_jsx_tags.insert("Head".into());
             el.name = JSXElementName::Ident(quote_ident!("__ALEPH_Head"));
           }
 
           "script" => {
             let mut resolver = self.resolver.borrow_mut();
-            resolver.builtin_jsx_tags.insert("CustomScript".into());
+            resolver.used_builtin_jsx_tags.insert("CustomScript".into());
             el.name = JSXElementName::Ident(quote_ident!("__ALEPH_CustomScript"));
           }
 
@@ -98,7 +98,7 @@ impl AlephJsxFold {
             }
 
             if should_replace {
-              resolver.builtin_jsx_tags.insert("Anchor".into());
+              resolver.used_builtin_jsx_tags.insert("Anchor".into());
               el.name = JSXElementName::Ident(quote_ident!("__ALEPH_Anchor"));
             }
           }
@@ -161,7 +161,7 @@ impl AlephJsxFold {
               }
 
               if name.eq("link") {
-                resolver.builtin_jsx_tags.insert("StyleLink".into());
+                resolver.used_builtin_jsx_tags.insert("StyleLink".into());
                 el.name = JSXElementName::Ident(quote_ident!("__ALEPH_StyleLink"));
               }
             }
@@ -208,7 +208,7 @@ impl AlephJsxFold {
             }
 
             let mut resolver = self.resolver.borrow_mut();
-            resolver.builtin_jsx_tags.insert("InlineStyle".into());
+            resolver.used_builtin_jsx_tags.insert("InlineStyle".into());
             el.name = JSXElementName::Ident(quote_ident!("__ALEPH_InlineStyle"));
             inline_style = Some((type_prop_value, id.into()));
           }

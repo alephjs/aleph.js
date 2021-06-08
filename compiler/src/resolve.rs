@@ -61,18 +61,18 @@ pub struct Resolver {
   pub dep_graph: Vec<DependencyDescriptor>,
   /// jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
-  /// use deno hooks
+  /// `useDeno` hooks
   pub deno_hooks: Vec<String>,
   /// bundle mode
   pub bundle_mode: bool,
-  /// bundled modules
-  pub bundle_external: IndexSet<String>,
+  /// bundle externals
+  pub bundle_externals: IndexSet<String>,
   /// star exports
   pub star_exports: Vec<String>,
   /// extra imports
   pub extra_imports: IndexSet<String>,
-  /// builtin jsx tags like `a`, `link`, `head`, etc
-  pub builtin_jsx_tags: IndexSet<String>,
+  /// used builtin jsx tags like `a`, `link`, `head`, etc
+  pub used_builtin_jsx_tags: IndexSet<String>,
 
   // private
   import_idx: i32,
@@ -86,13 +86,13 @@ impl Resolver {
     specifier: &str,
     import_map: ImportHashMap,
     bundle_mode: bool,
-    bundle_external: Vec<String>,
+    bundle_externals: Vec<String>,
     aleph_pkg_uri: Option<String>,
     react: Option<ReactResolve>,
   ) -> Self {
-    let mut set = IndexSet::<String>::new();
-    for url in bundle_external {
-      set.insert(url);
+    let mut tmp = IndexSet::<String>::new();
+    for url in bundle_externals {
+      tmp.insert(url);
     }
     Resolver {
       specifier: specifier.into(),
@@ -101,10 +101,10 @@ impl Resolver {
       inline_styles: HashMap::new(),
       deno_hooks: Vec::new(),
       bundle_mode,
-      bundle_external: set,
+      bundle_externals: tmp,
       star_exports: Vec::new(),
       extra_imports: IndexSet::new(),
-      builtin_jsx_tags: IndexSet::new(),
+      used_builtin_jsx_tags: IndexSet::new(),
       import_idx: 0,
       import_map: ImportMap::from_hashmap(import_map),
       aleph_pkg_uri,
