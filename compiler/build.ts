@@ -1,5 +1,7 @@
+import { encode } from 'https://deno.land/std@0.96.0/encoding/base64.ts'
 import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
 import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
+import { compress } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 
 async function run(cmd: string[]) {
   const p = Deno.run({
@@ -19,9 +21,14 @@ if (import.meta.main) {
     const jsCode = await Deno.readTextFile('./pkg/aleph_compiler.js')
     const hash = createHash('sha1').update(wasmData).toString()
     await ensureDir('./dist')
-    await Deno.writeFile(
-      './dist/compiler.wasm',
-      wasmData
+    await Deno.writeTextFile(
+      './dist/wasm.js',
+      [
+        `import { decode } from "https://deno.land/std@0.96.0/encoding/base64.ts";`,
+        `import { decompress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";`,
+        `const dataRaw = "${encode(compress(wasmData))}";`,
+        `export default () => decompress(decode(dataRaw));`
+      ].join('\n')
     )
     await Deno.writeTextFile(
       './dist/checksum.js',

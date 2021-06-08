@@ -1,7 +1,9 @@
 import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
+import { existsFile } from '../shared/fs.ts'
 import { Measure } from '../shared/log.ts'
 import type { ImportMap } from '../types.ts'
-import { cache } from '../server/cache.ts'
+import { getDenoDir } from '../server/helper.ts'
 import { checksum } from './dist/checksum.js'
 import init, { parseExportNamesSync, transformSync } from './dist/compiler.js'
 
@@ -43,7 +45,6 @@ export type TransformResult = {
     specifier: string
     importIndex: string
     isDynamic: boolean
-    ssrOnly: boolean
   }>
   denoHooks?: string[]
   starExports?: string[]
@@ -60,16 +61,18 @@ type InlineStyleRecord = Record<string, InlineStyle>
 
 let wasmReady: Promise<void> | boolean = false
 
-export async function initWasm() {
-  const { url } = import.meta
-  if (url.startsWith('file://')) {
-    const wasmPath = join(url.slice(7, -7), 'dist', 'compiler.wasm')
-    const wasmData = await Deno.readFile(wasmPath)
+async function initWasm() {
+  const cacheDir = join(await getDenoDir(), `deps/https/deno.land/aleph`)
+  const cachePath = `${cacheDir}/compiler.${checksum}.wasm`
+  if (await existsFile(cachePath)) {
+    const wasmData = await Deno.readFile(cachePath)
     await init(wasmData)
   } else {
-    const wasmUrl = url.slice(0, -7) + '/dist/compiler.wasm'
-    const { content } = await cache(wasmUrl)
-    await init(content)
+    const { default: getWasmData } = await import('./dist/wasm.js')
+    const wasmData = getWasmData()
+    await init(wasmData)
+    await ensureDir(cacheDir)
+    await Deno.writeFile(cachePath, wasmData)
   }
 }
 
