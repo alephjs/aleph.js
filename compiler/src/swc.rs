@@ -1,7 +1,7 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
-use crate::resolve::Resolver;
+use crate::resolve::{Resolver,DependencyDescriptor};
 use crate::resolve_fold::{resolve_fold, ExportsParser};
 use crate::source_type::SourceType;
 
@@ -170,7 +170,28 @@ impl SWC {
         hygiene()
       );
 
-      self.apply_transform(&mut passes, options.source_map)
+      let ret= self.apply_transform(&mut passes, options.source_map);
+      let mut resolver = resolver.borrow_mut();
+
+      // remove unused deps via tree-shaking
+      if let Ok((ref code,_)) = ret {
+        let mut deps: Vec<DependencyDescriptor> = Vec::new();
+        for dep in resolver.deps.clone()  {
+          let mut s = "\"".to_owned();
+          s.push_str(dep.relative_path.as_str());
+          s.push('"');
+          if code.contains(s.as_str()) {
+            deps.push(dep);
+          }
+        }
+        resolver.deps = deps;
+      }
+
+      if resolver.has_ssr_options || !resolver.deno_hooks.is_empty() {
+        // todo: gen tree-shaking ssr code
+      }
+
+      ret
     })
   }
 

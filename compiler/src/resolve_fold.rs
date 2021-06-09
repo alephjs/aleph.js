@@ -313,20 +313,20 @@ impl Fold for ResolveFold {
               let mut resolver = self.resolver.borrow_mut();
               let specifier = resolver.specifier.clone();
               let bundle_mode = resolver.bundle_mode;
-              let ssr_export = var.decls.iter().position(|decl| {
+              let ssr_options_index = var.decls.iter().position(|decl| {
                 if let Pat::Ident(ref binding) = decl.name {
                   specifier.starts_with("/pages/") && binding.id.sym.eq("ssr")
                 } else {
                   false
                 }
               });
-              if let Some(_) = ssr_export {
-                resolver.ssr_opts_export = true;
+              if let Some(_) = ssr_options_index {
+                resolver.has_ssr_options = true;
               }
               ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
                 span: DUMMY_SP,
                 decl: Decl::Var(if bundle_mode {
-                  if let Some(i) = ssr_export {
+                  if let Some(i) = ssr_options_index {
                     VarDecl{
                       span: DUMMY_SP,
                       kind: var.kind,

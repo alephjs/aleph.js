@@ -56,12 +56,12 @@ pub struct Resolver {
   pub specifier: String,
   /// a flag indicating if the specifier is remote url or not.
   pub specifier_is_remote: bool,
-  /// dependency graph
-  pub dep_graph: Vec<DependencyDescriptor>,
+  /// dependencies
+  pub deps: Vec<DependencyDescriptor>,
   /// jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
-  /// `ssr` options export
-  pub ssr_opts_export: bool,
+  /// a flag indicating whether the `ssr` options exported
+  pub has_ssr_options: bool,
   /// `useDeno` hooks
   pub deno_hooks: Vec<String>,
   /// bundle mode
@@ -98,9 +98,9 @@ impl Resolver {
     Resolver {
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
-      dep_graph: Vec::new(),
+      deps: Vec::new(),
       inline_styles: HashMap::new(),
-      ssr_opts_export: false,
+      has_ssr_options: false,
       deno_hooks: Vec::new(),
       bundle_mode,
       bundle_externals: tmp,
@@ -409,13 +409,13 @@ impl Resolver {
       path = "./".to_owned() + path.as_str();
     }
     if let Some(_) = self
-      .dep_graph
+      .deps
       .iter()
       .find(|&g| g.specifier == fixed_url.clone() && g.is_dynamic == is_dynamic)
     {
       // ignore repeated dependency
     } else {
-      self.dep_graph.push(DependencyDescriptor {
+      self.deps.push(DependencyDescriptor {
         specifier: fixed_url.clone(),
         import_index,
         is_dynamic,

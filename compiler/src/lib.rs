@@ -146,7 +146,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
   Ok(
     JsValue::from_serde(&TransformOutput {
       code,
-      deps: r.dep_graph.clone(),
+      deps: r.deps.clone(),
       inline_styles: r.inline_styles.clone(),
       star_exports: r.star_exports.clone(),
       deno_hooks: r.deno_hooks.clone(),

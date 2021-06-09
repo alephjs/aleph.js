@@ -348,7 +348,6 @@ mod tests {
   fn resolve_jsx_builtin_tags() {
     let source = r#"
       import React from "https://esm.sh/react"
-      import {join} from "https://deno.land/std/path/mod.ts"
       export default function Index() {
         return (
           <>
@@ -400,7 +399,7 @@ mod tests {
     ));
     let r = resolver.borrow_mut();
     assert_eq!(
-      r.dep_graph
+      r.deps
         .iter()
         .map(|g| { g.specifier.as_str() })
         .collect::<Vec<&str>>(),
