@@ -57,7 +57,7 @@ type InlineStyle = {
   exprs: string[]
 }
 
-type InlineStyleRecord = Record<string, InlineStyle>
+type InlineStyles = Record<string, InlineStyle>
 
 let wasmReady: Promise<void> | boolean = false
 
@@ -120,7 +120,7 @@ export async function transform(specifier: string, code: string, options: Transf
 
   // resolve inline-style
   if (inlineStyles) {
-    await Promise.all(Object.entries(inlineStyles as InlineStyleRecord).map(async ([key, style]) => {
+    await Promise.all(Object.entries(inlineStyles as InlineStyles).map(async ([key, style]) => {
       let tpl = style.quasis.reduce((tpl, quais, i, a) => {
         tpl += quais
         if (i < a.length - 1) {

@@ -159,7 +159,7 @@ impl SWC {
           ),
           is_jsx
         ),
-        resolve_fold(resolver.clone(), self.source_map.clone(), !options.is_dev),
+        resolve_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
         decorators::decorators(decorators::Config {
           legacy: true,
           emit_metadata: false

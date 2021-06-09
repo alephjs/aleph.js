@@ -56,7 +56,7 @@ export class Server {
           watcher.removeAllListeners('modify-' + specifier)
           socket.send(JSON.stringify({ type: 'remove', specifier }))
         })
-        log.debug('hmr opened')
+        log.debug('hmr connected')
         for await (const e of socket) {
           if (util.isNEString(e)) {
             try {

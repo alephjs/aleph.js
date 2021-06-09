@@ -9,20 +9,20 @@ use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 pub fn resolve_fold(
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
-  resolve_star_exports: bool,
+  is_dev: bool,
 ) -> impl Fold {
   ResolveFold {
     use_deno_idx: 0,
     resolver,
     source,
-    resolve_star_exports,
+    is_dev,
   }
 }
 
 pub struct ResolveFold {
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
-  resolve_star_exports: bool,
+  is_dev: bool,
   use_deno_idx: i32,
 }
 
@@ -286,7 +286,13 @@ impl Fold for ResolveFold {
                   }),
                 }))
               } else {
-                if self.resolve_star_exports {
+                if self.is_dev {
+                  ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
+                    span: DUMMY_SP,
+                    src: new_str(resolved_path.into()),
+                    asserts: None,
+                  }))
+                } else {
                   let mut src = "".to_owned();
                   src.push('[');
                   src.push_str(fixed_url.as_str());
@@ -297,12 +303,6 @@ impl Fold for ResolveFold {
                   ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
                     span: DUMMY_SP,
                     src: new_str(src.into()),
-                    asserts: None,
-                  }))
-                } else {
-                  ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
-                    span: DUMMY_SP,
-                    src: new_str(resolved_path.into()),
                     asserts: None,
                   }))
                 }
