@@ -308,38 +308,44 @@ impl Fold for ResolveFold {
                 }
               }
             }
-            // export ssr = {}
-            ModuleDecl::ExportDecl(ExportDecl{ decl:Decl::Var(var),..})=>{
-              let mut resolver = self.resolver.borrow_mut();
-              let specifier = resolver.specifier.clone();
-              let bundle_mode = resolver.bundle_mode;
-              let ssr_options_index = var.decls.iter().position(|decl| {
-                if let Pat::Ident(ref binding) = decl.name {
-                  specifier.starts_with("/pages/") && binding.id.sym.eq("ssr")
+            // match: export ssr = {}
+            ModuleDecl::ExportDecl(ExportDecl{ decl: Decl::Var(var), .. })=>{
+              let bundle_mode = self.resolver.borrow().bundle_mode;
+              if !bundle_mode {
+                ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
+                  span: DUMMY_SP,
+                  decl: Decl::Var(var),
+                }))
+              } else {
+                let mut resolver = self.resolver.borrow_mut();
+                let specifier = resolver.specifier.clone();
+                let decl_num = var.decls .len();
+                let decls = var.decls.into_iter().filter(|decl| {
+                  if let Pat::Ident(ref binding) = decl.name {
+                    !(specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
+                  } else {
+                    true
+                  }
+                }).collect::<Vec<VarDeclarator>>();
+                if decls.is_empty() {
+                  ModuleItem::Stmt(Stmt::Empty(EmptyStmt{
+                    span: DUMMY_SP,
+                  }))
                 } else {
-                  false
-                }
-              });
-              if let Some(_) = ssr_options_index {
-                resolver.has_ssr_options = true;
-              }
-              ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
-                span: DUMMY_SP,
-                decl: Decl::Var(if bundle_mode {
-                  if let Some(i) = ssr_options_index {
-                    VarDecl{
+                  if decl_num != decls.len() {
+                    resolver.has_ssr_options = true
+                  }
+                  ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
+                    span: DUMMY_SP,
+                    decl: Decl::Var( VarDecl{
                       span: DUMMY_SP,
                       kind: var.kind,
                       declare: var.declare,
-                      decls: var.decls.into_iter().skip(i).collect(),
-                    }
-                  } else {
-                    var
-                  }
-                } else {
-                  var
-                }),
-              }))
+                      decls,
+                    }),
+                  }))
+                }
+              }
             }
             _ => ModuleItem::ModuleDecl(decl),
           };
@@ -792,6 +798,8 @@ mod tests {
   #[test]
   fn bundle_mode() {
     let source = r#"
+      import { useDeno } from 'https://deno.land/x/aleph/framework/react/mod.ts'
+      import { join, basename } from 'https://deno.land/std/path/mod.ts'
       import React, { useState, useEffect as useEffect_ } from 'https://esm.sh/react'
       import * as React_ from 'https://esm.sh/react'
       import Logo from '../components/logo.tsx'
@@ -804,7 +812,16 @@ mod tests {
 
       const AsyncLogo = React.lazy(() => import('../components/async-logo.tsx'))
 
+      export const ssr = {
+        data: async () => { return {
+          filename: basename(import.meta.url)
+        } },
+        staticPaths: []
+      }
+
       export default function Index() {
+        const version = useDeno(() => Deno.verison.deno)
+
         return (
           <>
             <head>
@@ -815,6 +832,7 @@ mod tests {
             <AsyncLogo />
             <Nav />
             <h1>Hello World</h1>
+            <p>Powered by Deno v{version}</p>
           </>
         )
       }
@@ -827,6 +845,7 @@ mod tests {
       vec![
         "https://esm.sh/react".into(),
         "https://esm.sh/react-dom".into(),
+        "https://deno.land/x/aleph/framework/react/mod.ts".into(),
         "https://deno.land/x/aleph/framework/react/components/Head.ts".into(),
         "/components/logo.tsx".into(),
         "/shared/iife.ts".into(),
@@ -858,6 +877,7 @@ mod tests {
     assert!(code.contains("export const $$star_0 = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
     assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
+    assert!(!code.contains("export const ssr ="));
   }
 
   #[test]
