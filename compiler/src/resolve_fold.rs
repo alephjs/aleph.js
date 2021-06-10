@@ -1,6 +1,6 @@
 use crate::resolve::Resolver;
 use sha1::{Digest, Sha1};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc,path::Path};
 use swc_common::{SourceMap, Span, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
@@ -310,31 +310,25 @@ impl Fold for ResolveFold {
             }
             // match: export ssr = {}
             ModuleDecl::ExportDecl(ExportDecl{ decl: Decl::Var(var), .. })=>{
-              let bundle_mode = self.resolver.borrow().bundle_mode;
-              if !bundle_mode {
-                ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
-                  span: DUMMY_SP,
-                  decl: Decl::Var(var),
-                }))
-              } else {
-                let mut resolver = self.resolver.borrow_mut();
-                let specifier = resolver.specifier.clone();
-                let decl_num = var.decls .len();
-                let decls = var.decls.into_iter().filter(|decl| {
-                  if let Pat::Ident(ref binding) = decl.name {
-                    !(specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
-                  } else {
-                    true
-                  }
-                }).collect::<Vec<VarDeclarator>>();
+              let mut resolver = self.resolver.borrow_mut();
+              let specifier = resolver.specifier.clone();
+              let bundle_mode = resolver.bundle_mode;
+              let decls = var.decls.clone().into_iter().filter(|decl| {
+                if let Pat::Ident(ref binding) = decl.name {
+                  !(specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
+                } else {
+                  true
+                }
+              }).collect::<Vec<VarDeclarator>>();
+              if var.decls.len() != decls.len() {
+                resolver.has_ssr_options = true
+              }
+              if bundle_mode {
                 if decls.is_empty() {
                   ModuleItem::Stmt(Stmt::Empty(EmptyStmt{
                     span: DUMMY_SP,
                   }))
                 } else {
-                  if decl_num != decls.len() {
-                    resolver.has_ssr_options = true
-                  }
                   ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
                     span: DUMMY_SP,
                     decl: Decl::Var( VarDecl{
@@ -345,6 +339,11 @@ impl Fold for ResolveFold {
                     }),
                   }))
                 }
+              } else  {
+                ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
+                  span: DUMMY_SP,
+                  decl: Decl::Var(var),
+                }))
               }
             }
             _ => ModuleItem::ModuleDecl(decl),
@@ -362,7 +361,6 @@ impl Fold for ResolveFold {
 
   // resolve `import.meta.url`
   fn fold_expr(&mut self, expr: Expr) -> Expr {
-    let specifier = self.resolver.borrow().specifier.clone();
     let expr = match expr {
       Expr::Member(MemberExpr {
         span,
@@ -370,20 +368,32 @@ impl Fold for ResolveFold {
         prop,
         computed,
       }) => {
-        let mut is_import_meta_url = false;
+        let mut is_import_meta_url_expr = false;
         if let Expr::Ident(id) = prop.as_ref() {
           if id.sym.as_ref().eq("url") {
             if let ExprOrSuper::Expr(ref expr) = obj {
               if let Expr::MetaProp(MetaPropExpr { meta, prop }) = expr.as_ref() {
                 if meta.sym.as_ref().eq("import") && prop.sym.as_ref().eq("meta") {
-                  is_import_meta_url = true
+                  is_import_meta_url_expr = true
                 }
               }
             }
           }
         }
-        if is_import_meta_url {
-          Expr::Lit(Lit::Str(new_str(specifier)))
+        if is_import_meta_url_expr {
+          let resolver = self.resolver.borrow();
+          let specifier = resolver.specifier.clone();
+          if resolver.specifier_is_remote {
+            Expr::Lit(Lit::Str(new_str(specifier)))
+          } else {
+            let path = Path::new(resolver.working_dir.as_str());
+            let path = path.join(specifier.trim_start_matches("/"));
+            if let Some(p) = path.to_str() {
+              Expr::Lit(Lit::Str(new_str(p.into())))
+            } else {
+              Expr::Lit(Lit::Str(new_str(specifier)))
+            }
+          }
         } else {
           Expr::Member(MemberExpr {
             span,
@@ -666,7 +676,7 @@ fn new_str(str: String) -> Str {
 mod tests {
   use super::*;
   use crate::import_map::ImportHashMap;
-  use crate::resolve::{ReactResolve, Resolver};
+  use crate::resolve::{ReactOptions, Resolver};
   use crate::swc::{st, EmitOptions, SWC};
   use sha1::{Digest, Sha1};
   use std::collections::HashMap;
@@ -697,6 +707,7 @@ mod tests {
     imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
+      "/",
       ImportHashMap {
         imports,
         scopes: HashMap::new(),
@@ -704,7 +715,7 @@ mod tests {
       false,
       vec![],
       Some("https://deno.land/x/aleph@v1.0.0".into()),
-      Some(ReactResolve {
+      Some(ReactOptions {
         version: "17.0.2".into(),
         esm_sh_build_version: 2,
       }),
@@ -791,15 +802,15 @@ mod tests {
     let source = r#"
       console.log(import.meta.url)
     "#;
-    let (code, _) = st("/pages/index.tsx", source, true);
-    assert!(code.contains("console.log(\"/pages/index.tsx\")"));
+    let (code, _) = st("/pages/index.tsx", source, false);
+    assert!(code.contains("console.log(\"/test/pages/index.tsx\")"));
   }
 
   #[test]
   fn bundle_mode() {
     let source = r#"
       import { useDeno } from 'https://deno.land/x/aleph/framework/react/mod.ts'
-      import { join, basename } from 'https://deno.land/std/path/mod.ts'
+      import { join, basename, dirname } from 'https://deno.land/std/path/mod.ts'
       import React, { useState, useEffect as useEffect_ } from 'https://esm.sh/react'
       import * as React_ from 'https://esm.sh/react'
       import Logo from '../components/logo.tsx'
@@ -820,7 +831,10 @@ mod tests {
       }
 
       export default function Index() {
-        const version = useDeno(() => Deno.verison.deno)
+        const { title } = useDeno(async () => {
+          const text = await Deno.readTextFile(join(dirname(import.meta.url), '../config.json'))
+          return JSON.parse(text)
+        })
 
         return (
           <>
@@ -831,8 +845,7 @@ mod tests {
             <Logo />
             <AsyncLogo />
             <Nav />
-            <h1>Hello World</h1>
-            <p>Powered by Deno v{version}</p>
+            <h1>{title}</h1>
           </>
         )
       }
@@ -840,6 +853,7 @@ mod tests {
     let module = SWC::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
+      "/",
       ImportHashMap::default(),
       true,
       vec![

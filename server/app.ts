@@ -693,6 +693,7 @@ export class Application implements ServerApplication {
   /** common compiler options */
   get commonCompileOptions(): TransformOptions {
     return {
+      workingDir: this.workingDir,
       alephPkgUri: getAlephPkgUri(),
       importMap: this.importMap,
       inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
@@ -1076,8 +1077,8 @@ export class Application implements ServerApplication {
 
       let jsCode = code
 
-      // in production/bundle mode we need to replace the star export with names
-      if (starExports && starExports.length > 0) {
+      // in production(bundle) mode we need to replace the star export with names
+      if (!this.isDev && starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
           const exportSpecifier = starExports[index]
           const names = await this.parseModuleExportNames(exportSpecifier)

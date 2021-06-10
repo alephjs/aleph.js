@@ -187,7 +187,7 @@ impl SWC {
         resolver.deps = deps;
       }
 
-      if resolver.has_ssr_options || !resolver.deno_hooks.is_empty() {
+      if !resolver.bundle_mode && resolver.has_ssr_options || !resolver.deno_hooks.is_empty() {
         // todo: gen tree-shaking ssr code
       }
 
@@ -324,6 +324,7 @@ pub fn st(specifer: &str, source: &str, bundle_mode: bool) -> (String, Rc<RefCel
   let module = SWC::parse(specifer, source, None).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
+    "/test/",
     ImportHashMap::default(),
     bundle_mode,
     vec![],

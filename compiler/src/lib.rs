@@ -10,7 +10,7 @@ mod source_type;
 mod swc;
 
 use import_map::ImportHashMap;
-use resolve::{DependencyDescriptor, InlineStyle, ReactResolve, Resolver};
+use resolve::{DependencyDescriptor, InlineStyle, ReactOptions, Resolver};
 use serde::{Deserialize, Serialize};
 use source_type::SourceType;
 use std::collections::HashMap;
@@ -27,8 +27,11 @@ pub struct Options {
   #[serde(default)]
   pub aleph_pkg_uri: String,
 
+  #[serde(default = "default_working_dir")]
+  pub working_dir: String,
+
   #[serde(default)]
-  pub react: Option<ReactResolve>,
+  pub react: Option<ReactOptions>,
 
   #[serde(default)]
   pub swc_options: SWCOptions,
@@ -67,6 +70,10 @@ impl Default for SWCOptions {
       jsx_fragment_factory: default_pragma_frag(),
     }
   }
+}
+
+fn default_working_dir() -> String {
+  "/".into()
 }
 
 fn default_pragma() -> String {
@@ -120,6 +127,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
     .unwrap();
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifier,
+    options.working_dir.as_str(),
     options.import_map,
     options.bundle_mode,
     options.bundle_externals,

@@ -16,7 +16,7 @@ export enum SourceType {
   Unknown = '??',
 }
 
-export type ReactResolve = {
+export type ReactOptions = {
   version: string,
   esmShBuildVersion: number
 }
@@ -28,9 +28,10 @@ export type SWCOptions = {
 }
 
 export type TransformOptions = {
+  workingDir?: string
   importMap?: ImportMap
   alephPkgUri?: string
-  react?: ReactResolve
+  react?: ReactOptions
   swcOptions?: SWCOptions
   sourceMap?: boolean
   isDev?: boolean

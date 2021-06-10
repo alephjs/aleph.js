@@ -43,7 +43,7 @@ pub struct InlineStyle {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ReactResolve {
+pub struct ReactOptions {
   #[serde(default)]
   pub version: String,
   #[serde(default)]
@@ -56,13 +56,15 @@ pub struct Resolver {
   pub specifier: String,
   /// a flag indicating if the specifier is remote url or not.
   pub specifier_is_remote: bool,
+  /// the working dir of aleph app
+  pub working_dir: String,
   /// dependencies
   pub deps: Vec<DependencyDescriptor>,
   /// jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
   /// a flag indicating whether the `ssr` options exported
   pub has_ssr_options: bool,
-  /// `useDeno` hooks
+  /// a ID list of `useDeno` hooks
   pub deno_hooks: Vec<String>,
   /// bundle mode
   pub bundle_mode: bool,
@@ -79,17 +81,18 @@ pub struct Resolver {
   import_idx: i32,
   import_map: ImportMap,
   aleph_pkg_uri: Option<String>,
-  react: Option<ReactResolve>,
+  react: Option<ReactOptions>,
 }
 
 impl Resolver {
   pub fn new(
     specifier: &str,
+    working_dir: &str,
     import_map: ImportHashMap,
     bundle_mode: bool,
     bundle_externals: Vec<String>,
     aleph_pkg_uri: Option<String>,
-    react: Option<ReactResolve>,
+    react: Option<ReactOptions>,
   ) -> Self {
     let mut tmp = IndexSet::<String>::new();
     for url in bundle_externals {
@@ -98,6 +101,7 @@ impl Resolver {
     Resolver {
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
+      working_dir: working_dir.into(),
       deps: Vec::new(),
       inline_styles: HashMap::new(),
       has_ssr_options: false,
@@ -440,6 +444,7 @@ mod tests {
   fn resolver_fix_import_url() {
     let resolver = Resolver::new(
       "/app.tsx",
+      "/",
       ImportHashMap::default(),
       false,
       vec![],
@@ -498,6 +503,7 @@ mod tests {
     );
     let mut resolver = Resolver::new(
       "/pages/index.tsx",
+      "/",
       ImportHashMap {
         imports,
         scopes: HashMap::new(),
@@ -505,7 +511,7 @@ mod tests {
       false,
       vec![],
       None,
-      Some(ReactResolve {
+      Some(ReactOptions {
         version: "17.0.2".into(),
         esm_sh_build_version: 2,
       }),
@@ -631,11 +637,12 @@ mod tests {
   fn resolve_remote_1() {
     let mut resolver = Resolver::new(
       "https://esm.sh/react-dom",
+      "/",
       ImportHashMap::default(),
       false,
       vec![],
       None,
-      Some(ReactResolve {
+      Some(ReactOptions {
         version: "17.0.2".into(),
         esm_sh_build_version: 2,
       }),
@@ -677,11 +684,12 @@ mod tests {
   fn resolve_remote_2() {
     let mut resolver = Resolver::new(
       "https://esm.sh/preact/hooks",
+      "/",
       ImportHashMap::default(),
       false,
       vec![],
       None,
-      Some(ReactResolve {
+      Some(ReactOptions {
         version: "17.0.2".into(),
         esm_sh_build_version: 2,
       }),
