@@ -1,6 +1,6 @@
 use crate::resolve::Resolver;
 use sha1::{Digest, Sha1};
-use std::{cell::RefCell, rc::Rc,path::Path};
+use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::{SourceMap, Span, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
@@ -309,29 +309,35 @@ impl Fold for ResolveFold {
               }
             }
             // match: export ssr = {}
-            ModuleDecl::ExportDecl(ExportDecl{ decl: Decl::Var(var), .. })=>{
+            ModuleDecl::ExportDecl(ExportDecl {
+              decl: Decl::Var(var),
+              ..
+            }) => {
               let mut resolver = self.resolver.borrow_mut();
               let specifier = resolver.specifier.clone();
               let bundle_mode = resolver.bundle_mode;
-              let decls = var.decls.clone().into_iter().filter(|decl| {
-                if let Pat::Ident(ref binding) = decl.name {
-                  !(specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
-                } else {
-                  true
-                }
-              }).collect::<Vec<VarDeclarator>>();
+              let decls = var
+                .decls
+                .clone()
+                .into_iter()
+                .filter(|decl| {
+                  if let Pat::Ident(ref binding) = decl.name {
+                    !(specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
+                  } else {
+                    true
+                  }
+                })
+                .collect::<Vec<VarDeclarator>>();
               if var.decls.len() != decls.len() {
                 resolver.has_ssr_options = true
               }
               if bundle_mode {
                 if decls.is_empty() {
-                  ModuleItem::Stmt(Stmt::Empty(EmptyStmt{
-                    span: DUMMY_SP,
-                  }))
+                  ModuleItem::Stmt(Stmt::Empty(EmptyStmt { span: DUMMY_SP }))
                 } else {
-                  ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
+                  ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                     span: DUMMY_SP,
-                    decl: Decl::Var( VarDecl{
+                    decl: Decl::Var(VarDecl {
                       span: DUMMY_SP,
                       kind: var.kind,
                       declare: var.declare,
@@ -339,8 +345,8 @@ impl Fold for ResolveFold {
                     }),
                   }))
                 }
-              } else  {
-                ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl{
+              } else {
+                ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                   span: DUMMY_SP,
                   decl: Decl::Var(var),
                 }))

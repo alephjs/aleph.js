@@ -52,15 +52,15 @@ pub struct ReactOptions {
 
 /// A Resolver to resolve aleph.js import/export URL.
 pub struct Resolver {
+  /// the working dir of aleph app
+  pub working_dir: String,
   /// the text specifier associated with the import/export statement.
   pub specifier: String,
   /// a flag indicating if the specifier is remote url or not.
   pub specifier_is_remote: bool,
-  /// the working dir of aleph app
-  pub working_dir: String,
-  /// dependencies
+  /// the module dependencies
   pub deps: Vec<DependencyDescriptor>,
-  /// jsx inline styles
+  /// parsed jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
   /// a flag indicating whether the `ssr` options exported
   pub has_ssr_options: bool,
@@ -74,10 +74,10 @@ pub struct Resolver {
   pub star_exports: Vec<String>,
   /// extra imports
   pub extra_imports: IndexSet<String>,
-  /// used builtin jsx tags like `a`, `link`, `head`, etc
+  /// used builtin jsx tags like `a`, `link`, `head`, etc...
   pub used_builtin_jsx_tags: IndexSet<String>,
 
-  // private
+  // internal
   import_idx: i32,
   import_map: ImportMap,
   aleph_pkg_uri: Option<String>,
@@ -99,9 +99,9 @@ impl Resolver {
       tmp.insert(url);
     }
     Resolver {
+      working_dir: working_dir.into(),
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
-      working_dir: working_dir.into(),
       deps: Vec::new(),
       inline_styles: HashMap::new(),
       has_ssr_options: false,
