@@ -27,8 +27,8 @@ lazy_static! {
 #[serde(rename_all = "camelCase")]
 pub struct DependencyDescriptor {
   pub specifier: String,
-  pub import_index: String,
   pub is_dynamic: bool,
+  pub import_index: String,
   #[serde(skip)]
   pub relative_path: String,
 }

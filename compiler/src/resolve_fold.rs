@@ -726,7 +726,7 @@ mod tests {
         esm_sh_build_version: 2,
       }),
     )));
-    let (code, _) = module
+    let (code, _, _) = module
       .transform(resolver.clone(), &EmitOptions::default())
       .expect("could not transform module");
     println!("{}", code);
@@ -792,12 +792,12 @@ mod tests {
       .replace("/", "")
       .replace("=", "");
 
-    let (code, _) = st(specifer, source, false);
+    let (code, _, _) = st(specifer, source, false);
     assert!(code.contains(format!(", null, \"useDeno-{}\"", id_1).as_str()));
     assert!(code.contains(format!(", 1000, \"useDeno-{}\"", id_2).as_str()));
     assert!(code.contains(format!(", 1000, \"useDeno-{}\"", id_3).as_str()));
 
-    let (code, _) = st(specifer, source, true);
+    let (code, _, _) = st(specifer, source, true);
     assert!(code.contains(format!("null, null, \"useDeno-{}\"", id_1).as_str()));
     assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_2).as_str()));
     assert!(code.contains(format!("null, 1000, \"useDeno-{}\"", id_3).as_str()));
@@ -808,7 +808,7 @@ mod tests {
     let source = r#"
       console.log(import.meta.url)
     "#;
-    let (code, _) = st("/pages/index.tsx", source, false);
+    let (code, _, _) = st("/pages/index.tsx", source, false);
     assert!(code.contains("console.log(\"/test/pages/index.tsx\")"));
   }
 
@@ -873,7 +873,7 @@ mod tests {
       None,
       None,
     )));
-    let (code, _) = module
+    let (code, _, _) = module
       .transform(resolver.clone(), &EmitOptions::default())
       .expect("could not transform module");
     println!("{}", code);
@@ -898,6 +898,7 @@ mod tests {
     assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
     assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
     assert!(!code.contains("export const ssr ="));
+    assert!(!code.contains("deno.land/std/path/"));
   }
 
   #[test]

@@ -103,6 +103,14 @@ impl SWC {
     })
   }
 
+  /// parse export names in the module.
+  pub fn parse_export_names(&self) -> Result<Vec<String>, anyhow::Error> {
+    let program = Program::Module(self.module.clone());
+    let mut parser = ExportsParser { names: vec![] };
+    program.fold_with(&mut parser);
+    Ok(parser.names)
+  }
+
   /// transform a JS/TS/JSX/TSX file into a JS file, based on the supplied options.
   ///
   /// ### Arguments
@@ -114,7 +122,7 @@ impl SWC {
     self,
     resolver: Rc<RefCell<Resolver>>,
     options: &EmitOptions,
-  ) -> Result<(String, Option<String>), anyhow::Error> {
+  ) -> Result<(String, Option<String>, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
       let is_ts = match self.source_type {
@@ -170,41 +178,31 @@ impl SWC {
         hygiene()
       );
 
-      let ret = self.apply_transform(&mut passes, options.source_map);
+      let (code, map) = self.apply_fold(&mut passes, options.source_map).unwrap();
       let mut resolver = resolver.borrow_mut();
 
-      // remove unused deps via tree-shaking
-      if let Ok((ref code, _)) = ret {
-        let mut deps: Vec<DependencyDescriptor> = Vec::new();
-        for dep in resolver.deps.clone() {
-          let mut s = "\"".to_owned();
-          s.push_str(dep.relative_path.as_str());
-          s.push('"');
-          if code.contains(s.as_str()) {
-            deps.push(dep);
-          }
+      // remove unused deps by tree-shaking
+      let mut deps: Vec<DependencyDescriptor> = Vec::new();
+      for dep in resolver.deps.clone() {
+        let mut s = "\"".to_owned();
+        s.push_str(dep.relative_path.as_str());
+        s.push('"');
+        if code.contains(s.as_str()) {
+          deps.push(dep);
         }
-        resolver.deps = deps;
       }
+      resolver.deps = deps;
 
       if !resolver.bundle_mode && resolver.has_ssr_options || !resolver.deno_hooks.is_empty() {
         // todo: gen tree-shaking ssr code
       }
 
-      ret
+      Ok((code, None, map))
     })
   }
 
-  /// parse export names of the module.
-  pub fn parse_export_names(&self) -> Result<Vec<String>, anyhow::Error> {
-    let program = Program::Module(self.module.clone());
-    let mut parser = ExportsParser { names: vec![] };
-    program.fold_with(&mut parser);
-    Ok(parser.names)
-  }
-
   /// Apply transform with the fold.
-  pub fn apply_transform<T: Fold>(
+  pub fn apply_fold<T: Fold>(
     &self,
     mut fold: T,
     source_map: bool,
@@ -297,8 +295,8 @@ pub fn t<T: Fold>(specifier: &str, source: &str, tr: T, expect: &str) -> bool {
   let module = SWC::parse(specifier, source, None).expect("could not parse module");
   let (code, _) = swc_common::GLOBALS.set(&Globals::new(), || {
     module
-      .apply_transform(tr, false)
-      .expect("could not transpile module")
+      .apply_fold(tr, false)
+      .expect("could not transpile the module")
   });
   let matched = code.as_str().trim().eq(expect.trim());
 
@@ -320,7 +318,11 @@ pub fn t<T: Fold>(specifier: &str, source: &str, tr: T, expect: &str) -> bool {
 }
 
 #[allow(dead_code)]
-pub fn st(specifer: &str, source: &str, bundle_mode: bool) -> (String, Rc<RefCell<Resolver>>) {
+pub fn st(
+  specifer: &str,
+  source: &str,
+  bundle_mode: bool,
+) -> (String, Option<String>, Rc<RefCell<Resolver>>) {
   let module = SWC::parse(specifer, source, None).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
@@ -331,11 +333,11 @@ pub fn st(specifer: &str, source: &str, bundle_mode: bool) -> (String, Rc<RefCel
     Some("https://deno.land/x/aleph@v0.3.0".into()),
     None,
   )));
-  let (code, _) = module
+  let (code, client_code, _) = module
     .transform(resolver.clone(), &EmitOptions::default())
     .expect("could not transform module");
   println!("{}", code);
-  (code, resolver)
+  (code, client_code, resolver)
 }
 
 #[cfg(test)]
@@ -373,7 +375,7 @@ mod tests {
         bar() {}
       }
     "#;
-    let (code, _) = st("https://deno.land/x/mod.ts", source, false);
+    let (code, _, _) = st("https://deno.land/x/mod.ts", source, false);
     assert!(code.contains("var D;\n(function(D) {\n"));
     assert!(code.contains("_applyDecoratedDescriptor("));
   }
@@ -390,7 +392,7 @@ mod tests {
         )
       }
     "#;
-    let (code, _) = st("/pages/index.tsx", source, false);
+    let (code, _, _) = st("/pages/index.tsx", source, false);
     assert!(code.contains("React.createElement(React.Fragment, null"));
     assert!(code.contains("React.createElement(\"h1\", {"));
     assert!(code.contains("className: \"title\""));

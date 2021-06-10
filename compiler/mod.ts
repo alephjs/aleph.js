@@ -42,14 +42,17 @@ export type TransformOptions = {
 
 export type TransformResult = {
   code: string
-  deps: Array<{
-    specifier: string
-    importIndex: string
-    isDynamic: boolean
-  }>
+  clientCode?: string
+  deps?: DependencyDescriptor[]
   denoHooks?: string[]
   starExports?: string[]
   map?: string
+}
+
+type DependencyDescriptor = {
+  specifier: string
+  isDynamic: boolean
+  importIndex: string
 }
 
 type InlineStyle = {

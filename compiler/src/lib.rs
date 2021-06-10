@@ -88,6 +88,9 @@ fn default_pragma_frag() -> String {
 #[serde(rename_all = "camelCase")]
 pub struct TransformOutput {
   pub code: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub client_code: Option<String>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
   pub deps: Vec<DependencyDescriptor>,
   #[serde(skip_serializing_if = "HashMap::is_empty")]
   pub inline_styles: HashMap<String, InlineStyle>,
@@ -138,8 +141,8 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
     options.react,
   )));
   let module = SWC::parse(specifier, code, Some(options.swc_options.source_type))
-    .expect("could not parse module");
-  let (code, map) = module
+    .expect("could not parse the module");
+  let (code, client_code, map) = module
     .transform(
       resolver.clone(),
       &EmitOptions {
@@ -149,11 +152,12 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
         is_dev: options.is_dev,
       },
     )
-    .expect("could not transform module");
+    .expect("could not transform the module");
   let r = resolver.borrow_mut();
   Ok(
     JsValue::from_serde(&TransformOutput {
       code,
+      client_code,
       deps: r.deps.clone(),
       inline_styles: r.inline_styles.clone(),
       star_exports: r.star_exports.clone(),
