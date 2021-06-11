@@ -317,9 +317,9 @@ impl Fold for ResolveFold {
               let specifier = resolver.specifier.clone();
               let i = var.decls.clone().into_iter().position(|decl| {
                 if let Pat::Ident(ref binding) = decl.name {
-                  !(specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
+                  specifier.starts_with("/pages/") && binding.id.sym.eq("ssr")
                 } else {
-                  true
+                  false
                 }
               });
               if let Some(_) = i {
