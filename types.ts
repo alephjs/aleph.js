@@ -128,14 +128,14 @@ export type ImportMap = {
  * The config for CSS loader.
  */
 export type CSSOptions = {
-  /** `extractSize` specifies the extract size (default is 8k). */
-  extractSize?: number
-  /** `remoteExternal` loads remote css as external when it is true. */
-  remoteExternal?: boolean
-  /** `module` enables the css module feature. */
-  modules?: boolean | CSSModulesOptions
+  /** `cache` caches remote css to local if it is true. */
+  cache?: boolean
+  /** `extract` specifies the extract options (default is true with 8k limit). */
+  extract?: boolean | { limit?: number }
   /** `postcss` specifies the postcss plugins. */
   postcss?: { plugins: PostCSSPlugin[] }
+  /** `modules` enables the css modules feature. */
+  modules?: boolean | CSSModulesOptions | ((path: string) => boolean | CSSModulesOptions)
 }
 
 /**

@@ -52,8 +52,8 @@ export type TransformResult = {
 
 type DependencyDescriptor = {
   specifier: string
+  resolved: string
   isDynamic: boolean
-  importIndex: string
 }
 
 type InlineStyle = {

@@ -1,5 +1,5 @@
 import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import type { ReactResolve } from '../compiler/mod.ts'
+import type { ReactOptions } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDir, existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -11,7 +11,7 @@ import { getAlephPkgUri } from './helper.ts'
 const builtinCSSLoader = cssLoader()
 
 export type RequiredConfig = Required<Config> & {
-  react: ReactResolve
+  react: ReactOptions
 }
 
 export function defaultConfig(): Readonly<RequiredConfig> {
@@ -28,10 +28,12 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     ssr: {},
     plugins: [],
     css: {
-      extractSize: 8 * 1024,
-      remoteExternal: false,
+      cache: false,
+      extract: {
+        limit: 8 * 1024
+      },
       modules: false,
-      postcss: { plugins: ['autoprefixer'] }
+      postcss: { plugins: ['autoprefixer'] },
     },
     headers: {},
     compress: true,
@@ -142,10 +144,10 @@ export async function loadConfig(workingDir: string): Promise<Config> {
     config.plugins = [builtinCSSLoader]
   }
   if (util.isPlainObject(css)) {
-    const { extractSize, remoteExternal, modules, postcss } = css
+    const { extract, cache, modules, postcss } = css
     config.css = {
-      extractSize: typeof extractSize === 'number' && !Number.isNaN(extractSize) ? extractSize : 8 * 1024,
-      remoteExternal: Boolean(remoteExternal),
+      cache: Boolean(cache),
+      extract: util.isPlainObject(extract) ? { limit: typeof extract.limit === 'number' ? extract.limit : 8 * 1024 } : Boolean(extract),
       modules: util.isPlainObject(modules) ? modules : Boolean(modules),
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }

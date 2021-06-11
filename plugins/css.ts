@@ -22,7 +22,7 @@ export default (): LoaderPlugin => {
       const { css: cssConfig } = app.config
       const isRemote = util.isLikelyHttpURL(specifier)
 
-      if (isRemote && specifier.endsWith('.css') && cssConfig.remoteExternal) {
+      if (isRemote && specifier.endsWith('.css') && !cssConfig.cache) {
         return {
           code: [
             `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
@@ -98,8 +98,8 @@ export default (): LoaderPlugin => {
         return { type: 'css', code: css }
       }
 
-      const { extractSize = 8 * 1024 } = cssConfig
-      if (css.length > extractSize) {
+      const { extract } = cssConfig
+      if (extract && (extract === true || css.length > (extract.limit || 8 * 1024))) {
         const ext = extname(specifier)
         const hash = computeHash(css).slice(0, 8)
         const path = util.trimSuffix(isRemote ? toLocalPath(specifier) : specifier, ext) + '.' + hash + ext

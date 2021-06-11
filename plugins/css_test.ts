@@ -62,7 +62,7 @@ Deno.test('plugin: css loader with extract size option', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
   const app = new Application(dir, 'development')
-  app.config.css.extractSize = 10
+  app.config.css.extract = { limit: 10 }
   await ensureTextFile(
     join(dir, '/style/index.css'),
     'h1 { font-size: 18px; }'
@@ -83,7 +83,6 @@ Deno.test('plugin: css loader for remote external', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
   const app = new Application(dir, 'development')
-  app.config.css.remoteExternal = true
   const loader = cssLoader()
   const { code } = await loader.load!({ specifier: 'https://esm.sh/tailwindcss/dist/tailwind.min.css', }, app)
   assertEquals(code, [
