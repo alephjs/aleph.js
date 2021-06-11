@@ -58,21 +58,21 @@ pub struct Resolver {
   pub specifier_is_remote: bool,
   /// a flag indicating whether should ignore remote deps.
   pub ignore_remote_deps: bool,
-  /// the module dependencies
+  /// ordered dependencies in the module
   pub deps: Vec<DependencyDescriptor>,
   /// parsed jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
   /// a flag indicating whether the `ssr` options exported
   pub has_ssr_options: bool,
-  /// a ID list of `useDeno` hooks
+  /// a hook list of `useDeno`
   pub deno_hooks: Vec<String>,
   /// bundle mode
   pub bundle_mode: bool,
-  /// bundle externals
+  /// externals for bundle mode
   pub bundle_externals: IndexSet<String>,
-  /// star exports
+  /// all star exports in the module
   pub star_exports: Vec<String>,
-  /// extra imports
+  /// added extra imports
   pub extra_imports: IndexSet<String>,
   /// used builtin jsx tags like `a`, `link`, `head`, etc...
   pub used_builtin_jsx_tags: IndexSet<String>,

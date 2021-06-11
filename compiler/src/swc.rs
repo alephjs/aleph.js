@@ -1,9 +1,11 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
+use crate::export_parser::ExportParser;
 use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
-use crate::resolve_fold::{resolve_fold, ExportsParser};
+use crate::resolve_fold::resolve_fold;
 use crate::resolver::{DependencyDescriptor, Resolver};
 use crate::source_type::SourceType;
+use crate::strip_ssr::strip_ssr_fold;
 
 use std::{cell::RefCell, cmp::min, path::Path, rc::Rc};
 use swc_common::{
@@ -106,7 +108,7 @@ impl SWC {
   /// parse export names in the module.
   pub fn parse_export_names(&self) -> Result<Vec<String>, anyhow::Error> {
     let program = Program::Module(self.module.clone());
-    let mut parser = ExportsParser { names: vec![] };
+    let mut parser = ExportParser { names: vec![] };
     program.fold_with(&mut parser);
     Ok(parser.names)
   }
@@ -125,6 +127,7 @@ impl SWC {
   ) -> Result<(String, Option<String>, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
+      let bundle_mode = resolver.borrow().bundle_mode;
       let is_ts = match self.source_type {
         SourceType::TS => true,
         SourceType::TSX => true,
@@ -168,6 +171,7 @@ impl SWC {
           is_jsx
         ),
         resolve_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+        Optional::new(strip_ssr_fold(resolver.clone()), bundle_mode),
         decorators::decorators(decorators::Config {
           legacy: true,
           emit_metadata: false

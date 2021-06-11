@@ -2,11 +2,13 @@
 extern crate lazy_static;
 
 mod error;
+mod export_parser;
 mod import_map;
 mod jsx;
 mod resolve_fold;
 mod resolver;
 mod source_type;
+mod strip_ssr;
 mod swc;
 
 use import_map::ImportHashMap;
