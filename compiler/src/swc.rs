@@ -185,7 +185,7 @@ impl SWC {
       let mut deps: Vec<DependencyDescriptor> = Vec::new();
       for dep in resolver.deps.clone() {
         let mut s = "\"".to_owned();
-        s.push_str(dep.relative_path.as_str());
+        s.push_str(dep.resolved.as_str());
         s.push('"');
         if code.contains(s.as_str()) {
           deps.push(dep);

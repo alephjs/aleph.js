@@ -27,10 +27,8 @@ lazy_static! {
 #[serde(rename_all = "camelCase")]
 pub struct DependencyDescriptor {
   pub specifier: String,
+  pub resolved: String,
   pub is_dynamic: bool,
-  pub import_index: String,
-  #[serde(skip)]
-  pub relative_path: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -391,7 +389,6 @@ impl Resolver {
               filename.push('#');
               filename.push_str(fixed_url.as_str());
               filename.push('@');
-              self.import_idx = self.import_idx + 1;
               import_index = format!("{:0>6}", self.import_idx.to_string());
               filename.push_str(import_index.as_str());
             }
@@ -412,7 +409,6 @@ impl Resolver {
               filename.push('#');
               filename.push_str(fixed_url.as_str());
               filename.push('@');
-              self.import_idx = self.import_idx + 1;
               import_index = format!("{:0>6}", self.import_idx.to_string());
               filename.push_str(import_index.as_str());
             }
@@ -431,19 +427,13 @@ impl Resolver {
       resolved_path = "./".to_owned() + resolved_path.as_str();
     }
 
-    if let Some(_) = self
-      .deps
-      .iter()
-      .find(|&g| g.specifier == fixed_url.clone() && g.is_dynamic == is_dynamic)
-    {
-      return (resolved_path, fixed_url);
+    if !import_index.is_empty() {
+      self.import_idx = self.import_idx + 1;
     }
-
     self.deps.push(DependencyDescriptor {
       specifier: fixed_url.clone(),
-      import_index,
+      resolved: resolved_path.clone(),
       is_dynamic,
-      relative_path: resolved_path.clone(),
     });
     (resolved_path, fixed_url)
   }
@@ -620,14 +610,14 @@ mod tests {
     assert_eq!(
       resolver.resolve("../components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000001".into(),
+        "../components/logo.js#/components/logo.tsx@000000".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("../styles/app.css", false),
       (
-        "../styles/app.css.js#/styles/app.css@000002".into(),
+        "../styles/app.css.js#/styles/app.css@000001".into(),
         "/styles/app.css".into()
       )
     );
@@ -641,14 +631,14 @@ mod tests {
     assert_eq!(
       resolver.resolve("@/components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000003".into(),
+        "../components/logo.js#/components/logo.tsx@000002".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("~/components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000004".into(),
+        "../components/logo.js#/components/logo.tsx@000003".into(),
         "/components/logo.tsx".into()
       )
     );
@@ -840,30 +830,31 @@ mod tests {
     assert_eq!(
       resolver.resolve("../components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000001".into(),
+        "../components/logo.js#/components/logo.tsx@000000".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("../styles/app.css", false),
       (
-        "../styles/app.css.js#/styles/app.css@000002".into(),
+        "../styles/app.css.js#/styles/app.css@000001".into(),
         "/styles/app.css".into()
       )
     );
     assert_eq!(
       resolver.resolve("@/components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000003".into(),
+        "../components/logo.js#/components/logo.tsx@000002".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("~/components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000004".into(),
+        "../components/logo.js#/components/logo.tsx@000003".into(),
         "/components/logo.tsx".into()
       )
     );
+    assert_eq!(resolver.deps.len(), 4);
   }
 }

@@ -392,7 +392,7 @@ mod tests {
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
-        "import   \"../style/index.css.js#{}@000001\"",
+        "import   \"../style/index.css.js#{}@000000\"",
         "/style/index.css"
       )
       .as_str()

@@ -1090,7 +1090,7 @@ export class Application implements ServerApplication {
       }
 
       // revert external imports
-      if (this.loaders.length > 0) {
+      if (deps && this.loaders.length > 0) {
         deps.forEach(({ specifier }) => {
           if (specifier !== module.specifier && util.isLikelyHttpURL(specifier)) {
             let external = false
@@ -1119,20 +1119,20 @@ export class Application implements ServerApplication {
       }
 
       module.jsBuffer = encoder.encode(jsCode)
-      module.deps = deps.filter(({ specifier }) => specifier != module.specifier).map(({ specifier, isDynamic, importIndex }) => {
+      module.deps = deps?.filter(({ specifier }) => specifier != module.specifier).map(({ specifier, resolved, isDynamic }) => {
         const dep: DependencyDescriptor = { specifier }
         if (isDynamic) {
           dep.isDynamic = true
         }
         if (specifier.startsWith('/')) {
-          const mark = encoder.encode(`.js#${specifier}@${importIndex}`)
+          const mark = encoder.encode(resolved)
           const idx = indexOf(module.jsBuffer!, mark)
           if (idx > 0) {
-            dep.hashLoc = idx + mark.length - importIndex.length
+            dep.hashLoc = idx + mark.length - 6
           }
         }
         return dep
-      })
+      }) || []
       if (util.isNEArray(denoHooks)) {
         module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.config.ssr) {
