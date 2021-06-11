@@ -1,8 +1,8 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
-use crate::resolve::{DependencyDescriptor, Resolver};
 use crate::resolve_fold::{resolve_fold, ExportsParser};
+use crate::resolver::{DependencyDescriptor, Resolver};
 use crate::source_type::SourceType;
 
 use std::{cell::RefCell, cmp::min, path::Path, rc::Rc};
@@ -193,7 +193,7 @@ impl SWC {
       }
       resolver.deps = deps;
 
-      if !resolver.bundle_mode && resolver.has_ssr_options || !resolver.deno_hooks.is_empty() {
+      if !resolver.bundle_mode && (resolver.has_ssr_options || !resolver.deno_hooks.is_empty()) {
         // todo: gen tree-shaking ssr code
       }
 
@@ -328,6 +328,7 @@ pub fn st(
     specifer,
     "/test/",
     ImportHashMap::default(),
+    false,
     bundle_mode,
     vec![],
     Some("https://deno.land/x/aleph@v0.3.0".into()),

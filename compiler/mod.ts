@@ -28,13 +28,14 @@ export type SWCOptions = {
 }
 
 export type TransformOptions = {
-  workingDir?: string
-  importMap?: ImportMap
-  alephPkgUri?: string
-  react?: ReactOptions
   swcOptions?: SWCOptions
+  workingDir?: string
+  alephPkgUri?: string
+  importMap?: ImportMap
+  react?: ReactOptions
   sourceMap?: boolean
   isDev?: boolean
+  ignoreRemoteDeps?: boolean
   bundleMode?: boolean
   bundleExternal?: string[]
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>

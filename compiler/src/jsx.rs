@@ -1,4 +1,4 @@
-use crate::resolve::{is_remote_url, InlineStyle, Resolver};
+use crate::resolver::{is_remote_url, InlineStyle, Resolver};
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, rc::Rc};
 use swc_common::{SourceMap, Spanned, DUMMY_SP};

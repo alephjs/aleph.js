@@ -4,13 +4,13 @@ extern crate lazy_static;
 mod error;
 mod import_map;
 mod jsx;
-mod resolve;
 mod resolve_fold;
+mod resolver;
 mod source_type;
 mod swc;
 
 use import_map::ImportHashMap;
-use resolve::{DependencyDescriptor, InlineStyle, ReactOptions, Resolver};
+use resolver::{DependencyDescriptor, InlineStyle, ReactOptions, Resolver};
 use serde::{Deserialize, Serialize};
 use source_type::SourceType;
 use std::collections::HashMap;
@@ -25,28 +25,31 @@ pub struct Options {
   pub import_map: ImportHashMap,
 
   #[serde(default)]
-  pub aleph_pkg_uri: String,
+  pub aleph_pkg_uri: Option<String>,
 
   #[serde(default = "default_working_dir")]
   pub working_dir: String,
 
   #[serde(default)]
-  pub react: Option<ReactOptions>,
-
-  #[serde(default)]
   pub swc_options: SWCOptions,
 
   #[serde(default)]
-  pub source_map: bool,
-
-  #[serde(default)]
-  pub is_dev: bool,
+  pub ignore_remote_deps: bool,
 
   #[serde(default)]
   pub bundle_mode: bool,
 
   #[serde(default)]
   pub bundle_externals: Vec<String>,
+
+  #[serde(default)]
+  pub is_dev: bool,
+
+  #[serde(default)]
+  pub source_map: bool,
+
+  #[serde(default)]
+  pub react: Option<ReactOptions>,
 }
 
 #[derive(Deserialize)]
@@ -132,12 +135,10 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
     specifier,
     options.working_dir.as_str(),
     options.import_map,
+    options.ignore_remote_deps,
     options.bundle_mode,
     options.bundle_externals,
-    match options.aleph_pkg_uri.as_str() {
-      "" => None,
-      _ => Some(options.aleph_pkg_uri),
-    },
+    options.aleph_pkg_uri,
     options.react,
   )));
   let module = SWC::parse(specifier, code, Some(options.swc_options.source_type))

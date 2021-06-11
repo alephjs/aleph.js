@@ -58,6 +58,8 @@ pub struct Resolver {
   pub specifier: String,
   /// a flag indicating if the specifier is remote url or not.
   pub specifier_is_remote: bool,
+  /// a flag indicating whether should ignore remote deps.
+  pub ignore_remote_deps: bool,
   /// the module dependencies
   pub deps: Vec<DependencyDescriptor>,
   /// parsed jsx inline styles
@@ -89,6 +91,7 @@ impl Resolver {
     specifier: &str,
     working_dir: &str,
     import_map: ImportHashMap,
+    ignore_remote_deps: bool,
     bundle_mode: bool,
     bundle_externals: Vec<String>,
     aleph_pkg_uri: Option<String>,
@@ -102,6 +105,7 @@ impl Resolver {
       working_dir: working_dir.into(),
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
+      ignore_remote_deps,
       deps: Vec::new(),
       inline_styles: HashMap::new(),
       has_ssr_options: false,
@@ -254,6 +258,7 @@ impl Resolver {
         }
       }
     };
+
     // fix deno.land/x/aleph url
     if let Some(aleph_pkg_uri) = &self.aleph_pkg_uri {
       if fixed_url.starts_with("https://deno.land/x/aleph/") {
@@ -264,6 +269,7 @@ impl Resolver {
         );
       }
     }
+
     // fix react/react-dom url
     if let Some(react) = &self.react {
       if RE_REACT_URL.is_match(fixed_url.as_str()) {
@@ -307,7 +313,13 @@ impl Resolver {
         }
       }
     }
+
     let is_remote = is_remote_url(fixed_url.as_str());
+    if self.ignore_remote_deps && is_remote {
+      return (fixed_url.clone(), fixed_url);
+    }
+
+    let mut import_index = "".to_owned();
     let mut resolved_path = if is_remote {
       if self.specifier_is_remote {
         let mut buf = PathBuf::from(self.fix_import_url(self.specifier.as_str()));
@@ -358,8 +370,7 @@ impl Resolver {
         }
       }
     };
-    self.import_idx = self.import_idx + 1;
-    let import_index = format!("{:0>6}", self.import_idx.to_string());
+
     // fix extension & add hash placeholder
     match resolved_path.extension() {
       Some(os_str) => match os_str.to_str() {
@@ -380,6 +391,8 @@ impl Resolver {
               filename.push('#');
               filename.push_str(fixed_url.as_str());
               filename.push('@');
+              self.import_idx = self.import_idx + 1;
+              import_index = format!("{:0>6}", self.import_idx.to_string());
               filename.push_str(import_index.as_str());
             }
             resolved_path.set_file_name(filename);
@@ -399,6 +412,8 @@ impl Resolver {
               filename.push('#');
               filename.push_str(fixed_url.as_str());
               filename.push('@');
+              self.import_idx = self.import_idx + 1;
+              import_index = format!("{:0>6}", self.import_idx.to_string());
               filename.push_str(import_index.as_str());
             }
             resolved_path.set_file_name(filename);
@@ -408,25 +423,29 @@ impl Resolver {
       },
       None => {}
     };
-    let mut path = resolved_path.to_slash().unwrap();
-    if !path.starts_with("./") && !path.starts_with("../") && !path.starts_with("/") {
-      path = "./".to_owned() + path.as_str();
+    let mut resolved_path = resolved_path.to_slash().unwrap();
+    if !resolved_path.starts_with("./")
+      && !resolved_path.starts_with("../")
+      && !resolved_path.starts_with("/")
+    {
+      resolved_path = "./".to_owned() + resolved_path.as_str();
     }
+
     if let Some(_) = self
       .deps
       .iter()
       .find(|&g| g.specifier == fixed_url.clone() && g.is_dynamic == is_dynamic)
     {
-      // ignore repeated dependency
-    } else {
-      self.deps.push(DependencyDescriptor {
-        specifier: fixed_url.clone(),
-        import_index,
-        is_dynamic,
-        relative_path: path.clone(),
-      });
+      return (resolved_path, fixed_url);
     }
-    (path, fixed_url)
+
+    self.deps.push(DependencyDescriptor {
+      specifier: fixed_url.clone(),
+      import_index,
+      is_dynamic,
+      relative_path: resolved_path.clone(),
+    });
+    (resolved_path, fixed_url)
   }
 }
 
@@ -446,6 +465,7 @@ mod tests {
       "/app.tsx",
       "/",
       ImportHashMap::default(),
+      false,
       false,
       vec![],
       None,
@@ -509,6 +529,7 @@ mod tests {
         scopes: HashMap::new(),
       },
       false,
+      false,
       vec![],
       None,
       Some(ReactOptions {
@@ -528,16 +549,6 @@ mod tests {
       (
         "../-/esm.sh/react-refresh.js".into(),
         "https://esm.sh/react-refresh".into()
-      )
-    );
-    assert_eq!(
-      resolver.resolve(
-        "https://deno.land/x/aleph/framework/react/components/Link.ts",
-        false
-      ),
-      (
-        "../-/http_localhost_2020/framework/react/components/Link.js".into(),
-        "http://localhost:2020/framework/react/components/Link.ts".into()
       )
     );
     assert_eq!(
@@ -597,16 +608,26 @@ mod tests {
       )
     );
     assert_eq!(
+      resolver.resolve(
+        "https://deno.land/x/aleph/framework/react/components/Link.ts",
+        false
+      ),
+      (
+        "../-/http_localhost_2020/framework/react/components/Link.js".into(),
+        "http://localhost:2020/framework/react/components/Link.ts".into()
+      )
+    );
+    assert_eq!(
       resolver.resolve("../components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000012".into(),
+        "../components/logo.js#/components/logo.tsx@000001".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("../styles/app.css", false),
       (
-        "../styles/app.css.js#/styles/app.css@000013".into(),
+        "../styles/app.css.js#/styles/app.css@000002".into(),
         "/styles/app.css".into()
       )
     );
@@ -620,14 +641,14 @@ mod tests {
     assert_eq!(
       resolver.resolve("@/components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000015".into(),
+        "../components/logo.js#/components/logo.tsx@000003".into(),
         "/components/logo.tsx".into()
       )
     );
     assert_eq!(
       resolver.resolve("~/components/logo.tsx", false),
       (
-        "../components/logo.js#/components/logo.tsx@000016".into(),
+        "../components/logo.js#/components/logo.tsx@000004".into(),
         "/components/logo.tsx".into()
       )
     );
@@ -639,6 +660,7 @@ mod tests {
       "https://esm.sh/react-dom",
       "/",
       ImportHashMap::default(),
+      false,
       false,
       vec![],
       None,
@@ -687,6 +709,7 @@ mod tests {
       "/",
       ImportHashMap::default(),
       false,
+      false,
       vec![],
       None,
       Some(ReactOptions {
@@ -711,6 +734,136 @@ mod tests {
     assert_eq!(
       resolver.resolve("/preact", false),
       ("../preact.js".into(), "https://esm.sh/preact".into())
+    );
+  }
+
+  #[test]
+  fn resolve_simple_mode() {
+    let mut imports: HashMap<String, String> = HashMap::new();
+    imports.insert("@/".into(), "./".into());
+    imports.insert("~/".into(), "./".into());
+    imports.insert("react".into(), "https://esm.sh/react".into());
+    imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
+    imports.insert(
+      "https://deno.land/x/aleph/".into(),
+      "http://localhost:2020/".into(),
+    );
+    let mut resolver = Resolver::new(
+      "/pages/index.tsx",
+      "/",
+      ImportHashMap {
+        imports,
+        scopes: HashMap::new(),
+      },
+      true,
+      false,
+      vec![],
+      None,
+      Some(ReactOptions {
+        version: "17.0.2".into(),
+        esm_sh_build_version: 2,
+      }),
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/react", false),
+      (
+        "https://esm.sh/react@17.0.2".into(),
+        "https://esm.sh/react@17.0.2".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/react@16", false),
+      (
+        "https://esm.sh/react@17.0.2".into(),
+        "https://esm.sh/react@17.0.2".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/react-dom", false),
+      (
+        "https://esm.sh/react-dom@17.0.2".into(),
+        "https://esm.sh/react-dom@17.0.2".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/react-dom@16.14.0", false),
+      (
+        "https://esm.sh/react-dom@17.0.2".into(),
+        "https://esm.sh/react-dom@17.0.2".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/react-dom/server", false),
+      (
+        "https://esm.sh/react-dom@17.0.2/server".into(),
+        "https://esm.sh/react-dom@17.0.2/server".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("https://esm.sh/react-dom@16.13.1/server", false),
+      (
+        "https://esm.sh/react-dom@17.0.2/server".into(),
+        "https://esm.sh/react-dom@17.0.2/server".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("react-dom/server", false),
+      (
+        "https://esm.sh/react-dom@17.0.2/server".into(),
+        "https://esm.sh/react-dom@17.0.2/server".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("react", false),
+      (
+        "https://esm.sh/react@17.0.2".into(),
+        "https://esm.sh/react@17.0.2".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("https://deno.land/x/aleph/mod.ts", false),
+      (
+        "http://localhost:2020/mod.ts".into(),
+        "http://localhost:2020/mod.ts".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve(
+        "https://deno.land/x/aleph/framework/react/components/Link.ts",
+        false
+      ),
+      (
+        "http://localhost:2020/framework/react/components/Link.ts".into(),
+        "http://localhost:2020/framework/react/components/Link.ts".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("../components/logo.tsx", false),
+      (
+        "../components/logo.js#/components/logo.tsx@000001".into(),
+        "/components/logo.tsx".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("../styles/app.css", false),
+      (
+        "../styles/app.css.js#/styles/app.css@000002".into(),
+        "/styles/app.css".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("@/components/logo.tsx", false),
+      (
+        "../components/logo.js#/components/logo.tsx@000003".into(),
+        "/components/logo.tsx".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("~/components/logo.tsx", false),
+      (
+        "../components/logo.js#/components/logo.tsx@000004".into(),
+        "/components/logo.tsx".into()
+      )
     );
   }
 }

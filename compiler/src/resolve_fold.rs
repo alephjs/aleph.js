@@ -1,4 +1,4 @@
-use crate::resolve::Resolver;
+use crate::resolver::Resolver;
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::{SourceMap, Span, DUMMY_SP};
@@ -682,7 +682,7 @@ fn new_str(str: String) -> Str {
 mod tests {
   use super::*;
   use crate::import_map::ImportHashMap;
-  use crate::resolve::{ReactOptions, Resolver};
+  use crate::resolver::{ReactOptions, Resolver};
   use crate::swc::{st, EmitOptions, SWC};
   use sha1::{Digest, Sha1};
   use std::collections::HashMap;
@@ -719,6 +719,7 @@ mod tests {
         scopes: HashMap::new(),
       },
       false,
+      false,
       vec![],
       Some("https://deno.land/x/aleph@v1.0.0".into()),
       Some(ReactOptions {
@@ -735,10 +736,10 @@ mod tests {
     assert!(code.contains("import { useDeno } from \"../-/deno.land/x/aleph@v1.0.0/hooks.js\""));
     assert!(code.contains("import { render } from \"../-/esm.sh/react-dom@17.0.2/server.js\""));
     assert!(code.contains("import { render as _render } from \"../-/cdn.esm.sh/v2/react-dom@17.0.2/es2020/react-dom.js\""));
-    assert!(code.contains("import Logo from \"../component/logo.js#/component/logo.tsx@000006\""));
-    assert!(code.contains("import Logo2 from \"../component/logo.js#/component/logo.tsx@000007\""));
-    assert!(code.contains("import Logo3 from \"../component/logo.js#/component/logo.tsx@000008\""));
-    assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000009\")"));
+    assert!(code.contains("import Logo from \"../component/logo.js#/component/logo.tsx@000001\""));
+    assert!(code.contains("import Logo2 from \"../component/logo.js#/component/logo.tsx@000002\""));
+    assert!(code.contains("import Logo3 from \"../component/logo.js#/component/logo.tsx@000003\""));
+    assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000004\")"));
     assert!(code.contains("export { useState } from \"../-/esm.sh/react@17.0.2.js\""));
     assert!(code.contains("export * from \"[https://esm.sh/swr]:../-/esm.sh/swr.js\""));
   }
@@ -861,6 +862,7 @@ mod tests {
       "/pages/index.tsx",
       "/",
       ImportHashMap::default(),
+      false,
       true,
       vec![
         "https://esm.sh/react".into(),
