@@ -1,16 +1,16 @@
 use crate::resolve_fold::is_call_expr_by_name;
-use crate::resolver::Resolver;
-use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;
 use swc_ecma_ast::*;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 
-pub fn strip_ssr_fold(resolver: Rc<RefCell<Resolver>>) -> impl Fold {
-  StripSSRFold { resolver }
+pub fn strip_ssr_fold(specifier: &str) -> impl Fold {
+  StripSSRFold {
+    specifier: specifier.into(),
+  }
 }
 
 pub struct StripSSRFold {
-  resolver: Rc<RefCell<Resolver>>,
+  specifier: String,
 }
 
 impl Fold for StripSSRFold {
@@ -28,14 +28,13 @@ impl Fold for StripSSRFold {
               decl: Decl::Var(var),
               ..
             }) => {
-              let specifier = self.resolver.borrow().specifier.clone();
               let decls = var
                 .decls
                 .clone()
                 .into_iter()
                 .filter(|decl| {
                   if let Pat::Ident(ref binding) = decl.name {
-                    !(specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
+                    !(self.specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
                   } else {
                     true
                   }

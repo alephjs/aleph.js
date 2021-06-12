@@ -607,9 +607,10 @@ mod tests {
         esm_sh_build_version: 2,
       }),
     )));
-    let (code, _, _) = module
+    let code = module
       .transform(resolver.clone(), &EmitOptions::default())
-      .expect("could not transform module");
+      .unwrap()
+      .0;
     println!("{}", code);
     assert!(code.contains("import React from \"../-/esm.sh/react@17.0.2.js\""));
     assert!(code.contains("import { redirect } from \"../-/deno.land/x/aleph@v1.0.0/mod.js\""));
@@ -755,9 +756,10 @@ mod tests {
       None,
       None,
     )));
-    let (code, _, _) = module
+    let code = module
       .transform(resolver.clone(), &EmitOptions::default())
-      .expect("could not transform module");
+      .unwrap()
+      .0;
     println!("{}", code);
     assert!(code.contains("const { /*#__PURE__*/ default: React , useState , useEffect: useEffect_  } = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("const React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));

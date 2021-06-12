@@ -1,5 +1,5 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
-use crate::export_parser::ExportParser;
+use crate::export_names::ExportParser;
 use crate::import_map::ImportHashMap;
 use crate::jsx::aleph_jsx_fold;
 use crate::resolve_fold::resolve_fold;
@@ -124,7 +124,7 @@ impl SWC {
     self,
     resolver: Rc<RefCell<Resolver>>,
     options: &EmitOptions,
-  ) -> Result<(String, Option<String>, Option<String>), anyhow::Error> {
+  ) -> Result<(String, Option<String>, Option<String>, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
       let bundle_mode = resolver.borrow().bundle_mode;
@@ -171,7 +171,7 @@ impl SWC {
           is_jsx
         ),
         resolve_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
-        Optional::new(strip_ssr_fold(resolver.clone()), bundle_mode),
+        Optional::new(strip_ssr_fold(self.specifier.as_str()), bundle_mode),
         decorators::decorators(decorators::Config {
           legacy: true,
           emit_metadata: false
@@ -198,10 +198,17 @@ impl SWC {
       resolver.deps = deps;
 
       if !resolver.bundle_mode && (resolver.has_ssr_options || !resolver.deno_hooks.is_empty()) {
-        // todo: gen tree-shaking ssr code
+        let module =
+          SWC::parse(self.specifier.as_str(), code.as_str(), None).expect("could not parse module");
+        let (csr_code, csr_map) = swc_common::GLOBALS.set(&Globals::new(), || {
+          module
+            .apply_fold(strip_ssr_fold(self.specifier.as_str()), options.source_map)
+            .unwrap()
+        });
+        return Ok((code, map, Some(csr_code), csr_map));
       }
 
-      Ok((code, None, map))
+      Ok((code, map, None, None))
     })
   }
 
@@ -297,11 +304,8 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
 #[allow(dead_code)]
 pub fn t<T: Fold>(specifier: &str, source: &str, tr: T, expect: &str) -> bool {
   let module = SWC::parse(specifier, source, None).expect("could not parse module");
-  let (code, _) = swc_common::GLOBALS.set(&Globals::new(), || {
-    module
-      .apply_fold(tr, false)
-      .expect("could not transpile the module")
-  });
+  let (code, _) =
+    swc_common::GLOBALS.set(&Globals::new(), || module.apply_fold(tr, false).unwrap());
   let matched = code.as_str().trim().eq(expect.trim());
 
   if !matched {
@@ -338,11 +342,11 @@ pub fn st(
     Some("https://deno.land/x/aleph@v0.3.0".into()),
     None,
   )));
-  let (code, client_code, _) = module
+  let (code, _, csr_code, _) = module
     .transform(resolver.clone(), &EmitOptions::default())
-    .expect("could not transform module");
+    .unwrap();
   println!("{}", code);
-  (code, client_code, resolver)
+  (code, csr_code, resolver)
 }
 
 #[cfg(test)]

@@ -43,11 +43,12 @@ export type TransformOptions = {
 
 export type TransformResult = {
   code: string
-  clientCode?: string
+  csrCode?: string
   deps?: DependencyDescriptor[]
   denoHooks?: string[]
   starExports?: string[]
   map?: string
+  csrMap?: string
 }
 
 type DependencyDescriptor = {

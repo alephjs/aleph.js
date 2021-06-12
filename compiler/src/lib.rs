@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 mod error;
-mod export_parser;
+mod export_names;
 mod import_map;
 mod jsx;
 mod resolve_fold;
@@ -93,18 +93,27 @@ fn default_pragma_frag() -> String {
 #[serde(rename_all = "camelCase")]
 pub struct TransformOutput {
   pub code: String,
+
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub client_code: Option<String>,
+  pub csr_code: Option<String>,
+
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub deps: Vec<DependencyDescriptor>,
+
   #[serde(skip_serializing_if = "HashMap::is_empty")]
   pub inline_styles: HashMap<String, InlineStyle>,
+
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub deno_hooks: Vec<String>,
+
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub star_exports: Vec<String>,
+
   #[serde(skip_serializing_if = "Option::is_none")]
   pub map: Option<String>,
+
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub csr_map: Option<String>,
 }
 
 #[wasm_bindgen(js_name = "parseExportNamesSync")]
@@ -145,7 +154,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
   )));
   let module = SWC::parse(specifier, code, Some(options.swc_options.source_type))
     .expect("could not parse the module");
-  let (code, client_code, map) = module
+  let (code, map, csr_code, csr_map) = module
     .transform(
       resolver.clone(),
       &EmitOptions {
@@ -160,12 +169,13 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
   Ok(
     JsValue::from_serde(&TransformOutput {
       code,
-      client_code,
+      csr_code,
       deps: r.deps.clone(),
       inline_styles: r.inline_styles.clone(),
       star_exports: r.star_exports.clone(),
       deno_hooks: r.deno_hooks.clone(),
       map,
+      csr_map,
     })
     .unwrap(),
   )
