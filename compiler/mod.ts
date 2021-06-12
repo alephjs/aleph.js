@@ -5,7 +5,7 @@ import { Measure } from '../shared/log.ts'
 import type { ImportMap } from '../types.ts'
 import { getDenoDir } from '../server/helper.ts'
 import { checksum } from './dist/checksum.js'
-import init, { parseExportNamesSync, transformSync } from './dist/compiler.js'
+import init, { parseExportNamesSync, stripSsrCodeSync, transformSync } from './dist/compiler.js'
 
 export enum SourceType {
   JS = 'js',
@@ -43,12 +43,10 @@ export type TransformOptions = {
 
 export type TransformResult = {
   code: string
-  csrCode?: string
   deps?: DependencyDescriptor[]
   denoHooks?: string[]
   starExports?: string[]
   map?: string
-  csrMap?: string
 }
 
 type DependencyDescriptor = {
@@ -159,7 +157,13 @@ export async function transform(specifier: string, code: string, options: Transf
   }
 }
 
-/* parse export names of the module */
+/* strip SSR code. */
+export async function stripSsrCode(specifier: string, code: string, options: SWCOptions = {}): Promise<string[]> {
+  await checkWasmReady()
+  return stripSsrCodeSync(specifier, code, options)
+}
+
+/* parse export names of the module. */
 export async function parseExportNames(specifier: string, code: string, options: SWCOptions = {}): Promise<string[]> {
   await checkWasmReady()
   return parseExportNamesSync(specifier, code, options)

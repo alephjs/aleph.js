@@ -94,9 +94,6 @@ fn default_pragma_frag() -> String {
 pub struct TransformOutput {
   pub code: String,
 
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub csr_code: Option<String>,
-
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub deps: Vec<DependencyDescriptor>,
 
@@ -111,9 +108,6 @@ pub struct TransformOutput {
 
   #[serde(skip_serializing_if = "Option::is_none")]
   pub map: Option<String>,
-
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub csr_map: Option<String>,
 }
 
 #[wasm_bindgen(js_name = "parseExportNamesSync")]
@@ -131,7 +125,35 @@ pub fn parse_export_names_sync(
   let module =
     SWC::parse(specifier, code, Some(options.source_type)).expect("could not parse module");
   let export_names = module.parse_export_names().unwrap();
+
   Ok(JsValue::from_serde(&export_names).unwrap())
+}
+
+#[wasm_bindgen(js_name = "stripSsrCodeSync")]
+pub fn strip_ssr_code(specifier: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
+  console_error_panic_hook::set_once();
+
+  let options: Options = options
+    .into_serde()
+    .map_err(|err| format!("failed to parse options: {}", err))
+    .unwrap();
+  let module = SWC::parse(specifier, code, Some(options.swc_options.source_type))
+    .expect("could not parse the module");
+  let (code, map) = module
+    .strip_ssr_code(options.source_map)
+    .expect("could not strip ssr code");
+
+  Ok(
+    JsValue::from_serde(&TransformOutput {
+      code,
+      deps: vec![],
+      inline_styles: HashMap::new(),
+      star_exports: vec![],
+      deno_hooks: vec![],
+      map,
+    })
+    .unwrap(),
+  )
 }
 
 #[wasm_bindgen(js_name = "transformSync")]
@@ -154,7 +176,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
   )));
   let module = SWC::parse(specifier, code, Some(options.swc_options.source_type))
     .expect("could not parse the module");
-  let (code, map, csr_code, csr_map) = module
+  let (code, map) = module
     .transform(
       resolver.clone(),
       &EmitOptions {
@@ -165,17 +187,16 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
       },
     )
     .expect("could not transform the module");
-  let r = resolver.borrow_mut();
+  let r = resolver.borrow();
+
   Ok(
     JsValue::from_serde(&TransformOutput {
       code,
-      csr_code,
       deps: r.deps.clone(),
       inline_styles: r.inline_styles.clone(),
       star_exports: r.star_exports.clone(),
       deno_hooks: r.deno_hooks.clone(),
       map,
-      csr_map,
     })
     .unwrap(),
   )

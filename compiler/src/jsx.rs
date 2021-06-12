@@ -371,7 +371,7 @@ mod tests {
         )
       }
     "#;
-    let (code, _, resolver) = st("/pages/index.tsx", source, false);
+    let (code, resolver) = st("/pages/index.tsx", source, false);
     assert!(code.contains(
       "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.js\""
     ));
@@ -436,7 +436,7 @@ mod tests {
         )
       }
     "#;
-    let (code, _, resolver) = st("/pages/index.tsx", source, false);
+    let (code, resolver) = st("/pages/index.tsx", source, false);
     assert!(code.contains(
       "import __ALEPH_InlineStyle from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/InlineStyle.js\""
     ));
