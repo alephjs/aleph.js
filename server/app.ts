@@ -1,12 +1,12 @@
 import { bold, dim } from 'https://deno.land/std@0.96.0/fmt/colors.ts'
-import { indexOf, copy } from 'https://deno.land/std@0.96.0/bytes/mod.ts'
+import { indexOf, copy, equals } from 'https://deno.land/std@0.96.0/bytes/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
 import { walk } from 'https://deno.land/std@0.96.0/fs/walk.ts'
 import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
 import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
 import type { TransformOptions } from '../compiler/mod.ts'
-import { buildChecksum, parseExportNames, SourceType, transform } from '../compiler/mod.ts'
+import { wasmChecksum, parseExportNames, SourceType, transform } from '../compiler/mod.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
@@ -36,6 +36,7 @@ export type Module = {
   deps: DependencyDescriptor[]
   external?: boolean
   isStyle?: boolean
+  hasSsrOptions?: boolean
   denoHooks?: string[]
   hash?: string
   sourceHash: string
@@ -54,7 +55,6 @@ type ModuleSource = {
 type DependencyDescriptor = {
   specifier: string
   isDynamic?: boolean
-  hash?: string
   hashLoc?: number
 }
 
@@ -160,7 +160,7 @@ export class Application implements ServerApplication {
         shouldRebuild = (
           typeof v !== 'object' ||
           v === null ||
-          v.compiler !== buildChecksum ||
+          v.compiler !== wasmChecksum ||
           v.plugins !== plugins
         )
       } catch (e) { }
@@ -179,7 +179,7 @@ export class Application implements ServerApplication {
       ensureTextFile(buildManifestFile, JSON.stringify({
         aleph: VERSION,
         deno: Deno.version.deno,
-        compiler: buildChecksum,
+        compiler: wasmChecksum,
         plugins,
       }, undefined, 2))
     }
@@ -846,7 +846,7 @@ export class Application implements ServerApplication {
   }
 
   async getModuleJSCode(module: Module): Promise<Uint8Array | null> {
-    const { specifier, jsFile, jsBuffer } = module
+    const { jsFile, jsBuffer } = module
     if (jsBuffer) {
       return jsBuffer
     }
@@ -855,7 +855,7 @@ export class Application implements ServerApplication {
     if (await existsFile(cacheFp)) {
       const content = await Deno.readFile(cacheFp)
       module.jsBuffer = content
-      log.debug(`load jsCode of ${specifier}` + dim(' • ' + util.formatBytes(content.length)))
+      log.debug(`load '${jsFile}'` + dim(' • ' + util.formatBytes(content.length)))
       return content
     }
 
@@ -929,11 +929,11 @@ export class Application implements ServerApplication {
     return module
   }
 
-  private async initModule(specifier: string, { source, forceRefresh }: { source?: ModuleSource, forceRefresh?: boolean } = {}): Promise<[Module, ModuleSource | null]> {
+  private async initModule(specifier: string, { source: customSource, forceRefresh }: { source?: ModuleSource, forceRefresh?: boolean } = {}): Promise<[Module, ModuleSource | null]> {
     let external = false
     let data: any = null
 
-    if (source === undefined) {
+    if (customSource === undefined) {
       for (const l of this.loaders) {
         if (util.isFunction(l.resolve) && l.test.test(specifier)) {
           const ret = l.resolve(specifier)
@@ -970,6 +970,7 @@ export class Application implements ServerApplication {
     const metaFp = cacheFp.slice(0, -3) + '.meta.json'
 
     let defer = (err?: Error) => { }
+    let source: ModuleSource | null = null
     mod = {
       specifier,
       deps: [],
@@ -994,8 +995,8 @@ export class Application implements ServerApplication {
 
     if (isRemote && !this.#reloading) {
       if (!await existsFile(metaFp) || !await existsFile(cacheFp)) {
-        const globalCacheFp = join(await getDenoDir(), 'gen/aleph', jsFile)
-        const globalMetaFp = globalCacheFp.slice(0, -3) + '.meta.json'
+        const globalCacheFp = join(await getDenoDir(), `gen/aleph-${wasmChecksum}`, jsFile)
+        const globalMetaFp = `${globalCacheFp.slice(0, -3)}.meta.json`
         if (await existsFile(globalCacheFp) && await existsFile(globalMetaFp)) {
           await ensureDir(dirname(cacheFp))
           await Promise.all([
@@ -1011,11 +1012,12 @@ export class Application implements ServerApplication {
 
     if (await existsFile(metaFp)) {
       try {
-        const { specifier: _specifier, sourceHash, deps, isStyle, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
+        const { specifier: _specifier, sourceHash, deps, isStyle, hasSsrOptions, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
         if (_specifier === specifier && util.isNEString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
-          mod.isStyle = isStyle || undefined
+          mod.isStyle = Boolean(isStyle) || undefined
+          mod.hasSsrOptions = Boolean(hasSsrOptions) || undefined
           mod.denoHooks = util.isNEArray(denoHooks) ? denoHooks : undefined
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
@@ -1030,14 +1032,13 @@ export class Application implements ServerApplication {
     )
     if (shouldLoad) {
       try {
-        const src = source || await this.loadModuleSource(specifier, data)
+        const src = customSource || await this.loadModuleSource(specifier, data)
         const sourceHash = computeHash(src.code)
         if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
           mod.sourceHash = sourceHash
+          source = src
         }
         mod.isStyle = src.isStyle
-        defer()
-        return [mod, src]
       } catch (err) {
         log.error(`load module '${specifier}':`, err.message)
         defer(err)
@@ -1046,7 +1047,7 @@ export class Application implements ServerApplication {
     }
 
     defer()
-    return [mod, null]
+    return [mod, source]
   }
 
   private async transpileModule(module: Module, source: ModuleSource | null, ignoreDeps = false, __tracing: Set<string> = new Set()): Promise<void> {
@@ -1067,7 +1068,7 @@ export class Application implements ServerApplication {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, denoHooks, starExports, map } = await transform(specifier, source.code, {
+      const { code, deps, hasSsrOptions, denoHooks, starExports, map } = await transform(specifier, source.code, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
@@ -1133,6 +1134,8 @@ export class Application implements ServerApplication {
         }
         return dep
       }) || []
+
+      module.hasSsrOptions = hasSsrOptions
       if (util.isNEArray(denoHooks)) {
         module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.config.ssr) {
@@ -1147,8 +1150,9 @@ export class Application implements ServerApplication {
       const metaJSON = JSON.stringify({
         specifier,
         sourceHash: module.sourceHash,
-        isStyle: module.isStyle || undefined,
-        denoHooks: util.isNEArray(module.denoHooks) ? module.denoHooks : undefined,
+        isStyle: module.isStyle,
+        hasSsrOptions: module.hasSsrOptions,
+        denoHooks: module.denoHooks,
         deps: module.deps,
       }, undefined, 2)
       await ensureDir(dirname(cacheFp))
@@ -1157,9 +1161,10 @@ export class Application implements ServerApplication {
         Deno.writeTextFile(metaFp, metaJSON),
         map ? Deno.writeTextFile(`${cacheFp}.map`, map) : Promise.resolve(),
       ])
+      // cache remote module compilation forever
       if (util.isLikelyHttpURL(specifier) && !isLocalUrl(specifier)) {
-        const globalCacheFp = join(await getDenoDir(), 'gen/aleph', jsFile)
-        const globalMetaFp = globalCacheFp.slice(0, -3) + '.meta.json'
+        const globalCacheFp = join(await getDenoDir(), `gen/aleph-${wasmChecksum}`, jsFile)
+        const globalMetaFp = `${globalCacheFp.slice(0, -3)}.meta.json`
         await ensureDir(dirname(globalCacheFp))
         await Promise.all([
           Deno.writeFile(globalCacheFp, module.jsBuffer),
@@ -1174,30 +1179,31 @@ export class Application implements ServerApplication {
     }
 
     if (module.deps.length > 0) {
+      let fsync = false
       const encoder = new TextEncoder()
       const hasher = createHash('md5').update(module.sourceHash)
-      let fsync = false
-      await Promise.all(module.deps.map(async dep => {
-        const { specifier, hash: prevHash, hashLoc } = dep
+      if (module.deps.find(dep => dep.hashLoc !== undefined)) {
+        // preload js buffer
+        this.getModuleJSCode(module)
+      }
+      await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
         const [depModule, depSource] = await this.initModule(specifier)
         if (!depModule.external) {
           await this.transpileModule(depModule, depSource, false, __tracing)
         }
         const hash = depModule.hash || depModule.sourceHash
-        if (hashLoc && prevHash !== hash) {
-          const jsCode = await this.getModuleJSCode(module)
-          dep.hash = hash
-          if (jsCode) {
-            const hashData = encoder.encode((hash).substr(0, 6))
-            copy(hashData, jsCode, hashLoc)
-          }
-          if (!fsync) {
-            fsync = true
+        if (hashLoc !== undefined) {
+          const { jsBuffer } = module
+          const hashData = encoder.encode((hash).substr(0, 6))
+          if (jsBuffer && !equals(hashData, jsBuffer.slice(hashLoc, hashLoc + 6))) {
+            copy(hashData, jsBuffer, hashLoc)
+            if (!fsync) {
+              fsync = true
+            }
           }
         }
         hasher.update(hash)
       }))
-
       module.hash = hasher.toString()
       if (fsync) {
         await this.cacheModule(module)
@@ -1217,15 +1223,14 @@ export class Application implements ServerApplication {
       if (deps.length > 0) {
         let fsync = false
         for (const dep of deps) {
-          const { specifier, hash: prevHash, hashLoc } = dep
-          if (specifier === by.specifier && hashLoc && prevHash !== hash) {
+          const { specifier, hashLoc } = dep
+          if (specifier === by.specifier && hashLoc !== undefined) {
             const jsCode = await this.getModuleJSCode(mod)
-            dep.hash = hash
-            if (jsCode) {
+            if (jsCode && !equals(hashData, jsCode.slice(hashLoc, hashLoc + 6))) {
               copy(hashData, jsCode, hashLoc)
-            }
-            if (!fsync) {
-              fsync = true
+              if (!fsync) {
+                fsync = true
+              }
             }
           }
         }
@@ -1270,8 +1275,9 @@ export class Application implements ServerApplication {
         Deno.writeTextFile(metaFp, JSON.stringify({
           specifier,
           sourceHash: module.sourceHash,
-          isStyle: module.isStyle || undefined,
-          denoHooks: util.isNEArray(module.denoHooks) ? module.denoHooks : undefined,
+          isStyle: module.isStyle,
+          hasSsrOptions: module.hasSsrOptions,
+          denoHooks: module.denoHooks,
           deps: module.deps,
         }, undefined, 2)),
         lazyRemove(cacheFp.slice(0, -3) + '.client.js'),
