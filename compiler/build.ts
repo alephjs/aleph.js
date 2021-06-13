@@ -1,7 +1,10 @@
+import { dim } from 'https://deno.land/std@0.96.0/fmt/colors.ts'
 import { encode } from 'https://deno.land/std@0.96.0/encoding/base64.ts'
+import { exists } from 'https://deno.land/std@0.96.0/fs/exists.ts'
 import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
 import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
 import { compress } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
+import util from '../shared/util.ts'
 
 async function run(cmd: string[]) {
   const p = Deno.run({
@@ -15,11 +18,15 @@ async function run(cmd: string[]) {
 }
 
 if (import.meta.main) {
-  const packed = await run(['wasm-pack', 'build', '--target', 'web'])
-  if (packed) {
+  const ok = await run(['wasm-pack', 'build', '--target', 'web'])
+  if (ok) {
     const wasmData = await Deno.readFile('./pkg/aleph_compiler_bg.wasm')
     const jsCode = await Deno.readTextFile('./pkg/aleph_compiler.js')
     const hash = createHash('sha1').update(wasmData).toString()
+    let prevWasmJsSize = 0
+    if (await exists('./dist/checksum.js')) {
+      prevWasmJsSize = (await Deno.stat('./dist/wasm.js')).size
+    }
     await ensureDir('./dist')
     await Deno.writeTextFile(
       './dist/wasm.js',
@@ -47,5 +54,7 @@ if (import.meta.main) {
       `)
     )
     await run(['deno', 'fmt', '-q', './dist/compiler.js'])
+    const wasmJsSize = (await Deno.stat('./dist/wasm.js')).size
+    console.log(`${dim('[INFO]')}: wasm.js (${[prevWasmJsSize, wasmJsSize].filter(Boolean).map(n => util.formatBytes(n)).join(' -> ')})`)
   }
 }
