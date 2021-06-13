@@ -16,15 +16,15 @@ export enum SourceType {
   Unknown = '??',
 }
 
-export type ReactOptions = {
-  version: string,
-  esmShBuildVersion: number
-}
-
 export type SWCOptions = {
   sourceType?: SourceType
   jsxFactory?: string
   jsxFragmentFactory?: string
+}
+
+export type ReactOptions = {
+  version: string,
+  esmShBuildVersion: number
 }
 
 export type TransformOptions = {
@@ -44,6 +44,7 @@ export type TransformOptions = {
 export type TransformResult = {
   code: string
   deps?: DependencyDescriptor[]
+  hasSsrOptions?: boolean
   denoHooks?: string[]
   starExports?: string[]
   map?: string
@@ -170,6 +171,6 @@ export async function parseExportNames(specifier: string, code: string, options:
 }
 
 /**
- * The wasm build checksum.
+ * The wasm checksum.
  */
-export const buildChecksum = checksum
+export const wasmChecksum = checksum
