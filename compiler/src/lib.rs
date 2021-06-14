@@ -101,7 +101,7 @@ pub struct TransformOutput {
   pub inline_styles: HashMap<String, InlineStyle>,
 
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub has_ssr_options: Option<bool>,
+  pub ssr_options_hash: Option<String>,
 
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub deno_hooks: Vec<String>,
@@ -152,7 +152,7 @@ pub fn strip_ssr_code(specifier: &str, code: &str, options: JsValue) -> Result<J
       deps: vec![],
       inline_styles: HashMap::new(),
       star_exports: vec![],
-      has_ssr_options: None,
+      ssr_options_hash: None,
       deno_hooks: vec![],
       map,
     })
@@ -199,7 +199,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
       deps: r.deps.clone(),
       inline_styles: r.inline_styles.clone(),
       star_exports: r.star_exports.clone(),
-      has_ssr_options: if r.has_ssr_options { Some(true) } else { None },
+      ssr_options_hash: r.ssr_options_hash.clone(),
       deno_hooks: r.deno_hooks.clone(),
       map,
     })

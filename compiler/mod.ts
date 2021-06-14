@@ -44,7 +44,7 @@ export type TransformOptions = {
 export type TransformResult = {
   code: string
   deps?: DependencyDescriptor[]
-  hasSsrOptions?: boolean
+  ssrOptionsHash?: string
   denoHooks?: string[]
   starExports?: string[]
   map?: string

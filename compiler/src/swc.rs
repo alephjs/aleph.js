@@ -202,7 +202,12 @@ impl SWC {
       resolver.deps = deps;
 
       // ignore deps used by SSR
-      if !resolver.bundle_mode && (resolver.has_ssr_options || !resolver.deno_hooks.is_empty()) {
+      let has_ssr_options = if let Some(_) = resolver.ssr_options_hash {
+        true
+      } else {
+        false
+      };
+      if !resolver.bundle_mode && (has_ssr_options || !resolver.deno_hooks.is_empty()) {
         let module = SWC::parse(self.specifier.as_str(), code.as_str(), Some(SourceType::JS))
           .expect("could not parse the module");
         let (csr_code, _) = swc_common::GLOBALS.set(&Globals::new(), || {
@@ -616,30 +621,30 @@ mod tests {
   #[test]
   fn ssr_tree_shaking() {
     let source = r#"
-    import { useDeno } from 'https://deno.land/x/aleph/framework/react/mod.ts'
-    import { join, basename, dirname } from 'https://deno.land/std/path/mod.ts'
-    import React from 'https://esm.sh/react'
-    import { get } from '../libs/db.ts'
+      import { useDeno } from 'https://deno.land/x/aleph/framework/react/mod.ts'
+      import { join, basename, dirname } from 'https://deno.land/std/path/mod.ts'
+      import React from 'https://esm.sh/react'
+      import { get } from '../libs/db.ts'
 
-    export const ssr = {
-      data: async () => { return {
-        filename: basename(import.meta.url),
-        data: get('foo')
-      } },
-      staticPaths: []
-    }
+      export const ssr = {
+        data: async () => { return {
+          filename: basename(import.meta.url),
+          data: get('foo')
+        } },
+        staticPaths: []
+      }
 
-    export default function Index() {
-      const { title } = useDeno(async () => {
-        const text = await Deno.readTextFile(join(dirname(import.meta.url), '../config.json'))
-        return JSON.parse(text)
-      })
+      export default function Index() {
+        const { title } = useDeno(async () => {
+          const text = await Deno.readTextFile(join(dirname(import.meta.url), '../config.json'))
+          return JSON.parse(text)
+        })
 
-      return (
-        <h1>{title}</h1>
-      )
-    }
-  "#;
+        return (
+          <h1>{title}</h1>
+        )
+      }
+    "#;
     let module = SWC::parse("/pages/index.tsx", source, None).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
       "/pages/index.tsx",
@@ -664,9 +669,27 @@ mod tests {
       .contains("import { join, basename, dirname } from \"https://deno.land/std/path/mod.ts\""));
     assert!(code.contains("import { get } from \"/test/libs/db.ts\""));
     assert!(code.contains("export const ssr ="));
-    assert!(resolver.borrow().has_ssr_options);
     assert_eq!(resolver.borrow().deno_hooks.len(), 1);
     assert_eq!(resolver.borrow().deps.len(), 2);
+
+    let mut hasher = Sha1::new();
+    let callback_code = r#"ssr = {
+        data: async () => { return {
+          filename: basename(import.meta.url),
+          data: get('foo')
+        } },
+        staticPaths: []
+      }"#;
+    hasher.update(callback_code.clone());
+    assert_eq!(
+      resolver.borrow().ssr_options_hash,
+      Some(
+        base64::encode(hasher.finalize())
+          .replace("+", "")
+          .replace("/", "")
+          .replace("=", ""),
+      )
+    );
   }
 
   #[test]
@@ -758,6 +781,23 @@ mod tests {
     assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
     assert!(!code.contains("export const ssr ="));
     assert!(!code.contains("deno.land/std/path"));
-    assert!(resolver.borrow().has_ssr_options);
+
+    let mut hasher = Sha1::new();
+    let callback_code = r#"ssr = {
+        data: async () => { return {
+          filename: basename(import.meta.url)
+        } },
+        staticPaths: []
+      }"#;
+    hasher.update(callback_code.clone());
+    assert_eq!(
+      resolver.borrow().ssr_options_hash,
+      Some(
+        base64::encode(hasher.finalize())
+          .replace("+", "")
+          .replace("/", "")
+          .replace("=", ""),
+      )
+    );
   }
 }

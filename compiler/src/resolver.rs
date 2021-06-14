@@ -62,8 +62,8 @@ pub struct Resolver {
   pub deps: Vec<DependencyDescriptor>,
   /// parsed jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
-  /// a flag indicating whether the `ssr` options exported
-  pub has_ssr_options: bool,
+  /// ssr options hash
+  pub ssr_options_hash: Option<String>,
   /// a hook list of `useDeno`
   pub deno_hooks: Vec<String>,
   /// bundle mode
@@ -106,7 +106,7 @@ impl Resolver {
       ignore_remote_deps,
       deps: Vec::new(),
       inline_styles: HashMap::new(),
-      has_ssr_options: false,
+      ssr_options_hash: None,
       deno_hooks: Vec::new(),
       bundle_mode,
       bundle_externals: tmp,

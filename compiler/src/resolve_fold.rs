@@ -315,15 +315,24 @@ impl Fold for ResolveFold {
             }) => {
               let mut resolver = self.resolver.borrow_mut();
               let specifier = resolver.specifier.clone();
-              let i = var.decls.clone().into_iter().position(|decl| {
+              let decl = var.decls.clone().into_iter().find(|decl| {
                 if let Pat::Ident(ref binding) = decl.name {
                   specifier.starts_with("/pages/") && binding.id.sym.eq("ssr")
                 } else {
                   false
                 }
               });
-              if let Some(_) = i {
-                resolver.has_ssr_options = true
+              if let Some(d) = decl {
+                let mut hasher = Sha1::new();
+                let callback_code = self.source.span_to_snippet(d.span.clone()).unwrap();
+                println!("{}", callback_code);
+                hasher.update(callback_code.clone());
+                resolver.ssr_options_hash = Some(
+                  base64::encode(hasher.finalize())
+                    .replace("+", "")
+                    .replace("/", "")
+                    .replace("=", ""),
+                )
               }
               ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                 span: DUMMY_SP,
