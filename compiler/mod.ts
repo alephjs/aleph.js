@@ -35,9 +35,9 @@ export type TransformOptions = {
   react?: ReactOptions
   sourceMap?: boolean
   isDev?: boolean
-  ignoreRemoteDeps?: boolean
+  externalRemoteDeps?: boolean
   bundleMode?: boolean
-  bundleExternal?: string[]
+  bundleExternals?: string[]
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>
 }
 

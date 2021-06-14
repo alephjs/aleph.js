@@ -36,7 +36,7 @@ pub struct Options {
   pub swc_options: SWCOptions,
 
   #[serde(default)]
-  pub ignore_remote_deps: bool,
+  pub external_remote_deps: bool,
 
   #[serde(default)]
   pub bundle_mode: bool,
@@ -172,7 +172,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
     specifier,
     options.working_dir.as_str(),
     options.import_map,
-    options.ignore_remote_deps,
+    options.external_remote_deps,
     options.bundle_mode,
     options.bundle_externals,
     options.aleph_pkg_uri,
