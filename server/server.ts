@@ -182,7 +182,7 @@ export class Server {
 
       // serve APIs
       if (pathname.startsWith('/api/')) {
-        const route = app.getAPIRoute({
+        const route = await app.getAPIRoute({
           pathname,
           search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
         })

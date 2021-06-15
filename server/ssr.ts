@@ -156,71 +156,18 @@ export class Renderer {
     ]
   }
 
-  /** render custom 404 page. */
-  async render404Page(url: RouterURL): Promise<string> {
-    const appModule = this.#app.getModule('app')
-    const e404Module = this.find404PageModule()
-    const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
-    const { default: E404 } = e404Module ? await this.#app.importModule(e404Module) : {} as any
-    const styles = await this.lookupStyleModules(...[
-      appModule ? appModule.specifier : [],
-      e404Module ? e404Module.specifier : []
-    ].flat())
-    const { head, body, data, scripts } = await this.#renderer.render(
-      url,
-      App,
-      e404Module ? [{ specifier: e404Module.specifier, Component: E404 }] : [],
-      styles
-    )
-    return createHtml({
-      lang: url.locale,
-      head,
-      scripts: [
-        data ? {
-          id: 'ssr-data',
-          type: 'application/json',
-          innerText: JSON.stringify(data, undefined, this.#app.isDev ? 2 : 0),
-        } : '',
-        ...this.#app.getSSRHTMLScripts(),
-        ...scripts.map((script: Record<string, any>) => {
-          if (script.innerText && !this.#app.isDev) {
-            return { ...script, innerText: script.innerText }
-          }
-          return script
-        })
-      ],
-      body: `<div id="__aleph">${body}</div>`,
-      minify: !this.#app.isDev
-    })
-  }
-
-  private find404PageModule(): Module | null {
-    for (const ext of builtinModuleExts) {
-      const url = `/pages/404.${ext}`
-      const mod = this.#app.getModule(url)
-      if (mod) {
-        return mod
-      }
-    }
-    return null
-  }
-
-  /** render custom loading page for SPA mode. */
+  /** render the index page for SPA mode. */
   async renderSPAIndexPage(): Promise<string> {
     const { basePath, defaultLocale } = this.#app.config
     const appModule = this.#app.getModule('app')
 
     if (appModule) {
-      const { Loading } = await this.#app.importModule(appModule)
+      const { default: App, Loading } = await this.#app.importModule(appModule)
       const styles = await this.lookupStyleModules(appModule.specifier)
-      const {
-        head,
-        body,
-        scripts
-      } = await this.#renderer.render(
+      const { head, body, scripts } = await this.#renderer.render(
         createBlankRouterURL(basePath, defaultLocale),
-        undefined,
-        [{ specifier: appModule.specifier, Component: Loading }],
+        App,
+        [{ specifier: `${appModule.specifier}#Loading`, Component: Loading }],
         styles
       )
       return createHtml({

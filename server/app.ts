@@ -23,9 +23,9 @@ import {
   loadConfig, loadImportMap
 } from './config.ts'
 import {
-  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash,
-  getAlephPkgUri, getDenoDir, toRelativePath, getSourceType,
-  isLoaderPlugin, isLocalUrl, toLocalPath
+  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile,
+  getAlephPkgUri, getDenoDir, getSourceType, isLoaderPlugin, isLocalUrl,
+  moduleExclude, toLocalPath, toRelativePath
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { Renderer } from './ssr.ts'
@@ -36,7 +36,8 @@ export type Module = {
   deps: DependencyDescriptor[]
   external?: boolean
   isStyle?: boolean
-  hasSsrOptions?: boolean
+  externalRemoteDeps?: boolean
+  ssrOptionsHash?: string
   denoHooks?: string[]
   hash?: string
   sourceHash: string
@@ -56,6 +57,13 @@ type DependencyDescriptor = {
   specifier: string
   isDynamic?: boolean
   hashLoc?: number
+}
+
+type CompileOptions = {
+  source?: ModuleSource,
+  forceRefresh?: boolean,
+  ignoreDeps?: boolean,
+  externalRemoteDeps?: boolean
 }
 
 type TransformFn = (specifier: string, code: string) => string
@@ -99,14 +107,26 @@ export class Application implements ServerApplication {
   /** initiate application */
   private async init(reload: boolean) {
     const ms = new Measure()
-    const [config, importMap] = await Promise.all([
-      loadConfig(this.workingDir),
-      loadImportMap(this.workingDir),
-    ])
+    const importMapFile = await findFile(this.workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`))
+    const appFile = await findFile(this.workingDir, builtinModuleExts.map(ext => `app.${ext}`))
 
+    let configFile = await findFile(this.workingDir, ['ts', 'js', 'json'].map(ext => `aleph.config.${ext}`))
+    if (configFile && !configFile.endsWith('.json')) {
+      const mod = await this.compile(`/${basename(configFile)}`, { externalRemoteDeps: true })
+      configFile = join(this.buildDir, mod.jsFile)
+    }
+
+    const [config, importMap] = await Promise.all([
+      configFile ? loadConfig(configFile) : Promise.resolve({}),
+      importMapFile ? loadImportMap(importMapFile) : Promise.resolve({}),
+    ])
+    console.log(config)
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
-    fixConfigAndImportMap(this.config, this.importMap)
+    await fixConfigAndImportMap(this.workingDir, this.config, this.importMap)
+    this.#pageRouting.config(this.config)
+
+    ms.stop('load config')
 
     // load .env files
     for await (const { path: p, } of walk(this.workingDir, { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
@@ -120,12 +140,8 @@ export class Application implements ServerApplication {
       })
       log.info('load env from', basename(p))
     }
-
-    ms.stop('load config')
-
-    Deno.env.set('ALEPH_VERSION', VERSION)
-    Deno.env.set('ALEPH_BUILD_MODE', this.mode)
     Deno.env.set('ALEPH_FRAMEWORK', this.config.framework)
+    Deno.env.set('ALEPH_BUILD_MODE', this.mode)
 
     const alephPkgUri = getAlephPkgUri()
     const srcDir = join(this.workingDir, this.config.srcDir)
@@ -213,15 +229,9 @@ export class Application implements ServerApplication {
     ms.stop('apply plugins')
 
     const modules: string[] = []
-    const apiModules: string[] = []
-    const pageModules: string[] = []
     const moduleWalkOptions = {
       includeDirs: false,
-      skip: [
-        /(^|\/|\\)\./,
-        /\.d\.ts$/i,
-        /(\.|_)(test|spec|e2e)\.[a-z]+$/i
-      ]
+      skip: moduleExclude
     }
 
     // pre-compile framework modules
@@ -230,48 +240,31 @@ export class Application implements ServerApplication {
       modules.push(`${alephPkgUri}/framework/core/hmr.ts`)
       modules.push(`${alephPkgUri}/framework/core/nomodule.ts`)
     }
-
-    // compile app module
-    for (const ext of builtinModuleExts) {
-      if (await existsFile(join(srcDir, `app.${ext}`))) {
-        modules.push(`/app.${ext}`)
-        break
-      }
+    if (appFile) {
+      modules.push(`/${basename(appFile)}`)
     }
 
     if (await existsDir(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...moduleWalkOptions, exts: builtinModuleExts })) {
         const specifier = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
-        apiModules.push(specifier)
-        modules.push(specifier)
+        this.#apiRouting.update(...this.createRouteUpdate(specifier))
       }
     }
 
     if (await existsDir(pagesDir)) {
       for await (const { path: p } of walk(pagesDir, moduleWalkOptions)) {
         const specifier = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
-        let validated = builtinModuleExts.some(ext => p.endsWith('.' + ext))
-        if (!validated) {
-          validated = this.loaders.some(p => p.type === 'loader' && p.test.test(specifier) && p.allowPage)
-        }
-        if (validated) {
-          pageModules.push(specifier)
-          modules.push(specifier)
+        if (this.isPageModule(specifier)) {
+          this.#pageRouting.update(...this.createRouteUpdate(specifier))
+          if (!this.isDev) {
+            modules.push(specifier)
+          }
         }
       }
     }
 
     // wait all compilation tasks are done
     await Promise.all(modules.map(specifier => this.compile(specifier)))
-
-    // update routing
-    this.#pageRouting.config(this.config)
-    apiModules.forEach(specifier => {
-      this.#apiRouting.update(...this.createRouteUpdate(specifier))
-    })
-    pageModules.forEach(specifier => {
-      this.#pageRouting.update(...this.createRouteUpdate(specifier))
-    })
 
     // bundle
     if (!this.isDev) {
@@ -290,103 +283,138 @@ export class Application implements ServerApplication {
     }
   }
 
-  /** watch file changes, re-compile modules and send HMR signal. */
+  /** watch file changes, re-compile modules, and send HMR signal to client. */
   private async watch() {
     const srcDir = join(this.workingDir, this.config.srcDir)
     const w = Deno.watchFs(srcDir, { recursive: true })
     log.info('Start watching code changes...')
     for await (const event of w) {
-      for (const p of event.paths) {
-        const specifier = util.cleanPath(util.trimPrefix(p, srcDir))
+      for (const path of event.paths) {
+        const specifier = util.cleanPath(util.trimPrefix(path, srcDir))
         if (this.isScopedModule(specifier)) {
-          util.debounceX(specifier, async () => {
-            if (await existsFile(p)) {
-              let type = this.#modules.has(specifier) ? 'modify' : 'add'
-              log.info(type, specifier)
-              try {
-                const prevModule = this.#modules.get(specifier)
-                const module = await this.compile(specifier, { forceRefresh: true, ignoreDeps: true })
-                const hmrable = this.isHMRable(specifier)
-                const refetchPage = (
-                  this.config.ssr &&
-                  prevModule &&
-                  !(
-                    util.isNEArray(prevModule.denoHooks) &&
-                    util.isNEArray(module.denoHooks) &&
-                    prevModule.denoHooks.join(' ') === module.denoHooks.join(' ')
-                  )
-                )
-                if (hmrable) {
-                  let routePath: string | undefined = undefined
-                  let isIndex: boolean | undefined = undefined
-                  if (module.specifier.startsWith('/pages/')) {
-                    const [path, _, index] = this.createRouteUpdate(module.specifier)
-                    routePath = path
-                    isIndex = index
-                  }
-                  if (type === 'add') {
-                    this.#fsWatchListeners.forEach(e => {
-                      e.emit('add', { specifier: module.specifier, routePath, isIndex })
-                    })
-                  } else {
-                    this.#fsWatchListeners.forEach(e => {
-                      e.emit('modify-' + module.specifier, { refetchPage: refetchPage || undefined })
-                    })
-                  }
-                }
-                this.applyCompilationSideEffect(module, ({ specifier }) => {
-                  if (!hmrable && this.isHMRable(specifier)) {
-                    log.debug('compilation side-effect:', specifier, dim('<-'), module.specifier)
-                    this.#fsWatchListeners.forEach(e => {
-                      e.emit('modify-' + specifier, { refetchPage: refetchPage || undefined })
-                    })
-                  }
-                })
-              } catch (err) {
-                log.error(`compile(${specifier}):`, err.message)
-              }
-            } else if (this.#modules.has(specifier)) {
-              if (trimBuiltinModuleExts(specifier) === '/app') {
-                this.#renderer.clearCache()
-              } else if (specifier.startsWith('/pages/')) {
-                const [routePath] = this.createRouteUpdate(specifier)
-                this.#renderer.clearCache(routePath)
-                this.#pageRouting.removeRouteByModule(specifier)
-              } else if (specifier.startsWith('/api/')) {
-                this.#apiRouting.removeRouteByModule(specifier)
-              }
-              this.#modules.delete(specifier)
-              if (this.isHMRable(specifier)) {
-                this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
-              }
-              log.info('remove', specifier)
-            }
-          }, 50)
+          util.debounceX(
+            specifier,
+            () => this.watchHandler(path, specifier),
+            50
+          )
         }
       }
     }
   }
 
-  /** check the changed file whether it is a scoped module that can emit the HMR event. */
+  private async watchHandler(path: string, specifier: string): Promise<void> {
+    if (await existsFile(path)) {
+      if (this.#modules.has(specifier)) {
+        try {
+          const prevModule = this.#modules.get(specifier)!
+          const module = await this.compile(specifier, {
+            forceRefresh: true,
+            ignoreDeps: true,
+            externalRemoteDeps: specifier.startsWith('/api/')
+          })
+          const refetchPage = (
+            this.config.ssr &&
+            (
+              !(
+                util.isNEArray(prevModule.denoHooks) &&
+                util.isNEArray(module.denoHooks) &&
+                prevModule.denoHooks.join(';') === module.denoHooks.join(';')
+              ) ||
+              prevModule.ssrOptionsHash !== module.ssrOptionsHash
+            )
+          )
+          const hmrable = this.isHMRable(specifier)
+          if (hmrable) {
+            this.#fsWatchListeners.forEach(e => {
+              e.emit('modify-' + module.specifier, { refetchPage: refetchPage || undefined })
+            })
+          }
+          this.applyCompilationSideEffect(module, ({ specifier }) => {
+            if (!hmrable && this.isHMRable(specifier)) {
+              log.debug('compilation side-effect:', specifier, dim('<-'), module.specifier)
+              this.#fsWatchListeners.forEach(e => {
+                e.emit('modify-' + specifier, { refetchPage: refetchPage || undefined })
+              })
+            }
+          })
+          log.info('modify', specifier)
+        } catch (err) {
+          log.error(`compile(${specifier}):`, err.message)
+        }
+      } else {
+        let routePath: string | undefined = undefined
+        let isIndex: boolean | undefined = undefined
+        let emit = false
+        if (this.isPageModule(specifier)) {
+          let isNewModule = true
+          this.#pageRouting.lookup(routes => {
+            routes.forEach(({ module }) => {
+              if (module === specifier) {
+                isNewModule = false
+                return false
+              }
+            })
+          })
+          if (isNewModule) {
+            const [path, _, index] = this.createRouteUpdate(specifier)
+            routePath = path
+            isIndex = index
+            emit = true
+          }
+        }
+        if (trimBuiltinModuleExts(specifier) === '/app') {
+          await this.compile(specifier)
+          emit = true
+        }
+        if (emit) {
+          this.#fsWatchListeners.forEach(e => {
+            e.emit('add', { specifier, routePath, isIndex })
+          })
+        }
+      }
+    } else if (this.#modules.has(specifier)) {
+      this.#modules.delete(specifier)
+      if (trimBuiltinModuleExts(specifier) === '/app') {
+        this.#renderer.clearCache()
+        this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
+      } else if (specifier.startsWith('/pages/') && this.isPageModule(specifier)) {
+        const [routePath] = this.createRouteUpdate(specifier)
+        this.#pageRouting.removeRouteByModule(specifier)
+        this.#renderer.clearCache(routePath)
+        this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
+      } else if (specifier.startsWith('/api/')) {
+        this.#apiRouting.removeRouteByModule(specifier)
+      }
+      log.info('remove', specifier)
+    }
+  }
+
+  /** check the file whether it is a scoped module. */
   private isScopedModule(specifier: string) {
-    // is parsed module
+    // is compiled module
     if (this.#modules.has(specifier)) {
       return true
     }
 
-    for (const ext of builtinModuleExts) {
-      if (specifier.endsWith('.' + ext)) {
-        return (
-          specifier.startsWith('/pages/') ||
-          specifier.startsWith('/api/') ||
-          util.trimSuffix(specifier, '.' + ext) === '/app'
-        )
-      }
+    if (moduleExclude.some(r => r.test(specifier))) {
+      return false
     }
 
     // is page module by plugin
-    if (specifier.startsWith('/pages/') && this.loaders.some(p => p.test.test(specifier) && p.allowPage)) {
+    if (this.isPageModule(specifier)) {
       return true
+    }
+
+    for (const ext of builtinModuleExts) {
+      if (
+        specifier.endsWith('.' + ext) &&
+        (
+          specifier.startsWith('/api/') ||
+          util.trimSuffix(specifier, '.' + ext) === '/app'
+        )
+      ) {
+        return true
+      }
     }
 
     return false
@@ -411,7 +439,7 @@ export class Application implements ServerApplication {
     return null
   }
 
-  /** returns the module of the first one in the modules where predicate is true, and null otherwise.. */
+  /** get the first module in the modules map where predicate is true, and null otherwise. */
   findModule(predicate: (module: Module) => boolean): Module | null {
     for (const specifier of this.#modules.keys()) {
       const module = this.#modules.get(specifier)!
@@ -423,7 +451,7 @@ export class Application implements ServerApplication {
   }
 
   /** get api route by given location. */
-  getAPIRoute(location: { pathname: string, search?: string }): [RouterURL, Module] | null {
+  async getAPIRoute(location: { pathname: string, search?: string }): Promise<[RouterURL, Module] | null> {
     const router = this.#apiRouting.createRouter(location)
     if (router !== null) {
       const [url, nestedModules] = router
@@ -432,6 +460,8 @@ export class Application implements ServerApplication {
         if (this.#modules.has(specifier)) {
           return [url, this.#modules.get(specifier)!]
         }
+        const module = await this.compile(specifier, { externalRemoteDeps: true })
+        return [url, module]
       }
     }
     return null
@@ -491,7 +521,13 @@ export class Application implements ServerApplication {
     }
 
     let useDeno = false
-    for (const specifier of [...builtinModuleExts.map(ext => `/app.${ext}`), ...nestedModules]) {
+    let ssrData = false
+    await Promise.all(
+      nestedModules
+        .filter(specifier => !this.#modules.has(specifier))
+        .map(specifier => this.compile(specifier))
+    )
+    for (const specifier of ['app', ...nestedModules]) {
       const mod = this.getModule(specifier)
       if (mod) {
         if (mod.denoHooks?.length) {
@@ -510,7 +546,11 @@ export class Application implements ServerApplication {
         }
       }
     }
-    if (!useDeno) {
+    const mod = this.getModule(nestedModules[nestedModules.length - 1])
+    if (mod && mod.ssrOptionsHash && mod.ssrOptionsHash.includes('data;')) {
+      ssrData = true
+    }
+    if (!useDeno && !ssrData) {
       return {}
     }
 
@@ -537,14 +577,22 @@ export class Application implements ServerApplication {
 
     if (routePath === '') {
       const [html] = await this.#renderer.cache('404', path, async () => {
-        return [await this.#renderer.render404Page(router), null]
+        const [_, nestedModules] = this.#pageRouting.createRouter({ pathname: '/404' })
+        if (nestedModules.length > 0) {
+          await this.compile(nestedModules[0])
+        }
+        return await this.#renderer.renderPage(router, nestedModules.slice(0, 1))
       })
       return [status, html]
     }
 
     const [html] = await this.#renderer.cache(routePath, path, async () => {
-      let [html, data] = await this.#renderer.renderPage(router, nestedModules)
-      return [html, data]
+      await Promise.all(
+        nestedModules
+          .filter(specifier => !this.#modules.has(specifier))
+          .map(specifier => this.compile(specifier))
+      )
+      return await this.#renderer.renderPage(router, nestedModules)
     })
     return [status, html]
   }
@@ -570,9 +618,20 @@ export class Application implements ServerApplication {
     }
   }
 
+  /** check the module whether it is page. */
+  isPageModule(specifier: string): boolean {
+    if (!specifier.startsWith('/pages/')) {
+      return false
+    }
+    if (builtinModuleExts.some(ext => specifier.endsWith('.' + ext))) {
+      return true
+    }
+    return this.loaders.some(p => p.type === 'loader' && p.test.test(specifier) && p.allowPage)
+  }
+
   /** check the module whether it is hmrable. */
-  isHMRable(specifier: string) {
-    if (!this.isDev || util.isLikelyHttpURL(specifier)) {
+  isHMRable(specifier: string): boolean {
+    if (util.isLikelyHttpURL(specifier)) {
       return false
     }
 
@@ -921,7 +980,7 @@ export class Application implements ServerApplication {
   }
 
   /** compile the module by given specifier */
-  private async compile(specifier: string, options: { source?: ModuleSource, forceRefresh?: boolean, ignoreDeps?: boolean } = {}) {
+  private async compile(specifier: string, options: CompileOptions = {}) {
     const [module, source] = await this.initModule(specifier, options)
     if (!module.external) {
       await this.transpileModule(module, source, options.ignoreDeps)
@@ -929,7 +988,7 @@ export class Application implements ServerApplication {
     return module
   }
 
-  private async initModule(specifier: string, { source: customSource, forceRefresh }: { source?: ModuleSource, forceRefresh?: boolean } = {}): Promise<[Module, ModuleSource | null]> {
+  private async initModule(specifier: string, { source: customSource, forceRefresh, externalRemoteDeps }: CompileOptions = {}): Promise<[Module, ModuleSource | null]> {
     let external = false
     let data: any = null
 
@@ -957,7 +1016,7 @@ export class Application implements ServerApplication {
     }
 
     let mod = this.#modules.get(specifier)
-    if (mod && !forceRefresh) {
+    if (mod && !forceRefresh && !(!externalRemoteDeps && mod.externalRemoteDeps)) {
       await mod.ready
       return [mod, null]
     }
@@ -975,6 +1034,7 @@ export class Application implements ServerApplication {
       specifier,
       deps: [],
       sourceHash: '',
+      externalRemoteDeps,
       jsFile,
       ready: new Promise((resolve, reject) => {
         defer = (err?: Error) => {
@@ -1012,12 +1072,12 @@ export class Application implements ServerApplication {
 
     if (await existsFile(metaFp)) {
       try {
-        const { specifier: _specifier, sourceHash, deps, isStyle, hasSsrOptions, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
+        const { specifier: _specifier, sourceHash, deps, isStyle, ssrOptionsHash, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
         if (_specifier === specifier && util.isNEString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
           mod.isStyle = Boolean(isStyle) || undefined
-          mod.hasSsrOptions = Boolean(hasSsrOptions) || undefined
+          mod.ssrOptionsHash = util.isNEString(ssrOptionsHash) ? ssrOptionsHash : undefined
           mod.denoHooks = util.isNEArray(denoHooks) ? denoHooks : undefined
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
@@ -1050,8 +1110,13 @@ export class Application implements ServerApplication {
     return [mod, source]
   }
 
-  private async transpileModule(module: Module, source: ModuleSource | null, ignoreDeps = false, __tracing: Set<string> = new Set()): Promise<void> {
-    const { specifier, jsFile } = module
+  private async transpileModule(
+    module: Module,
+    source: ModuleSource | null,
+    ignoreDeps = false,
+    __tracing: Set<string> = new Set()
+  ): Promise<void> {
+    const { specifier, jsFile, externalRemoteDeps } = module
 
     // ensure the module only be transppiled once in current compilation context,
     // to avoid dead-loop caused by cicular imports
@@ -1068,12 +1133,13 @@ export class Application implements ServerApplication {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, hasSsrOptions, denoHooks, starExports, map } = await transform(specifier, source.code, {
+      const { code, deps, ssrOptionsHash, denoHooks, starExports, map } = await transform(specifier, source.code, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
           sourceType: source.type
         },
+        externalRemoteDeps
       })
 
       let jsCode = code
@@ -1135,7 +1201,7 @@ export class Application implements ServerApplication {
         return dep
       }) || []
 
-      module.hasSsrOptions = hasSsrOptions
+      module.ssrOptionsHash = ssrOptionsHash
       if (util.isNEArray(denoHooks)) {
         module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.config.ssr) {
@@ -1151,7 +1217,7 @@ export class Application implements ServerApplication {
         specifier,
         sourceHash: module.sourceHash,
         isStyle: module.isStyle,
-        hasSsrOptions: module.hasSsrOptions,
+        hasSsrOptions: module.ssrOptionsHash,
         denoHooks: module.denoHooks,
         deps: module.deps,
       }, undefined, 2)
@@ -1187,7 +1253,7 @@ export class Application implements ServerApplication {
         this.getModuleJSCode(module)
       }
       await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
-        const [depModule, depSource] = await this.initModule(specifier)
+        const [depModule, depSource] = await this.initModule(specifier, { externalRemoteDeps })
         if (!depModule.external) {
           await this.transpileModule(depModule, depSource, false, __tracing)
         }
@@ -1276,7 +1342,7 @@ export class Application implements ServerApplication {
           specifier,
           sourceHash: module.sourceHash,
           isStyle: module.isStyle,
-          hasSsrOptions: module.hasSsrOptions,
+          hasSsrOptions: module.ssrOptionsHash,
           denoHooks: module.denoHooks,
           deps: module.deps,
         }, undefined, 2)),
@@ -1332,8 +1398,11 @@ export class Application implements ServerApplication {
 
     // render 404 page
     {
-      const [router] = this.#pageRouting.createRouter({ pathname: '/404' })
-      let html = await this.#renderer.render404Page(router)
+      const [router, nestedModules] = this.#pageRouting.createRouter({ pathname: '/404' })
+      if (nestedModules.length > 0) {
+        await this.compile(nestedModules[0])
+      }
+      let [html] = await this.#renderer.renderPage(router, nestedModules.slice(0, 1))
       this.#injects.get('ssr')?.forEach(transform => {
         html = transform('/404', html)
       })

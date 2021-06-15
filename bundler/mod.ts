@@ -128,7 +128,7 @@ export class Bundler {
     await Deno.copyFile(bundleFile, saveAs)
   }
 
-  private async compile(mod: Module, external: string[]): Promise<string> {
+  private async compile(mod: Module, externals: string[]): Promise<string> {
     if (this.#compiled.has(mod.specifier)) {
       return this.#compiled.get(mod.specifier)!
     }
@@ -156,7 +156,7 @@ export class Bundler {
             sourceType: source.type,
           },
           bundleMode: true,
-          bundleExternal: external,
+          bundleExternals: externals,
         }
       )
 
@@ -171,10 +171,10 @@ export class Bundler {
 
       // compile deps
       await Promise.all(mod.deps.map(async dep => {
-        if (!dep.specifier.startsWith('#') && !external.includes(dep.specifier)) {
+        if (!dep.specifier.startsWith('#') && !externals.includes(dep.specifier)) {
           const depMod = this.#app.getModule(dep.specifier)
           if (depMod !== null) {
-            await this.compile(depMod, external)
+            await this.compile(depMod, externals)
           }
         }
       }))
