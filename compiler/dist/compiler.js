@@ -86,27 +86,7 @@ function getInt32Memory0() {
   return cachegetInt32Memory0;
 }
 
-let cachedTextDecoder = new TextDecoder("utf-8", {
-  ignoreBOM: true,
-  fatal: true,
-});
-
-cachedTextDecoder.decode();
-
-function getStringFromWasm0(ptr, len) {
-  return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
-}
-
 let heap_next = heap.length;
-
-function addHeapObject(obj) {
-  if (heap_next === heap.length) heap.push(heap.length + 1);
-  const idx = heap_next;
-  heap_next = heap[idx];
-
-  heap[idx] = obj;
-  return idx;
-}
 
 function dropObject(idx) {
   if (idx < 36) return;
@@ -119,15 +99,35 @@ function takeObject(idx) {
   dropObject(idx);
   return ret;
 }
+
+let cachedTextDecoder = new TextDecoder("utf-8", {
+  ignoreBOM: true,
+  fatal: true,
+});
+
+cachedTextDecoder.decode();
+
+function getStringFromWasm0(ptr, len) {
+  return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
+}
+
+function addHeapObject(obj) {
+  if (heap_next === heap.length) heap.push(heap.length + 1);
+  const idx = heap_next;
+  heap_next = heap[idx];
+
+  heap[idx] = obj;
+  return idx;
+}
 /**
-* @param {string} url
+* @param {string} specifier
 * @param {string} code
 * @param {any} options
 * @returns {any}
 */
-export function parseExportNamesSync(url, code, options) {
+export function parseExportNamesSync(specifier, code, options) {
   var ptr0 = passStringToWasm0(
-    url,
+    specifier,
     wasm.__wbindgen_malloc,
     wasm.__wbindgen_realloc,
   );
@@ -149,14 +149,43 @@ export function parseExportNamesSync(url, code, options) {
 }
 
 /**
-* @param {string} url
+* @param {string} specifier
 * @param {string} code
 * @param {any} options
 * @returns {any}
 */
-export function transformSync(url, code, options) {
+export function stripSsrCodeSync(specifier, code, options) {
   var ptr0 = passStringToWasm0(
-    url,
+    specifier,
+    wasm.__wbindgen_malloc,
+    wasm.__wbindgen_realloc,
+  );
+  var len0 = WASM_VECTOR_LEN;
+  var ptr1 = passStringToWasm0(
+    code,
+    wasm.__wbindgen_malloc,
+    wasm.__wbindgen_realloc,
+  );
+  var len1 = WASM_VECTOR_LEN;
+  var ret = wasm.stripSsrCodeSync(
+    ptr0,
+    len0,
+    ptr1,
+    len1,
+    addHeapObject(options),
+  );
+  return takeObject(ret);
+}
+
+/**
+* @param {string} specifier
+* @param {string} code
+* @param {any} options
+* @returns {any}
+*/
+export function transformSync(specifier, code, options) {
+  var ptr0 = passStringToWasm0(
+    specifier,
     wasm.__wbindgen_malloc,
     wasm.__wbindgen_realloc,
   );
@@ -219,12 +248,12 @@ async function init(input) {
     getInt32Memory0()[arg0 / 4 + 1] = len0;
     getInt32Memory0()[arg0 / 4 + 0] = ptr0;
   };
+  imports.wbg.__wbindgen_object_drop_ref = function (arg0) {
+    takeObject(arg0);
+  };
   imports.wbg.__wbindgen_json_parse = function (arg0, arg1) {
     var ret = JSON.parse(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
-  };
-  imports.wbg.__wbindgen_object_drop_ref = function (arg0) {
-    takeObject(arg0);
   };
   imports.wbg.__wbg_new_59cb74e423758ede = function () {
     var ret = new Error();
