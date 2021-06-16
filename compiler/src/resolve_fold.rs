@@ -317,22 +317,24 @@ impl Fold for ResolveFold {
               let specifier = resolver.specifier.clone();
               let decl = var.decls.clone().into_iter().find(|decl| {
                 if let Pat::Ident(ref binding) = decl.name {
-                  specifier.starts_with("/pages/") && binding.id.sym.eq("ssr")
+                  specifier.starts_with("/pages/")
+                    && (binding.id.sym.eq("ssrProps") || binding.id.sym.eq("ssgPaths"))
                 } else {
                   false
                 }
               });
               if let Some(d) = decl {
                 let mut hasher = Sha1::new();
-                let callback_code = self.source.span_to_snippet(d.span.clone()).unwrap();
-                println!("{}", callback_code);
-                hasher.update(callback_code.clone());
-                resolver.ssr_options_hash = Some(
-                  base64::encode(hasher.finalize())
-                    .replace("+", "")
-                    .replace("/", "")
-                    .replace("=", ""),
-                )
+                let fn_code = self.source.span_to_snippet(d.span.clone()).unwrap();
+                hasher.update(fn_code.clone());
+                let fn_hash = base64::encode(hasher.finalize());
+                if let Pat::Ident(ref binding) = d.name {
+                  if binding.id.sym.eq("ssrProps") {
+                    resolver.ssr_props_fn = Some(fn_hash)
+                  } else if binding.id.sym.eq("ssgPaths") {
+                    resolver.ssg_paths_fn = Some(fn_hash)
+                  }
+                }
               }
               ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                 span: DUMMY_SP,

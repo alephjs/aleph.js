@@ -202,7 +202,9 @@ impl SWC {
       resolver.deps = deps;
 
       // ignore deps used by SSR
-      let has_ssr_options = if let Some(_) = resolver.ssr_options_hash {
+      let has_ssr_options = if let Some(_) = resolver.ssr_props_fn {
+        true
+      } else if let Some(_) = resolver.ssg_paths_fn {
         true
       } else {
         false
@@ -626,13 +628,12 @@ mod tests {
       import React from 'https://esm.sh/react'
       import { get } from '../libs/db.ts'
 
-      export const ssr = {
-        data: async () => { return {
-          filename: basename(import.meta.url),
-          data: get('foo')
-        } },
-        staticPaths: []
-      }
+      export const ssrProps = async () => ({
+        filename: basename(import.meta.url),
+        data: get('foo')
+      })
+
+      export const ssgPaths = async () => ([join('/', 'foo')])
 
       export default function Index() {
         const { title } = useDeno(async () => {
@@ -668,27 +669,27 @@ mod tests {
     assert!(code
       .contains("import { join, basename, dirname } from \"https://deno.land/std/path/mod.ts\""));
     assert!(code.contains("import { get } from \"/test/libs/db.ts\""));
-    assert!(code.contains("export const ssr ="));
+    assert!(code.contains("export const ssrProps ="));
     assert_eq!(resolver.borrow().deno_hooks.len(), 1);
     assert_eq!(resolver.borrow().deps.len(), 2);
 
     let mut hasher = Sha1::new();
-    let callback_code = r#"ssr = {
-        data: async () => { return {
-          filename: basename(import.meta.url),
-          data: get('foo')
-        } },
-        staticPaths: []
-      }"#;
+    let callback_code = r#"ssrProps = async () => ({
+        filename: basename(import.meta.url),
+        data: get('foo')
+      })"#;
     hasher.update(callback_code.clone());
     assert_eq!(
-      resolver.borrow().ssr_options_hash,
-      Some(
-        base64::encode(hasher.finalize())
-          .replace("+", "")
-          .replace("/", "")
-          .replace("=", ""),
-      )
+      resolver.borrow().ssr_props_fn,
+      Some(base64::encode(hasher.finalize()))
+    );
+
+    let mut hasher = Sha1::new();
+    let callback_code = "ssgPaths = async () => ([join('/', 'foo')])";
+    hasher.update(callback_code.clone());
+    assert_eq!(
+      resolver.borrow().ssg_paths_fn,
+      Some(base64::encode(hasher.finalize()))
     );
   }
 
@@ -709,12 +710,10 @@ mod tests {
 
       const AsyncLogo = React.lazy(() => import('../components/async-logo.tsx'))
 
-      export const ssr = {
-        data: async () => { return {
-          filename: basename(import.meta.url)
-        } },
-        staticPaths: []
-      }
+      export const ssrProps = async () => ({
+        filename: basename(import.meta.url)
+      })
+      export const ssgPaths = async () => ([join('/', 'foo')])
 
       export default function Index() {
         const { title } = useDeno(async () => {
@@ -779,25 +778,8 @@ mod tests {
     assert!(code.contains("export const $$star_0 = __ALEPH.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
     assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
-    assert!(!code.contains("export const ssr ="));
+    assert!(!code.contains("export const ssrProps ="));
+    assert!(!code.contains("export const ssgPaths ="));
     assert!(!code.contains("deno.land/std/path"));
-
-    let mut hasher = Sha1::new();
-    let callback_code = r#"ssr = {
-        data: async () => { return {
-          filename: basename(import.meta.url)
-        } },
-        staticPaths: []
-      }"#;
-    hasher.update(callback_code.clone());
-    assert_eq!(
-      resolver.borrow().ssr_options_hash,
-      Some(
-        base64::encode(hasher.finalize())
-          .replace("+", "")
-          .replace("/", "")
-          .replace("=", ""),
-      )
-    );
   }
 }

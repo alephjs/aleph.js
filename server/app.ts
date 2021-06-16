@@ -37,7 +37,7 @@ export type Module = {
   external?: boolean
   isStyle?: boolean
   externalRemoteDeps?: boolean
-  ssrOptionsHash?: string
+  ssrPropsFn?: string
   denoHooks?: string[]
   hash?: string
   sourceHash: string
@@ -120,7 +120,6 @@ export class Application implements ServerApplication {
       configFile ? loadConfig(configFile) : Promise.resolve({}),
       importMapFile ? loadImportMap(importMapFile) : Promise.resolve({}),
     ])
-    console.log(config)
     Object.assign(this.config, config)
     Object.assign(this.importMap, importMap)
     await fixConfigAndImportMap(this.workingDir, this.config, this.importMap)
@@ -320,7 +319,7 @@ export class Application implements ServerApplication {
                 util.isNEArray(module.denoHooks) &&
                 prevModule.denoHooks.join(';') === module.denoHooks.join(';')
               ) ||
-              prevModule.ssrOptionsHash !== module.ssrOptionsHash
+              prevModule.ssrPropsFn !== module.ssrPropsFn
             )
           )
           const hmrable = this.isHMRable(specifier)
@@ -547,7 +546,7 @@ export class Application implements ServerApplication {
       }
     }
     const mod = this.getModule(nestedModules[nestedModules.length - 1])
-    if (mod && mod.ssrOptionsHash && mod.ssrOptionsHash.includes('data;')) {
+    if (mod && mod.ssrPropsFn && mod.ssrPropsFn.includes('data;')) {
       ssrData = true
     }
     if (!useDeno && !ssrData) {
@@ -1072,12 +1071,12 @@ export class Application implements ServerApplication {
 
     if (await existsFile(metaFp)) {
       try {
-        const { specifier: _specifier, sourceHash, deps, isStyle, ssrOptionsHash, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
+        const { specifier: _specifier, sourceHash, deps, isStyle, ssrPropsFn, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
         if (_specifier === specifier && util.isNEString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
           mod.isStyle = Boolean(isStyle) || undefined
-          mod.ssrOptionsHash = util.isNEString(ssrOptionsHash) ? ssrOptionsHash : undefined
+          mod.ssrPropsFn = util.isNEString(ssrPropsFn) ? ssrPropsFn : undefined
           mod.denoHooks = util.isNEArray(denoHooks) ? denoHooks : undefined
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
@@ -1133,7 +1132,7 @@ export class Application implements ServerApplication {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, ssrOptionsHash, denoHooks, starExports, map } = await transform(specifier, source.code, {
+      const { code, deps, ssrPropsFn, denoHooks, starExports, map } = await transform(specifier, source.code, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
@@ -1201,7 +1200,7 @@ export class Application implements ServerApplication {
         return dep
       }) || []
 
-      module.ssrOptionsHash = ssrOptionsHash
+      module.ssrPropsFn = ssrPropsFn
       if (util.isNEArray(denoHooks)) {
         module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.config.ssr) {
@@ -1217,7 +1216,7 @@ export class Application implements ServerApplication {
         specifier,
         sourceHash: module.sourceHash,
         isStyle: module.isStyle,
-        hasSsrOptions: module.ssrOptionsHash,
+        hasSsrOptions: module.ssrPropsFn,
         denoHooks: module.denoHooks,
         deps: module.deps,
       }, undefined, 2)
@@ -1342,7 +1341,7 @@ export class Application implements ServerApplication {
           specifier,
           sourceHash: module.sourceHash,
           isStyle: module.isStyle,
-          hasSsrOptions: module.ssrOptionsHash,
+          hasSsrOptions: module.ssrPropsFn,
           denoHooks: module.denoHooks,
           deps: module.deps,
         }, undefined, 2)),
