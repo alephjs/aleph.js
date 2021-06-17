@@ -1,7 +1,7 @@
 import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
 import { dirname, join } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.96.0/ws/mod.ts'
-import { trimBuiltinModuleExts } from '../framework/core/module.ts'
+import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { rewriteURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -106,9 +106,18 @@ export class Server {
         }
 
         if (relPath.endsWith('.js')) {
-          const module = app.findModule(({ jsFile }) => jsFile === relPath)
+          let module = app.findModule(({ jsFile }) => jsFile === relPath)
+          if (!module) {
+            for (const ext of [...builtinModuleExts.map(ext => `.${ext}`), '']) {
+              const sepcifier = util.trimSuffix(relPath, '.js') + ext
+              if (existsFile(join(app.workingDir, sepcifier))) {
+                module = await app.compile(sepcifier)
+                break
+              }
+            }
+          }
           if (module) {
-            const content = await app.getModuleJSCode(module)
+            const content = await app.getModuleJS(module)
             if (content) {
               const etag = createHash('md5').update(VERSION).update(module.hash || module.sourceHash).toString()
               if (etag === r.headers.get('If-None-Match')) {
@@ -116,11 +125,13 @@ export class Server {
                 return
               }
 
+              // todo: strip ssr code
+
               req.setHeader('ETag', etag)
               if (app.isHMRable(module.specifier)) {
                 let code = new TextDecoder().decode(content)
                 app.getCodeInjects('hmr')?.forEach(transform => {
-                  code = transform(module.specifier, code)
+                  code = transform(module!.specifier, code)
                 })
                 const hmrModuleSpecifier = toRelativePath(
                   dirname(toLocalPath(module.specifier)),
