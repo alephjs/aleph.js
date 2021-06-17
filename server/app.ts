@@ -38,6 +38,7 @@ export type Module = {
   isStyle?: boolean
   externalRemoteDeps?: boolean
   ssrPropsFn?: string
+  ssgPathsFn?: boolean
   denoHooks?: string[]
   hash?: string
   sourceHash: string
@@ -519,13 +520,14 @@ export class Application implements ServerApplication {
       return null
     }
 
-    let useDeno = false
-    let ssrData = false
     await Promise.all(
       nestedModules
         .filter(specifier => !this.#modules.has(specifier))
         .map(specifier => this.compile(specifier))
     )
+
+    let useDeno = false
+    let ssrProps = false
     for (const specifier of ['app', ...nestedModules]) {
       const mod = this.getModule(specifier)
       if (mod) {
@@ -546,10 +548,10 @@ export class Application implements ServerApplication {
       }
     }
     const mod = this.getModule(nestedModules[nestedModules.length - 1])
-    if (mod && mod.ssrPropsFn && mod.ssrPropsFn.includes('data;')) {
-      ssrData = true
+    if (mod && mod.ssrPropsFn) {
+      ssrProps = true
     }
-    if (!useDeno && !ssrData) {
+    if (!useDeno && !ssrProps) {
       return {}
     }
 
@@ -810,17 +812,6 @@ export class Application implements ServerApplication {
       }
     }
 
-    if (this.#dists.size > 0) {
-      Promise.all(Array.from(this.#dists.values()).map(async path => {
-        const src = join(this.buildDir, path)
-        if (await existsFile(src)) {
-          const dest = join(distDir, path)
-          await ensureDir(dirname(dest))
-          return Deno.copyFile(src, dest)
-        }
-      }))
-    }
-
     // copy bundle dist
     await this.#bundler.copyDist()
 
@@ -836,6 +827,18 @@ export class Application implements ServerApplication {
         await ensureDir(dirname(fp))
         await Deno.copyFile(p, fp)
       }
+    }
+
+    // copy custom dist files
+    if (this.#dists.size > 0) {
+      Promise.all(Array.from(this.#dists.values()).map(async path => {
+        const src = join(this.buildDir, path)
+        if (await existsFile(src)) {
+          const dest = join(distDir, path)
+          await ensureDir(dirname(dest))
+          return Deno.copyFile(src, dest)
+        }
+      }))
     }
 
     log.info(`Done in ${Math.round(performance.now() - start)}ms`)
@@ -899,11 +902,11 @@ export class Application implements ServerApplication {
     })
   }
 
-  async importModule({ jsFile, hash, sourceHash }: Module): Promise<any> {
+  async importModule<T = any>({ jsFile, hash, sourceHash }: Module): Promise<T> {
     return await import(`file://${join(this.buildDir, jsFile)}#${(hash || sourceHash).slice(0, 6)}`)
   }
 
-  async getModuleJSCode(module: Module): Promise<Uint8Array | null> {
+  async getModuleJS(module: Module): Promise<Uint8Array | null> {
     const { jsFile, jsBuffer } = module
     if (jsBuffer) {
       return jsBuffer
@@ -979,7 +982,7 @@ export class Application implements ServerApplication {
   }
 
   /** compile the module by given specifier */
-  private async compile(specifier: string, options: CompileOptions = {}) {
+  async compile(specifier: string, options: CompileOptions = {}) {
     const [module, source] = await this.initModule(specifier, options)
     if (!module.external) {
       await this.transpileModule(module, source, options.ignoreDeps)
@@ -1071,12 +1074,13 @@ export class Application implements ServerApplication {
 
     if (await existsFile(metaFp)) {
       try {
-        const { specifier: _specifier, sourceHash, deps, isStyle, ssrPropsFn, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
+        const { specifier: _specifier, sourceHash, deps, isStyle, ssrPropsFn, ssgPathsFn, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
         if (_specifier === specifier && util.isNEString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
           mod.isStyle = Boolean(isStyle) || undefined
           mod.ssrPropsFn = util.isNEString(ssrPropsFn) ? ssrPropsFn : undefined
+          mod.ssgPathsFn = Boolean(ssgPathsFn) || undefined
           mod.denoHooks = util.isNEArray(denoHooks) ? denoHooks : undefined
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
@@ -1132,7 +1136,7 @@ export class Application implements ServerApplication {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, ssrPropsFn, denoHooks, starExports, map } = await transform(specifier, source.code, {
+      const { code, deps, ssrPropsFn, ssgPathsFn, denoHooks, starExports, map } = await transform(specifier, source.code, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
@@ -1201,6 +1205,7 @@ export class Application implements ServerApplication {
       }) || []
 
       module.ssrPropsFn = ssrPropsFn
+      module.ssgPathsFn = ssgPathsFn
       if (util.isNEArray(denoHooks)) {
         module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.config.ssr) {
@@ -1216,7 +1221,8 @@ export class Application implements ServerApplication {
         specifier,
         sourceHash: module.sourceHash,
         isStyle: module.isStyle,
-        hasSsrOptions: module.ssrPropsFn,
+        ssrPropsFn: module.ssrPropsFn,
+        ssgPathsFn: module.ssgPathsFn,
         denoHooks: module.denoHooks,
         deps: module.deps,
       }, undefined, 2)
@@ -1247,9 +1253,9 @@ export class Application implements ServerApplication {
       let fsync = false
       const encoder = new TextEncoder()
       const hasher = createHash('md5').update(module.sourceHash)
-      if (module.deps.find(dep => dep.hashLoc !== undefined)) {
-        // preload js buffer
-        this.getModuleJSCode(module)
+      // preload js buffer
+      if (module.deps.findIndex(dep => dep.hashLoc !== undefined) >= 0) {
+        await this.getModuleJS(module)
       }
       await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
         const [depModule, depSource] = await this.initModule(specifier, { externalRemoteDeps })
@@ -1290,7 +1296,7 @@ export class Application implements ServerApplication {
         for (const dep of deps) {
           const { specifier, hashLoc } = dep
           if (specifier === by.specifier && hashLoc !== undefined) {
-            const jsCode = await this.getModuleJSCode(mod)
+            const jsCode = await this.getModuleJS(mod)
             if (jsCode && !equals(hashData, jsCode.slice(hashLoc, hashLoc + 6))) {
               copy(hashData, jsCode, hashLoc)
               if (!fsync) {
@@ -1341,7 +1347,8 @@ export class Application implements ServerApplication {
           specifier,
           sourceHash: module.sourceHash,
           isStyle: module.isStyle,
-          hasSsrOptions: module.ssrPropsFn,
+          ssrPropsFn: module.ssrPropsFn,
+          ssgPathsFn: module.ssgPathsFn,
           denoHooks: module.denoHooks,
           deps: module.deps,
         }, undefined, 2)),
