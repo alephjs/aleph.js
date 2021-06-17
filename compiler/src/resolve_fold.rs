@@ -324,15 +324,15 @@ impl Fold for ResolveFold {
                 }
               });
               if let Some(d) = decl {
-                let mut hasher = Sha1::new();
-                let fn_code = self.source.span_to_snippet(d.span.clone()).unwrap();
-                hasher.update(fn_code.clone());
-                let fn_hash = base64::encode(hasher.finalize());
                 if let Pat::Ident(ref binding) = d.name {
-                  if binding.id.sym.eq("ssrProps") {
-                    resolver.ssr_props_fn = Some(fn_hash)
-                  } else if binding.id.sym.eq("ssgPaths") {
-                    resolver.ssg_paths_fn = Some(fn_hash)
+                  if binding.id.sym.eq("ssgPaths") {
+                    resolver.ssg_paths_fn = Some(true);
+                  } else if binding.id.sym.eq("ssrProps") {
+                    let mut hasher = Sha1::new();
+                    let fn_code = self.source.span_to_snippet(d.span.clone()).unwrap();
+                    hasher.update(fn_code.clone());
+                    let fn_hash = base64::encode(hasher.finalize());
+                    resolver.ssr_props_fn = Some(fn_hash);
                   }
                 }
               }

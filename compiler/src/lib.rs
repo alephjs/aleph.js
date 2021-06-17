@@ -104,7 +104,7 @@ pub struct TransformOutput {
   pub ssr_props_fn: Option<String>,
 
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub ssg_paths_fn: Option<String>,
+  pub ssg_paths_fn: Option<bool>,
 
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub deno_hooks: Vec<String>,

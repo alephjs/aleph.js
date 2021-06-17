@@ -65,7 +65,7 @@ pub struct Resolver {
   /// the hash of `ssrProps` function
   pub ssr_props_fn: Option<String>,
   /// the hash of `ssgPaths` function
-  pub ssg_paths_fn: Option<String>,
+  pub ssg_paths_fn: Option<bool>,
   /// a hook list of `useDeno`
   pub deno_hooks: Vec<String>,
   /// bundle mode

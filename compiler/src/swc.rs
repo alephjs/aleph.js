@@ -684,13 +684,7 @@ mod tests {
       Some(base64::encode(hasher.finalize()))
     );
 
-    let mut hasher = Sha1::new();
-    let callback_code = "ssgPaths = async () => ([join('/', 'foo')])";
-    hasher.update(callback_code.clone());
-    assert_eq!(
-      resolver.borrow().ssg_paths_fn,
-      Some(base64::encode(hasher.finalize()))
-    );
+    assert_eq!(resolver.borrow().ssg_paths_fn, Some(true));
   }
 
   #[test]

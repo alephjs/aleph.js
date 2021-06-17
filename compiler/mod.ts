@@ -45,7 +45,7 @@ export type TransformResult = {
   code: string
   deps?: DependencyDescriptor[]
   ssrPropsFn?: string
-  ssgPathsFn?: string
+  ssgPathsFn?: boolean
   denoHooks?: string[]
   starExports?: string[]
   map?: string
