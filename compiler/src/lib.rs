@@ -103,6 +103,9 @@ pub struct TransformOutput {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub ssr_props_fn: Option<String>,
 
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub ssg_paths_fn: Option<String>,
+
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub deno_hooks: Vec<String>,
 
@@ -153,6 +156,7 @@ pub fn strip_ssr_code(specifier: &str, code: &str, options: JsValue) -> Result<J
       inline_styles: HashMap::new(),
       star_exports: vec![],
       ssr_props_fn: None,
+      ssg_paths_fn: None,
       deno_hooks: vec![],
       map,
     })
@@ -200,6 +204,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
       inline_styles: r.inline_styles.clone(),
       star_exports: r.star_exports.clone(),
       ssr_props_fn: r.ssr_props_fn.clone(),
+      ssg_paths_fn: r.ssg_paths_fn.clone(),
       deno_hooks: r.deno_hooks.clone(),
       map,
     })
