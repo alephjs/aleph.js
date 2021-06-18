@@ -1,4 +1,4 @@
-import { red } from "https://deno.land/std@0.96.0/fmt/colors.ts";
+import { red } from "https://deno.land/std@0.99.0/fmt/colors.ts";
 let wasm;
 
 const heap = new Array(32).fill(undefined);

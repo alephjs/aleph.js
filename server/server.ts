@@ -1,6 +1,6 @@
-import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
-import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.96.0/ws/mod.ts'
+import { createHash } from 'https://deno.land/std@0.99.0/hash/mod.ts'
+import { join } from 'https://deno.land/std@0.99.0/path/mod.ts'
+import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.99.0/ws/mod.ts'
 import { SourceType, stripSsrCode } from '../compiler/mod.ts'
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { rewriteURL } from '../framework/core/routing.ts'
@@ -134,6 +134,7 @@ export class Server {
                   } else {
                     const { code: csrCode } = await stripSsrCode(specifier, code, { sourceMap: true, swcOptions: { sourceType: SourceType.JS } })
                     Object.assign(module, { csrCode })
+                    // todo: merge source map
                     code = csrCode
                   }
                 }

@@ -1,5 +1,5 @@
-import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
+import { join } from 'https://deno.land/std@0.99.0/path/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.99.0/fs/ensure_dir.ts'
 import { existsFile } from '../shared/fs.ts'
 import { Measure } from '../shared/log.ts'
 import type { ImportMap } from '../types.ts'

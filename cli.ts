@@ -1,5 +1,5 @@
-import { resolve } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import { parse } from 'https://deno.land/std@0.96.0/flags/mod.ts'
+import { resolve } from 'https://deno.land/std@0.99.0/path/mod.ts'
+import { parse } from 'https://deno.land/std@0.99.0/flags/mod.ts'
 import { existsDir } from './shared/fs.ts'
 import log, { LevelNames } from './shared/log.ts'
 import util from './shared/util.ts'

@@ -1,4 +1,4 @@
-import { extname } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { extname } from 'https://deno.land/std@0.99.0/path/mod.ts'
 import { esbuild } from '../bundler/esbuild.ts'
 import { toLocalPath, computeHash } from '../server/helper.ts'
 import util from '../shared/util.ts'
