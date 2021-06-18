@@ -1,6 +1,7 @@
 import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
-import { dirname, join } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
 import { acceptWebSocket, isWebSocketCloseEvent } from 'https://deno.land/std@0.96.0/ws/mod.ts'
+import { SourceType, stripSsrCode } from '../compiler/mod.ts'
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { rewriteURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
@@ -10,7 +11,6 @@ import { VERSION } from '../version.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
 import { Application } from './app.ts'
-import { getAlephPkgUri, toRelativePath, toLocalPath } from './helper.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */
@@ -99,7 +99,6 @@ export class Server {
         }
 
         const relPath = util.trimPrefix(pathname, '/_aleph')
-
         if (relPath == '/main.js') {
           req.send(app.createMainJS(false), 'application/javascript; charset=utf-8')
           return
@@ -117,6 +116,7 @@ export class Server {
             }
           }
           if (module) {
+            const { specifier } = module
             const content = await app.getModuleJS(module)
             if (content) {
               const etag = createHash('md5').update(VERSION).update(module.hash || module.sourceHash).toString()
@@ -125,27 +125,30 @@ export class Server {
                 return
               }
 
-              // todo: strip ssr code
-
               req.setHeader('ETag', etag)
-              if (app.isHMRable(module.specifier)) {
+              if (app.isDev && app.isHMRable(specifier)) {
                 let code = new TextDecoder().decode(content)
-                app.getCodeInjects('hmr')?.forEach(transform => {
-                  code = transform(module!.specifier, code)
+                if (module.denoHooks?.length || module.ssrPropsFn || module.ssgPathsFn) {
+                  if ('csrCode' in module) {
+                    code = (module as any).csrCode
+                  } else {
+                    const { code: csrCode } = await stripSsrCode(specifier, code, { sourceMap: true, swcOptions: { sourceType: SourceType.JS } })
+                    Object.assign(module, { csrCode })
+                    code = csrCode
+                  }
+                }
+                app.getCodeInjects('hmr', specifier)?.forEach(transform => {
+                  const ret = transform(specifier, code)
+                  code = ret.code
                 })
-                const hmrModuleSpecifier = toRelativePath(
-                  dirname(toLocalPath(module.specifier)),
-                  toLocalPath(`${getAlephPkgUri()}/framework/core/hmr.js`)
-                )
-                const lines = [
-                  `import { createHotContext } from ${JSON.stringify(hmrModuleSpecifier)};`,
-                  `import.meta.hot = createHotContext(${JSON.stringify(module.specifier)});`,
+                code = [
+                  `import.meta.hot = window.$createHotContext(${JSON.stringify(specifier)});`,
                   '',
                   code,
                   '',
                   'import.meta.hot.accept();'
-                ]
-                req.send(lines.join('\n'), 'application/javascript; charset=utf-8')
+                ].join('\n')
+                req.send(code, 'application/javascript; charset=utf-8')
               } else {
                 req.send(content, 'application/javascript; charset=utf-8')
               }

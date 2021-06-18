@@ -172,7 +172,8 @@ export interface ServerApplication {
   addModule(specifier: string, sourceCode?: string): Promise<void>
   addDist(path: string, content: Uint8Array): Promise<void>
   fetch(url: string): Promise<{ content: Uint8Array, contentType: string | null }>
-  injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: (specifier: string, code: string) => string): void
+  injectCode(phase: 'compilation' | 'hmr' | 'ssr', test: RegExp | string, transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
+  injectCode(phase: 'compilation' | 'hmr' | 'ssr', transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
 }
 
 /**

@@ -67,7 +67,8 @@ type CompileOptions = {
   externalRemoteDeps?: boolean
 }
 
-type TransformFn = (specifier: string, code: string) => string
+type TransformFn = (specifier: string, code: string, map?: string) => { code: string, map?: string }
+type Transformer = { test?: RegExp | string, fn: TransformFn }
 
 /** The application class for aleph server. */
 export class Application implements ServerApplication {
@@ -87,7 +88,7 @@ export class Application implements ServerApplication {
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
   #dists: Set<string> = new Set()
-  #injects: Map<'compilation' | 'hmr' | 'ssr', TransformFn[]> = new Map()
+  #injects: Map<string, Transformer[]> = new Map()
   #reloading = false
 
   constructor(
@@ -504,12 +505,36 @@ export class Application implements ServerApplication {
   }
 
   /** inject code */
-  injectCode(stage: 'compilation' | 'hmr' | 'ssr', transform: TransformFn): void {
-    if (this.#injects.has(stage)) {
-      this.#injects.get(stage)!.push(transform)
-    } else {
-      this.#injects.set(stage, [transform])
+  injectCode(phase: 'compilation' | 'hmr' | 'ssr', test: string | RegExp, transform: TransformFn): void
+  injectCode(phase: 'compilation' | 'hmr' | 'ssr', transform: TransformFn): void
+  injectCode(phase: 'compilation' | 'hmr' | 'ssr', ...rest: any[]): void {
+    let inject: Transformer = {
+      fn: rest[0],
     }
+    if (rest.length === 2) {
+      inject.test = rest[0]
+      inject.fn = rest[1]
+    }
+    if (util.isFunction(inject.fn)) {
+      if (this.#injects.has(phase)) {
+        this.#injects.get(phase)!.push(inject)
+      } else {
+        this.#injects.set(phase, [inject])
+      }
+    }
+  }
+
+  /** get code injects */
+  getCodeInjects(phase: 'compilation' | 'hmr' | 'ssr', specifier: string): TransformFn[] {
+    return this.#injects.get(phase)?.filter(({ test }) => {
+      if (test === undefined || test === '') {
+        return true
+      }
+      if (test instanceof RegExp) {
+        return test.test(specifier)
+      }
+      return test === specifier
+    }).map(({ fn }) => fn) || []
   }
 
   /** get ssr data */
@@ -598,10 +623,7 @@ export class Application implements ServerApplication {
     return [status, html]
   }
 
-  /** get code injects */
-  getCodeInjects(phase: 'compilation' | 'hmr' | 'ssr') {
-    return this.#injects.get(phase)
-  }
+
 
   /** create a fs watcher.  */
   createFSWatcher(): EventEmitter {
@@ -682,12 +704,14 @@ export class Application implements ServerApplication {
 
     let code = [
       `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js";`,
-      this.isDev && `import { connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
+      this.isDev && `import { createHotContext, connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
+      this.isDev && `window.$createHotContext = createHotContext;`,
       this.isDev && `connect(${JSON.stringify(basePath)});`,
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
     ].filter(Boolean).join('\n')
-    this.#injects.get('compilation')?.forEach(transform => {
-      code = transform('/main.js', code)
+    this.getCodeInjects('compilation', '/main.js').forEach(transform => {
+      const ret = transform('/main.js', code)
+      code = ret.code
     })
     return code
   }
@@ -1384,8 +1408,9 @@ export class Application implements ServerApplication {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname })
         if (router.routePath !== '') {
           let [html, data] = await this.#renderer.renderPage(router, nestedModules)
-          this.#injects.get('ssr')?.forEach(transform => {
-            html = transform(pathname, html)
+          this.getCodeInjects('ssr', pathname)?.forEach(transform => {
+            const ret = transform(pathname, html)
+            html = ret.code
           })
           await ensureTextFile(join(outputDir, pathname, 'index.html'), html)
           if (data) {
@@ -1409,8 +1434,9 @@ export class Application implements ServerApplication {
         await this.compile(nestedModules[0])
       }
       let [html] = await this.#renderer.renderPage(router, nestedModules.slice(0, 1))
-      this.#injects.get('ssr')?.forEach(transform => {
-        html = transform('/404', html)
+      this.getCodeInjects('ssr', '/404').forEach(transform => {
+        const ret = transform('/404', html)
+        html = ret.code
       })
       await ensureTextFile(join(outputDir, '404.html'), html)
     }

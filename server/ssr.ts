@@ -1,5 +1,4 @@
 import { basename, dirname } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import { builtinModuleExts } from '../framework/core/module.ts'
 import { createBlankRouterURL } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -77,8 +76,9 @@ export class Renderer {
     }
     let [html, data] = await render()
     if (namespace !== '-') {
-      this.#app.getCodeInjects('ssr')?.forEach(transform => {
-        html = transform(key, html)
+      this.#app.getCodeInjects('ssr', key)?.forEach(transform => {
+        const ret = transform(key, html)
+        html = ret.code
       })
     }
     cache.set(key, { html, data })
