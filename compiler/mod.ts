@@ -160,7 +160,7 @@ export async function transform(specifier: string, code: string, options: Transf
 }
 
 /* strip SSR code. */
-export async function stripSsrCode(specifier: string, code: string, options: SWCOptions = {}): Promise<string[]> {
+export async function stripSsrCode(specifier: string, code: string, options: TransformOptions = {}): Promise<TransformResult> {
   await checkWasmReady()
   return stripSsrCodeSync(specifier, code, options)
 }
