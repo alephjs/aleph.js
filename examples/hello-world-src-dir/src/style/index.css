@@ -61,13 +61,13 @@ main {
 
 .links a {
   margin: 0 9px;
-  color: #999;
+  color: #666;
   text-decoration: none;
   transition: color 0.15s ease-in;
 }
 
 .links a:hover {
-  color: #111;
+  color: #000;
 }
 
 .counter {
