@@ -39,12 +39,6 @@ export class Analyzer {
       Analyzer.blankDependencyGraph('virtual:/common.js', true),
     ]
 
-    // app.js
-    const appMoudle = this.#app.getModule('app')
-    if (appMoudle) {
-      this.#entries.push(this.createDependencyGraph(appMoudle, true))
-    }
-
     // main.js
     this.#entries.push(this.createDependencyGraph({
       specifier: 'virtual:/main.js',
@@ -52,6 +46,12 @@ export class Analyzer {
         { specifier: bootstrapModuleUrl }
       ],
     }, true))
+
+    // app.js
+    const appMoudle = this.#app.getModule('app')
+    if (appMoudle) {
+      this.#entries.push(this.createDependencyGraph(appMoudle, true))
+    }
   }
 
   addEntry(module: Module) {
@@ -81,7 +81,8 @@ export class Analyzer {
     isPreload?: boolean,
     __tracing = new Set<string>()
   ): DependencyGraph {
-    const { specifier, deps, external } = module
+    const { specifier, external } = module
+    const deps: Module["deps"] = []
     const graph: DependencyGraph = {
       specifier,
       external,
@@ -102,6 +103,14 @@ export class Analyzer {
     }
     __tracing.add(specifier)
 
+    module.deps.forEach(dep => {
+      if (
+        this.#app.getModule(dep.specifier) !== null &&
+        deps.findIndex(({ specifier, isDynamic }) => dep.specifier === specifier && dep.isDynamic === isDynamic) === -1
+      ) {
+        deps.push(dep)
+      }
+    })
     graph.deps = deps.filter(({ specifier }) => this.#app.getModule(specifier) !== null)
       .map(dep => {
         const depMod = this.#app.getModule(dep.specifier)!
@@ -141,6 +150,7 @@ export class Analyzer {
             if (eq && !graph.external && !graph.isDynamic && !graph.isLoop && !graph.isShared) {
               sharedGraph.deps.push({ ...graph })
               graph.isShared = true
+              graph.isLoop = true
               graph.deps = []
               isShared = true
               return false // break walking

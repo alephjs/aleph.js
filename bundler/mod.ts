@@ -3,9 +3,9 @@ import { ensureDir } from 'https://deno.land/std@0.99.0/fs/ensure_dir.ts'
 import { transform } from '../compiler/mod.ts'
 import { trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
-import util from '../shared/util.ts'
 import type { BrowserNames } from '../types.ts'
 import { VERSION } from '../version.ts'
+import type { DependencyGraph } from '../server/analyzer.ts'
 import type { Application, Module } from '../server/app.ts'
 import { clearBuildCache, computeHash, getAlephPkgUri } from '../server/helper.ts'
 import { esbuild, stopEsbuild, esbuildUrlLoader } from './esbuild.ts'
@@ -14,12 +14,12 @@ export const bundlerRuntimeCode = `
   window.__ALEPH = {
     basePath: '/',
     pack: {},
-    bundled: {},
+    asyncChunks: {},
     import: function(s, r) {
       var a = this.pack,
           b = this.basePath,
           d = document,
-          l = this.bundled;
+          l = this.asyncChunks;
       if (s in a) {
         return Promise.resolve(a[s]);
       }
@@ -49,56 +49,48 @@ export const bundlerRuntimeCode = `
 /** The bundler class for aleph server. */
 export class Bundler {
   #app: Application
-  #bundled: Map<string, string>
+  #chunks: Map<string, { filename: string, async?: boolean }>
   #compiled: Map<string, string>
 
   constructor(app: Application) {
     this.#app = app
-    this.#bundled = new Map()
+    this.#chunks = new Map()
     this.#compiled = new Map()
   }
 
-  async bundle(entryMods: Array<{ specifier: string, shared: boolean }>) {
-    const remoteEntries = new Set<string>()
-    const sharedEntries = new Set<string>()
-    const entries = new Set<string>()
-
-    entryMods.forEach(({ specifier, shared }) => {
-      if (shared) {
-        if (util.isLikelyHttpURL(specifier)) {
-          remoteEntries.add(specifier)
-        } else {
-          sharedEntries.add(specifier)
-        }
-      } else {
-        entries.add(specifier)
-      }
-    })
+  async bundle(entries: DependencyGraph[]) {
+    const vendorDeps = entries.find(({ specifier }) => specifier === 'virtual:/vendor.js')?.deps.map(({ specifier }) => specifier) || []
+    const commonDeps = entries.find(({ specifier }) => specifier === 'virtual:/common.js')?.deps.map(({ specifier }) => specifier) || []
 
     if (this.#app.config.buildTarget !== 'esnext') {
       await this.bundlePolyfillsChunck()
     }
     await this.bundleChunk(
-      'deps',
-      Array.from(remoteEntries),
+      'vendor',
+      vendorDeps,
       []
     )
-    if (sharedEntries.size > 0) {
+    if (commonDeps.length) {
       await this.bundleChunk(
-        'shared',
-        Array.from(sharedEntries),
-        Array.from(remoteEntries)
+        'common',
+        commonDeps,
+        vendorDeps,
       )
     }
-    for (const specifier of entries) {
-      await this.bundleChunk(
-        trimBuiltinModuleExts(specifier),
-        [specifier],
-        [
-          Array.from(remoteEntries),
-          Array.from(sharedEntries)
-        ].flat()
-      )
+
+    // create page/dynamic chunks
+    for (const { specifier } of entries) {
+      if (!specifier.startsWith('virtual:')) {
+        await this.bundleChunk(
+          trimBuiltinModuleExts(specifier),
+          [specifier],
+          [
+            vendorDeps,
+            commonDeps
+          ].flat(),
+          true
+        )
+      }
     }
 
     // create main.js after all chunks are bundled
@@ -109,13 +101,15 @@ export class Bundler {
     stopEsbuild()
   }
 
-  getBundledFile(name: string): string | null {
-    return this.#bundled.get(name) || null
+  getSyncChunks(): string[] {
+    return Array.from(this.#chunks.values())
+      .filter(chunk => !chunk.async)
+      .map(chunk => chunk.filename)
   }
 
   async copyDist() {
     await Promise.all(
-      Array.from(this.#bundled.values()).map(jsFile => this.copyBundleFile(jsFile))
+      Array.from(this.#chunks.values()).map(({ filename }) => this.copyBundleFile(filename))
     )
   }
 
@@ -188,18 +182,18 @@ export class Bundler {
   }
 
   private async createMainJS() {
-    const bundled = Array.from(this.#bundled.entries())
-      .filter(([name]) => !['polyfills', 'deps', 'shared'].includes(name))
-      .reduce((r, [name, filename]) => {
-        r[name] = filename
+    const asyncChunks = Array.from(this.#chunks.entries())
+      .filter(([_, chunk]) => !!chunk.async)
+      .reduce((r, [name, chunk]) => {
+        r[name] = chunk.filename
         return r
       }, {} as Record<string, string>)
-    const mainJS = `__ALEPH.bundled=${JSON.stringify(bundled)};` + this.#app.createMainJS(true)
+    const mainJS = `__ALEPH.asyncChunks=${JSON.stringify(asyncChunks)};` + this.#app.createMainJS(true)
     const hash = computeHash(mainJS)
     const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
     await Deno.writeTextFile(bundleFilePath, mainJS)
-    this.#bundled.set('main', bundleFilename)
+    this.#chunks.set('main', { filename: bundleFilename })
   }
 
   /** create polyfills bundle. */
@@ -214,11 +208,11 @@ export class Bundler {
       const rawPolyfillsFile = `${alephPkgUri}/bundler/polyfills/${polyfillTarget}/mod.ts`
       await this.build(rawPolyfillsFile, bundleFilePath)
     }
-    this.#bundled.set('polyfills', bundleFilename)
+    this.#chunks.set('polyfills', { filename: bundleFilename })
   }
 
   /** create bundle chunk. */
-  private async bundleChunk(name: string, entry: string[], external: string[]) {
+  private async bundleChunk(name: string, entry: string[], external: string[], asyncChunk: boolean = false) {
     const entryCode = (await Promise.all(entry.map(async (specifier, i) => {
       const { buildDir } = this.#app
       let mod = this.#app.getModule(specifier)
@@ -247,7 +241,7 @@ export class Bundler {
       await this.build(bundleEntryFile, bundleFilePath)
       lazyRemove(bundleEntryFile)
     }
-    this.#bundled.set(name, bundleFilename)
+    this.#chunks.set(name, { filename: bundleFilename, async: asyncChunk })
   }
 
   /** run deno bundle and compress the output using terser. */

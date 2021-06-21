@@ -67,8 +67,8 @@ type CompileOptions = {
   externalRemoteDeps?: boolean
 }
 
-type TransformFn = (specifier: string, code: string, map?: string) => { code: string, map?: string }
 type Transformer = { test?: RegExp | string, fn: TransformFn }
+type TransformFn = (specifier: string, code: string, map?: string) => { code: string, map?: string }
 
 /** The application class for aleph server. */
 export class Application implements ServerApplication {
@@ -749,11 +749,9 @@ export class Application implements ServerApplication {
 
     return [
       simpleJSMinify(bundlerRuntimeCode),
-      ...['polyfills', 'deps', 'shared', 'main', entryFile ? util.trimSuffix(entryFile, '.js') : '']
-        .filter(name => name !== "" && this.#bundler.getBundledFile(name) !== null)
-        .map(name => ({
-          src: `${basePath}/_aleph/${this.#bundler.getBundledFile(name)}`
-        }))
+      ... this.#bundler.getSyncChunks().map(filename => ({
+        src: `${basePath}/_aleph/${filename}`
+      }))
     ]
   }
 
@@ -1213,7 +1211,7 @@ export class Application implements ServerApplication {
       }
 
       module.jsBuffer = encoder.encode(jsCode)
-      module.deps = deps?.filter(({ specifier }) => specifier != module.specifier).map(({ specifier, resolved, isDynamic }) => {
+      module.deps = deps?.filter(({ specifier }) => specifier !== module.specifier).map(({ specifier, resolved, isDynamic }) => {
         const dep: DependencyDescriptor = { specifier }
         if (isDynamic) {
           dep.isDynamic = true
@@ -1381,9 +1379,10 @@ export class Application implements ServerApplication {
     }
   }
 
-  /** create bundle chunks for production. */
+  /** create bundled chunks for production. */
   private async bundle() {
-    // await this.#bundler.bundle(concatAllEntries())
+    const entries = this.analyze()
+    await this.#bundler.bundle(entries)
   }
 
   /** render all pages in routing. */
