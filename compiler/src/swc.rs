@@ -192,10 +192,9 @@ impl SWC {
       // remove unused deps by tree-shaking
       let mut deps: Vec<DependencyDescriptor> = Vec::new();
       for dep in resolver.deps.clone() {
-        let mut s = "\"".to_owned();
-        s.push_str(dep.resolved.as_str());
-        s.push('"');
-        if code.contains(s.as_str()) {
+        if resolver.star_exports.contains(&dep.specifier)
+          || code.contains(to_str_lit(dep.resolved.as_str()).as_str())
+        {
           deps.push(dep);
         }
       }
@@ -222,10 +221,8 @@ impl SWC {
         });
         let mut deps: Vec<DependencyDescriptor> = Vec::new();
         for dep in resolver.deps.clone() {
-          let mut s = "\"".to_owned();
-          s.push_str(dep.resolved.as_str());
-          s.push('"');
-          if csr_code.contains(s.as_str()) {
+          let s = to_str_lit(dep.resolved.as_str());
+          if resolver.star_exports.contains(&dep.specifier) || csr_code.contains(s.as_str()) {
             deps.push(dep);
           } else {
             let mut raw = "\"".to_owned();
@@ -334,6 +331,13 @@ fn get_syntax(source_type: &SourceType) -> Syntax {
     SourceType::TSX => Syntax::Typescript(get_ts_config(true)),
     _ => Syntax::Es(get_es_config(false)),
   }
+}
+
+fn to_str_lit(sub_text: &str) -> String {
+  let mut s = "\"".to_owned();
+  s.push_str(sub_text);
+  s.push('"');
+  s
 }
 
 #[allow(dead_code)]
@@ -549,6 +553,10 @@ mod tests {
     assert!(code.contains("const AsyncLogo = React.lazy(()=>import(\"../components/async-logo.js#/components/async-logo.tsx@000003\")"));
     assert!(code.contains("export { useState } from \"../-/esm.sh/react@17.0.2.js\""));
     assert!(code.contains("export * from \"[https://esm.sh/swr]:../-/esm.sh/swr.js\""));
+    assert_eq!(
+      resolver.borrow().deps.last().unwrap().specifier,
+      "https://esm.sh/swr"
+    );
   }
 
   #[test]
