@@ -7,6 +7,7 @@ use crate::resolver::{is_remote_url, DependencyDescriptor, Resolver};
 use crate::source_type::SourceType;
 use crate::strip_ssr::strip_ssr_fold;
 
+use path_slash::PathBufExt;
 use std::{cell::RefCell, cmp::min, path::Path, rc::Rc};
 use swc_common::{
   chain,
@@ -230,8 +231,11 @@ impl SWC {
               raw.push_str(dep.specifier.as_str());
             } else {
               let path = Path::new(resolver.working_dir.as_str());
-              let path = path.join(dep.specifier.trim_start_matches("/"));
-              raw.push_str(path.to_str().unwrap());
+              let path = path
+                .join(dep.specifier.trim_start_matches("/"))
+                .to_slash()
+                .unwrap();
+              raw.push_str(path.as_str());
             }
             raw.push('"');
             code = code.replace(s.as_str(), raw.as_str());
