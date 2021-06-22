@@ -10,7 +10,7 @@ export {
 }
 
 export const esbuildUrlLoader: Plugin = {
-  name: 'http-loader',
+  name: 'esm-loader',
   setup(build) {
     build.onResolve({ filter: /.*/ }, args => {
       if (util.isLikelyHttpURL(args.path)) {

@@ -31,7 +31,7 @@ export class Routing {
     locales = [],
     routes = [],
     rewrites = {}
-  }: RoutingOptions) {
+  }: RoutingOptions = {}) {
     this._basePath = basePath
     this._defaultLocale = defaultLocale
     this._locales = locales
@@ -52,14 +52,6 @@ export class Routing {
   // routes returns the routes as copy
   get routes(): Route[] {
     return JSON.parse(JSON.stringify(this._routes))
-  }
-
-  config(options: RoutingOptions) {
-    Object.keys(options).forEach((key) => {
-      if ('_' + key in this) {
-        Object.assign(this, { ['_' + key]: options[key as keyof typeof options] })
-      }
-    })
   }
 
   update(path: string, moduleUrl: string, isIndex?: boolean) {
