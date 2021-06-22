@@ -3,7 +3,7 @@ import util from '../../shared/util.ts'
 export const builtinModuleExts = ['tsx', 'jsx', 'ts', 'js', 'mjs']
 
 export function importModule(basePath: string, url: string, forceRefetch = false): Promise<any> {
-  const { __ALEPH: ALEPH } = window as any
+  const { __ALEPH__: ALEPH } = window as any
 
   if (ALEPH) {
     return ALEPH.import(url, forceRefetch)

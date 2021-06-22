@@ -137,14 +137,16 @@ export function connect(basePath: string) {
   })
 }
 
-export function createHotContext(specifier: string) {
-  if (modules.has(specifier)) {
-    const mod = modules.get(specifier)!
-    mod.lock()
+Object.assign(window, {
+  $createHotContext: (specifier: string) => {
+    if (modules.has(specifier)) {
+      const mod = modules.get(specifier)!
+      mod.lock()
+      return mod
+    }
+
+    const mod = new Module(specifier)
+    modules.set(specifier, mod)
     return mod
   }
-
-  const mod = new Module(specifier)
-  modules.set(specifier, mod)
-  return mod
-}
+})

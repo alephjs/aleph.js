@@ -202,13 +202,7 @@ impl SWC {
       resolver.deps = deps;
 
       // ignore deps used by SSR
-      let has_ssr_options = if let Some(_) = resolver.ssr_props_fn {
-        true
-      } else if let Some(_) = resolver.ssg_paths_fn {
-        true
-      } else {
-        false
-      };
+      let has_ssr_options = resolver.ssr_props_fn.is_some() || resolver.ssg_paths_fn.is_some();
       if !resolver.bundle_mode && (has_ssr_options || !resolver.deno_hooks.is_empty()) {
         let module = SWC::parse(self.specifier.as_str(), code.as_str(), Some(SourceType::JS))
           .expect("could not parse the module");
@@ -764,26 +758,28 @@ mod tests {
       .unwrap()
       .0;
     println!("{}", code);
-    assert!(code.contains("const { /*#__PURE__*/ default: React , useState , useEffect: useEffect_  } = __ALEPH.pack[\"https://esm.sh/react\"]"));
-    assert!(code.contains("const React_ = __ALEPH.pack[\"https://esm.sh/react\"]"));
-    assert!(code.contains("const { default: Logo  } = __ALEPH.pack[\"/components/logo.tsx\"]"));
+    assert!(code.contains("const { /*#__PURE__*/ default: React , useState , useEffect: useEffect_  } = __ALEPH__.pack[\"https://esm.sh/react\"]"));
+    assert!(code.contains("const React_ = __ALEPH__.pack[\"https://esm.sh/react\"]"));
+    assert!(code.contains("const { default: Logo  } = __ALEPH__.pack[\"/components/logo.tsx\"]"));
     assert!(code.contains("import Nav from \"../components/nav.client.js\""));
-    assert!(!code.contains("__ALEPH.pack[\"/shared/iife.ts\"]"));
+    assert!(!code.contains("__ALEPH__.pack[\"/shared/iife.ts\"]"));
     assert!(code.contains("import   \"../shared/iife2.client.js\""));
     assert!(
-      code.contains("AsyncLogo = React.lazy(()=>__ALEPH.import(\"/components/async-logo.tsx\"")
+      code.contains("AsyncLogo = React.lazy(()=>__ALEPH__.import(\"/components/async-logo.tsx\"")
     );
     assert!(code.contains(
-      "const { default: __ALEPH_Head  } = __ALEPH.pack[\"https://deno.land/x/aleph/framework/react/components/Head.ts\"]"
+      "const { default: __ALEPH__Head  } = __ALEPH__.pack[\"https://deno.land/x/aleph/framework/react/components/Head.ts\"]"
     ));
     assert!(code.contains(
-      "import __ALEPH_StyleLink from \"../-/deno.land/x/aleph/framework/react/components/StyleLink.client.js\""
+      "import __ALEPH__StyleLink from \"../-/deno.land/x/aleph/framework/react/components/StyleLink.client.js\""
     ));
     assert!(code.contains("import   \"../-/esm.sh/tailwindcss/dist/tailwind.min.css.client.js\""));
     assert!(code.contains("import   \"../style/index.css.client.js\""));
-    assert!(code.contains("export const $$star_0 = __ALEPH.pack[\"https://esm.sh/react\"]"));
-    assert!(code.contains("export const ReactDom = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
-    assert!(code.contains("export const { render  } = __ALEPH.pack[\"https://esm.sh/react-dom\"]"));
+    assert!(code.contains("export const $$star_0 = __ALEPH__.pack[\"https://esm.sh/react\"]"));
+    assert!(code.contains("export const ReactDom = __ALEPH__.pack[\"https://esm.sh/react-dom\"]"));
+    assert!(
+      code.contains("export const { render  } = __ALEPH__.pack[\"https://esm.sh/react-dom\"]")
+    );
     assert!(!code.contains("export const ssrProps ="));
     assert!(!code.contains("export const ssgPaths ="));
     assert!(!code.contains("deno.land/std/path"));

@@ -76,7 +76,7 @@ export default function Router({
   }, [])
 
   useEffect(() => {
-    const isDev = !('__ALEPH' in window)
+    const isDev = !('__ALEPH__' in window)
     const { basePath } = routing
     const onAddModule = async (mod: { specifier: string, routePath?: string, isIndex?: boolean }) => {
       const name = trimBuiltinModuleExts(mod.specifier)

@@ -60,11 +60,11 @@ impl Fold for ResolveFold {
   //   - `export React, {useState} from "https://esm.sh/react"` -> `export React, {useState} from * from "/-/esm.sh/react.js"`
   //   - `export * from "https://esm.sh/react"` -> `export * from "/-/esm.sh/react.js"`
   // - bundle mode:
-  //   - `import React, { useState } from "https://esm.sh/react"` -> `const { default: React, useState } = __ALEPH.pack["https://esm.sh/react"];`
-  //   - `import * as React from "https://esm.sh/react"` -> `const React = __ALEPH.pack["https://esm.sh/react"]`
-  //   - `import Logo from "../components/logo.tsx"` -> `const { default: Logo } = __ALEPH.pack["/components/logo.tsx"]`
-  //   - `export React, {useState} from "https://esm.sh/react"` -> `export const { default: React, useState } = __ALEPH.pack["https://esm.sh/react"]`
-  //   - `export * from "https://esm.sh/react"` -> `export const $$star_N = __ALEPH.pack["https://esm.sh/react"]`
+  //   - `import React, { useState } from "https://esm.sh/react"` -> `const { default: React, useState } = __ALEPH__.pack["https://esm.sh/react"];`
+  //   - `import * as React from "https://esm.sh/react"` -> `const React = __ALEPH__.pack["https://esm.sh/react"]`
+  //   - `import Logo from "../components/logo.tsx"` -> `const { default: Logo } = __ALEPH__.pack["/components/logo.tsx"]`
+  //   - `export React, {useState} from "https://esm.sh/react"` -> `export const { default: React, useState } = __ALEPH__.pack["https://esm.sh/react"]`
+  //   - `export * from "https://esm.sh/react"` -> `export const $$star_N = __ALEPH__.pack["https://esm.sh/react"]`
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
     let aleph_pkg_uri = self.resolver.borrow().get_aleph_pkg_uri();
@@ -74,9 +74,9 @@ impl Fold for ResolveFold {
     for name in used_builtin_jsx_tags.clone() {
       let mut resolver = self.resolver.borrow_mut();
       let id_name = if name.eq("a") {
-        "__ALEPH_anchor".to_owned()
+        "__ALEPH__anchor".to_owned()
       } else {
-        "__ALEPH_".to_owned() + name.as_str()
+        "__ALEPH__".to_owned() + name.as_str()
       };
       let id = quote_ident!(id_name);
       let (resolved_path, fixed_url) = resolver.resolve(
@@ -173,7 +173,7 @@ impl Fold for ResolveFold {
                       decls: vec![create_aleph_pack_var_decl(fixed_url.as_ref(), name)],
                     })))
                   } else if names.len() > 0 {
-                    // const {default: React, useState} = __ALEPH.pack["https://esm.sh/react"];
+                    // const {default: React, useState} = __ALEPH__.pack["https://esm.sh/react"];
                     ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
                       span: DUMMY_SP,
                       kind: VarDeclKind::Const,
@@ -403,7 +403,7 @@ impl Fold for ResolveFold {
   // resolve dynamic import url & sign useDeno hook
   // - `import("https://esm.sh/rect")` -> `import("/-/esm.sh/react.js")`
   // - `import("../components/logo.tsx")` -> `import("../components/logo.js#/components/logo.tsx@000000")`
-  // - `import("../components/logo.tsx")` -> `__ALEPH.import("../components/logo.js#/components/logo.tsx@000000", "/pages/index.tsx")`
+  // - `import("../components/logo.tsx")` -> `__ALEPH__.import("../components/logo.js#/components/logo.tsx@000000", "/pages/index.tsx")`
   // - `useDeno(() => {})` -> `useDeno(() => {}, null, "{KEY}")`
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
@@ -420,7 +420,7 @@ impl Fold for ResolveFold {
       let mut resolver = self.resolver.borrow_mut();
       if resolver.bundle_mode {
         call.callee = ExprOrSuper::Expr(Box::new(Expr::MetaProp(MetaPropExpr {
-          meta: quote_ident!("__ALEPH"),
+          meta: quote_ident!("__ALEPH__"),
           prop: quote_ident!("import"),
         })))
       }
@@ -492,7 +492,7 @@ pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
 fn create_aleph_pack_member_expr(url: &str) -> MemberExpr {
   MemberExpr {
     span: DUMMY_SP,
-    obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH")))),
+    obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH__")))),
     prop: Box::new(Expr::Member(MemberExpr {
       span: DUMMY_SP,
       obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("pack")))),

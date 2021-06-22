@@ -3,19 +3,19 @@ import { trimBuiltinModuleExts, toPagePath, importModule } from './module.ts'
 
 // Augment the window object
 interface MockWindow extends Window {
-  __ALEPH: { import: (src: string, refetch?: boolean) => Promise<string> }
+  __ALEPH__: { import: (src: string, refetch?: boolean) => Promise<string> }
 }
 declare let window: MockWindow
 
 Deno.test('module importModule', async () => {
-  // mock  __ALEPH.import
+  // mock  __ALEPH__.import
   function foo(str: string, refetch: boolean = false) {
     if (refetch) {
       return Promise.resolve('refetching...')
     }
     return Promise.resolve(str)
   }
-  window.__ALEPH = {
+  window.__ALEPH__ = {
     import: foo
   }
 

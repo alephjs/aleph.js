@@ -6,8 +6,7 @@ import util from '../../shared/util.ts'
 runtime.injectIntoGlobalHook(window)
 Object.assign(window, {
   $RefreshReg$: () => { },
-  $RefreshSig$: () => (type: any) => type
+  $RefreshSig$: () => (type: any) => type,
+  __REACT_REFRESH_RUNTIME__: runtime,
+  __REACT_REFRESH__: util.debounce(runtime.performReactRefresh, 30)
 })
-
-export const performReactRefresh = util.debounce(runtime.performReactRefresh, 30)
-export const RefreshRuntime = runtime

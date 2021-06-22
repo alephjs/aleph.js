@@ -146,10 +146,10 @@ impl Resolver {
       let mut url = url;
       let mut root = Path::new("");
       if url.starts_with("./") {
-        url = url.trim_start_matches(".");
+        url = url.strip_prefix(".").unwrap();
         root = Path::new(".");
       } else if url.starts_with("../") {
-        url = url.trim_start_matches("..");
+        url = url.strip_prefix("..").unwrap();
         root = Path::new("..");
       }
       return RelativePath::new(url)
@@ -181,7 +181,7 @@ impl Resolver {
         let extname = extname.as_str();
         let mut file_name = "".to_owned();
         if s.ends_with(extname) {
-          file_name.push_str(s.trim_end_matches(extname));
+          file_name.push_str(s.strip_suffix(extname).unwrap());
         } else {
           file_name.push_str(s);
         }
@@ -266,7 +266,9 @@ impl Resolver {
         fixed_url = format!(
           "{}/{}",
           aleph_pkg_uri.as_str(),
-          fixed_url.trim_start_matches("https://deno.land/x/aleph/")
+          fixed_url
+            .strip_prefix("https://deno.land/x/aleph/")
+            .unwrap()
         );
       }
     }
@@ -278,7 +280,7 @@ impl Resolver {
         let mut host = caps.get(1).map_or("", |m| m.as_str());
         let build_version = caps
           .get(2)
-          .map_or("", |m| m.as_str().trim_start_matches("/v"));
+          .map_or("", |m| m.as_str().strip_prefix("/v").unwrap());
         let dom = caps.get(3).map_or("", |m| m.as_str());
         let ver = caps.get(4).map_or("", |m| m.as_str());
         let path = caps.get(5).map_or("", |m| m.as_str());
@@ -382,7 +384,8 @@ impl Resolver {
               .unwrap()
               .to_str()
               .unwrap()
-              .trim_end_matches(s)
+              .strip_suffix(s)
+              .unwrap()
               .to_owned();
             if self.bundle_mode && !is_dynamic {
               filename.push_str("client.");
@@ -722,6 +725,16 @@ mod tests {
       )
     );
     assert_eq!(
+      resolver.resolve(
+        "https://cdn.esm.sh/v1/pixi.js@6.0.2/es2020/pixi.js.js",
+        false
+      ),
+      (
+        "../../cdn.esm.sh/v1/pixi.js@6.0.2/es2020/pixi.js.js".into(),
+        "https://cdn.esm.sh/v1/pixi.js@6.0.2/es2020/pixi.js.js".into()
+      )
+    );
+    assert_eq!(
       resolver.resolve("../preact", false),
       ("../preact.js".into(), "https://esm.sh/preact".into())
     );
@@ -732,7 +745,7 @@ mod tests {
   }
 
   #[test]
-  fn resolve_simple_mode() {
+  fn resolve_ignore_remote_deps() {
     let mut imports: HashMap<String, String> = HashMap::new();
     imports.insert("@/".into(), "./".into());
     imports.insert("~/".into(), "./".into());

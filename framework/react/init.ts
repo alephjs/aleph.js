@@ -8,22 +8,21 @@ export async function init(app: ServerApplication) {
     await app.addModule(`${alephPkgUri}/framework/react/refresh.ts`)
     app.injectCode('compilation', '/main.js', (_: string, code: string) => ({
       code: [
-        `import { RefreshRuntime, performReactRefresh } from "./-/${alephPkgPath}/framework/react/refresh.js";`,
-        `Object.assign(window, { RefreshRuntime, performReactRefresh });`,
+        `import "./-/${alephPkgPath}/framework/react/refresh.js";`,
         code
       ].join('\n')
     }))
     app.injectCode('hmr', (specifier: string, code: string) => ({
       code: code.includes('$RefreshReg$(') ? [
-        'const prevRefreshReg = window.$RefreshReg$;',
-        'const prevRefreshSig = window.$RefreshSig$;',
-        `window.$RefreshReg$ = (type, id) => window.RefreshRuntime.register(type, ${JSON.stringify(specifier)} + "#" + id);`,
-        'window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;',
+        'const prevRefreshReg = $RefreshReg$;',
+        'const prevRefreshSig = $RefreshSig$;',
+        `window.$RefreshReg$ = (type, id) => __REACT_REFRESH_RUNTIME__.register(type, ${JSON.stringify(specifier)} + "#" + id);`,
+        'window.$RefreshSig$ = __REACT_REFRESH_RUNTIME__.createSignatureFunctionForTransform;',
         '',
         code,
         'window.$RefreshReg$ = prevRefreshReg;',
         'window.$RefreshSig$ = prevRefreshSig;',
-        'import.meta.hot.accept(window.performReactRefresh);'
+        'import.meta.hot.accept(__REACT_REFRESH__);'
       ].join('\n') : code
     }))
     // support ssr

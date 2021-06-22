@@ -65,13 +65,13 @@ impl AlephJsxFold {
           "head" => {
             let mut resolver = self.resolver.borrow_mut();
             resolver.used_builtin_jsx_tags.insert("Head".into());
-            el.name = JSXElementName::Ident(quote_ident!("__ALEPH_Head"));
+            el.name = JSXElementName::Ident(quote_ident!("__ALEPH__Head"));
           }
 
           "script" => {
             let mut resolver = self.resolver.borrow_mut();
             resolver.used_builtin_jsx_tags.insert("CustomScript".into());
-            el.name = JSXElementName::Ident(quote_ident!("__ALEPH_CustomScript"));
+            el.name = JSXElementName::Ident(quote_ident!("__ALEPH__CustomScript"));
           }
 
           "a" => {
@@ -99,7 +99,7 @@ impl AlephJsxFold {
 
             if should_replace {
               resolver.used_builtin_jsx_tags.insert("Anchor".into());
-              el.name = JSXElementName::Ident(quote_ident!("__ALEPH_Anchor"));
+              el.name = JSXElementName::Ident(quote_ident!("__ALEPH__Anchor"));
             }
           }
 
@@ -162,7 +162,7 @@ impl AlephJsxFold {
 
               if name.eq("link") {
                 resolver.used_builtin_jsx_tags.insert("StyleLink".into());
-                el.name = JSXElementName::Ident(quote_ident!("__ALEPH_StyleLink"));
+                el.name = JSXElementName::Ident(quote_ident!("__ALEPH__StyleLink"));
               }
             }
           }
@@ -209,7 +209,7 @@ impl AlephJsxFold {
 
             let mut resolver = self.resolver.borrow_mut();
             resolver.used_builtin_jsx_tags.insert("InlineStyle".into());
-            el.name = JSXElementName::Ident(quote_ident!("__ALEPH_InlineStyle"));
+            el.name = JSXElementName::Ident(quote_ident!("__ALEPH__InlineStyle"));
             inline_style = Some((type_prop_value, id.into()));
           }
 
@@ -373,22 +373,22 @@ mod tests {
     "#;
     let (code, resolver) = st("/pages/index.tsx", source, false);
     assert!(code.contains(
-      "import __ALEPH_Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.js\""
+      "import __ALEPH__Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.js\""
     ));
     assert!(code.contains(
-      "import __ALEPH_Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/Head.js\""
+      "import __ALEPH__Head from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/Head.js\""
     ));
     assert!(code.contains(
-      "import __ALEPH_StyleLink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.js\""
+      "import __ALEPH__StyleLink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.js\""
     ));
     assert!(code.contains(
-      "import __ALEPH_CustomScript from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/CustomScript.js\""
+      "import __ALEPH__CustomScript from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/CustomScript.js\""
     ));
     assert!(code.contains("React.createElement(\"a\","));
-    assert!(code.contains("React.createElement(__ALEPH_Anchor,"));
-    assert!(code.contains("React.createElement(__ALEPH_Head,"));
-    assert!(code.contains("React.createElement(__ALEPH_StyleLink,"));
-    assert!(code.contains("React.createElement(__ALEPH_CustomScript,"));
+    assert!(code.contains("React.createElement(__ALEPH__Anchor,"));
+    assert!(code.contains("React.createElement(__ALEPH__Head,"));
+    assert!(code.contains("React.createElement(__ALEPH__StyleLink,"));
+    assert!(code.contains("React.createElement(__ALEPH__CustomScript,"));
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
@@ -438,9 +438,9 @@ mod tests {
     "#;
     let (code, resolver) = st("/pages/index.tsx", source, false);
     assert!(code.contains(
-      "import __ALEPH_InlineStyle from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/InlineStyle.js\""
+      "import __ALEPH__InlineStyle from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/InlineStyle.js\""
     ));
-    assert!(code.contains("React.createElement(__ALEPH_InlineStyle,"));
+    assert!(code.contains("React.createElement(__ALEPH__InlineStyle,"));
     assert!(code.contains("__styleId: \"inline-style-"));
     let r = resolver.borrow_mut();
     assert!(r.inline_styles.len() == 2);

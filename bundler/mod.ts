@@ -11,7 +11,7 @@ import { clearBuildCache, computeHash, getAlephPkgUri } from '../server/helper.t
 import { esbuild, stopEsbuild, esbuildUrlLoader } from './esbuild.ts'
 
 export const bundlerRuntimeCode = `
-  window.__ALEPH = {
+  window.__ALEPH__ = {
     basePath: '/',
     pack: {},
     asyncChunks: {},
@@ -188,7 +188,7 @@ export class Bundler {
         r[name] = chunk.filename
         return r
       }, {} as Record<string, string>)
-    const mainJS = `__ALEPH.asyncChunks=${JSON.stringify(asyncChunks)};` + this.#app.createMainJS(true)
+    const mainJS = `__ALEPH__.asyncChunks=${JSON.stringify(asyncChunks)};` + this.#app.createMainJS(true)
     const hash = computeHash(mainJS)
     const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
     const bundleFilePath = join(this.#app.buildDir, bundleFilename)
@@ -220,13 +220,13 @@ export class Bundler {
         if (external.length === 0) {
           return [
             `import * as mod_${i} from ${JSON.stringify('file://' + join(buildDir, mod.jsFile))}`,
-            `__ALEPH.pack[${JSON.stringify(specifier)}] = mod_${i}`
+            `__ALEPH__.pack[${JSON.stringify(specifier)}] = mod_${i}`
           ]
         } else {
           const jsFile = await this.compile(mod, external)
           return [
             `import * as mod_${i} from ${JSON.stringify('file://' + jsFile)}`,
-            `__ALEPH.pack[${JSON.stringify(specifier)}] = mod_${i}`
+            `__ALEPH__.pack[${JSON.stringify(specifier)}] = mod_${i}`
           ]
         }
       }

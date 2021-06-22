@@ -702,15 +702,14 @@ export class Application implements ServerApplication {
 
     if (bundleMode) {
       return [
-        `__ALEPH.basePath = ${JSON.stringify(basePath)};`,
-        `__ALEPH.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default(${JSON.stringify(config)});`
+        `__ALEPH__.basePath = ${JSON.stringify(basePath)};`,
+        `__ALEPH__.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default(${JSON.stringify(config)});`
       ].join('')
     }
 
     let code = [
       `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js";`,
-      this.isDev && `import { createHotContext, connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
-      this.isDev && `window.$createHotContext = createHotContext;`,
+      this.isDev && `import { connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
       this.isDev && `connect(${JSON.stringify(basePath)});`,
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
     ].filter(Boolean).join('\n')
@@ -1082,23 +1081,6 @@ export class Application implements ServerApplication {
       this.#appModule = mod
     }
 
-    if (isRemote && !this.#reloading) {
-      if (!await existsFile(metaFp) || !await existsFile(cacheFp)) {
-        const globalCacheFp = join(await getDenoDir(), `gen/aleph-${wasmChecksum}`, jsFile)
-        const globalMetaFp = `${globalCacheFp.slice(0, -3)}.meta.json`
-        if (await existsFile(globalCacheFp) && await existsFile(globalMetaFp)) {
-          await ensureDir(dirname(cacheFp))
-          await Promise.all([
-            Deno.copyFile(globalCacheFp, cacheFp),
-            Deno.copyFile(globalMetaFp, metaFp)
-          ])
-          if (await existsFile(`${globalCacheFp}.map`)) {
-            await Deno.copyFile(`${globalCacheFp}.map`, `${cacheFp}.map`)
-          }
-        }
-      }
-    }
-
     if (await existsFile(metaFp)) {
       try {
         const { specifier: _specifier, sourceHash, deps, isStyle, ssrPropsFn, ssgPathsFn, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
@@ -1173,6 +1155,7 @@ export class Application implements ServerApplication {
       })
 
       let jsCode = code
+      let sourceMap = map
 
       // in production(bundle) mode we need to replace the star export with names
       if (!this.isDev && starExports && starExports.length > 0) {
@@ -1210,8 +1193,16 @@ export class Application implements ServerApplication {
         })
       }
 
+      this.getCodeInjects('compilation', specifier).forEach(transform => {
+        const { code, map } = transform(specifier, jsCode, sourceMap)
+        jsCode = code
+        if (sourceMap && map) {
+          sourceMap = map
+        }
+      })
+
       // add source mapping url
-      if (map) {
+      if (sourceMap) {
         jsCode += `\n//# sourceMappingURL=${basename(jsFile)}.map`
       }
 
@@ -1257,19 +1248,8 @@ export class Application implements ServerApplication {
       await Promise.all([
         Deno.writeFile(cacheFp, module.jsBuffer),
         Deno.writeTextFile(metaFp, metaJSON),
-        map ? Deno.writeTextFile(`${cacheFp}.map`, map) : Promise.resolve(),
+        sourceMap ? Deno.writeTextFile(`${cacheFp}.map`, sourceMap) : Promise.resolve(),
       ])
-      // cache remote module compilation forever
-      if (util.isLikelyHttpURL(specifier) && !isLocalUrl(specifier)) {
-        const globalCacheFp = join(await getDenoDir(), `gen/aleph-${wasmChecksum}`, jsFile)
-        const globalMetaFp = `${globalCacheFp.slice(0, -3)}.meta.json`
-        await ensureDir(dirname(globalCacheFp))
-        await Promise.all([
-          Deno.writeFile(globalCacheFp, module.jsBuffer),
-          Deno.writeTextFile(globalMetaFp, metaJSON),
-          map ? Deno.writeTextFile(`${globalCacheFp}.map`, map) : Promise.resolve(),
-        ])
-      }
     }
 
     if (ignoreDeps) {

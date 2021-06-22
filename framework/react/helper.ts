@@ -22,7 +22,7 @@ export function isLikelyReactComponent(type: any, strict = true): Boolean {
         // don't check component name
         return true
       }
-      const { __ALEPH: ALEPH } = window as any
+      const { __ALEPH__: ALEPH } = window as any
       if (ALEPH) {
         // in bundle mode, the component names have been compressed.
         return true

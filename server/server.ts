@@ -143,7 +143,7 @@ export class Server {
                   code = ret.code
                 })
                 code = [
-                  `import.meta.hot = window.$createHotContext(${JSON.stringify(specifier)});`,
+                  `import.meta.hot = $createHotContext(${JSON.stringify(specifier)});`,
                   '',
                   code,
                   '',
