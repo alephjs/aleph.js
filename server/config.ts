@@ -142,8 +142,24 @@ export async function loadConfig(specifier: string): Promise<Config> {
   return config
 }
 
+export function getDefaultImportMap(): ImportMap {
+  const alephPkgUri = getAlephPkgUri()
+  return {
+    imports: {
+      'aleph/': `${alephPkgUri}/`,
+      'aleph/types': `${alephPkgUri}/types.ts`,
+      'framework': `${alephPkgUri}/framework/core/mod.ts`,
+      'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
+      'react': `https://esm.sh/react@${defaultReactVersion}`,
+      'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`
+    },
+    scopes: {}
+  }
+}
+
 /** load and upgrade the import maps from `import_map.json` */
 export async function loadImportMap(importMapFile: string): Promise<ImportMap> {
+  const defaultImportMap = getDefaultImportMap()
   const importMap: ImportMap = { imports: {}, scopes: {} }
 
   try {
@@ -163,6 +179,13 @@ export async function loadImportMap(importMapFile: string): Promise<ImportMap> {
     }
   }
 
+  // in aleph dev mode, replace default imports
+  if (Deno.env.get('ALEPH_DEV') !== undefined) {
+    Object.assign(importMap.imports, defaultImportMap.imports)
+  } else {
+    importMap.imports = Object.assign({}, defaultImportMap.imports, importMap.imports)
+  }
+
   return importMap
 }
 
@@ -171,19 +194,9 @@ export async function loadImportMap(importMapFile: string): Promise<ImportMap> {
  * - set default `srcDir` to '/src' if it exists
  * - fix import map when the `srcDir` does not equal '/'
  * - respect react version in import map
+ * - add builtin css loader plugin
  */
 export async function fixConfigAndImportMap(workingDir: string, config: RequiredConfig, importMap: ImportMap) {
-  const alephPkgUri = getAlephPkgUri()
-  const defaultImports: Record<string, string> = {
-    'aleph': `${alephPkgUri}/mod.ts`,
-    'aleph/': `${alephPkgUri}/`,
-    'aleph/types': `${alephPkgUri}/types.ts`,
-    'framework': `${alephPkgUri}/framework/core/mod.ts`,
-    'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
-    'react': `https://esm.sh/react@${defaultReactVersion}`,
-    'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`
-  }
-
   // set default src directory
   if (
     config.srcDir === '/' &&
@@ -193,26 +206,21 @@ export async function fixConfigAndImportMap(workingDir: string, config: Required
     config.srcDir = '/src'
   }
 
-  // add builtin css loader plugin
-  config.plugins = [builtinCSSLoader, ...config.plugins]
-
-  // in aleph dev mode, use default imports instead of app settings
-  if (Deno.env.get('ALEPH_DEV') !== undefined) {
-    Object.assign(importMap.imports, defaultImports)
-  } else {
-    importMap.imports = Object.assign(defaultImports, importMap.imports)
-  }
-
-  // react verison should respect the import maps
   Object.keys(importMap.imports).forEach(key => {
     const url = importMap.imports[key]
+    // strip `srcDir` prefix
     if (config.srcDir !== '/' && url.startsWith('.' + config.srcDir)) {
       importMap.imports[key] = '.' + util.trimPrefix(url, '.' + config.srcDir)
     }
+    // react verison should respect the import maps
     if (/react@\d+\.\d+\.\d+(-[a-z0-9\.]+)?$/.test(url)) {
       config.react.version = url.split('@').pop()!
     }
   })
+
+  // add builtin css loader plugin
+  config.plugins = [builtinCSSLoader, ...config.plugins]
+
 }
 
 /** checks whether the loader is builtin css loader */

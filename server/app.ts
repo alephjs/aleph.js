@@ -19,8 +19,8 @@ import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import type { RequiredConfig } from './config.ts'
 import {
-  defaultConfig, fixConfigAndImportMap, isBuiltinCSSLoader,
-  loadConfig, loadImportMap
+  defaultConfig, fixConfigAndImportMap, getDefaultImportMap,
+  isBuiltinCSSLoader, loadConfig, loadImportMap
 } from './config.ts'
 import {
   checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile,
@@ -81,8 +81,8 @@ export class Application implements ServerApplication {
 
   #modules: Map<string, Module> = new Map()
   #appModule: Module | null = null
-  #pageRouting: Routing = new Routing({})
-  #apiRouting: Routing = new Routing({})
+  #pageRouting: Routing = new Routing()
+  #apiRouting: Routing = new Routing()
   #fsWatchListeners: Array<EventEmitter> = []
   #analyzer: Analyzer = new Analyzer(this)
   #bundler: Bundler = new Bundler(this)
@@ -109,24 +109,26 @@ export class Application implements ServerApplication {
   /** initiate application */
   private async init(reload: boolean) {
     const ms = new Measure()
-    const importMapFile = await findFile(this.workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`))
-    const appFile = await findFile(this.workingDir, builtinModuleExts.map(ext => `app.${ext}`))
 
-    let configFile = await findFile(this.workingDir, ['ts', 'js', 'json'].map(ext => `aleph.config.${ext}`))
-    if (configFile && !configFile.endsWith('.json')) {
-      const mod = await this.compile(`/${basename(configFile)}`, { externalRemoteDeps: true })
-      configFile = join(this.buildDir, mod.jsFile)
+    let [importMapFile, configFile] = await Promise.all([
+      await findFile(this.workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`)),
+      await findFile(this.workingDir, ['ts', 'js', 'mjs', 'json'].map(ext => `aleph.config.${ext}`))
+    ])
+    if (importMapFile) {
+      Object.assign(this.importMap, await loadImportMap(importMapFile))
+    } else {
+      Object.assign(this.importMap, getDefaultImportMap())
+    }
+    if (configFile) {
+      if (!configFile.endsWith('.json')) {
+        const mod = await this.compile(`/${basename(configFile)}`, { externalRemoteDeps: true })
+        configFile = join(this.buildDir, mod.jsFile)
+      }
+      Object.assign(this.config, await loadConfig(configFile))
+      this.#pageRouting = new Routing(this.config)
     }
 
-    const [config, importMap] = await Promise.all([
-      configFile ? loadConfig(configFile) : Promise.resolve({}),
-      importMapFile ? loadImportMap(importMapFile) : Promise.resolve({}),
-    ])
-    Object.assign(this.config, config)
-    Object.assign(this.importMap, importMap)
     await fixConfigAndImportMap(this.workingDir, this.config, this.importMap)
-    this.#pageRouting.config(this.config)
-
     ms.stop('load config')
 
     // load .env files
@@ -141,15 +143,17 @@ export class Application implements ServerApplication {
       })
       log.info('load env from', basename(p))
     }
+    Deno.env.set('ALEPH_ENV', this.mode)
     Deno.env.set('ALEPH_FRAMEWORK', this.config.framework)
-    Deno.env.set('ALEPH_BUILD_MODE', this.mode)
+    Deno.env.set('ALEPH_VERSION', VERSION)
 
     const alephPkgUri = getAlephPkgUri()
     const srcDir = join(this.workingDir, this.config.srcDir)
     const apiDir = join(srcDir, 'api')
     const pagesDir = join(srcDir, 'pages')
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
-    const plugins = computeHash(JSON.stringify({
+    const configHash = computeHash(JSON.stringify({
+      importMap: this.importMap,
       plugins: this.config.plugins.map(({ name }) => name),
       css: {
         modules: this.config.css.modules,
@@ -178,7 +182,7 @@ export class Application implements ServerApplication {
           typeof v !== 'object' ||
           v === null ||
           v.compiler !== wasmChecksum ||
-          v.plugins !== plugins
+          v.configHash !== configHash
         )
       } catch (e) { }
     }
@@ -197,7 +201,7 @@ export class Application implements ServerApplication {
         aleph: VERSION,
         deno: Deno.version.deno,
         compiler: wasmChecksum,
-        plugins,
+        configHash,
       }, undefined, 2))
     }
 
@@ -229,6 +233,7 @@ export class Application implements ServerApplication {
 
     ms.stop('apply plugins')
 
+    const appFile = await findFile(this.workingDir, builtinModuleExts.map(ext => `app.${ext}`))
     const modules: string[] = []
     const moduleWalkOptions = {
       includeDirs: false,
