@@ -109,7 +109,7 @@ export class Server {
           if (!module && app.isDev) {
             for (const ext of [...builtinModuleExts.map(ext => `.${ext}`), '']) {
               const sepcifier = util.trimSuffix(relPath, '.js') + ext
-              if (existsFile(join(app.workingDir, sepcifier))) {
+              if (await existsFile(join(app.workingDir, sepcifier))) {
                 module = await app.compile(sepcifier)
                 break
               }
