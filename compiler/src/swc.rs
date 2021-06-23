@@ -761,9 +761,9 @@ mod tests {
     assert!(code.contains("const { /*#__PURE__*/ default: React , useState , useEffect: useEffect_  } = __ALEPH__.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("const React_ = __ALEPH__.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("const { default: Logo  } = __ALEPH__.pack[\"/components/logo.tsx\"]"));
-    assert!(code.contains("import Nav from \"../components/nav.client.js\""));
+    assert!(code.contains("import Nav from \"../components/nav.bundling.js\""));
     assert!(!code.contains("__ALEPH__.pack[\"/shared/iife.ts\"]"));
-    assert!(code.contains("import   \"../shared/iife2.client.js\""));
+    assert!(code.contains("import   \"../shared/iife2.bundling.js\""));
     assert!(
       code.contains("AsyncLogo = React.lazy(()=>__ALEPH__.import(\"/components/async-logo.tsx\"")
     );
@@ -771,10 +771,10 @@ mod tests {
       "const { default: __ALEPH__Head  } = __ALEPH__.pack[\"https://deno.land/x/aleph/framework/react/components/Head.ts\"]"
     ));
     assert!(code.contains(
-      "import __ALEPH__StyleLink from \"../-/deno.land/x/aleph/framework/react/components/StyleLink.client.js\""
+      "import __ALEPH__StyleLink from \"../-/deno.land/x/aleph/framework/react/components/StyleLink.bundling.js\""
     ));
-    assert!(code.contains("import   \"../-/esm.sh/tailwindcss/dist/tailwind.min.css.client.js\""));
-    assert!(code.contains("import   \"../style/index.css.client.js\""));
+    assert!(code.contains("import   \"../-/esm.sh/tailwindcss/dist/tailwind.min.css.bundling.js\""));
+    assert!(code.contains("import   \"../style/index.css.bundling.js\""));
     assert!(code.contains("export const $$star_0 = __ALEPH__.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("export const ReactDom = __ALEPH__.pack[\"https://esm.sh/react-dom\"]"));
     assert!(

@@ -388,7 +388,7 @@ impl Resolver {
               .unwrap()
               .to_owned();
             if self.bundle_mode && !is_dynamic {
-              filename.push_str("client.");
+              filename.push_str("bundling.");
             }
             filename.push_str("js");
             if !(self.bundle_mode && !is_dynamic) && !is_remote && !self.specifier_is_remote {
@@ -408,7 +408,7 @@ impl Resolver {
               .unwrap()
               .to_owned();
             if self.bundle_mode && !is_dynamic {
-              filename.push_str(".client");
+              filename.push_str(".bundling");
             }
             filename.push_str(".js");
             if !(self.bundle_mode && !is_dynamic) && !is_remote && !self.specifier_is_remote {

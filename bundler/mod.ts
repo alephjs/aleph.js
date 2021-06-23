@@ -127,7 +127,7 @@ export class Bundler {
       return this.#compiled.get(mod.specifier)!
     }
 
-    const jsFile = join(this.#app.buildDir, mod.jsFile.slice(0, -3) + '.client.js')
+    const jsFile = join(this.#app.buildDir, mod.jsFile.slice(0, -3) + '.bundling.js')
     this.#compiled.set(mod.specifier, jsFile)
 
     if (await existsFile(jsFile)) {

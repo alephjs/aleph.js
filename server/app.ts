@@ -1359,7 +1359,7 @@ export class Application implements ServerApplication {
           denoHooks: module.denoHooks,
           deps: module.deps,
         }, undefined, 2)),
-        lazyRemove(cacheFp.slice(0, -3) + '.client.js'),
+        lazyRemove(cacheFp.slice(0, -3) + '.bundling.js'),
       ])
     }
   }

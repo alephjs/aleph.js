@@ -2,7 +2,7 @@
 
 import util from '../../shared/util.ts'
 
-const clientStyles = new Map<string, { css?: string, href?: string }>()
+const styleMap = new Map<string, { css?: string, href?: string }>()
 const inDeno = typeof Deno !== 'undefined' && typeof Deno.version?.deno === 'string'
 
 export function removeCSS(url: string, recoverable?: boolean) {
@@ -12,11 +12,11 @@ export function removeCSS(url: string, recoverable?: boolean) {
       if (recoverable) {
         const tag = el.tagName.toLowerCase()
         if (tag === 'style') {
-          clientStyles.set(url, { css: el.innerHTML })
+          styleMap.set(url, { css: el.innerHTML })
         } else if (tag === 'link') {
           const href = el.getAttribute('href')
           if (href) {
-            clientStyles.set(url, { href })
+            styleMap.set(url, { href })
           }
         }
       }
@@ -26,8 +26,8 @@ export function removeCSS(url: string, recoverable?: boolean) {
 }
 
 export function recoverCSS(url: string) {
-  if (clientStyles.has(url)) {
-    applyCSS(url, clientStyles.get(url)!)
+  if (styleMap.has(url)) {
+    applyCSS(url, styleMap.get(url)!)
   }
 }
 
