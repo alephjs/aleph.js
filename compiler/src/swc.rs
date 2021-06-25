@@ -117,7 +117,13 @@ impl SWC {
   pub fn strip_ssr_code(self, source_map: bool) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
       self.apply_fold(
-        chain!(strip_ssr_fold(self.specifier.as_str()), strip()),
+        chain!(
+          strip_ssr_fold(self.specifier.as_str()),
+          strip::strip_with_config(strip::Config {
+            use_define_for_class_fields: true,
+            ..Default::default()
+          })
+        ),
         source_map,
       )
     })
@@ -182,7 +188,10 @@ impl SWC {
           emit_metadata: false
         }),
         helpers::inject_helpers(),
-        strip(),
+        strip::strip_with_config(strip::Config {
+          use_define_for_class_fields: true,
+          ..Default::default()
+        }),
         fixer(Some(&self.comments)),
         hygiene()
       );
