@@ -1,6 +1,7 @@
-import { extname } from 'https://deno.land/std@0.99.0/path/mod.ts'
+import { extname, join } from 'https://deno.land/std@0.99.0/path/mod.ts'
 import { esbuild } from '../bundler/esbuild.ts'
 import { toLocalPath, computeHash } from '../server/helper.ts'
+import { existsFile } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { Measure } from '../shared/log.ts'
 import type { LoaderPlugin, PostCSSPlugin } from '../types.ts'
@@ -23,6 +24,18 @@ export default (): LoaderPlugin => {
       const isRemote = util.isLikelyHttpURL(specifier)
 
       if (isRemote && specifier.endsWith('.css') && !cssConfig.cache) {
+        return {
+          code: [
+            `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
+            `export const href = ${JSON.stringify(specifier)}`,
+            `export default {}`,
+            `applyCSS(${JSON.stringify(specifier)}, { href })`,
+          ].join('\n')
+        }
+      }
+
+      // Don't process .css files in ./public folder
+      if (!isRemote && specifier.endsWith('.css') && await existsFile(join(app.workingDir, 'public', specifier))) {
         return {
           code: [
             `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
