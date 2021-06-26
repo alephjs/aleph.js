@@ -441,7 +441,6 @@ impl Resolver {
       resolved: resolved_path.clone(),
       is_dynamic,
     });
-    println!("deps.push: {}", fixed_url.clone());
     (resolved_path, fixed_url)
   }
 }

@@ -643,12 +643,13 @@ mod tests {
       import React from 'https://esm.sh/react'
       import { get } from '../libs/db.ts'
 
-      export const ssrProps = async () => ({
-        filename: basename(import.meta.url),
-        data: get('foo')
-      })
-
-      export const ssgPaths = async () => ([join('/', 'foo')])
+      export const ssr = {
+        props: async () => ({
+          filename: basename(import.meta.url),
+          data: get('foo')
+        }),
+        "paths": async () => ([join('/', 'foo')])
+      }
 
       export default function Index() {
         const { title } = useDeno(async () => {
@@ -684,15 +685,15 @@ mod tests {
     assert!(code
       .contains("import { join, basename, dirname } from \"https://deno.land/std/path/mod.ts\""));
     assert!(code.contains("import { get } from \"/test/libs/db.ts\""));
-    assert!(code.contains("export const ssrProps ="));
+    assert!(code.contains("export const ssr ="));
     assert_eq!(resolver.borrow().deno_hooks.len(), 1);
     assert_eq!(resolver.borrow().deps.len(), 2);
 
     let mut hasher = Sha1::new();
-    let callback_code = r#"ssrProps = async () => ({
-        filename: basename(import.meta.url),
-        data: get('foo')
-      })"#;
+    let callback_code = r#"async () => ({
+          filename: basename(import.meta.url),
+          data: get('foo')
+        })"#;
     hasher.update(callback_code.clone());
     assert_eq!(
       resolver.borrow().ssr_props_fn,
@@ -719,10 +720,12 @@ mod tests {
 
       const AsyncLogo = React.lazy(() => import('../components/async-logo.tsx'))
 
-      export const ssrProps = async () => ({
-        filename: basename(import.meta.url)
-      })
-      export const ssgPaths = async () => ([join('/', 'foo')])
+      export const ssr = {
+        props: async () => ({
+          filename: basename(import.meta.url)
+        }),
+        paths: async () => ([join('/', 'foo')])
+      }
 
       export default function Index() {
         const { title } = useDeno(async () => {
@@ -789,8 +792,7 @@ mod tests {
     assert!(
       code.contains("export const { render  } = __ALEPH__.pack[\"https://esm.sh/react-dom\"]")
     );
-    assert!(!code.contains("export const ssrProps ="));
-    assert!(!code.contains("export const ssgPaths ="));
+    assert!(!code.contains("export const ssr ="));
     assert!(!code.contains("deno.land/std/path"));
   }
 }

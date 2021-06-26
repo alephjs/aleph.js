@@ -317,22 +317,47 @@ impl Fold for ResolveFold {
               let specifier = resolver.specifier.clone();
               let decl = var.decls.clone().into_iter().find(|decl| {
                 if let Pat::Ident(ref binding) = decl.name {
-                  specifier.starts_with("/pages/")
-                    && (binding.id.sym.eq("ssrProps") || binding.id.sym.eq("ssgPaths"))
+                  !decl.definite
+                    && decl.init.is_some()
+                    && specifier.starts_with("/pages/")
+                    && binding.id.sym.eq("ssr")
                 } else {
                   false
                 }
               });
               if let Some(d) = decl {
-                if let Pat::Ident(ref binding) = d.name {
-                  if binding.id.sym.eq("ssgPaths") {
-                    resolver.ssg_paths_fn = Some(true);
-                  } else if binding.id.sym.eq("ssrProps") {
-                    let mut hasher = Sha1::new();
-                    let fn_code = self.source.span_to_snippet(d.span.clone()).unwrap();
-                    hasher.update(fn_code.clone());
-                    let fn_hash = base64::encode(hasher.finalize());
-                    resolver.ssr_props_fn = Some(fn_hash);
+                if let Expr::Object(ObjectLit { props, .. }) = d.init.unwrap().as_ref() {
+                  for prop in props {
+                    if let PropOrSpread::Prop(prop) = prop {
+                      if let Prop::KeyValue(KeyValueProp { key, value, .. }) = prop.as_ref() {
+                        let value_span = match value.as_ref() {
+                          Expr::Arrow(arrow) => Some(arrow.span),
+                          Expr::Fn(expr) => Some(expr.function.span),
+                          _ => None,
+                        };
+                        let key = match key {
+                          PropName::Ident(i) => Some(i.sym.clone()),
+                          PropName::Str(s) => Some(s.value.clone()),
+                          _ => None,
+                        };
+                        if value_span.is_some() {
+                          if let Some(key) = key {
+                            if key.eq("props") {
+                              let mut hasher = Sha1::new();
+                              let fn_code = self
+                                .source
+                                .span_to_snippet(value_span.unwrap().clone())
+                                .unwrap();
+                              hasher.update(fn_code.clone());
+                              let fn_hash = base64::encode(hasher.finalize());
+                              resolver.ssr_props_fn = Some(fn_hash);
+                            } else if key.eq("paths") {
+                              resolver.ssg_paths_fn = Some(true);
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }

@@ -34,8 +34,7 @@ impl Fold for StripSSRFold {
                 .into_iter()
                 .filter(|decl| {
                   if let Pat::Ident(ref binding) = decl.name {
-                    !(self.specifier.starts_with("/pages/")
-                      && (binding.id.sym.eq("ssrProps") || binding.id.sym.eq("ssgPaths")))
+                    !(self.specifier.starts_with("/pages/") && binding.id.sym.eq("ssr"))
                   } else {
                     true
                   }
