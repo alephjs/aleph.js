@@ -160,11 +160,11 @@ export class Application implements ServerApplication {
         postcssPlugins: this.config.css.postcss?.plugins.map(p => {
           if (util.isString(p)) {
             return p
-          } else if (util.isArray(p)) {
-            return p[0]
-          } else {
-            return 'Plugin'
           }
+          if (util.isArray(p)) {
+            return p[0]
+          }
+          return 'Plugin'
         })
       },
       react: this.config.react,
