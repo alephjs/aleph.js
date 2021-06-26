@@ -59,7 +59,10 @@ export function dynamic<T extends ComponentType<any>>(
         } else {
           setErr(new Error('Missing the component exported as default'))
         }
-      }).catch(setErr)
+      }).catch(err => {
+        setErr(err)
+        console.error(err.stack)
+      })
     }, [])
 
     if (err !== null) {
