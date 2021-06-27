@@ -213,7 +213,7 @@ export async function fixConfigAndImportMap(workingDir: string, config: Required
       importMap.imports[key] = '.' + util.trimPrefix(url, '.' + config.srcDir)
     }
     // react verison should respect the import maps
-    if (/react@\d+\.\d+\.\d+(-[a-z0-9\.]+)?$/.test(url)) {
+    if (/\/\/esm\.sh\/react@\d+\.\d+\.\d+(-[a-z0-9\.]+)?$/.test(url)) {
       config.react.version = url.split('@').pop()!
     }
   })
