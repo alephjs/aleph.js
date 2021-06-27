@@ -107,7 +107,7 @@ export class Renderer {
         const { default: Component, ssr } = await this.#app.importModule(module)
         let ssrProps = ssr?.props
         if (util.isFunction(ssrProps)) {
-          ssrProps = ssrProps()
+          ssrProps = ssrProps(url)
           if (ssrProps instanceof Promise) {
             ssrProps = await ssrProps
           }
