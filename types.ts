@@ -164,8 +164,8 @@ export type GloablSSROptions = {
  * Page **SSR** options.
  */
 export type SSROptions = {
-  props?: (router: RouterURL) => (Record<string, any> | Promise<Record<string, any>>) | Record<string, any>
-  paths?: () => (string[] | Promise<string[]>) | string[]
+  props?(router: RouterURL): ({ props: Record<string, any>, expires?: number } | Promise<{ props: Record<string, any>, expires?: number }>)
+  paths?(): (string[] | Promise<string[]>)
 }
 
 /**

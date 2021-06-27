@@ -19,7 +19,7 @@ export type RendererStore = {
 export async function render(
   url: RouterURL,
   App: ComponentType<any> | undefined,
-  nestedPageComponents: { specifier: string, Component?: any }[],
+  nestedPageComponents: { specifier: string, Component?: any, props?: Record<string, any> }[],
   styles: Record<string, { css?: string, href?: string }>
 ): Promise<FrameworkRenderResult> {
   const global = globalThis as any
@@ -43,6 +43,21 @@ export async function render(
     delete global['rendering-' + dataUrl]
     events.removeAllListeners('useDeno-' + dataUrl)
   }
+
+  nestedPageComponents.forEach(({ specifier, props }) => {
+    if (util.isPlainObject(props)) {
+      let expires = 0
+      if (typeof props.$expires === 'number' && props.$expires > 0) {
+        expires = props.$expires
+      } else if (typeof props.$ttl === 'number' && props.$ttl > 0) {
+        expires = Date.now() + Math.round(props.$ttl * 1000)
+      }
+      data[`props-${btoa(specifier)}`] = {
+        value: props,
+        expires
+      }
+    }
+  })
 
   // share rendering data
   global['rendering-' + dataUrl] = renderingData

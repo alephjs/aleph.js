@@ -6,8 +6,8 @@ import type { RouterURL } from '../types.ts'
 import type { Application, Module } from './app.ts'
 
 export type SSRData = {
-  expires: number
   value: any
+  expires: number
 }
 
 export type SSROutput = {
@@ -28,7 +28,7 @@ export type FrameworkRenderer = {
   render(
     url: RouterURL,
     AppComponent: any,
-    nestedPageComponents: { specifier: string, Component?: any }[],
+    nestedPageComponents: { specifier: string, Component?: any, props?: Record<string, any> }[],
     styles: Record<string, { css?: string, href?: string }>
   ): Promise<FrameworkRenderResult>
 }
@@ -104,11 +104,19 @@ export class Renderer {
       .filter(specifier => this.#app.getModule(specifier) !== null)
       .map(async specifier => {
         const module = this.#app.getModule(specifier)!
-        const { default: Component } = await this.#app.importModule(module)
+        const { default: Component, ssr } = await this.#app.importModule(module)
+        let ssrProps = ssr?.props
+        if (util.isFunction(ssrProps)) {
+          ssrProps = ssrProps()
+          if (ssrProps instanceof Promise) {
+            ssrProps = await ssrProps
+          }
+        }
         state.entryFile = dirname(specifier) + '/' + basename(module.jsFile)
         return {
           specifier,
-          Component
+          Component,
+          props: util.isPlainObject(ssrProps) ? ssrProps : undefined
         }
       })
     )

@@ -20,7 +20,7 @@ export async function loadPageData(url: RouterURL): Promise<void> {
   const dataUrl = `${basePath}/_aleph/data/${util.btoaUrl(href)}.json`
   const data = await fetch(dataUrl).then(resp => resp.json())
   if (util.isPlainObject(data)) {
-    storeData(data, href)
+    storeData(href, data)
   }
 }
 
@@ -31,14 +31,14 @@ export function loadSSRDataFromTag(url: RouterURL) {
     try {
       const ssrData = JSON.parse(ssrDataEl.innerText)
       if (util.isPlainObject(ssrData)) {
-        storeData(ssrData, href)
+        storeData(href, ssrData)
         return
       }
     } catch (e) { }
   }
 }
 
-function storeData(data: any, href: string) {
+function storeData(href: string, data: any) {
   let expires = 0
   for (const key in data) {
     const { expires: _expires } = data[key]
