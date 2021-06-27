@@ -330,19 +330,27 @@ impl Fold for ResolveFold {
                   for prop in props {
                     if let PropOrSpread::Prop(prop) = prop {
                       if let Prop::KeyValue(KeyValueProp { key, value, .. }) = prop.as_ref() {
+                        let key = match key {
+                          PropName::Ident(i) => Some(i.sym.as_ref()),
+                          PropName::Str(s) => Some(s.value.as_ref()),
+                          _ => None,
+                        };
                         let value_span = match value.as_ref() {
                           Expr::Arrow(arrow) => Some(arrow.span),
                           Expr::Fn(expr) => Some(expr.function.span),
-                          _ => None,
-                        };
-                        let key = match key {
-                          PropName::Ident(i) => Some(i.sym.clone()),
-                          PropName::Str(s) => Some(s.value.clone()),
+                          Expr::Object(object) => match key {
+                            Some("props") => Some(object.span),
+                            _ => None,
+                          },
+                          Expr::Array(array) => match key {
+                            Some("paths") => Some(array.span),
+                            _ => None,
+                          },
                           _ => None,
                         };
                         if value_span.is_some() {
-                          if let Some(key) = key {
-                            if key.eq("props") {
+                          match key {
+                            Some("props") => {
                               let mut hasher = Sha1::new();
                               let fn_code = self
                                 .source
@@ -351,9 +359,11 @@ impl Fold for ResolveFold {
                               hasher.update(fn_code.clone());
                               let fn_hash = base64::encode(hasher.finalize());
                               resolver.ssr_props_fn = Some(fn_hash);
-                            } else if key.eq("paths") {
+                            }
+                            Some("paths") => {
                               resolver.ssg_paths_fn = Some(true);
                             }
+                            _ => {}
                           }
                         }
                       }
