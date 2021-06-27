@@ -24,7 +24,7 @@ export type Config = {
   /** `locales` specifies the available locales. */
   locales?: string[]
   /** `ssr` specifies the options for **SSR**. */
-  ssr?: boolean | SSROptions
+  ssr?: boolean | GloablSSROptions
   /** `plugins` specifies some plugins for the appliaction. */
   plugins?: (LoaderPlugin | ServerPlugin)[]
   /** `css` specifies the css processing options. */
@@ -151,13 +151,21 @@ export type CSSModulesOptions = {
 }
 
 /**
- * The options for **SSR**.
+ * Global **SSR** options.
  */
-export type SSROptions = {
+export type GloablSSROptions = {
   /** A list of RegExp for paths to use **SSR**. */
   include?: RegExp[]
   /** A list of RegExp for paths to skip **SSR**. */
   exclude?: RegExp[]
+}
+
+/**
+ * Page **SSR** options.
+ */
+export type SSROptions = {
+  props?: (router: RouterURL) => (Record<string, any> | Promise<Record<string, any>>) | Record<string, any>
+  paths?: () => (string[] | Promise<string[]>) | string[]
 }
 
 /**

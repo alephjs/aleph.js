@@ -118,6 +118,8 @@ export async function transform(specifier: string, code: string, options: Transf
   let {
     code: jsContent,
     deps,
+    ssrPropsFn,
+    ssgPathsFn,
     inlineStyles,
     denoHooks,
     starExports,
@@ -153,6 +155,8 @@ export async function transform(specifier: string, code: string, options: Transf
   return {
     code: jsContent,
     deps,
+    ssrPropsFn,
+    ssgPathsFn,
     denoHooks,
     starExports,
     map

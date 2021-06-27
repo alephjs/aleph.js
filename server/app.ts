@@ -1385,28 +1385,55 @@ export class Application implements ServerApplication {
     log.info(bold('- Pages (SSG)'))
 
     // render pages
-    const paths = new Set(this.#pageRouting.paths)
-    // todo: check getStaticPaths
-    await Promise.all(Array.from(paths).map(async pathname => {
+    const paths: Set<{ pathname: string, search?: string }> = new Set(this.#pageRouting.paths.map(pathname => ({ pathname })))
+    const locales = this.config.locales.filter(l => l !== this.config.defaultLocale)
+    for (const specifier of this.#modules.keys()) {
+      const module = this.#modules.get(specifier)!
+      if (module.ssgPathsFn) {
+        const { ssr } = await this.importModule(module)
+        let ssrPaths = ssr.paths
+        if (util.isFunction(ssrPaths)) {
+          ssrPaths = ssrPaths()
+          if (ssrPaths instanceof Promise) {
+            ssrPaths = await ssrPaths
+          }
+        }
+        if (util.isNEArray(ssrPaths)) {
+          ssrPaths.forEach(path => {
+            if (util.isNEString(path)) {
+              const parts = path.split('?')
+              const pathname = util.cleanPath(parts.shift()!)
+              const search = parts.length > 0 ? '?' + (new URLSearchParams('?' + parts.join('?'))).toString() : undefined
+              const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
+              if (router.routePath !== '' && nestedModules.pop() === specifier) {
+                paths.add({ pathname, search })
+              } else {
+                log.warn(`Invalid SSG path '${path}'`)
+              }
+            }
+          })
+        }
+      }
+    }
+    await Promise.all(Array.from(paths).map((loc) => ([loc, ...locales.map(locale => ({ ...loc, pathname: locale + loc.pathname }))])).flat().map(async ({ pathname, search }) => {
       if (this.isSSRable(pathname)) {
-        const [router, nestedModules] = this.#pageRouting.createRouter({ pathname })
+        const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
         if (router.routePath !== '') {
+          const href = pathname + (search || '')
           let [html, data] = await this.#renderer.renderPage(router, nestedModules)
-          this.getCodeInjects('ssr', pathname)?.forEach(transform => {
-            const ret = transform(pathname, html)
+          this.getCodeInjects('ssr', href)?.forEach(transform => {
+            const ret = transform(href, html)
             html = ret.code
           })
-          await ensureTextFile(join(outputDir, pathname, 'index.html'), html)
+          await ensureTextFile(join(outputDir, pathname, 'index.html' + (search || '')), html)
           if (data) {
             const dataFile = join(
               outputDir,
-              `_aleph/data/${util.btoaUrl(pathname)}.json`
+              `_aleph/data/${util.btoaUrl(href)}.json`
             )
             await ensureTextFile(dataFile, JSON.stringify(data))
           }
-          log.info('  ○', pathname, dim('• ' + util.formatBytes(html.length)))
-        } else {
-          log.error('Page not found:', pathname)
+          log.info('  ○', href, dim('• ' + util.formatBytes(html.length)))
         }
       }
     }))
