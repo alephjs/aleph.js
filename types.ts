@@ -134,8 +134,8 @@ export type CSSOptions = {
   extract?: boolean | { limit?: number }
   /** `postcss` specifies the postcss plugins. */
   postcss?: { plugins: PostCSSPlugin[] }
-  /** `modules` enables the css modules feature. */
-  modules?: boolean | CSSModulesOptions | ((path: string) => boolean | CSSModulesOptions)
+  /** `modules` specifies CSS modules behavior. */
+  modules?: CSSModulesOptions
 }
 
 /**

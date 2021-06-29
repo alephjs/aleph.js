@@ -32,7 +32,6 @@ export function defaultConfig(): Readonly<RequiredConfig> {
       extract: {
         limit: 8 * 1024
       },
-      modules: false,
       postcss: { plugins: ['autoprefixer'] },
     },
     headers: {},
@@ -134,7 +133,7 @@ export async function loadConfig(specifier: string): Promise<Config> {
     config.css = {
       cache: Boolean(cache),
       extract: util.isPlainObject(extract) ? { limit: typeof extract.limit === 'number' ? extract.limit : 8 * 1024 } : Boolean(extract),
-      modules: util.isPlainObject(modules) ? modules : Boolean(modules),
+      modules: util.isPlainObject(modules) ? modules : undefined,
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }
   }

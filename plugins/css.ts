@@ -10,9 +10,6 @@ const postcssVersion = '8.2.15'
 const productionOnlyPostcssPlugins = ['autoprefixer']
 
 export default (): LoaderPlugin => {
-  let postcss: any = null
-  let modulesJSON: Map<string, Record<string, string>> = new Map()
-
   return {
     name: 'css-loader',
     type: 'loader',
@@ -46,29 +43,26 @@ export default (): LoaderPlugin => {
         }
       }
 
-      if (postcss === null) {
-        let plugins = cssConfig.postcss?.plugins || []
-        if (util.isPlainObject(cssConfig.modules) || cssConfig.modules === true) {
-          plugins = plugins.filter(p => {
-            if (p === 'postcss-modules' || (Array.isArray(p) && p[0] === 'postcss-modules')) {
-              return false
-            }
-            return true
-          }) || []
-          plugins.push(['postcss-modules', {
-            ...(util.isPlainObject(cssConfig.modules) ? cssConfig.modules : {}),
-            getJSON: (specifier: string, json: Record<string, string>) => {
-              modulesJSON.set(specifier, json)
-            },
-          }])
-        }
-        postcss = await initPostCSS(plugins, app.mode === 'development')
-        ms.stop('init postcss')
+      let plugins = cssConfig.postcss?.plugins || []
+      let modulesJSON: Record<string, string> = {}
+      if (/\.module\.[a-z]+$/.test(specifier)) {
+        plugins = plugins.filter(p => {
+          if (p === 'postcss-modules' || (Array.isArray(p) && p[0] === 'postcss-modules')) {
+            return false
+          }
+          return true
+        }) || []
+        plugins.push(['postcss-modules', {
+          ...(util.isPlainObject(cssConfig.modules) ? cssConfig.modules : {}),
+          getJSON: (_specifier: string, json: Record<string, string>) => {
+            modulesJSON = json
+          },
+        }])
       }
+      const postcss = await initPostCSS(plugins, app.mode === 'development')
 
       let sourceCode = ''
       let css = ''
-      let cssModules: Record<string, string> = {}
 
       if (data instanceof Uint8Array) {
         sourceCode = (new TextDecoder).decode(data)
@@ -85,10 +79,6 @@ export default (): LoaderPlugin => {
       } else {
         const ret = await postcss.process(sourceCode, { from: specifier }).async()
         css = ret.css
-        if (modulesJSON.has(specifier)) {
-          cssModules = modulesJSON.get(specifier)!
-          modulesJSON.delete(specifier)
-        }
       }
 
       if (app.mode === 'production') {
@@ -121,7 +111,7 @@ export default (): LoaderPlugin => {
           code: [
             `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
             `export const href = ${JSON.stringify('/_aleph/' + util.trimPrefix(path, '/'))}`,
-            `export default ${JSON.stringify(cssModules)}`,
+            `export default ${JSON.stringify(modulesJSON)}`,
             `applyCSS(${JSON.stringify(specifier)}, { href })`
           ].join('\n'),
           // todo: generate map
@@ -132,7 +122,7 @@ export default (): LoaderPlugin => {
         code: [
           `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
           `export const css = ${JSON.stringify(css)}`,
-          `export default ${JSON.stringify(cssModules)}`,
+          `export default ${JSON.stringify(modulesJSON)}`,
           `applyCSS(${JSON.stringify(specifier)}, { css })`,
         ].join('\n'),
         // todo: generate map

@@ -1,10 +1,15 @@
 use crate::resolver::Resolver;
+use regex::Regex;
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::{SourceMap, Span, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
+
+lazy_static! {
+  pub static ref RE_CSS_MODULES: Regex = Regex::new(r"\.module\.[a-z]+\.js(#|$)").unwrap();
+}
 
 pub fn resolve_fold(
   resolver: Rc<RefCell<Resolver>>,
@@ -73,12 +78,7 @@ impl Fold for ResolveFold {
 
     for name in used_builtin_jsx_tags.clone() {
       let mut resolver = self.resolver.borrow_mut();
-      let id_name = if name.eq("a") {
-        "__ALEPH__anchor".to_owned()
-      } else {
-        "__ALEPH__".to_owned() + name.as_str()
-      };
-      let id = quote_ident!(id_name);
+      let id = quote_ident!("__ALEPH__".to_owned() + name.as_str());
       let (resolved_path, fixed_url) = resolver.resolve(
         format!("{}/framework/react/components/{}.ts", aleph_pkg_uri, name).as_str(),
         false,
@@ -100,31 +100,62 @@ impl Fold for ResolveFold {
             span: DUMMY_SP,
             local: id,
           })],
-          src: Str {
-            span: DUMMY_SP,
-            value: resolved_path.into(),
-            has_escape: false,
-            kind: Default::default(),
-          },
+          src: new_str(resolved_path),
           type_only: false,
           asserts: None,
         })));
       }
     }
 
+    let mut css_modules: Vec<Ident> = vec![];
     for imp in extra_imports {
-      items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-        span: DUMMY_SP,
-        specifiers: vec![],
-        src: Str {
+      if RE_CSS_MODULES.is_match(imp.as_str()) {
+        let id = quote_ident!(format!("__ALEPH__CSS_MODULES_{}", css_modules.len()));
+        items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
           span: DUMMY_SP,
-          value: imp.into(),
-          has_escape: false,
-          kind: Default::default(),
-        },
-        type_only: false,
-        asserts: None,
-      })));
+          specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+            span: DUMMY_SP,
+            local: id.clone(),
+          })],
+          src: new_str(imp),
+          type_only: false,
+          asserts: None,
+        })));
+        css_modules.push(id);
+      } else {
+        items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+          span: DUMMY_SP,
+          specifiers: vec![],
+          src: new_str(imp),
+          type_only: false,
+          asserts: None,
+        })));
+      }
+    }
+    if css_modules.len() > 0 {
+      items.push(ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
+        span: DUMMY_SP,
+        kind: VarDeclKind::Const,
+        declare: false,
+        decls: vec![VarDeclarator {
+          span: DUMMY_SP,
+          name: new_pat_ident("__ALEPH__CSS_MODULES_ALL"),
+          init: Some(Box::new(Expr::Object(ObjectLit {
+            span: DUMMY_SP,
+            props: css_modules
+              .into_iter()
+              .map(|id| {
+                PropOrSpread::Spread(SpreadElement {
+                  dot3_token: DUMMY_SP,
+                  expr: Box::new(Expr::Ident(id)),
+                })
+              })
+              .collect(),
+          }))),
+          definite: false,
+        }],
+      }))));
+      items.push(create_aleph_cx());
     }
 
     for item in module_items {
@@ -531,12 +562,7 @@ fn create_aleph_pack_member_expr(url: &str) -> MemberExpr {
     prop: Box::new(Expr::Member(MemberExpr {
       span: DUMMY_SP,
       obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("pack")))),
-      prop: Box::new(Expr::Lit(Lit::Str(Str {
-        span: DUMMY_SP,
-        value: url.into(),
-        has_escape: false,
-        kind: Default::default(),
-      }))),
+      prop: Box::new(Expr::Lit(Lit::Str(new_str(url.into())))),
       computed: true,
     })),
     computed: false,
@@ -591,6 +617,132 @@ pub fn create_aleph_pack_var_decl_member(
   }
 }
 
+// const __ALEPH__CX = c => typeof c === 'string' ? c.split(' ').map(n => n.charAt(0) === '$' ? __ALEPH__CSS_MODULES_ALL[n.slice(1)] || n : n).join(' ') : c;
+pub fn create_aleph_cx() -> ModuleItem {
+  ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
+    span: DUMMY_SP,
+    kind: VarDeclKind::Const,
+    declare: false,
+    decls: vec![VarDeclarator {
+      span: DUMMY_SP,
+      name: new_pat_ident("__ALEPH__CX"),
+      init: Some(Box::new(Expr::Arrow(new_arrow(
+        "c",
+        Expr::Cond(CondExpr {
+          span: DUMMY_SP,
+          test: Box::new(Expr::Bin(BinExpr {
+            span: DUMMY_SP,
+            op: BinaryOp::EqEqEq,
+            left: Box::new(Expr::Unary(UnaryExpr {
+              span: DUMMY_SP,
+              op: UnaryOp::TypeOf,
+              arg: Box::new(Expr::Ident(quote_ident!("c"))),
+            })),
+            right: Box::new(Expr::Lit(Lit::Str(new_str("string".into())))),
+          })),
+          cons: Box::new(Expr::Member(MemberExpr {
+            span: DUMMY_SP,
+            obj: ExprOrSuper::Expr(Box::new(Expr::Member(MemberExpr {
+              span: DUMMY_SP,
+              obj: ExprOrSuper::Expr(new_member_call("c", "split", Lit::Str(new_str(" ".into())))),
+              prop: Box::new(Expr::Call(CallExpr {
+                span: DUMMY_SP,
+                callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("map")))),
+                args: vec![ExprOrSpread {
+                  spread: None,
+                  expr: Box::new(Expr::Arrow(new_arrow(
+                    "n",
+                    Expr::Cond(CondExpr {
+                      span: DUMMY_SP,
+                      test: Box::new(Expr::Bin(BinExpr {
+                        span: DUMMY_SP,
+                        op: BinaryOp::EqEqEq,
+                        left: new_member_call(
+                          "n",
+                          "charAt",
+                          Lit::Num(Number {
+                            span: DUMMY_SP,
+                            value: 0.0,
+                          }),
+                        ),
+                        right: Box::new(Expr::Lit(Lit::Str(new_str("$".into())))),
+                      })),
+                      cons: Box::new(Expr::Bin(BinExpr {
+                        span: DUMMY_SP,
+                        op: BinaryOp::LogicalOr,
+                        left: Box::new(Expr::Member(MemberExpr {
+                          span: DUMMY_SP,
+                          obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!(
+                            "__ALEPH__CSS_MODULES_ALL"
+                          )))),
+                          prop: new_member_call(
+                            "n",
+                            "slice",
+                            Lit::Num(Number {
+                              span: DUMMY_SP,
+                              value: 1.0,
+                            }),
+                          ),
+                          computed: true,
+                        })),
+                        right: Box::new(Expr::Ident(quote_ident!("n"))),
+                      })),
+                      alt: Box::new(Expr::Ident(quote_ident!("n"))),
+                    }),
+                  ))),
+                }],
+                type_args: None,
+              })),
+              computed: false,
+            }))),
+            prop: Box::new(Expr::Call(CallExpr {
+              span: DUMMY_SP,
+              callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("join")))),
+              args: vec![ExprOrSpread {
+                spread: None,
+                expr: Box::new(Expr::Lit(Lit::Str(new_str(" ".into())))),
+              }],
+              type_args: None,
+            })),
+            computed: false,
+          })),
+          alt: Box::new(Expr::Ident(quote_ident!("c"))),
+        }),
+      )))),
+      definite: false,
+    }],
+  })))
+}
+
+fn new_member_call(obj: &str, method_name: &str, arg0: Lit) -> Box<Expr> {
+  Box::new(Expr::Member(MemberExpr {
+    span: DUMMY_SP,
+    obj: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!(obj)))),
+    prop: Box::new(Expr::Call(CallExpr {
+      span: DUMMY_SP,
+      callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!(method_name)))),
+      args: vec![ExprOrSpread {
+        spread: None,
+        expr: Box::new(Expr::Lit(arg0)),
+      }],
+      type_args: None,
+    })),
+    computed: false,
+  }))
+}
+
+fn new_arrow(arg0: &str, body: Expr) -> ArrowExpr {
+  ArrowExpr {
+    span: DUMMY_SP,
+    params: vec![new_pat_ident(arg0)],
+    body: BlockStmtOrExpr::Expr(Box::new(body)),
+    is_async: false,
+    is_generator: false,
+    type_params: None,
+    return_type: None,
+  }
+}
+
 fn new_str(str: String) -> Str {
   Str {
     span: DUMMY_SP,
@@ -598,4 +750,11 @@ fn new_str(str: String) -> Str {
     has_escape: false,
     kind: Default::default(),
   }
+}
+
+fn new_pat_ident(s: &str) -> Pat {
+  Pat::Ident(BindingIdent {
+    id: quote_ident!(s),
+    type_ann: None,
+  })
 }

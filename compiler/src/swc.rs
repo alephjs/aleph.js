@@ -1,7 +1,7 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::export_names::ExportParser;
 use crate::import_map::ImportHashMap;
-use crate::jsx::aleph_jsx_fold;
+use crate::jsx::{aleph_jsx_fold, aleph_jsx_pass2_fold};
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::{is_remote_url, DependencyDescriptor, Resolver};
 use crate::source_type::SourceType;
@@ -151,7 +151,11 @@ impl SWC {
       };
       let passes = chain!(
         Optional::new(
-          aleph_jsx_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+          aleph_jsx_fold(resolver.clone(), self.source_map.clone()),
+          jsx
+        ),
+        Optional::new(
+          aleph_jsx_pass2_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
           jsx
         ),
         Optional::new(

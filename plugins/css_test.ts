@@ -107,7 +107,7 @@ Deno.test('plugin: css loader for inline styles', async () => {
 })
 
 Deno.test({
-  name: 'plugin: css loader enables css modules feature',
+  name: 'plugin: css loader css modules feature',
   fn: async () => {
     Deno.env.set('DENO_TESTING', 'true')
     const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
@@ -117,7 +117,7 @@ Deno.test({
       generateScopedName: '[name]_[local]'
     }
     await ensureTextFile(
-      join(dir, '/style/index.css'),
+      join(dir, '/style/index.module.css'),
       '.name { font-size: 18px; }'
     )
     const loader = cssLoader()

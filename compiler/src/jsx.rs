@@ -1,3 +1,4 @@
+use crate::resolve_fold::RE_CSS_MODULES;
 use crate::resolver::{is_remote_url, InlineStyle, Resolver};
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, rc::Rc};
@@ -6,15 +7,22 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 
-pub fn aleph_jsx_fold(
-  resolver: Rc<RefCell<Resolver>>,
-  source: Rc<SourceMap>,
-  is_dev: bool,
-) -> impl Fold {
+pub fn aleph_jsx_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
   AlephJsxFold {
     resolver: resolver.clone(),
     source,
     inline_style_idx: 0,
+  }
+}
+
+pub fn aleph_jsx_pass2_fold(
+  resolver: Rc<RefCell<Resolver>>,
+  source: Rc<SourceMap>,
+  is_dev: bool,
+) -> impl Fold {
+  AlephJsxPass2Fold {
+    resolver: resolver.clone(),
+    source,
     is_dev,
   }
 }
@@ -31,7 +39,6 @@ struct AlephJsxFold {
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
   inline_style_idx: i32,
-  is_dev: bool,
 }
 
 impl AlephJsxFold {
@@ -223,47 +230,6 @@ impl AlephJsxFold {
       _ => {}
     };
 
-    // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
-    if self.is_dev {
-      let resolver = self.resolver.borrow_mut();
-      match self.source.span_to_lines(el.span) {
-        Ok(file_lines) => {
-          el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
-            span: DUMMY_SP,
-            name: JSXAttrName::Ident(quote_ident!("__source")),
-            value: Some(JSXAttrValue::JSXExprContainer(JSXExprContainer {
-              span: DUMMY_SP,
-              expr: JSXExpr::Expr(Box::new(
-                ObjectLit {
-                  span: DUMMY_SP,
-                  props: vec![
-                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                      key: PropName::Ident(quote_ident!("fileName")),
-                      value: Box::new(Expr::Lit(Lit::Str(Str {
-                        span: DUMMY_SP,
-                        value: resolver.specifier.as_str().into(),
-                        has_escape: false,
-                        kind: Default::default(),
-                      }))),
-                    }))),
-                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                      key: PropName::Ident(quote_ident!("lineNumber")),
-                      value: Box::new(Expr::Lit(Lit::Num(Number {
-                        span: DUMMY_SP,
-                        value: (file_lines.lines[0].line_index + 1) as _,
-                      }))),
-                    }))),
-                  ],
-                }
-                .into(),
-              )),
-            })),
-          }));
-        }
-        _ => {}
-      };
-    }
-
     (el, inline_style)
   }
 }
@@ -331,6 +297,150 @@ impl Fold for AlephJsxFold {
     for child in el.children {
       children.push(child.fold_children_with(self));
     }
+    JSXElement {
+      span: DUMMY_SP,
+      opening,
+      children,
+      ..el
+    }
+  }
+}
+
+struct AlephJsxPass2Fold {
+  resolver: Rc<RefCell<Resolver>>,
+  source: Rc<SourceMap>,
+  is_dev: bool,
+}
+
+impl AlephJsxPass2Fold {
+  fn fold_jsx_opening_element(&mut self, mut el: JSXOpeningElement) -> JSXOpeningElement {
+    let extra_imports = self.resolver.borrow().extra_imports.clone();
+    let mut css_modules = false;
+
+    for imp in extra_imports {
+      if RE_CSS_MODULES.is_match(imp.as_str()) {
+        css_modules = true;
+        break;
+      }
+    }
+
+    if css_modules {
+      let mut i: Option<usize> = None;
+      let mut class_name_value_expr: Option<Box<Expr>> = None;
+
+      for (index, attr) in el.attrs.iter().enumerate() {
+        match &attr {
+          JSXAttrOrSpread::JSXAttr(JSXAttr {
+            name: JSXAttrName::Ident(id),
+            value: Some(value),
+            ..
+          }) => {
+            if id.sym.eq("className") {
+              match value {
+                JSXAttrValue::Lit(lit) => {
+                  class_name_value_expr = Some(Box::new(Expr::Call(CallExpr {
+                    span: DUMMY_SP,
+                    callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH__CX")))),
+                    args: vec![ExprOrSpread {
+                      spread: None,
+                      expr: Box::new(Expr::Lit(lit.clone())),
+                    }],
+                    type_args: None,
+                  })))
+                }
+                JSXAttrValue::JSXExprContainer(JSXExprContainer { expr, .. }) => {
+                  if let JSXExpr::Expr(expr) = expr {
+                    class_name_value_expr = Some(Box::new(Expr::Call(CallExpr {
+                      span: DUMMY_SP,
+                      callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH__CX")))),
+                      args: vec![ExprOrSpread {
+                        spread: None,
+                        expr: expr.clone(),
+                      }],
+                      type_args: None,
+                    })))
+                  }
+                }
+                _ => {}
+              };
+              i = Some(index);
+              break;
+            }
+          }
+          _ => {}
+        };
+      }
+
+      if let Some(index) = i {
+        if let Some(expr) = class_name_value_expr {
+          el.attrs[index] = JSXAttrOrSpread::JSXAttr(JSXAttr {
+            span: DUMMY_SP,
+            name: JSXAttrName::Ident(quote_ident!("className")),
+            value: Some(JSXAttrValue::JSXExprContainer(JSXExprContainer {
+              span: DUMMY_SP,
+              expr: JSXExpr::Expr(expr),
+            })),
+          });
+        }
+      }
+    }
+
+    // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
+    if self.is_dev {
+      let resolver = self.resolver.borrow_mut();
+      match self.source.span_to_lines(el.span) {
+        Ok(file_lines) => {
+          el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
+            span: DUMMY_SP,
+            name: JSXAttrName::Ident(quote_ident!("__source")),
+            value: Some(JSXAttrValue::JSXExprContainer(JSXExprContainer {
+              span: DUMMY_SP,
+              expr: JSXExpr::Expr(Box::new(
+                ObjectLit {
+                  span: DUMMY_SP,
+                  props: vec![
+                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                      key: PropName::Ident(quote_ident!("fileName")),
+                      value: Box::new(Expr::Lit(Lit::Str(Str {
+                        span: DUMMY_SP,
+                        value: resolver.specifier.as_str().into(),
+                        has_escape: false,
+                        kind: Default::default(),
+                      }))),
+                    }))),
+                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                      key: PropName::Ident(quote_ident!("lineNumber")),
+                      value: Box::new(Expr::Lit(Lit::Num(Number {
+                        span: DUMMY_SP,
+                        value: (file_lines.lines[0].line_index + 1) as _,
+                      }))),
+                    }))),
+                  ],
+                }
+                .into(),
+              )),
+            })),
+          }));
+        }
+        _ => {}
+      };
+    }
+
+    el
+  }
+}
+
+impl Fold for AlephJsxPass2Fold {
+  noop_fold_type!();
+
+  fn fold_jsx_element(&mut self, el: JSXElement) -> JSXElement {
+    let mut children: Vec<JSXElementChild> = vec![];
+    let opening = self.fold_jsx_opening_element(el.opening);
+
+    for child in el.children {
+      children.push(child.fold_children_with(self));
+    }
+
     JSXElement {
       span: DUMMY_SP,
       opening,
@@ -409,6 +519,60 @@ mod tests {
         "https://deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.ts",
         "https://deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.ts",
         "https://deno.land/x/aleph@v0.3.0/framework/react/components/CustomScript.ts",
+        "https://esm.sh/react"
+      ]
+    );
+  }
+
+  #[test]
+  fn resolve_jsx_css_modules() {
+    let source = r#"
+      import React from "https://esm.sh/react"
+
+      export default function Index() {
+        return (
+          <>
+            <link rel="stylesheet" href="../style/app.module.css" />
+            <link rel="stylesheet" href="../style/index.module.css" />
+            <h2 className="$title $bold">Hi :)</h2>
+            <p className={'$' + 'desc'}>Welcom</p>
+          </>
+        )
+      }
+    "#;
+    let (code, resolver) = st("/pages/index.tsx", source, false);
+    assert!(code.contains(
+      "import __ALEPH__StyleLink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.js\""
+    ));
+    assert!(code.contains("React.createElement(__ALEPH__StyleLink,"));
+    assert!(code.contains("href: \"/style/index.module.css\""));
+    assert!(code.contains(
+      format!(
+        "import __ALEPH__CSS_MODULES_0 from \"../style/app.module.css.js#{}@000000\"",
+        "/style/app.module.css"
+      )
+      .as_str()
+    ));
+    assert!(code.contains(
+      format!(
+        "import __ALEPH__CSS_MODULES_1 from \"../style/index.module.css.js#{}@000001\"",
+        "/style/index.module.css"
+      )
+      .as_str()
+    ));
+    assert!(code.contains("const __ALEPH__CX = (c)=>typeof c === \"string\" ? c.split(\" \").map((n)=>n.charAt(0) === \"$\" ? __ALEPH__CSS_MODULES_ALL[n.slice(1)] || n : n\n    ).join(\" \") : c"));
+    assert!(code.contains("className: __ALEPH__CX(\"$title $bold\")"));
+    assert!(code.contains("className: __ALEPH__CX('$' + 'desc')"));
+    let r = resolver.borrow_mut();
+    assert_eq!(
+      r.deps
+        .iter()
+        .map(|g| { g.specifier.as_str() })
+        .collect::<Vec<&str>>(),
+      vec![
+        "/style/app.module.css",
+        "/style/index.module.css",
+        "https://deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.ts",
         "https://esm.sh/react"
       ]
     );
