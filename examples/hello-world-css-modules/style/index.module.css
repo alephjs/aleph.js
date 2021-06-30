@@ -1,0 +1,134 @@
+* {
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 100%;
+  vertical-align: baseline;
+  background: transparent;
+}
+
+body {
+  font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size: 16px;
+}
+
+main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.page h1 {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 18px;
+  font-weight: 400;
+  text-align: center;
+  color: #000;
+}
+
+.page h1 strong {
+  font-weight: 700;
+}
+
+.page p {
+  margin: 0;
+  line-height: 1.5;
+  text-align: center;
+  color: #333;
+}
+
+.logo + p {
+  margin-top: 6px;
+}
+
+.links span,
+.links a {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.links span {
+  color: #999;
+}
+
+.links span::after {
+  content: '·';
+}
+
+.links a {
+  margin: 0 9px;
+  color: #666;
+  text-decoration: none;
+  transition: color 0.15s ease-in;
+}
+
+.links a:hover {
+  color: #000;
+}
+
+.counter {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 270px;
+  height: 48px;
+  margin: 30px auto 0;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  transition: border-color 0.15s ease-in;
+}
+
+.counter:hover {
+  border-color: #ccc;
+}
+
+.counter em {
+  display: inline-block;
+  width: 48px;
+  font-weight: 400;
+  text-align: center;
+  color: #999;
+}
+
+.counter strong {
+  display: inline-block;
+  width: 48px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.counter button {
+  display: line-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid #ddd;
+  line-height: 1;
+  font-size: 12px;
+  font-family: Courier, monospace;
+  font-weight: 600;
+  color: #999;
+  transition: color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+  cursor: pointer;
+}
+
+.counter button:hover {
+  color: #000;
+  border-color:#ccc;
+}
+
+.counter button + button {
+  margin-left: 9px;
+}
+
+.page .copyinfo {
+  margin-top: 30px;
+  font-size: 14px;
+  color: #999;
+}
