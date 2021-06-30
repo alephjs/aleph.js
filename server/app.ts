@@ -1124,7 +1124,6 @@ export class Application implements ServerApplication {
         }
         mod.isStyle = src.isStyle
       } catch (err) {
-        log.error(`load module '${specifier}':`, err.message)
         defer(err)
         return [mod, null]
       }

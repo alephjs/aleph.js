@@ -42,7 +42,7 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
         log.info('Download', url)
       }
     } else {
-      log.debug('Download error:', err)
+      log.debug(err)
       log.warn(`Download ${url} failed, retrying...`)
     }
     try {
