@@ -6,8 +6,10 @@ import util from '../shared/util.ts'
 import { Measure } from '../shared/log.ts'
 import type { LoaderPlugin, PostCSSPlugin } from '../types.ts'
 
-const postcssVersion = '8.2.15'
+const postcssVersion = '8.3.5'
+const postcssModulesVersion = '4.1.3'
 const productionOnlyPostcssPlugins = ['autoprefixer']
+const isModulesPluginName = (v: any): v is string => (typeof v === 'string' && /^postcss\-modules(@|$)/i.test(v.trim()))
 
 export default (): LoaderPlugin => {
   return {
@@ -46,18 +48,28 @@ export default (): LoaderPlugin => {
       let plugins = cssConfig.postcss?.plugins || []
       let modulesJSON: Record<string, string> = {}
       if (/\.module\.[a-z]+$/.test(specifier)) {
-        plugins = plugins.filter(p => {
-          if (p === 'postcss-modules' || (Array.isArray(p) && p[0] === 'postcss-modules')) {
-            return false
-          }
-          return true
-        }) || []
-        plugins.push(['postcss-modules', {
+        const options = {
           ...(util.isPlainObject(cssConfig.modules) ? cssConfig.modules : {}),
           getJSON: (_specifier: string, json: Record<string, string>) => {
             modulesJSON = json
           },
-        }])
+        }
+        let hasModulesPlugin = false
+        plugins = plugins.map(plugin => {
+          if (isModulesPluginName(plugin)) {
+            hasModulesPlugin = true
+            return [plugin.trim().toLowerCase(), options]
+          }
+          if (Array.isArray(plugin) && isModulesPluginName(plugin[0])) {
+            hasModulesPlugin = true
+            return [plugin[0].trim().toLowerCase(), { ...options, ...plugin[1] }]
+          }
+          return plugin
+        })
+
+        if (!hasModulesPlugin) {
+          plugins.push([`postcss-modules@${postcssModulesVersion}`, options])
+        }
       }
       const postcss = await initPostCSS(plugins, app.mode === 'development')
 

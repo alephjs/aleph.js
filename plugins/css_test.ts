@@ -121,12 +121,12 @@ Deno.test({
       '.name { font-size: 18px; }'
     )
     const loader = cssLoader()
-    const { code } = await loader.load!({ specifier: '/style/index.css', }, app)
+    const { code } = await loader.load!({ specifier: '/style/index.module.css', }, app)
     assertEquals(code, [
       'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-      'export const css = ".index_name { font-size: 18px; }"',
-      'export default {"name":"index_name"}',
-      'applyCSS("/style/index.css", { css })',
+      'export const css = ".index-module_name { font-size: 18px; }"',
+      'export default {"name":"index-module_name"}',
+      'applyCSS("/style/index.module.css", { css })',
     ].join('\n'))
   },
   sanitizeResources: false
