@@ -24,11 +24,11 @@ import {
 } from './config.ts'
 import {
   checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile,
-  getAlephPkgUri, getDenoDir, getSourceType, isLoaderPlugin, isLocalUrl,
+  getAlephPkgUri, getSourceType, isLoaderPlugin, isLocalUrl,
   moduleExclude, toLocalPath, toRelativePath
 } from './helper.ts'
 import { getContentType } from './mime.ts'
-import { FrameworkRenderResult, Renderer } from './ssr.ts'
+import { Renderer } from './ssr.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -218,18 +218,6 @@ export class Application implements ServerApplication {
       if (util.isFunction(render)) {
         this.#renderer.setFrameworkRenderer({ render })
       }
-    } else {
-      this.#renderer.setFrameworkRenderer({
-        // deno-lint-ignore require-await
-        render: async (): Promise<FrameworkRenderResult> => {
-          return {
-            head: [],
-            body: "",
-            data: null,
-            scripts: [],
-          }
-        }
-      })
     }
 
     ms.stop(`init ${this.config.framework} framework`)

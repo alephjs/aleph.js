@@ -166,37 +166,9 @@ export class Renderer {
 
   /** render the index page for SPA mode. */
   async renderSPAIndexPage(): Promise<string> {
-    const { basePath, defaultLocale } = this.#app.config
-    const appModule = this.#app.getModule('app')
-
-    if (appModule) {
-      const { default: App, Loading } = await this.#app.importModule(appModule)
-      const styles = await this.lookupStyleModules(appModule.specifier)
-      const { head, body, scripts } = await this.#renderer.render(
-        createBlankRouterURL(basePath, defaultLocale),
-        App,
-        [{ specifier: `${appModule.specifier}#Loading`, Component: Loading }],
-        styles
-      )
-      return createHtml({
-        lang: defaultLocale,
-        head,
-        scripts: [
-          ...this.#app.getSSRHTMLScripts(),
-          ...scripts.map((script: Record<string, any>) => {
-            if (script.innerText && !this.#app.isDev) {
-              return { ...script, innerText: script.innerText }
-            }
-            return script
-          })
-        ],
-        body: `<div id="__aleph">${body}</div>`,
-        minify: !this.#app.isDev
-      })
-    }
-
+    // todo: render fallback page
     return createHtml({
-      lang: defaultLocale,
+      lang: this.#app.config.defaultLocale,
       head: [],
       scripts: this.#app.getSSRHTMLScripts(),
       body: '<div id="__aleph"></div>',
