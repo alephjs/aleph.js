@@ -28,7 +28,7 @@ import {
   moduleExclude, toLocalPath, toRelativePath
 } from './helper.ts'
 import { getContentType } from './mime.ts'
-import { Renderer } from './ssr.ts'
+import { Renderer } from './renderer.ts'
 
 /** A module includes the compilation details. */
 export type Module = {

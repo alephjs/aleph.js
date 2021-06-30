@@ -1,5 +1,4 @@
 import { basename, dirname } from 'https://deno.land/std@0.99.0/path/mod.ts'
-import { createBlankRouterURL } from '../framework/core/routing.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
@@ -166,7 +165,7 @@ export class Renderer {
 
   /** render the index page for SPA mode. */
   async renderSPAIndexPage(): Promise<string> {
-    // todo: render fallback page
+    // todo: render custom fallback page
     return createHtml({
       lang: this.#app.config.defaultLocale,
       head: [],
