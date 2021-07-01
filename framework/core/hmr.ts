@@ -103,10 +103,11 @@ export function connect(basePath: string) {
           updateUrl,
           routePath,
           isIndex,
-          refetchPage
+          refreshPage
         } = JSON.parse(data)
-        if (refetchPage === true) {
+        if (refreshPage === true) {
           location.reload()
+          return
         }
         switch (type) {
           case 'add':

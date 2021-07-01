@@ -318,28 +318,24 @@ export class Application implements ServerApplication {
             ignoreDeps: true,
             externalRemoteDeps: specifier.startsWith('/api/')
           })
-          const refetchPage = (
+          const refreshPage = (
             this.config.ssr &&
             (
-              !(
-                util.isNEArray(prevModule.denoHooks) &&
-                util.isNEArray(module.denoHooks) &&
-                prevModule.denoHooks.join(';') === module.denoHooks.join(';')
-              ) ||
-              prevModule.ssrPropsFn !== module.ssrPropsFn
+              (module.denoHooks !== undefined && JSON.stringify(prevModule.denoHooks) !== JSON.stringify(module.denoHooks)) ||
+              (module.ssrPropsFn !== undefined && prevModule.ssrPropsFn !== module.ssrPropsFn)
             )
           )
           const hmrable = this.isHMRable(specifier)
           if (hmrable) {
             this.#fsWatchListeners.forEach(e => {
-              e.emit('modify-' + module.specifier, { refetchPage: refetchPage || undefined })
+              e.emit('modify-' + module.specifier, { refreshPage: refreshPage || undefined })
             })
           }
           this.applyCompilationSideEffect(module, ({ specifier }) => {
             if (!hmrable && this.isHMRable(specifier)) {
               log.debug('compilation side-effect:', specifier, dim('<-'), module.specifier)
               this.#fsWatchListeners.forEach(e => {
-                e.emit('modify-' + specifier, { refetchPage: refetchPage || undefined })
+                e.emit('modify-' + specifier, { refreshPage: refreshPage || undefined })
               })
             }
           })
