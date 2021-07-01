@@ -2,6 +2,7 @@ import {
   createElement,
   ComponentType,
   ComponentPropsWithRef,
+  FC,
   ReactElement,
   useContext,
   useEffect,
@@ -47,7 +48,7 @@ export function withRouter<P>(Component: ComponentType<P>) {
 export function dynamic<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>
 ): ComponentType<ComponentPropsWithRef<T>> {
-  const DynamicComponent = (props: ComponentPropsWithRef<T>) => {
+  const DynamicComponent: FC<ComponentPropsWithRef<T>> = props => {
     const [mod, setMod] = useState<{ component: T } | null>(null)
     const [err, setErr] = useState<Error | null>(null)
     const { to } = useContext(FallbackContext)
@@ -57,7 +58,7 @@ export function dynamic<T extends ComponentType<any>>(
         if (isLikelyReactComponent(component, false)) {
           setMod({ component })
         } else {
-          setErr(new Error('Missing the component exported as default'))
+          setErr(new Error('Missing the react component exported as default'))
         }
       }).catch(err => {
         setErr(err)
@@ -84,6 +85,8 @@ export function dynamic<T extends ComponentType<any>>(
 
     return to as ReactElement
   }
+
+  DynamicComponent.displayName = 'Dynamic'
 
   return DynamicComponent
 }
