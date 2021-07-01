@@ -113,6 +113,17 @@ export class Routing {
   }
 
   createRouter(location?: { pathname: string, search?: string }): [RouterURL, string[]] {
+    let [url, nestedModules] = this._createRouter(location)
+    if (url.routePath === '' && location === undefined) {
+      const [{ routePath }, nested] = this._createRouter({ pathname: '/404' })
+      console.log(routePath)
+      Object.assign(url, { routePath })
+      nestedModules = nested
+    }
+    return [url, nestedModules]
+  }
+
+  private _createRouter(location?: { pathname: string, search?: string }): [RouterURL, string[]] {
     const loc = location || (window as any).location || { pathname: '/' }
     const url = rewriteURL(loc.pathname + (loc.search || ''), this._basePath, this._rewrites)
 

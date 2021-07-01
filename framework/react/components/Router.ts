@@ -32,11 +32,7 @@ export default function Router({
   })
   const [route, setRoute] = useState<PageRoute>(pageRoute)
   const onpopstate = useCallback(async (e: any) => {
-    let [url, nestedModules] = routing.createRouter()
-    if (url.routePath === '') {
-      const r = routing.createRouter({ pathname: '/404' })
-      nestedModules = r[1]
-    }
+    const [url, nestedModules] = routing.createRouter()
     if (url.routePath !== '') {
       setRoute(await createPageRoute(url, nestedModules, true))
       if (e.resetScroll) {
