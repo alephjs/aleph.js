@@ -115,6 +115,7 @@ export default {
   },
   async isUrlOk(url: string): Promise<boolean> {
     const res = await fetch(url).catch((e) => e)
+    await res.body?.cancel();
     return res.status === 200
   }
 }

@@ -12,6 +12,7 @@ Deno.test(`util`, async () => {
 
   // test isUrlOk
   assertEquals(await util.isUrlOk('https://deno.land'), true)
+  assertEquals(await util.isUrlOk('https://deno'), false)
 
   // test trimPrefix
   assertEquals(util.trimPrefix('foobar', 'foo'), 'bar')
