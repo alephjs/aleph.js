@@ -11,8 +11,7 @@ Deno.test(`util`, async () => {
   assertEquals(util.isLikelyHttpURL('www.deno.land'), false)
 
   // test isUrlOk
-  assertEquals(util.isUrlOk('https://deno.land'), true)
-  assertEquals(util.isUrlOk('https://deno'), false);
+  assertEquals(await util.isUrlOk('https://deno.land'), true)
 
   // test trimPrefix
   assertEquals(util.trimPrefix('foobar', 'foo'), 'bar')
