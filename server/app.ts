@@ -373,16 +373,19 @@ export class Application implements ServerApplication {
             e.emit('add', { specifier, routePath, isIndex })
           })
         }
+        log.info('add', specifier)
       }
-    } else if (this.#modules.has(specifier)) {
-      this.#modules.delete(specifier)
+    } else {
+      if (this.#modules.has(specifier)) {
+        this.#modules.delete(specifier)
+      }
       if (trimBuiltinModuleExts(specifier) === '/app') {
         this.#renderer.clearCache()
         this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
       } else if (specifier.startsWith('/pages/') && this.isPageModule(specifier)) {
         const [routePath] = this.createRouteUpdate(specifier)
-        this.#pageRouting.removeRouteByModule(specifier)
         this.#renderer.clearCache(routePath)
+        this.#pageRouting.removeRouteByModule(specifier)
         this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
       } else if (specifier.startsWith('/api/')) {
         this.#apiRouting.removeRouteByModule(specifier)
@@ -393,13 +396,13 @@ export class Application implements ServerApplication {
 
   /** check the file whether it is a scoped module. */
   private isScopedModule(specifier: string) {
+    if (moduleExclude.some(r => r.test(specifier))) {
+      return false
+    }
+
     // is compiled module
     if (this.#modules.has(specifier)) {
       return true
-    }
-
-    if (moduleExclude.some(r => r.test(specifier))) {
-      return false
     }
 
     // is page module by plugin
@@ -407,6 +410,7 @@ export class Application implements ServerApplication {
       return true
     }
 
+    // is api or app module
     for (const ext of builtinModuleExts) {
       if (
         specifier.endsWith('.' + ext) &&
