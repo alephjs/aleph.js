@@ -1,16 +1,14 @@
-import { Untar } from "https://deno.land/std@0.96.0/archive/tar.ts"
-import { cyan, dim, green, red } from "https://deno.land/std@0.96.0/fmt/colors.ts"
-import { ensureDir } from "https://deno.land/std@0.96.0/fs/ensure_dir.ts"
-import { join } from "https://deno.land/std@0.96.0/path/mod.ts"
-import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts"
-import { x_brotli, x_flate } from "../server/compress.ts"
-import {
-  defaultReactVersion,
-  supportedAlephTemplate
-} from "../shared/constants.ts"
-import { ensureTextFile } from "../shared/fs.ts"
-import util from "../shared/util.ts"
-import { VERSION } from "../version.ts"
+import { Untar } from 'https://deno.land/std@0.96.0/archive/tar.ts'
+import { green, cyan ,red, dim } from 'https://deno.land/std@0.96.0/fmt/colors.ts'
+import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
+import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
+import { ensureTextFile } from '../shared/fs.ts'
+import util from '../shared/util.ts'
+import { defaultReactVersion } from '../shared/constants.ts'
+import { VERSION } from '../version.ts'
+import { x_brotli, x_flate } from '../server/compress.ts'
+import isFolderEmpty from './helpers/is-folder-empty.ts';
 
 export const helpMessage = `
 Usage:
@@ -24,17 +22,9 @@ Options:
 `;
 
 export default async function (
-  template: string = "hello-world",
+  template: string = "hello-worldss",
   nameArg?: string,
 ) {
-  if (!supportedAlephTemplate.includes(template)) {
-    console.log(
-      red(
-        `Could not use a template named ${template}. Please check your spelling and try again.`,
-      ),
-    );
-    Deno.exit(1);
-  }
 
   const cwd = Deno.cwd();
   const rev = "master";
@@ -44,9 +34,20 @@ export default async function (
     return;
   }
 
-  const vscode = await confirm(
-    "Add recommended workspace settings of VS Code?",
-  );
+  const hasTemplate = await util.isUrlOk("https://api.github.com/repos/alephjs/alephjs-templates/contents/" + template);
+
+  if (!hasTemplate) {
+    console.error(
+      `Could not use a template named ${red(template)}. Please check your spelling and try again.`,
+    )
+    Deno.exit(1);
+  }
+
+  if (!isFolderEmpty(cwd, name)) {
+    Deno.exit(1)
+  }
+
+  const vscode = await confirm('Add recommended workspace settings of VS Code?')
 
   console.log("Downloading template. This might take a moment...");
 
@@ -60,6 +61,7 @@ export default async function (
   const entryList = new Untar(new Deno.Buffer(tarData));
 
   for await (const entry of entryList) {
+
     if (entry.fileName.startsWith(`alephjs-templates-${rev}/${template}/`)) {
       const fp = join(
         cwd,
