@@ -12,7 +12,6 @@ export default function (root: string, name: string): boolean {
     '.hgcheck',
     '.hgignore',
     '.idea',
-    '.npmignore',
     '.travis.yml',
     'LICENSE',
     'Thumbs.db',
