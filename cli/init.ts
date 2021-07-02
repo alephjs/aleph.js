@@ -1,16 +1,16 @@
-import { Untar } from "https://deno.land/std@0.96.0/archive/tar.ts";
-import { dim, green, red } from "https://deno.land/std@0.96.0/fmt/colors.ts";
-import { ensureDir } from "https://deno.land/std@0.96.0/fs/ensure_dir.ts";
-import { join } from "https://deno.land/std@0.96.0/path/mod.ts";
-import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
-import { x_brotli, x_flate } from "../server/compress.ts";
+import { Untar } from "https://deno.land/std@0.96.0/archive/tar.ts"
+import { cyan, dim, green, red } from "https://deno.land/std@0.96.0/fmt/colors.ts"
+import { ensureDir } from "https://deno.land/std@0.96.0/fs/ensure_dir.ts"
+import { join } from "https://deno.land/std@0.96.0/path/mod.ts"
+import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts"
+import { x_brotli, x_flate } from "../server/compress.ts"
 import {
   defaultReactVersion,
-  supportedAlephTemplate,
-} from "../shared/constants.ts";
-import { ensureTextFile } from "../shared/fs.ts";
-import util from "../shared/util.ts";
-import { VERSION } from "../version.ts";
+  supportedAlephTemplate
+} from "../shared/constants.ts"
+import { ensureTextFile } from "../shared/fs.ts"
+import util from "../shared/util.ts"
+import { VERSION } from "../version.ts"
 
 export const helpMessage = `
 Usage:
@@ -154,6 +154,16 @@ export default async function (
     }`,
   );
   console.log(dim("---"));
+  console.log()
+  console.log(
+    `    If you have any problems, do not hesitate to file an issue:`
+  )
+  console.log(
+    `      ${cyan(
+      'https://github.com/alephjs/aleph.js/issues/new'
+    )}`
+  )
+  console.log();
   Deno.exit(0);
 }
 
