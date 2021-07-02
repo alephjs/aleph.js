@@ -47,10 +47,8 @@ export async function render(
   nestedPageComponents.forEach(({ specifier, props }) => {
     if (util.isPlainObject(props)) {
       let expires = 0
-      if (typeof props.$expires === 'number' && props.$expires > 0) {
-        expires = props.$expires
-      } else if (typeof props.$ttl === 'number' && props.$ttl > 0) {
-        expires = Date.now() + Math.round(props.$ttl * 1000)
+      if (typeof props.$revalidate === 'number' && props.$revalidate > 0) {
+        expires = Date.now() + Math.round(props.$revalidate * 1000)
       }
       data[`props-${btoa(specifier)}`] = {
         value: props,
