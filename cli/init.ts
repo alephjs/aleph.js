@@ -22,7 +22,7 @@ Options:
 `;
 
 export default async function (
-  template: string = "hello-worldss",
+  template: string = "hello-world",
   nameArg?: string,
 ) {
 
