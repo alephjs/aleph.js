@@ -10,6 +10,10 @@ Deno.test(`util`, async () => {
   assertEquals(util.isLikelyHttpURL('file:///deno.land'), false)
   assertEquals(util.isLikelyHttpURL('www.deno.land'), false)
 
+  // test isUrlOk
+  assertEquals(util.isUrlOk('https://deno.land'), true)
+  assertEquals(util.isUrlOk('https://deno'), false);
+
   // test trimPrefix
   assertEquals(util.trimPrefix('foobar', 'foo'), 'bar')
   assertEquals(util.trimPrefix('foobar', 'baz'), 'foobar')
