@@ -1064,14 +1064,13 @@ export class Application implements ServerApplication {
       sourceHash: '',
       externalRemoteDeps,
       jsFile,
-      ready: new Promise((resolve, reject) => {
+      ready: new Promise((resolve) => {
         defer = (err?: Error) => {
           if (err) {
             this.#modules.delete(specifier)
-            reject(err)
-          } else {
-            resolve()
+            log.error(err.message)
           }
+          resolve()
         }
       })
     }
