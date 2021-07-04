@@ -239,7 +239,7 @@ impl SWC {
             } else {
               let path = Path::new(resolver.working_dir.as_str());
               let path = path
-                .join(dep.specifier.trim_start_matches("/"))
+                .join(dep.specifier.trim_start_matches('/'))
                 .to_slash()
                 .unwrap();
               raw.push_str(path.as_str());

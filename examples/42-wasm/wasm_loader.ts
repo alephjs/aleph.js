@@ -4,8 +4,8 @@ export default (): LoaderPlugin => ({
   type: 'loader',
   name: 'wasm-loader',
   test: /\.wasm$/i,
-  load: async ({ url }, app) => {
-    const { content } = await app.fetch(url)
+  load: async ({ specifier }, app) => {
+    const { content } = await app.fetch(specifier)
     return {
       code: [
         `const wasmBytes = new Uint8Array([${content.join(',')}])`,

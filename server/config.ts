@@ -8,7 +8,7 @@ import cssLoader from '../plugins/css.ts'
 import type { Config, ImportMap, PostCSSPlugin, LoaderPlugin } from '../types.ts'
 import { getAlephPkgUri } from './helper.ts'
 
-const builtinCSSLoader = cssLoader()
+export const builtinCSSLoader = cssLoader()
 
 export type RequiredConfig = Required<Config> & {
   react: ReactOptions

@@ -448,7 +448,7 @@ impl Fold for ResolveFold {
             Expr::Lit(Lit::Str(new_str(specifier)))
           } else {
             let path = Path::new(resolver.working_dir.as_str());
-            let path = path.join(specifier.trim_start_matches("/"));
+            let path = path.join(specifier.trim_start_matches('/'));
             Expr::Lit(Lit::Str(new_str(path.to_str().unwrap().into())))
           }
         } else {

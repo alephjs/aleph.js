@@ -19,7 +19,7 @@ import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import type { RequiredConfig } from './config.ts'
 import {
-  defaultConfig, fixConfigAndImportMap, getDefaultImportMap,
+  builtinCSSLoader, defaultConfig, fixConfigAndImportMap, getDefaultImportMap,
   isBuiltinCSSLoader, loadConfig, loadImportMap
 } from './config.ts'
 import {
@@ -786,22 +786,16 @@ export class Application implements ServerApplication {
         if (type !== 'css') {
           for (const loader of this.loaders) {
             if (loader.test.test(`.${type}`) && loader.load) {
-              const { code, type } = await loader.load({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
-              if (type === 'css') {
+              const { code, type: codeType } = await loader.load({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
+              if (codeType === 'css') {
+                type = 'css'
                 tpl = code
               }
             }
           }
         }
-        for (const loader of this.loaders) {
-          if (loader.test.test('.css') && loader.load) {
-            const { code, type } = await loader.load({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
-            if (type === 'css') {
-              return code
-            }
-          }
-        }
-        return tpl
+        const { code } = await builtinCSSLoader.load!({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
+        return code
       },
       isDev: this.isDev,
       react: this.config.react,
@@ -987,15 +981,11 @@ export class Application implements ServerApplication {
 
     if (sourceType === SourceType.CSS) {
       isStyle = true
-      for (const loader of this.loaders) {
-        if (loader.test.test('.css') && util.isFunction(loader.load)) {
-          // todo: covert source map
-          const { code, type = 'js' } = await loader.load({ specifier, data: sourceCode }, this)
-          if (type === 'js') {
-            sourceCode = code
-            sourceType = SourceType.JS
-          }
-        }
+      // todo: covert source map
+      const { code, type = 'js' } = await builtinCSSLoader.load!({ specifier, data: sourceCode }, this)
+      if (type === 'js') {
+        sourceCode = code
+        sourceType = SourceType.JS
       }
     }
 
