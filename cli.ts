@@ -1,17 +1,17 @@
-import { parse } from "https://deno.land/std@0.96.0/flags/mod.ts";
-import { resolve } from "https://deno.land/std@0.96.0/path/mod.ts";
-import { existsDir } from "./shared/fs.ts";
-import log, { LevelNames } from "./shared/log.ts";
-import util from "./shared/util.ts";
-import { VERSION } from "./version.ts";
+import { parse } from 'https://deno.land/std@0.96.0/flags/mod.ts'
+import { resolve } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { existsDir } from './shared/fs.ts'
+import log, { LevelNames } from './shared/log.ts'
+import util from './shared/util.ts'
+import { VERSION } from './version.ts';
 
 const commands = {
-  "init": "Create a new app",
-  "dev": "Start the app in development mode",
-  "start": "Start the app in production mode",
-  "build": "Build the app to a static site (SSG)",
-  "analyze": "Analyze the app deps",
-  "upgrade": "Upgrade Aleph.js command",
+  'init': 'Create a new app',
+  'dev': 'Start the app in development mode',
+  'start': 'Start the app in production mode',
+  'build': 'Build the app to a static site (SSG)',
+  'analyze': 'Analyze the app deps',
+  'upgrade': 'Upgrade Aleph.js command',
 };
 
 const helpMessage = `Aleph.js v${VERSION}
@@ -26,7 +26,7 @@ Usage:
 Commands:
     ${
   Object.entries(commands).map(([name, desc]) => `${name.padEnd(15)}${desc}`)
-    .join("\n    ")
+  .join('\n    ')
 }
 
 Options:
@@ -51,7 +51,7 @@ async function main() {
       `deno ${deno}`,
       `v8 ${v8}`,
       `typescript ${typescript}`,
-    ].join("\n"));
+    ].join('\n'));
     Deno.exit(0);
   }
 
@@ -77,27 +77,27 @@ async function main() {
   const { default: cmd } = await import(`./cli/${command}.ts`);
 
   // execute `init` command
-  if (command === "init") {
+  if (command === 'init') {
     await cmd(options?.template, args[0]);
     return;
   }
 
   // execute `upgrade` command
-  if (command === "upgrade") {
-    await cmd(options.v || options.version || args[0] || "latest");
+  if (command === 'upgrade') {
+    await cmd(options.v || options.version || args[0] || 'latest');
     return;
   }
 
   // set log level
-  const l = options.L || options["log-level"];
+  const l = options.L || options['log-level'];
   if (util.isNEString(l)) {
     log.setLevel(l.toLowerCase() as LevelNames);
   }
 
   // check working dir
-  const workingDir = resolve(String(args[0] || "."));
+  const workingDir = resolve(String(args[0] || '.'));
   if (!await existsDir(workingDir)) {
-    log.fatal("No such directory:", workingDir);
+    log.fatal('No such directory:', workingDir);
   }
 
   await cmd(workingDir, options);
