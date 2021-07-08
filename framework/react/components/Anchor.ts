@@ -28,7 +28,7 @@ export default function Anchor(props: AnchorProps) {
     rel,
     href: propHref,
     ['aria-current']: propAriaCurrent,
-    ['data-active-className']: activeClassName,
+    ['data-active-className']: activeClassName = 'active',
     ['data-active-style']: activeStyle,
     className: propClassName,
     style: propStyle,

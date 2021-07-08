@@ -6,7 +6,7 @@ import { inDeno } from '../helper.ts'
 export default function InlineStyle({ children, ...rest }: StyleHTMLAttributes<{}>) {
   const { inlineStyles } = useContext(SSRContext)
   const { __styleId: id } = rest as any
-  const css = children?.toLocaleString()
+  const css = children?.toString()
 
   if (id && css) {
     if (inDeno) {
