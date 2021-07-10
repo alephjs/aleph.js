@@ -338,7 +338,9 @@ export class Application implements ServerApplication {
                 e.emit('modify-' + specifier, { refreshPage: refreshPage || undefined })
               })
             }
+            this.clearSSRCache(specifier)
           })
+          this.clearSSRCache(specifier)
           log.info('modify', specifier)
         } catch (err) {
           log.error(`compile(${specifier}):`, err.message)
@@ -348,21 +350,25 @@ export class Application implements ServerApplication {
         let isIndex: boolean | undefined = undefined
         let emit = false
         if (this.isPageModule(specifier)) {
-          let isNewModule = true
+          let isNew = true
           this.#pageRouting.lookup(routes => {
             routes.forEach(({ module }) => {
               if (module === specifier) {
-                isNewModule = false
-                return false
+                isNew = false
+                return false // break loop
               }
             })
           })
-          if (isNewModule) {
-            const [path, _, index] = this.createRouteUpdate(specifier)
-            routePath = path
-            isIndex = index
+          if (isNew) {
+            const [_routePath, _specifier, _isIndex] = this.createRouteUpdate(specifier)
+            routePath = _routePath
+            specifier = _specifier
+            isIndex = _isIndex
             emit = true
+            this.#pageRouting.update(routePath, specifier, isIndex)
           }
+        } else if (specifier.startsWith('/api/')) {
+          this.#apiRouting.update(...this.createRouteUpdate(specifier))
         }
         if (trimBuiltinModuleExts(specifier) === '/app') {
           await this.compile(specifier)
@@ -380,16 +386,14 @@ export class Application implements ServerApplication {
         this.#modules.delete(specifier)
       }
       if (trimBuiltinModuleExts(specifier) === '/app') {
-        this.#renderer.clearCache()
         this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
-      } else if (specifier.startsWith('/pages/') && this.isPageModule(specifier)) {
-        const [routePath] = this.createRouteUpdate(specifier)
-        this.#renderer.clearCache(routePath)
+      } else if (this.isPageModule(specifier)) {
         this.#pageRouting.removeRouteByModule(specifier)
         this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
       } else if (specifier.startsWith('/api/')) {
         this.#apiRouting.removeRouteByModule(specifier)
       }
+      this.clearSSRCache(specifier)
       log.info('remove', specifier)
     }
   }
@@ -872,10 +876,11 @@ export class Application implements ServerApplication {
     if (!isBuiltinModuleType) {
       for (const loader of this.loaders) {
         if (loader.test.test(specifier) && loader.allowPage && loader.resolve) {
-          const { pagePath, isIndex: _isIndex } = loader.resolve(specifier)
+          const { pagePath, specifier: _specifier, isIndex: _isIndex } = loader.resolve(specifier)
           if (util.isNEString(pagePath)) {
             routePath = pagePath
-            if (!!_isIndex) {
+            specifier = _specifier
+            if (_isIndex) {
               isIndex = true
             }
             break
@@ -884,7 +889,7 @@ export class Application implements ServerApplication {
       }
     } else if (routePath !== '/') {
       for (const ext of builtinModuleExts) {
-        if (specifier.endsWith('/index.' + ext)) {
+        if (specifier.endsWith(`/index.${ext}`)) {
           isIndex = true
           break
         }
@@ -1279,11 +1284,10 @@ export class Application implements ServerApplication {
     }
   }
 
-  /** apply compilation side-effect caused by dependency graph updating. */
+  /** apply compilation side-effect caused by updating dependency graph. */
   private async applyCompilationSideEffect(by: Module, callback: (mod: Module) => void) {
     const hash = by.hash || by.sourceHash
     const hashData = (new TextEncoder()).encode(hash.substr(0, 6))
-    this.applyModuleSideEffect(by.specifier)
     for (const mod of this.#modules.values()) {
       const { deps } = mod
       if (deps.length > 0) {
@@ -1310,7 +1314,6 @@ export class Application implements ServerApplication {
           })
           mod.hash = hasher.toString()
           await this.cacheModule(mod)
-          this.applyModuleSideEffect(mod.specifier)
           callback(mod)
           await this.applyCompilationSideEffect(mod, callback)
         }
@@ -1318,15 +1321,12 @@ export class Application implements ServerApplication {
     }
   }
 
-  private applyModuleSideEffect(specifier: string) {
+  private clearSSRCache(specifier: string) {
     if (trimBuiltinModuleExts(specifier) === '/app') {
       this.#renderer.clearCache()
-    } else if (specifier.startsWith('/pages/')) {
+    } else if (this.isPageModule(specifier)) {
       const [routePath] = this.createRouteUpdate(specifier)
       this.#renderer.clearCache(routePath)
-      this.#pageRouting.update(...this.createRouteUpdate(specifier))
-    } else if (specifier.startsWith('/api/')) {
-      this.#apiRouting.update(...this.createRouteUpdate(specifier))
     }
   }
 

@@ -86,7 +86,11 @@ export class Renderer {
 
   clearCache(namespace?: string) {
     if (namespace) {
-      this.#cache.delete(namespace)
+      Array.from(this.#cache.keys()).forEach(key => {
+        if (key.startsWith(namespace)) {
+          this.#cache.delete(namespace)
+        }
+      })
     } else {
       this.#cache.clear()
     }
