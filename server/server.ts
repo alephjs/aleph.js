@@ -64,7 +64,6 @@ export class Server {
               if (data.type === 'hotAccept' && util.isNEString(data.specifier)) {
                 const mod = app.getModule(data.specifier)
                 if (mod) {
-                  log.debug('hmr on', mod.specifier)
                   watcher.on(`modify-${mod.specifier}`, (data) => {
                     socket.send(JSON.stringify({
                       ...data,
