@@ -141,6 +141,7 @@ export class Routing {
         pathname = '/' + a.slice(2).join('/')
       }
     }
+    pathname = util.trimSuffix(pathname, '/')
 
     this._lookup(route => {
       const path = route.map(r => r.path).join('')

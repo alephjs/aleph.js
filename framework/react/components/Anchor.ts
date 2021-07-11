@@ -61,7 +61,7 @@ export default function Anchor(props: AnchorProps) {
     }
 
     const [p, q] = util.splitBy(propHref, '?')
-    if (p !== pathname) {
+    if (util.trimSuffix(p, '/') !== pathname) {
       return false
     }
 
