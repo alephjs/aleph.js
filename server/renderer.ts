@@ -103,8 +103,13 @@ export class Renderer {
     const state = { entryFile: '' }
     const appModule = this.#app.getModule('app')
     const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
+    await Promise.all(
+      nestedModules
+        .filter(specifier => !this.#app.getModule(specifier))
+        .map(specifier => this.#app.compile(specifier))
+    )
     const nestedPageComponents = await Promise.all(nestedModules
-      .filter(specifier => this.#app.getModule(specifier) !== null)
+      .filter(specifier => !!this.#app.getModule(specifier))
       .map(async specifier => {
         const module = this.#app.getModule(specifier)!
         const { default: Component, ssr } = await this.#app.importModule(module)

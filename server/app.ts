@@ -600,39 +600,28 @@ export class Application implements ServerApplication {
   async getPageHTML(loc: { pathname: string, search?: string }): Promise<[number, string]> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { routePath } = router
-    const status = routePath !== '' ? 200 : 404
     const path = loc.pathname + (loc.search || '')
 
     if (!this.isSSRable(loc.pathname)) {
       const [html] = await this.#renderer.cache('-', 'spa-index', async () => {
         return [await this.#renderer.renderSPAIndexPage(), null]
       })
-      return [status, html]
+      return [200, html]
     }
 
     if (routePath === '') {
       const [html] = await this.#renderer.cache('404', path, async () => {
         const [_, nestedModules] = this.#pageRouting.createRouter({ pathname: '/404' })
-        if (nestedModules.length > 0) {
-          await this.compile(nestedModules[0])
-        }
         return await this.#renderer.renderPage(router, nestedModules.slice(0, 1))
       })
-      return [status, html]
+      return [404, html]
     }
 
     const [html] = await this.#renderer.cache(routePath, path, async () => {
-      await Promise.all(
-        nestedModules
-          .filter(specifier => !this.#modules.has(specifier))
-          .map(specifier => this.compile(specifier))
-      )
       return await this.#renderer.renderPage(router, nestedModules)
     })
-    return [status, html]
+    return [200, html]
   }
-
-
 
   /** create a fs watcher.  */
   createFSWatcher(): EventEmitter {
