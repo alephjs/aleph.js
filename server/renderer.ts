@@ -2,7 +2,7 @@ import { basename, dirname } from 'https://deno.land/std@0.99.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
-import type { Application, Module } from './app.ts'
+import type { Aleph, Module } from './aleph.ts'
 
 export type SSRData = {
   value: any
@@ -34,12 +34,12 @@ export type FrameworkRenderer = {
 
 /** The renderer class for SSR. */
 export class Renderer {
-  #app: Application
+  #aleph: Aleph
   #renderer: FrameworkRenderer
   #cache: Map<string, Map<string, SSROutput>>
 
-  constructor(app: Application) {
-    this.#app = app
+  constructor(app: Aleph) {
+    this.#aleph = app
     this.#renderer = { render: async () => { throw new Error("framework renderer is undefined") } }
     this.#cache = new Map()
   }
@@ -75,7 +75,7 @@ export class Renderer {
     }
     let [html, data] = await render()
     if (namespace !== '-') {
-      this.#app.getCodeInjects('ssr', key)?.forEach(transform => {
+      this.#aleph.getCodeInjects('ssr', key)?.forEach(transform => {
         const ret = transform(key, html)
         html = ret.code
       })
@@ -99,20 +99,20 @@ export class Renderer {
   /** render page base the given location. */
   async renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
     const start = performance.now()
-    const isDev = this.#app.isDev
+    const isDev = this.#aleph.isDev
     const state = { entryFile: '' }
-    const appModule = this.#app.getModule('app')
-    const { default: App } = appModule ? await this.#app.importModule(appModule) : {} as any
+    const appModule = this.#aleph.getModule('app')
+    const { default: App } = appModule ? await this.#aleph.importModule(appModule) : {} as any
     await Promise.all(
       nestedModules
-        .filter(specifier => !this.#app.getModule(specifier))
-        .map(specifier => this.#app.compile(specifier))
+        .filter(specifier => !this.#aleph.getModule(specifier))
+        .map(specifier => this.#aleph.compile(specifier))
     )
     const nestedPageComponents = await Promise.all(nestedModules
-      .filter(specifier => !!this.#app.getModule(specifier))
+      .filter(specifier => !!this.#aleph.getModule(specifier))
       .map(async specifier => {
-        const module = this.#app.getModule(specifier)!
-        const { default: Component, ssr } = await this.#app.importModule(module)
+        const module = this.#aleph.getModule(specifier)!
+        const { default: Component, ssr } = await this.#aleph.importModule(module)
         let ssrProps = ssr?.props
         if (util.isFunction(ssrProps)) {
           ssrProps = ssrProps(url)
@@ -134,7 +134,7 @@ export class Renderer {
     ].flat())
 
     // ensure working directory
-    Deno.chdir(this.#app.workingDir)
+    Deno.chdir(this.#aleph.workingDir)
 
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
@@ -157,7 +157,7 @@ export class Renderer {
             type: 'application/json',
             innerText: JSON.stringify(data, undefined, isDev ? 2 : 0),
           } : '',
-          ...this.#app.getSSRHTMLScripts(state.entryFile),
+          ...this.#aleph.getSSRHTMLScripts(state.entryFile),
           ...scripts.map((script: Record<string, any>) => {
             if (script.innerText && !isDev) {
               return { ...script, innerText: script.innerText }
@@ -176,26 +176,26 @@ export class Renderer {
   async renderSPAIndexPage(): Promise<string> {
     // todo: render custom fallback page
     return createHtml({
-      lang: this.#app.config.defaultLocale,
+      lang: this.#aleph.config.defaultLocale,
       head: [],
-      scripts: this.#app.getSSRHTMLScripts(),
+      scripts: this.#aleph.getSSRHTMLScripts(),
       body: '<div id="__aleph"></div>',
-      minify: !this.#app.isDev
+      minify: !this.#aleph.isDev
     })
   }
 
   private async lookupStyleModules(...specifiers: string[]): Promise<Record<string, { css?: string, href?: string }>> {
     const mods: Module[] = []
     specifiers.forEach(specifier => {
-      this.#app.lookupDeps(specifier, ({ specifier }) => {
-        const mod = this.#app.getModule(specifier)
+      this.#aleph.lookupDeps(specifier, ({ specifier }) => {
+        const mod = this.#aleph.getModule(specifier)
         if (mod && mod.isStyle) {
           mods.push({ ...mod, deps: [...mod.deps] })
         }
       })
     })
     return (await Promise.all(mods.map(async module => {
-      const { css, href } = await this.#app.importModule(module)
+      const { css, href } = await this.#aleph.importModule(module)
       return { specifier: module.specifier, css, href }
     }))).reduce((styles, { specifier, css, href }) => {
       styles[specifier] = { css, href }

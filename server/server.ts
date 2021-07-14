@@ -10,26 +10,26 @@ import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 import type { ServerRequest } from '../types.ts'
 import { Request } from './api.ts'
-import { Application } from './app.ts'
+import { Aleph } from './aleph.ts'
 import { getContentType } from './mime.ts'
 
 /** The Aleph server class. */
 export class Server {
-  #app: Application
+  #aleph: Aleph
   #ready: boolean
 
-  constructor(app: Application) {
-    this.#app = app
+  constructor(app: Aleph) {
+    this.#aleph = app
     this.#ready = false
   }
 
   async handle(r: ServerRequest) {
     if (!this.#ready) {
-      await this.#app.ready
+      await this.#aleph.ready
       this.#ready = true
     }
 
-    const app = this.#app
+    const app = this.#aleph
     const { basePath, headers, rewrites } = app.config
     const url = rewriteURL(r.url, basePath, rewrites)
     const pathname = decodeURI(url.pathname)

@@ -13,7 +13,7 @@ import { Routing } from '../framework/core/routing.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { ImportMap, RouterURL, ServerApplication } from '../types.ts'
+import type { ImportMap, RouterURL, Aleph as IAleph } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
@@ -70,8 +70,8 @@ type CompileOptions = {
 type Transformer = { test?: RegExp | string, fn: TransformFn }
 type TransformFn = (specifier: string, code: string, map?: string) => { code: string, map?: string }
 
-/** The application class for aleph server. */
-export class Application implements ServerApplication {
+/** The Aleph class for aleph server. */
+export class Aleph implements IAleph {
   readonly mode: 'development' | 'production'
   readonly workingDir: string
   readonly buildDir: string

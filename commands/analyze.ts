@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.99.0/http/server.ts'
-import { Application } from '../server/app.ts'
+import { Aleph } from '../server/aleph.ts'
 import { getFlag, parsePortNumber } from '../shared/flags.ts'
 import log from '../shared/log.ts'
 
@@ -18,10 +18,10 @@ Options:
 `
 
 export default async function (workingDir: string, flags: Record<string, any>) {
-  const app = new Application(workingDir, 'production', Boolean(flags.r || flags.reload))
+  const aleph = new Aleph(workingDir, 'production', Boolean(flags.r || flags.reload))
   const port = parsePortNumber(getFlag(flags, ['p', 'port'], '9000'))
-  await app.ready
-  const entries = app.analyze()
+  await aleph.ready
+  const entries = aleph.analyze()
   const s = serve({ port })
   log.info(`Server ready on http://localhost:${port}`)
   for await (const r of s) {

@@ -40,13 +40,13 @@ export type Config = {
 }
 
 /**
- * A loader plugin to load source media.
+ * The loader plugin to load source media.
  */
 export type LoaderPlugin = {
-  /** `name` gives the plugin a name. */
-  name: string
   /** `type` specifies the plugin type. */
   type: 'loader'
+  /** `name` gives the plugin a name. */
+  name: string
   /** `test` matches the import specifier. */
   test: RegExp
   /** `acceptHMR` enables the HMR. */
@@ -56,19 +56,19 @@ export type LoaderPlugin = {
   /** `resove` resolves the module specifier. */
   resolve?(specifier: string): ResolveResult
   /** `load` loads the source content. */
-  load?(input: { specifier: string, data?: any }, app: ServerApplication): LoaderOutput | Promise<LoaderOutput>
+  load?(input: { specifier: string, data?: any }, aleph: Aleph): LoaderOutput | Promise<LoaderOutput>
 }
 
 /**
- * A server plugin to enhance aleph server.
+ * The server plugin to enhance aleph runtime.
  */
 export type ServerPlugin = {
-  /** `name` gives the plugin a name. */
-  name: string
   /** `type` specifies the plugin type. */
   type: 'server'
+  /** `name` gives the plugin a name. */
+  name: string
   /** `setup` setups the plugin. */
-  setup(app: ServerApplication): Promise<void> | void
+  setup(aleph: Aleph): Promise<void> | void
 }
 
 /**
@@ -169,9 +169,9 @@ export type SSROptions = {
 }
 
 /**
- * An interface that aligns to the parts of the aleph server's `Application`.
+ * An interface that aligns to the parts of the `Aleph`.
  */
-export interface ServerApplication {
+export interface Aleph {
   readonly mode: 'development' | 'production'
   readonly workingDir: string
   readonly buildDir: string

@@ -1,5 +1,5 @@
 import util from '../shared/util.ts'
-import type { Application, Module } from './app.ts'
+import type { Aleph, Module } from './aleph.ts'
 import { getAlephPkgUri } from './helper.ts'
 
 export type DependencyGraph = {
@@ -15,11 +15,11 @@ export type DependencyGraph = {
 }
 
 export class Analyzer {
-  #app: Application
+  #aleph: Aleph
   #entries: DependencyGraph[]
 
-  constructor(app: Application) {
-    this.#app = app
+  constructor(app: Aleph) {
+    this.#aleph = app
     this.#entries = [
       Analyzer.blankDependencyGraph('virtual:/vendor.js', true),
       Analyzer.blankDependencyGraph('virtual:/common.js', true),
@@ -31,7 +31,7 @@ export class Analyzer {
   }
 
   reset() {
-    const { framework } = this.#app.config
+    const { framework } = this.#aleph.config
     const bootstrapModuleUrl = `${getAlephPkgUri()}/framework/${framework}/bootstrap.ts`
 
     this.#entries = [
@@ -48,7 +48,7 @@ export class Analyzer {
     }, true))
 
     // app.js
-    const appMoudle = this.#app.getModule('app')
+    const appMoudle = this.#aleph.getModule('app')
     if (appMoudle) {
       this.#entries.push(this.createDependencyGraph(appMoudle, true))
     }
@@ -105,15 +105,15 @@ export class Analyzer {
 
     module.deps.forEach(dep => {
       if (
-        this.#app.getModule(dep.specifier) !== null &&
+        this.#aleph.getModule(dep.specifier) !== null &&
         deps.findIndex(({ specifier, isDynamic }) => dep.specifier === specifier && dep.isDynamic === isDynamic) === -1
       ) {
         deps.push(dep)
       }
     })
-    graph.deps = deps.filter(({ specifier }) => this.#app.getModule(specifier) !== null)
+    graph.deps = deps.filter(({ specifier }) => this.#aleph.getModule(specifier) !== null)
       .map(dep => {
-        const depMod = this.#app.getModule(dep.specifier)!
+        const depMod = this.#aleph.getModule(dep.specifier)!
         const isRemote = util.isLikelyHttpURL(dep.specifier)
         const sharedGraph = this.#entries[isRemote ? 0 : 1]
 

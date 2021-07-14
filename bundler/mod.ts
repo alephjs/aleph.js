@@ -6,7 +6,7 @@ import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
 import type { BrowserNames } from '../types.ts'
 import { VERSION } from '../version.ts'
 import type { DependencyGraph } from '../server/analyzer.ts'
-import type { Application, Module } from '../server/app.ts'
+import type { Aleph, Module } from '../server/aleph.ts'
 import { clearBuildCache, computeHash, getAlephPkgUri } from '../server/helper.ts'
 import { esbuild, stopEsbuild, esbuildUrlLoader } from './esbuild.ts'
 
@@ -48,12 +48,12 @@ export const bundlerRuntimeCode = `
 
 /** The bundler class for aleph server. */
 export class Bundler {
-  #app: Application
+  #aleph: Aleph
   #chunks: Map<string, { filename: string, async?: boolean }>
   #compiled: Map<string, string>
 
-  constructor(app: Application) {
-    this.#app = app
+  constructor(app: Aleph) {
+    this.#aleph = app
     this.#chunks = new Map()
     this.#compiled = new Map()
   }
@@ -62,7 +62,7 @@ export class Bundler {
     const vendorDeps = entries.find(({ specifier }) => specifier === 'virtual:/vendor.js')?.deps.map(({ specifier }) => specifier) || []
     const commonDeps = entries.find(({ specifier }) => specifier === 'virtual:/common.js')?.deps.map(({ specifier }) => specifier) || []
 
-    if (this.#app.config.buildTarget !== 'esnext') {
+    if (this.#aleph.config.buildTarget !== 'esnext') {
       await this.bundlePolyfillsChunck()
     }
     await this.bundleChunk(
@@ -114,7 +114,7 @@ export class Bundler {
   }
 
   private async copyBundleFile(jsFilename: string) {
-    const { workingDir, buildDir, config } = this.#app
+    const { workingDir, buildDir, config } = this.#aleph
     const outputDir = join(workingDir, config.outputDir)
     const bundleFile = join(buildDir, jsFilename)
     const saveAs = join(outputDir, '_aleph', jsFilename)
@@ -127,14 +127,14 @@ export class Bundler {
       return this.#compiled.get(mod.specifier)!
     }
 
-    const jsFile = join(this.#app.buildDir, mod.jsFile.slice(0, -3) + '.bundling.js')
+    const jsFile = join(this.#aleph.buildDir, mod.jsFile.slice(0, -3) + '.bundling.js')
     this.#compiled.set(mod.specifier, jsFile)
 
     if (await existsFile(jsFile)) {
       return jsFile
     }
 
-    const source = await this.#app.loadModuleSource(mod.specifier)
+    const source = await this.#aleph.loadModuleSource(mod.specifier)
     if (source === null) {
       this.#compiled.delete(mod.specifier)
       throw new Error(`Unsupported module '${mod.specifier}'`)
@@ -145,7 +145,7 @@ export class Bundler {
         mod.specifier,
         source.code,
         {
-          ...this.#app.commonCompileOptions,
+          ...this.#aleph.commonCompileOptions,
           swcOptions: {
             sourceType: source.type,
           },
@@ -157,7 +157,7 @@ export class Bundler {
       if (starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
           const specifier = starExports[index]
-          const names = await this.#app.parseModuleExportNames(specifier)
+          const names = await this.#aleph.parseModuleExportNames(specifier)
           code = code.replaceAll(`export * from "[${specifier}]:`, `export {${names.filter(name => name !== 'default').join(',')}} from "`)
           code = code.replaceAll(`export const $$star_${index}`, `export const {${names.filter(name => name !== 'default').join(',')}}`)
         }
@@ -166,7 +166,7 @@ export class Bundler {
       // compile deps
       await Promise.all(mod.deps.map(async dep => {
         if (!dep.specifier.startsWith('#') && !externals.includes(dep.specifier)) {
-          const depMod = this.#app.getModule(dep.specifier)
+          const depMod = this.#aleph.getModule(dep.specifier)
           if (depMod !== null) {
             await this.compile(depMod, externals)
           }
@@ -188,10 +188,10 @@ export class Bundler {
         r[name] = chunk.filename
         return r
       }, {} as Record<string, string>)
-    const mainJS = `__ALEPH__.asyncChunks=${JSON.stringify(asyncChunks)};` + this.#app.createMainJS(true)
+    const mainJS = `__ALEPH__.asyncChunks=${JSON.stringify(asyncChunks)};` + this.#aleph.createMainJS(true)
     const hash = computeHash(mainJS)
     const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
-    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    const bundleFilePath = join(this.#aleph.buildDir, bundleFilename)
     await Deno.writeTextFile(bundleFilePath, mainJS)
     this.#chunks.set('main', { filename: bundleFilename })
   }
@@ -199,11 +199,11 @@ export class Bundler {
   /** create polyfills bundle. */
   private async bundlePolyfillsChunck() {
     const alephPkgUri = getAlephPkgUri()
-    const { buildTarget } = this.#app.config
+    const { buildTarget } = this.#aleph.config
     const polyfillTarget = 'es' + (parseInt(buildTarget.slice(2)) + 1) // buildTarget + 1
     const hash = computeHash(polyfillTarget + '/esbuild@v0.11.11/' + VERSION)
     const bundleFilename = `polyfills.bundle.${hash.slice(0, 8)}.js`
-    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    const bundleFilePath = join(this.#aleph.buildDir, bundleFilename)
     if (!await existsFile(bundleFilePath)) {
       const rawPolyfillsFile = `${alephPkgUri}/bundler/polyfills/${polyfillTarget}/mod.ts`
       await this.build(rawPolyfillsFile, bundleFilePath)
@@ -214,8 +214,8 @@ export class Bundler {
   /** create bundle chunk. */
   private async bundleChunk(name: string, entry: string[], external: string[], asyncChunk: boolean = false) {
     const entryCode = (await Promise.all(entry.map(async (specifier, i) => {
-      const { buildDir } = this.#app
-      let mod = this.#app.getModule(specifier)
+      const { buildDir } = this.#aleph
+      let mod = this.#aleph.getModule(specifier)
       if (mod && mod.jsFile !== '') {
         if (external.length === 0) {
           return [
@@ -234,8 +234,8 @@ export class Bundler {
     }))).flat().join('\n')
     const hash = computeHash(entryCode + VERSION + Deno.version.deno)
     const bundleFilename = `${name}.bundle.${hash.slice(0, 8)}.js`
-    const bundleEntryFile = join(this.#app.buildDir, `${name}.bundle.entry.js`)
-    const bundleFilePath = join(this.#app.buildDir, bundleFilename)
+    const bundleEntryFile = join(this.#aleph.buildDir, `${name}.bundle.entry.js`)
+    const bundleFilePath = join(this.#aleph.buildDir, bundleFilename)
     if (!await existsFile(bundleFilePath)) {
       await Deno.writeTextFile(bundleEntryFile, entryCode)
       await this.build(bundleEntryFile, bundleFilePath)
@@ -246,7 +246,7 @@ export class Bundler {
 
   /** run deno bundle and compress the output using terser. */
   private async build(entryFile: string, bundleFile: string) {
-    const { buildTarget, browserslist } = this.#app.config
+    const { buildTarget, browserslist } = this.#aleph.config
 
     await clearBuildCache(bundleFile)
     await esbuild({

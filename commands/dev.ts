@@ -1,4 +1,4 @@
-import { Application } from '../server/app.ts'
+import { Aleph } from '../server/aleph.ts'
 import { serve } from '../server/stdserver.ts'
 import { getFlag, parsePortNumber } from '../shared/flags.ts'
 
@@ -18,8 +18,8 @@ Options:
 `
 
 export default async function (workingDir: string, flags: Record<string, any>) {
-  const app = new Application(workingDir, 'development', Boolean(flags.r || flags.reload))
+  const aleph = new Aleph(workingDir, 'development', Boolean(flags.r || flags.reload))
   const hostname = getFlag(flags, ['hostname'])
   const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
-  await serve({ app, port, hostname })
+  await serve({ aleph, port, hostname })
 }

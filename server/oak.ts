@@ -1,12 +1,12 @@
 import type { Context } from 'https://deno.land/x/oak@v7.7.0/context.ts'
 import type { Middleware } from 'https://deno.land/x/oak@v7.7.0/middleware.ts'
 import { NativeRequest } from 'https://deno.land/x/oak@v7.7.0/http_server_native.ts'
-import { Application } from './app.ts'
+import { Aleph } from './aleph.ts'
 import { Server } from './server.ts'
 
 /** Create an oak middleware for Aleph server. */
-export function alephOak(app: Application): Middleware {
-  const server = new Server(app)
+export function alephOak(aleph: Aleph): Middleware {
+  const server = new Server(aleph)
 
   return (ctx: Context) => {
     const { originalRequest } = ctx.request

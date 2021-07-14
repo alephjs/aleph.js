@@ -1,14 +1,14 @@
 import { serve as stdServe, serveTLS, Server as StdServer } from 'https://deno.land/std@0.99.0/http/server.ts'
 import log from '../shared/log.ts'
 import type { ServerRequest } from '../types.ts'
-import { Application } from './app.ts'
+import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
 import { Server } from './server.ts'
 
 /** Options for creating a standard Aleph server. */
 export type ServeOptions = {
-  /** The Aleph Server Application to serve. */
-  app: Application
+  /** The Aleph to serve. */
+  aleph: Aleph
   /** The port to listen on. */
   port: number
   /** A literal IP address or host name that can be resolved to an IP address.
@@ -24,9 +24,9 @@ export type ServeOptions = {
 }
 
 /** Create a standard Aleph server. */
-export async function serve({ app, port, hostname, certFile, keyFile, signal }: ServeOptions) {
-  const server = new Server(app)
-  await app.ready
+export async function serve({ aleph, port, hostname, certFile, keyFile, signal }: ServeOptions) {
+  const server = new Server(aleph)
+  await aleph.ready
 
   while (true) {
     try {
@@ -39,16 +39,16 @@ export async function serve({ app, port, hostname, certFile, keyFile, signal }: 
       signal?.addEventListener('abort', () => {
         (s as StdServer).close()
       })
-      if (!app.isDev && app.config.compress) {
+      if (!aleph.isDev && aleph.config.compress) {
         compress.init()
       }
-      log.info(`Server ready on http://${hostname || 'localhost'}:${port}${app.config.basePath}`)
+      log.info(`Server ready on http://${hostname || 'localhost'}:${port}${aleph.config.basePath}`)
       for await (const r of s) {
         server.handle(r)
       }
     } catch (err) {
       if (err instanceof Deno.errors.AddrInUse) {
-        if (!app.isDev) {
+        if (!aleph.isDev) {
           log.fatal(`port ${port} already in use!`)
         }
         log.warn(`port ${port} already in use, try ${port + 1}...`)
