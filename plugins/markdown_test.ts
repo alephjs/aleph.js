@@ -1,13 +1,13 @@
 import { join } from 'std/path/mod.ts'
 import { assert, assertEquals } from 'std/testing/asserts.ts'
-import { Application } from '../server/app.ts'
+import { Aleph } from '../server/aleph.ts'
 import { ensureTextFile } from '../shared/fs.ts'
 import markdownLoader from './markdown.ts'
 
 Deno.test('plugin: markdown loader', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const app = new Application(dir)
+  const app = new Aleph(dir)
   const loader = markdownLoader()
   await ensureTextFile(
     join(dir, '/pages/docs/index.md'),

@@ -22,7 +22,7 @@ export default (): LoaderPlugin => {
     },
     load: async ({ specifier }, app) => {
       const { framework } = app.config
-      const { content } = await app.fetch(specifier)
+      const { content } = await app.fetchModule(specifier)
       const { __content, ...meta } = safeLoadFront((new TextDecoder).decode(content))
       const html = marked.parse(__content)
       const props = {

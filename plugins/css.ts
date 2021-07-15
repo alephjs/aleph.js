@@ -81,7 +81,7 @@ export default (): LoaderPlugin => {
       } else if (util.isNEString(data)) {
         sourceCode = data
       } else {
-        const { content } = await app.fetch(specifier)
+        const { content } = await app.fetchModule(specifier)
         sourceCode = (new TextDecoder).decode(content)
       }
 

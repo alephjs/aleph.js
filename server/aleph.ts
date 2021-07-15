@@ -754,7 +754,7 @@ export class Aleph implements IAleph {
 
   /** parse the export names of the module. */
   async parseModuleExportNames(specifier: string): Promise<string[]> {
-    const { content, contentType } = await this.fetch(specifier)
+    const { content, contentType } = await this.fetchModule(specifier)
     const sourceType = getSourceType(specifier, contentType || undefined)
     if (sourceType === SourceType.Unknown || sourceType === SourceType.CSS) {
       return []
@@ -888,10 +888,10 @@ export class Aleph implements IAleph {
     return [routePath, specifier, isIndex]
   }
 
-  /** fetch resource by the url. */
-  async fetch(url: string): Promise<{ content: Uint8Array, contentType: string | null }> {
-    if (!util.isLikelyHttpURL(url)) {
-      const filepath = join(this.workingDir, this.config.srcDir, util.trimPrefix(url, 'file://'))
+  /** fetch module content by the specifier. */
+  async fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }> {
+    if (!util.isLikelyHttpURL(specifier)) {
+      const filepath = join(this.workingDir, this.config.srcDir, util.trimPrefix(specifier, 'file://'))
       if (await existsFile(filepath)) {
         const content = await Deno.readFile(filepath)
         return { content, contentType: getContentType(filepath) }
@@ -901,16 +901,16 @@ export class Aleph implements IAleph {
     }
 
     // append `dev` query for development mode
-    if (this.isDev && url.startsWith('https://esm.sh/')) {
-      const u = new URL(url)
+    if (this.isDev && specifier.startsWith('https://esm.sh/')) {
+      const u = new URL(specifier)
       if (!u.searchParams.has('dev')) {
         u.searchParams.set('dev', '')
         u.search = u.search.replace('dev=', 'dev')
-        url = u.toString()
+        specifier = u.toString()
       }
     }
 
-    return await cache(url, {
+    return await cache(specifier, {
       forceRefresh: this.#reloading,
       retryTimes: 10
     })
@@ -966,7 +966,7 @@ export class Aleph implements IAleph {
       sourceCode = code
       sourceMap = map || null
     } else {
-      const source = await this.fetch(specifier)
+      const source = await this.fetchModule(specifier)
       sourceType = getSourceType(specifier, source.contentType || undefined)
       if (sourceType !== SourceType.Unknown) {
         sourceCode = (new TextDecoder).decode(source.content)

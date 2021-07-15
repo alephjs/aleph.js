@@ -1,8 +1,3 @@
-import type { Status } from 'https://deno.land/std@0.99.0/http/http_status.ts'
-import type { BufReader, BufWriter } from 'https://deno.land/std@0.99.0/io/bufio.ts'
-import type { MultipartFormData } from 'https://deno.land/std@0.99.0/mime/multipart.ts'
-import { Plugin, PluginCreator } from 'https://esm.sh/postcss@8.2.15'
-
 /**
  * The config for aleph server.
  */
@@ -74,7 +69,7 @@ export type ServerPlugin = {
 /**
  * The Plugin for postcss.
  */
-export type PostCSSPlugin = string | [string, any] | Plugin | PluginCreator<any>
+export type PostCSSPlugin = string | [string, any] | Record<string, any> | CallableFunction
 
 /**
  * The result of loader's resolve method.
@@ -177,49 +172,20 @@ export interface Aleph {
   readonly buildDir: string
   readonly config: Required<Config>
   readonly importMap: ImportMap
+  fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
   addModule(specifier: string, sourceCode?: string): Promise<void>
   addDist(path: string, content: Uint8Array): Promise<void>
-  fetch(url: string): Promise<{ content: Uint8Array, contentType: string | null }>
   injectCode(phase: 'compilation' | 'hmr' | 'ssr', test: RegExp | string, transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
   injectCode(phase: 'compilation' | 'hmr' | 'ssr', transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
 }
 
 /**
- * An interface that aligns to the parts of std http srever's `ServerRequest`.
- */
-export interface ServerRequest {
-  readonly url: string
-  readonly method: string
-  readonly headers: Headers
-  readonly conn: Deno.Conn
-  readonly r: BufReader
-  readonly w: BufWriter
-  readonly body: Deno.Reader
-  respond(r: ServerResponse): Promise<void>
-}
-
-/**
- * An interface is compatible with std http srever's `request.respond()`.
- */
-export interface ServerResponse {
-  status?: number
-  headers?: Headers
-  body?: Uint8Array | Deno.Reader | string
-}
-
-/**
  * An interface extends the `ServerRequest` for API requests.
  */
-export interface APIRequest extends ServerRequest {
-  readonly params: Record<string, string>
-  readonly query: URLSearchParams
-  readonly cookies: ReadonlyMap<string, string>
-  readonly hostname: string
-  /** `readBody` reads the body to an object in bytes, string, json, or multipart form data. */
-  readBody(type?: 'raw'): Promise<Uint8Array>
-  readBody(type: 'text'): Promise<string>
-  readBody(type: 'json'): Promise<any>
-  readBody(type: 'form'): Promise<MultipartFormData>
+export interface APIRequest {
+  readonly req: Request
+  readonly router: RouterURL
+
   /**
    * `addHeader` adds a new value onto an existing response header of the request, or
    * adds the header if it does not already exist.
@@ -234,12 +200,12 @@ export interface APIRequest extends ServerRequest {
   removeHeader(key: string): this
   /** `status` sets response status of the request. */
   status(code: number): this
-  /** `send` replies to the request with any content with type. */
+  /** `send` replies to the request with raw content. */
   send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
   /** `json` replies to the request with a json content. */
   json(data: any): Promise<void>
   /** `redirect` replies to redirect the client to another URL with optional response `status` defaulting to 302. */
-  redirect(url: string, status?: Status): this
+  redirect(url: string, status?: number): this
 }
 
 /**
