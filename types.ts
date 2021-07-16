@@ -193,7 +193,7 @@ export type ServerOptions = {
  * The middleware for api requests.
  */
 export type APIMiddleware = {
-  (req: APIRequest, next: () => void): void
+  (req: APIRequest, next: () => void): Promise<void>
 }
 
 /**

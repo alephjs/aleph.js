@@ -7,6 +7,7 @@ import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
+import { APIRequest } from '../types.ts'
 import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
 import { getContentType } from './mime.ts'
@@ -29,7 +30,7 @@ export class Server {
     }
 
     const app = this.#aleph
-    const { basePath, server: { headers, rewrites } } = app.config
+    const { basePath, server: { headers, rewrites, middlewares } } = app.config
     const url = resolveURL(req.url, basePath, rewrites)
     const pathname = decodeURI(url.pathname)
 
@@ -205,10 +206,18 @@ export class Server {
         if (route !== null) {
           try {
             const [router, module] = route
-
-            const { default: handle } = await app.importModule(module)
-            if (util.isFunction(handle)) {
-              await handle({ req, resp, router, data: {} })
+            const context: APIRequest = { req, resp, router, data: new Map() }
+            for (const mw of middlewares) {
+              let next = false
+              await mw(context, () => next = true)
+              if (!next) {
+                return
+              }
+            }
+            const { default: _handler, handler } = await app.importModule(module)
+            const h = _handler || handler
+            if (util.isFunction(h)) {
+              await h(context)
             } else {
               await resp.status(500).json({ status: 500, message: 'bad api handler' })
             }

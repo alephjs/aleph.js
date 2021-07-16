@@ -112,10 +112,10 @@ export async function loadConfig(specifier: string): Promise<Config> {
   }
   if (util.isPlainObject(server)) {
     config.server = {
-      headers: util.isPlainObject(build.headers) ? toStringMap(build.headers) : {},
-      rewrites: util.isPlainObject(build.rewrites) ? toStringMap(build.rewrites) : {},
-      middlewares: Array.isArray(build.middlewares) ? build.middlewares : [],
-      compress: typeof build.compress === 'boolean' ? build.compress : true
+      headers: util.isPlainObject(server.headers) ? toStringMap(server.headers) : {},
+      rewrites: util.isPlainObject(server.rewrites) ? toStringMap(server.rewrites) : {},
+      middlewares: Array.isArray(server.middlewares) ? server.middlewares : [],
+      compress: typeof server.compress === 'boolean' ? server.compress : true
     }
   }
   if (util.isPlainObject(css)) {
