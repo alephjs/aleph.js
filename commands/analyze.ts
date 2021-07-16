@@ -33,4 +33,13 @@ export default async function (workingDir: string, flags: Record<string, any>) {
       body: JSON.stringify(entries)
     })
   }
+  const server = Deno.listen({ port })
+  log.info(`Server ready on http://localhost:${port}`)
+
+  for await (const conn of server) {
+    (async () => {
+      const httpConn = Deno.serveHttp(conn)
+      for await (const requestEvent of httpConn) { }
+    })()
+  }
 }

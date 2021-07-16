@@ -87,7 +87,7 @@ async function main() {
 
   // set log level
   const l = options.L || options['log-level']
-  if (util.isNEString(l)) {
+  if (util.isFilledString(l)) {
     log.setLevel(l.toLowerCase() as LevelNames)
   }
 

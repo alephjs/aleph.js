@@ -1,18 +1,18 @@
 import { getAlephPkgUri } from '../../server/helper.ts'
-import type { ServerApplication } from '../../types.ts'
+import type { Aleph } from '../../types.ts'
 
-export async function init(app: ServerApplication) {
-  if (app.mode === 'development') {
+export async function init(aleph: Aleph) {
+  if (aleph.mode === 'development') {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
-    await app.addModule(`${alephPkgUri}/framework/react/refresh.ts`)
-    app.injectCode('compilation', '/main.js', (_: string, code: string) => ({
+    await aleph.addModule(`${alephPkgUri}/framework/react/refresh.ts`)
+    aleph.injectCode('compilation', '/main.js', (_: string, code: string) => ({
       code: [
         `import "./-/${alephPkgPath}/framework/react/refresh.js";`,
         code
       ].join('\n')
     }))
-    app.injectCode('hmr', (specifier: string, code: string) => ({
+    aleph.injectCode('hmr', (specifier: string, code: string) => ({
       code: code.includes('$RefreshReg$(') ? [
         'const prevRefreshReg = $RefreshReg$;',
         'const prevRefreshSig = $RefreshSig$;',

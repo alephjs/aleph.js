@@ -128,7 +128,7 @@ export async function render(
   rendererStore.headElements.forEach(({ type, props }) => {
     const { children, ...rest } = props
     if (type === 'title') {
-      if (util.isNEString(children)) {
+      if (util.isFilledString(children)) {
         ret.head.push(`<title ssr>${children}</title>`)
       } else if (util.isNEArray(children)) {
         ret.head.push(`<title ssr>${children.join('')}</title>`)
@@ -137,7 +137,7 @@ export async function render(
       const attrs = Object.entries(rest).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`).join('')
       if (type === 'script') {
         ret.head.push(`<${type}${attrs}>${Array.isArray(children) ? children.join('') : children || ''}</${type}>`)
-      } else if (util.isNEString(children)) {
+      } else if (util.isFilledString(children)) {
         ret.head.push(`<${type}${attrs} ssr>${children}</${type}>`)
       } else if (util.isNEArray(children)) {
         ret.head.push(`<${type}${attrs} ssr>${children.join('')}</${type}>`)
@@ -150,9 +150,9 @@ export async function render(
   // insert script tags
   rendererStore.scripts.forEach(({ props }) => {
     const { children, dangerouslySetInnerHTML, ...attrs } = props
-    if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
+    if (dangerouslySetInnerHTML && util.isFilledString(dangerouslySetInnerHTML.__html)) {
       ret.scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
-    } if (util.isNEString(children)) {
+    } if (util.isFilledString(children)) {
       ret.scripts.push({ ...attrs, innerText: children })
     } else if (util.isNEArray(children)) {
       ret.scripts.push({ ...attrs, innerText: children.join('') })

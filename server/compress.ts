@@ -1,5 +1,3 @@
-import type { ServerRequest, ServerResponse } from '../types.ts'
-
 export const x_brotli = 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 export const x_flate = 'https://deno.land/x/denoflate@1.2.1/mod.ts'
 
@@ -20,11 +18,19 @@ class Compression {
     this.#ready = true
   }
 
-  apply(req: ServerRequest, resp: ServerResponse, contentType: string, content: Uint8Array): Uint8Array {
+  compress(
+    content: Uint8Array,
+    options: {
+      contentType: string,
+      reqHeaders: Headers,
+      respHeaders: Headers
+    }
+  ): Uint8Array {
     if (!this.#ready) {
       return content
     }
 
+    const { contentType, reqHeaders, respHeaders } = options
     let shouldCompress = false
     if (contentType) {
       if (contentType.startsWith('text/')) {
@@ -37,14 +43,14 @@ class Compression {
     }
 
     if (shouldCompress && content.length > 1024) {
-      const ae = req.headers.get('accept-encoding') || ''
+      const ae = reqHeaders.get('accept-encoding') || ''
       if (ae.includes('br') && this.#brotli !== null) {
-        resp.headers?.set('Vary', 'Origin')
-        resp.headers?.set('Content-Encoding', 'br')
+        respHeaders.set('Vary', 'Origin')
+        respHeaders.set('Content-Encoding', 'br')
         return this.#brotli(content)
       } else if (ae.includes('gzip') && this.#gzip !== null) {
-        resp.headers?.set('Vary', 'Origin')
-        resp.headers?.set('Content-Encoding', 'gzip')
+        respHeaders.set('Vary', 'Origin')
+        respHeaders.set('Content-Encoding', 'gzip')
         return this.#gzip(content)
       }
     }

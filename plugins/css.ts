@@ -78,7 +78,7 @@ export default (): LoaderPlugin => {
 
       if (data instanceof Uint8Array) {
         sourceCode = (new TextDecoder).decode(data)
-      } else if (util.isNEString(data)) {
+      } else if (util.isFilledString(data)) {
         sourceCode = data
       } else {
         const { content } = await app.fetchModule(specifier)
@@ -146,7 +146,7 @@ export default (): LoaderPlugin => {
 async function initPostCSS(plugins: PostCSSPlugin[], isDev: boolean) {
   const pluginObjects = await Promise.all(plugins.filter(p => {
     if (isDev) {
-      if (util.isNEString(p) && productionOnlyPostcssPlugins.includes(p)) {
+      if (util.isFilledString(p) && productionOnlyPostcssPlugins.includes(p)) {
         return false
       } else if (Array.isArray(p) && productionOnlyPostcssPlugins.includes(p[0])) {
         return false
@@ -154,7 +154,7 @@ async function initPostCSS(plugins: PostCSSPlugin[], isDev: boolean) {
     }
     return true
   }).map(async p => {
-    if (util.isNEString(p)) {
+    if (util.isFilledString(p)) {
       return await importPostcssPluginByName(p)
     } else if (Array.isArray(p)) {
       const Plugin = await importPostcssPluginByName(p[0])

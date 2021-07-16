@@ -2,7 +2,7 @@ export default {
   isString(a: any): a is string {
     return typeof a === 'string'
   },
-  isNEString(a: any): a is string {
+  isFilledString(a: any): a is string {
     return typeof a === 'string' && a.length > 0
   },
   isArray(a: any): a is Array<any> {

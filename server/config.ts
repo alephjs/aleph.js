@@ -5,26 +5,30 @@ import { existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import cssLoader from '../plugins/css.ts'
-import type { Config, ImportMap, PostCSSPlugin, LoaderPlugin } from '../types.ts'
+import type { BrowserNames, Config, ImportMap, PostCSSPlugin, LoaderPlugin } from '../types.ts'
 import { getAlephPkgUri } from './helper.ts'
 
 export const builtinCSSLoader = cssLoader()
 
 export type RequiredConfig = Required<Config> & {
+  srcDir: string
+  build: Required<Config['build']>
+  server: Required<Config['server']>
   react: ReactOptions
 }
 
 export function defaultConfig(): Readonly<RequiredConfig> {
   return {
     framework: 'react',
-    buildTarget: 'es2015',
-    browserslist: {},
-    basePath: '/',
     srcDir: '/',
-    outputDir: '/dist',
+    basePath: '/',
     defaultLocale: 'en',
     locales: [],
-    rewrites: {},
+    build: {
+      target: 'es2015',
+      browsers: {} as Record<BrowserNames, number>,
+      outputDir: '/dist'
+    },
     ssr: {},
     plugins: [],
     css: {
@@ -34,8 +38,12 @@ export function defaultConfig(): Readonly<RequiredConfig> {
       },
       postcss: { plugins: ['autoprefixer'] },
     },
-    headers: {},
-    compress: true,
+    server: {
+      rewrites: {},
+      headers: {},
+      middlewares: [],
+      compress: true,
+    },
     env: {},
     react: {
       version: defaultReactVersion,
@@ -65,38 +73,21 @@ export async function loadConfig(specifier: string): Promise<Config> {
   const config: Config = {}
   const {
     framework,
-    srcDir,
-    outputDir,
     basePath,
-    buildTarget,
-    browserslist,
     defaultLocale,
     locales,
+    build,
     ssr,
-    rewrites,
     plugins,
     css,
-    headers,
-    compress,
+    server,
     env,
   } = data
   if (isFramework(framework)) {
     config.framework = framework
   }
-  if (util.isNEString(srcDir)) {
-    config.srcDir = util.cleanPath(srcDir)
-  }
-  if (util.isNEString(outputDir)) {
-    config.outputDir = util.cleanPath(outputDir)
-  }
-  if (util.isNEString(basePath)) {
+  if (util.isFilledString(basePath)) {
     config.basePath = util.cleanPath(basePath)
-  }
-  if (isBuildTarget(buildTarget)) {
-    config.buildTarget = buildTarget
-  }
-  if (util.isPlainObject(browserslist)) {
-    config.browserslist = browserslist
   }
   if (isLocaleID(defaultLocale)) {
     config.defaultLocale = defaultLocale
@@ -105,28 +96,27 @@ export async function loadConfig(specifier: string): Promise<Config> {
     locales.filter(id => !isLocaleID(id)).forEach(id => log.warn(`invalid locale ID '${id}'`))
     config.locales = Array.from(new Set(locales.filter(isLocaleID)))
   }
+  if (util.isPlainObject(build)) {
+    config.build = {
+      target: isBuildTarget(build.target) ? build.target : 'es2015',
+      browsers: util.isPlainObject(build.browsers) ? build.browsers : {},
+      outputDir: util.isFilledString(build.outputDir) ? util.cleanPath(build.outputDir) : '/dist'
+    }
+  }
   if (typeof ssr === 'boolean') {
     config.ssr = ssr
   } else if (util.isPlainObject(ssr)) {
-    const include = util.isArray(ssr.include) ? ssr.include.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
-    const exclude = util.isArray(ssr.exclude) ? ssr.exclude.map(v => util.isNEString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
+    const include = util.isArray(ssr.include) ? ssr.include.map(v => util.isFilledString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
+    const exclude = util.isArray(ssr.exclude) ? ssr.exclude.map(v => util.isFilledString(v) ? new RegExp(v) : v).filter(v => v instanceof RegExp) : []
     config.ssr = { include, exclude }
   }
-  if (util.isPlainObject(rewrites)) {
-    config.rewrites = toStringMap(rewrites)
-  }
-  if (util.isPlainObject(headers)) {
-    config.headers = toStringMap(headers)
-  }
-  if (typeof compress === 'boolean') {
-    config.compress = compress
-  }
-  if (util.isPlainObject(env)) {
-    config.env = toStringMap(env)
-    Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
-  }
-  if (util.isNEArray(plugins)) {
-    config.plugins = plugins.filter(v => v && util.isNEString(v.type))
+  if (util.isPlainObject(server)) {
+    config.server = {
+      headers: util.isPlainObject(build.headers) ? toStringMap(build.headers) : {},
+      rewrites: util.isPlainObject(build.rewrites) ? toStringMap(build.rewrites) : {},
+      middlewares: Array.isArray(build.middlewares) ? build.middlewares : [],
+      compress: typeof build.compress === 'boolean' ? build.compress : true
+    }
   }
   if (util.isPlainObject(css)) {
     const { extract, cache, modules, postcss } = css
@@ -136,6 +126,13 @@ export async function loadConfig(specifier: string): Promise<Config> {
       modules: util.isPlainObject(modules) ? modules : undefined,
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }
+  }
+  if (util.isNEArray(plugins)) {
+    config.plugins = plugins.filter(v => v && util.isFilledString(v.type))
+  }
+  if (util.isPlainObject(env)) {
+    config.env = toStringMap(env)
+    Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
   }
 
   return config
@@ -257,7 +254,7 @@ function isPostcssConfig(v: any): v is { plugins: PostCSSPlugin[] } {
 
 const reLocaleID = /^[a-z]{2}(-[a-zA-Z0-9]+)?$/
 function isLocaleID(v: any): v is string {
-  return util.isNEString(v) && reLocaleID.test(v)
+  return util.isFilledString(v) && reLocaleID.test(v)
 }
 
 function toStringMap(v: any): Record<string, string> {
@@ -267,12 +264,12 @@ function toStringMap(v: any): Record<string, string> {
       if (key == '') {
         return
       }
-      if (util.isNEString(value)) {
+      if (util.isFilledString(value)) {
         imports[key] = value
         return
       } else if (util.isNEArray(value)) {
         for (const v of value) {
-          if (util.isNEString(v)) {
+          if (util.isFilledString(v)) {
             imports[key] = v
             return
           }

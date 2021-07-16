@@ -62,7 +62,7 @@ export class Bundler {
     const vendorDeps = entries.find(({ specifier }) => specifier === 'virtual:/vendor.js')?.deps.map(({ specifier }) => specifier) || []
     const commonDeps = entries.find(({ specifier }) => specifier === 'virtual:/common.js')?.deps.map(({ specifier }) => specifier) || []
 
-    if (this.#aleph.config.buildTarget !== 'esnext') {
+    if (this.#aleph.config.build.target !== 'esnext') {
       await this.bundlePolyfillsChunck()
     }
     await this.bundleChunk(
@@ -115,7 +115,7 @@ export class Bundler {
 
   private async copyBundleFile(jsFilename: string) {
     const { workingDir, buildDir, config } = this.#aleph
-    const outputDir = join(workingDir, config.outputDir)
+    const outputDir = join(workingDir, config.build.outputDir)
     const bundleFile = join(buildDir, jsFilename)
     const saveAs = join(outputDir, '_aleph', jsFilename)
     await ensureDir(dirname(saveAs))
@@ -199,8 +199,8 @@ export class Bundler {
   /** create polyfills bundle. */
   private async bundlePolyfillsChunck() {
     const alephPkgUri = getAlephPkgUri()
-    const { buildTarget } = this.#aleph.config
-    const polyfillTarget = 'es' + (parseInt(buildTarget.slice(2)) + 1) // buildTarget + 1
+    const { build } = this.#aleph.config
+    const polyfillTarget = 'es' + (parseInt(build.target.slice(2)) + 1) // buildTarget + 1
     const hash = computeHash(polyfillTarget + '/esbuild@v0.11.11/' + VERSION)
     const bundleFilename = `polyfills.bundle.${hash.slice(0, 8)}.js`
     const bundleFilePath = join(this.#aleph.buildDir, bundleFilename)
@@ -246,7 +246,7 @@ export class Bundler {
 
   /** run deno bundle and compress the output using terser. */
   private async build(entryFile: string, bundleFile: string) {
-    const { buildTarget, browserslist } = this.#aleph.config
+    const { build } = this.#aleph.config
 
     await clearBuildCache(bundleFile)
     await esbuild({
@@ -254,8 +254,8 @@ export class Bundler {
       outfile: bundleFile,
       platform: 'browser',
       format: 'iife',
-      target: [String(buildTarget)].concat(Object.keys(browserslist).map(name => {
-        return `${name}${browserslist[name as BrowserNames]}`
+      target: [String(build.target)].concat(Object.keys(build.browsers).map(name => {
+        return `${name}${build.browsers[name as BrowserNames]}`
       })),
       bundle: true,
       minify: true,

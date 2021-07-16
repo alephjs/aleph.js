@@ -223,7 +223,7 @@ function createHtml({
   const eol = minify ? '' : '\n'
   const indent = minify ? '' : ' '.repeat(2)
   const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
-    if (!util.isString(v) && util.isNEString(v.src)) {
+    if (!util.isString(v) && util.isFilledString(v.src)) {
       if (v.type === 'module') {
         return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
       } else if (!v.nomodule) {
@@ -235,10 +235,10 @@ function createHtml({
   const scriptTags = scripts.map(v => {
     if (util.isString(v)) {
       return `<script>${v}</script>`
-    } else if (util.isNEString(v.innerText)) {
+    } else if (util.isFilledString(v.innerText)) {
       const { innerText, ...rest } = v
       return `<script${formatAttrs(rest)}>${eol}${innerText}${eol}${indent}</script>`
-    } else if (util.isNEString(v.src) && !v.preload) {
+    } else if (util.isFilledString(v.src) && !v.preload) {
       return `<script${formatAttrs(v)}></script>`
     } else {
       return ''

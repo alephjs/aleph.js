@@ -23,14 +23,14 @@ export class Routing {
   private _defaultLocale: string
   private _locales: string[]
   private _routes: Route[]
-  private _rewrites: Record<string, string>
+  private _rewrites?: Record<string, string>
 
   constructor({
     basePath = '/',
     defaultLocale = 'en',
     locales = [],
     routes = [],
-    rewrites = {}
+    rewrites
   }: RoutingOptions = {}) {
     this._basePath = basePath
     this._defaultLocale = defaultLocale
@@ -125,7 +125,11 @@ export class Routing {
 
   private _createRouter(location?: { pathname: string, search?: string }): [RouterURL, string[]] {
     const loc = location || (window as any).location || { pathname: '/' }
-    const url = rewriteURL(loc.pathname + (loc.search || ''), this._basePath, this._rewrites)
+    const url = resolveURL(
+      'http://localhost' + loc.pathname + (loc.search || ''),
+      this._basePath,
+      this._rewrites
+    )
 
     let locale = this._defaultLocale
     let pathname = decodeURI(url.pathname)
@@ -252,9 +256,9 @@ export function createBlankRouterURL(basePath = '/', locale = 'en'): RouterURL {
   }
 }
 
-/** `rewriteURL` returns a rewrited URL */
-export function rewriteURL(reqUrl: string, basePath: string, rewrites: Record<string, string>): URL {
-  const url = new URL('http://localhost' + reqUrl)
+/** `resolveURL` returns a rewrote URL */
+export function resolveURL(reqUrl: string, basePath: string, rewrites?: Record<string, string>): URL {
+  const url = new URL(reqUrl)
   if (basePath !== '/') {
     url.pathname = util.trimPrefix(decodeURI(url.pathname), basePath)
   }

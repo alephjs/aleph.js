@@ -120,7 +120,7 @@ export function toRelativePath(from: string, to: string): string {
 
 /** get source type by given url and content type. */
 export function getSourceType(url: string, contentType?: string): SourceType {
-  if (util.isNEString(contentType)) {
+  if (util.isFilledString(contentType)) {
     switch (contentType.split(';')[0].trim()) {
       case 'application/javascript':
       case 'text/javascript':

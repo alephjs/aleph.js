@@ -11,10 +11,11 @@ export function alephOak(aleph: Aleph): Middleware {
   return (ctx: Context) => {
     const { originalRequest } = ctx.request
     if (originalRequest instanceof NativeRequest) {
-      ctx.throw(500, 'Aleph.js doesn\'t support NativeRequest yet')
-    } else {
-      server.handle(originalRequest)
+      const { request, respond } = originalRequest
+      server.handle(request, respond as (r: Response | Promise<Response>) => Promise<void>)
       ctx.respond = false
+    } else {
+      ctx.throw(500, 'Aleph.js doesn\'t std SertRequest yet')
     }
   }
 }

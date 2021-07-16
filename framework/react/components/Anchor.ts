@@ -41,7 +41,7 @@ export default function Anchor(props: AnchorProps) {
   const isNav = useMemo(() => relKeys.includes('nav'), [relKeys])
   const { pathname, params, query } = useRouter()
   const href = useMemo(() => {
-    if (!util.isNEString(propHref)) {
+    if (!util.isFilledString(propHref)) {
       return ''
     }
     if (util.isLikelyHttpURL(propHref)) {
@@ -56,7 +56,7 @@ export default function Anchor(props: AnchorProps) {
     return [p, q].filter(Boolean).join('?')
   }, [pathname, propHref])
   const isCurrent = useMemo(() => {
-    if (!util.isNEString(propHref)) {
+    if (!util.isFilledString(propHref)) {
       return false
     }
 
@@ -77,7 +77,7 @@ export default function Anchor(props: AnchorProps) {
     if (!isNav || !isCurrent) {
       return propClassName
     }
-    return [propClassName, activeClassName].filter(util.isNEString).map(n => n.trim()).filter(Boolean).join(' ')
+    return [propClassName, activeClassName].filter(util.isFilledString).map(n => n.trim()).filter(Boolean).join(' ')
   }, [propClassName, activeClassName, isCurrent, isNav])
   const style = useMemo(() => {
     if (!isNav || !isCurrent) {
@@ -86,7 +86,7 @@ export default function Anchor(props: AnchorProps) {
     return Object.assign({}, propStyle, activeStyle)
   }, [propStyle, activeStyle, isCurrent, isNav])
   const ariaCurrent = useMemo(() => {
-    if (util.isNEString(propAriaCurrent)) {
+    if (util.isFilledString(propAriaCurrent)) {
       return propAriaCurrent
     }
     if (href.startsWith('/')) {

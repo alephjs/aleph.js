@@ -45,11 +45,11 @@ export function applyCSS(url: string, { css, href }: { css?: string, href?: stri
         return el.getAttribute('data-module-id') === url
       })
       let el: any
-      if (util.isNEString(css)) {
+      if (util.isFilledString(css)) {
         el = document.createElement('style')
         el.type = 'text/css'
         el.appendChild(document.createTextNode(css))
-      } else if (util.isNEString(href)) {
+      } else if (util.isFilledString(href)) {
         el = document.createElement('link')
         el.rel = 'stylesheet'
         el.href = href

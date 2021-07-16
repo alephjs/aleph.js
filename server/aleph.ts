@@ -690,7 +690,7 @@ export class Aleph implements IAleph {
       renderMode: this.config.ssr ? 'ssr' : 'spa',
       defaultLocale,
       locales: [],
-      rewrites: this.config.rewrites,
+      rewrites: this.config.server.rewrites,
     }
 
     if (bundleMode) {
@@ -815,7 +815,7 @@ export class Aleph implements IAleph {
     // wait for app ready
     await this.ready
 
-    const outputDir = join(this.workingDir, this.config.outputDir)
+    const outputDir = join(this.workingDir, this.config.build.outputDir)
     const distDir = join(outputDir, '_aleph')
 
     // clean previous build
@@ -866,7 +866,7 @@ export class Aleph implements IAleph {
       for (const loader of this.loaders) {
         if (loader.test.test(specifier) && loader.allowPage && loader.resolve) {
           const { pagePath, specifier: _specifier, isIndex: _isIndex } = loader.resolve(specifier)
-          if (util.isNEString(pagePath)) {
+          if (util.isFilledString(pagePath)) {
             routePath = pagePath
             specifier = _specifier
             if (_isIndex) {
@@ -1067,11 +1067,11 @@ export class Aleph implements IAleph {
     if (await existsFile(metaFp)) {
       try {
         const { specifier: _specifier, sourceHash, deps, isStyle, ssrPropsFn, ssgPathsFn, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
-        if (_specifier === specifier && util.isNEString(sourceHash) && util.isArray(deps)) {
+        if (_specifier === specifier && util.isFilledString(sourceHash) && util.isArray(deps)) {
           mod.sourceHash = sourceHash
           mod.deps = deps
           mod.isStyle = Boolean(isStyle) || undefined
-          mod.ssrPropsFn = util.isNEString(ssrPropsFn) ? ssrPropsFn : undefined
+          mod.ssrPropsFn = util.isFilledString(ssrPropsFn) ? ssrPropsFn : undefined
           mod.ssgPathsFn = Boolean(ssgPathsFn) || undefined
           mod.denoHooks = util.isNEArray(denoHooks) ? denoHooks : undefined
         } else {
@@ -1350,7 +1350,7 @@ export class Aleph implements IAleph {
   /** render all pages in routing. */
   private async ssg() {
     const { ssr } = this.config
-    const outputDir = join(this.workingDir, this.config.outputDir)
+    const outputDir = join(this.workingDir, this.config.build.outputDir)
 
     if (ssr === false) {
       const html = await this.#renderer.renderSPAIndexPage()
@@ -1377,7 +1377,7 @@ export class Aleph implements IAleph {
         }
         if (util.isNEArray(ssrPaths)) {
           ssrPaths.forEach(path => {
-            if (util.isNEString(path)) {
+            if (util.isFilledString(path)) {
               const parts = path.split('?')
               const pathname = util.cleanPath(parts.shift()!)
               const search = parts.length > 0 ? '?' + (new URLSearchParams('?' + parts.join('?'))).toString() : undefined
