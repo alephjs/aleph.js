@@ -1,5 +1,5 @@
-import { createHash } from 'https://deno.land/std@0.99.0/hash/mod.ts'
-import { join } from 'https://deno.land/std@0.99.0/path/mod.ts'
+import { createHash } from 'https://deno.land/std@0.100.0/hash/mod.ts'
+import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { SourceType, stripSsrCode } from '../compiler/mod.ts'
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { resolveURL } from '../framework/core/routing.ts'

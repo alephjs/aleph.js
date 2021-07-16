@@ -1,4 +1,4 @@
-import { basename, dirname } from 'https://deno.land/std@0.99.0/path/mod.ts'
+import { basename, dirname } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { RouterURL } from '../types.ts'
