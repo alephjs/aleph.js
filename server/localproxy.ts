@@ -8,7 +8,7 @@ export async function localProxy(cwd: string, port: number) {
   const serve = async (conn: Deno.Conn) => {
     const httpConn = Deno.serveHttp(conn)
     for await (const { request, respondWith } of httpConn) {
-      handle(request, respondWith)
+      await handle(request, respondWith)
     }
   }
   const handle = async (request: Request, respondWith: (r: Response | Promise<Response>) => Promise<void>) => {

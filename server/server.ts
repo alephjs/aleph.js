@@ -22,7 +22,7 @@ export class Server {
     this.#ready = false
   }
 
-  async handle(req: Request, respond: (r: Response | Promise<Response>) => Promise<void>) {
+  async handle(req: Request, respond: (r: Response | Promise<Response>) => Promise<void>): Promise<void> {
     if (!this.#ready) {
       await this.#aleph.ready
       this.#ready = true
@@ -32,24 +32,11 @@ export class Server {
     const { basePath, server: { headers, rewrites } } = app.config
     const url = resolveURL(req.url, basePath, rewrites)
     const pathname = decodeURI(url.pathname)
-    const resp = new AResponse(req, respond)
-
-    // set custom headers
-    if (headers) {
-      for (const key in headers) {
-        resp.setHeader(key, headers[key])
-      }
-    }
-
-    // in dev mode, we use `Last-Modified` and `ETag` header to control cache
-    if (app.isDev) {
-      resp.setHeader('Cache-Control', 'max-age=0')
-    }
 
     try {
       // serve hmr ws
       if (pathname === '/_hmr') {
-        const { websocket } = Deno.upgradeWebSocket(req)
+        const { websocket, response } = Deno.upgradeWebSocket(req)
         const watcher = app.createFSWatcher()
         websocket.addEventListener('open', () => {
           watcher.on('add', (mod: any) => websocket.send(JSON.stringify({ ...mod, type: 'add' })))
@@ -83,7 +70,22 @@ export class Server {
             } catch (e) { }
           }
         })
+        await respond(response)
         return
+      }
+
+      const resp = new AResponse(req, respond)
+
+      // set custom headers
+      if (headers) {
+        for (const key in headers) {
+          resp.setHeader(key, headers[key])
+        }
+      }
+
+      // in dev mode, we use `Last-Modified` and `ETag` header to control cache
+      if (app.isDev) {
+        resp.setHeader('Cache-Control', 'max-age=0')
       }
 
       // serve dist files
@@ -92,16 +94,16 @@ export class Server {
           const path = util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json'))
           const data = await app.getSSRData({ pathname: path })
           if (data === null) {
-            resp.status(404).send('null', 'application/json; charset=utf-8')
+            await resp.status(404).send('null', 'application/json; charset=utf-8')
           } else {
-            resp.send(JSON.stringify(data), 'application/json; charset=utf-8')
+            await resp.send(JSON.stringify(data), 'application/json; charset=utf-8')
           }
           return
         }
 
         const relPath = util.trimPrefix(pathname, '/_aleph')
         if (relPath == '/main.js') {
-          resp.send(app.createMainJS(false), 'application/javascript; charset=utf-8')
+          await resp.send(app.createMainJS(false), 'application/javascript; charset=utf-8')
           return
         }
 
@@ -122,7 +124,7 @@ export class Server {
             if (content) {
               const etag = createHash('md5').update(VERSION).update(module.hash || module.sourceHash).toString()
               if (etag === req.headers.get('If-None-Match')) {
-                resp.status(304).send()
+                await resp.status(304).send()
                 return
               }
 
@@ -150,9 +152,9 @@ export class Server {
                   '',
                   'import.meta.hot.accept();'
                 ].join('\n')
-                resp.send(code, 'application/javascript; charset=utf-8')
+                await resp.send(code, 'application/javascript; charset=utf-8')
               } else {
-                resp.send(content, 'application/javascript; charset=utf-8')
+                await resp.send(content, 'application/javascript; charset=utf-8')
               }
               return
             }
@@ -164,19 +166,18 @@ export class Server {
           const info = Deno.lstatSync(filePath)
           const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
           if (lastModified === req.headers.get('If-Modified-Since')) {
-            resp.status(304).send()
+            await resp.status(304).send()
             return
           }
 
-          resp.setHeader('Last-Modified', lastModified)
-          resp.send(
+          await resp.setHeader('Last-Modified', lastModified).send(
             await Deno.readTextFile(filePath),
             getContentType(filePath)
           )
           return
         }
 
-        resp.status(404).send('not found')
+        await resp.status(404).send('not found')
         return
       }
 
@@ -186,13 +187,12 @@ export class Server {
         const info = Deno.lstatSync(filePath)
         const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
         if (lastModified === req.headers.get('If-Modified-Since')) {
-          resp.status(304).send()
+          await resp.status(304).send()
           return
         }
 
         const body = Deno.readFileSync(filePath)
-        resp.setHeader('Last-Modified', lastModified)
-        resp.send(body, getContentType(filePath))
+        await resp.setHeader('Last-Modified', lastModified).send(body, getContentType(filePath))
         return
       }
 
@@ -210,14 +210,14 @@ export class Server {
             if (util.isFunction(handle)) {
               await handle({ req, resp, router, data: {} })
             } else {
-              resp.status(500).json({ status: 500, message: 'bad api handler' })
+              await resp.status(500).json({ status: 500, message: 'bad api handler' })
             }
           } catch (err) {
-            resp.status(500).json({ status: 500, message: err.message })
+            await resp.status(500).json({ status: 500, message: err.message })
             log.error('invoke API:', err)
           }
         } else {
-          resp.status(404).json({ status: 404, message: 'not found' })
+          await resp.status(404).json({ status: 404, message: 'not found' })
         }
         return
       }
@@ -227,31 +227,31 @@ export class Server {
         pathname,
         search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
       })
-      resp.status(status).send(html, 'text/html; charset=utf-8')
+      await resp.status(status).send(html, 'text/html; charset=utf-8')
     } catch (err) {
-      resp.status(500).send(
+      respond(new Response(
         [
           `<!DOCTYPE html>`,
           `<title>Server Error</title>`,
           `<h1>Error: ${err.message}</h1>`,
           `<p><pre>${err.stack}</pre></p>`
         ].join('\n'),
-        'text/html; charset=utf-8'
-      )
+        {
+          status: 500,
+          headers: new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
+        }
+      ))
     }
   }
 }
 
-/** Options for creating a standard Aleph server. */
+/** Options for creating a native server. */
 export type ServeOptions = {
   /** The Aleph to serve. */
   aleph: Aleph
   /** The port to listen on. */
   port: number
-  /**
-    * A literal IP address or host name that can be resolved to an IP address.
-    * If not specified, defaults to `0.0.0.0`.
-    */
+  /** A literal IP address or host name that can be resolved to an IP address. Defaults to `0.0.0.0`. */
   hostname?: string
   /** The certificate file for TLS connection. */
   certFile?: string
@@ -290,7 +290,7 @@ export async function serve({ aleph, port, hostname, certFile, keyFile, signal }
           // Each request sent over the HTTP connection will be yielded as an async
           // iterator from the HTTP connection.
           for await (const { request, respondWith } of httpConn) {
-            server.handle(request, respondWith)
+            await server.handle(request, respondWith)
           }
         })()
       }
