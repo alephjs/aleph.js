@@ -1,18 +1,21 @@
-import type { LoaderPlugin } from '../../types.ts'
+import type { Plugin } from 'aleph/types.ts'
 
-export default (): LoaderPlugin => ({
-  type: 'loader',
+export default (): Plugin => ({
   name: 'wasm-loader',
-  test: /\.wasm$/i,
-  load: async ({ specifier }, app) => {
-    const { content } = await app.fetch(specifier)
-    return {
-      code: [
-        `const wasmBytes = new Uint8Array([${content.join(',')}])`,
-        'const wasmModule = new WebAssembly.Module(wasmBytes)',
-        'const { exports } = new WebAssembly.Instance(wasmModule)',
-        'export default exports',
-      ].join('\n')
-    }
+  setup(aleph) {
+    aleph.addModuleLoader({
+      test: /\.wasm$/i,
+      load: async ({ specifier }, aleph) => {
+        const { content } = await aleph.fetchModule(specifier)
+        return {
+          code: [
+            `const wasmBytes = new Uint8Array([${content.join(',')}])`,
+            'const wasmModule = new WebAssembly.Module(wasmBytes)',
+            'const { exports } = new WebAssembly.Instance(wasmModule)',
+            'export default exports',
+          ].join('\n')
+        }
+      }
+    })
   }
 })

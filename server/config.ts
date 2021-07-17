@@ -141,8 +141,8 @@ export function getDefaultImportMap(): ImportMap {
     imports: {
       'aleph/': `${alephPkgUri}/`,
       'aleph/types': `${alephPkgUri}/types.ts`,
-      'framework': `${alephPkgUri}/framework/core/mod.ts`,
-      'framework/react': `${alephPkgUri}/framework/react/mod.ts`,
+      'aleph/web': `${alephPkgUri}/framework/core/mod.ts`,
+      'aleph/react': `${alephPkgUri}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
       'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`
     },

@@ -19,7 +19,7 @@ export async function prepublish(version: string): Promise<boolean> {
     Object.assign(importMap.imports, {
       'aleph/': `https://deno.land/x/aleph@v${version}/`,
       'aleph/types': `https://deno.land/x/aleph@v${version}/types.ts`,
-      'aleph/core': `https://deno.land/x/aleph@v${version}/framework/core/mod.ts`,
+      'aleph/web': `https://deno.land/x/aleph@v${version}/framework/core/mod.ts`,
       'aleph/react': `https://deno.land/x/aleph@v${version}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
       'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,

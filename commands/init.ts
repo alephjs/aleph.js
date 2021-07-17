@@ -63,7 +63,7 @@ export default async function (nameArg?: string) {
       '~/': './',
       'aleph/': `https://deno.land/x/aleph@v${VERSION}/`,
       'aleph/types': `https://deno.land/x/aleph@v${VERSION}/types.ts`,
-      'aleph/core': `https://deno.land/x/aleph@v${VERSION}/framework/core/mod.ts`,
+      'aleph/web': `https://deno.land/x/aleph@v${VERSION}/framework/core/mod.ts`,
       'aleph/react': `https://deno.land/x/aleph@v${VERSION}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
       'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
