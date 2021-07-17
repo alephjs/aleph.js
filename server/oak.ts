@@ -4,8 +4,8 @@ import { NativeRequest } from 'https://deno.land/x/oak@v7.7.0/http_server_native
 import { Aleph } from './aleph.ts'
 import { Server } from './server.ts'
 
-/** Create an oak middleware for Aleph server. */
-export function alephOak(aleph: Aleph): Middleware {
+/** `oakify` creates an **oak** middleware for Aleph app. */
+export function oakify(aleph: Aleph): Middleware {
   const server = new Server(aleph)
 
   return (ctx: Context) => {
@@ -15,7 +15,7 @@ export function alephOak(aleph: Aleph): Middleware {
       server.handle(request, respond as (r: Response | Promise<Response>) => Promise<void>)
       ctx.respond = false
     } else {
-      ctx.throw(500, 'Aleph.js doesn\'t std SertRequest yet')
+      ctx.throw(500, 'Aleph.js doesn\'t support oak `ServerRequest` yet')
     }
   }
 }
