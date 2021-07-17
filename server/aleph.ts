@@ -10,22 +10,19 @@ import { wasmChecksum, parseExportNames, SourceType, transform } from '../compil
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
+import { builtinCSSLoader, isBuiltinCSSLoader } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { ImportMap, RouterURL, Aleph as IAleph } from '../types.ts'
+import type { Aleph as IAleph, ImportMap, ModuleLoader, RouterURL } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import type { RequiredConfig } from './config.ts'
+import { defaultConfig, fixConfigAndImportMap, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
 import {
-  builtinCSSLoader, defaultConfig, fixConfigAndImportMap, getDefaultImportMap,
-  isBuiltinCSSLoader, loadConfig, loadImportMap
-} from './config.ts'
-import {
-  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile,
-  getAlephPkgUri, getSourceType, isLoaderPlugin, isLocalUrl,
-  moduleExclude, toLocalPath, toRelativePath
+  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile, getAlephPkgUri, getSourceType,
+  isLocalUrl, moduleExclude, toLocalPath, toRelativePath
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { Renderer } from './renderer.ts'
@@ -87,6 +84,7 @@ export class Aleph implements IAleph {
   #analyzer: Analyzer = new Analyzer(this)
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
+  #loaders: ModuleLoader[] = []
   #dists: Set<string> = new Set()
   #injects: Map<string, Transformer[]> = new Map()
   #reloading = false
@@ -222,12 +220,10 @@ export class Aleph implements IAleph {
 
     ms.stop(`init ${this.config.framework} framework`)
 
-    // apply server plugins
+    // apply plugins
     await Promise.all(
       this.config.plugins.map(async plugin => {
-        if (plugin.type === 'server') {
-          await plugin.setup(this)
-        }
+        await plugin.setup(this)
       })
     )
 
@@ -240,6 +236,9 @@ export class Aleph implements IAleph {
       skip: moduleExclude
     }
 
+    // add builtin css loader
+    this.addModuleLoader(builtinCSSLoader)
+
     // pre-compile framework modules
     modules.push(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`)
     if (this.isDev) {
@@ -250,6 +249,7 @@ export class Aleph implements IAleph {
       modules.push(`/${basename(appFile)}`)
     }
 
+    // create API routing
     if (await existsDir(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...moduleWalkOptions, exts: builtinModuleExts })) {
         const specifier = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
@@ -257,6 +257,7 @@ export class Aleph implements IAleph {
       }
     }
 
+    // create Page routing
     if (await existsDir(pagesDir)) {
       for await (const { path: p } of walk(pagesDir, moduleWalkOptions)) {
         const specifier = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
@@ -434,10 +435,6 @@ export class Aleph implements IAleph {
     return this.mode === 'development'
   }
 
-  get loaders() {
-    return this.config.plugins.filter(isLoaderPlugin)
-  }
-
   /** get the module by given specifier. */
   getModule(specifier: string): Module | null {
     if (specifier === 'app') {
@@ -475,6 +472,15 @@ export class Aleph implements IAleph {
       }
     }
     return null
+  }
+
+  /** add a module loader. */
+  addModuleLoader(loader: ModuleLoader): void {
+    if (util.isFunction(loader.resolve) || util.isFunction(loader.load)) {
+      if (!this.#loaders.includes(loader)) {
+        this.#loaders.push(loader)
+      }
+    }
   }
 
   /** add a module by given path and optional source code. */
@@ -647,7 +653,7 @@ export class Aleph implements IAleph {
     if (builtinModuleExts.some(ext => specifier.endsWith('.' + ext))) {
       return true
     }
-    return this.loaders.some(p => p.type === 'loader' && p.test.test(specifier) && p.allowPage)
+    return this.#loaders.some(p => p.test.test(specifier) && p.allowPage)
   }
 
   /** check the module whether it is hmrable. */
@@ -671,7 +677,7 @@ export class Aleph implements IAleph {
       return true
     }
 
-    return this.loaders.some(p => (
+    return this.#loaders.some(p => (
       p.test.test(specifier) &&
       (p.acceptHMR || p.allowPage)
     ))
@@ -777,7 +783,7 @@ export class Aleph implements IAleph {
       importMap: this.importMap,
       inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
         if (type !== 'css') {
-          for (const loader of this.loaders) {
+          for (const loader of this.#loaders) {
             if (loader.test.test(`.${type}`) && loader.load) {
               const { code, type: codeType } = await loader.load({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
               if (codeType === 'css') {
@@ -863,7 +869,7 @@ export class Aleph implements IAleph {
     let isIndex: boolean | undefined = undefined
 
     if (!isBuiltinModuleType) {
-      for (const loader of this.loaders) {
+      for (const loader of this.#loaders) {
         if (loader.test.test(specifier) && loader.allowPage && loader.resolve) {
           const { pagePath, specifier: _specifier, isIndex: _isIndex } = loader.resolve(specifier)
           if (util.isFilledString(pagePath)) {
@@ -941,7 +947,7 @@ export class Aleph implements IAleph {
     let sourceCode: string = ''
     let sourceType: SourceType = SourceType.Unknown
     let sourceMap: string | null = null
-    let loader = this.loaders.find(l => l.test.test(specifier))
+    let loader = this.#loaders.find(l => l.test.test(specifier))
     let isStyle = loader !== undefined && isBuiltinCSSLoader(loader)
 
     if (loader && util.isFunction(loader.load)) {
@@ -1005,7 +1011,7 @@ export class Aleph implements IAleph {
     let data: any = null
 
     if (customSource === undefined) {
-      for (const l of this.loaders) {
+      for (const l of this.#loaders) {
         if (util.isFunction(l.resolve) && l.test.test(specifier)) {
           const ret = l.resolve(specifier)
           specifier = ret.specifier
@@ -1152,11 +1158,11 @@ export class Aleph implements IAleph {
       }
 
       // revert external imports
-      if (deps && this.loaders.length > 0) {
+      if (deps && this.#loaders.length > 0) {
         deps.forEach(({ specifier }) => {
           if (specifier !== module.specifier && util.isLikelyHttpURL(specifier)) {
             let external = false
-            for (const l of this.loaders) {
+            for (const l of this.#loaders) {
               if (util.isFunction(l.resolve) && l.test.test(specifier)) {
                 const ret = l.resolve(specifier)
                 external = Boolean(ret.external)

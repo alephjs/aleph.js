@@ -6,25 +6,23 @@ import { stopEsbuild } from '../bundler/esbuild.ts'
 import { Aleph } from '../server/aleph.ts'
 import { computeHash } from '../server/helper.ts'
 import { ensureTextFile } from '../shared/fs.ts'
-import cssLoader from './css.ts'
+import { builtinCSSLoader } from './css.ts'
 
 Deno.test('plugin: css loader', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const app = new Aleph(dir, 'development')
+  const aleph = new Aleph(dir, 'development')
   await ensureTextFile(
     join(dir, '/style/index.css'),
     'h1 { font-size: 18px; }'
   )
-  const loader = cssLoader()
-  const { code } = await loader.load!({ specifier: '/style/index.css', }, app)
-  assert(loader.type === 'loader')
-  assert(loader.test.test('/style/index.css'))
-  assert(loader.test.test('/style/index.pcss'))
-  assert(loader.test.test('/style/index.postcss'))
-  assert(!loader.test.test('/style/index.less'))
-  assert(!loader.test.test('/style/index.sass'))
-  assert(loader.acceptHMR)
+  const { code } = await builtinCSSLoader.load!({ specifier: '/style/index.css', }, aleph)
+  assert(builtinCSSLoader.test.test('/style/index.css'))
+  assert(builtinCSSLoader.test.test('/style/index.pcss'))
+  assert(builtinCSSLoader.test.test('/style/index.postcss'))
+  assert(!builtinCSSLoader.test.test('/style/index.less'))
+  assert(!builtinCSSLoader.test.test('/style/index.sass'))
+  assert(builtinCSSLoader.acceptHMR)
   assertEquals(code, [
     'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
     'export const css = "h1 { font-size: 18px; }"',
@@ -38,13 +36,12 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DENO_TESTING', 'true')
     const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-    const app = new Aleph(dir, 'production')
+    const aleph = new Aleph(dir, 'production')
     await ensureTextFile(
       join(dir, '/style/index.css'),
       'h1 { font-size: 18px; }'
     )
-    const loader = cssLoader()
-    const { code } = await loader.load!({ specifier: '/style/index.css', }, app)
+    const { code } = await builtinCSSLoader.load!({ specifier: '/style/index.css', }, aleph)
     assertEquals(code, [
       'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
       'export const css = "h1{font-size:18px}"',
@@ -61,14 +58,13 @@ Deno.test({
 Deno.test('plugin: css loader with extract size option', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const app = new Aleph(dir, 'development')
-  app.config.css.extract = { limit: 10 }
+  const aleph = new Aleph(dir, 'development')
+  aleph.config.css.extract = { limit: 10 }
   await ensureTextFile(
     join(dir, '/style/index.css'),
     'h1 { font-size: 18px; }'
   )
-  const loader = cssLoader()
-  const { code } = await loader.load!({ specifier: '/style/index.css', }, app)
+  const { code } = await builtinCSSLoader.load!({ specifier: '/style/index.css', }, aleph)
   const distPath = `/style/index.${computeHash('h1 { font-size: 18px; }').slice(0, 8)}.css`
   assertEquals(code, [
     'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
@@ -76,15 +72,14 @@ Deno.test('plugin: css loader with extract size option', async () => {
     'export default {}',
     'applyCSS("/style/index.css", { href })',
   ].join('\n'))
-  assert(await exists(join(app.buildDir, distPath)))
+  assert(await exists(join(aleph.buildDir, distPath)))
 })
 
 Deno.test('plugin: css loader for remote external', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const app = new Aleph(dir, 'development')
-  const loader = cssLoader()
-  const { code } = await loader.load!({ specifier: 'https://esm.sh/tailwindcss/dist/tailwind.min.css', }, app)
+  const aleph = new Aleph(dir, 'development')
+  const { code } = await builtinCSSLoader.load!({ specifier: 'https://esm.sh/tailwindcss/dist/tailwind.min.css', }, aleph)
   assertEquals(code, [
     'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
     'export const href = "https://esm.sh/tailwindcss/dist/tailwind.min.css"',
@@ -96,12 +91,11 @@ Deno.test('plugin: css loader for remote external', async () => {
 Deno.test('plugin: css loader for inline styles', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const app = new Aleph(dir, 'development')
-  const loader = cssLoader()
-  const { code, type } = await loader.load!({
+  const aleph = new Aleph(dir, 'development')
+  const { code, type } = await builtinCSSLoader.load!({
     specifier: '#inline-style-{}',
     data: 'h1 { font-size: 18px; }'
-  }, app)
+  }, aleph)
   assertEquals(code, 'h1 { font-size: 18px; }')
   assertEquals(type, 'css')
 })
@@ -111,8 +105,8 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DENO_TESTING', 'true')
     const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-    const app = new Aleph(dir, 'development')
-    app.config.css.modules = {
+    const aleph = new Aleph(dir, 'development')
+    aleph.config.css.modules = {
       scopeBehaviour: 'local',
       generateScopedName: '[name]_[local]'
     }
@@ -120,8 +114,7 @@ Deno.test({
       join(dir, '/style/index.module.css'),
       '.name { font-size: 18px; }'
     )
-    const loader = cssLoader()
-    const { code } = await loader.load!({ specifier: '/style/index.module.css', }, app)
+    const { code } = await builtinCSSLoader.load!({ specifier: '/style/index.module.css', }, aleph)
     assertEquals(code, [
       'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
       'export const css = ".index-module_name { font-size: 18px; }"',
@@ -135,16 +128,15 @@ Deno.test({
 Deno.test('plugin: css loader with postcss plugins', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const app = new Aleph(dir, 'development')
-  app.config.css.postcss = {
+  const aleph = new Aleph(dir, 'development')
+  aleph.config.css.postcss = {
     plugins: ['postcss-nested']
   }
   await ensureTextFile(
     join(dir, '/style/index.css'),
     '.foo { .bar { font-size: 100%; } }'
   )
-  const loader = cssLoader()
-  const { code } = await loader.load!({ specifier: '/style/index.css' }, app)
+  const { code } = await builtinCSSLoader.load!({ specifier: '/style/index.css' }, aleph)
   assertEquals(code, [
     'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
     'export const css = ".foo .bar { font-size: 100%; }"',

@@ -1,20 +1,3 @@
-
-/**
- * An interface that aligns to the parts of the `Aleph`.
- */
-export interface Aleph {
-  readonly mode: 'development' | 'production'
-  readonly workingDir: string
-  readonly buildDir: string
-  readonly config: Required<Config>
-  readonly importMap: ImportMap
-  fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
-  addModule(specifier: string, sourceCode?: string): Promise<void>
-  addDist(path: string, content: Uint8Array): Promise<void>
-  injectCode(phase: 'compilation' | 'hmr' | 'ssr', test: RegExp | string, transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
-  injectCode(phase: 'compilation' | 'hmr' | 'ssr', transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
-}
-
 /**
  * The config for aleph server.
  */
@@ -36,20 +19,33 @@ export type Config = {
   /** `css` specifies the css processing options. */
   css?: CSSOptions
   /** `plugins` specifies some plugins to extend Aleph runtime. */
-  plugins?: (LoaderPlugin | ServerPlugin)[]
+  plugins?: Plugin[]
   /** `env` appends system env variables. */
   env?: Record<string, string>
 }
 
 /**
+ * An interface that aligns to the parts of the `Aleph`.
+ */
+export interface Aleph {
+  readonly mode: 'development' | 'production'
+  readonly workingDir: string
+  readonly buildDir: string
+  readonly config: Required<Config>
+  readonly importMap: ImportMap
+  addModuleLoader(loader: ModuleLoader): void
+  addModule(specifier: string, sourceCode?: string): Promise<void>
+  addDist(path: string, content: Uint8Array): Promise<void>
+  fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
+  injectCode(phase: 'compilation' | 'hmr' | 'ssr', test: RegExp | string, transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
+  injectCode(phase: 'compilation' | 'hmr' | 'ssr', transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
+}
+
+/**
  * The loader plugin to load source media.
  */
-export type LoaderPlugin = {
-  /** `type` specifies the plugin type. */
-  type: 'loader'
-  /** `name` gives the plugin a name. */
-  name: string
-  /** `test` matches the import specifier. */
+export type ModuleLoader = {
+  /** `test` matches the module specifier. */
   test: RegExp
   /** `acceptHMR` enables the HMR. */
   acceptHMR?: boolean
@@ -64,9 +60,7 @@ export type LoaderPlugin = {
 /**
  * The server plugin to enhance aleph runtime.
  */
-export type ServerPlugin = {
-  /** `type` specifies the plugin type. */
-  type: 'server'
+export type Plugin = {
   /** `name` gives the plugin a name. */
   name: string
   /** `setup` setups the plugin. */
@@ -168,10 +162,18 @@ export type GlobalSSROptions = {
 }
 
 /**
+ * The **SSR** props.
+ */
+export type SSRProps = {
+  [key: string]: any
+  $revalidate?: number
+}
+
+/**
  * The **SSR** options for pages.
  */
 export type SSROptions = {
-  props?(router: RouterURL): ({ props: Record<string, any>, expires?: number } | Promise<{ props: Record<string, any>, expires?: number }>)
+  props?(router: RouterURL): (SSRProps | Promise<SSRProps>)
   paths?(): (string[] | Promise<string[]>)
 }
 

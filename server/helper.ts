@@ -6,7 +6,6 @@ import { existsFile, existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { SourceType } from '../compiler/mod.ts'
-import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
 
@@ -62,11 +61,6 @@ const reLocalUrl = /^https?:\/\/(localhost|0\.0\.0\.0|127\.0\.0\.1)(\:|\/|$)/
 /** check whether it is a localhost url. */
 export function isLocalUrl(url: string): boolean {
   return reLocalUrl.test(url)
-}
-
-/** check the plugin whether it is a loader. */
-export function isLoaderPlugin(plugin: LoaderPlugin | ServerPlugin): plugin is LoaderPlugin {
-  return plugin.type === 'loader'
 }
 
 export async function findFile(wd: string, filenames: string[]) {
