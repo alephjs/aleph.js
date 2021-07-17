@@ -1,4 +1,4 @@
-import { useDeno, useRouter } from 'framework/react'
+import { useDeno, useRouter } from 'aleph/react'
 import React from 'react'
 
 export default function Query() {

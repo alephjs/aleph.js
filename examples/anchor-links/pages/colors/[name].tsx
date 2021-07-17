@@ -1,4 +1,4 @@
-import { useRouter } from 'framework/react'
+import { useRouter } from 'aleph/react'
 import React from 'react'
 
 export default function Query() {

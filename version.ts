@@ -17,11 +17,10 @@ export async function prepublish(version: string): Promise<boolean> {
     const data = await Deno.readTextFile('./import_map.json')
     const importMap = JSON.parse(data)
     Object.assign(importMap.imports, {
-      'aleph': `https://deno.land/x/aleph@v${version}/mod.ts`,
       'aleph/': `https://deno.land/x/aleph@v${version}/`,
       'aleph/types': `https://deno.land/x/aleph@v${version}/types.ts`,
-      'framework': `https://deno.land/x/aleph@v${version}/framework/core/mod.ts`,
-      'framework/react': `https://deno.land/x/aleph@v${version}/framework/react/mod.ts`,
+      'aleph/core': `https://deno.land/x/aleph@v${version}/framework/core/mod.ts`,
+      'aleph/react': `https://deno.land/x/aleph@v${version}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
       'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
     })
