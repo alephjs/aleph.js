@@ -902,7 +902,7 @@ export class Aleph implements IAleph {
         const content = await Deno.readFile(filepath)
         return { content, contentType: getContentType(filepath) }
       } else {
-        return Promise.reject(new Error(`No such file`))
+        return Promise.reject(new Error(`No such file: ${util.trimPrefix(filepath, this.workingDir + '/')}`))
       }
     }
 
