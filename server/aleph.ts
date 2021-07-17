@@ -70,7 +70,7 @@ type CompileOptions = {
 type Transformer = { test?: RegExp | string, fn: TransformFn }
 type TransformFn = (specifier: string, code: string, map?: string) => { code: string, map?: string }
 
-/** The Aleph class for aleph server. */
+/** The Aleph class for aleph runtime. */
 export class Aleph implements IAleph {
   readonly mode: 'development' | 'production'
   readonly workingDir: string
@@ -106,7 +106,7 @@ export class Aleph implements IAleph {
     this.ready = Deno.env.get('DENO_TESTING') ? Promise.resolve() : this.init(reload)
   }
 
-  /** initiate application */
+  /** initiate runtime */
   private async init(reload: boolean) {
     const ms = new Measure()
 
@@ -211,7 +211,7 @@ export class Aleph implements IAleph {
     const { init } = await import(`../framework/${this.config.framework}/init.ts`)
     await init(this)
 
-    // compile & import framework renderer
+    // compile and import framework renderer
     if (this.config.ssr) {
       const mod = await this.compile(`${alephPkgUri}/framework/${this.config.framework}/renderer.ts`)
       const { render } = await this.importModule(mod)
