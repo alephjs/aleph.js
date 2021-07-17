@@ -12,7 +12,7 @@ export function oakify(aleph: Aleph): Middleware {
     const { originalRequest } = ctx.request
     if (originalRequest instanceof NativeRequest) {
       const { request, respond } = originalRequest
-      server.handle(request, respond as (r: Response | Promise<Response>) => Promise<void>)
+      server.handle({ request, respondWith: respond })
       ctx.respond = false
     } else {
       ctx.throw(500, 'Aleph.js doesn\'t support oak `ServerRequest` yet')

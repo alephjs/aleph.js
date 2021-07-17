@@ -11,7 +11,7 @@ import { APIRequest } from '../types.ts'
 import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
 import { getContentType } from './mime.ts'
-import { AResponse } from './response.ts'
+import { APIResponse } from './response.ts'
 
 /** The Aleph server class. */
 export class Server {
@@ -23,12 +23,13 @@ export class Server {
     this.#ready = false
   }
 
-  async handle(req: Request, respond: (r: Response | Promise<Response>) => Promise<void>): Promise<void> {
+  async handle(e: Deno.RequestEvent): Promise<void> {
     if (!this.#ready) {
       await this.#aleph.ready
       this.#ready = true
     }
 
+    const { request: req, respondWith } = e
     const app = this.#aleph
     const { basePath, server: { headers, rewrites, middlewares } } = app.config
     const url = resolveURL(req.url, basePath, rewrites)
@@ -71,11 +72,14 @@ export class Server {
             } catch (e) { }
           }
         })
-        await respond(response)
+        await respondWith(response)
         return
       }
 
-      const resp = new AResponse(req, respond)
+      const resp = new APIResponse(e)
+
+      // set server header
+      resp.setHeader('Server', 'Aleph.js')
 
       // set custom headers
       if (headers) {
@@ -238,7 +242,7 @@ export class Server {
       })
       await resp.status(status).send(html, 'text/html; charset=utf-8')
     } catch (err) {
-      respond(new Response(
+      e.respondWith(new Response(
         [
           `<!DOCTYPE html>`,
           `<title>Server Error</title>`,
@@ -277,29 +281,29 @@ export async function serve({ aleph, port, hostname, certFile, keyFile, signal }
 
   while (true) {
     try {
-      let l: Deno.Listener
+      let listener: Deno.Listener
       if (certFile && keyFile)
-        l = Deno.listenTls({ port, hostname, certFile, keyFile })
+        listener = Deno.listenTls({ port, hostname, certFile, keyFile })
       else {
-        l = Deno.listen({ port, hostname })
-      }
-      if (!aleph.isDev && aleph.config.server.compress) {
-        compress.init()
+        listener = Deno.listen({ port, hostname })
       }
       signal?.addEventListener('abort', () => {
-        l.close()
+        listener.close()
       })
+      if (!aleph.isDev && aleph.config.server.compress) {
+        compress.enable()
+      }
       log.info(`Server ready on http://${hostname || 'localhost'}:${port}${aleph.config.basePath}`)
 
-      for await (const conn of l) {
+      for await (const conn of listener) {
         // In order to not be blocking, we need to handle each connection individually
         // in its own async function.
         (async () => {
           const httpConn = Deno.serveHttp(conn)
           // Each request sent over the HTTP connection will be yielded as an async
           // iterator from the HTTP connection.
-          for await (const { request, respondWith } of httpConn) {
-            await server.handle(request, respondWith)
+          for await (const e of httpConn) {
+            await server.handle(e)
           }
         })()
       }
