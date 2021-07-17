@@ -145,7 +145,7 @@ export class Routing {
         pathname = '/' + a.slice(2).join('/')
       }
     }
-    pathname = util.trimSuffix(pathname, '/')
+    pathname = pathname !== '/' ? util.trimSuffix(pathname, '/') : '/'
 
     this._lookup(route => {
       const path = route.map(r => r.path).join('')
@@ -169,6 +169,8 @@ export class Routing {
       {
         basePath: this._basePath,
         locale,
+        defaultLocale: this._defaultLocale,
+        locales: this._locales,
         pathname,
         routePath,
         params,
@@ -247,6 +249,8 @@ export function createBlankRouterURL(basePath = '/', locale = 'en'): RouterURL {
   return {
     basePath,
     locale,
+    defaultLocale: locale,
+    locales: [],
     routePath: '',
     pathname: '/',
     params: {},

@@ -239,6 +239,8 @@ export type RouterURL = {
   readonly basePath: string
   readonly routePath: string
   readonly locale: string
+  readonly defaultLocale: string
+  readonly locales: string[]
   readonly pathname: string
   readonly params: Record<string, string>
   readonly query: URLSearchParams
