@@ -1,22 +1,13 @@
 import { assert, assertEquals } from 'std/testing/asserts.ts'
 import util from '../shared/util.ts'
-import type { LoaderPlugin, ServerPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import {
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
   toRelativePath,
-  isLoaderPlugin,
   toLocalPath
 } from './helper.ts'
-
-Deno.test('server/helper: isLoaderPlugin', () => {
-  const loader: LoaderPlugin = { name: 'test', type: 'loader', test: /test/ }
-  const plugin: ServerPlugin = { name: 'test', type: 'server', setup: () => { } }
-  assert(isLoaderPlugin(loader))
-  assert(!isLoaderPlugin(plugin))
-})
 
 Deno.test('server/helper: getAlephPkgUri dev', () => {
   const port = 3000
