@@ -109,8 +109,8 @@ export class Aleph implements IAleph {
     const ms = new Measure()
 
     let [importMapFile, configFile] = await Promise.all([
-      await findFile(this.workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`)),
-      await findFile(this.workingDir, ['ts', 'js', 'mjs', 'json'].map(ext => `aleph.config.${ext}`))
+      findFile(this.workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`)),
+      findFile(this.workingDir, ['ts', 'js', 'mjs', 'json'].map(ext => `aleph.config.${ext}`))
     ])
     if (importMapFile) {
       Object.assign(this.importMap, await loadImportMap(importMapFile))
@@ -203,7 +203,25 @@ export class Aleph implements IAleph {
       }, undefined, 2))
     }
 
-    ms.stop()
+    ms.stop(`init env`)
+
+    // apply plugins
+    await Promise.all(
+      this.config.plugins.map(async plugin => {
+        await plugin.setup(this)
+      })
+    )
+
+    ms.stop('apply plugins')
+
+    const mwFile = await findFile(this.workingDir, ['ts', 'js', 'mjs'].map(ext => `${this.config.srcDir}/api/_middlewares.${ext}`))
+    if (mwFile) {
+      const mwMod = await this.compile(`/api/${basename(mwFile)}`, { externalRemoteDeps: true })
+      const { default: _middlewares } = await import('file://' + join(this.buildDir, mwMod.jsFile))
+      const middlewares = Array.isArray(_middlewares) ? _middlewares.filter(fn => util.isFunction(fn)) : []
+      this.config.server.middlewares.push(...middlewares)
+      ms.stop(`load API middlewares (${middlewares.length}) from 'api/${basename(mwFile)}'`)
+    }
 
     // init framework
     const { init } = await import(`../framework/${this.config.framework}/init.ts`)
@@ -219,15 +237,6 @@ export class Aleph implements IAleph {
     }
 
     ms.stop(`init ${this.config.framework} framework`)
-
-    // apply plugins
-    await Promise.all(
-      this.config.plugins.map(async plugin => {
-        await plugin.setup(this)
-      })
-    )
-
-    ms.stop('apply plugins')
 
     const appFile = await findFile(this.workingDir, builtinModuleExts.map(ext => `app.${ext}`))
     const modules: string[] = []

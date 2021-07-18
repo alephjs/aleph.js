@@ -7,7 +7,7 @@ import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
-import { APIRequest } from '../types.ts'
+import { APIContext } from '../types.ts'
 import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
 import { getContentType } from './mime.ts'
@@ -76,7 +76,7 @@ export class Server {
         return
       }
 
-      const resp = new APIResponse(e)
+      const resp = new APIResponse()
 
       // set server header
       resp.setHeader('Server', 'Aleph.js')
@@ -99,16 +99,16 @@ export class Server {
           const path = util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json'))
           const data = await app.getSSRData({ pathname: path })
           if (data === null) {
-            await resp.status(404).send('null', 'application/json; charset=utf-8')
+            await resp.json(null).writeTo(e, 404)
           } else {
-            await resp.send(JSON.stringify(data), 'application/json; charset=utf-8')
+            await resp.json(data).writeTo(e)
           }
           return
         }
 
         const relPath = util.trimPrefix(pathname, '/_aleph')
         if (relPath == '/main.js') {
-          await resp.send(app.createMainJS(false), 'application/javascript; charset=utf-8')
+          await resp.content(app.createMainJS(false), 'application/javascript; charset=utf-8').writeTo(e)
           return
         }
 
@@ -129,7 +129,7 @@ export class Server {
             if (content) {
               const etag = createHash('md5').update(VERSION).update(module.hash || module.sourceHash).toString()
               if (etag === req.headers.get('If-None-Match')) {
-                await resp.status(304).send()
+                await resp.writeTo(e, 304)
                 return
               }
 
@@ -157,9 +157,9 @@ export class Server {
                   '',
                   'import.meta.hot.accept();'
                 ].join('\n')
-                await resp.send(code, 'application/javascript; charset=utf-8')
+                await resp.content(code, 'application/javascript; charset=utf-8').writeTo(e)
               } else {
-                await resp.send(content, 'application/javascript; charset=utf-8')
+                await resp.content(content, 'application/javascript; charset=utf-8').writeTo(e)
               }
               return
             }
@@ -171,18 +171,15 @@ export class Server {
           const info = Deno.lstatSync(filePath)
           const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
           if (lastModified === req.headers.get('If-Modified-Since')) {
-            await resp.status(304).send()
+            await resp.writeTo(e, 304)
             return
           }
 
-          await resp.setHeader('Last-Modified', lastModified).send(
-            await Deno.readTextFile(filePath),
-            getContentType(filePath)
-          )
+          await (await resp.setHeader('Last-Modified', lastModified).file(filePath)).writeTo(e)
           return
         }
 
-        await resp.status(404).send('not found')
+        await resp.content('file not found').writeTo(e, 404)
         return
       }
 
@@ -192,12 +189,11 @@ export class Server {
         const info = Deno.lstatSync(filePath)
         const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
         if (lastModified === req.headers.get('If-Modified-Since')) {
-          await resp.status(304).send()
+          await resp.writeTo(e, 304)
           return
         }
 
-        const body = Deno.readFileSync(filePath)
-        await resp.setHeader('Last-Modified', lastModified).send(body, getContentType(filePath))
+        await (await resp.setHeader('Last-Modified', lastModified).file(filePath)).writeTo(e)
         return
       }
 
@@ -210,27 +206,33 @@ export class Server {
         if (route !== null) {
           try {
             const [router, module] = route
-            const context: APIRequest = { req, resp, router, data: new Map() }
-            for (const mw of middlewares) {
-              let next = false
-              await mw(context, () => next = true)
-              if (!next) {
-                return
+            const data = new Map()
+            const steps = [...middlewares, async (context: APIContext) => {
+              const { default: _handler, handler } = await app.importModule(module)
+              const h = _handler || handler
+              if (util.isFunction(h)) {
+                await h(context)
+              } else {
+                await resp.json({ status: 500, message: 'bad api handler' }).writeTo(e, 500)
+              }
+            }]
+            let pointer = 0
+            const next = async () => {
+              if (pointer < steps.length) {
+                await steps[pointer]({ req, resp, router, data }, () => {
+                  pointer++
+                  next()
+                })
               }
             }
-            const { default: _handler, handler } = await app.importModule(module)
-            const h = _handler || handler
-            if (util.isFunction(h)) {
-              await h(context)
-            } else {
-              await resp.status(500).json({ status: 500, message: 'bad api handler' })
-            }
+            await next()
+            resp.writeTo(e)
           } catch (err) {
-            await resp.status(500).json({ status: 500, message: err.message })
+            await resp.json({ status: 500, message: err.message }).writeTo(e, 500)
             log.error('invoke API:', err)
           }
         } else {
-          await resp.status(404).json({ status: 404, message: 'not found' })
+          await resp.json({ status: 404, message: 'not found' }).writeTo(e, 404)
         }
         return
       }
@@ -240,7 +242,7 @@ export class Server {
         pathname,
         search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
       })
-      await resp.status(status).send(html, 'text/html; charset=utf-8')
+      await resp.content(html, 'text/html; charset=utf-8').writeTo(e, status)
     } catch (err) {
       e.respondWith(new Response(
         [

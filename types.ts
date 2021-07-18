@@ -1,5 +1,5 @@
 /**
- * The config for aleph server.
+ * The config for aleph app.
  */
 export type Config = {
   /** `framework` specifies the framework (default is 'react'). */
@@ -42,7 +42,7 @@ export interface Aleph {
 }
 
 /**
- * The loader plugin to load source media.
+ * The module loader to load source media.
  */
 export type ModuleLoader = {
   /** `test` matches the module specifier. */
@@ -58,7 +58,7 @@ export type ModuleLoader = {
 }
 
 /**
- * The server plugin to enhance aleph runtime.
+ * The plugin to enhance aleph runtime.
  */
 export type Plugin = {
   /** `name` gives the plugin a name. */
@@ -68,7 +68,7 @@ export type Plugin = {
 }
 
 /**
- * The result of loader plugin's `resolve` method.
+ * The result of module loader's `resolve` method.
  */
 export type ResolveResult = {
   specifier: string,
@@ -79,7 +79,7 @@ export type ResolveResult = {
 }
 
 /**
- * The output of loader plugin's `load` method.
+ * The output of module loader's `load` method.
  */
 export type LoaderOutput = {
   /** The transformed code type (default is 'js'). */
@@ -91,14 +91,14 @@ export type LoaderOutput = {
 }
 
 /**
- * The built target for esbuild.
+ * The built target of esbuild.
  */
 export type BuildTarget = 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' | 'esnext'
 
 /**
- * The supported borwser names for esbuild.
+ * The supported borwser name of esbuild.
  */
-export type BrowserNames = 'chrome' | 'edge' | 'firefox' | 'ios' | 'safari'
+export type BrowserName = 'chrome' | 'edge' | 'firefox' | 'ios' | 'safari'
 
 /**
  * The config for ES Build.
@@ -107,7 +107,7 @@ export type BuildOptions = {
   /** `target` specifies the build target in production mode (default is [**es2015**]). */
   target?: BuildTarget
   /** `browsers` specifies the target browsers for esbuild. */
-  browsers?: Record<BrowserNames, number>
+  browsers?: Record<BrowserName, number>
   /** `outputDir` specifies the output directory for `build` command (default is '**dist**'). */
   outputDir?: string
 }
@@ -121,7 +121,7 @@ export type ImportMap = {
 }
 
 /**
- * The config for CSS loader.
+ * The config for builtin CSS loader.
  */
 export type CSSOptions = {
   /** `cache` caches remote css to local if it is true. */
@@ -135,7 +135,7 @@ export type CSSOptions = {
 }
 
 /**
- * The Plugin type for postcss.
+ * The plugin type of postcss.
  */
 export type PostCSSPlugin = string | [string, any] | Record<string, any> | CallableFunction
 
@@ -192,16 +192,16 @@ export type ServerOptions = {
 }
 
 /**
- * The middleware for api requests.
+ * The middleware for API requests.
  */
 export type APIMiddleware = {
-  (req: APIRequest, next: () => void): Promise<void>
+  (context: APIContext, next: () => void): Promise<void>
 }
 
 /**
- * The main param for API requests.
+ * The context for API middlewares and routes.
  */
-export type APIRequest = {
+export type APIContext = {
   readonly req: Request
   readonly resp: APIResponse
   readonly router: RouterURL
@@ -212,6 +212,9 @@ export type APIRequest = {
  * An interface that aligns to the parts of the `Aleph`.
  */
 export interface APIResponse {
+  headers: Headers
+  status?: number
+  body?: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>
   /**
   * `addHeader` adds a new value onto an existing response header of the request, or
   * adds the header if it does not already exist.
@@ -224,14 +227,16 @@ export interface APIResponse {
   setHeader(key: string, value: string): this
   /** `removeHeader` removes the value for an existing response header of the request. */
   removeHeader(key: string): this
-  /** `status` sets response status of the request. */
-  status(code: number): this
-  /** `send` replies to the request with raw content. */
-  send(data?: string | Uint8Array | ArrayBuffer, contentType?: string): Promise<void>
-  /** `json` replies to the request with a json content. */
-  json(data: any): Promise<void>
   /** `redirect` replies to redirect the client to another URL with optional response `status` defaulting to 302. */
-  redirect(url: string, status?: number): Promise<void>
+  redirect(url: string, status?: number): this
+  /** `json` replies to the request with a raw content. */
+  content(data: string | Uint8Array | ArrayBuffer, contentType?: string): this
+  /** `json` replies to the request with a json content. */
+  json(data: any, space?: string | number): this
+  /** `file` reads the file content and sets `content-type` header by the file name. */
+  file(name: string): Promise<this>
+  /** `proxy` proxies the http request. */
+  proxy(url: string): Promise<this>
 }
 
 /**
