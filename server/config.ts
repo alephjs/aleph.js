@@ -4,7 +4,7 @@ import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { BrowserNames, Config, ImportMap, PostCSSPlugin } from '../types.ts'
+import type { BrowserName, Config, ImportMap, PostCSSPlugin } from '../types.ts'
 import { getAlephPkgUri } from './helper.ts'
 
 export type RequiredConfig = Required<Config> & {
@@ -23,7 +23,7 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     locales: [],
     build: {
       target: 'es2015',
-      browsers: {} as Record<BrowserNames, number>,
+      browsers: {} as Record<BrowserName, number>,
       outputDir: '/dist'
     },
     ssr: {},
@@ -111,7 +111,7 @@ export async function loadConfig(specifier: string): Promise<Config> {
     config.server = {
       headers: util.isPlainObject(server.headers) ? toStringMap(server.headers) : {},
       rewrites: util.isPlainObject(server.rewrites) ? toStringMap(server.rewrites) : {},
-      middlewares: Array.isArray(server.middlewares) ? server.middlewares : [],
+      middlewares: Array.isArray(server.middlewares) ? server.middlewares.filter(v => typeof v === 'function') : [],
       compress: typeof server.compress === 'boolean' ? server.compress : true
     }
   }
@@ -187,7 +187,6 @@ export async function loadImportMap(importMapFile: string): Promise<ImportMap> {
  * - set default `srcDir` to '/src' if it exists
  * - fix import map when the `srcDir` does not equal '/'
  * - respect react version in import map
- * - add builtin css loader plugin
  */
 export async function fixConfigAndImportMap(workingDir: string, config: RequiredConfig, importMap: ImportMap) {
   // set default src directory

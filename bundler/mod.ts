@@ -3,7 +3,7 @@ import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
 import { transform } from '../compiler/mod.ts'
 import { trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
-import type { BrowserNames } from '../types.ts'
+import type { BrowserName } from '../types.ts'
 import { VERSION } from '../version.ts'
 import type { DependencyGraph } from '../server/analyzer.ts'
 import type { Aleph, Module } from '../server/aleph.ts'
@@ -255,7 +255,7 @@ export class Bundler {
       platform: 'browser',
       format: 'iife',
       target: [String(build.target)].concat(Object.keys(build.browsers).map(name => {
-        return `${name}${build.browsers[name as BrowserNames]}`
+        return `${name}${build.browsers[name as BrowserName]}`
       })),
       bundle: true,
       minify: true,
