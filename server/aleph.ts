@@ -150,29 +150,10 @@ export class Aleph implements IAleph {
     const apiDir = join(srcDir, 'api')
     const pagesDir = join(srcDir, 'pages')
     const buildManifestFile = join(this.buildDir, 'build.manifest.json')
-    const configHash = computeHash(JSON.stringify({
-      importMap: this.importMap,
-      plugins: this.config.plugins.map(({ name }) => name),
-      css: {
-        modules: this.config.css.modules,
-        postcssPlugins: this.config.css.postcss?.plugins.map(p => {
-          if (util.isString(p)) {
-            return p
-          }
-          if (util.isArray(p)) {
-            return p[0]
-          }
-          return 'Plugin'
-        })
-      },
-      react: this.config.react,
-    }, (key: string, value: any) => {
-      if (key === 'inlineStylePreprocess') {
-        return void 0
-      }
-      return value
-    }))
+    const importMapString = JSON.stringify(this.importMap)
+
     let shouldRebuild = !await existsFile(buildManifestFile)
+    let saveManifestFile = shouldRebuild
     if (!shouldRebuild) {
       try {
         const v = JSON.parse(await Deno.readTextFile(buildManifestFile))
@@ -180,8 +161,11 @@ export class Aleph implements IAleph {
           typeof v !== 'object' ||
           v === null ||
           v.compiler !== wasmChecksum ||
-          v.configHash !== configHash
+          (v.importMap !== importMapString && confirm('The import-maps has been changed, rebuild modules?'))
         )
+        if (!shouldRebuild && v.importMap !== importMapString) {
+          saveManifestFile = true
+        }
       } catch (e) { }
     }
 
@@ -193,13 +177,13 @@ export class Aleph implements IAleph {
       await ensureDir(this.buildDir)
     }
 
-    if (shouldRebuild) {
+    if (saveManifestFile) {
       log.debug('rebuild...')
       ensureTextFile(buildManifestFile, JSON.stringify({
         aleph: VERSION,
         deno: Deno.version.deno,
         compiler: wasmChecksum,
-        configHash,
+        importMap: importMapString,
       }, undefined, 2))
     }
 
@@ -262,7 +246,9 @@ export class Aleph implements IAleph {
     if (await existsDir(apiDir)) {
       for await (const { path: p } of walk(apiDir, { ...moduleWalkOptions, exts: builtinModuleExts })) {
         const specifier = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
-        this.#apiRouting.update(...this.createRouteUpdate(specifier))
+        if (!specifier.startsWith('/api/_middlewares.')) {
+          this.#apiRouting.update(...this.createRouteUpdate(specifier))
+        }
       }
     }
 
@@ -377,7 +363,7 @@ export class Aleph implements IAleph {
             emit = true
             this.#pageRouting.update(routePath, specifier, isIndex)
           }
-        } else if (specifier.startsWith('/api/')) {
+        } else if (specifier.startsWith('/api/') && !specifier.startsWith('/api/_middlewares.')) {
           this.#apiRouting.update(...this.createRouteUpdate(specifier))
         }
         if (trimBuiltinModuleExts(specifier) === '/app') {
@@ -509,7 +495,7 @@ export class Aleph implements IAleph {
     await this.compile(specifier, { source })
     if (specifier.startsWith('/pages/')) {
       this.#pageRouting.update(...this.createRouteUpdate(specifier))
-    } else if (specifier.startsWith('/api/')) {
+    } else if (specifier.startsWith('/api/') && !specifier.startsWith('/api/_middlewares.')) {
       this.#apiRouting.update(...this.createRouteUpdate(specifier))
     }
     return
