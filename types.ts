@@ -212,8 +212,8 @@ export type APIContext = {
  * An interface that aligns to the parts of the `Aleph`.
  */
 export interface APIResponse {
+  status: number
   headers: Headers
-  status?: number
   body?: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>
   /**
   * `addHeader` adds a new value onto an existing response header of the request, or
@@ -229,8 +229,8 @@ export interface APIResponse {
   removeHeader(key: string): this
   /** `redirect` replies to redirect the client to another URL with optional response `status` defaulting to 302. */
   redirect(url: string, status?: number): this
-  /** `json` replies to the request with a raw content. */
-  content(data: string | Uint8Array | ArrayBuffer, contentType?: string): this
+  /** `content` replies to the request with a raw content. */
+  content(data: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>, contentType?: string): this
   /** `json` replies to the request with a json content. */
   json(data: any, space?: string | number): this
   /** `file` reads the file content and sets `content-type` header by the file name. */

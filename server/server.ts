@@ -99,16 +99,16 @@ export class Server {
           const path = util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json'))
           const data = await app.getSSRData({ pathname: path })
           if (data === null) {
-            await resp.json(null).writeTo(e, 404)
+            resp.json(null).writeTo(e, 404)
           } else {
-            await resp.json(data).writeTo(e)
+            resp.json(data).writeTo(e)
           }
           return
         }
 
         const relPath = util.trimPrefix(pathname, '/_aleph')
         if (relPath == '/main.js') {
-          await resp.content(app.createMainJS(false), 'application/javascript; charset=utf-8').writeTo(e)
+          resp.content(app.createMainJS(false), 'application/javascript; charset=utf-8').writeTo(e)
           return
         }
 
@@ -129,7 +129,7 @@ export class Server {
             if (content) {
               const etag = createHash('md5').update(VERSION).update(module.hash || module.sourceHash).toString()
               if (etag === req.headers.get('If-None-Match')) {
-                await resp.writeTo(e, 304)
+                resp.writeTo(e, 304)
                 return
               }
 
@@ -157,9 +157,9 @@ export class Server {
                   '',
                   'import.meta.hot.accept();'
                 ].join('\n')
-                await resp.content(code, 'application/javascript; charset=utf-8').writeTo(e)
+                resp.content(code, 'application/javascript; charset=utf-8').writeTo(e)
               } else {
-                await resp.content(content, 'application/javascript; charset=utf-8').writeTo(e)
+                resp.content(content, 'application/javascript; charset=utf-8').writeTo(e)
               }
               return
             }
@@ -171,15 +171,15 @@ export class Server {
           const info = Deno.lstatSync(filePath)
           const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
           if (lastModified === req.headers.get('If-Modified-Since')) {
-            await resp.writeTo(e, 304)
+            resp.writeTo(e, 304)
             return
           }
 
-          await (await resp.setHeader('Last-Modified', lastModified).file(filePath)).writeTo(e)
+          (await resp.setHeader('Last-Modified', lastModified).file(filePath)).writeTo(e)
           return
         }
 
-        await resp.content('file not found').writeTo(e, 404)
+        resp.content('file not found').writeTo(e, 404)
         return
       }
 
@@ -189,11 +189,11 @@ export class Server {
         const info = Deno.lstatSync(filePath)
         const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
         if (lastModified === req.headers.get('If-Modified-Since')) {
-          await resp.writeTo(e, 304)
+          resp.writeTo(e, 304)
           return
         }
 
-        await (await resp.setHeader('Last-Modified', lastModified).file(filePath)).writeTo(e)
+        (await resp.setHeader('Last-Modified', lastModified).file(filePath)).writeTo(e)
         return
       }
 
@@ -219,20 +219,31 @@ export class Server {
             let pointer = 0
             const next = async () => {
               if (pointer < steps.length) {
-                await steps[pointer]({ req, resp, router, data }, () => {
+                let nextPromise: any = null
+                const result = steps[pointer]({ req, resp, router, data }, () => {
                   pointer++
-                  next()
+                  nextPromise = next()
                 })
+                if (nextPromise) {
+                  await nextPromise
+                  nextPromise = null
+                }
+                if (result instanceof Promise) {
+                  await result
+                }
+                if (nextPromise) {
+                  await nextPromise
+                }
               }
             }
             await next()
             resp.writeTo(e)
           } catch (err) {
-            await resp.json({ status: 500, message: err.message }).writeTo(e, 500)
+            resp.json({ status: 500, message: err.message }).writeTo(e, 500)
             log.error('invoke API:', err)
           }
         } else {
-          await resp.json({ status: 404, message: 'not found' }).writeTo(e, 404)
+          resp.json({ status: 404, message: 'not found' }).writeTo(e, 404)
         }
         return
       }
@@ -242,7 +253,7 @@ export class Server {
         pathname,
         search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
       })
-      await resp.content(html, 'text/html; charset=utf-8').writeTo(e, status)
+      resp.content(html, 'text/html; charset=utf-8').writeTo(e, status)
     } catch (err) {
       e.respondWith(new Response(
         [

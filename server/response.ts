@@ -29,7 +29,7 @@ export class APIResponse implements IResponse {
     return this
   }
 
-  content(data: string | Uint8Array | ArrayBuffer, contentType?: string): this {
+  content(data: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>, contentType?: string): this {
     this.body = data
     if (contentType) {
       this.setHeader('Content-Type', contentType)
