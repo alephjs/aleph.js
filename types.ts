@@ -199,13 +199,12 @@ export type APIMiddleware = {
 }
 
 /**
- * The context for API middlewares and routes.
+ * An interface that aligns to the `Deno.RequestEvent`
  */
-export type APIContext = {
-  readonly req: Request
-  readonly resp: APIResponse
-  readonly router: RouterURL
+export interface APIContext extends Deno.RequestEvent {
   readonly data: Map<string, any>
+  readonly response: APIResponse
+  readonly router: RouterURL
 }
 
 /**

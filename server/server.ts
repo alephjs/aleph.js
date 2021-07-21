@@ -10,7 +10,6 @@ import { VERSION } from '../version.ts'
 import { APIContext } from '../types.ts'
 import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
-import { getContentType } from './mime.ts'
 import { APIResponse } from './response.ts'
 
 /** The Aleph server class. */
@@ -217,10 +216,20 @@ export class Server {
               }
             }]
             let pointer = 0
+            let responded = false
             const next = async () => {
-              if (pointer < steps.length) {
+              if (pointer < steps.length && !responded) {
                 let nextPromise: any = null
-                const result = steps[pointer]({ req, resp, router, data }, () => {
+                const result = steps[pointer]({
+                  request: req,
+                  response: resp,
+                  respondWith: async (r: Response | Promise<Response>) => {
+                    responded = true
+                    await respondWith(r)
+                  },
+                  router,
+                  data
+                }, () => {
                   pointer++
                   nextPromise = next()
                 })
@@ -237,7 +246,9 @@ export class Server {
               }
             }
             await next()
-            resp.writeTo(e)
+            if (!responded) {
+              resp.writeTo(e)
+            }
           } catch (err) {
             resp.json({ status: 500, message: err.message }).writeTo(e, 500)
             log.error('invoke API:', err)
