@@ -20,7 +20,7 @@ export default function Router({
   pageRoute: PageRoute
   routing: Routing
 }) {
-  const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
+  const [app, setApp] = useState<{ Component: ComponentType<any> | null }>(() => {
     const App = appModule.default
     if (App) {
       if (isLikelyReactComponent(App)) {
@@ -64,7 +64,7 @@ export default function Router({
         if (isLikelyReactComponent(Component)) {
           setApp({ Component })
         } else {
-          setApp({ Component: E400MissingComponent, props: { name: 'Custom App' } })
+          setApp({ Component: () => createElement(E400MissingComponent, { name: 'Custom App' }) })
         }
       } else {
         const { routePath, specifier, isIndex } = mod
@@ -131,7 +131,7 @@ export default function Router({
         RouterContext.Provider,
         { value: route.url },
         ...[
-          (route.Page && app.Component) && createElement(app.Component, Object.assign({}, app.props, { Page: route.Page, pageProps: route.pageProps })),
+          (route.Page && app.Component) && createElement(app.Component, route),
           (route.Page && !app.Component) && createElement(route.Page, route.pageProps),
           !route.Page && createElement(E404Page)
         ].filter(Boolean),

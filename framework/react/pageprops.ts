@@ -7,7 +7,7 @@ import { isLikelyReactComponent } from './helper.ts'
 
 export type PageProps = {
   Page: ComponentType<any> | null
-  pageProps: (Partial<PageProps> & { name?: string }) | null
+  pageProps: Record<string, any> | null
 }
 
 export type PageRoute = PageProps & {
@@ -51,10 +51,14 @@ export function createPageProps(nestedComponents: { specifier: string, Component
   return pageProps
 }
 
-function createPagePropsSegment(seg: { specifier: string, Component?: ComponentType<any>, props?: Record<string, any> }): PageProps {
+function createPagePropsSegment(seg: {
+  specifier: string,
+  Component?: ComponentType<any>,
+  props?: Record<string, any>
+}): PageProps {
   const pageProps: PageProps = {
     Page: null,
-    pageProps: seg.props ?? null
+    pageProps: seg.props || null
   }
   if (seg.Component) {
     if (isLikelyReactComponent(seg.Component)) {
