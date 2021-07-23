@@ -1,7 +1,9 @@
-import { StyleHTMLAttributes, useContext, useEffect } from 'https://esm.sh/react@17.0.2'
+import { StyleHTMLAttributes, useContext, useEffect, useLayoutEffect } from 'https://esm.sh/react@17.0.2'
 import { applyCSS, removeCSS } from '../../core/style.ts'
 import { SSRContext } from '../context.ts'
 import { inDeno } from '../helper.ts'
+
+const useIsomorphicLayoutEffect = inDeno ? useEffect : useLayoutEffect
 
 export default function InlineStyle({ children, ...rest }: StyleHTMLAttributes<{}>) {
   const { inlineStyles } = useContext(SSRContext)
@@ -16,7 +18,7 @@ export default function InlineStyle({ children, ...rest }: StyleHTMLAttributes<{
     }
   }
 
-  useEffect(() => () => id && removeCSS('#' + id), [])
+  useIsomorphicLayoutEffect(() => () => id && removeCSS('#' + id), [])
 
   return null
 }
