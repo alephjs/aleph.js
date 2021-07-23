@@ -53,7 +53,7 @@ export default function Head(props: PropsWithChildren<{}>) {
           if (key === 'children') {
             if (util.isFilledString(value)) {
               el.innerText = value
-            } else if (util.isNEArray(value)) {
+            } else if (util.isFilledArray(value)) {
               el.innerText = value.join('')
             }
           } else {

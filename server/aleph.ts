@@ -1074,7 +1074,7 @@ export class Aleph implements IAleph {
           mod.isStyle = Boolean(isStyle) || undefined
           mod.ssrPropsFn = util.isFilledString(ssrPropsFn) ? ssrPropsFn : undefined
           mod.ssgPathsFn = Boolean(ssgPathsFn) || undefined
-          mod.denoHooks = util.isNEArray(denoHooks) ? denoHooks : undefined
+          mod.denoHooks = util.isFilledArray(denoHooks) ? denoHooks : undefined
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
           Deno.remove(metaFp)
@@ -1207,7 +1207,7 @@ export class Aleph implements IAleph {
 
       module.ssrPropsFn = ssrPropsFn
       module.ssgPathsFn = ssgPathsFn
-      if (util.isNEArray(denoHooks)) {
+      if (util.isFilledArray(denoHooks)) {
         module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.config.ssr) {
           log.error(`'useDeno' hook in SPA mode is illegal: ${specifier}`)
@@ -1376,7 +1376,7 @@ export class Aleph implements IAleph {
             ssrPaths = await ssrPaths
           }
         }
-        if (util.isNEArray(ssrPaths)) {
+        if (util.isFilledArray(ssrPaths)) {
           ssrPaths.forEach(path => {
             if (util.isFilledString(path)) {
               const parts = path.split('?')

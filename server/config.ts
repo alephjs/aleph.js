@@ -124,7 +124,7 @@ export async function loadConfig(specifier: string): Promise<Config> {
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }
   }
-  if (util.isNEArray(plugins)) {
+  if (util.isFilledArray(plugins)) {
     config.plugins = plugins.filter(v => util.isPlainObject(v) && util.isFunction(v.setup))
   }
   if (util.isPlainObject(env)) {
@@ -254,7 +254,7 @@ function toStringMap(v: any): Record<string, string> {
       if (util.isFilledString(value)) {
         imports[key] = value
         return
-      } else if (util.isNEArray(value)) {
+      } else if (util.isFilledArray(value)) {
         for (const v of value) {
           if (util.isFilledString(v)) {
             imports[key] = v

@@ -130,7 +130,7 @@ export async function render(
     if (type === 'title') {
       if (util.isFilledString(children)) {
         ret.head.push(`<title ssr>${children}</title>`)
-      } else if (util.isNEArray(children)) {
+      } else if (util.isFilledArray(children)) {
         ret.head.push(`<title ssr>${children.join('')}</title>`)
       }
     } else {
@@ -139,7 +139,7 @@ export async function render(
         ret.head.push(`<${type}${attrs}>${Array.isArray(children) ? children.join('') : children || ''}</${type}>`)
       } else if (util.isFilledString(children)) {
         ret.head.push(`<${type}${attrs} ssr>${children}</${type}>`)
-      } else if (util.isNEArray(children)) {
+      } else if (util.isFilledArray(children)) {
         ret.head.push(`<${type}${attrs} ssr>${children.join('')}</${type}>`)
       } else {
         ret.head.push(`<${type}${attrs} ssr />`)
@@ -154,7 +154,7 @@ export async function render(
       ret.scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
     } if (util.isFilledString(children)) {
       ret.scripts.push({ ...attrs, innerText: children })
-    } else if (util.isNEArray(children)) {
+    } else if (util.isFilledArray(children)) {
       ret.scripts.push({ ...attrs, innerText: children.join('') })
     } else {
       ret.scripts.push(props)

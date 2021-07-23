@@ -8,11 +8,11 @@ export default {
   isArray(a: any): a is Array<any> {
     return Array.isArray(a)
   },
-  isNEArray(a: any): a is Array<any> {
+  isFilledArray(a: any): a is Array<any> {
     return Array.isArray(a) && a.length > 0
   },
   isPlainObject(a: any): a is Record<string, any> {
-    return typeof a === 'object' && a !== null && !Array.isArray(a) && Object.getPrototypeOf(a) == Object.prototype
+    return typeof a === 'object' && a !== null && Object.getPrototypeOf(a) === Object.prototype
   },
   isFunction(a: any): a is Function {
     return typeof a === 'function'
