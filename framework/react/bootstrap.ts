@@ -3,7 +3,7 @@ import { hydrate, render } from 'https://esm.sh/react-dom@17.0.2'
 import { importModule } from '../core/module.ts'
 import { Routing, RoutingOptions } from '../core/routing.ts'
 import Router from './components/Router.ts'
-import { createPageRoute } from './pageprops.ts'
+import { loadPage } from './pagedata.ts'
 
 type BootstrapOptions = Required<RoutingOptions> & {
   appModule?: string,
@@ -16,7 +16,7 @@ export default async function bootstrap(options: BootstrapOptions) {
   const appModule = appModuleSpcifier ? await importModule(basePath, appModuleSpcifier) : {}
   const routing = new Routing({ routes, rewrites, basePath, defaultLocale, locales })
   const [url, nestedModules] = routing.createRouter()
-  const pageRoute = await createPageRoute(url, nestedModules)
+  const pageRoute = await loadPage(url, nestedModules)
   const routerEl = createElement(Router, { appModule, pageRoute, routing })
   const mountPoint = document.getElementById('__aleph')
 

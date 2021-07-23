@@ -1,12 +1,17 @@
 import { ComponentType, createElement, useCallback, useEffect, useState } from 'https://esm.sh/react@17.0.2'
+import { RouterURL } from '../../../types.ts'
 import events from '../../core/events.ts'
 import { importModule, trimBuiltinModuleExts } from '../../core/module.ts'
 import { Routing } from '../../core/routing.ts'
 import { RouterContext } from '../context.ts'
 import { isLikelyReactComponent } from '../helper.ts'
-import { createPageRoute } from '../pageprops.ts'
-import type { PageRoute } from '../pageprops.ts'
+import { loadPage } from '../pagedata.ts'
+import type { PageProps } from '../pageprops.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './ErrorBoundary.ts'
+
+type PageRoute = PageProps & {
+  url: RouterURL
+}
 
 export default function Router({
   appModule,
@@ -34,7 +39,7 @@ export default function Router({
   const onpopstate = useCallback(async (e: any) => {
     const [url, nestedModules] = routing.createRouter()
     if (url.routePath !== '') {
-      setRoute(await createPageRoute(url, nestedModules, true))
+      setRoute(await loadPage(url, nestedModules, e.forceRefetch))
       if (e.resetScroll) {
         (window as any).scrollTo(0, 0)
       }
