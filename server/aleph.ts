@@ -294,7 +294,7 @@ export class Aleph implements IAleph {
       for (const path of event.paths) {
         const specifier = util.cleanPath(util.trimPrefix(path, srcDir))
         if (this.isScopedModule(specifier)) {
-          util.debounceX(
+          util.debounceById(
             specifier,
             () => this.watchHandler(path, specifier),
             50
