@@ -6,23 +6,7 @@ import { createPageProps } from './pageprops.ts'
 
 const global = window as any
 
-export async function loadPage(url: RouterURL, nestedModules: string[], refresh = false): Promise<PageProps & { url: RouterURL }> {
-  if (refresh) {
-    await loadPageData(url)
-  } else {
-    loadSSRDataFromTag(url)
-  }
-  const imports = nestedModules.map(async specifier => {
-    const { default: Component } = await importModule(url.basePath, specifier, refresh)
-    const data = (window as any)[`pagedata://${url.toString()}#props-${btoa(specifier)}`] || {}
-    return {
-      specifier,
-      Component,
-      props: { ...data.value }
-    }
-  })
-  return { ...createPageProps(await Promise.all(imports)), url }
-}
+
 
 export async function loadPageData(url: RouterURL): Promise<void> {
   const href = url.toString()
