@@ -71,7 +71,12 @@ export class Server {
             } catch (e) { }
           }
         })
-        await respondWith(response)
+
+        try {
+          await respondWith(response)
+        } catch (err) {
+          log.warn('http:', err.message)
+        }
         return
       }
 
@@ -225,7 +230,11 @@ export class Server {
                   response: resp,
                   respondWith: async (r: Response | Promise<Response>) => {
                     responded = true
-                    await respondWith(r)
+                    try {
+                      await respondWith(r)
+                    } catch (err) {
+                      log.warn('http:', err.message)
+                    }
                   },
                   router,
                   data
@@ -266,18 +275,22 @@ export class Server {
       })
       resp.content(html, 'text/html; charset=utf-8').writeTo(e, status)
     } catch (err) {
-      e.respondWith(new Response(
-        [
-          `<!DOCTYPE html>`,
-          `<title>Server Error</title>`,
-          `<h1>Error: ${err.message}</h1>`,
-          `<p><pre>${err.stack}</pre></p>`
-        ].join('\n'),
-        {
-          status: 500,
-          headers: new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
-        }
-      ))
+      try {
+        e.respondWith(new Response(
+          [
+            `<!DOCTYPE html>`,
+            `<title>Server Error</title>`,
+            `<h1>Error: ${err.message}</h1>`,
+            `<p><pre>${err.stack}</pre></p>`
+          ].join('\n'),
+          {
+            status: 500,
+            headers: new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
+          }
+        ))
+      } catch (err) {
+        log.warn('send:', err.message)
+      }
     }
   }
 }

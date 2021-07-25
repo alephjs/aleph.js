@@ -92,7 +92,7 @@ export class APIResponse implements IResponse {
     try {
       await respondWith(new Response(body, { headers, status: status || this.status }))
     } catch (err) {
-      log.warn('send:', err.message)
+      log.warn('http:', err.message)
     }
   }
 }
