@@ -1,31 +1,38 @@
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
-import { importModule } from '../core/module.ts'
-import type { PageProps } from './pageprops.ts'
-import { createPageProps } from './pageprops.ts'
 
 const global = window as any
 
-
-
-export async function loadPageData(url: RouterURL): Promise<void> {
+export function shouldLoadPageData(url: RouterURL): boolean {
   const href = url.toString()
-  const pagedataUrl = 'pagedata://' + href
+  const pagedataUrl = `pagedata://${href}`
   if (pagedataUrl in global) {
     const { expires, keys } = global[pagedataUrl]
     if (expires === 0 || Date.now() < expires) {
-      return
+      return false
     }
     delete global[pagedataUrl]
     keys.forEach((key: string) => {
       delete global[`${pagedataUrl}#${key}`]
     })
   }
+  return true
+}
+
+export async function loadPageData(url: RouterURL): Promise<void> {
+  const href = url.toString()
   const basePath = util.trimSuffix(url.basePath, '/')
   const dataUrl = `${basePath}/_aleph/data/${util.btoaUrl(href)}.json`
-  const data = await fetch(dataUrl).then(resp => resp.json())
-  if (util.isPlainObject(data)) {
-    storeData(href, data)
+  try {
+    const resp = await fetch(dataUrl)
+    if (resp.status === 200) {
+      const data = await resp.json()
+      if (util.isPlainObject(data)) {
+        storeData(href, data)
+      }
+    }
+  } catch (err) {
+    console.error(err)
   }
 }
 

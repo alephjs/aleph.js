@@ -5,7 +5,7 @@ import { importModule, trimBuiltinModuleExts } from '../../core/module.ts'
 import { Routing } from '../../core/routing.ts'
 import { RouterContext } from '../context.ts'
 import { isLikelyReactComponent } from '../helper.ts'
-import { loadPageData } from '../pagedata.ts'
+import { shouldLoadPageData, loadPageData } from '../pagedata.ts'
 import type { PageProps } from '../pageprops.ts'
 import { createPageProps } from '../pageprops.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './ErrorBoundary.ts'
@@ -53,7 +53,9 @@ export default function Router({
   const onpopstate = useCallback(async (e: any) => {
     const [url, nestedModules] = routing.createRouter()
     if (url.routePath !== '') {
-      await loadPageData(url)
+      if (shouldLoadPageData(url)) {
+        await loadPageData(url)
+      }
       setRoute(await createPageRoute(url, nestedModules, e.forceRefetch))
       if (e.resetScroll) {
         (window as any).scrollTo(0, 0)
