@@ -1,17 +1,21 @@
 import { Component, createElement, CSSProperties } from 'https://esm.sh/react@17.0.2'
+import { inDeno } from '../helper.ts'
 
-export class ErrorBoundary extends Component<{}, { error: Error | null }> {
+export class ErrorBoundary extends Component<{}, { error: Error | Promise<any> | null }> {
   constructor(props: {}) {
     super(props)
     this.state = { error: null }
-    Object.assign(window, { recover: () => this.setState({ error: null }) })
-  }
-
-  static getDerivedStateFromError(error: any) {
-    return { error }
+    if (!inDeno) {
+      Object.assign(window, { __ALEPH_ErrorBoundary: this })
+    }
   }
 
   componentDidCatch(error: any, info: any) {
+    this.setState({ error })
+    if (error instanceof Promise) {
+      error.then(() => this.setState({ error: null })).catch(error => this.setState({ error }))
+      return
+    }
     const event = new CustomEvent('componentDidCatch', { detail: { error, info } })
     window.dispatchEvent(event)
   }
@@ -19,16 +23,18 @@ export class ErrorBoundary extends Component<{}, { error: Error | null }> {
   render() {
     const { error } = this.state
 
-    if (error !== null) {
-      if (error instanceof Error) {
-        return (
-          createElement(
-            'pre',
-            null,
-            error.stack || error.message || error.toString()
-          )
-        )
-      }
+    // todo: default loading UI
+    if (error instanceof Promise) {
+      return null
+    }
+
+    // todo: error UI
+    if (error instanceof Error) {
+      return createElement(
+        'pre',
+        null,
+        error.stack || error.message || error.toString()
+      )
     }
 
     return this.props.children
