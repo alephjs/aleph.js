@@ -3,15 +3,16 @@ import { hydrate, render } from 'https://esm.sh/react-dom@17.0.2'
 import { importModule } from '../core/module.ts'
 import { Routing, RoutingOptions } from '../core/routing.ts'
 import Router, { createPageRoute } from './components/Router.ts'
-import { loadSSRDataFromTag } from './pagedata.ts'
+import { loadSSRDataFromTag, setStaticSsrRoutes } from './pagedata.ts'
 
 type BootstrapOptions = Required<RoutingOptions> & {
+  ssrRoutes?: string[],
   appModule?: string,
   renderMode: 'ssr' | 'spa'
 }
 
 export default async function bootstrap(options: BootstrapOptions) {
-  const { basePath, defaultLocale, locales, appModule: appModuleSpcifier, routes, rewrites, renderMode } = options
+  const { basePath, defaultLocale, locales, appModule: appModuleSpcifier, routes, ssrRoutes, rewrites, renderMode } = options
   const { document } = window as any
   const appModule = appModuleSpcifier ? await importModule(basePath, appModuleSpcifier) : {}
   const routing = new Routing({ routes, rewrites, basePath, defaultLocale, locales })
@@ -21,23 +22,25 @@ export default async function bootstrap(options: BootstrapOptions) {
   const mountPoint = document.getElementById('__aleph')
 
   if (renderMode === 'ssr') {
+    if (ssrRoutes) {
+      setStaticSsrRoutes(ssrRoutes)
+    }
     loadSSRDataFromTag(url)
     hydrate(routerEl, mountPoint)
   } else {
     render(routerEl, mountPoint)
   }
 
-  // remove ssr head elements, set a timmer to avoid the tab title flash
-  setTimeout(() => {
-    Array.from(document.head.children).forEach((el: any) => {
-      const tag = el.tagName.toLowerCase()
-      if (
-        el.hasAttribute('ssr') &&
-        tag !== 'style' &&
-        !(tag === 'link' && el.getAttribute('rel') === 'stylesheet')
-      ) {
-        document.head.removeChild(el)
-      }
-    })
-  }, 0)
+  // remove ssr head elements
+  await Promise.resolve()
+  Array.from(document.head.children).forEach((el: any) => {
+    const tag = el.tagName.toLowerCase()
+    if (
+      el.hasAttribute('ssr') &&
+      tag !== 'style' &&
+      !(tag === 'link' && el.getAttribute('rel') === 'stylesheet')
+    ) {
+      document.head.removeChild(el)
+    }
+  })
 }

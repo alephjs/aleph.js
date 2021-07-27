@@ -2,6 +2,12 @@ import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.ts'
 
 const global = window as any
+const lazySsrRoutes: Map<string, boolean> = new Map()
+
+let staticSsrRoutes: Set<string> | null = null
+export function setStaticSsrRoutes(routes: string[]) {
+  staticSsrRoutes = new Set(routes)
+}
 
 export function shouldLoadPageData(url: RouterURL): boolean {
   const href = url.toString()
@@ -16,6 +22,12 @@ export function shouldLoadPageData(url: RouterURL): boolean {
       delete global[`${pagedataUrl}#${key}`]
     })
   }
+  if (staticSsrRoutes) {
+    return staticSsrRoutes.has(url.routePath)
+  }
+  if (lazySsrRoutes.has(url.routePath)) {
+    return lazySsrRoutes.get(url.routePath)!
+  }
   return true
 }
 
@@ -29,10 +41,17 @@ export async function loadPageData(url: RouterURL): Promise<void> {
       const data = await resp.json()
       if (util.isPlainObject(data)) {
         storeData(href, data)
+        if (!staticSsrRoutes) {
+          lazySsrRoutes.set(url.routePath, true)
+        }
+      }
+    } else if (resp.status === 404) {
+      if (!staticSsrRoutes) {
+        lazySsrRoutes.set(url.routePath, false)
       }
     }
   } catch (err) {
-    console.error(err)
+    console.error('loadPageData:', err)
   }
 }
 
@@ -46,7 +65,9 @@ export function loadSSRDataFromTag(url: RouterURL) {
         storeData(href, ssrData)
         return
       }
-    } catch (e) { }
+    } catch (e) {
+      console.warn('ssr-data: invalid JSON')
+    }
   }
 }
 
