@@ -222,7 +222,7 @@ export class Aleph implements IAleph {
 
     ms.stop(`init ${this.config.framework} framework`)
 
-    const appFile = await findFile(this.workingDir, builtinModuleExts.map(ext => `app.${ext}`))
+    const appFile = await findFile(srcDir, builtinModuleExts.map(ext => `app.${ext}`))
     const modules: string[] = []
     const moduleWalkOptions = {
       includeDirs: false,
@@ -561,33 +561,34 @@ export class Aleph implements IAleph {
         .map(specifier => this.compile(specifier))
     )
 
-    let useDeno = false
-    let ssrProps = false
-    for (const specifier of ['app', ...nestedModules]) {
-      const mod = this.getModule(specifier)
-      if (mod) {
-        if (mod.denoHooks?.length) {
-          useDeno = true
-        } else {
-          this.lookupDeps(mod.specifier, dep => {
-            const depMod = this.getModule(dep.specifier)
-            if (depMod?.denoHooks?.length) {
-              useDeno = true
-              return false
-            }
-          })
-        }
-        if (useDeno) {
-          break
+    let shouldRender = false
+    const pageModule = this.getModule(nestedModules[nestedModules.length - 1])
+    if (pageModule && pageModule.ssrPropsFn) {
+      shouldRender = true
+    }
+    if (!shouldRender) {
+      for (const specifier of ['app', ...nestedModules]) {
+        const mod = this.getModule(specifier)
+        if (mod) {
+          if (mod.denoHooks?.length) {
+            shouldRender = true
+          } else {
+            this.lookupDeps(mod.specifier, dep => {
+              const depMod = this.getModule(dep.specifier)
+              if (depMod?.denoHooks?.length) {
+                shouldRender = true
+                return false
+              }
+            })
+          }
+          if (shouldRender) {
+            break
+          }
         }
       }
     }
-    const mod = this.getModule(nestedModules[nestedModules.length - 1])
-    if (mod && mod.ssrPropsFn) {
-      ssrProps = true
-    }
-    if (!useDeno && !ssrProps) {
-      return {}
+    if (!shouldRender) {
+      return null
     }
 
     const path = loc.pathname + (loc.search || '')
@@ -1128,7 +1129,7 @@ export class Aleph implements IAleph {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, ssrPropsFn, ssgPathsFn, denoHooks, starExports, map } = await transform(specifier, source.code, {
+      const { code, deps, denoHooks, ssrPropsFn, ssgPathsFn, starExports, map } = await transform(specifier, source.code, {
         ...this.commonCompileOptions,
         sourceMap: this.isDev,
         swcOptions: {
