@@ -1,24 +1,25 @@
 import type { APIRequest } from 'aleph/types.ts'
 
-export default async function handler(req: APIRequest) {
+export default async function handler({ router, response: resp }: APIRequest) {
   let count = parseInt(localStorage.getItem('count') || '0')
 
-  switch (req.params['action']) {
+  switch (router.params['action']) {
     case 'increase':
       count++
       localStorage.setItem('count', count.toString())
-      req.json({ count })
+      resp.json({ count })
       break
     case 'decrease':
       count--
       localStorage.setItem('count', count.toString())
-      req.json({ count })
+      resp.json({ count })
       break
     default:
-      req.status(400).json({
+      resp.status = 400
+      resp.json({
         error: 'UnknownAction',
         status: 400,
-        message: `undefined action '${req.params['action']}'`
+        message: `undefined action '${router.params['action']}'`
       })
       break
   }

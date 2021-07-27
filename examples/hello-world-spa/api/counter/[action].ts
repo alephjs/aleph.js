@@ -1,6 +1,6 @@
 import type { APIRequest } from 'aleph/types.ts'
 
-export default async function handler({ router, resp }: APIRequest) {
+export default async function handler({ router, response: resp }: APIRequest) {
   let count = parseInt(localStorage.getItem('count') || '0')
 
   switch (router.params['action']) {
@@ -15,7 +15,8 @@ export default async function handler({ router, resp }: APIRequest) {
       resp.json({ count })
       break
     default:
-      resp.status(400).json({
+      resp.status = 400
+      resp.json({
         error: 'UnknownAction',
         status: 400,
         message: `undefined action '${router.params['action']}'`
