@@ -209,13 +209,16 @@ export type APIMiddleware = {
  * An interface that aligns to the `Deno.RequestEvent`
  */
 export interface APIContext extends Deno.RequestEvent {
+  /** The data handled by middlewares. */
   readonly data: Map<string, any>
+  /** An interface that aligns to the parts of the `Response` with helper methods */
   readonly response: APIResponse
+  /** The router by the api routing. */
   readonly router: RouterURL
 }
 
 /**
- * An interface that aligns to the parts of the `Response`.
+ * An interface that aligns to the parts of the `Response` with helpers.
  */
 export interface APIResponse {
   status: number
