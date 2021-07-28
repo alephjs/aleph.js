@@ -192,10 +192,17 @@ export type ServerOptions = {
 }
 
 /**
+ * The handler for API requests.
+ */
+export type APIHandler = {
+  (context: APIContext): Promise<void> | void
+}
+
+/**
  * The middleware for API requests.
  */
 export type APIMiddleware = {
-  (context: APIContext, next: () => void): Promise<void>
+  (context: APIContext, next: () => void): Promise<void> | void
 }
 
 /**
