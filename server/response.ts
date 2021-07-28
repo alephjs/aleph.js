@@ -1,6 +1,5 @@
 import { APIResponse as IResponse } from '../types.ts'
 import log from '../shared/log.ts'
-import { getContentType } from './mime.ts'
 import compress from './compress.ts'
 
 export class APIResponse implements IResponse {
@@ -29,32 +28,9 @@ export class APIResponse implements IResponse {
     return this
   }
 
-  content(data: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>, contentType?: string): this {
-    this.body = data
-    if (contentType) {
-      this.setHeader('Content-Type', contentType)
-    }
-    return this
-  }
-
   json(data: any, space?: string | number): this {
-    this.content(JSON.stringify(data, undefined, space), 'application/json; charset=utf-8')
-    return this
-  }
-
-  async file(path: string): Promise<this> {
-    this.body = await Deno.readFile(path)
-    this.setHeader('Content-Type', getContentType(path))
-    return this
-  }
-
-  async proxy(url: string): Promise<this> {
-    const resp = await fetch(url)
-    if (resp.body) {
-      this.body = resp.body
-    }
-    this.headers = resp.headers
-    this.status = resp.status
+    this.setHeader('Content-Type', 'application/json; charset=utf-8')
+    this.body = JSON.stringify(data, undefined, space)
     return this
   }
 

@@ -10,6 +10,7 @@ import { VERSION } from '../version.ts'
 import { APIContext } from '../types.ts'
 import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
+import { getContentType } from './mime.ts'
 import { APIResponse } from './response.ts'
 
 /** The Aleph server class. */
@@ -112,7 +113,9 @@ export class Server {
 
         const relPath = util.trimPrefix(pathname, '/_aleph')
         if (relPath == '/main.js') {
-          resp.content(app.createMainJS(false), 'application/javascript; charset=utf-8').writeTo(e)
+          resp.body = app.createMainJS(false)
+          resp.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+          resp.writeTo(e)
           return
         }
 
@@ -138,6 +141,8 @@ export class Server {
               }
 
               resp.setHeader('ETag', etag)
+              resp.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+
               if (app.isDev && app.isHMRable(specifier)) {
                 let code = new TextDecoder().decode(content)
                 if (module.denoHooks?.length || module.ssrPropsFn || module.ssgPathsFn) {
@@ -161,10 +166,11 @@ export class Server {
                   '',
                   'import.meta.hot.accept();'
                 ].join('\n')
-                resp.content(code, 'application/javascript; charset=utf-8').writeTo(e)
+                resp.body = code
               } else {
-                resp.content(content, 'application/javascript; charset=utf-8').writeTo(e)
+                resp.body = content
               }
+              resp.writeTo(e)
               return
             }
           }
@@ -179,11 +185,15 @@ export class Server {
             return
           }
 
-          (await resp.setHeader('Last-Modified', lastModified).file(filePath)).writeTo(e)
+          resp.body = await Deno.readFile(filePath)
+          resp.setHeader('Last-Modified', lastModified)
+          resp.setHeader('Content-Type', getContentType(filePath))
+          resp.writeTo(e)
           return
         }
 
-        resp.content('file not found').writeTo(e, 404)
+        resp.body = 'file not found'
+        resp.writeTo(e, 404)
         return
       }
 
@@ -197,7 +207,10 @@ export class Server {
           return
         }
 
-        (await resp.setHeader('Last-Modified', lastModified).file(filePath)).writeTo(e)
+        resp.body = await Deno.readFile(filePath)
+        resp.setHeader('Last-Modified', lastModified)
+        resp.setHeader('Content-Type', getContentType(filePath))
+        resp.writeTo(e)
         return
       }
 
@@ -273,9 +286,12 @@ export class Server {
         pathname,
         search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
       })
-      resp.content(html, 'text/html; charset=utf-8').writeTo(e, status)
+      resp.body = html
+      resp.setHeader('Content-Type', 'text/html; charset=utf-8')
+      resp.writeTo(e, status)
     } catch (err) {
       try {
+        // todo: custom error page
         e.respondWith(new Response(
           [
             `<!DOCTYPE html>`,

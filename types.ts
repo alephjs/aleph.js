@@ -93,7 +93,7 @@ export type LoaderOutput = {
 /**
  * The built target of esbuild.
  */
-export type BuildTarget = 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' | 'esnext'
+export type BuildTarget = 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' | 'es2021' | 'esnext'
 
 /**
  * The supported borwser name of esbuild.
@@ -208,7 +208,7 @@ export interface APIContext extends Deno.RequestEvent {
 }
 
 /**
- * An interface that aligns to the parts of the `Aleph`.
+ * An interface that aligns to the parts of the `Response`.
  */
 export interface APIResponse {
   status: number
@@ -228,14 +228,8 @@ export interface APIResponse {
   removeHeader(key: string): this
   /** `redirect` replies to redirect the client to another URL with optional response `status` defaulting to 302. */
   redirect(url: string, status?: number): this
-  /** `content` replies to the request with a raw content. */
-  content(data: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>, contentType?: string): this
   /** `json` replies to the request with a json content. */
   json(data: any, space?: string | number): this
-  /** `file` reads the file content and sets `content-type` header by the file name. */
-  file(name: string): Promise<this>
-  /** `proxy` proxies the http request. */
-  proxy(url: string): Promise<this>
 }
 
 /**
