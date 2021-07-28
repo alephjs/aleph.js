@@ -471,7 +471,7 @@ export class Aleph implements IAleph {
 
   /** add a module loader. */
   addModuleLoader(loader: ModuleLoader): void {
-    if (util.isFunction(loader.resolve) || util.isFunction(loader.load)) {
+    if (loader.test instanceof RegExp && (util.isFunction(loader.resolve) || util.isFunction(loader.load))) {
       if (!this.#loaders.includes(loader)) {
         this.#loaders.push(loader)
       }
