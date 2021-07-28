@@ -2,8 +2,8 @@ import { extname, join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { esbuild } from '../bundler/esbuild.ts'
 import { toLocalPath, computeHash } from '../server/helper.ts'
 import { existsFile } from '../shared/fs.ts'
-import util from '../shared/util.ts'
 import { Measure } from '../shared/log.ts'
+import util from '../shared/util.ts'
 import type { ModuleLoader, Plugin, PostCSSPlugin } from '../types.ts'
 
 const postcssVersion = '8.3.5'
@@ -11,6 +11,7 @@ const postcssModulesVersion = '4.1.3'
 const productionOnlyPostcssPlugins = ['autoprefixer']
 const isModulesPluginName = (v: any): v is string => (typeof v === 'string' && /^postcss\-modules(@|$)/i.test(v.trim()))
 
+/** the builtin css loader */
 export const builtinCSSLoader: Readonly<ModuleLoader> = {
   test: /\.(css|pcss|postcss)$/i,
   acceptHMR: true,
@@ -139,17 +140,9 @@ export const builtinCSSLoader: Readonly<ModuleLoader> = {
   }
 }
 
-/** checks whether the loader is builtin css loader */
+/** check whether the loader is the builtin css loader */
 export function isBuiltinCSSLoader(loader: ModuleLoader): boolean {
   return loader === builtinCSSLoader
-}
-
-
-export default (): Plugin => {
-  return {
-    name: 'css-loader',
-    setup: (aleph) => aleph.addModuleLoader(builtinCSSLoader)
-  }
 }
 
 async function initPostCSS(plugins: PostCSSPlugin[], isDev: boolean) {
@@ -194,4 +187,11 @@ async function importPostcssPluginByName(name: string) {
   const url = `https://esm.sh/${name}?deps=postcss@${postcssVersion}&no-check`
   const { default: Plugin } = await import(url)
   return Plugin
+}
+
+export default (): Plugin => {
+  return {
+    name: 'css-loader',
+    setup: (aleph) => aleph.addModuleLoader(builtinCSSLoader)
+  }
 }

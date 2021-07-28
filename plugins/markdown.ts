@@ -52,6 +52,6 @@ export const markdownLoader: Readonly<ModuleLoader> = {
 export default (): Plugin => {
   return {
     name: 'markdown-loader',
-    setup: (aleph) => aleph.addModuleLoader(markdownLoader)
+    setup: aleph => aleph.addModuleLoader(markdownLoader)
   }
 }
