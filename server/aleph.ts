@@ -1,4 +1,4 @@
-import { bold, dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
+import { dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
 import { indexOf, copy, equals } from 'https://deno.land/std@0.100.0/bytes/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
 import { walk } from 'https://deno.land/std@0.100.0/fs/walk.ts'
@@ -555,6 +555,7 @@ export class Aleph implements IAleph {
       return null
     }
 
+    // pre-compile modules to check ssr options
     await Promise.all(
       nestedModules
         .filter(specifier => !this.#modules.has(specifier))
@@ -598,7 +599,7 @@ export class Aleph implements IAleph {
     return data
   }
 
-  /** get ssr page */
+  /** get page ssr html */
   async getPageHTML(loc: { pathname: string, search?: string }): Promise<[number, string]> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { routePath } = router
@@ -1361,8 +1362,6 @@ export class Aleph implements IAleph {
       return
     }
 
-    log.info(bold('- Pages (SSG)'))
-
     // render pages
     const paths: Set<{ pathname: string, search?: string }> = new Set(this.#pageRouting.paths.map(pathname => ({ pathname })))
     const locales = this.config.locales.filter(l => l !== this.config.defaultLocale)
@@ -1394,7 +1393,9 @@ export class Aleph implements IAleph {
         }
       }
     }
-    await Promise.all(Array.from(paths).map((loc) => ([loc, ...locales.map(locale => ({ ...loc, pathname: locale + loc.pathname }))])).flat().map(async ({ pathname, search }) => {
+
+    // render route pages
+    await Promise.all(Array.from(paths).map(loc => ([loc, ...locales.map(locale => ({ ...loc, pathname: locale + loc.pathname }))])).flat().map(async ({ pathname, search }) => {
       if (this.isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
         if (router.routePath !== '') {
@@ -1412,7 +1413,7 @@ export class Aleph implements IAleph {
             )
             await ensureTextFile(dataFile, JSON.stringify(data))
           }
-          log.info('  ○', href, dim('• ' + util.formatBytes(html.length)))
+          log.debug('SSR', href, dim('• ' + util.formatBytes(html.length)))
         }
       }
     }))

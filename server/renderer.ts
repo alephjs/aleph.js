@@ -103,15 +103,9 @@ export class Renderer {
     const state = { entryFile: '' }
     const appModule = this.#aleph.getModule('app')
     const { default: App } = appModule ? await this.#aleph.importModule(appModule) : {} as any
-    await Promise.all(
-      nestedModules
-        .filter(specifier => !this.#aleph.getModule(specifier))
-        .map(specifier => this.#aleph.compile(specifier))
-    )
     const nestedPageComponents = await Promise.all(nestedModules
-      .filter(specifier => !!this.#aleph.getModule(specifier))
       .map(async specifier => {
-        const module = this.#aleph.getModule(specifier)!
+        const module = this.#aleph.getModule(specifier) || (await this.#aleph.compile(specifier))
         const { default: Component, ssr } = await this.#aleph.importModule(module)
         let ssrProps = ssr?.props
         if (util.isFunction(ssrProps)) {
