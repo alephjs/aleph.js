@@ -1,11 +1,9 @@
-import { createHash } from 'https://deno.land/std@0.100.0/hash/mod.ts'
 import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { resolveURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import { VERSION } from '../version.ts'
 import { APIContext } from '../types.ts'
 import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
@@ -130,15 +128,15 @@ export class Server {
             }
           }
           if (module) {
-            const content = await app.readModuleJS(module)
+            const content = await app.readModuleJS(module, !!app.isDev)
             if (content) {
-              const etag = createHash('md5').update(VERSION).update(module.hash || module.sourceHash).toString()
-              if (etag === req.headers.get('If-None-Match')) {
+              const hash = module.hash || module.sourceHash
+              if (hash === req.headers.get('If-None-Match')) {
                 resp.writeTo(e, 304)
                 return
               }
 
-              resp.setHeader('ETag', etag)
+              resp.setHeader('ETag', hash)
               resp.setHeader('Content-Type', 'application/javascript; charset=utf-8')
               resp.body = content
               resp.writeTo(e)

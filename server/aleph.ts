@@ -345,9 +345,9 @@ export class Aleph implements IAleph {
               e.emit('modify-' + module.specifier, { refreshPage: refreshPage || undefined })
             })
           }
-          this.applyCompilationSideEffect(module, ({ specifier }) => {
+          this.applyCompilationSideEffect(module, ({ specifier, hash }) => {
             if (!hmrable && this.isHMRable(specifier)) {
-              log.debug('compilation side-effect:', specifier, dim('<-'), module.specifier)
+              log.debug(`compilation side-effect: ${specifier}(${hash?.substr(0, 6)}) ${dim('<-')} ${module.specifier}(${module.hash?.substr(0, 6)})`)
               this.#fsWatchListeners.forEach(e => {
                 e.emit('modify-' + specifier, { refreshPage: refreshPage || undefined })
               })
@@ -895,7 +895,7 @@ export class Aleph implements IAleph {
     return await import(`file://${join(this.buildDir, jsFile)}#${(hash || sourceHash).slice(0, 6)}`)
   }
 
-  async readModuleJS(module: Module): Promise<Uint8Array | null> {
+  async readModuleJS(module: Module, injectHMRCode = false): Promise<Uint8Array | null> {
     const { specifier, jsFile, jsBuffer } = module
     if (!jsBuffer) {
       const cacheFp = join(this.buildDir, jsFile)
@@ -905,8 +905,12 @@ export class Aleph implements IAleph {
       }
     }
 
-    if (!this.isDev || !this.isHMRable(specifier) || !module.jsBuffer) {
-      return module.jsBuffer || null
+    if (!module.jsBuffer) {
+      return null
+    }
+
+    if (!injectHMRCode || !this.isHMRable(specifier)) {
+      return module.jsBuffer
     }
 
     let code = new TextDecoder().decode(module.jsBuffer)
@@ -915,16 +919,17 @@ export class Aleph implements IAleph {
         code = (module as any).csrCode
       } else {
         const { code: csrCode } = await stripSsrCode(specifier, code, { sourceMap: true, swcOptions: { sourceType: SourceType.JS } })
+        // cache csr code
         Object.assign(module, { csrCode })
-        // todo: merge source map
         code = csrCode
+        // todo: merge source map
       }
     }
     this.#transformListeners.forEach(({ test, transform }) => {
       if (test === 'hmr') {
         const ret = transform({ specifier, code })
-        // todo: merge source map
         code = ret.code
+        // todo: merge source map
       }
     })
     return new TextEncoder().encode([
@@ -1239,10 +1244,6 @@ export class Aleph implements IAleph {
       ])
     }
 
-    if (ignoreDeps) {
-      return
-    }
-
     if (module.deps.length > 0) {
       let fsync = false
       const encoder = new TextEncoder()
@@ -1252,26 +1253,31 @@ export class Aleph implements IAleph {
         await this.readModuleJS(module)
       }
       await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
-        const [depModule, depSource] = await this.initModule(specifier, { externalRemoteDeps })
-        if (!depModule.external) {
-          await this.transpileModule(depModule, depSource, false, __tracing)
+        let depModule: Module | null
+        if (ignoreDeps) {
+          depModule = this.getModule(specifier)
+        } else {
+          const [mod, src] = await this.initModule(specifier, { externalRemoteDeps })
+          if (!mod.external) {
+            await this.transpileModule(mod, src, false, __tracing)
+          }
+          depModule = mod
         }
-        const hash = depModule.hash || depModule.sourceHash
-        if (hashLoc !== undefined) {
-          const { jsBuffer } = module
-          const hashData = encoder.encode((hash).substr(0, 6))
-          if (jsBuffer && !equals(hashData, jsBuffer.slice(hashLoc, hashLoc + 6))) {
-            copy(hashData, jsBuffer, hashLoc)
-            if (!fsync) {
+        if (depModule) {
+          const hash = depModule.hash || depModule.sourceHash
+          if (hashLoc !== undefined) {
+            if (await this.replaceDepHash(module, hashLoc, hash)) {
               fsync = true
             }
           }
+          hasher.update(hash)
+        } else {
+          log.error(`transpile '${module.specifier}': missing dependency module '${specifier}'`)
         }
-        hasher.update(hash)
       }))
       module.hash = hasher.toString()
       if (fsync) {
-        await this.cacheModule(module)
+        await this.writeModule(module)
       }
     } else {
       module.hash = module.sourceHash
@@ -1279,9 +1285,13 @@ export class Aleph implements IAleph {
   }
 
   /** apply compilation side-effect caused by updating dependency graph. */
-  private async applyCompilationSideEffect(by: Module, callback: (mod: Module) => void) {
+  private async applyCompilationSideEffect(by: Module, callback: (mod: Module) => void, __tracing = new Set<string>()) {
+    if (__tracing.has(by.specifier)) {
+      return
+    }
+    __tracing.add(by.specifier)
+
     const hash = by.hash || by.sourceHash
-    const hashData = (new TextEncoder()).encode(hash.substr(0, 6))
     for (const mod of this.#modules.values()) {
       const { deps } = mod
       if (deps.length > 0) {
@@ -1289,12 +1299,8 @@ export class Aleph implements IAleph {
         for (const dep of deps) {
           const { specifier, hashLoc } = dep
           if (specifier === by.specifier && hashLoc !== undefined) {
-            const jsCode = await this.readModuleJS(mod)
-            if (jsCode && !equals(hashData, jsCode.slice(hashLoc, hashLoc + 6))) {
-              copy(hashData, jsCode, hashLoc)
-              if (!fsync) {
-                fsync = true
-              }
+            if (await this.replaceDepHash(mod, hashLoc, hash)) {
+              fsync = true
             }
           }
         }
@@ -1307,12 +1313,26 @@ export class Aleph implements IAleph {
             }
           })
           mod.hash = hasher.toString()
-          await this.cacheModule(mod)
           callback(mod)
-          await this.applyCompilationSideEffect(mod, callback)
+          this.applyCompilationSideEffect(mod, callback)
+          this.writeModule(mod)
         }
       }
     }
+  }
+
+  /** replace dep hash in the `jsBuffer` and remove `csrCode` cache if it exits */
+  private async replaceDepHash(module: Module, hashLoc: number, hash: string) {
+    const hashData = (new TextEncoder()).encode(hash.substr(0, 6))
+    await this.readModuleJS(module)
+    if (module.jsBuffer && !equals(hashData, module.jsBuffer.slice(hashLoc, hashLoc + 6))) {
+      copy(hashData, module.jsBuffer, hashLoc)
+      if ('csrCode' in module) {
+        Reflect.deleteProperty(module, 'csrCode')
+      }
+      return true
+    }
+    return false
   }
 
   private clearSSRCache(specifier: string) {
@@ -1324,7 +1344,7 @@ export class Aleph implements IAleph {
     }
   }
 
-  private async cacheModule(module: Module) {
+  private async writeModule(module: Module) {
     const { specifier, jsBuffer, jsFile } = module
     if (jsBuffer) {
       const cacheFp = join(this.buildDir, jsFile)
