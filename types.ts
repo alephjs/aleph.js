@@ -1,4 +1,22 @@
 /**
+ * An interface that aligns to the parts of the `Aleph` class.
+ */
+export interface Aleph {
+  readonly mode: 'development' | 'production'
+  readonly workingDir: string
+  readonly config: Required<Config>
+  readonly importMap: ImportMap
+  addModule(specifier: string, sourceCode?: string): Promise<void>
+  addDist(path: string, content: Uint8Array): Promise<void>
+  fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
+  onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
+  onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
+  onTransform(test: RegExp, transform: (input: TransformInput) => TransformOutput): void
+  onTransform(specifier: string, transform: (input: TransformInput) => TransformOutput): void
+  onSSR(callback: (path: string, html: string) => { html: string }): void
+}
+
+/**
  * The config for aleph app.
  */
 export type Config = {
@@ -6,10 +24,8 @@ export type Config = {
   framework?: 'react'
   /** `basePath` specifies the path prefix (default is '/'). */
   basePath?: string
-  /** `defaultLocale` specifies the default locale (default is '**en**'). */
-  defaultLocale?: string
-  /** `locales` specifies the available locales. */
-  locales?: string[]
+  /** `i18n` specifies the options for **Internationalization**. */
+  i18n?: I18nOptions
   /** `build` specifies the options for **ES Build**. */
   build?: BuildOptions
   /** `ssr` specifies the options for **SSR**. */
@@ -25,39 +41,6 @@ export type Config = {
 }
 
 /**
- * An interface that aligns to the parts of the `Aleph`.
- */
-export interface Aleph {
-  readonly mode: 'development' | 'production'
-  readonly workingDir: string
-  readonly buildDir: string
-  readonly config: Required<Config>
-  readonly importMap: ImportMap
-  addModuleLoader(loader: ModuleLoader): void
-  addModule(specifier: string, sourceCode?: string): Promise<void>
-  addDist(path: string, content: Uint8Array): Promise<void>
-  fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
-  injectCode(phase: 'compilation' | 'hmr' | 'ssr', test: RegExp | string, transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
-  injectCode(phase: 'compilation' | 'hmr' | 'ssr', transform: (specifier: string, code: string, map?: string) => { code: string, map?: string }): void
-}
-
-/**
- * The module loader to load source media.
- */
-export type ModuleLoader = {
-  /** `test` matches the module specifier. */
-  test: RegExp
-  /** `acceptHMR` enables the HMR. */
-  acceptHMR?: boolean
-  /** allowPage` allows to load the module as a page. */
-  allowPage?: boolean
-  /** `resove` resolves the module specifier. */
-  resolve?(specifier: string): ResolveResult
-  /** `load` loads the source content. */
-  load?(input: { specifier: string, data?: any }, aleph: Aleph): LoaderOutput | Promise<LoaderOutput>
-}
-
-/**
  * The plugin to enhance aleph runtime.
  */
 export type Plugin = {
@@ -68,26 +51,70 @@ export type Plugin = {
 }
 
 /**
- * The result of module loader's `resolve` method.
+ * The basic route info.
  */
-export type ResolveResult = {
-  specifier: string,
-  external?: boolean,
-  pagePath?: string,
+type RouteBasicInfo = {
+  path: string
   isIndex?: boolean
-  data?: any,
 }
 
 /**
- * The output of module loader's `load` method.
+ * The result from the `onResolve` listener.
  */
-export type LoaderOutput = {
+export type ResolveResult = {
+  specifier?: string
+  asPage?: RouteBasicInfo
+  acceptHMR?: boolean
+  external?: boolean
+  data?: any
+}
+
+/**
+ * The input to the `onLoad` listener.
+ */
+export type LoadInput = {
+  specifier: string
+  data?: any
+}
+
+/**
+ * The output of the `onLoad` listener.
+ */
+export type LoadOutput = {
   /** The transformed code type (default is 'js'). */
   type?: 'css' | 'js' | 'jsx' | 'ts' | 'tsx'
   /** The transformed code. */
   code: string
   /** The source map. */
   map?: string
+}
+
+
+/**
+ * The input to the `onTransform` listener.
+ */
+export type TransformInput = {
+  specifier: string
+  code: string
+  map?: string
+}
+
+/**
+ * The output of the `onTransform` listener.
+ */
+export type TransformOutput = {
+  code: string
+  map?: string
+}
+
+/**
+ * The options for **Internationalization**.
+ */
+type I18nOptions = {
+  /** `defaultLocale` specifies the default locale (default is the first locale). */
+  defaultLocale?: string
+  /** `locales` specifies all the available locales. */
+  locales: string[]
 }
 
 /**

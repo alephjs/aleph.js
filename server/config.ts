@@ -9,6 +9,7 @@ import { getAlephPkgUri } from './helper.ts'
 
 export type RequiredConfig = Required<Config> & {
   srcDir: string
+  i18n: Required<Config['i18n']>
   build: Required<Config['build']>
   server: Required<Config['server']>
   react: ReactOptions
@@ -19,8 +20,10 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     framework: 'react',
     srcDir: '/',
     basePath: '/',
-    defaultLocale: 'en',
-    locales: [],
+    i18n: {
+      defaultLocale: 'en',
+      locales: [],
+    },
     build: {
       target: 'es2015',
       browsers: {} as Record<BrowserName, number>,
@@ -71,8 +74,7 @@ export async function loadConfig(specifier: string): Promise<Config> {
   const {
     framework,
     basePath,
-    defaultLocale,
-    locales,
+    i18n,
     build,
     ssr,
     plugins,
@@ -86,12 +88,16 @@ export async function loadConfig(specifier: string): Promise<Config> {
   if (util.isFilledString(basePath)) {
     config.basePath = util.cleanPath(basePath)
   }
-  if (isLocaleID(defaultLocale)) {
-    config.defaultLocale = defaultLocale
-  }
-  if (util.isArray(locales)) {
-    locales.filter(id => !isLocaleID(id)).forEach(id => log.warn(`invalid locale ID '${id}'`))
-    config.locales = Array.from(new Set(locales.filter(isLocaleID)))
+  if (util.isPlainObject(i18n)) {
+    let locales: string[] = []
+    if (util.isArray(i18n.locales)) {
+      i18n.locales.filter(id => !isLocaleID(id)).forEach(id => log.warn(`invalid locale ID '${id}'`))
+      locales = Array.from(new Set(i18n.locales.filter(isLocaleID)))
+    }
+    config.i18n = {
+      defaultLocale: isLocaleID(i18n.defaultLocale) ? i18n.defaultLocale : 'en',
+      locales
+    }
   }
   if (util.isPlainObject(build)) {
     config.build = {

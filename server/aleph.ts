@@ -6,25 +6,29 @@ import { createHash } from 'https://deno.land/std@0.100.0/hash/mod.ts'
 import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
 import type { TransformOptions } from '../compiler/mod.ts'
-import { wasmChecksum, parseExportNames, SourceType, transform } from '../compiler/mod.ts'
+import { wasmChecksum, parseExportNames, SourceType, transform, stripSsrCode } from '../compiler/mod.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
-import { builtinCSSLoader, isBuiltinCSSLoader } from '../plugins/css.ts'
+import cssPlugin, { cssLoader, isCSS } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph as IAleph, ImportMap, ModuleLoader, RouterURL } from '../types.ts'
+import type {
+  Aleph as IAleph, ImportMap, LoadInput, LoadOutput, RouterURL, ResolveResult,
+  TransformOutput, TransformInput
+} from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import type { RequiredConfig } from './config.ts'
 import { defaultConfig, fixConfigAndImportMap, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
 import {
-  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile, getAlephPkgUri, getSourceType,
-  isLocalUrl, moduleExclude, toLocalPath, toRelativePath
+  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile,
+  getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath
 } from './helper.ts'
 import { getContentType } from './mime.ts'
+import type { SSRData } from './renderer.ts'
 import { Renderer } from './renderer.ts'
 
 /** A module includes the compilation details. */
@@ -64,8 +68,22 @@ type CompileOptions = {
   externalRemoteDeps?: boolean
 }
 
-type Transformer = { test?: RegExp | string, fn: TransformFn }
-type TransformFn = (specifier: string, code: string, map?: string) => { code: string, map?: string }
+type ResolveListener = {
+  test: RegExp,
+  resolve(specifier: string): ResolveResult,
+}
+
+type LoadListener = {
+  test: RegExp,
+  load(input: LoadInput): Promise<LoadOutput> | LoadOutput,
+}
+
+type TransformListener = {
+  test: RegExp | string,
+  transform(input: TransformInput): TransformOutput,
+}
+
+type SsrListener = (path: string, html: string) => { html: string }
 
 /** The Aleph class for aleph runtime. */
 export class Aleph implements IAleph {
@@ -80,13 +98,15 @@ export class Aleph implements IAleph {
   #appModule: Module | null = null
   #pageRouting: Routing = new Routing()
   #apiRouting: Routing = new Routing()
-  #fsWatchListeners: Array<EventEmitter> = []
   #analyzer: Analyzer = new Analyzer(this)
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
-  #loaders: ModuleLoader[] = []
+  #fsWatchListeners: Array<EventEmitter> = []
+  #resolverListeners: Array<ResolveListener> = []
+  #loadListeners: Array<LoadListener> = []
+  #transformListeners: Array<TransformListener> = []
+  #ssrListeners: Array<SsrListener> = []
   #dists: Set<string> = new Set()
-  #injects: Map<string, Transformer[]> = new Map()
   #reloading = false
 
   constructor(
@@ -190,6 +210,7 @@ export class Aleph implements IAleph {
     ms.stop(`init env`)
 
     // apply plugins
+    cssPlugin().setup(this)
     await Promise.all(
       this.config.plugins.map(async plugin => {
         await plugin.setup(this)
@@ -228,9 +249,6 @@ export class Aleph implements IAleph {
       includeDirs: false,
       skip: moduleExclude
     }
-
-    // add builtin css loader
-    this.addModuleLoader(builtinCSSLoader)
 
     // pre-compile framework modules
     modules.push(`${alephPkgUri}/framework/${this.config.framework}/bootstrap.ts`)
@@ -469,13 +487,20 @@ export class Aleph implements IAleph {
     return null
   }
 
-  /** add a module loader. */
-  addModuleLoader(loader: ModuleLoader): void {
-    if (loader.test instanceof RegExp && (util.isFunction(loader.resolve) || util.isFunction(loader.load))) {
-      if (!this.#loaders.includes(loader)) {
-        this.#loaders.push(loader)
-      }
-    }
+  onResolve(test: RegExp, callback: (specifier: string) => ResolveResult): void {
+    this.#resolverListeners.push({ test, resolve: callback })
+  }
+
+  onLoad(test: RegExp, callback: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void {
+    this.#loadListeners.push({ test, load: callback })
+  }
+
+  onTransform(test: RegExp | string, callback: (input: TransformInput) => TransformOutput): void {
+    this.#transformListeners.push({ test, transform: callback })
+  }
+
+  onSSR(callback: (path: string, html: string) => { html: string }): void {
+    this.#ssrListeners.push(callback)
   }
 
   /** add a module by given path and optional source code. */
@@ -514,41 +539,8 @@ export class Aleph implements IAleph {
     this.#dists.add(pathname)
   }
 
-  /** inject code */
-  injectCode(phase: 'compilation' | 'hmr' | 'ssr', test: string | RegExp, transform: TransformFn): void
-  injectCode(phase: 'compilation' | 'hmr' | 'ssr', transform: TransformFn): void
-  injectCode(phase: 'compilation' | 'hmr' | 'ssr', ...rest: any[]): void {
-    let inject: Transformer = {
-      fn: rest[0],
-    }
-    if (rest.length === 2) {
-      inject.test = rest[0]
-      inject.fn = rest[1]
-    }
-    if (util.isFunction(inject.fn)) {
-      if (this.#injects.has(phase)) {
-        this.#injects.get(phase)!.push(inject)
-      } else {
-        this.#injects.set(phase, [inject])
-      }
-    }
-  }
-
-  /** get code injects */
-  getCodeInjects(phase: 'compilation' | 'hmr' | 'ssr', specifier: string): TransformFn[] {
-    return this.#injects.get(phase)?.filter(({ test }) => {
-      if (test === undefined || test === '') {
-        return true
-      }
-      if (test instanceof RegExp) {
-        return test.test(specifier)
-      }
-      return test === specifier
-    }).map(({ fn }) => fn) || []
-  }
-
   /** get ssr data */
-  async getSSRData(loc: { pathname: string, search?: string }): Promise<any> {
+  async getSSRData(loc: { pathname: string, search?: string }): Promise<Record<string, SSRData> | null> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { routePath } = router
     if (routePath === '' || !this.isSSRable(router.pathname)) {
@@ -615,15 +607,25 @@ export class Aleph implements IAleph {
     if (routePath === '') {
       const [html] = await this.#renderer.cache('404', path, async () => {
         const [_, nestedModules] = this.#pageRouting.createRouter({ pathname: '/404' })
-        return await this.#renderer.renderPage(router, nestedModules.slice(0, 1))
+        return await this.renderPage(router, nestedModules.slice(0, 1))
       })
       return [404, html]
     }
 
     const [html] = await this.#renderer.cache(routePath, path, async () => {
-      return await this.#renderer.renderPage(router, nestedModules)
+      return await this.renderPage(router, nestedModules)
     })
     return [200, html]
+  }
+
+  private async renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
+    const href = url.toString()
+    let [html, data] = await this.#renderer.renderPage(url, nestedModules)
+    for (const callback of this.#ssrListeners) {
+      const ret = callback(href, html)
+      html = ret.html
+    }
+    return [html, data]
   }
 
   /** create a fs watcher.  */
@@ -642,49 +644,11 @@ export class Aleph implements IAleph {
     }
   }
 
-  /** check the module whether it is page. */
-  isPageModule(specifier: string): boolean {
-    if (!specifier.startsWith('/pages/')) {
-      return false
-    }
-    if (builtinModuleExts.some(ext => specifier.endsWith('.' + ext))) {
-      return true
-    }
-    return this.#loaders.some(p => p.test.test(specifier) && p.allowPage)
-  }
-
-  /** check the module whether it is hmrable. */
-  isHMRable(specifier: string): boolean {
-    if (util.isLikelyHttpURL(specifier)) {
-      return false
-    }
-
-    for (const ext of builtinModuleExts) {
-      if (specifier.endsWith('.' + ext)) {
-        return (
-          specifier.startsWith('/pages/') ||
-          specifier.startsWith('/components/') ||
-          util.trimSuffix(specifier, '.' + ext) === '/app'
-        )
-      }
-    }
-
-    const mod = this.#modules.get(specifier)
-    if (mod && mod.isStyle) {
-      return true
-    }
-
-    return this.#loaders.some(p => (
-      p.test.test(specifier) &&
-      (p.acceptHMR || p.allowPage)
-    ))
-  }
-
   /** create main bootstrap script in javascript. */
   createMainJS(bundleMode = false): string {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
-    const { basePath: basePath, defaultLocale, framework } = this.config
+    const { framework, basePath: basePath, i18n: { defaultLocale } } = this.config
     const { routes } = this.#pageRouting
     const config: Record<string, any> = {
       basePath,
@@ -709,9 +673,11 @@ export class Aleph implements IAleph {
       this.isDev && `connect(${JSON.stringify(basePath)});`,
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
     ].filter(Boolean).join('\n')
-    this.getCodeInjects('compilation', '/main.js').forEach(transform => {
-      const ret = transform('/main.js', code)
-      code = ret.code
+    this.#transformListeners.forEach(({ test, transform }) => {
+      if (test === 'main.js') {
+        const ret = transform({ specifier: '/main.js', code })
+        code = ret.code
+      }
     })
     return code
   }
@@ -780,17 +746,18 @@ export class Aleph implements IAleph {
       importMap: this.importMap,
       inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
         if (type !== 'css') {
-          for (const loader of this.#loaders) {
-            if (loader.test.test(`.${type}`) && loader.load) {
-              const { code, type: codeType } = await loader.load({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
+          for (const { test, load } of this.#loadListeners) {
+            if (test.test(`.${type}`)) {
+              const { code, type: codeType } = await load({ specifier: key, data: (new TextEncoder).encode(tpl) })
               if (codeType === 'css') {
                 type = 'css'
                 tpl = code
+                break
               }
             }
           }
         }
-        const { code } = await builtinCSSLoader.load!({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
+        const { code } = await cssLoader({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
         return code
       },
       isDev: this.isDev,
@@ -866,16 +833,21 @@ export class Aleph implements IAleph {
     let isIndex: boolean | undefined = undefined
 
     if (!isBuiltinModuleType) {
-      for (const loader of this.#loaders) {
-        if (loader.test.test(specifier) && loader.allowPage && loader.resolve) {
-          const { pagePath, specifier: _specifier, isIndex: _isIndex } = loader.resolve(specifier)
-          if (util.isFilledString(pagePath)) {
-            routePath = pagePath
-            specifier = _specifier
-            if (_isIndex) {
-              isIndex = true
+      for (const { test, resolve } of this.#resolverListeners) {
+        if (test.test(specifier)) {
+          const { specifier: _specifier, asPage } = resolve(specifier)
+          if (asPage) {
+            const { path: pagePath, isIndex: _isIndex } = asPage
+            if (util.isFilledString(pagePath)) {
+              routePath = pagePath
+              if (_specifier) {
+                specifier = _specifier
+              }
+              if (_isIndex) {
+                isIndex = true
+              }
+              break
             }
-            break
           }
         }
       }
@@ -923,32 +895,56 @@ export class Aleph implements IAleph {
     return await import(`file://${join(this.buildDir, jsFile)}#${(hash || sourceHash).slice(0, 6)}`)
   }
 
-  async getModuleJS(module: Module): Promise<Uint8Array | null> {
-    const { jsFile, jsBuffer } = module
-    if (jsBuffer) {
-      return jsBuffer
+  async readModuleJS(module: Module): Promise<Uint8Array | null> {
+    const { specifier, jsFile, jsBuffer } = module
+    if (!jsBuffer) {
+      const cacheFp = join(this.buildDir, jsFile)
+      if (await existsFile(cacheFp)) {
+        module.jsBuffer = await Deno.readFile(cacheFp)
+        log.debug(`load '${jsFile}'` + dim(' • ' + util.formatBytes(module.jsBuffer.length)))
+      }
     }
 
-    const cacheFp = join(this.buildDir, jsFile)
-    if (await existsFile(cacheFp)) {
-      const content = await Deno.readFile(cacheFp)
-      module.jsBuffer = content
-      log.debug(`load '${jsFile}'` + dim(' • ' + util.formatBytes(content.length)))
-      return content
+    if (!this.isDev || !this.isHMRable(specifier) || !module.jsBuffer) {
+      return module.jsBuffer || null
     }
 
-    return null
+    let code = new TextDecoder().decode(module.jsBuffer)
+    if (module.denoHooks?.length || module.ssrPropsFn || module.ssgPathsFn) {
+      if ('csrCode' in module) {
+        code = (module as any).csrCode
+      } else {
+        const { code: csrCode } = await stripSsrCode(specifier, code, { sourceMap: true, swcOptions: { sourceType: SourceType.JS } })
+        Object.assign(module, { csrCode })
+        // todo: merge source map
+        code = csrCode
+      }
+    }
+    this.#transformListeners.forEach(({ test, transform }) => {
+      if (test === 'hmr') {
+        const ret = transform({ specifier, code })
+        // todo: merge source map
+        code = ret.code
+      }
+    })
+    return new TextEncoder().encode([
+      `import.meta.hot = $createHotContext(${JSON.stringify(specifier)});`,
+      '',
+      code,
+      '',
+      'import.meta.hot.accept();'
+    ].join('\n'))
   }
 
   async loadModuleSource(specifier: string, data?: any): Promise<ModuleSource> {
     let sourceCode: string = ''
     let sourceType: SourceType = SourceType.Unknown
     let sourceMap: string | null = null
-    let loader = this.#loaders.find(l => l.test.test(specifier))
-    let isStyle = loader !== undefined && isBuiltinCSSLoader(loader)
+    let loader = this.#loadListeners.find(l => l.test.test(specifier))
+    let isStyle = isCSS(specifier)
 
-    if (loader && util.isFunction(loader.load)) {
-      const { code, type = 'js', map } = await loader.load({ specifier, data }, this)
+    if (loader) {
+      const { code, type = 'js', map } = await loader.load({ specifier, data })
       switch (type) {
         case 'js':
           sourceType = SourceType.JS
@@ -979,7 +975,7 @@ export class Aleph implements IAleph {
     if (sourceType === SourceType.CSS) {
       isStyle = true
       // todo: covert source map
-      const { code, type = 'js' } = await builtinCSSLoader.load!({ specifier, data: sourceCode }, this)
+      const { code, type = 'js' } = await cssLoader({ specifier, data: sourceCode }, this)
       if (type === 'js') {
         sourceCode = code
         sourceType = SourceType.JS
@@ -1008,10 +1004,12 @@ export class Aleph implements IAleph {
     let data: any = null
 
     if (customSource === undefined) {
-      for (const l of this.#loaders) {
-        if (util.isFunction(l.resolve) && l.test.test(specifier)) {
-          const ret = l.resolve(specifier)
-          specifier = ret.specifier
+      for (const { test, resolve } of this.#resolverListeners) {
+        if (test.test(specifier)) {
+          const ret = resolve(specifier)
+          if (ret.specifier) {
+            specifier = ret.specifier
+          }
           external = Boolean(ret.external)
           data = ret.data
           break
@@ -1155,15 +1153,17 @@ export class Aleph implements IAleph {
       }
 
       // revert external imports
-      if (deps && this.#loaders.length > 0) {
+      if (deps && this.#resolverListeners.length > 0) {
         deps.forEach(({ specifier }) => {
           if (specifier !== module.specifier && util.isLikelyHttpURL(specifier)) {
             let external = false
-            for (const l of this.#loaders) {
-              if (util.isFunction(l.resolve) && l.test.test(specifier)) {
-                const ret = l.resolve(specifier)
+            for (const { test, resolve } of this.#resolverListeners) {
+              if (test.test(specifier)) {
+                const ret = resolve(specifier)
+                if (ret.specifier) {
+                  specifier = ret.specifier
+                }
                 external = Boolean(ret.external)
-                specifier = ret.specifier
                 break
               }
             }
@@ -1178,11 +1178,13 @@ export class Aleph implements IAleph {
         })
       }
 
-      this.getCodeInjects('compilation', specifier).forEach(transform => {
-        const { code, map } = transform(specifier, jsCode, sourceMap)
-        jsCode = code
-        if (sourceMap && map) {
-          sourceMap = map
+      this.#transformListeners.forEach(({ test, transform }) => {
+        if (test instanceof RegExp ? test.test(specifier) : test === '*') {
+          const { code, map } = transform({ specifier, code: jsCode, map: sourceMap })
+          jsCode = code
+          if (map) {
+            sourceMap = map
+          }
         }
       })
 
@@ -1247,7 +1249,7 @@ export class Aleph implements IAleph {
       const hasher = createHash('md5').update(module.sourceHash)
       // preload js buffer
       if (module.deps.findIndex(dep => dep.hashLoc !== undefined) >= 0) {
-        await this.getModuleJS(module)
+        await this.readModuleJS(module)
       }
       await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
         const [depModule, depSource] = await this.initModule(specifier, { externalRemoteDeps })
@@ -1287,7 +1289,7 @@ export class Aleph implements IAleph {
         for (const dep of deps) {
           const { specifier, hashLoc } = dep
           if (specifier === by.specifier && hashLoc !== undefined) {
-            const jsCode = await this.getModuleJS(mod)
+            const jsCode = await this.readModuleJS(mod)
             if (jsCode && !equals(hashData, jsCode.slice(hashLoc, hashLoc + 6))) {
               copy(hashData, jsCode, hashLoc)
               if (!fsync) {
@@ -1364,7 +1366,7 @@ export class Aleph implements IAleph {
 
     // render pages
     const paths: Set<{ pathname: string, search?: string }> = new Set(this.#pageRouting.paths.map(pathname => ({ pathname })))
-    const locales = this.config.locales.filter(l => l !== this.config.defaultLocale)
+    const locales = this.config.i18n.locales.filter(l => l !== this.config.i18n.defaultLocale)
     for (const specifier of this.#modules.keys()) {
       const module = this.#modules.get(specifier)!
       if (module.ssgPathsFn) {
@@ -1399,12 +1401,8 @@ export class Aleph implements IAleph {
       if (this.isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
         if (router.routePath !== '') {
-          const href = pathname + (search || '')
-          let [html, data] = await this.#renderer.renderPage(router, nestedModules)
-          this.getCodeInjects('ssr', href)?.forEach(transform => {
-            const ret = transform(href, html)
-            html = ret.code
-          })
+          const href = router.toString()
+          const [html, data] = await this.renderPage(router, nestedModules)
           await ensureTextFile(join(outputDir, pathname, 'index.html' + (search || '')), html)
           if (data) {
             const dataFile = join(
@@ -1424,13 +1422,47 @@ export class Aleph implements IAleph {
       if (nestedModules.length > 0) {
         await this.compile(nestedModules[0])
       }
-      let [html] = await this.#renderer.renderPage(router, nestedModules.slice(0, 1))
-      this.getCodeInjects('ssr', '/404').forEach(transform => {
-        const ret = transform('/404', html)
-        html = ret.code
-      })
+      const [html] = await this.renderPage(router, nestedModules.slice(0, 1))
       await ensureTextFile(join(outputDir, '404.html'), html)
     }
+  }
+
+  /** check the module whether it is page. */
+  private isPageModule(specifier: string): boolean {
+    if (!specifier.startsWith('/pages/')) {
+      return false
+    }
+    if (builtinModuleExts.some(ext => specifier.endsWith('.' + ext))) {
+      return true
+    }
+
+    return this.#resolverListeners.some(({ test, resolve }) => test.test(specifier) && !!resolve(specifier).asPage)
+  }
+
+  /** check the module whether it is hmrable. */
+  private isHMRable(specifier: string): boolean {
+    if (util.isLikelyHttpURL(specifier)) {
+      return false
+    }
+
+    for (const ext of builtinModuleExts) {
+      if (specifier.endsWith('.' + ext)) {
+        return (
+          specifier.startsWith('/pages/') ||
+          specifier.startsWith('/components/') ||
+          util.trimSuffix(specifier, '.' + ext) === '/app'
+        )
+      }
+    }
+
+    const mod = this.#modules.get(specifier)
+    if (mod && mod.isStyle) {
+      return true
+    }
+
+    return this.#resolverListeners.some(({ test, resolve }) => (
+      test.test(specifier) && this.acceptHMR(resolve(specifier))
+    ))
   }
 
   /** check the page whether it supports SSR. */
@@ -1454,6 +1486,10 @@ export class Aleph implements IAleph {
       return true
     }
     return ssr
+  }
+
+  private acceptHMR(ret: ResolveResult): boolean {
+    return ret.acceptHMR || !!ret.asPage
   }
 
   /** lookup app deps recurively. */

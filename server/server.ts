@@ -1,6 +1,5 @@
 import { createHash } from 'https://deno.land/std@0.100.0/hash/mod.ts'
 import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
-import { SourceType, stripSsrCode } from '../compiler/mod.ts'
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { resolveURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
@@ -131,8 +130,7 @@ export class Server {
             }
           }
           if (module) {
-            const { specifier } = module
-            const content = await app.getModuleJS(module)
+            const content = await app.readModuleJS(module)
             if (content) {
               const etag = createHash('md5').update(VERSION).update(module.hash || module.sourceHash).toString()
               if (etag === req.headers.get('If-None-Match')) {
@@ -142,34 +140,7 @@ export class Server {
 
               resp.setHeader('ETag', etag)
               resp.setHeader('Content-Type', 'application/javascript; charset=utf-8')
-
-              if (app.isDev && app.isHMRable(specifier)) {
-                let code = new TextDecoder().decode(content)
-                if (module.denoHooks?.length || module.ssrPropsFn || module.ssgPathsFn) {
-                  if ('csrCode' in module) {
-                    code = (module as any).csrCode
-                  } else {
-                    const { code: csrCode } = await stripSsrCode(specifier, code, { sourceMap: true, swcOptions: { sourceType: SourceType.JS } })
-                    Object.assign(module, { csrCode })
-                    // todo: merge source map
-                    code = csrCode
-                  }
-                }
-                app.getCodeInjects('hmr', specifier)?.forEach(transform => {
-                  const ret = transform(specifier, code)
-                  code = ret.code
-                })
-                code = [
-                  `import.meta.hot = $createHotContext(${JSON.stringify(specifier)});`,
-                  '',
-                  code,
-                  '',
-                  'import.meta.hot.accept();'
-                ].join('\n')
-                resp.body = code
-              } else {
-                resp.body = content
-              }
+              resp.body = content
               resp.writeTo(e)
               return
             }
@@ -352,11 +323,15 @@ export async function serve({ aleph, port, hostname, certFile, keyFile, signal }
         // In order to not be blocking, we need to handle each connection individually
         // in its own async function.
         (async () => {
-          const httpConn = Deno.serveHttp(conn)
-          // Each request sent over the HTTP connection will be yielded as an async
-          // iterator from the HTTP connection.
-          for await (const e of httpConn) {
-            await server.handle(e)
+          try {
+            const httpConn = Deno.serveHttp(conn)
+            // Each request sent over the HTTP connection will be yielded as an async
+            // iterator from the HTTP connection.
+            for await (const e of httpConn) {
+              await server.handle(e)
+            }
+          } catch (err) {
+            log.warn(err.message)
           }
         })()
       }

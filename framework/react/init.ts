@@ -6,13 +6,13 @@ export async function init(aleph: Aleph) {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
     await aleph.addModule(`${alephPkgUri}/framework/react/refresh.ts`)
-    aleph.injectCode('compilation', '/main.js', (_: string, code: string) => ({
+    aleph.onTransform('main.js', ({ code }) => ({
       code: [
         `import "./-/${alephPkgPath}/framework/react/refresh.js";`,
         code
       ].join('\n')
     }))
-    aleph.injectCode('hmr', (specifier: string, code: string) => ({
+    aleph.onTransform('hmr', ({ specifier, code }) => ({
       code: code.includes('$RefreshReg$(') ? [
         'const prevRefreshReg = $RefreshReg$;',
         'const prevRefreshSig = $RefreshSig$;',

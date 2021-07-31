@@ -74,12 +74,6 @@ export class Renderer {
       cache.delete(key)
     }
     let [html, data] = await render()
-    if (namespace !== '-') {
-      this.#aleph.getCodeInjects('ssr', key)?.forEach(transform => {
-        const ret = transform(key, html)
-        html = ret.code
-      })
-    }
     cache.set(key, { html, data })
     return [html, data]
   }
@@ -170,7 +164,7 @@ export class Renderer {
   async renderSPAIndexPage(): Promise<string> {
     // todo: render custom fallback page
     return createHtml({
-      lang: this.#aleph.config.defaultLocale,
+      lang: this.#aleph.config.i18n.defaultLocale,
       head: [],
       scripts: this.#aleph.getSSRHTMLScripts(),
       body: '<div id="__aleph"></div>',
