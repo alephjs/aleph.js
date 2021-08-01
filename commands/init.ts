@@ -7,7 +7,7 @@ import { ensureTextFile } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
-import { x_brotli, x_flate } from '../server/compress.ts'
+import { deno_x_brotli, deno_x_flate } from '../server/compress.ts'
 
 export const helpMessage = `
 Usage:
@@ -77,7 +77,7 @@ export default async function (nameArg?: string) {
 
   const urls = Object.values(importMap.imports).filter(v => !v.endsWith('/'))
   const p = Deno.run({
-    cmd: [Deno.execPath(), 'cache', ...urls, x_brotli, x_flate]
+    cmd: [Deno.execPath(), 'cache', ...urls, deno_x_brotli, deno_x_flate]
   })
   await p.status()
   p.close()

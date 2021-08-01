@@ -5,11 +5,7 @@ import { createNamedContext } from './helper.ts'
 import type { RendererStore } from './renderer.ts'
 
 export const RouterContext = createNamedContext<RouterURL>(createBlankRouterURL(), 'RouterContext')
-
-export const FallbackContext = createNamedContext<{ to: ReactNode }>({
-  to: null
-}, 'FallbackContext')
-
+export const FallbackContext = createNamedContext<{ to: ReactNode }>({ to: null }, 'FallbackContext')
 export const SSRContext = createContext<RendererStore>({
   headElements: new Map(),
   inlineStyles: new Map(),

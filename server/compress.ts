@@ -1,5 +1,5 @@
-export const x_brotli = 'https://deno.land/x/brotli@v0.1.4/mod.ts'
-export const x_flate = 'https://deno.land/x/denoflate@1.2.1/mod.ts'
+export const deno_x_brotli = 'https://deno.land/x/brotli@v0.1.4/mod.ts'
+export const deno_x_flate = 'https://deno.land/x/denoflate@1.2.1/mod.ts'
 
 class Compression {
   #brotli: ((data: Uint8Array) => Uint8Array) | null = null
@@ -32,13 +32,13 @@ class Compression {
   ): Promise<Uint8Array> {
     if (encoding === 'br') {
       if (this.#brotli === null) {
-        const { compress } = await import(x_brotli)
+        const { compress } = await import(deno_x_brotli)
         this.#brotli = compress
       }
       return this.#brotli!(data)
     } else if (encoding === 'gzip') {
       if (this.#gzip === null) {
-        const denoflate = await import(x_flate)
+        const denoflate = await import(deno_x_flate)
         this.#gzip = (data: Uint8Array) => denoflate.gzip(data, undefined)
       }
       return this.#gzip!(data)
