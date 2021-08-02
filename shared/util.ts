@@ -33,8 +33,8 @@ export default {
     }
     return s
   },
-  splitBy(s: string, searchString: string): [string, string] {
-    const i = s.indexOf(searchString)
+  splitBy(s: string, searchString: string, fromLast = false): [string, string] {
+    const i = fromLast ? s.lastIndexOf(searchString) : s.indexOf(searchString)
     if (i >= 0) {
       return [s.slice(0, i), s.slice(i + 1)]
     }
