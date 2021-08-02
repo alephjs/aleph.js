@@ -145,7 +145,7 @@ export class Renderer {
             type: 'application/json',
             innerText: JSON.stringify(data, undefined, isDev ? 2 : 0),
           } : '',
-          ...this.#aleph.getSSRHTMLScripts(state.entryFile),
+          ...this.#aleph.getScripts(state.entryFile),
           ...scripts.map((script: Record<string, any>) => {
             if (script.innerText && !isDev) {
               return { ...script, innerText: script.innerText }
@@ -158,18 +158,6 @@ export class Renderer {
       }),
       data
     ]
-  }
-
-  /** render the index page for SPA mode. */
-  async renderSPAIndexPage(): Promise<string> {
-    // todo: render custom fallback page
-    return createHtml({
-      lang: this.#aleph.config.i18n.defaultLocale,
-      head: [],
-      scripts: this.#aleph.getSSRHTMLScripts(),
-      body: '<div id="__aleph"></div>',
-      minify: !this.#aleph.isDev
-    })
   }
 
   private async lookupStyleModules(...specifiers: string[]): Promise<Record<string, { css?: string, href?: string }>> {
@@ -193,7 +181,7 @@ export class Renderer {
 }
 
 /** create html content by given arguments */
-function createHtml({
+export function createHtml({
   body,
   lang = 'en',
   head = [],

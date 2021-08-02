@@ -14,10 +14,7 @@ import cssPlugin, { cssLoader, isCSS } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type {
-  Aleph as IAleph, ImportMap, LoadInput, LoadOutput, RouterURL, ResolveResult,
-  TransformOutput, TransformInput
-} from '../types.ts'
+import type { Aleph as IAleph, ImportMap, LoadInput, LoadOutput, RouterURL, ResolveResult, TransformOutput, TransformInput } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
@@ -29,7 +26,7 @@ import {
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import type { SSRData } from './renderer.ts'
-import { Renderer } from './renderer.ts'
+import { createHtml, Renderer } from './renderer.ts'
 
 /** A module includes the compilation details. */
 export type Module = {
@@ -470,7 +467,7 @@ export class Aleph implements IAleph {
     return null
   }
 
-  /** get api route by given location. */
+  /** get api route by the given location. */
   async getAPIRoute(location: { pathname: string, search?: string }): Promise<[RouterURL, Module] | null> {
     const router = this.#apiRouting.createRouter(location)
     if (router !== null) {
@@ -539,7 +536,7 @@ export class Aleph implements IAleph {
     this.#dists.add(pathname)
   }
 
-  /** get ssr data */
+  /** get ssr data by the given location(page), return `null` if no data defined */
   async getSSRData(loc: { pathname: string, search?: string }): Promise<Record<string, SSRData> | null> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { routePath } = router
@@ -591,15 +588,15 @@ export class Aleph implements IAleph {
     return data
   }
 
-  /** get page ssr html */
-  async getPageHTML(loc: { pathname: string, search?: string }): Promise<[number, string]> {
+  /** render page to HTML by the given location */
+  async renderPage(loc: { pathname: string, search?: string }): Promise<[number, string]> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { routePath } = router
     const path = loc.pathname + (loc.search || '')
 
     if (!this.isSSRable(loc.pathname)) {
       const [html] = await this.#renderer.cache('-', 'spa-index', async () => {
-        return [await this.#renderer.renderSPAIndexPage(), null]
+        return [this.createSPAIndexHtml(), null]
       })
       return [200, html]
     }
@@ -607,18 +604,18 @@ export class Aleph implements IAleph {
     if (routePath === '') {
       const [html] = await this.#renderer.cache('404', path, async () => {
         const [_, nestedModules] = this.#pageRouting.createRouter({ pathname: '/404' })
-        return await this.renderPage(router, nestedModules.slice(0, 1))
+        return await this.#renderPage(router, nestedModules.slice(0, 1))
       })
       return [404, html]
     }
 
     const [html] = await this.#renderer.cache(routePath, path, async () => {
-      return await this.renderPage(router, nestedModules)
+      return await this.#renderPage(router, nestedModules)
     })
     return [200, html]
   }
 
-  private async renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
+  async #renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
     const href = url.toString()
     let [html, data] = await this.#renderer.renderPage(url, nestedModules)
     for (const callback of this.#ssrListeners) {
@@ -682,11 +679,24 @@ export class Aleph implements IAleph {
     return code
   }
 
-  /** get ssr html scripts */
-  getSSRHTMLScripts(entryFile?: string) {
+  /** create the index html for SPA mode. */
+  private createSPAIndexHtml(): string {
+    // todo: render custom fallback page
+    return createHtml({
+      lang: this.config.i18n.defaultLocale,
+      head: [],
+      scripts: this.getScripts(),
+      body: '<div id="__aleph"></div>',
+      minify: !this.isDev
+    })
+  }
+
+  /** get scripts for html output */
+  getScripts(entryFile?: string) {
     const { framework } = this.config
     const basePath = util.trimSuffix(this.config.basePath, '/')
     const alephPkgPath = getAlephPkgUri().replace('https://', '').replace('http://localhost:', 'http_localhost_')
+    const syncChunks = this.#bundler.getSyncChunks()
 
     if (this.isDev) {
       const preload: string[] = [
@@ -715,7 +725,7 @@ export class Aleph implements IAleph {
 
     return [
       simpleJSMinify(bundlerRuntimeCode),
-      ... this.#bundler.getSyncChunks().map(filename => ({
+      ...syncChunks.map(filename => ({
         src: `${basePath}/_aleph/${filename}`
       }))
     ]
@@ -739,7 +749,7 @@ export class Aleph implements IAleph {
   }
 
   /** common compiler options */
-  get commonCompileOptions(): TransformOptions {
+  get commonCompilerOptions(): TransformOptions {
     return {
       workingDir: this.workingDir,
       alephPkgUri: getAlephPkgUri(),
@@ -895,7 +905,7 @@ export class Aleph implements IAleph {
     return await import(`file://${join(this.buildDir, jsFile)}#${(hash || sourceHash).slice(0, 6)}`)
   }
 
-  async readModuleJS(module: Module, injectHMRCode = false): Promise<Uint8Array | null> {
+  async getModuleJS(module: Module, injectHMRCode = false): Promise<Uint8Array | null> {
     const { specifier, jsFile, jsBuffer } = module
     if (!jsBuffer) {
       const cacheFp = join(this.buildDir, jsFile)
@@ -918,6 +928,7 @@ export class Aleph implements IAleph {
       if ('csrCode' in module) {
         code = (module as any).csrCode
       } else {
+        [code] = util.splitBy(code, '\n//# sourceMappingURL=', true)
         const { code: csrCode } = await stripSsrCode(specifier, code, { sourceMap: true, swcOptions: { sourceType: SourceType.JS } })
         // cache csr code
         Object.assign(module, { csrCode })
@@ -1134,7 +1145,7 @@ export class Aleph implements IAleph {
       const ms = new Measure()
       const encoder = new TextEncoder()
       const { code, deps, denoHooks, ssrPropsFn, ssgPathsFn, starExports, map } = await transform(specifier, source.code, {
-        ...this.commonCompileOptions,
+        ...this.commonCompilerOptions,
         sourceMap: this.isDev,
         swcOptions: {
           sourceType: source.type
@@ -1246,12 +1257,7 @@ export class Aleph implements IAleph {
 
     if (module.deps.length > 0) {
       let fsync = false
-      const encoder = new TextEncoder()
       const hasher = createHash('md5').update(module.sourceHash)
-      // preload js buffer
-      if (module.deps.findIndex(dep => dep.hashLoc !== undefined) >= 0) {
-        await this.readModuleJS(module)
-      }
       await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
         let depModule: Module | null
         if (ignoreDeps) {
@@ -1277,7 +1283,7 @@ export class Aleph implements IAleph {
       }))
       module.hash = hasher.toString()
       if (fsync) {
-        await this.writeModule(module)
+        await this.cacheModule(module)
       }
     } else {
       module.hash = module.sourceHash
@@ -1315,7 +1321,7 @@ export class Aleph implements IAleph {
           mod.hash = hasher.toString()
           callback(mod)
           this.applyCompilationSideEffect(mod, callback)
-          this.writeModule(mod)
+          this.cacheModule(mod)
         }
       }
     }
@@ -1324,9 +1330,9 @@ export class Aleph implements IAleph {
   /** replace dep hash in the `jsBuffer` and remove `csrCode` cache if it exits */
   private async replaceDepHash(module: Module, hashLoc: number, hash: string) {
     const hashData = (new TextEncoder()).encode(hash.substr(0, 6))
-    await this.readModuleJS(module)
-    if (module.jsBuffer && !equals(hashData, module.jsBuffer.slice(hashLoc, hashLoc + 6))) {
-      copy(hashData, module.jsBuffer, hashLoc)
+    const jsBuffer = await this.getModuleJS(module)
+    if (jsBuffer && !equals(hashData, jsBuffer.slice(hashLoc, hashLoc + 6))) {
+      copy(hashData, jsBuffer, hashLoc)
       if ('csrCode' in module) {
         Reflect.deleteProperty(module, 'csrCode')
       }
@@ -1344,7 +1350,7 @@ export class Aleph implements IAleph {
     }
   }
 
-  private async writeModule(module: Module) {
+  private async cacheModule(module: Module) {
     const { specifier, jsBuffer, jsFile } = module
     if (jsBuffer) {
       const cacheFp = join(this.buildDir, jsFile)
@@ -1378,9 +1384,10 @@ export class Aleph implements IAleph {
     const outputDir = join(this.workingDir, this.config.build.outputDir)
 
     if (ssr === false) {
-      const html = await this.#renderer.renderSPAIndexPage()
+      const html = this.createSPAIndexHtml()
       await ensureTextFile(join(outputDir, 'index.html'), html)
       await ensureTextFile(join(outputDir, '404.html'), html)
+      // todo: 500 page
       return
     }
 
@@ -1422,7 +1429,7 @@ export class Aleph implements IAleph {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
         if (router.routePath !== '') {
           const href = router.toString()
-          const [html, data] = await this.renderPage(router, nestedModules)
+          const [html, data] = await this.#renderPage(router, nestedModules)
           await ensureTextFile(join(outputDir, pathname, 'index.html' + (search || '')), html)
           if (data) {
             const dataFile = join(
@@ -1442,7 +1449,7 @@ export class Aleph implements IAleph {
       if (nestedModules.length > 0) {
         await this.compile(nestedModules[0])
       }
-      const [html] = await this.renderPage(router, nestedModules.slice(0, 1))
+      const [html] = await this.#renderPage(router, nestedModules.slice(0, 1))
       await ensureTextFile(join(outputDir, '404.html'), html)
     }
   }

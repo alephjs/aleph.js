@@ -15,8 +15,8 @@ export class Server {
   #aleph: Aleph
   #ready: boolean
 
-  constructor(app: Aleph) {
-    this.#aleph = app
+  constructor(aleph: Aleph) {
+    this.#aleph = aleph
     this.#ready = false
   }
 
@@ -27,8 +27,8 @@ export class Server {
     }
 
     const { request: req, respondWith } = e
-    const app = this.#aleph
-    const { basePath, server: { headers, rewrites, middlewares } } = app.config
+    const aleph = this.#aleph
+    const { basePath, server: { headers, rewrites, middlewares } } = aleph.config
     const url = resolveURL(req.url, basePath, rewrites)
     const pathname = decodeURI(url.pathname)
 
@@ -36,7 +36,7 @@ export class Server {
       // serve hmr ws
       if (pathname === '/_hmr') {
         const { websocket, response } = Deno.upgradeWebSocket(req)
-        const watcher = app.createFSWatcher()
+        const watcher = aleph.createFSWatcher()
         websocket.addEventListener('open', () => {
           watcher.on('add', (mod: any) => websocket.send(JSON.stringify({ ...mod, type: 'add' })))
           watcher.on('remove', (specifier: string) => {
@@ -46,7 +46,7 @@ export class Server {
           log.debug('hmr connected')
         })
         websocket.addEventListener('close', () => {
-          app.removeFSWatcher(watcher)
+          aleph.removeFSWatcher(watcher)
           log.debug('hmr closed')
         })
         websocket.addEventListener('message', (e) => {
@@ -54,7 +54,7 @@ export class Server {
             try {
               const data = JSON.parse(e.data)
               if (data.type === 'hotAccept' && util.isFilledString(data.specifier)) {
-                const mod = app.getModule(data.specifier)
+                const mod = aleph.getModule(data.specifier)
                 if (mod) {
                   watcher.on(`modify-${mod.specifier}`, (data) => {
                     websocket.send(JSON.stringify({
@@ -91,7 +91,7 @@ export class Server {
       }
 
       // in dev mode, we use `Last-Modified` and `ETag` header to control cache
-      if (app.isDev) {
+      if (aleph.isDev) {
         resp.setHeader('Cache-Control', 'max-age=0')
       }
 
@@ -99,7 +99,7 @@ export class Server {
       if (pathname.startsWith('/_aleph/')) {
         if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('.json')) {
           const path = util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json'))
-          const data = await app.getSSRData({ pathname: path })
+          const data = await aleph.getSSRData({ pathname: path })
           if (data === null) {
             resp.json(null).writeTo(e, 404)
           } else {
@@ -110,25 +110,25 @@ export class Server {
 
         const relPath = util.trimPrefix(pathname, '/_aleph')
         if (relPath == '/main.js') {
-          resp.body = app.createMainJS(false)
+          resp.body = aleph.createMainJS(false)
           resp.setHeader('Content-Type', 'application/javascript; charset=utf-8')
           resp.writeTo(e)
           return
         }
 
         if (relPath.endsWith('.js')) {
-          let module = app.findModule(({ jsFile }) => jsFile === relPath)
-          if (!module && app.isDev) {
+          let module = aleph.findModule(({ jsFile }) => jsFile === relPath)
+          if (!module && aleph.isDev) {
             for (const ext of [...builtinModuleExts.map(ext => `.${ext}`), '']) {
               const sepcifier = util.trimSuffix(relPath, '.js') + ext
-              if (await existsFile(join(app.workingDir, sepcifier))) {
-                module = await app.compile(sepcifier)
+              if (await existsFile(join(aleph.workingDir, sepcifier))) {
+                module = await aleph.compile(sepcifier)
                 break
               }
             }
           }
           if (module) {
-            const content = await app.readModuleJS(module, !!app.isDev)
+            const content = await aleph.getModuleJS(module, aleph.isDev)
             if (content) {
               const hash = module.hash || module.sourceHash
               if (hash === req.headers.get('If-None-Match')) {
@@ -145,7 +145,7 @@ export class Server {
           }
         }
 
-        const filePath = join(app.buildDir, relPath)
+        const filePath = join(aleph.buildDir, relPath)
         if (await existsFile(filePath)) {
           const info = Deno.lstatSync(filePath)
           const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
@@ -167,7 +167,7 @@ export class Server {
       }
 
       // serve public files
-      const filePath = join(app.workingDir, 'public', pathname)
+      const filePath = join(aleph.workingDir, 'public', pathname)
       if (await existsFile(filePath)) {
         const info = Deno.lstatSync(filePath)
         const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
@@ -185,7 +185,7 @@ export class Server {
 
       // serve APIs
       if (pathname.startsWith('/api/')) {
-        const route = await app.getAPIRoute({
+        const route = await aleph.getAPIRoute({
           pathname,
           search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
         })
@@ -194,7 +194,7 @@ export class Server {
             const [router, module] = route
             const data = new Map()
             const steps = [...middlewares, async (context: APIContext) => {
-              const { default: _handler, handler } = await app.importModule(module)
+              const { default: _handler, handler } = await aleph.importModule(module)
               const h = _handler || handler
               if (util.isFunction(h)) {
                 await h(context)
@@ -251,7 +251,7 @@ export class Server {
       }
 
       // ssr
-      const [status, html] = await app.getPageHTML({
+      const [status, html] = await aleph.renderPage({
         pathname,
         search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
       })

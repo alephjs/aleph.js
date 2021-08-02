@@ -145,7 +145,7 @@ export class Bundler {
         mod.specifier,
         source.code,
         {
-          ...this.#aleph.commonCompileOptions,
+          ...this.#aleph.commonCompilerOptions,
           swcOptions: {
             sourceType: source.type,
           },
