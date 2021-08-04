@@ -41,7 +41,7 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
     }
   }
 
-  let plugins = cssConfig.postcss?.plugins || []
+  let plugins = cssConfig.postcss.plugins || []
   let modulesJSON: Record<string, string> = {}
   if (/\.module\.[a-z]+$/.test(specifier)) {
     const options = {

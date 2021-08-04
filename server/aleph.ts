@@ -76,7 +76,7 @@ type LoadListener = {
 }
 
 type TransformListener = {
-  test: RegExp | string,
+  test: RegExp | 'hmr' | 'mainscript',
   transform(input: TransformInput): TransformOutput,
 }
 
@@ -492,7 +492,7 @@ export class Aleph implements IAleph {
     this.#loadListeners.push({ test, load: callback })
   }
 
-  onTransform(test: RegExp | string, callback: (input: TransformInput) => TransformOutput): void {
+  onTransform(test: RegExp | 'hmr' | 'mainscript', callback: (input: TransformInput) => TransformOutput): void {
     this.#transformListeners.push({ test, transform: callback })
   }
 
@@ -671,7 +671,7 @@ export class Aleph implements IAleph {
       `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
     ].filter(Boolean).join('\n')
     this.#transformListeners.forEach(({ test, transform }) => {
-      if (test === 'main.js') {
+      if (test === 'mainscript') {
         const ret = transform({ specifier: '/main.js', code })
         code = ret.code
       }
@@ -1195,7 +1195,7 @@ export class Aleph implements IAleph {
       }
 
       this.#transformListeners.forEach(({ test, transform }) => {
-        if (test instanceof RegExp ? test.test(specifier) : test === '*') {
+        if (test instanceof RegExp && test.test(specifier)) {
           const { code, map } = transform({ specifier, code: jsCode, map: sourceMap })
           jsCode = code
           if (map) {

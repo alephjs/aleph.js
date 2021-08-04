@@ -6,7 +6,7 @@ export async function init(aleph: Aleph) {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
     await aleph.addModule(`${alephPkgUri}/framework/react/refresh.ts`)
-    aleph.onTransform('main.js', ({ code }) => ({
+    aleph.onTransform('mainscript', ({ code }) => ({
       code: [
         `import "./-/${alephPkgPath}/framework/react/refresh.js";`,
         code

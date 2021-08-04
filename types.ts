@@ -4,20 +4,18 @@
 export interface Aleph {
   readonly mode: 'development' | 'production'
   readonly workingDir: string
-  readonly config: Required<Config>
-  readonly importMap: ImportMap
+  readonly config: RequiredConfig
   addModule(specifier: string, sourceCode?: string): Promise<void>
   addDist(path: string, content: Uint8Array): Promise<void>
   fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
-  onTransform(test: RegExp, transform: (input: TransformInput) => TransformOutput): void
-  onTransform(specifier: string, transform: (input: TransformInput) => TransformOutput): void
+  onTransform(test: 'hmr' | 'mainscript' | RegExp, transform: (input: TransformInput) => TransformOutput): void
   onSSR(callback: (path: string, html: string) => { html: string }): void
 }
 
 /**
- * The config for aleph app.
+ * The configuration for aleph app.
  */
 export type Config = {
   /** `framework` specifies the framework (default is 'react'). */
@@ -26,18 +24,25 @@ export type Config = {
   basePath?: string
   /** `i18n` specifies the options for **Internationalization**. */
   i18n?: I18nOptions
+  /** `css` specifies the css processing options. */
+  css?: CSSOptions
   /** `build` specifies the options for **ES Build**. */
   build?: BuildOptions
   /** `ssr` specifies the options for **SSR**. */
   ssr?: boolean | GlobalSSROptions
-  /** `server` specifies the options for **Server**. */
-  server?: ServerOptions
-  /** `css` specifies the css processing options. */
-  css?: CSSOptions
   /** `plugins` specifies some plugins to extend Aleph runtime. */
   plugins?: Plugin[]
   /** `env` appends system env variables. */
   env?: Record<string, string>
+  /** `server` specifies the options for **Server**. */
+  server?: ServerOptions
+}
+
+export type RequiredConfig = Required<Config> & {
+  i18n: Required<I18nOptions>
+  build: Required<BuildOptions>
+  server: Required<ServerOptions>
+  css: Required<CSSOptions>
 }
 
 /**

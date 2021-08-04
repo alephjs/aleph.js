@@ -4,14 +4,11 @@ import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { BrowserName, Config, ImportMap, PostCSSPlugin } from '../types.ts'
+import type { BrowserName, Config, RequiredConfig as TRequiredConfig, ImportMap, PostCSSPlugin } from '../types.ts'
 import { getAlephPkgUri } from './helper.ts'
 
-export type RequiredConfig = Required<Config> & {
+export type RequiredConfig = TRequiredConfig & {
   srcDir: string
-  i18n: Required<Config['i18n']>
-  build: Required<Config['build']>
-  server: Required<Config['server']>
   react: ReactOptions
 }
 
@@ -33,6 +30,7 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     plugins: [],
     css: {
       cache: false,
+      modules: {},
       extract: {
         limit: 8 * 1024
       },
@@ -126,7 +124,7 @@ export async function loadConfig(specifier: string): Promise<Config> {
     config.css = {
       cache: Boolean(cache),
       extract: util.isPlainObject(extract) ? { limit: typeof extract.limit === 'number' ? extract.limit : 8 * 1024 } : Boolean(extract),
-      modules: util.isPlainObject(modules) ? modules : undefined,
+      modules: util.isPlainObject(modules) ? modules : {},
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }
   }
