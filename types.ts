@@ -5,9 +5,9 @@ export interface Aleph {
   readonly mode: 'development' | 'production'
   readonly workingDir: string
   readonly config: RequiredConfig
-  addModule(specifier: string, sourceCode?: string): Promise<void>
   addDist(path: string, content: Uint8Array): Promise<void>
-  fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
+  addModule(specifier: string, sourceCode?: string): Promise<void>
+  fetchModuleSource(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
   onTransform(test: 'hmr' | 'mainscript' | RegExp, transform: (input: TransformInput) => TransformOutput): void

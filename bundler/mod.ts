@@ -134,7 +134,7 @@ export class Bundler {
       return jsFile
     }
 
-    const source = await this.#aleph.loadModuleSource(mod.specifier)
+    const source = await this.#aleph.resolveModuleSource(mod.specifier)
     if (source === null) {
       this.#compiled.delete(mod.specifier)
       throw new Error(`Unsupported module '${mod.specifier}'`)

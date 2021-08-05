@@ -76,7 +76,7 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
   } else if (util.isFilledString(data)) {
     sourceCode = data
   } else {
-    const { content } = await aleph.fetchModule(specifier)
+    const { content } = await aleph.fetchModuleSource(specifier)
     sourceCode = (new TextDecoder).decode(content)
   }
 

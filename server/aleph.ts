@@ -733,7 +733,7 @@ export class Aleph implements IAleph {
 
   /** parse the export names of the module. */
   async parseModuleExportNames(specifier: string): Promise<string[]> {
-    const { content, contentType } = await this.fetchModule(specifier)
+    const { content, contentType } = await this.fetchModuleSource(specifier)
     const sourceType = getSourceType(specifier, contentType || undefined)
     if (sourceType === SourceType.Unknown || sourceType === SourceType.CSS) {
       return []
@@ -873,34 +873,6 @@ export class Aleph implements IAleph {
     return [routePath, specifier, isIndex]
   }
 
-  /** fetch module content by the specifier. */
-  async fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }> {
-    if (!util.isLikelyHttpURL(specifier)) {
-      const filepath = join(this.workingDir, this.config.srcDir, util.trimPrefix(specifier, 'file://'))
-      if (await existsFile(filepath)) {
-        const content = await Deno.readFile(filepath)
-        return { content, contentType: getContentType(filepath) }
-      } else {
-        return Promise.reject(new Error(`No such file: ${util.trimPrefix(filepath, this.workingDir + '/')}`))
-      }
-    }
-
-    // append `dev` query for development mode
-    if (this.isDev && specifier.startsWith('https://esm.sh/')) {
-      const u = new URL(specifier)
-      if (!u.searchParams.has('dev')) {
-        u.searchParams.set('dev', '')
-        u.search = u.search.replace('dev=', 'dev')
-        specifier = u.toString()
-      }
-    }
-
-    return await cache(specifier, {
-      forceRefresh: this.#reloading,
-      retryTimes: 10
-    })
-  }
-
   async importModule<T = any>({ jsFile, hash, sourceHash }: Module): Promise<T> {
     return await import(`file://${join(this.buildDir, jsFile)}#${(hash || sourceHash).slice(0, 6)}`)
   }
@@ -952,7 +924,35 @@ export class Aleph implements IAleph {
     ].join('\n'))
   }
 
-  async loadModuleSource(specifier: string, data?: any): Promise<ModuleSource> {
+  /** fetch module source by the specifier. */
+  async fetchModuleSource(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }> {
+    if (!util.isLikelyHttpURL(specifier)) {
+      const filepath = join(this.workingDir, this.config.srcDir, util.trimPrefix(specifier, 'file://'))
+      if (await existsFile(filepath)) {
+        const content = await Deno.readFile(filepath)
+        return { content, contentType: getContentType(filepath) }
+      } else {
+        return Promise.reject(new Error(`No such file: ${util.trimPrefix(filepath, this.workingDir + '/')}`))
+      }
+    }
+
+    // append `dev` query for development mode
+    if (this.isDev && specifier.startsWith('https://esm.sh/')) {
+      const u = new URL(specifier)
+      if (!u.searchParams.has('dev')) {
+        u.searchParams.set('dev', '')
+        u.search = u.search.replace('dev=', 'dev')
+        specifier = u.toString()
+      }
+    }
+
+    return await cache(specifier, {
+      forceRefresh: this.#reloading,
+      retryTimes: 10
+    })
+  }
+
+  async resolveModuleSource(specifier: string, data?: any): Promise<ModuleSource> {
     let sourceCode: string = ''
     let sourceType: SourceType = SourceType.Unknown
     let sourceMap: string | null = null
@@ -981,7 +981,7 @@ export class Aleph implements IAleph {
       sourceCode = code
       sourceMap = map || null
     } else {
-      const source = await this.fetchModule(specifier)
+      const source = await this.fetchModuleSource(specifier)
       sourceType = getSourceType(specifier, source.contentType || undefined)
       if (sourceType !== SourceType.Unknown) {
         sourceCode = (new TextDecoder).decode(source.content)
@@ -1104,7 +1104,7 @@ export class Aleph implements IAleph {
     )
     if (shouldLoad) {
       try {
-        const src = customSource || await this.loadModuleSource(specifier, data)
+        const src = customSource || await this.resolveModuleSource(specifier, data)
         const sourceHash = computeHash(src.code)
         if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
           mod.sourceHash = sourceHash
