@@ -19,7 +19,7 @@ export const markdownResovler = (specifier: string): ResolveResult => {
 
 export const markdownLoader = async ({ specifier }: LoadInput, aleph: Aleph): Promise<LoadOutput> => {
   const { framework } = aleph.config
-  const { content } = await aleph.fetchModuleSource(specifier)
+  const { content } = await aleph.fetchModule(specifier)
   const { __content, ...meta } = safeLoadFront((new TextDecoder).decode(content))
   const html = marked.parse(__content)
   const props = {

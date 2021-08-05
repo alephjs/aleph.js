@@ -733,7 +733,7 @@ export class Aleph implements IAleph {
 
   /** parse the export names of the module. */
   async parseModuleExportNames(specifier: string): Promise<string[]> {
-    const { content, contentType } = await this.fetchModuleSource(specifier)
+    const { content, contentType } = await this.fetchModule(specifier)
     const sourceType = getSourceType(specifier, contentType || undefined)
     if (sourceType === SourceType.Unknown || sourceType === SourceType.CSS) {
       return []
@@ -925,7 +925,7 @@ export class Aleph implements IAleph {
   }
 
   /** fetch module source by the specifier. */
-  async fetchModuleSource(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }> {
+  async fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }> {
     if (!util.isLikelyHttpURL(specifier)) {
       const filepath = join(this.workingDir, this.config.srcDir, util.trimPrefix(specifier, 'file://'))
       if (await existsFile(filepath)) {
@@ -981,7 +981,7 @@ export class Aleph implements IAleph {
       sourceCode = code
       sourceMap = map || null
     } else {
-      const source = await this.fetchModuleSource(specifier)
+      const source = await this.fetchModule(specifier)
       sourceType = getSourceType(specifier, source.contentType || undefined)
       if (sourceType !== SourceType.Unknown) {
         sourceCode = (new TextDecoder).decode(source.content)

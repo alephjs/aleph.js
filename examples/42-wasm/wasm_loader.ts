@@ -4,7 +4,7 @@ export default <Plugin>{
   name: 'wasm-loader',
   setup: aleph => {
     aleph.onLoad(/\.wasm$/i, async ({ specifier }) => {
-      const { content } = await aleph.fetchModuleSource(specifier)
+      const { content } = await aleph.fetchModule(specifier)
       return {
         code: [
           `const wasmBytes = new Uint8Array([${content.join(',')}])`,
