@@ -11,6 +11,7 @@ const commands = {
   'start': 'Start the app in production mode',
   'build': 'Build the app to a static site (SSG)',
   'analyze': 'Analyze the app deps',
+  'importmap': 'Manage import_map.json',
   'upgrade': 'Upgrade Aleph.js command'
 }
 
