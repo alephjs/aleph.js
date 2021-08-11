@@ -35,21 +35,21 @@ export class Server {
     try {
       // serve hmr ws
       if (pathname === '/_hmr') {
-        const { websocket, response } = Deno.upgradeWebSocket(req)
+        const { socket, response } = Deno.upgradeWebSocket(req)
         const watcher = aleph.createFSWatcher()
-        websocket.addEventListener('open', () => {
-          watcher.on('add', (mod: any) => websocket.send(JSON.stringify({ ...mod, type: 'add' })))
+        socket.addEventListener('open', () => {
+          watcher.on('add', (mod: any) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
           watcher.on('remove', (specifier: string) => {
             watcher.removeAllListeners('modify-' + specifier)
-            websocket.send(JSON.stringify({ type: 'remove', specifier }))
+            socket.send(JSON.stringify({ type: 'remove', specifier }))
           })
           log.debug('hmr connected')
         })
-        websocket.addEventListener('close', () => {
+        socket.addEventListener('close', () => {
           aleph.removeFSWatcher(watcher)
           log.debug('hmr closed')
         })
-        websocket.addEventListener('message', (e) => {
+        socket.addEventListener('message', (e) => {
           if (util.isFilledString(e.data)) {
             try {
               const data = JSON.parse(e.data)
@@ -57,7 +57,7 @@ export class Server {
                 const mod = aleph.getModule(data.specifier)
                 if (mod) {
                   watcher.on(`modify-${mod.specifier}`, (data) => {
-                    websocket.send(JSON.stringify({
+                    socket.send(JSON.stringify({
                       ...data,
                       type: 'update',
                       specifier: mod.specifier,
