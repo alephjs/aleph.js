@@ -1,8 +1,8 @@
 import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { cache } from '../server/cache.ts'
 import util from '../shared/util.ts'
-// @deno-types="https://deno.land/x/esbuild@v0.12.17/mod.d.ts"
-import { build, stop, Plugin } from 'https://deno.land/x/esbuild@v0.12.17/mod.js'
+// @deno-types="https://deno.land/x/esbuild@v0.12.19/mod.d.ts"
+import { build, stop, Plugin } from 'https://deno.land/x/esbuild@v0.12.19/mod.js'
 
 export {
   build as esbuild,
