@@ -5,10 +5,23 @@ export async function init(aleph: Aleph) {
   if (aleph.mode === 'development') {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
-    await aleph.addModule(`${alephPkgUri}/framework/react/refresh.ts`)
+    const refreshModule = await aleph.addModule(`${alephPkgUri}/framework/react/refresh.ts`, `
+      import runtime from 'https://esm.sh/react-refresh@0.10.0/runtime'
+      import util from '../../shared/util.ts'
+
+      // react-refresh
+      // @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
+      runtime.injectIntoGlobalHook(window)
+      Object.assign(window, {
+        $RefreshReg$: () => { },
+        $RefreshSig$: () => (type: any) => type,
+        __REACT_REFRESH_RUNTIME__: runtime,
+        __REACT_REFRESH__: util.debounce(runtime.performReactRefresh, 30)
+      })
+    `)
     aleph.onTransform('mainscript', ({ code }) => ({
       code: [
-        `import "./-/${alephPkgPath}/framework/react/refresh.js";`,
+        `import ".${refreshModule.jsFile}";`,
         code
       ].join('\n')
     }))

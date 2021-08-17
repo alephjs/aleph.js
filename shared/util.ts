@@ -100,7 +100,7 @@ export default {
   debounce<T extends Function>(callback: T, delay: number): T {
     let timer: number | null = null
     return ((...args: any[]) => {
-      if (timer != null) {
+      if (timer !== null) {
         clearTimeout(timer)
       }
       timer = setTimeout(() => {

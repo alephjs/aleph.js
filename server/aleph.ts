@@ -501,26 +501,23 @@ export class Aleph implements IAleph {
   }
 
   /** add a module by given path and optional source code. */
-  async addModule(specifier: string, sourceCode?: string): Promise<void> {
-    const source = sourceCode ? {
-      code: sourceCode,
-      type: SourceType.TSX,
-      external: false,
-      isStyle: false,
-    } : undefined
-    if (source !== undefined) {
-      const type = getSourceType(specifier)
-      if (type !== SourceType.Unknown) {
-        source.type = type
+  async addModule(specifier: string, sourceCode: string): Promise<Module> {
+    const module = await this.compile(specifier, {
+      source: {
+        code: sourceCode,
+        type: getSourceType(specifier),
+        isStyle: false,
       }
+    })
+    if (specifier.startsWith('pages/') || specifier.startsWith('api/')) {
+      specifier = '/' + specifier
     }
-    await this.compile(specifier, { source })
     if (specifier.startsWith('/pages/')) {
       this.#pageRouting.update(...this.createRouteUpdate(specifier))
     } else if (specifier.startsWith('/api/') && !specifier.startsWith('/api/_middlewares.')) {
       this.#apiRouting.update(...this.createRouteUpdate(specifier))
     }
-    return
+    return module
   }
 
   /** add a dist. */

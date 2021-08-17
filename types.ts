@@ -6,7 +6,7 @@ export interface Aleph {
   readonly workingDir: string
   readonly config: RequiredConfig
   addDist(path: string, content: Uint8Array): Promise<void>
-  addModule(specifier: string, sourceCode?: string): Promise<void>
+  addModule(specifier: string, sourceCode: string): Promise<{ specifier: string, jsFile: string }>
   fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
