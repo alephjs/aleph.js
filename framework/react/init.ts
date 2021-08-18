@@ -4,7 +4,6 @@ import type { Aleph } from '../../types.ts'
 export async function init(aleph: Aleph) {
   if (aleph.mode === 'development') {
     const alephPkgUri = getAlephPkgUri()
-    const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
     const refreshModule = await aleph.addModule(`${alephPkgUri}/framework/react/refresh.ts`, `
       import runtime from 'https://esm.sh/react-refresh@0.10.0/runtime'
       import util from '../../shared/util.ts'
@@ -19,7 +18,7 @@ export async function init(aleph: Aleph) {
         __REACT_REFRESH__: util.debounce(runtime.performReactRefresh, 30)
       })
     `)
-    aleph.onTransform('mainscript', ({ code }) => ({
+    aleph.onTransform('main', ({ code }) => ({
       code: [
         `import ".${refreshModule.jsFile}";`,
         code
