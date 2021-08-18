@@ -10,7 +10,7 @@ export interface Aleph {
   fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
-  onTransform(test: 'hmr' | 'mainscript' | RegExp, transform: (input: TransformInput) => TransformOutput): void
+  onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformInput) => TransformOutput): void
   onSSR(callback: (path: string, html: string) => { html: string }): void
 }
 
@@ -64,7 +64,7 @@ type RouteBasicInfo = {
 }
 
 /**
- * The result from the `onResolve` listener.
+ * The result from the `onResolve` hook.
  */
 export type ResolveResult = {
   specifier?: string
@@ -75,7 +75,7 @@ export type ResolveResult = {
 }
 
 /**
- * The input to the `onLoad` listener.
+ * The input to the `onLoad` hook.
  */
 export type LoadInput = {
   specifier: string
@@ -83,20 +83,20 @@ export type LoadInput = {
 }
 
 /**
- * The output of the `onLoad` listener.
+ * The output of the `onLoad` hook.
  */
 export type LoadOutput = {
   /** The transformed code type (default is 'js'). */
   type?: 'css' | 'js' | 'jsx' | 'ts' | 'tsx'
   /** The transformed code. */
   code: string
-  /** The source map. */
+  /** The source map if available. */
   map?: string
 }
 
 
 /**
- * The input to the `onTransform` listener.
+ * The input to the `onTransform` hook.
  */
 export type TransformInput = {
   specifier: string
@@ -105,7 +105,7 @@ export type TransformInput = {
 }
 
 /**
- * The output of the `onTransform` listener.
+ * The output of the `onTransform` hook.
  */
 export type TransformOutput = {
   code: string
