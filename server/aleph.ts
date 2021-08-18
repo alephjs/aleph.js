@@ -603,7 +603,7 @@ export class Aleph implements IAleph {
 
     const path = loc.pathname + (loc.search || '')
     const [_, data] = await this.#renderer.cache(routePath, path, async () => {
-      return await this.#renderer.renderPage(router, nestedModules)
+      return await this.#renderPage(router, nestedModules)
     })
     return data
   }
@@ -636,10 +636,9 @@ export class Aleph implements IAleph {
   }
 
   async #renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
-    const href = url.toString()
     let [html, data] = await this.#renderer.renderPage(url, nestedModules)
     for (const callback of this.#ssrListeners) {
-      const ret = callback(href, html)
+      const ret = callback(url.toString(), html)
       html = ret.html
     }
     return [html, data]
