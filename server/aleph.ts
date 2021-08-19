@@ -14,7 +14,7 @@ import cssPlugin, { cssLoader, isCSS } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph as IAleph, ImportMap, LoadInput, LoadOutput, RouterURL, ResolveResult, TransformOutput, TransformInput } from '../types.d.ts'
+import type { Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, RouterURL, ResolveResult, TransformOutput, TransformInput, SSRData, SSRInput, SSROutput } from '../types.d.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
@@ -25,25 +25,7 @@ import {
   getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath
 } from './helper.ts'
 import { getContentType } from './mime.ts'
-import type { SSRData } from './renderer.ts'
 import { createHtml, Renderer } from './renderer.ts'
-
-/** A module includes the compilation details. */
-export type Module = {
-  specifier: string
-  deps: DependencyDescriptor[]
-  external?: boolean
-  isStyle?: boolean
-  externalRemoteDeps?: boolean
-  ssrPropsFn?: string
-  ssgPathsFn?: boolean
-  denoHooks?: string[]
-  hash?: string
-  sourceHash: string
-  jsFile: string
-  jsBuffer?: Uint8Array
-  ready: Promise<void>
-}
 
 type ModuleSource = {
   code: string
@@ -52,17 +34,11 @@ type ModuleSource = {
   map?: string
 }
 
-type DependencyDescriptor = {
-  specifier: string
-  isDynamic?: boolean
-  hashLoc?: number
-}
-
 type CompileOptions = {
   source?: ModuleSource,
   forceRefresh?: boolean,
   ignoreDeps?: boolean,
-  externalRemoteDeps?: boolean
+  httpExternal?: boolean
 }
 
 type ResolveListener = {
@@ -80,9 +56,9 @@ type TransformListener = {
   transform(input: TransformInput): TransformOutput,
 }
 
-type SsrListener = (path: string, html: string) => { html: string }
+type SsrListener = (input: SSRInput) => SSROutput
 
-/** The Aleph class for aleph runtime. */
+/** The class for Aleph server runtime. */
 export class Aleph implements IAleph {
   #config: RequiredConfig
   #importMap: ImportMap
@@ -135,7 +111,7 @@ export class Aleph implements IAleph {
     }
     if (configFile) {
       if (!configFile.endsWith('.json')) {
-        const mod = await this.compile(`/${basename(configFile)}`, { externalRemoteDeps: true })
+        const mod = await this.compile(`/${basename(configFile)}`, { httpExternal: true })
         configFile = join(this.#buildDir, mod.jsFile)
       }
       Object.assign(this.#config, await loadConfig(configFile))
@@ -217,7 +193,7 @@ export class Aleph implements IAleph {
 
     const mwFile = await findFile(this.#workingDir, ['ts', 'js', 'mjs'].map(ext => `${this.#config.srcDir}/api/_middlewares.${ext}`))
     if (mwFile) {
-      const mwMod = await this.compile(`/api/${basename(mwFile)}`, { externalRemoteDeps: true })
+      const mwMod = await this.compile(`/api/${basename(mwFile)}`, { httpExternal: true })
       const { default: _middlewares } = await import('file://' + join(this.#buildDir, mwMod.jsFile))
       const middlewares = Array.isArray(_middlewares) ? _middlewares.filter(fn => util.isFunction(fn)) : []
       this.#config.server.middlewares.push(...middlewares)
@@ -326,7 +302,7 @@ export class Aleph implements IAleph {
           const module = await this.compile(specifier, {
             forceRefresh: true,
             ignoreDeps: true,
-            externalRemoteDeps: specifier.startsWith('/api/')
+            httpExternal: specifier.startsWith('/api/')
           })
           const refreshPage = (
             this.#config.ssr &&
@@ -500,7 +476,7 @@ export class Aleph implements IAleph {
         if (this.#modules.has(specifier)) {
           return [url, this.#modules.get(specifier)!]
         }
-        const module = await this.compile(specifier, { externalRemoteDeps: true })
+        const module = await this.compile(specifier, { httpExternal: true })
         return [url, module]
       }
     }
@@ -519,7 +495,7 @@ export class Aleph implements IAleph {
     this.#transformListeners.push({ test, transform: callback })
   }
 
-  onSSR(callback: (path: string, html: string) => { html: string }): void {
+  onSSR(callback: (input: SSRInput) => SSROutput): void {
     this.#ssrListeners.push(callback)
   }
 
@@ -638,8 +614,13 @@ export class Aleph implements IAleph {
   async #renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
     let [html, data] = await this.#renderer.renderPage(url, nestedModules)
     for (const callback of this.#ssrListeners) {
-      const ret = callback(url.toString(), html)
-      html = ret.html
+      const ret = callback({ path: url.toString(), html, data })
+      if (util.isFilledString(ret.html)) {
+        html = ret.html
+      }
+      if (util.isPlainObject(ret.data)) {
+        data = ret.data
+      }
     }
     return [html, data]
   }
@@ -676,22 +657,31 @@ export class Aleph implements IAleph {
       rewrites: this.#config.server.rewrites,
     }
 
+    let code: string
     if (bundleMode) {
-      return [
+      code = [
         `__ALEPH__.basePath = ${JSON.stringify(basePath)};`,
         `__ALEPH__.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default(${JSON.stringify(config)});`
       ].join('')
+    } else {
+      code = [
+        `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js";`,
+        this.isDev && `import { connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
+        this.isDev && `connect(${JSON.stringify(basePath)});`,
+        `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
+      ].filter(Boolean).join('\n')
     }
-
-    let code = [
-      `import bootstrap from "./-/${alephPkgPath}/framework/${framework}/bootstrap.js";`,
-      this.isDev && `import { connect } from "./-/${alephPkgPath}/framework/core/hmr.js";`,
-      this.isDev && `connect(${JSON.stringify(basePath)});`,
-      `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
-    ].filter(Boolean).join('\n')
     this.#transformListeners.forEach(({ test, transform }) => {
       if (test === 'main') {
-        const ret = transform({ specifier: '/main.js', code })
+        const ret = transform({
+          module: {
+            specifier: '/main.js',
+            deps: [],
+            sourceHash: '',
+            jsFile: '',
+          },
+          code,
+        })
         code = ret.code
       }
     })
@@ -929,7 +919,8 @@ export class Aleph implements IAleph {
     }
     this.#transformListeners.forEach(({ test, transform }) => {
       if (test === 'hmr') {
-        const ret = transform({ specifier, code })
+        const { jsBuffer, ready, ...rest } = module
+        const ret = transform({ module: structuredClone(rest), code })
         code = ret.code
         // todo: merge source map
       }
@@ -1034,7 +1025,7 @@ export class Aleph implements IAleph {
     return module
   }
 
-  private async initModule(specifier: string, { source: customSource, forceRefresh, externalRemoteDeps }: CompileOptions = {}): Promise<[Module, ModuleSource | null]> {
+  private async initModule(specifier: string, { source: customSource, forceRefresh, httpExternal }: CompileOptions = {}): Promise<[Module, ModuleSource | null]> {
     let external = false
     let data: any = null
 
@@ -1064,7 +1055,7 @@ export class Aleph implements IAleph {
     }
 
     let mod = this.#modules.get(specifier)
-    if (mod && !forceRefresh && !(!externalRemoteDeps && mod.externalRemoteDeps)) {
+    if (mod && !forceRefresh && !(!httpExternal && mod.httpExternal)) {
       await mod.ready
       return [mod, null]
     }
@@ -1082,7 +1073,7 @@ export class Aleph implements IAleph {
       specifier,
       deps: [],
       sourceHash: '',
-      externalRemoteDeps,
+      httpExternal,
       jsFile,
       ready: new Promise((resolve) => {
         defer = (err?: Error) => {
@@ -1146,7 +1137,7 @@ export class Aleph implements IAleph {
     ignoreDeps = false,
     __tracing: Set<string> = new Set()
   ): Promise<void> {
-    const { specifier, jsFile, externalRemoteDeps } = module
+    const { specifier, jsFile, httpExternal } = module
 
     // ensure the module only be transppiled once in current compilation context,
     // to avoid dead-loop caused by cicular imports
@@ -1163,13 +1154,13 @@ export class Aleph implements IAleph {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, denoHooks, ssrPropsFn, ssgPathsFn, starExports, map } = await transform(specifier, source.code, {
+      const { code, deps, denoHooks, ssrPropsFn, ssgPathsFn, starExports, jsxStaticClassNames, map } = await transform(specifier, source.code, {
         ...this.commonCompilerOptions,
         sourceMap: this.isDev,
         swcOptions: {
           sourceType: source.type
         },
-        externalRemoteDeps
+        httpExternal
       })
 
       let jsCode = code
@@ -1213,9 +1204,18 @@ export class Aleph implements IAleph {
         })
       }
 
+      Object.assign(module, { ssrPropsFn, ssgPathsFn, jsxStaticClassNames })
+      if (util.isFilledArray(denoHooks)) {
+        module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
+        if (!this.#config.ssr) {
+          log.error(`'useDeno' hook in SPA mode is illegal: ${specifier}`)
+        }
+      }
+
       this.#transformListeners.forEach(({ test, transform }) => {
         if (test instanceof RegExp && test.test(specifier)) {
-          const { code, map } = transform({ specifier, code: jsCode, map: sourceMap })
+          const { jsBuffer, ready, ...rest } = module
+          const { code, map } = transform({ module: structuredClone(rest), code: jsCode, map: sourceMap })
           jsCode = code
           if (map) {
             sourceMap = map
@@ -1243,15 +1243,6 @@ export class Aleph implements IAleph {
         }
         return dep
       }) || []
-
-      module.ssrPropsFn = ssrPropsFn
-      module.ssgPathsFn = ssgPathsFn
-      if (util.isFilledArray(denoHooks)) {
-        module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
-        if (!this.#config.ssr) {
-          log.error(`'useDeno' hook in SPA mode is illegal: ${specifier}`)
-        }
-      }
 
       ms.stop(`transpile '${specifier}'`)
 
@@ -1282,7 +1273,7 @@ export class Aleph implements IAleph {
         if (ignoreDeps) {
           depModule = this.getModule(specifier)
         } else {
-          const [mod, src] = await this.initModule(specifier, { externalRemoteDeps })
+          const [mod, src] = await this.initModule(specifier, { httpExternal })
           if (!mod.external) {
             await this.transpileModule(mod, src, false, __tracing)
           }

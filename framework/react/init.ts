@@ -24,7 +24,7 @@ export async function init(aleph: Aleph) {
         code
       ].join('\n')
     }))
-    aleph.onTransform('hmr', ({ specifier, code }) => ({
+    aleph.onTransform('hmr', ({ module: { specifier }, code }) => ({
       code: code.includes('$RefreshReg$(') ? [
         'const prevRefreshReg = $RefreshReg$;',
         'const prevRefreshSig = $RefreshSig$;',

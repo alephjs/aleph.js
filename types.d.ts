@@ -11,7 +11,7 @@ export interface Aleph {
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
   onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformInput) => TransformOutput): void
-  onSSR(callback: (path: string, html: string) => { html: string }): void
+  onSSR(callback: (input: SSRInput) => SSROutput): void
 }
 
 /**
@@ -46,21 +46,13 @@ export type RequiredConfig = Required<Config> & {
 }
 
 /**
- * The plugin to enhance aleph runtime.
+ * The plugin to enhance Aleph server runtime.
  */
 export type Plugin = {
   /** `name` gives the plugin a name. */
   name: string
-  /** `setup` setups the plugin. */
+  /** `setup` inits the plugin. */
   setup(aleph: Aleph): Promise<void> | void
-}
-
-/**
- * The basic route info.
- */
-type RouteBasicInfo = {
-  path: string
-  isIndex?: boolean
 }
 
 /**
@@ -68,7 +60,7 @@ type RouteBasicInfo = {
  */
 export type ResolveResult = {
   specifier?: string
-  asPage?: RouteBasicInfo
+  asPage?: { path: string, isIndex?: boolean }
   acceptHMR?: boolean
   external?: boolean
   data?: any
@@ -94,12 +86,11 @@ export type LoadOutput = {
   map?: string
 }
 
-
 /**
  * The input to the `onTransform` hook.
  */
 export type TransformInput = {
-  specifier: string
+  module: Omit<Module, 'jsBuffer' | 'ready'>
   code: string
   map?: string
 }
@@ -112,10 +103,50 @@ export type TransformOutput = {
   map?: string
 }
 
+/** A module includes the compilation details. */
+export type Module = {
+  readonly specifier: string
+  deps: DependencyDescriptor[]
+  external?: boolean
+  isStyle?: boolean
+  httpExternal?: boolean
+  ssrPropsFn?: string
+  ssgPathsFn?: boolean
+  denoHooks?: string[]
+  jsxStaticClassNames?: string[]
+  hash?: string
+  sourceHash: string
+  jsFile: string
+  jsBuffer?: Uint8Array
+  ready: Promise<void>
+}
+
+type DependencyDescriptor = {
+  readonly specifier: string
+  isDynamic?: boolean
+  hashLoc?: number
+}
+
+export type SSRData = {
+  value: any
+  expires: number
+}
+
+export type SSRInput = {
+  path: string
+  html: string
+  data: Record<string, SSRData> | null
+}
+
+export type SSROutput = {
+  html: string
+  data: Record<string, SSRData> | null
+}
+
 /**
  * The options for **Internationalization**.
  */
-type I18nOptions = {
+export type I18nOptions = {
   /** `defaultLocale` specifies the default locale (default is the first locale). */
   defaultLocale?: string
   /** `locales` specifies all the available locales. */

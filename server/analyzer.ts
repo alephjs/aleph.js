@@ -1,5 +1,6 @@
 import util from '../shared/util.ts'
-import type { Aleph, Module } from './aleph.ts'
+import type { Module } from '../types.d.ts'
+import type { Aleph } from './aleph.ts'
 import { getAlephPkgUri } from './helper.ts'
 
 export type DependencyGraph = {

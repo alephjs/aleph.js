@@ -1,18 +1,8 @@
 import { basename, dirname } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { RouterURL } from '../types.d.ts'
-import type { Aleph, Module } from './aleph.ts'
-
-export type SSRData = {
-  value: any
-  expires: number
-}
-
-export type SSROutput = {
-  html: string
-  data: Record<string, SSRData> | null
-}
+import type { Module, RouterURL, SSRData, SSROutput } from '../types.d.ts'
+import type { Aleph } from './aleph.ts'
 
 /** The render result of framework SSR. */
 export type FrameworkRenderResult = {
