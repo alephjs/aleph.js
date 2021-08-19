@@ -7,27 +7,27 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 
-pub fn aleph_jsx_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
-  AlephJsxFold {
+pub fn jsx_magic_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
+  JSXMagicFold {
     resolver: resolver.clone(),
     source,
     inline_style_idx: 0,
   }
 }
 
-pub fn aleph_jsx_pass2_fold(
+pub fn jsx_magic_pass_2_fold(
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
   is_dev: bool,
 ) -> impl Fold {
-  AlephJsxPass2Fold {
+  JSXMagicPass2Fold {
     resolver: resolver.clone(),
     source,
     is_dev,
   }
 }
 
-/// aleph.js jsx fold, core functions include:
+/// JSX magic fold, core functions include:
 /// - add `__sourceFile` prop in development mode
 /// - resolve `a` to `Anchor`
 /// - resolve `head` to `Head`
@@ -35,13 +35,13 @@ pub fn aleph_jsx_pass2_fold(
 /// - resolve `style` to `InlineStyle`
 /// - resolve `script` to `CustomScript`
 /// - optimize `img` in producation mode
-struct AlephJsxFold {
+struct JSXMagicFold {
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
   inline_style_idx: i32,
 }
 
-impl AlephJsxFold {
+impl JSXMagicFold {
   fn new_inline_style_ident(&mut self) -> String {
     let resolver = self.resolver.borrow();
     let mut ident: String = "inline-style-".to_owned();
@@ -234,7 +234,7 @@ impl AlephJsxFold {
   }
 }
 
-impl Fold for AlephJsxFold {
+impl Fold for JSXMagicFold {
   noop_fold_type!();
 
   fn fold_jsx_element(&mut self, mut el: JSXElement) -> JSXElement {
@@ -264,8 +264,7 @@ impl Fold for AlephJsxFold {
                   es.push(raw.into());
                 }
                 for quasi in quasis {
-                  let raw = self.source.span_to_snippet(quasi.span.clone()).unwrap();
-                  qs.push(raw.into());
+                  qs.push(quasi.raw.value.to_string());
                 }
                 let (t, id) = inline_style;
                 resolver.inline_styles.insert(
@@ -306,13 +305,63 @@ impl Fold for AlephJsxFold {
   }
 }
 
-struct AlephJsxPass2Fold {
+struct JSXMagicPass2Fold {
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
   is_dev: bool,
 }
 
-impl AlephJsxPass2Fold {
+impl JSXMagicPass2Fold {
+  fn record_jsx_class_name(&mut self, expr: Box<Expr>) {
+    match expr.as_ref() {
+      Expr::Lit(Lit::Str(Str { value, .. })) => {
+        let s = value.as_ref();
+        if s != "" {
+          self
+            .resolver
+            .borrow_mut()
+            .jsx_static_class_names
+            .insert(s.into());
+        }
+      }
+      Expr::Lit(Lit::JSXText(JSXText { value, .. })) => {
+        let s = value.as_ref();
+        if s != "" {
+          self
+            .resolver
+            .borrow_mut()
+            .jsx_static_class_names
+            .insert(s.into());
+        }
+      }
+      Expr::Cond(CondExpr { cons, alt, .. }) => {
+        self.record_jsx_class_name(cons.clone());
+        self.record_jsx_class_name(alt.clone());
+      }
+      Expr::Bin(BinExpr {
+        op, left, right, ..
+      }) => {
+        if *op == BinaryOp::Add {
+          self.record_jsx_class_name(left.clone());
+          self.record_jsx_class_name(right.clone());
+        }
+      }
+      Expr::Tpl(Tpl { exprs, quasis, .. }) => {
+        for expr in exprs {
+          self.record_jsx_class_name(expr.clone());
+        }
+        let mut resolver = self.resolver.borrow_mut();
+        for quasi in quasis {
+          let s = quasi.raw.value.as_ref();
+          if s != "" {
+            resolver.jsx_static_class_names.insert(s.into());
+          }
+        }
+      }
+      _ => {}
+    }
+  }
+
   fn fold_jsx_opening_element(&mut self, mut el: JSXOpeningElement) -> JSXOpeningElement {
     let extra_imports = self.resolver.borrow().extra_imports.clone();
     let mut css_modules = false;
@@ -324,21 +373,22 @@ impl AlephJsxPass2Fold {
       }
     }
 
-    if css_modules {
-      let mut i: Option<usize> = None;
-      let mut class_name_value_expr: Option<Box<Expr>> = None;
+    let mut class_name_index: Option<usize> = None;
+    let mut class_name_cx_expr: Option<Box<Expr>> = None;
 
-      for (index, attr) in el.attrs.iter().enumerate() {
-        match &attr {
-          JSXAttrOrSpread::JSXAttr(JSXAttr {
-            name: JSXAttrName::Ident(id),
-            value: Some(value),
-            ..
-          }) => {
-            if id.sym.eq("className") {
-              match value {
-                JSXAttrValue::Lit(lit) => {
-                  class_name_value_expr = Some(Box::new(Expr::Call(CallExpr {
+    for (index, attr) in el.attrs.iter().enumerate() {
+      match &attr {
+        JSXAttrOrSpread::JSXAttr(JSXAttr {
+          name: JSXAttrName::Ident(id),
+          value: Some(value),
+          ..
+        }) => {
+          if id.sym.eq("className") {
+            match value {
+              JSXAttrValue::Lit(lit) => {
+                self.record_jsx_class_name(Box::new(Expr::Lit(lit.clone())));
+                if css_modules {
+                  class_name_cx_expr = Some(Box::new(Expr::Call(CallExpr {
                     span: DUMMY_SP,
                     callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH__CX")))),
                     args: vec![ExprOrSpread {
@@ -348,9 +398,12 @@ impl AlephJsxPass2Fold {
                     type_args: None,
                   })))
                 }
-                JSXAttrValue::JSXExprContainer(JSXExprContainer { expr, .. }) => {
-                  if let JSXExpr::Expr(expr) = expr {
-                    class_name_value_expr = Some(Box::new(Expr::Call(CallExpr {
+              }
+              JSXAttrValue::JSXExprContainer(JSXExprContainer { expr, .. }) => {
+                if let JSXExpr::Expr(expr) = expr {
+                  self.record_jsx_class_name(expr.clone());
+                  if css_modules {
+                    class_name_cx_expr = Some(Box::new(Expr::Call(CallExpr {
                       span: DUMMY_SP,
                       callee: ExprOrSuper::Expr(Box::new(Expr::Ident(quote_ident!("__ALEPH__CX")))),
                       args: vec![ExprOrSpread {
@@ -361,33 +414,33 @@ impl AlephJsxPass2Fold {
                     })))
                   }
                 }
-                _ => {}
-              };
-              i = Some(index);
-              break;
-            }
+              }
+              _ => {}
+            };
+            class_name_index = Some(index);
+            break;
           }
-          _ => {}
-        };
-      }
-
-      if let Some(index) = i {
-        if let Some(expr) = class_name_value_expr {
-          el.attrs[index] = JSXAttrOrSpread::JSXAttr(JSXAttr {
-            span: DUMMY_SP,
-            name: JSXAttrName::Ident(quote_ident!("className")),
-            value: Some(JSXAttrValue::JSXExprContainer(JSXExprContainer {
-              span: DUMMY_SP,
-              expr: JSXExpr::Expr(expr),
-            })),
-          });
         }
+        _ => {}
+      };
+    }
+
+    if let Some(index) = class_name_index {
+      if let Some(expr) = class_name_cx_expr {
+        el.attrs[index] = JSXAttrOrSpread::JSXAttr(JSXAttr {
+          span: DUMMY_SP,
+          name: JSXAttrName::Ident(quote_ident!("className")),
+          value: Some(JSXAttrValue::JSXExprContainer(JSXExprContainer {
+            span: DUMMY_SP,
+            expr: JSXExpr::Expr(expr),
+          })),
+        });
       }
     }
 
     // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
     if self.is_dev {
-      let resolver = self.resolver.borrow_mut();
+      let resolver = self.resolver.borrow();
       match self.source.span_to_lines(el.span) {
         Ok(file_lines) => {
           el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
@@ -430,7 +483,7 @@ impl AlephJsxPass2Fold {
   }
 }
 
-impl Fold for AlephJsxPass2Fold {
+impl Fold for JSXMagicPass2Fold {
   noop_fold_type!();
 
   fn fold_jsx_element(&mut self, el: JSXElement) -> JSXElement {
@@ -482,6 +535,7 @@ mod tests {
       }
     "#;
     let (code, resolver) = st("/pages/index.tsx", source, false);
+    let r = resolver.borrow_mut();
     assert!(code.contains(
       "import __ALEPH__Anchor from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/Anchor.js\""
     ));
@@ -502,12 +556,11 @@ mod tests {
     assert!(code.contains("href: \"/style/index.css\""));
     assert!(code.contains(
       format!(
-        "import   \"../style/index.css.js#{}@000000\"",
+        "import \"../style/index.css.js#{}@000000\"",
         "/style/index.css"
       )
       .as_str()
     ));
-    let r = resolver.borrow_mut();
     assert_eq!(
       r.deps
         .iter()
@@ -535,12 +588,14 @@ mod tests {
             <link rel="stylesheet" href="../style/app.module.css" />
             <link rel="stylesheet" href="../style/index.module.css" />
             <h2 className="$title $bold">Hi :)</h2>
-            <p className={'$' + 'desc'}>Welcom</p>
+            <p className={'$' + 'desc'}>Welcome</p>
+            <p className={`bold ${'lg'}`}>Thanks</p>
           </>
         )
       }
     "#;
     let (code, resolver) = st("/pages/index.tsx", source, false);
+    let r = resolver.borrow_mut();
     assert!(code.contains(
       "import __ALEPH__StyleLink from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/StyleLink.js\""
     ));
@@ -563,7 +618,8 @@ mod tests {
     assert!(code.contains("const __ALEPH__CX = (c)=>typeof c === \"string\" ? c.split(\" \").map((n)=>n.charAt(0) === \"$\" ? __ALEPH__CSS_MODULES_ALL[n.slice(1)] || n : n\n    ).join(\" \") : c"));
     assert!(code.contains("className: __ALEPH__CX(\"$title $bold\")"));
     assert!(code.contains("className: __ALEPH__CX('$' + 'desc')"));
-    let r = resolver.borrow_mut();
+    assert!(code.contains("className: __ALEPH__CX(`bold ${'lg'}`)"));
+    assert_eq!(r.jsx_static_class_names.len(), 5);
     assert_eq!(
       r.deps
         .iter()
@@ -601,12 +657,12 @@ mod tests {
       }
     "#;
     let (code, resolver) = st("/pages/index.tsx", source, false);
+    let r = resolver.borrow_mut();
     assert!(code.contains(
       "import __ALEPH__InlineStyle from \"../-/deno.land/x/aleph@v0.3.0/framework/react/components/InlineStyle.js\""
     ));
     assert!(code.contains("React.createElement(__ALEPH__InlineStyle,"));
     assert!(code.contains("__styleId: \"inline-style-"));
-    let r = resolver.borrow_mut();
     assert!(r.inline_styles.len() == 2);
   }
 }

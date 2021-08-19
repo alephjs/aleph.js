@@ -36,7 +36,7 @@ pub struct Options {
   pub swc_options: SWCOptions,
 
   #[serde(default)]
-  pub external_remote_deps: bool,
+  pub http_external: bool,
 
   #[serde(default)]
   pub bundle_mode: bool,
@@ -112,6 +112,9 @@ pub struct TransformOutput {
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub star_exports: Vec<String>,
 
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub jsx_static_class_names: Vec<String>,
+
   #[serde(skip_serializing_if = "Option::is_none")]
   pub map: Option<String>,
 }
@@ -158,6 +161,7 @@ pub fn strip_ssr_code(specifier: &str, code: &str, options: JsValue) -> Result<J
       ssr_props_fn: None,
       ssg_paths_fn: None,
       deno_hooks: vec![],
+      jsx_static_class_names: vec![],
       map,
     })
     .unwrap(),
@@ -176,7 +180,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
     specifier,
     options.working_dir.as_str(),
     options.import_map,
-    options.external_remote_deps,
+    options.http_external,
     options.bundle_mode,
     options.bundle_externals,
     options.aleph_pkg_uri,
@@ -206,6 +210,7 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
       ssr_props_fn: r.ssr_props_fn.clone(),
       ssg_paths_fn: r.ssg_paths_fn.clone(),
       deno_hooks: r.deno_hooks.clone(),
+      jsx_static_class_names: r.jsx_static_class_names.clone().into_iter().collect(),
       map,
     })
     .unwrap(),

@@ -50,34 +50,36 @@ pub struct ReactOptions {
 
 /// A Resolver to resolve aleph.js import/export URL.
 pub struct Resolver {
-  /// the working dir of aleph app
+  /// the current working dir of aleph app
   pub working_dir: String,
   /// the text specifier associated with the import/export statement.
   pub specifier: String,
-  /// a flag indicating if the specifier is remote url or not.
+  /// a flag indicating if the specifier is a remote(http) url.
   pub specifier_is_remote: bool,
   /// a flag indicating whether should ignore remote deps.
   pub ignore_remote_deps: bool,
-  /// ordered dependencies in the module
+  /// a ordered dependencies of the module
   pub deps: Vec<DependencyDescriptor>,
   /// parsed jsx inline styles
   pub inline_styles: HashMap<String, InlineStyle>,
   /// the hash of `ssrProps` function
   pub ssr_props_fn: Option<String>,
-  /// the hash of `ssgPaths` function
+  /// if with `ssgPaths` function
   pub ssg_paths_fn: Option<bool>,
-  /// a hook list of `useDeno`
+  /// a hook list of `useDeno` in the module
   pub deno_hooks: Vec<String>,
   /// bundle mode
   pub bundle_mode: bool,
   /// externals for bundle mode
   pub bundle_externals: IndexSet<String>,
-  /// all star exports in the module
+  /// all star exports of the module
   pub star_exports: Vec<String>,
-  /// added extra imports
+  /// extra imports
   pub extra_imports: IndexSet<String>,
   /// used builtin jsx tags like `a`, `link`, `head`, etc...
   pub used_builtin_jsx_tags: IndexSet<String>,
+  /// jsx static class names
+  pub jsx_static_class_names: IndexSet<String>,
 
   // internal
   import_idx: i32,
@@ -116,6 +118,7 @@ impl Resolver {
       star_exports: Vec::new(),
       extra_imports: IndexSet::new(),
       used_builtin_jsx_tags: IndexSet::new(),
+      jsx_static_class_names: IndexSet::new(),
       import_idx: 0,
       import_map: ImportMap::from_hashmap(import_map),
       aleph_pkg_uri,

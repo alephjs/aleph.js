@@ -35,7 +35,7 @@ export type TransformOptions = {
   react?: ReactOptions
   sourceMap?: boolean
   isDev?: boolean
-  externalRemoteDeps?: boolean
+  httpExternal?: boolean
   bundleMode?: boolean
   bundleExternals?: string[]
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>
@@ -48,6 +48,7 @@ export type TransformResult = {
   ssgPathsFn?: boolean
   denoHooks?: string[]
   starExports?: string[]
+  jsxStaticClassNames?: string[]
   map?: string
 }
 

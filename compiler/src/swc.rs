@@ -1,7 +1,7 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::export_names::ExportParser;
 use crate::import_map::ImportHashMap;
-use crate::jsx::{aleph_jsx_fold, aleph_jsx_pass2_fold};
+use crate::jsx::{jsx_magic_fold, jsx_magic_pass_2_fold};
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::{is_remote_url, DependencyDescriptor, Resolver};
 use crate::source_type::SourceType;
@@ -151,11 +151,11 @@ impl SWC {
       };
       let passes = chain!(
         Optional::new(
-          aleph_jsx_fold(resolver.clone(), self.source_map.clone()),
+          jsx_magic_fold(resolver.clone(), self.source_map.clone()),
           jsx
         ),
         Optional::new(
-          aleph_jsx_pass2_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+          jsx_magic_pass_2_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
           jsx
         ),
         Optional::new(
@@ -779,7 +779,7 @@ mod tests {
     assert!(code.contains("const { default: Logo  } = __ALEPH__.pack[\"/components/logo.tsx\"]"));
     assert!(code.contains("import Nav from \"../components/nav.bundling.js\""));
     assert!(!code.contains("__ALEPH__.pack[\"/shared/iife.ts\"]"));
-    assert!(code.contains("import   \"../shared/iife2.bundling.js\""));
+    assert!(code.contains("import \"../shared/iife2.bundling.js\""));
     assert!(
       code.contains("AsyncLogo = React.lazy(()=>__ALEPH__.import(\"/components/async-logo.tsx\"")
     );
@@ -789,8 +789,8 @@ mod tests {
     assert!(code.contains(
       "import __ALEPH__StyleLink from \"../-/deno.land/x/aleph/framework/react/components/StyleLink.bundling.js\""
     ));
-    assert!(code.contains("import   \"../-/esm.sh/tailwindcss/dist/tailwind.min.css.bundling.js\""));
-    assert!(code.contains("import   \"../style/index.css.bundling.js\""));
+    assert!(code.contains("import \"../-/esm.sh/tailwindcss/dist/tailwind.min.css.bundling.js\""));
+    assert!(code.contains("import \"../style/index.css.bundling.js\""));
     assert!(code.contains("export const $$star_0 = __ALEPH__.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("export const ReactDom = __ALEPH__.pack[\"https://esm.sh/react-dom\"]"));
     assert!(
