@@ -1,5 +1,5 @@
 import { ComponentType, createElement, useCallback, useEffect, useState } from 'https://esm.sh/react@17.0.2'
-import { RouterURL } from '../../../types.ts'
+import { RouterURL } from '../../../types.d.ts'
 import events from '../../core/events.ts'
 import { importModule, trimBuiltinModuleExts } from '../../core/module.ts'
 import { Routing } from '../../core/routing.ts'

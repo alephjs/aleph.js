@@ -1,5 +1,5 @@
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.d.ts'
 import { redirect } from './redirect.ts'
 
 const ghostRoute: Route = { path: '', module: '' }

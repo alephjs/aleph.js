@@ -1,5 +1,5 @@
 import { getAlephPkgUri } from '../../server/helper.ts'
-import type { Aleph } from '../../types.ts'
+import type { Aleph } from '../../types.d.ts'
 
 export async function init(aleph: Aleph) {
   if (aleph.mode === 'development') {

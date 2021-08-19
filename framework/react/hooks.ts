@@ -1,5 +1,5 @@
 import { useContext, useMemo } from 'https://esm.sh/react@17.0.2'
-import type { RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.d.ts'
 import events from '../core/events.ts'
 import { RouterContext } from './context.ts'
 import { inDeno } from './helper.ts'

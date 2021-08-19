@@ -1,4 +1,4 @@
-import type { Plugin } from 'aleph/types.ts'
+import type { Plugin } from 'aleph/types.d.ts'
 
 export default <Plugin>{
   name: 'wasm-loader',

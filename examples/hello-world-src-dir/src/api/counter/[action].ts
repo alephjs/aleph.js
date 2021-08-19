@@ -1,4 +1,4 @@
-import type { APIHandler } from 'aleph/types.ts'
+import type { APIHandler } from 'aleph/types.d.ts'
 
 export const handler: APIHandler = ({ router, response }) => {
   let count = parseInt(localStorage.getItem('count') || '0')

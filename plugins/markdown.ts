@@ -1,4 +1,4 @@
-import type { Aleph, LoadInput, LoadOutput, ResolveResult, Plugin } from '../types.ts'
+import type { Aleph, LoadInput, LoadOutput, ResolveResult, Plugin } from '../types.d.ts'
 import marked from 'https://esm.sh/marked@2.0.1'
 import { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.1'
 import util from '../shared/util.ts'

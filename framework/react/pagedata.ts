@@ -1,5 +1,5 @@
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.d.ts'
 
 const global = window as any
 const lazySsrRoutes: Map<string, boolean> = new Map()

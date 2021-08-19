@@ -1,4 +1,4 @@
-import { APIResponse as IResponse } from '../types.ts'
+import { APIResponse as IResponse } from '../types.d.ts'
 import log from '../shared/log.ts'
 import compress from './compress.ts'
 

@@ -4,7 +4,7 @@ import { toLocalPath, computeHash } from '../server/helper.ts'
 import { existsFile } from '../shared/fs.ts'
 import { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph, LoadInput, LoadOutput, Plugin, PostCSSPlugin } from '../types.ts'
+import type { Aleph, LoadInput, LoadOutput, Plugin, PostCSSPlugin } from '../types.d.ts'
 
 const test = /\.(css|pcss|postcss)$/i
 const postcssVersion = '8.3.5'

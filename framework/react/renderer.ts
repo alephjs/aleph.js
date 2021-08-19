@@ -2,7 +2,7 @@ import { createElement, ComponentType, ReactElement } from 'https://esm.sh/react
 import { renderToString } from 'https://esm.sh/react-dom@17.0.2/server'
 import util from '../../shared/util.ts'
 import type { FrameworkRenderResult } from '../../server/renderer.ts'
-import type { RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.d.ts'
 import events from '../core/events.ts'
 import { RouterContext, SSRContext } from './context.ts'
 import { E400MissingComponent, E404Page } from './components/ErrorBoundary.ts'

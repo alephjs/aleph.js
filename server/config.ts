@@ -4,7 +4,7 @@ import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { BrowserName, Config, RequiredConfig as TRequiredConfig, ImportMap, PostCSSPlugin } from '../types.ts'
+import type { BrowserName, Config, RequiredConfig as TRequiredConfig, ImportMap, PostCSSPlugin } from '../types.d.ts'
 import { getAlephPkgUri } from './helper.ts'
 
 export type RequiredConfig = TRequiredConfig & {
@@ -144,7 +144,7 @@ export function getDefaultImportMap(): ImportMap {
   return {
     imports: {
       'aleph/': `${alephPkgUri}/`,
-      'aleph/types': `${alephPkgUri}/types.ts`,
+      'aleph/types': `${alephPkgUri}/types.d.ts`,
       'aleph/web': `${alephPkgUri}/framework/core/mod.ts`,
       'aleph/react': `${alephPkgUri}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
