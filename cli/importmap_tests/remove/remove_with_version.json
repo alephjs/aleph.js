@@ -1,0 +1,19 @@
+{
+    "testname": "Remove std@0.96.0/",
+    "args": ["std@0.96.0/"],
+    "input": {
+      "imports": {
+        "/": "./",
+        "std/": "https://deno.land/std@0.96.0/"
+      }
+    },
+    "output": {
+      "imports": {
+        "/": "./"
+      }
+    },
+    "result": {
+      "count": 1,
+      "skipped": 0
+    }
+  }

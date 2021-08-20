@@ -1,0 +1,19 @@
+{
+  "testname": "Add std@0.96.0/",
+  "args": ["std@0.96.0/"],
+  "input": {
+    "imports": {
+      "/": "./"
+    }
+  },
+  "output": {
+    "imports": {
+      "/": "./",
+      "std/": "https://deno.land/std@0.96.0/"
+    }
+  },
+  "result": {
+    "count": 1,
+    "skipped": 0
+  }
+}

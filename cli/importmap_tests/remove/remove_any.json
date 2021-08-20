@@ -1,0 +1,17 @@
+{
+    "testname": "Remove /",
+    "args": ["/"],
+    "input": {
+      "imports": {
+        "/": "./"
+      }
+    },
+    "output": {
+      "imports": {
+      }
+    },
+    "result": {
+      "count": 1,
+      "skipped": 0
+    }
+  }

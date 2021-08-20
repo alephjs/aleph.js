@@ -1,0 +1,19 @@
+{
+    "testname": "Add std@0.96.0/path",
+    "args": ["std@0.96.0/path"],
+    "input": {
+      "imports": {
+        "/": "./"
+      }
+    },
+    "output": {
+      "imports": {
+        "/": "./",
+        "std/path": "https://deno.land/std@0.96.0/path/mod.ts"
+      }
+    },
+    "result": {
+      "count": 1,
+      "skipped": 0
+    }
+  }

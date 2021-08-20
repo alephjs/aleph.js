@@ -1,0 +1,19 @@
+{
+  "testname": "Add std/ --rolling",
+  "args": ["std/", null, null, true],
+  "input": {
+    "imports": {
+      "/": "./"
+    }
+  },
+  "output": {
+    "imports": {
+      "/": "./",
+      "std/": "https://deno.land/std/"
+    }
+  },
+  "result": {
+    "count": 1,
+    "skipped": 0
+  }
+}

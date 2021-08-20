@@ -21,80 +21,61 @@ import {
   assertEquals,
   assertMatch
 } from 'https://deno.land/std@0.96.0/testing/asserts.ts'
+import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import log from '../shared/log.ts'
 
-/** Test stripping version numbers from module name */
-namespace stripVerTest {
-  const cases = {
-    'aleph/': 'aleph/',
-    'std/hash/': 'std/hash/',
-    'std@1.3.1/': 'std/',
-    'std@5.2/path/': 'std/path/',
-    'aleph@v1.0.0/': 'aleph/',
-    'react@17.1.3/': 'react/',
-    'package@a123.1sz/abc.ts': 'package/abc.ts',
-  }
-  for (const c of Object.keys(cases)) {
-    Deno.test(`stripVer(${c})`, () => {
-      assertEquals(im.stripVer(c), cases[c as keyof typeof cases])
-    })
-  }
+log.setLevel('error')
+
+type CmdTest = {
+  testname: string,
+  args: any,
+  input: im.ImportMap,
+  output: im.ImportMap,
+  result: im.CommandResult
 }
 
-namespace getSubModTest {
-  const cases = {
-    'aleph/': '',
-    'std/hash/': '/hash',
-    'std@1.3.1/': '',
-    'std@5.2/path/': '/path',
-    'aleph@v1.0.0/': '',
-    'react@17.1.3/': '',
-    'package@a123.1sz/abc.ts': '/abc.ts',
-  }
-  for (const c of Object.keys(cases)) {
-    Deno.test(`getSubMod(${c})`, () => {
-      assertEquals(im.getSubMod(c), cases[c as keyof typeof cases])
-    })
-  }
+const addTests = readTests('add')
+
+for (const tc of addTests) {
+  Deno.test(`Test Add: ${tc.testname}`, async () => {
+    assertEquals(await im.add(tc.input, tc.args[0], tc.args[1], tc.args[2], tc.args[3]), tc.result)
+    assertEquals(tc.input, tc.output)
+  })
 }
 
-namespace getSTDUrlTest {
-  const cases = {
-    'std/': /https:\/\/deno\.land\/std@\d+\.\d+\.\d+\//,
-    'std@0.96.0/': 'https://deno.land/std@0.96.0/',
-    'std@0.96.0/path': 'https://deno.land/std@0.96.0/path/mod.ts',
-    'std@0.42.0/fs': 'https://deno.land/std@0.42.0/fs/mod.ts',
-    'std@0.42.0/fs/': 'https://deno.land/std@0.42.0/fs/',
-    'std@0.42.0/fs/ensure_link.ts': 'https://deno.land/std@0.42.0/fs/ensure_link.ts',
-    'std@0.42.0/fs/testdata/': 'https://deno.land/std@0.42.0/fs/testdata/',
-  }
-  for (const c of Object.keys(cases)) {
-    Deno.test(`getSTDUrl(${c})`, async () => {
-      const ca = cases[c as keyof typeof cases]
-      if (typeof ca === 'string') {
-        assertEquals(await im.getSTDUrl(c), ca)
-      } else {
-        assertMatch(await im.getSTDUrl(c), ca)
-      }
-    })
-  }
+const removeTests = readTests('remove')
+
+for (const tc of removeTests) {
+  Deno.test(`Test Remove: ${tc.testname}`, async () => {
+    assertEquals(await im.remove(tc.input, tc.args[0]), tc.result)
+    assertEquals(tc.input, tc.output)
+  })
 }
 
-namespace getXUrlTest {
-  const cases = {
-    'aleph/': /https:\/\/deno\.land\/x\/aleph@[^/]+\//,
-    'aleph/framework/': /https:\/\/deno\.land\/x\/aleph@[^/]+\/framework\//,
-    'aleph@v0.3.0-alpha.33/': 'https://deno.land/x/aleph@v0.3.0-alpha.33/',
-    'aleph@v0.3.0-alpha.33/framework/core': 'https://deno.land/x/aleph@v0.3.0-alpha.33/framework/core/mod.ts',
-  }
-  for (const c of Object.keys(cases)) {
-    Deno.test(`getXUrl(${c})`, async () => {
-      const ca = cases[c as keyof typeof cases]
-      if (typeof ca === 'string') {
-        assertEquals(await im.getXUrl(c), ca)
-      } else {
-        assertMatch(await im.getXUrl(c), ca)
-      }
-    })
-  }
-}
+/**
+ * These tests will fail the moment the packages used to test them update.
+ * So they are commented out.
+ */
+/*
+const updateTests = readTests('update')
 
+for (const tc of updateTests) {
+  Deno.test(`Test Update: ${tc.testname}`, async () => {
+    assertEquals(await im.update(tc.input, tc.args), tc.result)
+    assertEquals(tc.input, tc.output)
+  })
+}
+*/
+
+function readTests(folderName: string) {
+  const folderPath = join(fromFileUrl(dirname(import.meta.url)), `/importmap_tests/${folderName}/`)
+  const folder = Deno.readDirSync(folderPath)
+  const tests = []
+  for (const t of folder) {
+    if (t.isFile) {
+      const text = JSON.parse(Deno.readTextFileSync(join(folderPath, t.name))) as CmdTest
+      tests.push(text)
+    }
+  }
+  return tests
+}

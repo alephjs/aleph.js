@@ -1,0 +1,19 @@
+{
+  "testname": "Add aleph@v0.3.0-alpha.33/",
+  "args": ["aleph@v0.3.0-alpha.33/"],
+  "input": {
+    "imports": {
+      "/": "./"
+    }
+  },
+  "output": {
+    "imports": {
+      "/": "./",
+      "aleph/": "https://deno.land/x/aleph@v0.3.0-alpha.33/"
+    }
+  },
+  "result": {
+    "count": 1,
+    "skipped": 0
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "testname": "Add / -> ./",
+  "args": ["", "/", "./"],
+  "input": {
+    "imports": {
+      "std/": "https://deno.land/std@0.96.0/"
+    }
+  },
+  "output": {
+    "imports": {
+      "std/": "https://deno.land/std@0.96.0/",
+      "/": "./"
+    }
+  },
+  "result": {
+    "count": 1,
+    "skipped": 0
+  }
+}
