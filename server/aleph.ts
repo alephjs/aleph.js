@@ -510,6 +510,7 @@ export class Aleph implements IAleph {
   /** add a module by given path and optional source code. */
   async addModule(specifier: string, sourceCode: string): Promise<Module> {
     let sourceType = getSourceType(specifier)
+    let isStyle = false
     if (sourceType === SourceType.Unknown) {
       throw new Error("addModule: unknown souce type")
     }
@@ -517,12 +518,13 @@ export class Aleph implements IAleph {
       const ret = await cssLoader({ specifier, data: (new TextEncoder).encode(sourceCode) }, this)
       sourceCode = ret.code
       sourceType = SourceType.JS
+      isStyle = true
     }
     const module = await this.compile(specifier, {
       source: {
         code: sourceCode,
         type: sourceType,
-        isStyle: false,
+        isStyle,
       }
     })
     if (specifier.startsWith('pages/') || specifier.startsWith('api/')) {
@@ -1175,7 +1177,7 @@ export class Aleph implements IAleph {
 
       const ms = new Measure()
       const encoder = new TextEncoder()
-      const { code, deps, denoHooks, ssrPropsFn, ssgPathsFn, starExports, jsxStaticClassNames, map } = await transform(specifier, source.code, {
+      const { code, deps = [], denoHooks, ssrPropsFn, ssgPathsFn, starExports, jsxStaticClassNames, map } = await transform(specifier, source.code, {
         ...this.commonCompilerOptions,
         sourceMap: this.isDev,
         swcOptions: {
@@ -1200,7 +1202,7 @@ export class Aleph implements IAleph {
       }
 
       // revert external imports
-      if (deps && this.#resolverListeners.length > 0) {
+      if (deps.length > 0 && this.#resolverListeners.length > 0) {
         deps.forEach(({ specifier }) => {
           if (specifier !== module.specifier && util.isLikelyHttpURL(specifier)) {
             let external = false
@@ -1225,7 +1227,7 @@ export class Aleph implements IAleph {
         })
       }
 
-      Object.assign(module, { ssrPropsFn, ssgPathsFn, jsxStaticClassNames })
+      Object.assign(module, { deps, ssrPropsFn, ssgPathsFn, jsxStaticClassNames })
       if (util.isFilledArray(denoHooks)) {
         module.denoHooks = denoHooks.map(id => util.trimPrefix(id, 'useDeno-'))
         if (!this.#config.ssr) {
@@ -1252,7 +1254,7 @@ export class Aleph implements IAleph {
       }
 
       module.jsBuffer = encoder.encode(jsCode)
-      module.deps = deps?.filter(({ specifier }) => specifier !== module.specifier).map(({ specifier, resolved, isDynamic }) => {
+      module.deps = deps.filter(({ specifier }) => specifier !== module.specifier).map(({ specifier, resolved, isDynamic }) => {
         const dep: DependencyDescriptor = { specifier }
         if (isDynamic) {
           dep.isDynamic = true
@@ -1265,7 +1267,7 @@ export class Aleph implements IAleph {
           }
         }
         return dep
-      }) || []
+      })
 
       ms.stop(`transpile '${specifier}'`)
 
