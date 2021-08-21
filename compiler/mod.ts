@@ -124,6 +124,7 @@ export async function transform(specifier: string, code: string, options: Transf
     inlineStyles,
     denoHooks,
     starExports,
+    jsxStaticClassNames,
     map,
   } = transformSync(specifier, code, transformOptions)
 
@@ -160,6 +161,7 @@ export async function transform(specifier: string, code: string, options: Transf
     ssgPathsFn,
     denoHooks,
     starExports,
+    jsxStaticClassNames,
     map
   }
 }

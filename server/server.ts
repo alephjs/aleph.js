@@ -110,7 +110,7 @@ export class Server {
 
         const relPath = util.trimPrefix(pathname, '/_aleph')
         if (relPath == '/main.js') {
-          resp.body = aleph.createMainJS(false)
+          resp.body = await aleph.createMainJS(false)
           resp.setHeader('Content-Type', 'application/javascript; charset=utf-8')
           resp.writeTo(e)
           return

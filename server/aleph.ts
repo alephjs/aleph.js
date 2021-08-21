@@ -53,7 +53,7 @@ type LoadListener = {
 
 type TransformListener = {
   test: RegExp | 'hmr' | 'main',
-  transform(input: TransformInput): TransformOutput,
+  transform(input: TransformInput): TransformOutput | void | Promise<TransformOutput> | Promise<void>,
 }
 
 type SsrListener = (input: SSRInput) => SSROutput
@@ -143,6 +143,7 @@ export class Aleph implements IAleph {
     const pagesDir = join(srcDir, 'pages')
     const buildManifestFile = join(this.#buildDir, 'build.manifest.json')
     const importMapString = JSON.stringify(this.#importMap)
+    const pluginNames = this.#config.plugins.map(({ name }) => name).join(',')
 
     let shouldRebuild = !await existsFile(buildManifestFile)
     let saveManifestFile = shouldRebuild
@@ -153,7 +154,8 @@ export class Aleph implements IAleph {
           typeof v !== 'object' ||
           v === null ||
           v.compiler !== wasmChecksum ||
-          (v.importMap !== importMapString && confirm('The import-maps has been changed, rebuild modules?'))
+          (v.importMap !== importMapString && confirm('The import-maps has been changed, clean build cache?')) ||
+          (v.plugins !== pluginNames && confirm('The plugin list has been updated, clean build cache?'))
         )
         if (!shouldRebuild && v.importMap !== importMapString) {
           saveManifestFile = true
@@ -176,6 +178,7 @@ export class Aleph implements IAleph {
         deno: Deno.version.deno,
         compiler: wasmChecksum,
         importMap: importMapString,
+        plugins: pluginNames,
       }, undefined, 2))
     }
 
@@ -299,6 +302,11 @@ export class Aleph implements IAleph {
       if (this.#modules.has(specifier)) {
         try {
           const prevModule = this.#modules.get(specifier)!
+          if (prevModule.jsFile === '/aleph.config.js') {
+            log.info(`${prevModule.specifier.slice(1)} has be changed, please restart the server.`)
+            return
+          }
+
           const module = await this.compile(specifier, {
             forceRefresh: true,
             ignoreDeps: true,
@@ -491,7 +499,7 @@ export class Aleph implements IAleph {
     this.#loadListeners.push({ test, load: callback })
   }
 
-  onTransform(test: RegExp | 'hmr' | 'main', callback: (input: TransformInput) => TransformOutput): void {
+  onTransform(test: RegExp | 'hmr' | 'main', callback: (input: TransformInput) => TransformOutput | Promise<TransformOutput>): void {
     this.#transformListeners.push({ test, transform: callback })
   }
 
@@ -501,10 +509,19 @@ export class Aleph implements IAleph {
 
   /** add a module by given path and optional source code. */
   async addModule(specifier: string, sourceCode: string): Promise<Module> {
+    let sourceType = getSourceType(specifier)
+    if (sourceType === SourceType.Unknown) {
+      throw new Error("addModule: unknown souce type")
+    }
+    if (sourceType === SourceType.CSS) {
+      const ret = await cssLoader({ specifier, data: (new TextEncoder).encode(sourceCode) }, this)
+      sourceCode = ret.code
+      sourceType = SourceType.JS
+    }
     const module = await this.compile(specifier, {
       source: {
         code: sourceCode,
-        type: getSourceType(specifier),
+        type: sourceType,
         isStyle: false,
       }
     })
@@ -642,7 +659,7 @@ export class Aleph implements IAleph {
   }
 
   /** create main bootstrap script in javascript. */
-  createMainJS(bundleMode = false): string {
+  async createMainJS(bundleMode = false): Promise<string> {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
     const { framework, basePath: basePath, i18n: { defaultLocale } } = this.#config
@@ -671,9 +688,9 @@ export class Aleph implements IAleph {
         `bootstrap(${JSON.stringify(config, undefined, this.isDev ? 2 : undefined)});`
       ].filter(Boolean).join('\n')
     }
-    this.#transformListeners.forEach(({ test, transform }) => {
+    for (const { test, transform } of this.#transformListeners) {
       if (test === 'main') {
-        const ret = transform({
+        let ret = await transform({
           module: {
             specifier: '/main.js',
             deps: [],
@@ -683,10 +700,10 @@ export class Aleph implements IAleph {
           code,
         })
         if (util.isFilledString(ret?.code)) {
-          code = ret.code
+          code = ret!.code
         }
       }
-    })
+    }
     return code
   }
 
@@ -919,16 +936,16 @@ export class Aleph implements IAleph {
         // todo: merge source map
       }
     }
-    this.#transformListeners.forEach(({ test, transform }) => {
+    for (const { test, transform } of this.#transformListeners) {
       if (test === 'hmr') {
         const { jsBuffer, ready, ...rest } = module
-        const ret = transform({ module: structuredClone(rest), code })
+        const ret = await transform({ module: rest, code })
         if (util.isFilledString(ret?.code)) {
-          code = ret.code
+          code = ret!.code
         }
         // todo: merge source map
       }
-    })
+    }
     return new TextEncoder().encode([
       `import.meta.hot = $createHotContext(${JSON.stringify(specifier)});`,
       '',
@@ -1216,18 +1233,18 @@ export class Aleph implements IAleph {
         }
       }
 
-      this.#transformListeners.forEach(({ test, transform }) => {
+      for (const { test, transform } of this.#transformListeners) {
         if (test instanceof RegExp && test.test(specifier)) {
           const { jsBuffer, ready, ...rest } = module
-          const { code, map } = transform({ module: structuredClone(rest), code: jsCode, map: sourceMap }) || {}
-          if (util.isFilledString(code)) {
-            jsCode = code
+          const ret = await transform({ module: rest, code: jsCode, map: sourceMap })
+          if (util.isFilledString(ret?.code)) {
+            jsCode = ret!.code
           }
-          if (util.isFilledString(map)) {
-            sourceMap = map
+          if (util.isFilledString(ret?.map)) {
+            sourceMap = ret!.map
           }
         }
-      })
+      }
 
       // add source mapping url
       if (sourceMap) {

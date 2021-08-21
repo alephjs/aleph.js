@@ -10,7 +10,7 @@ export interface Aleph {
   fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
-  onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformInput) => TransformOutput): void
+  onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformInput) => TransformOutput | void | Promise<TransformOutput> | Promise<void>): void
   onSSR(callback: (input: SSRInput) => SSROutput): void
 }
 

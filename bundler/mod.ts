@@ -188,7 +188,7 @@ export class Bundler {
         r[name] = chunk.filename
         return r
       }, {} as Record<string, string>)
-    const mainJS = `__ALEPH__.asyncChunks=${JSON.stringify(asyncChunks)};` + this.#aleph.createMainJS(true)
+    const mainJS = `__ALEPH__.asyncChunks=${JSON.stringify(asyncChunks)};` + await this.#aleph.createMainJS(true)
     const hash = computeHash(mainJS)
     const bundleFilename = `main.bundle.${hash.slice(0, 8)}.js`
     const bundleFilePath = join(this.#aleph.buildDir, bundleFilename)
