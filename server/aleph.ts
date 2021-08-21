@@ -191,13 +191,13 @@ export class Aleph implements IAleph {
 
     ms.stop('apply plugins')
 
-    const mwFile = await findFile(this.#workingDir, ['ts', 'js', 'mjs'].map(ext => `${this.#config.srcDir}/api/_middlewares.${ext}`))
-    if (mwFile) {
-      const mwMod = await this.compile(`/api/${basename(mwFile)}`, { httpExternal: true })
+    const mwsFile = await findFile(this.#workingDir, ['ts', 'js', 'mjs'].map(ext => `${this.#config.srcDir}/api/_middlewares.${ext}`))
+    if (mwsFile) {
+      const mwMod = await this.compile(`/api/${basename(mwsFile)}`, { httpExternal: true })
       const { default: _middlewares } = await import('file://' + join(this.#buildDir, mwMod.jsFile))
       const middlewares = Array.isArray(_middlewares) ? _middlewares.filter(fn => util.isFunction(fn)) : []
       this.#config.server.middlewares.push(...middlewares)
-      ms.stop(`load API middlewares (${middlewares.length}) from 'api/${basename(mwFile)}'`)
+      ms.stop(`load API middlewares (${middlewares.length}) from 'api/${basename(mwsFile)}'`)
     }
 
     // init framework
@@ -682,7 +682,9 @@ export class Aleph implements IAleph {
           },
           code,
         })
-        code = ret.code
+        if (util.isFilledString(ret?.code)) {
+          code = ret.code
+        }
       }
     })
     return code
@@ -921,7 +923,9 @@ export class Aleph implements IAleph {
       if (test === 'hmr') {
         const { jsBuffer, ready, ...rest } = module
         const ret = transform({ module: structuredClone(rest), code })
-        code = ret.code
+        if (util.isFilledString(ret?.code)) {
+          code = ret.code
+        }
         // todo: merge source map
       }
     })
@@ -1215,9 +1219,11 @@ export class Aleph implements IAleph {
       this.#transformListeners.forEach(({ test, transform }) => {
         if (test instanceof RegExp && test.test(specifier)) {
           const { jsBuffer, ready, ...rest } = module
-          const { code, map } = transform({ module: structuredClone(rest), code: jsCode, map: sourceMap })
-          jsCode = code
-          if (map) {
+          const { code, map } = transform({ module: structuredClone(rest), code: jsCode, map: sourceMap }) || {}
+          if (util.isFilledString(code)) {
+            jsCode = code
+          }
+          if (util.isFilledString(map)) {
             sourceMap = map
           }
         }
