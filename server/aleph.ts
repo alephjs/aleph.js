@@ -157,7 +157,7 @@ export class Aleph implements IAleph {
           (v.importMap !== importMapString && confirm('The import-maps has been changed, clean build cache?')) ||
           (v.plugins !== pluginNames && confirm('The plugin list has been updated, clean build cache?'))
         )
-        if (!shouldRebuild && v.importMap !== importMapString) {
+        if (!shouldRebuild && v.importMap !== importMapString && v.plugins !== pluginNames) {
           saveManifestFile = true
         }
       } catch (e) { }
