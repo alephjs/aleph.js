@@ -32,8 +32,6 @@ export type Config = {
   ssr?: boolean | GlobalSSROptions
   /** `plugins` specifies some plugins to extend Aleph runtime. */
   plugins?: Plugin[]
-  /** `env` appends system env variables. */
-  env?: Record<string, string>
   /** `server` specifies the options for **Server**. */
   server?: ServerOptions
 }

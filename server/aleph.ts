@@ -172,6 +172,19 @@ export class Aleph implements IAleph {
       }, undefined, 2))
     }
 
+    // load .env.* files
+    for await (const { path: p, } of walk(this.workingDir, { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
+      const text = await Deno.readTextFile(p)
+      text.split('\n').forEach(line => {
+        let [key, value] = util.splitBy(line, '=')
+        key = key.trim()
+        if (key) {
+          Deno.env.set(key, value.trim())
+        }
+      })
+      log.info('load env from', basename(p))
+    }
+
     ms.stop(`init env`)
 
     // apply plugins
@@ -192,9 +205,6 @@ export class Aleph implements IAleph {
       this.#config.server.middlewares.push(...middlewares)
       ms.stop(`load API middlewares (${middlewares.length}) from 'api/${basename(mwsFile)}'`)
     }
-
-    // apply custom env
-    Object.entries(this.#config.env).forEach(([key, value]) => Deno.env.set(key, value))
 
     // init framework
     const { init } = await import(`../framework/${this.#config.framework}/init.ts`)

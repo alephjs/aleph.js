@@ -42,7 +42,6 @@ export function defaultConfig(): Readonly<RequiredConfig> {
       middlewares: [],
       compress: true,
     },
-    env: {},
     react: {
       version: defaultReactVersion,
       esmShBuildVersion: 43,
@@ -139,9 +138,6 @@ export async function loadConfig(specifier: string): Promise<Config> {
   }
   if (util.isFilledArray(plugins)) {
     config.plugins = plugins.filter(v => util.isPlainObject(v) && util.isFunction(v.setup))
-  }
-  if (util.isPlainObject(env)) {
-    config.env = toStringMap(env)
   }
 
   return config
