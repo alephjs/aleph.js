@@ -148,6 +148,8 @@ export function getSourceType(url: string, contentType?: string): SourceType {
   return SourceType.Unknown
 }
 
+const reEndsWithVersion = /@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$/
+
 /**
  * fix remote import url to local
  * https://esm.sh/react.js?bundle -> /-/esm.sh/react.YnVuZGxl.js
@@ -162,9 +164,10 @@ export function toLocalPath(url: string): string {
     if (search !== '') {
       const a = util.splitPath(pathname)
       const basename = a.pop()!
-      const ext = extname(basename)
+      const realext = extname(basename)
+      const ext = realext != "" && !basename.match(reEndsWithVersion) ? realext : "js"
       const search64 = util.btoaUrl(search.slice(1))
-      a.push(util.trimSuffix(basename, ext) + `.${search64}` + ext)
+      a.push(util.trimSuffix(basename, ext) + `.${search64}.` + ext)
       pathname = '/' + a.join('/')
     }
     return [

@@ -8,6 +8,7 @@ import util from '../shared/util.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
 import { deno_x_brotli, deno_x_flate } from '../server/compress.ts'
+import isFolderEmpty from './helpers/is-folder-empty.ts';
 
 export const helpMessage = `
 Usage:
@@ -26,6 +27,10 @@ export default async function (nameArg?: string) {
   const name = nameArg || (await ask('Name:')).trim()
   if (name === '') {
     return
+  }
+
+  if (!isFolderEmpty(cwd, name)) {
+    Deno.exit(1)
   }
 
   const template = 'hello-world' // todo: add template select ui
