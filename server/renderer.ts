@@ -89,7 +89,10 @@ export class Renderer {
     const { default: App } = appModule ? await this.#aleph.importModule(appModule) : {} as any
     const nestedPageComponents = await Promise.all(nestedModules
       .map(async specifier => {
-        const module = this.#aleph.getModule(specifier) || (await this.#aleph.compile(specifier))
+        let module = this.#aleph.getModule(specifier)
+        if (module === null) {
+          module = await this.#aleph.compile(specifier)
+        }
         const { default: Component, ssr } = await this.#aleph.importModule(module)
         let ssrProps = ssr?.props
         if (util.isFunction(ssrProps)) {
@@ -111,15 +114,15 @@ export class Renderer {
       nestedModules
     ].flat())
 
-    // ensure working directory
-    Deno.chdir(this.#aleph.workingDir)
-
     const { head, body, data, scripts } = await this.#renderer.render(
       url,
       App,
       nestedPageComponents,
       styles
     )
+
+    // keep working directory
+    Deno.chdir(this.#aleph.workingDir)
 
     if (isDev) {
       log.info(`render '${url.toString()}' in ${Math.round(performance.now() - start)}ms`)

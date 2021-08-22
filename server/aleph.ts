@@ -1,3 +1,4 @@
+import { delay } from 'https://deno.land/std@0.100.0/async/delay.ts'
 import { dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
 import { indexOf, copy, equals } from 'https://deno.land/std@0.100.0/bytes/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
@@ -915,8 +916,12 @@ export class Aleph implements IAleph {
     return [routePath, specifier, isIndex]
   }
 
-  async importModule<T = any>({ jsFile, hash, sourceHash }: Module): Promise<T> {
-    return await import(`file://${join(this.#buildDir, jsFile)}#${(hash || sourceHash).slice(0, 6)}`)
+  async importModule<T = any>({ specifier, jsFile, hash, sourceHash }: Module): Promise<T> {
+    const path = join(this.#buildDir, jsFile)
+    if (existsFile(path)) {
+      return await import(`file://${path}#${(hash || sourceHash).slice(0, 6)}`)
+    }
+    throw new Error(`import ${specifier}: file not found: ${path}`)
   }
 
   async getModuleJS(module: Module, injectHMRCode = false): Promise<Uint8Array | null> {
@@ -1287,23 +1292,7 @@ export class Aleph implements IAleph {
 
       ms.stop(`transpile '${specifier}'`)
 
-      const cacheFp = join(this.#buildDir, jsFile)
-      const metaFp = cacheFp.slice(0, -3) + '.meta.json'
-      const metaJSON = JSON.stringify({
-        specifier,
-        sourceHash: module.sourceHash,
-        isStyle: module.isStyle,
-        ssrPropsFn: module.ssrPropsFn,
-        ssgPathsFn: module.ssgPathsFn,
-        denoHooks: module.denoHooks,
-        deps: module.deps,
-      }, undefined, 2)
-      await ensureDir(dirname(cacheFp))
-      await Promise.all([
-        Deno.writeFile(cacheFp, module.jsBuffer),
-        Deno.writeTextFile(metaFp, metaJSON),
-        sourceMap ? Deno.writeTextFile(`${cacheFp}.map`, sourceMap) : Promise.resolve(),
-      ])
+      await this.cacheModule(module, sourceMap)
     }
 
     if (module.deps.length > 0) {
@@ -1401,7 +1390,7 @@ export class Aleph implements IAleph {
     }
   }
 
-  private async cacheModule(module: Module) {
+  private async cacheModule(module: Module, sourceMap?: string) {
     const { specifier, jsBuffer, jsFile } = module
     if (jsBuffer) {
       const cacheFp = join(this.#buildDir, jsFile)
@@ -1418,6 +1407,7 @@ export class Aleph implements IAleph {
           denoHooks: module.denoHooks,
           deps: module.deps,
         }, undefined, 2)),
+        sourceMap ? Deno.writeTextFile(`${cacheFp}.map`, sourceMap) : Promise.resolve(),
         lazyRemove(cacheFp.slice(0, -3) + '.bundling.js'),
       ])
     }
