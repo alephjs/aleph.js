@@ -34,33 +34,37 @@ export function recoverCSS(url: string) {
 export function applyCSS(url: string, { css, href }: { css?: string, href?: string }) {
   if (!inDeno) {
     const { document } = window as any
-    const ssr = Array.from<any>(document.head.children).find((el: any) => {
+    const ssrEl = Array.from<any>(document.head.children).find((el: any) => {
       return el.getAttribute('data-module-id') === url && el.hasAttribute('ssr')
     })
-    if (ssr) {
+    if (ssrEl) {
       // apply the css at next time
-      ssr.removeAttribute('ssr')
+      ssrEl.removeAttribute('ssr')
     } else {
       const prevEls = Array.from(document.head.children).filter((el: any) => {
         return el.getAttribute('data-module-id') === url
       })
+      const clean = () => {
+        if (prevEls.length > 0) {
+          prevEls.forEach(el => document.head.removeChild(el))
+        }
+      }
       let el: any
       if (util.isFilledString(css)) {
         el = document.createElement('style')
         el.type = 'text/css'
         el.appendChild(document.createTextNode(css))
+        Promise.resolve().then(clean)
       } else if (util.isFilledString(href)) {
         el = document.createElement('link')
         el.rel = 'stylesheet'
         el.href = href
+        el.onload = clean
       } else {
         throw new Error('applyCSS: missing css')
       }
       el.setAttribute('data-module-id', url)
       document.head.appendChild(el)
-      if (prevEls.length > 0) {
-        prevEls.forEach(el => document.head.removeChild(el))
-      }
     }
   }
 }
