@@ -1,5 +1,5 @@
 import { Untar } from 'https://deno.land/std@0.100.0/archive/tar.ts'
-import { green, dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
+import { green, blue, dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
 import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
@@ -8,7 +8,6 @@ import util from '../shared/util.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
 import { deno_x_brotli, deno_x_flate } from '../server/compress.ts'
-import isFolderEmpty from './helpers/is-folder-empty.ts';
 
 export const helpMessage = `
 Usage:
@@ -128,4 +127,51 @@ async function confirm(question: string = 'are you sure?') {
   let a: string
   while (!/^(y(es)?|no?)$/i.test(a = (await ask(question + ' ' + dim('[y/n]'))).trim())) { }
   return a.charAt(0).toLowerCase() === 'y'
+}
+
+function isFolderEmpty(root: string, name: string): boolean {
+  const validFiles = [
+    '.DS_Store',
+    '.git',
+    '.gitattributes',
+    '.gitignore',
+    '.gitlab-ci.yml',
+    '.hg',
+    '.hgcheck',
+    '.hgignore',
+    '.idea',
+    '.travis.yml',
+    'LICENSE',
+    'Thumbs.db',
+    'docs',
+    'mkdocs.yml',
+  ]
+
+  const conflicts = []
+
+  for (const { name: file, isDirectory } of Deno.readDirSync(root)) {
+    // Support IntelliJ IDEA-based editors
+    if (validFiles.includes(file) || /\.iml$/.test(file)) {
+      if (isDirectory) {
+        conflicts.push(blue(file) + '/')
+      } else {
+        conflicts.push(file)
+      }
+    }
+  }
+
+  if (conflicts.length > 0) {
+    console.log(
+      [
+        `The directory ${green(name)} contains files that could conflict:`,
+        '',
+        ...conflicts,
+        '',
+        'Either try using a new directory name, or remove the files listed above.'
+      ].join('\n')
+    )
+    return false
+  }
+
+  return true
 }
