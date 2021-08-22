@@ -32,6 +32,8 @@ export default function Anchor(props: AnchorProps) {
     ['data-active-style']: activeStyle,
     className: propClassName,
     style: propStyle,
+    onClick: propOnClick,
+    onMouseEnter: propOnMouseEnter,
     children,
     ...rest
   } = props
@@ -101,8 +103,8 @@ export default function Anchor(props: AnchorProps) {
     }
   }, [isCurrent])
   const onMouseEnter = useCallback((e: MouseEvent) => {
-    if (util.isFunction(props.onMouseEnter)) {
-      props.onMouseEnter(e)
+    if (util.isFunction(propOnMouseEnter)) {
+      propOnMouseEnter(e)
     }
     if (e.defaultPrevented) {
       return
@@ -110,8 +112,8 @@ export default function Anchor(props: AnchorProps) {
     prefetch()
   }, [prefetch])
   const onClick = useCallback((e: MouseEvent) => {
-    if (util.isFunction(props.onMouseEnter)) {
-      props.onMouseEnter(e)
+    if (util.isFunction(propOnClick)) {
+      propOnClick(e)
     }
     if (e.defaultPrevented || isModifiedEvent(e)) {
       return
