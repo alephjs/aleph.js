@@ -233,7 +233,7 @@ function isFramework(v: any): v is 'react' {
   }
 }
 
-function isBuildTarget(v: any): v is 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' | 'esnext' {
+function isBuildTarget(v: any): v is 'es2015' | 'es2016' | 'es2017' | 'es2018' | 'es2019' | 'es2020' | 'es2021' | 'esnext' {
   switch (v) {
     case 'es2015':
     case 'es2016':
@@ -241,6 +241,7 @@ function isBuildTarget(v: any): v is 'es2015' | 'es2016' | 'es2017' | 'es2018' |
     case 'es2018':
     case 'es2019':
     case 'es2020':
+    case 'es2021':
     case 'esnext':
       return true
     default:
