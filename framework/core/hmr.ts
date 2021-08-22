@@ -68,6 +68,15 @@ export function connect(basePath: string) {
   const { protocol, host } = location
   const wsUrl = (protocol === 'https:' ? 'wss' : 'ws') + '://' + host + basePath.replace(/\/+$/, '') + '/_hmr'
   const ws = new WebSocket(wsUrl)
+  const contact = (callback: () => void) => {
+    setTimeout(() => {
+      const ws = new WebSocket(wsUrl)
+      ws.addEventListener('open', callback)
+      ws.addEventListener('close', () => {
+        contact(callback) // retry
+      })
+    }, 500)
+  }
 
   ws.addEventListener('open', () => {
     state.socket = ws
@@ -76,21 +85,16 @@ export function connect(basePath: string) {
   })
 
   ws.addEventListener('close', () => {
-    if (state.socket === null) {
+    if (state.socket !== null) {
+      state.socket = null
+      console.log('[HMR] closed.')
       // re-connect
       setTimeout(() => {
         connect(basePath)
       }, 300)
     } else {
-      state.socket = null
-      console.log('[HMR] closed.')
       // reload the page when re-connected
-      setInterval(() => {
-        const ws = new WebSocket(wsUrl)
-        ws.addEventListener('open', () => {
-          location.reload()
-        })
-      }, 300)
+      contact(() => location.reload())
     }
   })
 
