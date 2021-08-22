@@ -37,11 +37,18 @@ export class Server {
       if (pathname === '/_hmr') {
         const { socket, response } = Deno.upgradeWebSocket(req)
         const watcher = aleph.createFSWatcher()
+        const send = (message: object) => {
+          try {
+            socket.send(JSON.stringify(message))
+          } catch (err) {
+            log.warn('socket.send:', err.message)
+          }
+        }
         socket.addEventListener('open', () => {
           watcher.on('add', (mod: any) => socket.send(JSON.stringify({ ...mod, type: 'add' })))
           watcher.on('remove', (specifier: string) => {
             watcher.removeAllListeners('modify-' + specifier)
-            socket.send(JSON.stringify({ type: 'remove', specifier }))
+            send({ type: 'remove', specifier })
           })
           log.debug('hmr connected')
         })
@@ -57,19 +64,18 @@ export class Server {
                 const mod = aleph.getModule(data.specifier)
                 if (mod) {
                   watcher.on(`modify-${mod.specifier}`, (data) => {
-                    socket.send(JSON.stringify({
+                    send({
                       ...data,
                       type: 'update',
                       specifier: mod.specifier,
                       updateUrl: util.cleanPath(`${basePath}/_aleph/${trimBuiltinModuleExts(mod.specifier)}.js`),
-                    }))
+                    })
                   })
                 }
               }
             } catch (e) { }
           }
         })
-
         try {
           await respondWith(response)
         } catch (err) {
