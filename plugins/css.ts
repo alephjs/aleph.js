@@ -1,8 +1,8 @@
 import { extname, join } from 'https://deno.land/std@0.100.0/path/mod.ts'
-import { esbuild } from '../bundler/esbuild.ts'
+import { esbuild, esmLoader } from '../bundler/esbuild.ts'
 import { toLocalPath, computeHash } from '../server/helper.ts'
 import { existsFile } from '../shared/fs.ts'
-import { Measure } from '../shared/log.ts'
+import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { Aleph, LoadInput, LoadOutput, Plugin, PostCSSPlugin } from '../types.d.ts'
 
@@ -18,7 +18,15 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
   const { css: cssConfig } = aleph.config
   const isRemote = util.isLikelyHttpURL(specifier)
 
-  if (isRemote && specifier.endsWith('.css') && !cssConfig.cache) {
+  // Don't process remote .css files if the cache is disabled
+  if (
+    (isRemote && specifier.endsWith('.css')) &&
+    (
+      cssConfig.cache === false ||
+      (cssConfig.cache instanceof RegExp && !cssConfig.cache.test(specifier)) ||
+      (Array.isArray(cssConfig.cache) && !cssConfig.cache.some(r => r.test(specifier)))
+    )
+  ) {
     return {
       code: [
         `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
@@ -30,7 +38,12 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
   }
 
   // Don't process .css files in ./public folder
-  if (!isRemote && specifier.endsWith('.css') && await existsFile(join(aleph.workingDir, 'public', specifier))) {
+  if (
+    !isRemote &&
+    specifier.endsWith('.css') &&
+    !(await existsFile(join(aleph.workingDir, specifier))) &&
+    await existsFile(join(aleph.workingDir, 'public', specifier))
+  ) {
     return {
       code: [
         `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
@@ -40,33 +53,6 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
       ].join('\n')
     }
   }
-
-  let plugins = cssConfig.postcss.plugins || []
-  let modulesJSON: Record<string, string> = {}
-  if (/\.module\.[a-z]+$/.test(specifier)) {
-    const options = {
-      ...(util.isPlainObject(cssConfig.modules) ? cssConfig.modules : {}),
-      getJSON: (_specifier: string, json: Record<string, string>) => {
-        modulesJSON = json
-      },
-    }
-    let hasModulesPlugin = false
-    plugins = plugins.map(plugin => {
-      if (isModulesPluginName(plugin)) {
-        hasModulesPlugin = true
-        return [plugin.trim().toLowerCase(), options]
-      }
-      if (Array.isArray(plugin) && isModulesPluginName(plugin[0])) {
-        hasModulesPlugin = true
-        return [plugin[0].trim().toLowerCase(), { ...options, ...plugin[1] }]
-      }
-      return plugin
-    })
-    if (!hasModulesPlugin) {
-      plugins.push([`postcss-modules@${postcssModulesVersion}`, options])
-    }
-  }
-  const postcss = await initPostCSS(plugins, aleph.mode === 'development')
 
   let sourceCode = ''
   let css = ''
@@ -80,27 +66,61 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
     sourceCode = (new TextDecoder).decode(content)
   }
 
-  // do not process remote css files
-  if (isRemote && specifier.endsWith('.css')) {
-    css = sourceCode
-  } else {
-    const ret = await postcss.process(sourceCode, { from: specifier }).async()
-    css = ret.css
+  let postPlugins = cssConfig.postcss.plugins || []
+  let modulesJSON: Record<string, string> = {}
+  if (/\.module\.[a-z]+$/.test(specifier)) {
+    const options = {
+      ...(util.isPlainObject(cssConfig.modules) ? cssConfig.modules : {}),
+      getJSON: (_specifier: string, json: Record<string, string>) => {
+        modulesJSON = json
+      },
+    }
+    let hasModulesPlugin = false
+    postPlugins = postPlugins.map(plugin => {
+      if (isModulesPluginName(plugin)) {
+        hasModulesPlugin = true
+        return [plugin.trim().toLowerCase(), options]
+      }
+      if (Array.isArray(plugin) && isModulesPluginName(plugin[0])) {
+        hasModulesPlugin = true
+        return [plugin[0].trim().toLowerCase(), { ...options, ...plugin[1] }]
+      }
+      return plugin
+    })
+    if (!hasModulesPlugin) {
+      postPlugins.push([`postcss-modules@${postcssModulesVersion}`, options])
+    }
   }
 
-  if (aleph.mode === 'production') {
+  // init postcss with plugins
+  const postcss = await initPostCSS(postPlugins, aleph.mode === 'development')
+
+  // postcss: don't process large(>64k) remote css files
+  if (isRemote && specifier.endsWith('.css') && !specifier.endsWith('.module.css') && sourceCode.length > 64 * 1024) {
+    css = sourceCode
+  } else if (postcss !== null) {
+    try {
+      const ret = await postcss.process(sourceCode, { from: specifier }).async()
+      css = ret.css
+    } catch (err) {
+      log.warn('postcss:', err.mesage)
+    }
+  }
+
+  try {
     const ret = await esbuild({
       stdin: {
         loader: 'css',
         sourcefile: specifier,
         contents: css
       },
-      bundle: false,
-      minify: true,
-      write: false
+      write: false,
+      bundle: true,
+      minify: aleph.mode === 'production',
+      plugins: [esmLoader],
     })
     css = util.trimSuffix(ret.outputFiles[0].text, '\n')
-  }
+  } catch (e) { }
 
   ms.stop(`process ${specifier}`)
 
@@ -108,8 +128,8 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
     return { type: 'css', code: css }
   }
 
-  const { extract } = cssConfig
-  if (extract && (extract === true || css.length > (extract.limit || 8 * 1024))) {
+  const { extract: { limit = 8 * 1024 } } = cssConfig
+  if (css.length > limit) {
     const ext = extname(specifier)
     const hash = computeHash(css).slice(0, 8)
     const path = util.trimSuffix(isRemote ? toLocalPath(specifier) : specifier, ext) + '.' + hash + ext
@@ -139,7 +159,7 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
 export const isCSS = (specifier: string): boolean => test.test(specifier)
 
 async function initPostCSS(plugins: PostCSSPlugin[], isDev: boolean) {
-  const pluginObjects = await Promise.all(plugins.filter(p => {
+  const postPlugins = await Promise.all(plugins.filter(p => {
     if (isDev) {
       if (util.isFilledString(p) && productionOnlyPostcssPlugins.includes(p)) {
         return false
@@ -162,18 +182,12 @@ async function initPostCSS(plugins: PostCSSPlugin[], isDev: boolean) {
     }
   }))
 
-  if (pluginObjects.length === 0) {
-    return {
-      process: (content: string) => ({
-        async: async () => {
-          return { css: content }
-        }
-      })
-    }
+  if (postPlugins.length === 0) {
+    return null
   }
 
   const { default: PostCSS } = await import(`https://esm.sh/postcss@${postcssVersion}`)
-  return PostCSS(pluginObjects)
+  return PostCSS(postPlugins)
 }
 
 async function importPostcssPluginByName(name: string) {

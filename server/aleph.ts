@@ -133,8 +133,10 @@ export class Aleph implements IAleph {
       })
       log.info('load env from', basename(p))
     }
+
     Deno.env.set('ALEPH_ENV', this.#mode)
     Deno.env.set('ALEPH_FRAMEWORK', this.#config.framework)
+    Deno.env.set('ALEPH_WORKING_DIR', this.#workingDir)
     Deno.env.set('ALEPH_VERSION', VERSION)
 
     const alephPkgUri = getAlephPkgUri()
@@ -335,45 +337,55 @@ export class Aleph implements IAleph {
             this.clearSSRCache(specifier)
           })
           this.clearSSRCache(specifier)
-          log.info('modify', specifier)
+          log.debug('modify', specifier)
         } catch (err) {
           log.error(`compile(${specifier}):`, err.message)
         }
       } else {
         let routePath: string | undefined = undefined
         let isIndex: boolean | undefined = undefined
-        let emit = false
+        let unrouted = false
         if (this.isPageModule(specifier)) {
-          let isNew = true
+          unrouted = true
           this.#pageRouting.lookup(routes => {
             routes.forEach(({ module }) => {
               if (module === specifier) {
-                isNew = false
+                unrouted = false
                 return false // break loop
               }
             })
           })
-          if (isNew) {
+          if (unrouted) {
             const [_routePath, _specifier, _isIndex] = this.createRouteUpdate(specifier)
             routePath = _routePath
             specifier = _specifier
             isIndex = _isIndex
-            emit = true
             this.#pageRouting.update(routePath, specifier, isIndex)
           }
         } else if (specifier.startsWith('/api/') && !specifier.startsWith('/api/_middlewares.')) {
-          this.#apiRouting.update(...this.createRouteUpdate(specifier))
+          unrouted = true
+          this.#pageRouting.lookup(routes => {
+            routes.forEach(({ module }) => {
+              if (module === specifier) {
+                unrouted = false
+                return false // break loop
+              }
+            })
+          })
+          if (unrouted) {
+            this.#apiRouting.update(...this.createRouteUpdate(specifier))
+          }
         }
         if (trimBuiltinModuleExts(specifier) === '/app') {
           await this.compile(specifier)
-          emit = true
+          unrouted = true
         }
-        if (emit) {
+        if (unrouted) {
           this.#fsWatchListeners.forEach(e => {
             e.emit('add', { specifier, routePath, isIndex })
           })
+          log.debug('add', specifier)
         }
-        log.info('add', specifier)
       }
     } else {
       if (this.#modules.has(specifier)) {
@@ -388,7 +400,7 @@ export class Aleph implements IAleph {
         this.#apiRouting.removeRouteByModule(specifier)
       }
       this.clearSSRCache(specifier)
-      log.info('remove', specifier)
+      log.debug('remove', specifier)
     }
   }
 
@@ -1089,6 +1101,7 @@ export class Aleph implements IAleph {
     const jsFile = join(dirname(localPath), `${name}.js`)
     const cacheFp = join(this.#buildDir, jsFile)
     const metaFp = cacheFp.slice(0, -3) + '.meta.json'
+    const isNew = !mod
 
     let defer = (err?: Error) => { }
     let source: ModuleSource | null = null
@@ -1101,8 +1114,11 @@ export class Aleph implements IAleph {
       ready: new Promise((resolve) => {
         defer = (err?: Error) => {
           if (err) {
-            this.#modules.delete(specifier)
+            if (isNew) {
+              this.#modules.delete(specifier)
+            }
             log.error(err.message)
+            // todo: send error to client
           }
           resolve()
         }

@@ -8,7 +8,7 @@ import { VERSION } from '../version.ts'
 import type { DependencyGraph } from '../server/analyzer.ts'
 import type { Aleph } from '../server/aleph.ts'
 import { clearBuildCache, computeHash, getAlephPkgUri } from '../server/helper.ts'
-import { esbuild, stopEsbuild, esbuildUrlLoader } from './esbuild.ts'
+import { esbuild, stopEsbuild, esmLoader } from './esbuild.ts'
 
 export const bundlerRuntimeCode = `
   window.__ALEPH__ = {
@@ -254,14 +254,15 @@ export class Bundler {
       outfile: bundleFile,
       platform: 'browser',
       format: 'iife',
-      target: [String(build.target)].concat(Object.keys(build.browsers).map(name => {
-        return `${name}${build.browsers[name as BrowserName]}`
-      })),
+      target: [
+        String(build.target),
+        ...Object.keys(build.browsers).map(name => `${name}${build.browsers[name as BrowserName]}`)
+      ],
       bundle: true,
       minify: true,
       treeShaking: true,
       sourcemap: false,
-      plugins: [esbuildUrlLoader],
+      plugins: [esmLoader],
     })
   }
 }

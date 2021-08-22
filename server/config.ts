@@ -29,7 +29,7 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     ssr: {},
     plugins: [],
     css: {
-      cache: false,
+      cache: true,
       modules: {},
       extract: {
         limit: 8 * 1024
@@ -120,10 +120,19 @@ export async function loadConfig(specifier: string): Promise<Config> {
     }
   }
   if (util.isPlainObject(css)) {
-    const { extract, cache, modules, postcss } = css
+    const { extract, cache: v, modules, postcss } = css
+    let cache: boolean | RegExp | RegExp[] = true
+    if (typeof v === 'boolean' || v instanceof RegExp) {
+      cache = v
+    } else if (Array.isArray(v)) {
+      cache = v.filter(test => test instanceof RegExp)
+      if (cache.length === 0) {
+        cache = false
+      }
+    }
     config.css = {
-      cache: Boolean(cache),
-      extract: util.isPlainObject(extract) ? { limit: typeof extract.limit === 'number' ? extract.limit : 8 * 1024 } : Boolean(extract),
+      cache,
+      extract: util.isPlainObject(extract) && typeof extract.limit === 'number' ? extract : { limit: 8 * 1024 },
       modules: util.isPlainObject(modules) ? modules : {},
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }

@@ -188,9 +188,9 @@ export type ImportMap = {
  */
 export type CSSOptions = {
   /** `cache` caches remote css to local if it is true. */
-  cache?: boolean
+  cache?: boolean | RegExp | RegExp[]
   /** `extract` specifies the extract options (default is true with 8k limit). */
-  extract?: boolean | { limit?: number }
+  extract?: { limit?: number }
   /** `postcss` specifies the postcss plugins. */
   postcss?: { plugins: PostCSSPlugin[] }
   /** `modules` specifies CSS modules behavior. */
