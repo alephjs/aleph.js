@@ -142,7 +142,6 @@ export async function loadConfig(specifier: string): Promise<Config> {
   }
   if (util.isPlainObject(env)) {
     config.env = toStringMap(env)
-    Object.entries(env).forEach(([key, value]) => Deno.env.set(key, value))
   }
 
   return config
