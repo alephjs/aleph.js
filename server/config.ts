@@ -132,7 +132,7 @@ export async function loadConfig(specifier: string): Promise<Config> {
     }
     config.css = {
       cache,
-      extract: util.isPlainObject(extract) && typeof extract.limit === 'number' ? extract : { limit: 8 * 1024 },
+      extract: util.isPlainObject(extract) && typeof extract.limit === 'number' ? extract as any : { limit: 8 * 1024 },
       modules: util.isPlainObject(modules) ? modules : {},
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }
