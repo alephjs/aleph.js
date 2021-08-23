@@ -1,8 +1,6 @@
-import { delay } from 'std/async/delay.ts'
 import { exists } from 'std/fs/exists.ts'
 import { join } from 'std/path/mod.ts'
 import { assert, assertEquals } from 'std/testing/asserts.ts'
-import { stopEsbuild } from '../bundler/esbuild.ts'
 import { Aleph } from '../server/aleph.ts'
 import { computeHash } from '../server/helper.ts'
 import { ensureTextFile } from '../shared/fs.ts'
@@ -30,30 +28,6 @@ Deno.test('plugin: css loader', async () => {
   assert(!isCSS('/style/index.sass'))
 })
 
-Deno.test({
-  name: 'plugin: css loader in production mode',
-  fn: async () => {
-    Deno.env.set('DENO_TESTING', 'true')
-    const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-    const aleph = new Aleph(dir, 'production')
-    await ensureTextFile(
-      join(dir, '/style/index.css'),
-      'h1 { font-size: 18px; }'
-    )
-    const { code } = await cssLoader({ specifier: '/style/index.css', }, aleph)
-    assertEquals(code, [
-      'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-      'export const css = "h1{font-size:18px}"',
-      'export default {}',
-      'applyCSS("/style/index.css", { css })',
-    ].join('\n'))
-
-    stopEsbuild()
-    await delay(150) // wait esbuild stop
-  },
-  sanitizeResources: false,
-})
-
 Deno.test('plugin: css loader with extract size option', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
@@ -78,6 +52,7 @@ Deno.test('plugin: css loader for remote external', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
   const aleph = new Aleph(dir, 'development')
+  aleph.config.css.cache = false
   const { code } = await cssLoader({ specifier: 'https://esm.sh/tailwindcss/dist/tailwind.min.css', }, aleph)
   assertEquals(code, [
     'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',

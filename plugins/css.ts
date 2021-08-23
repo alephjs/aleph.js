@@ -105,22 +105,26 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
     } catch (err) {
       log.warn('postcss:', err.message || err)
     }
+  } else {
+    css = sourceCode
   }
 
-  try {
-    const ret = await esbuild({
-      stdin: {
-        loader: 'css',
-        sourcefile: specifier,
-        contents: css
-      },
-      write: false,
-      bundle: true,
-      minify: aleph.mode === 'production',
-      plugins: [esmLoader],
-    })
-    css = util.trimSuffix(ret.outputFiles[0].text, '\n')
-  } catch (e) { }
+  if (!Deno.env.get('DENO_TESTING')) {
+    try {
+      const ret = await esbuild({
+        stdin: {
+          loader: 'css',
+          sourcefile: specifier,
+          contents: css
+        },
+        write: false,
+        bundle: true,
+        minify: aleph.mode === 'production',
+        plugins: [esmLoader],
+      })
+      css = util.trimSuffix(ret.outputFiles[0].text, '\n')
+    } catch (e) { }
+  }
 
   ms.stop(`process ${specifier}`)
 
