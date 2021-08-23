@@ -144,7 +144,7 @@ export async function transform(specifier: string, code: string, options: Transf
         tpl = await inlineStylePreprocess('#' + key, style.type, tpl)
       }
       tpl = tpl.replace(
-        /\: var\(--aleph-inline-style-expr-(\d+)\)/g,
+        /\:\s*var\(--aleph-inline-style-expr-(\d+)\)/g,
         (_, id) => ': ${' + style.exprs[parseInt(id)] + '}'
       ).replace(
         /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
