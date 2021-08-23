@@ -298,7 +298,7 @@ async function checkUpdateEsm(name: string, url: string) {
     log.warn(`Invalid URL ${url}, skipping...`)
     return
   }
-  const vlatest = await fetchEsmModVer(modname[0])
+  const vlatest = (await fetchEsmModVer(modname[0]))['dist-tags'].latest
   if (vlatest === vcurrent) {
     log.info(`${name} is already at the latest version ${vlatest}`)
     return
@@ -373,7 +373,13 @@ async function getDenoModUriFrag(mod: string, submod: string, desiredVer?: strin
 }
 
 async function getEsmModUriFrag(mod: string, desiredVer?: string, roll?: boolean) {
-  const selectedVer = await fetchEsmModVer(mod, desiredVer)
+  let selectedVer = desiredVer
+  const vinfo = await fetchEsmModVer(mod, desiredVer)
+  if (!desiredVer) {
+    selectedVer = vinfo['dist-tags'].latest
+  } else if (!(desiredVer in vinfo.versions)) {
+    throw new Error(`Specified Version ${desiredVer} does not exist for module ${mod}`)
+  }
   return `${mod}${roll ? '' : '@' + selectedVer}`
 }
 
@@ -382,6 +388,14 @@ async function getEsmModUriFrag(mod: string, desiredVer?: string, roll?: boolean
  *                             Async Helpers
  * ----------------------------------------------------------------------------
  */
+
+type NPMModMeta = {
+  name: string,
+  'dist-tags': {
+    latest: string
+  },
+  versions: Record<string, any>
+}
 
 /** Fetches module info from https://api.deno.land/modules/MODULE */
 async function fetchDenoModInfo(mod: string) {
@@ -415,16 +429,12 @@ async function fetchDenoModMeta(mod: string, ver: string): Promise<ModMeta> {
 
 /** Fetches module of a specific version from esm.sh, returns latest version if not specified, errors if fail */
 async function fetchEsmModVer(mod: string, ver?: string) {
-  const req = await fetch(`https://esm.sh/${mod}${ver ? '@' + ver : ''}`)
+  const req = await fetch(`https://registry.npmjs.org/${mod}`)
   if (!req.ok) {
-    throw new Error(`Could not fetch module or version ${mod}${ver ? '@' + ver : ''}`)
+    throw new Error(`Could not fetch versions for module ${mod}.`)
   }
-  const text = await req.text()
-  const detectedVer = text.match(/(?<=@)[^\s]+/)
-  if (!detectedVer) {
-    throw new Error(`Could not find version number for ${mod} on esm.sh`)
-  }
-  return detectedVer[0]
+  const json = await req.json()
+  return json as NPMModMeta
 }
 
 async function writeImportMap(path: string, obj: ImportMap) {
