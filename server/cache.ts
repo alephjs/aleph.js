@@ -1,6 +1,6 @@
-import { ensureDir } from 'https://deno.land/std@0.96.0/fs/ensure_dir.ts'
-import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
-import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
+import { createHash } from 'https://deno.land/std@0.100.0/hash/mod.ts'
+import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -42,7 +42,7 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
         log.info('Download', url)
       }
     } else {
-      log.debug('Download error:', err)
+      log.debug(err)
       log.warn(`Download ${url} failed, retrying...`)
     }
     try {

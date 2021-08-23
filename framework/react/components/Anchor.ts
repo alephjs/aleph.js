@@ -28,10 +28,12 @@ export default function Anchor(props: AnchorProps) {
     rel,
     href: propHref,
     ['aria-current']: propAriaCurrent,
-    ['data-active-className']: activeClassName,
+    ['data-active-className']: activeClassName = 'active',
     ['data-active-style']: activeStyle,
     className: propClassName,
     style: propStyle,
+    onClick: propOnClick,
+    onMouseEnter: propOnMouseEnter,
     children,
     ...rest
   } = props
@@ -41,7 +43,7 @@ export default function Anchor(props: AnchorProps) {
   const isNav = useMemo(() => relKeys.includes('nav'), [relKeys])
   const { pathname, params, query } = useRouter()
   const href = useMemo(() => {
-    if (!util.isNEString(propHref)) {
+    if (!util.isFilledString(propHref)) {
       return ''
     }
     if (util.isLikelyHttpURL(propHref)) {
@@ -56,12 +58,12 @@ export default function Anchor(props: AnchorProps) {
     return [p, q].filter(Boolean).join('?')
   }, [pathname, propHref])
   const isCurrent = useMemo(() => {
-    if (!util.isNEString(propHref)) {
+    if (!util.isFilledString(propHref)) {
       return false
     }
 
     const [p, q] = util.splitBy(propHref, '?')
-    if (p !== pathname) {
+    if (util.trimSuffix(p, '/') !== pathname) {
       return false
     }
 
@@ -77,7 +79,7 @@ export default function Anchor(props: AnchorProps) {
     if (!isNav || !isCurrent) {
       return propClassName
     }
-    return [propClassName, activeClassName].filter(util.isNEString).map(n => n.trim()).filter(Boolean).join(' ')
+    return [propClassName, activeClassName].filter(util.isFilledString).map(n => n.trim()).filter(Boolean).join(' ')
   }, [propClassName, activeClassName, isCurrent, isNav])
   const style = useMemo(() => {
     if (!isNav || !isCurrent) {
@@ -86,7 +88,7 @@ export default function Anchor(props: AnchorProps) {
     return Object.assign({}, propStyle, activeStyle)
   }, [propStyle, activeStyle, isCurrent, isNav])
   const ariaCurrent = useMemo(() => {
-    if (util.isNEString(propAriaCurrent)) {
+    if (util.isFilledString(propAriaCurrent)) {
       return propAriaCurrent
     }
     if (href.startsWith('/')) {
@@ -101,8 +103,8 @@ export default function Anchor(props: AnchorProps) {
     }
   }, [isCurrent])
   const onMouseEnter = useCallback((e: MouseEvent) => {
-    if (util.isFunction(props.onMouseEnter)) {
-      props.onMouseEnter(e)
+    if (util.isFunction(propOnMouseEnter)) {
+      propOnMouseEnter(e)
     }
     if (e.defaultPrevented) {
       return
@@ -110,8 +112,8 @@ export default function Anchor(props: AnchorProps) {
     prefetch()
   }, [prefetch])
   const onClick = useCallback((e: MouseEvent) => {
-    if (util.isFunction(props.onMouseEnter)) {
-      props.onMouseEnter(e)
+    if (util.isFunction(propOnClick)) {
+      propOnClick(e)
     }
     if (e.defaultPrevented || isModifiedEvent(e)) {
       return

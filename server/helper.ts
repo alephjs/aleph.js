@@ -1,12 +1,11 @@
-import { dim, red, yellow } from 'https://deno.land/std@0.96.0/fmt/colors.ts'
-import { createHash } from 'https://deno.land/std@0.96.0/hash/mod.ts'
-import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { dim, red, yellow } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
+import { createHash } from 'https://deno.land/std@0.100.0/hash/mod.ts'
+import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { minDenoVersion } from '../shared/constants.ts'
-import { existsDir } from '../shared/fs.ts'
+import { existsFile, existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { SourceType } from '../compiler/mod.ts'
-import type { ServerPlugin, LoaderPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
 
@@ -31,15 +30,6 @@ Object.assign((globalThis as any).navigator, {
 let _denoDir: string | null = null
 let _localProxy = false
 
-export const moduleWalkOptions = {
-  includeDirs: false,
-  skip: [
-    /(^|\/|\\)\./,
-    /\.d\.ts$/i,
-    /(\.|_)(test|spec|e2e)\.[a-z]+$/i
-  ]
-}
-
 export function checkDenoVersion() {
   const [currentMajor, currentMinor, currentPatch] = Deno.version.deno.split('.').map(p => parseInt(p))
   const [major, minor, patch] = minDenoVersion.split('.').map(p => parseInt(p))
@@ -60,6 +50,12 @@ export function checkAlephDev() {
   }
 }
 
+export const moduleExclude = [
+  /(^|\/|\\)\./,
+  /\.d\.ts$/i,
+  /(\.|_)(test|spec|e2e)\.[a-z]+$/i
+]
+
 const reLocalUrl = /^https?:\/\/(localhost|0\.0\.0\.0|127\.0\.0\.1)(\:|\/|$)/
 
 /** check whether it is a localhost url. */
@@ -67,9 +63,14 @@ export function isLocalUrl(url: string): boolean {
   return reLocalUrl.test(url)
 }
 
-/** check the plugin whether it is a loader. */
-export function isLoaderPlugin(plugin: LoaderPlugin | ServerPlugin): plugin is LoaderPlugin {
-  return plugin.type === 'loader'
+export async function findFile(wd: string, filenames: string[]) {
+  for (const filename of filenames) {
+    const fullPath = join(wd, filename)
+    if (await existsFile(fullPath)) {
+      return fullPath
+    }
+  }
+  return null
 }
 
 /** get the deno cache dir. */
@@ -104,7 +105,7 @@ export function getAlephPkgUri() {
 
 /** get the relative path from `from` to `to`. */
 export function toRelativePath(from: string, to: string): string {
-  const r = relative(from, to).split('\\').join('/')
+  const r = relative(from, to).replaceAll('\\', '/')
   if (!r.startsWith('.') && !r.startsWith('/')) {
     return './' + r
   }
@@ -113,7 +114,7 @@ export function toRelativePath(from: string, to: string): string {
 
 /** get source type by given url and content type. */
 export function getSourceType(url: string, contentType?: string): SourceType {
-  if (util.isNEString(contentType)) {
+  if (util.isFilledString(contentType)) {
     switch (contentType.split(';')[0].trim()) {
       case 'application/javascript':
       case 'text/javascript':

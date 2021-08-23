@@ -1,23 +1,18 @@
-import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
-import { serve } from 'https://deno.land/std@0.96.0/http/server.ts'
+import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import log from '../shared/log.ts'
-import { Request } from './api.ts'
 import { getContentType } from './mime.ts'
 
 /** proxy https://deno.land/x/aleph on localhost */
 export async function localProxy(cwd: string, port: number) {
-  const s = serve({ port })
-
-  // ALEPH_DEV_PORT env tells the server we are in dev mode
-  // for Aleph.js development
-  if (Deno.env.get('ALEPH_DEV_PORT') !== port.toString()) {
-    Deno.env.set('ALEPH_DEV_PORT', port.toString())
+  const s = Deno.listen({ port })
+  const serve = async (conn: Deno.Conn) => {
+    const httpConn = Deno.serveHttp(conn)
+    for await (const { request, respondWith } of httpConn) {
+      await handle(request, respondWith)
+    }
   }
-
-  log.debug(`Proxy https://deno.land/x/aleph on http://localhost:${port}`)
-  for await (const r of s) {
-    const url = new URL('http://localhost' + r.url)
-    const resp = new Request(r, {}, url.searchParams)
+  const handle = async (request: Request, respondWith: (r: Response | Promise<Response>) => Promise<void>) => {
+    const url = new URL(request.url)
     const filepath = join(cwd, url.pathname)
     try {
       const info = await Deno.lstat(filepath)
@@ -29,19 +24,38 @@ export async function localProxy(cwd: string, port: number) {
             items.push(`<li><a href='${join(url.pathname, encodeURI(item.name))}'>${item.name}${item.isDirectory ? '/' : ''}<a></li>`)
           }
         }
-        resp.send(
-          `<!DOCTYPE html><title>aleph.js/</title><h1>&nbsp;aleph.js/</h1><ul>${Array.from(items).join('')}</ul>`,
-          'text/html; charset=utf-8'
-        )
+        respondWith(new Response(
+          `<!DOCTYPE html><title>aleph.js${url.pathname}</title><h2>&nbsp;aleph.js${url.pathname}</h2><ul>${Array.from(items).join('')}</ul>`,
+          {
+            headers: new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
+          }
+        ))
         return
       }
-      resp.send(await Deno.readFile(filepath), getContentType(filepath))
+      respondWith(new Response(
+        await Deno.readFile(filepath),
+        {
+          headers: new Headers({ 'Content-Type': getContentType(filepath) })
+        }
+      ))
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) {
-        resp.status(404).send('file not found')
+        respondWith(new Response('file not found', { status: 400 }))
         return
       }
-      resp.status(500).send(err.message)
+      respondWith(new Response(err.message, { status: 500 }))
     }
+  }
+
+  // ALEPH_DEV_PORT env tells the server we are in dev mode
+  // for Aleph.js development
+  if (Deno.env.get('ALEPH_DEV_PORT') !== port.toString()) {
+    Deno.env.set('ALEPH_DEV_PORT', port.toString())
+  }
+
+  log.debug(`Proxy https://deno.land/x/aleph on http://localhost:${port}`)
+
+  for await (const conn of s) {
+    serve(conn)
   }
 }

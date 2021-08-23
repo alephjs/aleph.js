@@ -1,18 +1,13 @@
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.d.ts'
 import { redirect } from './redirect.ts'
 
-const ghostRoute: Route = { path: '', module: { url: '' } }
+const ghostRoute: Route = { path: '', module: '' }
 
 export type Route = {
   path: string
-  module: RouteModule
+  module: string
   children?: Route[]
-}
-
-export type RouteModule = {
-  readonly url: string
-  readonly withData?: boolean
 }
 
 export type RoutingOptions = {
@@ -28,15 +23,15 @@ export class Routing {
   private _defaultLocale: string
   private _locales: string[]
   private _routes: Route[]
-  private _rewrites: Record<string, string>
+  private _rewrites?: Record<string, string>
 
   constructor({
     basePath = '/',
     defaultLocale = 'en',
     locales = [],
     routes = [],
-    rewrites = {}
-  }: RoutingOptions) {
+    rewrites
+  }: RoutingOptions = {}) {
     this._basePath = basePath
     this._defaultLocale = defaultLocale
     this._locales = locales
@@ -59,19 +54,10 @@ export class Routing {
     return JSON.parse(JSON.stringify(this._routes))
   }
 
-  config(options: RoutingOptions) {
-    Object.keys(options).forEach((key) => {
-      if ('_' + key in this) {
-        Object.assign(this, { ['_' + key]: options[key as keyof typeof options] })
-      }
-    })
-  }
-
-  update(path: string, moduleUrl: string, options: { isIndex?: boolean, withData?: boolean } = {}) {
-    const { isIndex, ...rest } = options
+  update(path: string, moduleUrl: string, isIndex?: boolean) {
     const newRoute: Route = {
-      path: path === '/' ? path : util.trimSuffix(path, '/') + (options.isIndex ? '/' : ''),
-      module: { url: moduleUrl, ...rest }
+      path: path === '/' ? path : util.trimSuffix(path, '/') + (isIndex ? '/' : ''),
+      module: moduleUrl
     }
     const dirtyRoutes: Set<Route[]> = new Set()
     let exists = false
@@ -80,8 +66,8 @@ export class Routing {
       const path = routePath.map(r => r.path).join('')
       const route = routePath[routePath.length - 1]
       const parentRoute = routePath[routePath.length - 2]
-      if (route.module.url === newRoute.module.url) {
-        Object.assign(route.module, newRoute.module)
+      if (route.module === newRoute.module) {
+        route.module = newRoute.module
         exists = true
         return false
       }
@@ -111,10 +97,10 @@ export class Routing {
     targetRoutes.push(newRoute)
   }
 
-  removeRoute(url: string) {
+  removeRouteByModule(specifier: string) {
     this._lookup(path => {
       const route = path[path.length - 1]
-      if (route.module.url === url) {
+      if (route.module === specifier) {
         const parentRoute = path[path.length - 2]
         const routes = parentRoute ? parentRoute.children! : this._routes
         const index = routes.indexOf(route)
@@ -126,15 +112,30 @@ export class Routing {
     })
   }
 
-  createRouter(location?: { pathname: string, search?: string }): [RouterURL, RouteModule[]] {
+  createRouter(location?: { pathname: string, search?: string }): [RouterURL, string[]] {
+    let [url, nestedModules] = this._createRouter(location)
+    if (url.routePath === '' && location === undefined) {
+      const [{ routePath }, nested] = this._createRouter({ pathname: '/404' })
+      console.log(routePath)
+      Object.assign(url, { routePath })
+      nestedModules = nested
+    }
+    return [url, nestedModules]
+  }
+
+  private _createRouter(location?: { pathname: string, search?: string }): [RouterURL, string[]] {
     const loc = location || (window as any).location || { pathname: '/' }
-    const url = rewriteURL(loc.pathname + (loc.search || ''), this._basePath, this._rewrites)
+    const url = resolveURL(
+      'http://localhost' + loc.pathname + (loc.search || ''),
+      this._basePath,
+      this._rewrites
+    )
 
     let locale = this._defaultLocale
     let pathname = decodeURI(url.pathname)
     let routePath = ''
     let params = {} as Record<string, string>
-    let nestedModules: RouteModule[] = []
+    let nestedModules: string[] = []
 
     if (pathname !== '/' && this._locales.length > 0) {
       const a = pathname.split('/')
@@ -144,6 +145,7 @@ export class Routing {
         pathname = '/' + a.slice(2).join('/')
       }
     }
+    pathname = pathname !== '/' ? util.trimSuffix(pathname, '/') : '/'
 
     this._lookup(route => {
       const path = route.map(r => r.path).join('')
@@ -167,6 +169,8 @@ export class Routing {
       {
         basePath: this._basePath,
         locale,
+        defaultLocale: this._defaultLocale,
+        locales: this._locales,
         pathname,
         routePath,
         params,
@@ -245,6 +249,8 @@ export function createBlankRouterURL(basePath = '/', locale = 'en'): RouterURL {
   return {
     basePath,
     locale,
+    defaultLocale: locale,
+    locales: [],
     routePath: '',
     pathname: '/',
     params: {},
@@ -254,9 +260,9 @@ export function createBlankRouterURL(basePath = '/', locale = 'en'): RouterURL {
   }
 }
 
-/** `rewriteURL` returns a rewrited URL */
-export function rewriteURL(reqUrl: string, basePath: string, rewrites: Record<string, string>): URL {
-  const url = new URL('http://localhost' + reqUrl)
+/** `resolveURL` returns a rewrote URL */
+export function resolveURL(reqUrl: string, basePath: string, rewrites?: Record<string, string>): URL {
+  const url = new URL(reqUrl)
   if (basePath !== '/') {
     url.pathname = util.trimPrefix(decodeURI(url.pathname), basePath)
   }

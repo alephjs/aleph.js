@@ -16,7 +16,7 @@ events.once('routerstate', state => {
 export async function redirect(url: string, replace?: boolean) {
   const { location, history } = window as any
 
-  if (!util.isNEString(url)) {
+  if (!util.isFilledString(url)) {
     return
   }
 

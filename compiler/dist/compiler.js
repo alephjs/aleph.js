@@ -1,4 +1,4 @@
-import { red } from "https://deno.land/std@0.96.0/fmt/colors.ts";
+import { red } from "https://deno.land/std@0.100.0/fmt/colors.ts";
 let wasm;
 
 let cachedTextDecoder = new TextDecoder("utf-8", {
@@ -120,14 +120,14 @@ function takeObject(idx) {
   return ret;
 }
 /**
-* @param {string} url
+* @param {string} specifier
 * @param {string} code
 * @param {any} options
 * @returns {any}
 */
-export function parseExportNamesSync(url, code, options) {
+export function parseExportNamesSync(specifier, code, options) {
   var ptr0 = passStringToWasm0(
-    url,
+    specifier,
     wasm.__wbindgen_malloc,
     wasm.__wbindgen_realloc,
   );
@@ -149,14 +149,43 @@ export function parseExportNamesSync(url, code, options) {
 }
 
 /**
-* @param {string} url
+* @param {string} specifier
 * @param {string} code
 * @param {any} options
 * @returns {any}
 */
-export function transformSync(url, code, options) {
+export function stripSsrCodeSync(specifier, code, options) {
   var ptr0 = passStringToWasm0(
-    url,
+    specifier,
+    wasm.__wbindgen_malloc,
+    wasm.__wbindgen_realloc,
+  );
+  var len0 = WASM_VECTOR_LEN;
+  var ptr1 = passStringToWasm0(
+    code,
+    wasm.__wbindgen_malloc,
+    wasm.__wbindgen_realloc,
+  );
+  var len1 = WASM_VECTOR_LEN;
+  var ret = wasm.stripSsrCodeSync(
+    ptr0,
+    len0,
+    ptr1,
+    len1,
+    addHeapObject(options),
+  );
+  return takeObject(ret);
+}
+
+/**
+* @param {string} specifier
+* @param {string} code
+* @param {any} options
+* @returns {any}
+*/
+export function transformSync(specifier, code, options) {
+  var ptr0 = passStringToWasm0(
+    specifier,
     wasm.__wbindgen_malloc,
     wasm.__wbindgen_realloc,
   );

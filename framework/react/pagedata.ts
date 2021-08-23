@@ -1,45 +1,77 @@
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.ts'
+import type { RouterURL } from '../../types.d.ts'
 
 const global = window as any
+const lazySsrRoutes: Map<string, boolean> = new Map()
 
-export async function loadPageData(url: RouterURL) {
+let staticSsrRoutes: Set<string> | null = null
+export function setStaticSsrRoutes(routes: string[]) {
+  staticSsrRoutes = new Set(routes)
+}
+
+export function shouldLoadPageData(url: RouterURL): boolean {
   const href = url.toString()
-  const pagedataUrl = 'pagedata://' + href
+  const pagedataUrl = `pagedata://${href}`
   if (pagedataUrl in global) {
     const { expires, keys } = global[pagedataUrl]
     if (expires === 0 || Date.now() < expires) {
-      return
+      return false
     }
     delete global[pagedataUrl]
     keys.forEach((key: string) => {
       delete global[`${pagedataUrl}#${key}`]
     })
   }
+  if (staticSsrRoutes) {
+    return staticSsrRoutes.has(url.routePath)
+  }
+  if (lazySsrRoutes.has(url.routePath)) {
+    return lazySsrRoutes.get(url.routePath)!
+  }
+  return true
+}
+
+export async function loadPageData(url: RouterURL): Promise<void> {
+  const href = url.toString()
   const basePath = util.trimSuffix(url.basePath, '/')
   const dataUrl = `${basePath}/_aleph/data/${util.btoaUrl(href)}.json`
-  const data = await (await fetch(dataUrl)).json()
-  if (util.isPlainObject(data)) {
-    storeData(data, href)
+  try {
+    const resp = await fetch(dataUrl)
+    if (resp.status === 200) {
+      const data = await resp.json()
+      if (util.isPlainObject(data)) {
+        storeData(href, data)
+        if (!staticSsrRoutes) {
+          lazySsrRoutes.set(url.routePath, true)
+        }
+      }
+    } else if (resp.status === 404) {
+      if (!staticSsrRoutes) {
+        lazySsrRoutes.set(url.routePath, false)
+      }
+    }
+  } catch (err) {
+    console.error('loadPageData:', err)
   }
 }
 
-export async function loadPageDataFromTag(url: RouterURL) {
+export function loadSSRDataFromTag(url: RouterURL) {
   const href = url.toString()
   const ssrDataEl = global.document.getElementById('ssr-data')
   if (ssrDataEl) {
     try {
       const ssrData = JSON.parse(ssrDataEl.innerText)
       if (util.isPlainObject(ssrData)) {
-        storeData(ssrData, href)
+        storeData(href, ssrData)
         return
       }
-    } catch (e) { }
+    } catch (e) {
+      console.warn('ssr-data: invalid JSON')
+    }
   }
-  await loadPageData(url)
 }
 
-function storeData(data: any, href: string) {
+function storeData(href: string, data: any) {
   let expires = 0
   for (const key in data) {
     const { expires: _expires } = data[key]
