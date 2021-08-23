@@ -28,26 +28,6 @@ Deno.test('plugin: css loader', async () => {
   assert(!isCSS('/style/index.sass'))
 })
 
-Deno.test('plugin: css loader with extract size option', async () => {
-  Deno.env.set('DENO_TESTING', 'true')
-  const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const aleph = new Aleph(dir, 'development')
-  aleph.config.css.extract = { limit: 10 }
-  await ensureTextFile(
-    join(dir, '/style/index.css'),
-    'h1 { font-size: 18px; }'
-  )
-  const { code } = await cssLoader({ specifier: '/style/index.css', }, aleph)
-  const distPath = `/style/index.${computeHash('h1 { font-size: 18px; }').slice(0, 8)}.css`
-  assertEquals(code, [
-    'import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"',
-    `export const href = "/_aleph${distPath}"`,
-    'export default {}',
-    'applyCSS("/style/index.css", { href })',
-  ].join('\n'))
-  assert(await exists(join(aleph.buildDir, distPath)))
-})
-
 Deno.test('plugin: css loader for remote external', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })

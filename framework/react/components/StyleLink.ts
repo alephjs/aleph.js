@@ -5,8 +5,11 @@ import { inDeno } from '../helper.ts'
 const useIsomorphicLayoutEffect = inDeno ? useEffect : useLayoutEffect
 
 export default function StyleLink({ href }: { href: string }) {
-  useIsomorphicLayoutEffect(() => {
+  if (!inDeno) {
     recoverCSS(href)
+  }
+
+  useIsomorphicLayoutEffect(() => {
     return () => removeCSS(href, true)
   }, [])
 

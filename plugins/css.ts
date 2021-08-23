@@ -133,23 +133,6 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
     return { type: 'css', code: css }
   }
 
-  const { extract: { limit = 8 * 1024 } } = cssConfig
-  if (css.length > limit) {
-    const ext = extname(specifier)
-    const hash = computeHash(css).slice(0, 8)
-    const path = util.trimSuffix(isRemote ? toLocalPath(specifier) : specifier, ext) + '.' + hash + ext
-    await aleph.addDist(path, (new TextEncoder).encode(css))
-    return {
-      code: [
-        `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
-        `export const href = ${JSON.stringify('/_aleph/' + util.trimPrefix(path, '/'))}`,
-        `export default ${JSON.stringify(modulesJSON)}`,
-        `applyCSS(${JSON.stringify(specifier)}, { href })`
-      ].join('\n'),
-      // todo: generate map
-    }
-  }
-
   return {
     code: [
       `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,

@@ -1304,7 +1304,7 @@ export class Aleph implements IAleph {
           }
           depModule = mod
         }
-        if (!ignoreDeps && depModule) {
+        if (depModule) {
           const hash = depModule.hash || depModule.sourceHash
           if (hashLoc !== undefined) {
             if (await this.replaceDepHash(module, hashLoc, hash)) {
