@@ -44,7 +44,7 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     },
     react: {
       version: defaultReactVersion,
-      esmShBuildVersion: 43,
+      esmShBuildVersion: 45,
     }
   }
 }
