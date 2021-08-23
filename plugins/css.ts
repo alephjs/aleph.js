@@ -103,6 +103,7 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
       const ret = await postcss.process(sourceCode, { from: specifier }).async()
       css = ret.css
     } catch (err) {
+      css = sourceCode
       log.warn('postcss:', err.message || err)
     }
   } else {
