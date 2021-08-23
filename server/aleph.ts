@@ -784,8 +784,17 @@ export class Aleph implements IAleph {
     const code = (new TextDecoder).decode(content)
     const names = await parseExportNames(specifier, code, { sourceType })
     return (await Promise.all(names.map(async name => {
-      if (name.startsWith('{') && name.startsWith('}')) {
-        return await this.parseModuleExportNames(name.slice(1, -1))
+      if (name.startsWith('{') && name.endsWith('}')) {
+        let dep = name.slice(1, -1)
+        if (util.isLikelyHttpURL(specifier)) {
+          const url = new URL(specifier)
+          if (dep.startsWith('/')) {
+            dep = url.protocol + '//' + url.host + dep
+          } else {
+            dep = url.protocol + '//' + url.host + join(url.pathname, dep)
+          }
+        }
+        return await this.parseModuleExportNames(dep)
       }
       return name
     }))).flat()
