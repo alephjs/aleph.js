@@ -1006,7 +1006,6 @@ export class Aleph implements IAleph {
     let sourceType: SourceType = SourceType.Unknown
     let sourceMap: string | null = null
     let loader = this.#loadListeners.find(l => l.test.test(specifier))
-    let isStyle = isCSS(specifier)
 
     if (loader) {
       const { code, type = 'js', map } = await loader.load({ specifier, data })

@@ -55,7 +55,7 @@ export function dynamic<T extends ComponentType<any>>(
 
     useEffect(() => {
       factory().then(({ default: component }) => {
-        if (isLikelyReactComponent(component, false)) {
+        if (isLikelyReactComponent(component)) {
           setMod({ component })
         } else {
           setErr(new Error('Missing the react component exported as default'))
