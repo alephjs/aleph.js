@@ -122,6 +122,7 @@ export class Server {
           return
         }
 
+        // serve modules
         if (relPath.endsWith('.js')) {
           let module = aleph.findModule(({ jsFile }) => jsFile === relPath)
           if (!module && aleph.isDev) {
@@ -151,6 +152,7 @@ export class Server {
           }
         }
 
+        // serve other build files
         const filePath = join(aleph.buildDir, relPath)
         if (await existsFile(filePath)) {
           const info = Deno.lstatSync(filePath)

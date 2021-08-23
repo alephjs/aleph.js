@@ -1,13 +1,14 @@
 import { dirname, join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
-import { transform } from '../compiler/mod.ts'
+import { SourceType, transform } from '../compiler/mod.ts'
 import { trimBuiltinModuleExts } from '../framework/core/module.ts'
-import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
-import type { BrowserName, Module } from '../types.d.ts'
-import { VERSION } from '../version.ts'
+import { cssLoader } from '../plugins/css.ts'
 import type { DependencyGraph } from '../server/analyzer.ts'
 import type { Aleph } from '../server/aleph.ts'
 import { clearBuildCache, computeHash, getAlephPkgUri } from '../server/helper.ts'
+import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
+import type { BrowserName, Module } from '../types.d.ts'
+import { VERSION } from '../version.ts'
 import { esbuild, stopEsbuild, esmLoader } from './esbuild.ts'
 
 export const bundlerRuntimeCode = `
@@ -134,10 +135,20 @@ export class Bundler {
       return jsFile
     }
 
-    const source = await this.#aleph.resolveModuleSource(mod.specifier)
+    let source = await this.#aleph.resolveModuleSource(mod.specifier)
     if (source === null) {
       this.#compiled.delete(mod.specifier)
       throw new Error(`Unsupported module '${mod.specifier}'`)
+    }
+
+    if (source.type === SourceType.CSS) {
+      const { code, map } = await cssLoader({ specifier: mod.specifier, data: source.code }, this.#aleph)
+      source = {
+        type: SourceType.JS,
+        code,
+        map
+      }
+      mod.isStyle = true
     }
 
     try {

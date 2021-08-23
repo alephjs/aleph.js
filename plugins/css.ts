@@ -206,7 +206,6 @@ export default (): Plugin => {
     name: 'css-loader',
     setup: aleph => {
       aleph.onResolve(test, () => ({ acceptHMR: true }))
-      aleph.onLoad(test, input => cssLoader(input, aleph))
     }
   }
 }

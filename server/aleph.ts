@@ -1,4 +1,3 @@
-import { delay } from 'https://deno.land/std@0.100.0/async/delay.ts'
 import { dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
 import { indexOf, copy, equals } from 'https://deno.land/std@0.100.0/bytes/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
@@ -31,7 +30,6 @@ import { createHtml, Renderer } from './renderer.ts'
 type ModuleSource = {
   code: string
   type: SourceType
-  isStyle: boolean
   map?: string
 }
 
@@ -523,21 +521,13 @@ export class Aleph implements IAleph {
   /** add a module by given path and optional source code. */
   async addModule(specifier: string, sourceCode: string): Promise<Module> {
     let sourceType = getSourceType(specifier)
-    let isStyle = false
     if (sourceType === SourceType.Unknown) {
       throw new Error("addModule: unknown souce type")
-    }
-    if (sourceType === SourceType.CSS) {
-      const ret = await cssLoader({ specifier, data: (new TextEncoder).encode(sourceCode) }, this)
-      sourceCode = ret.code
-      sourceType = SourceType.JS
-      isStyle = true
     }
     const module = await this.compile(specifier, {
       source: {
         code: sourceCode,
         type: sourceType,
-        isStyle,
       }
     })
     if (specifier.startsWith('pages/') || specifier.startsWith('api/')) {
@@ -1047,20 +1037,9 @@ export class Aleph implements IAleph {
       }
     }
 
-    if (sourceType === SourceType.CSS) {
-      isStyle = true
-      // todo: covert source map
-      const { code, type = 'js' } = await cssLoader({ specifier, data: sourceCode }, this)
-      if (type === 'js') {
-        sourceCode = code
-        sourceType = SourceType.JS
-      }
-    }
-
     return {
       code: sourceCode,
       type: sourceType,
-      isStyle,
       map: sourceMap ? sourceMap : undefined
     }
   }
@@ -1074,7 +1053,11 @@ export class Aleph implements IAleph {
     return module
   }
 
-  private async initModule(specifier: string, { source: customSource, forceRefresh, httpExternal }: CompileOptions = {}): Promise<[Module, ModuleSource | null]> {
+  /** init the module by given specifier, don't transpile the code when the returned `source` is equal to null */
+  private async initModule(
+    specifier: string,
+    { source: customSource, forceRefresh, httpExternal }: CompileOptions = {}
+  ): Promise<[Module, ModuleSource | null]> {
     let external = false
     let data: any = null
 
@@ -1161,11 +1144,7 @@ export class Aleph implements IAleph {
       } catch (e) { }
     }
 
-    const shouldLoad = !(
-      (isRemote && !this.#reloading && mod.sourceHash !== '') &&
-      await existsFile(cacheFp)
-    )
-    if (shouldLoad) {
+    if (!isRemote || this.#reloading || mod.sourceHash === '' || !await existsFile(cacheFp)) {
       try {
         const src = customSource || await this.resolveModuleSource(specifier, data)
         const sourceHash = computeHash(src.code)
@@ -1173,7 +1152,6 @@ export class Aleph implements IAleph {
           mod.sourceHash = sourceHash
           source = src
         }
-        mod.isStyle = src.isStyle
       } catch (err) {
         defer(err)
         return [mod, null]
@@ -1203,6 +1181,14 @@ export class Aleph implements IAleph {
       if (source.type === SourceType.Unknown) {
         log.error(`Unsupported module '${specifier}'`)
         return
+      }
+
+      if (source.type === SourceType.CSS) {
+        const { code, map } = await cssLoader({ specifier, data: source.code }, this)
+        source.code = code
+        source.map = map
+        source.type = SourceType.JS
+        module.isStyle = true
       }
 
       const ms = new Measure()
@@ -1318,7 +1304,7 @@ export class Aleph implements IAleph {
           }
           depModule = mod
         }
-        if (depModule) {
+        if (!ignoreDeps && depModule) {
           const hash = depModule.hash || depModule.sourceHash
           if (hashLoc !== undefined) {
             if (await this.replaceDepHash(module, hashLoc, hash)) {
