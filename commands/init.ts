@@ -3,7 +3,7 @@ import { green, blue, dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
 import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
-import { ensureTextFile } from '../shared/fs.ts'
+import { ensureTextFile, existsDir } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
@@ -28,8 +28,10 @@ export default async function (nameArg?: string) {
     return
   }
 
-  if (!isFolderEmpty(cwd, name)) {
-    Deno.exit(1)
+  if (!await isFolderEmpty(cwd, name)) {
+    if (!await confirm('Continue?')) {
+      Deno.exit(1)
+    }
   }
 
   const template = 'hello-world' // todo: add template select ui
@@ -129,7 +131,7 @@ async function confirm(question: string = 'are you sure?') {
   return a.charAt(0).toLowerCase() === 'y'
 }
 
-function isFolderEmpty(root: string, name: string): boolean {
+async function isFolderEmpty(root: string, name: string): Promise<boolean> {
   const validFiles = [
     '.DS_Store',
     '.git',
@@ -149,13 +151,15 @@ function isFolderEmpty(root: string, name: string): boolean {
 
   const conflicts = []
 
-  for (const { name: file, isDirectory } of Deno.readDirSync(root)) {
-    // Support IntelliJ IDEA-based editors
-    if (validFiles.includes(file) || /\.iml$/.test(file)) {
-      if (isDirectory) {
-        conflicts.push(blue(file) + '/')
-      } else {
-        conflicts.push(file)
+  if (await existsDir(join(root, name))) {
+    for await (const { name: file, isDirectory } of Deno.readDir(join(root, name))) {
+      // Support IntelliJ IDEA-based editors
+      if (validFiles.includes(file) || /\.iml$/.test(file)) {
+        if (isDirectory) {
+          conflicts.push(blue(file) + '/')
+        } else {
+          conflicts.push(file)
+        }
       }
     }
   }
@@ -166,8 +170,7 @@ function isFolderEmpty(root: string, name: string): boolean {
         `The directory ${green(name)} contains files that could conflict:`,
         '',
         ...conflicts,
-        '',
-        'Either try using a new directory name, or remove the files listed above.'
+        ''
       ].join('\n')
     )
     return false
