@@ -1,20 +1,18 @@
-import type { Context } from 'https://deno.land/x/oak@v7.3.0/context.ts'
-import type { Middleware } from 'https://deno.land/x/oak@v7.3.0/middleware.ts'
-import { NativeRequest } from 'https://deno.land/x/oak@v7.3.0/http_server_native.ts'
-import { Application } from './app.ts'
+import type { Aleph } from './aleph.ts'
 import { Server } from './server.ts'
 
-/** Create an oak middleware for Aleph server. */
-export function alephOak(app: Application): Middleware {
-  const server = new Server(app)
+/** `oakify` creates an **oak** middleware with Aleph server. */
+export function oakify(aleph: Aleph) {
+  const server = new Server(aleph)
 
-  return (ctx: Context) => {
+  return (ctx: any) => {
     const { originalRequest } = ctx.request
-    if (originalRequest instanceof NativeRequest) {
-      ctx.throw(500, 'Aleph.js doesn\'t support NativeRequest yet')
-    } else {
-      server.handle(originalRequest)
+    if ('respond' in originalRequest) {
+      const { request, respond } = originalRequest
+      server.handle({ request, respondWith: respond })
       ctx.respond = false
+    } else {
+      ctx.throw(500, 'Aleph.js doesn\'t support std `ServerRequest` yet')
     }
   }
 }

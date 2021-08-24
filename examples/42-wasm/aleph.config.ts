@@ -1,6 +1,6 @@
-import wasm from './wasm_loader.ts'
-import type { Config } from '../../types.ts'
+import type { Config } from 'aleph/types'
+import wasmLoader from './wasm_loader.ts'
 
-export default (): Config => ({
-  plugins: [wasm()]
-})
+export default <Config>{
+  plugins: [wasmLoader]
+}

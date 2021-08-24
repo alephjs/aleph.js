@@ -1,4 +1,4 @@
-import { Application } from '../server/app.ts'
+import { Aleph } from '../server/aleph.ts'
 
 export const helpMessage = `
 Usage:
@@ -14,7 +14,7 @@ Options:
 `
 
 export default async function (workingDir: string, options: Record<string, any>) {
-  const app = new Application(workingDir, 'production', Boolean(options.r || options.reload))
-  await app.build()
+  const aleph = new Aleph(workingDir, 'production', Boolean(options.r || options.reload))
+  await aleph.build()
   Deno.exit(0)
 }

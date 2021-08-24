@@ -1,5 +1,5 @@
-import { Application } from '../server/app.ts'
-import { serve } from '../server/stdserver.ts'
+import { Aleph } from '../server/aleph.ts'
+import { serve } from '../server/mod.ts'
 import { getFlag, parsePortNumber } from '../shared/flags.ts'
 import log from '../shared/log.ts'
 
@@ -7,7 +7,7 @@ export const helpMessage = `
 Usage:
     aleph start <dir> [...options]
 
-<dir> represents the directory of the aleph.js app,
+<dir> represents the directory of Aleph.js app,
 if the <dir> is empty, the current directory will be used.
 
 Options:
@@ -21,7 +21,7 @@ Options:
 `
 
 export default async function (workingDir: string, flags: Record<string, any>) {
-  const app = new Application(workingDir, 'production', Boolean(flags.r || flags.reload))
+  const aleph = new Aleph(workingDir, 'production', Boolean(flags.r || flags.reload))
   const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
   const hostname = getFlag(flags, ['hostname'])
   const certFile = getFlag(flags, ['tls-cert'])
@@ -31,5 +31,5 @@ export default async function (workingDir: string, flags: Record<string, any>) {
   } else if (certFile !== undefined && keyFile === undefined) {
     log.fatal('missing `--tls-key` option')
   }
-  await serve({ app, port, hostname, certFile, keyFile })
+  await serve({ aleph, port, hostname, certFile, keyFile })
 }
