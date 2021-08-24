@@ -1,7 +1,7 @@
 import { basename, dirname } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Module, RouterURL, SSRData, SSROutput } from '../types.d.ts'
+import type { HtmlDescriptor, Module, RouterURL, SSRData } from '../types.d.ts'
 import type { Aleph } from './aleph.ts'
 
 /** The render result of framework SSR. */
@@ -26,7 +26,7 @@ export type FrameworkRenderer = {
 export class Renderer {
   #aleph: Aleph
   #renderer: FrameworkRenderer
-  #cache: Map<string, Map<string, SSROutput>>
+  #cache: Map<string, Map<string, { html: string, data: Record<string, SSRData> | null }>>
 
   constructor(app: Aleph) {
     this.#aleph = app
@@ -81,7 +81,7 @@ export class Renderer {
   }
 
   /** render page base the given location. */
-  async renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
+  async renderPage(url: RouterURL, nestedModules: string[]): Promise<[HtmlDescriptor, Record<string, SSRData> | null]> {
     const start = performance.now()
     const isDev = this.#aleph.isDev
     const state = { entryFile: '' }
@@ -129,9 +129,9 @@ export class Renderer {
     }
 
     return [
-      createHtml({
+      {
         lang: url.locale,
-        head: head,
+        headElements: head,
         scripts: [
           data ? {
             id: 'ssr-data',
@@ -148,7 +148,7 @@ export class Renderer {
         ],
         body: `<div id="__aleph">${body}</div>`,
         minify: !isDev
-      }),
+      },
       data
     ]
   }
@@ -173,22 +173,15 @@ export class Renderer {
   }
 }
 
-/** create html content by given arguments */
-export function createHtml({
+/** build html content by given descriptor */
+export function buildHtml({
   body,
   lang = 'en',
-  head = [],
-  className,
+  headElements: head = [],
+  bodyClassName: className,
   scripts = [],
   minify = false
-}: {
-  body: string,
-  lang?: string,
-  head?: string[],
-  className?: string,
-  scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, async?: boolean, preload?: boolean, nomodule?: boolean })[],
-  minify?: boolean
-}) {
+}: HtmlDescriptor) {
   const eol = minify ? '' : '\n'
   const indent = minify ? '' : ' '.repeat(2)
   const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {

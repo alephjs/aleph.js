@@ -143,6 +143,8 @@ export function getSourceType(url: string, contentType?: string): SourceType {
     case '.tsx':
       return SourceType.TSX
     case '.css':
+    case '.pcss':
+    case '.postcss':
       return SourceType.CSS
   }
   return SourceType.Unknown

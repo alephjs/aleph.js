@@ -10,11 +10,11 @@ import { wasmChecksum, parseExportNames, SourceType, transform, stripSsrCode } f
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
-import cssPlugin, { cssLoader, isCSS } from '../plugins/css.ts'
+import cssPlugin, { cssLoader } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, RouterURL, ResolveResult, TransformOutput, TransformInput, SSRData, SSRInput, SSROutput } from '../types.d.ts'
+import type { Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, HtmlDescriptor, RouterURL, ResolveResult, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
@@ -25,7 +25,7 @@ import {
   getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath
 } from './helper.ts'
 import { getContentType } from './mime.ts'
-import { createHtml, Renderer } from './renderer.ts'
+import { buildHtml, Renderer } from './renderer.ts'
 
 type ModuleSource = {
   code: string
@@ -52,10 +52,10 @@ type LoadListener = {
 
 type TransformListener = {
   test: RegExp | 'hmr' | 'main',
-  transform(input: TransformInput): TransformOutput | void | Promise<TransformOutput> | Promise<void>,
+  transform(input: TransformOutput & { module: Module }): TransformOutput | void | Promise<TransformOutput> | Promise<void>,
 }
 
-type SsrListener = (input: SSRInput) => SSROutput
+type RenderListener = (input: RenderOutput & { path: string }) => void | Promise<void>
 
 /** The class for Aleph server runtime. */
 export class Aleph implements IAleph {
@@ -76,7 +76,7 @@ export class Aleph implements IAleph {
   #resolverListeners: Array<ResolveListener> = []
   #loadListeners: Array<LoadListener> = []
   #transformListeners: Array<TransformListener> = []
-  #ssrListeners: Array<SsrListener> = []
+  #renderListeners: Array<RenderListener> = []
   #dists: Set<string> = new Set()
   #reloading = false
 
@@ -510,12 +510,12 @@ export class Aleph implements IAleph {
     this.#loadListeners.push({ test, load: callback })
   }
 
-  onTransform(test: RegExp | 'hmr' | 'main', callback: (input: TransformInput) => TransformOutput | Promise<TransformOutput>): void {
+  onTransform(test: RegExp | 'hmr' | 'main', callback: (input: TransformOutput & { module: Module }) => TransformOutput | Promise<TransformOutput>): void {
     this.#transformListeners.push({ test, transform: callback })
   }
 
-  onSSR(callback: (input: SSRInput) => SSROutput): void {
-    this.#ssrListeners.push(callback)
+  onRender(callback: (input: RenderOutput & { path: string }) => void | Promise<void>): void {
+    this.#renderListeners.push(callback)
   }
 
   /** add a module by given path and optional source code. */
@@ -613,8 +613,8 @@ export class Aleph implements IAleph {
     const path = loc.pathname + (loc.search || '')
 
     if (!this.isSSRable(loc.pathname)) {
-      const [html] = await this.#renderer.cache('-', 'spa-index', async () => {
-        return [this.createSPAIndexHtml(), null]
+      const [html] = await this.#renderer.cache('-', 'spa-index-html', async () => {
+        return [await this.createSPAIndexHtml(), null]
       })
       return [200, html]
     }
@@ -635,16 +635,10 @@ export class Aleph implements IAleph {
 
   async #renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
     let [html, data] = await this.#renderer.renderPage(url, nestedModules)
-    for (const callback of this.#ssrListeners) {
-      const ret = callback({ path: url.toString(), html, data })
-      if (util.isFilledString(ret.html)) {
-        html = ret.html
-      }
-      if (util.isPlainObject(ret.data)) {
-        data = ret.data
-      }
+    for (const callback of this.#renderListeners) {
+      callback({ path: url.toString(), html, data })
     }
-    return [html, data]
+    return [buildHtml(html), data]
   }
 
   /** create a fs watcher.  */
@@ -701,6 +695,7 @@ export class Aleph implements IAleph {
             deps: [],
             sourceHash: '',
             jsFile: '',
+            ready: Promise.resolve()
           },
           code,
         })
@@ -713,15 +708,18 @@ export class Aleph implements IAleph {
   }
 
   /** create the index html for SPA mode. */
-  private createSPAIndexHtml(): string {
-    // todo: render custom fallback page
-    return createHtml({
+  private async createSPAIndexHtml(): Promise<string> {
+    let html = {
       lang: this.#config.i18n.defaultLocale,
-      head: [],
+      headElements: [],
       scripts: this.getScripts(),
       body: '<div id="__aleph"></div>',
       minify: !this.isDev
-    })
+    }
+    for (const callback of this.#renderListeners) {
+      await callback({ path: 'spa-index-html', html, data: null })
+    }
+    return buildHtml(html)
   }
 
   /** get scripts for html output */
@@ -956,8 +954,7 @@ export class Aleph implements IAleph {
     }
     for (const { test, transform } of this.#transformListeners) {
       if (test === 'hmr') {
-        const { jsBuffer, ready, ...rest } = module
-        const ret = await transform({ module: rest, code })
+        const ret = await transform({ module: { ...module }, code })
         if (util.isFilledString(ret?.code)) {
           code = ret!.code
         }
@@ -1252,8 +1249,7 @@ export class Aleph implements IAleph {
 
       for (const { test, transform } of this.#transformListeners) {
         if (test instanceof RegExp && test.test(specifier)) {
-          const { jsBuffer, ready, ...rest } = module
-          const ret = await transform({ module: rest, code: jsCode, map: sourceMap })
+          const ret = await transform({ module: { ...module }, code: jsCode, map: sourceMap })
           if (util.isFilledString(ret?.code)) {
             jsCode = ret!.code
           }
@@ -1419,7 +1415,7 @@ export class Aleph implements IAleph {
     const outputDir = join(this.#workingDir, this.#config.build.outputDir)
 
     if (ssr === false) {
-      const html = this.createSPAIndexHtml()
+      const html = await this.createSPAIndexHtml()
       await ensureTextFile(join(outputDir, 'index.html'), html)
       await ensureTextFile(join(outputDir, '404.html'), html)
       // todo: 500 page

@@ -10,12 +10,12 @@ export interface Aleph {
   fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
-  onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformInput) => TransformOutput | void | Promise<TransformOutput> | Promise<void>): void
-  onSSR(callback: (input: SSRInput) => SSROutput): void
+  onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformOutput & { module: Module }) => TransformOutput | void | Promise<TransformOutput> | Promise<void>): void
+  onRender(callback: (input: RenderOutput) => Promise<void> | void): void
 }
 
 /**
- * The configuration for aleph app.
+ * The configuration for aleph application.
  */
 export type Config = {
   /** `framework` specifies the framework (default is 'react'). */
@@ -36,6 +36,7 @@ export type Config = {
   server?: ServerOptions
 }
 
+/* The Requred configuration for aleph application. */
 export type RequiredConfig = Required<Config> & {
   i18n: Required<I18nOptions>
   build: Required<BuildOptions>
@@ -85,15 +86,6 @@ export type LoadOutput = {
 }
 
 /**
- * The input to the `onTransform` hook.
- */
-export type TransformInput = {
-  module: Omit<Module, 'jsBuffer' | 'ready'>
-  code: string
-  map?: string
-}
-
-/**
  * The output of the `onTransform` hook.
  */
 export type TransformOutput = {
@@ -119,25 +111,33 @@ export type Module = {
   ready: Promise<void>
 }
 
+/** The Dependency Descriptor. */
 type DependencyDescriptor = {
   readonly specifier: string
   isDynamic?: boolean
   hashLoc?: number
 }
 
+/** The HTML Descriptor. */
+type HtmlDescriptor = {
+  lang?: string,
+  headElements?: string[],
+  body?: string,
+  bodyClassName?: string,
+  scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, async?: boolean, preload?: boolean, nomodule?: boolean })[],
+  minify?: boolean
+}
+
+/** SSR data with expires. */
 export type SSRData = {
   value: any
   expires: number
 }
 
-export type SSRInput = {
+/** render output includes html and data. */
+export type RenderOutput = {
   path: string
-  html: string
-  data: Record<string, SSRData> | null
-}
-
-export type SSROutput = {
-  html: string
+  html: HtmlDescriptor
   data: Record<string, SSRData> | null
 }
 
