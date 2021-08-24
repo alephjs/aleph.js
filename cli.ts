@@ -24,7 +24,10 @@ Usage:
     aleph <command> [...options]
 
 Commands:
-    ${Object.entries(commands).map(([name, desc]) => `${name.padEnd(15)}${desc}`).join('\n    ')}
+    ${
+  Object.entries(commands).map(([name, desc]) => `${name.padEnd(15)}${desc}`)
+  .join('\n    ')
+}
 
 Options:
     -v, --version  Prints version number
@@ -47,7 +50,7 @@ async function main() {
       `aleph.js ${VERSION}`,
       `deno ${deno}`,
       `v8 ${v8}`,
-      `typescript ${typescript}`
+      `typescript ${typescript}`,
     ].join('\n'))
     Deno.exit(0)
   }
@@ -75,7 +78,7 @@ async function main() {
 
   // execute `init` command
   if (command === 'init') {
-    await cmd(args[0])
+    await cmd(options?.template, args[0])
     return
   }
 
