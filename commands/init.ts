@@ -1,4 +1,6 @@
 import { Untar } from 'https://deno.land/std@0.100.0/archive/tar.ts'
+import { Buffer } from 'https://deno.land/std@0.100.0/io/buffer.ts'
+import { readAll } from 'https://deno.land/std@0.100.0/io/util.ts'
 import { green, blue, dim, red, cyan } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
 import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
@@ -16,15 +18,14 @@ Usage:
 <name> represents the name of new app.
 
 Options:
-    -h, --help                        Prints help message
     -t, --template <path-to-template> Specify a template for the created project
+    -h, --help                        Prints help message
 `
 
 export default async function (
   template: string = 'hello-world',
   nameArg?: string,
 ) {
-
   const cwd = Deno.cwd()
   const rev = 'master'
 
@@ -42,27 +43,28 @@ export default async function (
     Deno.exit(1)
   }
 
+  // check dir is clean
   if (!await isFolderEmpty(cwd, name)) {
     if (!await confirm('Continue?')) {
       Deno.exit(1)
     }
   }
 
-  const vscode = await confirm('Add recommended workspace settings of VS Code?')
+  // ask to create vscode files
+  const vscode = await confirm('Using VS Code?')
 
+  // download template
   console.log('Downloading template. This might take a moment...')
-
   const resp = await fetch(
     'https://codeload.github.com/alephjs/alephjs-templates/tar.gz/' + rev,
   )
-  const gzData = await Deno.readAll(new Deno.Buffer(await resp.arrayBuffer()))
+  const gzData = await readAll(new Buffer(await resp.arrayBuffer()))
 
-  console.log('Saving template...')
+  console.log('Apply template...')
   const tarData = gunzip(gzData)
-  const entryList = new Untar(new Deno.Buffer(tarData))
+  const entryList = new Untar(new Buffer(tarData))
 
   for await (const entry of entryList) {
-
     if (entry.fileName.startsWith(`alephjs-templates-${rev}/${template}/`)) {
       const fp = join(
         cwd,
@@ -108,13 +110,6 @@ export default async function (
     ),
   ])
 
-  const urls = Object.values(importMap.imports).filter((v) => !v.endsWith('/'))
-  const p = Deno.run({
-    cmd: [Deno.execPath(), 'cache', ...urls, deno_x_brotli, deno_x_flate]
-  })
-  await p.status()
-  p.close()
-
   if (vscode) {
     const extensions = {
       'recommendations': [
@@ -139,31 +134,29 @@ export default async function (
     ])
   }
 
+  // cache deps in import maps
+  console.log('Cache deps...')
+  const urls = Object.values(importMap.imports).filter((v) => !v.endsWith('/'))
+  const p = Deno.run({
+    cmd: [Deno.execPath(), 'cache', ...urls, deno_x_brotli, deno_x_flate],
+    stderr: 'null',
+    stdout: 'null',
+  })
+  await p.status()
+  p.close()
+
   console.log('Done')
-  console.log(dim('---'))
-  console.log(green('Aleph.js is ready to go!'))
-  console.log(`${dim('$')} cd ${name}`)
-  console.log(
-    `${dim('$')} aleph dev     ${dim('# start the app in `development` mode')}`,
+  console.log(`
+${green('Aleph.js is ready to go!')}
+${dim('▲')} cd ${name}
+${dim('▲')} aleph dev    ${dim('# start the app in `development` mode')}
+${dim('▲')} aleph start  ${dim('# start the app in `production` mode')}
+${dim('▲')} aleph build  ${dim('# build the app to a static site (SSG)')}
+
+Docs: ${cyan('https://alephjs.org/docs')}
+Bugs: ${cyan('https://alephjs.org.com/alephjs/aleph.js/issues')}`
   )
-  console.log(
-    `${dim('$')} aleph start   ${dim('# start the app in `production` mode')}`,
-  )
-  console.log(
-    `${dim('$')} aleph build   ${dim('# build the app to a static site (SSG)')
-    }`,
-  )
-  console.log(dim('---'))
-  console.log()
-  console.log(
-    `    If you have any problems, do not hesitate to file an issue:`
-  )
-  console.log(
-    `      ${cyan(
-      'https://github.com/alephjs/aleph.js/issues/new'
-    )}`
-  )
-  console.log()
+
   Deno.exit(0)
 }
 
@@ -181,12 +174,7 @@ async function ask(
 
 async function confirm(question: string = 'are you sure?') {
   let a: string
-  while (
-    !/^(y(es)?|no?)$/i.test(
-      a = (await ask(question + ' ' + dim('[y/n]'))).trim(),
-    )
-  ) {
-  }
+  while (!/^(y(es)?|no?)$/i.test(a = (await ask(question + ' ' + dim('[y/n]'))).trim())) { }
   return a.charAt(0).toLowerCase() === 'y'
 }
 
@@ -205,6 +193,13 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
     'LICENSE',
     'Thumbs.db',
     'docs',
+    'public',
+    'api',
+    'pages',
+    'src',
+    'app.tsx',
+    'aleph.config.ts',
+    'import_map.json',
     'mkdocs.yml',
   ]
 
@@ -228,7 +223,8 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
       [
         `The directory ${green(name)} contains files that could conflict:`,
         '',
-        ...conflicts,
+        ...conflicts.filter(name => name.endsWith('/')).sort().map(name => dim('- ') + name),
+        ...conflicts.filter(name => !name.endsWith('/')).sort().map(name => dim('- ') + name),
         ''
       ].join('\n')
     )
