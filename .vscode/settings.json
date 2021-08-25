@@ -27,5 +27,8 @@
   },
   "deno.enable": true,
   "deno.unstable": true,
-  "deno.importMap": "./import_map.json"
+  "deno.importMap": "./import_map.json",
+  "deno.suggest.imports.hosts": {
+    "https://deno.land": true
+  }
 }
