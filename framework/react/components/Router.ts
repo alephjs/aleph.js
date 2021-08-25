@@ -5,7 +5,7 @@ import { importModule, trimBuiltinModuleExts } from '../../core/module.ts'
 import { Routing } from '../../core/routing.ts'
 import { RouterContext } from '../context.ts'
 import { isLikelyReactComponent } from '../helper.ts'
-import { shouldLoadPageData, loadPageData } from '../pagedata.ts'
+import { shouldLoadData, loadPageData } from '../pagedata.ts'
 import type { PageProps } from '../pageprops.ts'
 import { createPageProps } from '../pageprops.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './ErrorBoundary.ts'
@@ -14,9 +14,18 @@ type PageRoute = PageProps & {
   url: RouterURL
 }
 
-export async function createPageRoute(url: RouterURL, nestedModules: string[], refresh = false): Promise<PageRoute> {
-  const imports = nestedModules.map(async specifier => {
+export async function importPageModules(url: RouterURL, nestedModules: string[], refresh = false): Promise<{ specifier: string, Component: any }[]> {
+  return await Promise.all(nestedModules.map(async specifier => {
     const { default: Component } = await importModule(url.basePath, specifier, refresh)
+    return {
+      specifier,
+      Component
+    }
+  }))
+}
+
+export function createPageRoute(url: RouterURL, nestedModules: { specifier: string, Component: any }[]): PageRoute {
+  const nest = nestedModules.map(({ specifier, Component }) => {
     const data = (window as any)[`pagedata://${url.toString()}#props-${btoa(specifier)}`] || {}
     return {
       specifier,
@@ -24,7 +33,7 @@ export async function createPageRoute(url: RouterURL, nestedModules: string[], r
       props: { ...data.value }
     }
   })
-  return { ...createPageProps(await Promise.all(imports)), url }
+  return { ...createPageProps(nest), url }
 }
 
 export default function Router({
@@ -53,10 +62,11 @@ export default function Router({
   const onpopstate = useCallback(async (e: any) => {
     const [url, nestedModules] = routing.createRouter()
     if (url.routePath !== '') {
-      if (shouldLoadPageData(url)) {
+      const components = await importPageModules(url, nestedModules, e.forceRefetch)
+      if (await shouldLoadData(url)) {
         await loadPageData(url)
       }
-      setRoute(await createPageRoute(url, nestedModules, e.forceRefetch))
+      setRoute(createPageRoute(url, components))
       if (e.resetScroll) {
         (window as any).scrollTo(0, 0)
       }

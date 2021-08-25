@@ -595,6 +595,7 @@ export class Aleph implements IAleph {
         }
       }
     }
+
     if (!shouldRender) {
       return null
     }
@@ -675,6 +676,7 @@ export class Aleph implements IAleph {
 
     let code: string
     if (bundleMode) {
+      // todo: inject static data routes
       code = [
         `__ALEPH__.basePath = ${JSON.stringify(basePath)};`,
         `__ALEPH__.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default(${JSON.stringify(config)});`

@@ -2,14 +2,15 @@ import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.d.ts'
 
 const global = window as any
-const lazySsrRoutes: Map<string, boolean> = new Map()
+const lazyDataRoutes: Map<string, boolean> = new Map()
 
-let staticSsrRoutes: Set<string> | null = null
-export function setStaticSsrRoutes(routes: string[]) {
-  staticSsrRoutes = new Set(routes)
+let staticDataRoutes: Set<string> | null = null
+
+export function setStaticDataRoutes(routes: string[]) {
+  staticDataRoutes = new Set(routes)
 }
 
-export function shouldLoadPageData(url: RouterURL): boolean {
+export async function shouldLoadData(url: RouterURL): Promise<boolean> {
   const href = url.toString()
   const pagedataUrl = `pagedata://${href}`
   if (pagedataUrl in global) {
@@ -22,12 +23,13 @@ export function shouldLoadPageData(url: RouterURL): boolean {
       delete global[`${pagedataUrl}#${key}`]
     })
   }
-  if (staticSsrRoutes) {
-    return staticSsrRoutes.has(url.routePath)
+  if (staticDataRoutes) {
+    return staticDataRoutes.has(url.routePath)
   }
-  if (lazySsrRoutes.has(url.routePath)) {
-    return lazySsrRoutes.get(url.routePath)!
+  if (lazyDataRoutes.has(url.routePath)) {
+    return lazyDataRoutes.get(url.routePath)!
   }
+  // load data anyway
   return true
 }
 
@@ -39,15 +41,15 @@ export async function loadPageData(url: RouterURL): Promise<void> {
     const resp = await fetch(dataUrl)
     if (resp.status === 200) {
       const data = await resp.json()
-      if (util.isPlainObject(data)) {
-        storeData(href, data)
-        if (!staticSsrRoutes) {
-          lazySsrRoutes.set(url.routePath, true)
+      if (data === null) {
+        if (!staticDataRoutes) {
+          lazyDataRoutes.set(url.routePath, false)
         }
-      }
-    } else if (resp.status === 404) {
-      if (!staticSsrRoutes) {
-        lazySsrRoutes.set(url.routePath, false)
+      } else if (util.isPlainObject(data)) {
+        storeData(href, data)
+        if (!staticDataRoutes) {
+          lazyDataRoutes.set(url.routePath, true)
+        }
       }
     }
   } catch (err) {

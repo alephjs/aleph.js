@@ -104,10 +104,10 @@ export class Server {
       // serve dist files
       if (pathname.startsWith('/_aleph/')) {
         if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('.json')) {
-          const path = util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json'))
-          const data = await aleph.getSSRData({ pathname: path })
+          const [path, search] = util.splitBy(util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json')), '?')
+          const data = await aleph.getSSRData({ pathname: path, search: search ? '?' + search : undefined })
           if (data === null) {
-            resp.json(null).writeTo(e, 404)
+            resp.json(null).writeTo(e)
           } else {
             resp.json(data).writeTo(e)
           }
