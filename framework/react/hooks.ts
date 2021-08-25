@@ -39,11 +39,10 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), options?: { k
   return useMemo(() => {
     const global = window as any
     const href = router.toString()
-    const pagedataUrl = `pagedata://${href}`
-    const dataUrl = `${pagedataUrl}#${id}`
+    const dataUrl = `pagedata://${href}`
 
     if (inDeno) {
-      const renderingData = global[`rendering-${pagedataUrl}`]
+      const renderingData = global[`rendering-${dataUrl}`]
 
       if (renderingData && id in renderingData) {
         return renderingData[id]  // 2+ pass
@@ -51,18 +50,20 @@ export function useDeno<T = any>(callback: () => (T | Promise<T>), options?: { k
 
       const value = callback()
       const expires = typeof revalidate === 'number' && !isNaN(revalidate) ? Date.now() + revalidate * 1000 : 0
-      events.emit(`useDeno-${pagedataUrl}`, { id, value, expires })
+      events.emit(`useDeno-${dataUrl}`, { id, value, expires })
 
       // thow an `AsyncUseDenoError` to break current rendering
       if (value instanceof Promise) {
         throw new AsyncUseDenoError()
       }
 
-      renderingData[id] = value
+      if (renderingData) {
+        renderingData[id] = value
+      }
       return value
     }
 
-    const data = global[dataUrl]
+    const data = global[`${dataUrl}#${id}`]
     return data?.value
   }, [id, router])
 }

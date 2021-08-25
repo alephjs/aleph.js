@@ -22,7 +22,7 @@ export async function render(
   nestedPageComponents: { specifier: string, Component?: any, props?: Record<string, any> }[],
   styles: Record<string, { css?: string, href?: string }>
 ): Promise<FrameworkRenderResult> {
-  const global = globalThis as any
+  const global = window as any
   const ret: FrameworkRenderResult = {
     head: [],
     body: '',
@@ -35,12 +35,13 @@ export async function render(
     scripts: new Map(),
   }
   const dataUrl = 'pagedata://' + url.toString()
+  const dataKey = 'rendering-' + dataUrl
   const asyncCalls: Array<[string, number, Promise<any>]> = []
   const data: Record<string, any> = {}
   const renderingData: Record<string, any> = {}
   const pageProps = createPageProps(nestedPageComponents)
-  const defer = () => {
-    delete global['rendering-' + dataUrl]
+  const defer = async () => {
+    Reflect.deleteProperty(global, dataKey)
     events.removeAllListeners('useDeno-' + dataUrl)
   }
 
@@ -58,7 +59,7 @@ export async function render(
   })
 
   // share rendering data
-  global['rendering-' + dataUrl] = renderingData
+  global[dataKey] = renderingData
 
   // listen `useDeno-*` events to get hooks callback result.
   events.on('useDeno-' + dataUrl, ({ id, value, expires }: { id: string, value: any, expires: number }) => {
