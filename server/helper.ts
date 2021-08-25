@@ -184,8 +184,8 @@ export function toLocalPath(url: string): string {
 }
 
 /** compute hash of the content */
-export function computeHash(content: string | Uint8Array): string {
-  return createHash('sha1').update(content).toString()
+export function computeHash(content: string | Uint8Array, algorithm: 'md5' | 'sha1' = 'sha1'): string {
+  return createHash(algorithm).update(content).toString()
 }
 
 /**

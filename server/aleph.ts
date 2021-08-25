@@ -326,9 +326,9 @@ export class Aleph implements IAleph {
               e.emit('modify-' + module.specifier, { refreshPage: refreshPage || undefined })
             })
           }
-          this.applyCompilationSideEffect(module, ({ specifier, hash }) => {
+          this.applyCompilationSideEffect(module, (m) => {
             if (!hmrable && this.isHMRable(specifier)) {
-              log.debug(`compilation side-effect: ${specifier}(${hash?.substr(0, 6)}) ${dim('<-')} ${module.specifier}(${module.hash?.substr(0, 6)})`)
+              log.debug(`compilation side-effect: ${specifier} ${dim('<-')} ${module.specifier}(${module.sourceHash.substr(0, 6)})`)
               this.#fsWatchListeners.forEach(e => {
                 e.emit('modify-' + specifier, { refreshPage: refreshPage || undefined })
               })
@@ -569,34 +569,7 @@ export class Aleph implements IAleph {
         .map(specifier => this.compile(specifier))
     )
 
-    let shouldRender = false
-    const pageModule = this.getModule(nestedModules[nestedModules.length - 1])
-    if (pageModule && pageModule.ssrPropsFn) {
-      shouldRender = true
-    }
-    if (!shouldRender) {
-      for (const specifier of ['app', ...nestedModules]) {
-        const mod = this.getModule(specifier)
-        if (mod) {
-          if (mod.denoHooks?.length) {
-            shouldRender = true
-          } else {
-            this.lookupDeps(mod.specifier, dep => {
-              const depMod = this.getModule(dep.specifier)
-              if (depMod?.denoHooks?.length) {
-                shouldRender = true
-                return false
-              }
-            })
-          }
-          if (shouldRender) {
-            break
-          }
-        }
-      }
-    }
-
-    if (!shouldRender) {
+    if (!this.#isDataRoute(nestedModules)) {
       return null
     }
 
@@ -605,6 +578,34 @@ export class Aleph implements IAleph {
       return await this.#renderPage(router, nestedModules)
     })
     return data
+  }
+
+  /* check whether the route has data by givan nested modules */
+  #isDataRoute(nestedModules: string[]) {
+    const pageModule = this.getModule(nestedModules[nestedModules.length - 1])
+    if (pageModule && pageModule.ssrPropsFn) {
+      return true
+    }
+    for (const specifier of ['app', ...nestedModules]) {
+      const mod = this.getModule(specifier)
+      if (mod) {
+        if (mod.denoHooks?.length) {
+          return true
+        }
+        let ok = false
+        this.lookupDeps(mod.specifier, dep => {
+          const depMod = this.getModule(dep.specifier)
+          if (depMod?.denoHooks?.length) {
+            ok = true
+            return false // break loop
+          }
+        })
+        if (ok) {
+          return
+        }
+      }
+    }
+    return false
   }
 
   /** render page to HTML by the given location */
@@ -676,7 +677,10 @@ export class Aleph implements IAleph {
 
     let code: string
     if (bundleMode) {
-      // todo: inject static data routes
+      config.dataRoutes = this.#pageRouting.paths.filter(pathname => {
+        const [_, nestedModules] = this.#pageRouting.createRouter({ pathname })
+        return this.#isDataRoute(nestedModules)
+      })
       code = [
         `__ALEPH__.basePath = ${JSON.stringify(basePath)};`,
         `__ALEPH__.pack["${alephPkgUri}/framework/${framework}/bootstrap.ts"].default(${JSON.stringify(config)});`
@@ -762,6 +766,17 @@ export class Aleph implements IAleph {
         src: `${basePath}/_aleph/${filename}`
       }))
     ]
+  }
+
+  gteModuleHash(module: Module) {
+    const hasher = createHash('md5').update(module.sourceHash)
+    this.lookupDeps(module.specifier, dep => {
+      const depMod = this.getModule(dep.specifier)
+      if (depMod) {
+        hasher.update(depMod.sourceHash)
+      }
+    })
+    return hasher.toString()
   }
 
   /** parse the export names of the module. */
@@ -915,12 +930,13 @@ export class Aleph implements IAleph {
     return [routePath, specifier, isIndex]
   }
 
-  async importModule<T = any>({ specifier, jsFile, hash, sourceHash }: Module): Promise<T> {
-    const path = join(this.#buildDir, jsFile)
+  async importModule<T = any>(module: Module): Promise<T> {
+    const path = join(this.#buildDir, module.jsFile)
+    const hash = this.gteModuleHash(module)
     if (existsFile(path)) {
-      return await import(`file://${path}#${(hash || sourceHash).slice(0, 6)}`)
+      return await import(`file://${path}#${(hash).slice(0, 6)}`)
     }
-    throw new Error(`import ${specifier}: file not found: ${path}`)
+    throw new Error(`import ${module.specifier}: file not found: ${path}`)
   }
 
   async getModuleJS(module: Module, injectHMRCode = false): Promise<Uint8Array | null> {
@@ -1289,7 +1305,6 @@ export class Aleph implements IAleph {
 
     if (module.deps.length > 0) {
       let fsync = false
-      const hasher = createHash('md5').update(module.sourceHash)
       await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
         let depModule: Module | null
         if (ignoreDeps) {
@@ -1302,23 +1317,19 @@ export class Aleph implements IAleph {
           depModule = mod
         }
         if (depModule) {
-          const hash = depModule.hash || depModule.sourceHash
           if (hashLoc !== undefined) {
+            const hash = this.gteModuleHash(depModule)
             if (await this.replaceDepHash(module, hashLoc, hash)) {
               fsync = true
             }
           }
-          hasher.update(hash)
         } else {
           log.error(`transpile '${module.specifier}': missing dependency module '${specifier}'`)
         }
       }))
-      module.hash = hasher.toString()
       if (fsync) {
         await this.cacheModule(module)
       }
-    } else {
-      module.hash = module.sourceHash
     }
   }
 
@@ -1329,7 +1340,7 @@ export class Aleph implements IAleph {
     }
     __tracing.add(by.specifier)
 
-    const hash = by.hash || by.sourceHash
+    let hash: string | null = null
     for (const mod of this.#modules.values()) {
       const { deps } = mod
       if (deps.length > 0) {
@@ -1337,20 +1348,15 @@ export class Aleph implements IAleph {
         for (const dep of deps) {
           const { specifier, hashLoc } = dep
           if (specifier === by.specifier && hashLoc !== undefined) {
+            if (hash == null) {
+              hash = this.gteModuleHash(by)
+            }
             if (await this.replaceDepHash(mod, hashLoc, hash)) {
               fsync = true
             }
           }
         }
         if (fsync) {
-          const hasher = createHash('md5').update(mod.sourceHash)
-          deps.forEach(({ specifier }) => {
-            const depMod = specifier === by.specifier ? by : this.#modules.get(specifier)
-            if (depMod) {
-              hasher.update(depMod.hash || depMod.sourceHash)
-            }
-          })
-          mod.hash = hasher.toString()
           callback(mod)
           this.applyCompilationSideEffect(mod, callback)
           this.cacheModule(mod)
@@ -1424,7 +1430,7 @@ export class Aleph implements IAleph {
       return
     }
 
-    // render pages
+    // lookup pages
     const paths: Set<{ pathname: string, search?: string }> = new Set(this.#pageRouting.paths.map(pathname => ({ pathname })))
     const locales = this.#config.i18n.locales.filter(l => l !== this.#config.i18n.defaultLocale)
     for (const specifier of this.#modules.keys()) {

@@ -104,7 +104,6 @@ export type Module = {
   ssgPathsFn?: boolean
   denoHooks?: string[]
   jsxStaticClassNames?: string[]
-  hash?: string
   sourceHash: string
   jsFile: string
   jsBuffer?: Uint8Array

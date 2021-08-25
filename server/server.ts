@@ -137,7 +137,7 @@ export class Server {
           if (module) {
             const content = await aleph.getModuleJS(module, aleph.isDev)
             if (content) {
-              const hash = module.hash || module.sourceHash
+              const hash = aleph.gteModuleHash(module)
               if (hash === req.headers.get('If-None-Match')) {
                 resp.writeTo(e, 304)
                 return
