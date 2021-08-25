@@ -640,7 +640,7 @@ export class Aleph implements IAleph {
     for (const callback of this.#renderListeners) {
       callback({ path: url.toString(), html, data })
     }
-    return [buildHtml(html), data]
+    return [buildHtml(html, !this.isDev), data]
   }
 
   /** create a fs watcher.  */
@@ -720,12 +720,12 @@ export class Aleph implements IAleph {
       headElements: [],
       scripts: this.getScripts(),
       body: '<div id="__aleph"></div>',
-      minify: !this.isDev
+      bodyAttrs: {},
     }
     for (const callback of this.#renderListeners) {
       await callback({ path: 'spa-index-html', html, data: null })
     }
-    return buildHtml(html)
+    return buildHtml(html, !this.isDev)
   }
 
   /** get scripts for html output */

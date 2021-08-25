@@ -147,7 +147,7 @@ export class Renderer {
           })
         ],
         body: `<div id="__aleph">${body}</div>`,
-        minify: !isDev
+        bodyAttrs: {}
       },
       data
     ]
@@ -176,15 +176,14 @@ export class Renderer {
 /** build html content by given descriptor */
 export function buildHtml({
   body,
+  bodyAttrs = {},
   lang = 'en',
-  headElements: head = [],
-  bodyClassName: className,
-  scripts = [],
-  minify = false
-}: HtmlDescriptor) {
+  headElements = [],
+  scripts = []
+}: HtmlDescriptor, minify = false) {
   const eol = minify ? '' : '\n'
   const indent = minify ? '' : ' '.repeat(2)
-  const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
+  const headTags = headElements.map(tag => tag.trim()).concat(scripts.map(v => {
     if (!util.isString(v) && util.isFilledString(v.src)) {
       if (v.type === 'module') {
         return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
@@ -207,7 +206,7 @@ export function buildHtml({
     }
   }).filter(Boolean)
 
-  if (!head.some(tag => tag.trimLeft().startsWith('<meta') && tag.includes('name="viewport"'))) {
+  if (!headElements.some(tag => tag.trimLeft().startsWith('<meta') && tag.includes('name="viewport"'))) {
     headTags.unshift('<meta name="viewport" content="width=device-width" />')
   }
 
@@ -218,7 +217,7 @@ export function buildHtml({
     indent + '<meta charSet="utf-8" />',
     ...headTags.map(tag => indent + tag),
     '</head>',
-    className ? `<body class="${className}">` : '<body>',
+    `<body${formatAttrs(bodyAttrs)}>`,
     indent + body,
     ...scriptTags.map(tag => indent + tag),
     '</body>',
