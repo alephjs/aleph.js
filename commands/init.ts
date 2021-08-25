@@ -2,6 +2,7 @@ import { Untar } from 'https://deno.land/std@0.100.0/archive/tar.ts'
 import { Buffer } from 'https://deno.land/std@0.100.0/io/buffer.ts'
 import { readAll } from 'https://deno.land/std@0.100.0/io/util.ts'
 import { green, blue, dim, red, cyan } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
+import { validateDenoLand } from "https://deno.land/x/is_valid_package_name/mod.ts";
 import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
 import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
@@ -31,6 +32,13 @@ export default async function (
 
   const name = nameArg || (await ask('Name:')).trim()
   if (name === '') {
+    return
+  }
+
+  const [valid, error] = validateDenoLand(name)
+
+  if (!valid) {
+    console.error(`Invalid project name: ${red(error)}`)
     return
   }
 
