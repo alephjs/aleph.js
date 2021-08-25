@@ -37,16 +37,24 @@ deno test -A --unstable --location=http://localhost --import-map=./import_map.js
 ## Project Structure
 
 - **/bundler** bundler for production mode
-- **/cli** commands code
-- **/compiler** compiler in rust powered by swc
+- **/commands** commands code
+- **/compiler** the compiler written in rust powered by swc
 - **/framework**
-  - **core** framework core code
+  - **core** framework core
   - **react** framework in React
 - **/design** design drawings and assets
 - **/examples** examples
-- **/plugins** plugins
+- **/plugins** official plugins
 - **/server** server code
 - **/shared** shared code
+
+## Code Style We Followed
+
+- Single quote for string
+- No semicolon
+- 2 spaces indent
+- Types everything
+- Order your imports
 
 ## Code of Conduct
 
