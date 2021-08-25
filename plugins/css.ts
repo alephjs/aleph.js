@@ -7,7 +7,7 @@ import util from '../shared/util.ts'
 import type { Aleph, LoadInput, LoadOutput, Plugin, PostCSSPlugin } from '../types.d.ts'
 
 const test = /\.(css|pcss|postcss)$/i
-const postcssVersion = '8.3.5'
+const postcssVersion = '8.3.6'
 const postcssModulesVersion = '4.1.3'
 const productionOnlyPostcssPlugins = ['autoprefixer']
 const isModulesPluginName = (v: any): v is string => (typeof v === 'string' && /^postcss\-modules(@|$)/i.test(v.trim()))
@@ -174,7 +174,7 @@ async function initPostCSS(plugins: PostCSSPlugin[], isDev: boolean) {
     return null
   }
 
-  const { default: PostCSS } = await import(`https://esm.sh/postcss@${postcssVersion}`)
+  const { default: PostCSS } = await import(`https://esm.sh/postcss@${postcssVersion}?no-check`)
   return PostCSS(postPlugins)
 }
 
