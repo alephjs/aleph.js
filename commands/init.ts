@@ -34,6 +34,11 @@ export default async function (
     return
   }
 
+  if (!/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) {
+    console.error(`Invalid project name: ${red(name)}`)
+    return
+  }
+
   const hasTemplate = await util.isUrlOk('https://api.github.com/repos/alephjs/alephjs-templates/contents/' + template)
 
   if (!hasTemplate) {
