@@ -131,10 +131,8 @@ export class Server {
         }
       }
 
-      // in dev mode, we use `Last-Modified` and `ETag` header to control cache
-      if (aleph.isDev) {
-        resp.setHeader('Cache-Control', 'max-age=0')
-      }
+      // we use `Last-Modified` and `ETag` header to control cache
+      resp.setHeader('Cache-Control', 'max-age=0')
 
       // serve dist files
       if (pathname.startsWith('/_aleph/')) {
