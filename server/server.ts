@@ -86,7 +86,9 @@ export class Server {
 
       const resp = new APIResponse()
       const end = async (status?: number): Promise<void> => {
-        let { body, headers, } = resp
+        const acceptEncoding = req.headers.get('accept-encoding')
+        let { body, headers } = resp
+
         let contentType: string | null = null
         if (headers.has('Content-Type')) {
           contentType = headers.get('Content-Type')!
@@ -95,8 +97,7 @@ export class Server {
           headers.set('Content-Type', contentType)
         }
 
-        const acceptEncoding = req.headers.get('accept-encoding')
-        if (acceptEncoding && body && contentType) {
+        if (compress.enable && acceptEncoding && body && contentType) {
           let data = new Uint8Array()
           if (typeof body === 'string') {
             data = new TextEncoder().encode(body)
@@ -360,7 +361,7 @@ export async function serve({ aleph, port, hostname, certFile, keyFile, signal }
         listener.close()
       })
       if (!aleph.isDev && aleph.config.server.compress) {
-        compress.enable()
+        compress.enable = true
       }
       log.info(`Server ready on http://${hostname || 'localhost'}:${port}${aleph.config.basePath}`)
 
