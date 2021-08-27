@@ -4,7 +4,7 @@
     "aleph/types": "./types.d.ts",
     "aleph/web": "./framework/core/mod.ts",
     "aleph/react": "./framework/react/mod.ts",
-    "std/": "https://deno.land/std@0.100.0/",
+    "std/": "https://deno.land/std@0.106.0/",
     "react": "https://esm.sh/react@17.0.2",
     "react-dom": "https://esm.sh/react-dom@17.0.2"
   }

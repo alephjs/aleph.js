@@ -4,14 +4,11 @@ export const deno_x_flate = 'https://deno.land/x/denoflate@1.2.1/mod.ts'
 class Compression {
   #brotli: ((data: Uint8Array) => Uint8Array) | null = null
   #gzip: ((data: Uint8Array) => Uint8Array) | null = null
-  #enable: boolean = false
 
-  async enable() {
-    this.#enable = true
-  }
+  enable: boolean = false
 
   accept(acceptEncoding: string, contentType: string, contentLength: number): 'br' | 'gzip' | null {
-    const shouldCompress = this.#enable && (
+    const shouldCompress = this.enable && (
       contentType.startsWith('text/') ||
       /^application\/(javascript|json|xml|wasm)/i.test(contentType) ||
       /^image\/svg\+xml/i.test(contentType)

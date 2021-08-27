@@ -1,4 +1,6 @@
-import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
+import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { readerFromStreamReader } from "https://deno.land/std@0.106.0/io/streams.ts"
+import { readAll } from "https://deno.land/std@0.106.0/io/util.ts"
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { resolveURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
@@ -85,6 +87,43 @@ export class Server {
       }
 
       const resp = new APIResponse()
+      const end = async (status?: number): Promise<void> => {
+        const acceptEncoding = req.headers.get('accept-encoding')
+        let { body, headers } = resp
+
+        let contentType: string | null = null
+        if (headers.has('Content-Type')) {
+          contentType = headers.get('Content-Type')!
+        } else if (typeof body === 'string') {
+          contentType = 'text/plain; charset=utf-8'
+          headers.set('Content-Type', contentType)
+        }
+
+        if (compress.enable && acceptEncoding && body && contentType) {
+          let data = new Uint8Array()
+          if (typeof body === 'string') {
+            data = new TextEncoder().encode(body)
+          } else if (body instanceof Uint8Array) {
+            data = body
+          } else if (body instanceof ArrayBuffer) {
+            data = new Uint8Array(body)
+          } else if (typeof body.getReader === 'function') {
+            data = await readAll(readerFromStreamReader(body.getReader()))
+          }
+          const contentEncoding = compress.accept(acceptEncoding, contentType, data.length)
+          if (contentEncoding) {
+            body = await compress.compress(data, contentEncoding)
+            headers.set('Vary', 'Origin')
+            headers.set('Content-Encoding', contentEncoding)
+          }
+        }
+
+        try {
+          await respondWith(new Response(body, { headers, status: status || resp.status }))
+        } catch (err) {
+          log.warn('http:', err.message)
+        }
+      }
 
       // set server header
       resp.setHeader('Server', 'Aleph.js')
@@ -96,10 +135,8 @@ export class Server {
         }
       }
 
-      // in dev mode, we use `Last-Modified` and `ETag` header to control cache
-      if (aleph.isDev) {
-        resp.setHeader('Cache-Control', 'max-age=0')
-      }
+      // we use `Last-Modified` and `ETag` header to control cache
+      resp.setHeader('Cache-Control', 'max-age=0')
 
       // serve dist files
       if (pathname.startsWith('/_aleph/')) {
@@ -107,9 +144,11 @@ export class Server {
           const [path, search] = util.splitBy(util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json')), '?')
           const data = await aleph.getSSRData({ pathname: path, search: search ? '?' + search : undefined })
           if (data === null) {
-            resp.json(null).writeTo(e)
+            resp.json(null)
+            end()
           } else {
-            resp.json(data).writeTo(e)
+            resp.json(data)
+            end()
           }
           return
         }
@@ -118,7 +157,7 @@ export class Server {
         if (relPath == '/main.js') {
           resp.body = await aleph.createMainJS(false)
           resp.setHeader('Content-Type', 'application/javascript; charset=utf-8')
-          resp.writeTo(e)
+          end()
           return
         }
 
@@ -139,14 +178,14 @@ export class Server {
             if (content) {
               const hash = aleph.gteModuleHash(module)
               if (hash === req.headers.get('If-None-Match')) {
-                resp.writeTo(e, 304)
+                end(304)
                 return
               }
 
               resp.setHeader('ETag', hash)
               resp.setHeader('Content-Type', 'application/javascript; charset=utf-8')
               resp.body = content
-              resp.writeTo(e)
+              end()
               return
             }
           }
@@ -158,19 +197,19 @@ export class Server {
           const info = Deno.lstatSync(filePath)
           const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
           if (lastModified === req.headers.get('If-Modified-Since')) {
-            resp.writeTo(e, 304)
+            end(304)
             return
           }
 
           resp.body = await Deno.readFile(filePath)
           resp.setHeader('Last-Modified', lastModified)
           resp.setHeader('Content-Type', getContentType(filePath))
-          resp.writeTo(e)
+          end()
           return
         }
 
         resp.body = 'file not found'
-        resp.writeTo(e, 404)
+        end(404)
         return
       }
 
@@ -180,14 +219,14 @@ export class Server {
         const info = Deno.lstatSync(filePath)
         const lastModified = info.mtime?.toUTCString() ?? (new Date).toUTCString()
         if (lastModified === req.headers.get('If-Modified-Since')) {
-          resp.writeTo(e, 304)
+          end(304)
           return
         }
 
         resp.body = await Deno.readFile(filePath)
         resp.setHeader('Last-Modified', lastModified)
         resp.setHeader('Content-Type', getContentType(filePath))
-        resp.writeTo(e)
+        end()
         return
       }
 
@@ -207,7 +246,8 @@ export class Server {
               if (util.isFunction(h)) {
                 await h(context)
               } else {
-                await resp.json({ status: 500, message: 'bad api handler' }).writeTo(e, 500)
+                resp.json({ status: 500, message: 'bad api handler' })
+                end(500)
               }
             }]
             let pointer = 0
@@ -246,14 +286,16 @@ export class Server {
             }
             await next()
             if (!responded) {
-              resp.writeTo(e)
+              end()
             }
           } catch (err) {
-            resp.json({ status: 500, message: err.message }).writeTo(e, 500)
+            resp.json({ status: 500, message: err.message })
+            end(500)
             log.error('invoke API:', err)
           }
         } else {
-          resp.json({ status: 404, message: 'not found' }).writeTo(e, 404)
+          resp.json({ status: 404, message: 'not found' })
+          end(404)
         }
         return
       }
@@ -263,9 +305,9 @@ export class Server {
         pathname,
         search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
       })
-      resp.body = html
       resp.setHeader('Content-Type', 'text/html; charset=utf-8')
-      resp.writeTo(e, status)
+      resp.body = html
+      end(status)
     } catch (err) {
       try {
         // todo: custom error page
@@ -321,7 +363,7 @@ export async function serve({ aleph, port, hostname, certFile, keyFile, signal }
         listener.close()
       })
       if (!aleph.isDev && aleph.config.server.compress) {
-        compress.enable()
+        compress.enable = true
       }
       log.info(`Server ready on http://${hostname || 'localhost'}:${port}${aleph.config.basePath}`)
 
