@@ -1,4 +1,6 @@
 import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
+import { readerFromStreamReader } from "https://deno.land/std@0.100.0/io/streams.ts"
+import { readAll } from "https://deno.land/std@0.100.0/io/util.ts"
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { resolveURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
@@ -105,6 +107,8 @@ export class Server {
             data = body
           } else if (body instanceof ArrayBuffer) {
             data = new Uint8Array(body)
+          } else if (typeof body.getReader === 'function') {
+            data = await readAll(readerFromStreamReader(body.getReader()))
           }
           const contentEncoding = compress.accept(acceptEncoding, contentType, data.length)
           if (contentEncoding) {
@@ -301,8 +305,8 @@ export class Server {
         pathname,
         search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
       })
-      resp.body = html
       resp.setHeader('Content-Type', 'text/html; charset=utf-8')
+      resp.body = html
       end(status)
     } catch (err) {
       try {
