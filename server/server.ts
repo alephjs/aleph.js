@@ -1,6 +1,6 @@
-import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
-import { readerFromStreamReader } from "https://deno.land/std@0.100.0/io/streams.ts"
-import { readAll } from "https://deno.land/std@0.100.0/io/util.ts"
+import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { readerFromStreamReader } from "https://deno.land/std@0.106.0/io/streams.ts"
+import { readAll } from "https://deno.land/std@0.106.0/io/util.ts"
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { resolveURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'

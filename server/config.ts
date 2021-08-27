@@ -1,4 +1,4 @@
-import { basename, join } from 'https://deno.land/std@0.100.0/path/mod.ts'
+import { basename, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import type { ReactOptions } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { existsDir } from '../shared/fs.ts'

@@ -1,7 +1,7 @@
-import { parse } from 'https://deno.land/std@0.100.0/flags/mod.ts'
-import { red } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
-import { dirname, join } from 'https://deno.land/std@0.100.0/path/mod.ts'
-import { existsSync } from 'https://deno.land/std@0.100.0/fs/exists.ts'
+import { parse } from 'https://deno.land/std@0.106.0/flags/mod.ts'
+import { red } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
+import { dirname, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { existsSync } from 'https://deno.land/std@0.106.0/fs/exists.ts'
 
 export async function checkVersion(version: string): Promise<string> {
   console.log('Looking up latest version...')

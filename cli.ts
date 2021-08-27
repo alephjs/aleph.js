@@ -1,5 +1,5 @@
-import { resolve } from 'https://deno.land/std@0.100.0/path/mod.ts'
-import { parse } from 'https://deno.land/std@0.100.0/flags/mod.ts'
+import { resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { parse } from 'https://deno.land/std@0.106.0/flags/mod.ts'
 import { existsDir } from './shared/fs.ts'
 import log, { LevelNames } from './shared/log.ts'
 import util from './shared/util.ts'
@@ -24,10 +24,9 @@ Usage:
     aleph <command> [...options]
 
 Commands:
-    ${
-  Object.entries(commands).map(([name, desc]) => `${name.padEnd(15)}${desc}`)
-  .join('\n    ')
-}
+    ${Object.entries(commands).map(([name, desc]) => `${name.padEnd(15)}${desc}`)
+    .join('\n    ')
+  }
 
 Options:
     -v, --version  Prints version number
