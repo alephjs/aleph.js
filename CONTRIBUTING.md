@@ -2,15 +2,15 @@
 
 Welcome, and thank you for taking time in contributing to Aleph.js! You can improve Aleph.js in different ways:
 
-- ∆ add new features
-- ✘ bugfix
+- ∆ submit new features
+- ✘ find bugs
 - ✔︎ review code
 - ☇ write plugins
 - 𝔸 improve our [documentation](https://github.com/alephjs/alephjs.org)
 
 ## Development Setup
 
-You will need [Deno](https://deno.land/) 1.8+.
+You will need [Deno](https://deno.land/) 1.13+.
 
 1. Fork this repository to your own GitHub account.
 2. Clone the repository to your local device.
@@ -37,24 +37,25 @@ deno test -A --unstable --location=http://localhost --import-map=./import_map.js
 ## Project Structure
 
 - **/bundler** bundler for production mode
-- **/commands** commands code
-- **/compiler** the compiler written in rust powered by swc
+- **/commands** commands to start
+- **/compiler** a JS/TS/JSX compiler written in rust powered by swc
 - **/framework**
   - **core** framework core
   - **react** framework in React
 - **/design** design drawings and assets
-- **/examples** examples
+- **/examples** examples to learn
 - **/plugins** official plugins
-- **/server** server code
+- **/server** server to run apps
 - **/shared** shared code
 
 ## Code Style We Followed
 
 - Single quote for string
-- No semicolon
+- No semicolons
 - 2 spaces indent
 - Types everything
 - Order your imports
+- Format code using vscode default TS Server
 
 ## Code of Conduct
 
