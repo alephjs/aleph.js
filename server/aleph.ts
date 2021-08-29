@@ -117,7 +117,7 @@ export class Aleph implements IAleph {
       this.#pageRouting = new Routing(this.#config)
     }
 
-    await fixConfigAndImportMap(this.#workingDir, this.#config, this.#importMap)
+    await fixConfigAndImportMap(this.#workingDir, this.#config, this.#importMap, importMapFile)
     ms.stop('load config')
 
     Deno.env.set('ALEPH_ENV', this.#mode)
@@ -129,24 +129,32 @@ export class Aleph implements IAleph {
     const srcDir = join(this.#workingDir, this.#config.srcDir)
     const apiDir = join(srcDir, 'api')
     const pagesDir = join(srcDir, 'pages')
-    const buildManifestFile = join(this.#buildDir, 'build.manifest.json')
+    const manifestFile = join(this.#buildDir, 'build.manifest.json')
     const importMapString = JSON.stringify(this.#importMap)
     const pluginNames = this.#config.plugins.map(({ name }) => name).join(',')
 
-    let shouldRebuild = !await existsFile(buildManifestFile)
-    let saveManifestFile = shouldRebuild
+    let shouldRebuild = !await existsFile(manifestFile)
+    let shouldUpdateManifest = shouldRebuild
     if (!shouldRebuild) {
       try {
-        const v = JSON.parse(await Deno.readTextFile(buildManifestFile))
+        const v = JSON.parse(await Deno.readTextFile(manifestFile))
+        const confirmClean = (msg: string): boolean => {
+          shouldUpdateManifest = true
+          // in 'prodcution' mode, we don't ask user to clean build cache
+          if (!this.isDev) {
+            return true
+          }
+          return confirm(msg)
+        }
         shouldRebuild = (
           typeof v !== 'object' ||
           v === null ||
           v.compiler !== wasmChecksum ||
-          (v.importMap !== importMapString && confirm('The import-maps has been changed, clean build cache?')) ||
-          (v.plugins !== pluginNames && confirm('The plugin list has been updated, clean build cache?'))
+          (v.importMap !== importMapString && confirmClean('The import-maps has been changed, clean build cache?')) ||
+          (v.plugins !== pluginNames && confirmClean('The plugin list has been updated, clean build cache?'))
         )
-        if (!shouldRebuild && v.importMap !== importMapString && v.plugins !== pluginNames) {
-          saveManifestFile = true
+        if (shouldRebuild) {
+          shouldUpdateManifest = true
         }
       } catch (e) { }
     }
@@ -159,9 +167,8 @@ export class Aleph implements IAleph {
       await ensureDir(this.#buildDir)
     }
 
-    if (saveManifestFile) {
-      log.debug('rebuild...')
-      ensureTextFile(buildManifestFile, JSON.stringify({
+    if (shouldUpdateManifest) {
+      ensureTextFile(manifestFile, JSON.stringify({
         aleph: VERSION,
         deno: Deno.version.deno,
         compiler: wasmChecksum,
