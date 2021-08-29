@@ -17,6 +17,9 @@ lazy_static! {
     r"@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$"
   )
   .unwrap();
+  pub static ref RE_DENO_X_ALEPH_URL: Regex = Regex::new(
+    r"^https?://deno.land/x/aleph(@v?[0-9a-z\.\-]+)?/"
+  ).unwrap();
   pub static ref RE_REACT_URL: Regex = Regex::new(
     r"^https?://(esm.sh|cdn.esm.sh|cdn.esm.sh.cn|esm.x-static.io)(/v\d+)?/react(\-dom)?(@[\^|~]{0,1}[0-9a-z\.\-]+)?([/|\?].*)?$"
   )
@@ -265,13 +268,11 @@ impl Resolver {
 
     // fix deno.land/x/aleph url
     if let Some(aleph_pkg_uri) = &self.aleph_pkg_uri {
-      if fixed_url.starts_with("https://deno.land/x/aleph/") {
+      if RE_DENO_X_ALEPH_URL.is_match(fixed_url.as_str()) {
         fixed_url = format!(
           "{}/{}",
           aleph_pkg_uri.as_str(),
-          fixed_url
-            .strip_prefix("https://deno.land/x/aleph/")
-            .unwrap()
+          RE_DENO_X_ALEPH_URL.replace(fixed_url.as_str(), ""),
         );
       }
     }
@@ -753,10 +754,7 @@ mod tests {
     imports.insert("~/".into(), "./".into());
     imports.insert("react".into(), "https://esm.sh/react".into());
     imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
-    imports.insert(
-      "https://deno.land/x/aleph/".into(),
-      "http://localhost:2020/".into(),
-    );
+    imports.insert("aleph/".into(), "http://localhost:2020/".into());
     let mut resolver = Resolver::new(
       "/pages/index.tsx",
       "/",
@@ -767,7 +765,7 @@ mod tests {
       true,
       false,
       vec![],
-      None,
+      Some("https://deno.land/x/aleph@v0.3.0".into()),
       Some(ReactOptions {
         version: "17.0.2".into(),
         esm_sh_build_version: 2,
@@ -830,20 +828,34 @@ mod tests {
       )
     );
     assert_eq!(
-      resolver.resolve("https://deno.land/x/aleph/mod.ts", false),
+      resolver.resolve("aleph/mod.ts", false),
       (
         "http://localhost:2020/mod.ts".into(),
         "http://localhost:2020/mod.ts".into()
       )
     );
     assert_eq!(
-      resolver.resolve(
-        "https://deno.land/x/aleph/framework/react/components/Link.ts",
-        false
-      ),
+      resolver.resolve("https://deno.land/x/aleph/mod.ts", false),
+      (
+        "https://deno.land/x/aleph@v0.3.0/mod.ts".into(),
+        "https://deno.land/x/aleph@v0.3.0/mod.ts".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve("aleph/framework/react/components/Link.ts", false),
       (
         "http://localhost:2020/framework/react/components/Link.ts".into(),
         "http://localhost:2020/framework/react/components/Link.ts".into()
+      )
+    );
+    assert_eq!(
+      resolver.resolve(
+        "https://deno.land/x/aleph@v0.2.0/framework/react/components/Link.ts",
+        false
+      ),
+      (
+        "https://deno.land/x/aleph@v0.3.0/framework/react/components/Link.ts".into(),
+        "https://deno.land/x/aleph@v0.3.0/framework/react/components/Link.ts".into()
       )
     );
     assert_eq!(
