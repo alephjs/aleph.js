@@ -11,6 +11,8 @@ import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
 import { deno_x_brotli, deno_x_flate } from '../server/compress.ts'
 
+const vercelRuntimeVersion = '0.7.0'
+
 export const helpMessage = `
 Usage:
     aleph init <name> [...options]
@@ -146,7 +148,7 @@ export default async function (
       JSON.stringify({
         functions: {
           'api/**/*.{j,t}s': {
-            runtime: 'vercel-aleph@0.6.0'
+            runtime: `vercel-aleph@${vercelRuntimeVersion}`
           }
         }
       }, undefined, 2),
