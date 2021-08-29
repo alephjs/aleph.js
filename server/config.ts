@@ -116,7 +116,7 @@ export async function loadConfig(specifier: string): Promise<Config> {
     }
   }
   if (util.isPlainObject(css)) {
-    const { extract, cache: v, modules, postcss } = css
+    const { cache: v, modules, postcss } = css
     let cache: boolean | RegExp | RegExp[] = true
     if (typeof v === 'boolean' || v instanceof RegExp) {
       cache = v
