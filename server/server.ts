@@ -127,6 +127,8 @@ export class Server {
 
       // set server header
       resp.setHeader('Server', 'Aleph.js')
+      // by default, we use `Last-Modified` and `ETag` header to control cache
+      resp.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
 
       // set custom headers
       if (headers) {
@@ -134,9 +136,6 @@ export class Server {
           resp.setHeader(key, headers[key])
         }
       }
-
-      // we use `Last-Modified` and `ETag` header to control cache
-      resp.setHeader('Cache-Control', 'max-age=0')
 
       // serve dist files
       if (pathname.startsWith('/_aleph/')) {
