@@ -10,8 +10,8 @@ class Compression {
   accept(acceptEncoding: string, contentType: string, contentLength: number): 'br' | 'gzip' | null {
     const shouldCompress = this.enable && (
       contentType.startsWith('text/') ||
-      /^application\/(javascript|json|xml|wasm)/i.test(contentType) ||
-      /^image\/svg\+xml/i.test(contentType)
+      contentType.startsWith('image/svg+xml') ||
+      /^application\/(javascript|json|xml|wasm)/i.test(contentType)
     )
     if (shouldCompress && contentLength > 1024) {
       if (acceptEncoding.includes('br')) {
