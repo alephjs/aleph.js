@@ -1,6 +1,5 @@
 import util from '../../shared/util.ts'
 import type { RouterURL } from '../../types.d.ts'
-import { redirect } from './redirect.ts'
 
 const ghostRoute: Route = { path: '', module: '' }
 
@@ -16,6 +15,7 @@ export type RoutingOptions = {
   locales?: string[]
   routes?: Route[]
   rewrites?: Record<string, string>
+  redirect?: (url: string, replace?: boolean) => void
 }
 
 export class Routing {
@@ -24,19 +24,22 @@ export class Routing {
   private _locales: string[]
   private _routes: Route[]
   private _rewrites?: Record<string, string>
+  private _redirect?: (url: string, replace?: boolean) => void
 
   constructor({
     basePath = '/',
     defaultLocale = 'en',
     locales = [],
     routes = [],
-    rewrites
+    rewrites,
+    redirect
   }: RoutingOptions = {}) {
     this._basePath = basePath
     this._defaultLocale = defaultLocale
     this._locales = locales
     this._routes = routes
     this._rewrites = rewrites
+    this._redirect = redirect
   }
 
   get basePath() {
@@ -179,8 +182,8 @@ export class Routing {
           const qs = this.query.toString()
           return [this.pathname, qs].filter(Boolean).join('?')
         },
-        push: (url: string) => redirect(url),
-        replace: (url: string) => redirect(url, true),
+        push: (url: string) => this._redirect && this._redirect(url),
+        replace: (url: string) => this._redirect && this._redirect(url, true),
       },
       nestedModules
     ]

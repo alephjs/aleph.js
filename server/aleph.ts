@@ -1,9 +1,9 @@
-import { dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
-import { indexOf, copy, equals } from 'https://deno.land/std@0.100.0/bytes/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
-import { walk } from 'https://deno.land/std@0.100.0/fs/walk.ts'
-import { createHash } from 'https://deno.land/std@0.100.0/hash/mod.ts'
-import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.100.0/path/mod.ts'
+import { dim } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
+import { indexOf, copy, equals } from 'https://deno.land/std@0.106.0/bytes/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.106.0/fs/ensure_dir.ts'
+import { walk } from 'https://deno.land/std@0.106.0/fs/walk.ts'
+import { createHash } from 'https://deno.land/std@0.106.0/hash/mod.ts'
+import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
 import type { TransformOptions } from '../compiler/mod.ts'
 import { wasmChecksum, parseExportNames, SourceType, transform, stripSsrCode } from '../compiler/mod.ts'
@@ -117,7 +117,7 @@ export class Aleph implements IAleph {
       this.#pageRouting = new Routing(this.#config)
     }
 
-    await fixConfigAndImportMap(this.#workingDir, this.#config, this.#importMap)
+    await fixConfigAndImportMap(this.#workingDir, this.#config, this.#importMap, importMapFile)
     ms.stop('load config')
 
     Deno.env.set('ALEPH_ENV', this.#mode)
@@ -129,24 +129,32 @@ export class Aleph implements IAleph {
     const srcDir = join(this.#workingDir, this.#config.srcDir)
     const apiDir = join(srcDir, 'api')
     const pagesDir = join(srcDir, 'pages')
-    const buildManifestFile = join(this.#buildDir, 'build.manifest.json')
+    const manifestFile = join(this.#buildDir, 'build.manifest.json')
     const importMapString = JSON.stringify(this.#importMap)
     const pluginNames = this.#config.plugins.map(({ name }) => name).join(',')
 
-    let shouldRebuild = !await existsFile(buildManifestFile)
-    let saveManifestFile = shouldRebuild
+    let shouldRebuild = !await existsFile(manifestFile)
+    let shouldUpdateManifest = shouldRebuild
     if (!shouldRebuild) {
       try {
-        const v = JSON.parse(await Deno.readTextFile(buildManifestFile))
+        const v = JSON.parse(await Deno.readTextFile(manifestFile))
+        const confirmClean = (msg: string): boolean => {
+          shouldUpdateManifest = true
+          // in 'prodcution' mode, we don't ask user to clean build cache
+          if (!this.isDev) {
+            return true
+          }
+          return confirm(msg)
+        }
         shouldRebuild = (
           typeof v !== 'object' ||
           v === null ||
           v.compiler !== wasmChecksum ||
-          (v.importMap !== importMapString && confirm('The import-maps has been changed, clean build cache?')) ||
-          (v.plugins !== pluginNames && confirm('The plugin list has been updated, clean build cache?'))
+          (v.importMap !== importMapString && confirmClean('The import-maps has been changed, clean build cache?')) ||
+          (v.plugins !== pluginNames && confirmClean('The plugin list has been updated, clean build cache?'))
         )
-        if (!shouldRebuild && v.importMap !== importMapString && v.plugins !== pluginNames) {
-          saveManifestFile = true
+        if (shouldRebuild) {
+          shouldUpdateManifest = true
         }
       } catch (e) { }
     }
@@ -159,9 +167,8 @@ export class Aleph implements IAleph {
       await ensureDir(this.#buildDir)
     }
 
-    if (saveManifestFile) {
-      log.debug('rebuild...')
-      ensureTextFile(buildManifestFile, JSON.stringify({
+    if (shouldUpdateManifest) {
+      ensureTextFile(manifestFile, JSON.stringify({
         aleph: VERSION,
         deno: Deno.version.deno,
         compiler: wasmChecksum,
@@ -640,7 +647,7 @@ export class Aleph implements IAleph {
     for (const callback of this.#renderListeners) {
       callback({ path: url.toString(), html, data })
     }
-    return [buildHtml(html), data]
+    return [buildHtml(html, !this.isDev), data]
   }
 
   /** create a fs watcher.  */
@@ -720,12 +727,12 @@ export class Aleph implements IAleph {
       headElements: [],
       scripts: this.getScripts(),
       body: '<div id="__aleph"></div>',
-      minify: !this.isDev
+      bodyAttrs: {},
     }
     for (const callback of this.#renderListeners) {
       await callback({ path: 'spa-index-html', html, data: null })
     }
-    return buildHtml(html)
+    return buildHtml(html, !this.isDev)
   }
 
   /** get scripts for html output */

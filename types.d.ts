@@ -119,12 +119,11 @@ type DependencyDescriptor = {
 
 /** The HTML Descriptor. */
 type HtmlDescriptor = {
-  lang?: string,
-  headElements?: string[],
-  body?: string,
-  bodyClassName?: string,
-  scripts?: (string | { id?: string, type?: string, src?: string, innerText?: string, async?: boolean, preload?: boolean, nomodule?: boolean })[],
-  minify?: boolean
+  lang: string,
+  headElements: string[],
+  scripts: (string | { id?: string, type?: string, src?: string, innerText?: string, async?: boolean, preload?: boolean, nomodule?: boolean })[],
+  body: string,
+  bodyAttrs: Record<string, string>,
 }
 
 /** SSR data with expires. */

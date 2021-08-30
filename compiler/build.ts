@@ -1,8 +1,8 @@
-import { dim } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
-import { encode } from 'https://deno.land/std@0.100.0/encoding/base64.ts'
-import { exists } from 'https://deno.land/std@0.100.0/fs/exists.ts'
-import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
-import { createHash } from 'https://deno.land/std@0.100.0/hash/mod.ts'
+import { dim } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
+import { encode } from 'https://deno.land/std@0.106.0/encoding/base64.ts'
+import { exists } from 'https://deno.land/std@0.106.0/fs/exists.ts'
+import { ensureDir } from 'https://deno.land/std@0.106.0/fs/ensure_dir.ts'
+import { createHash } from 'https://deno.land/std@0.106.0/hash/mod.ts'
 import { compress } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
 import util from '../shared/util.ts'
 
@@ -31,7 +31,7 @@ if (import.meta.main) {
     await Deno.writeTextFile(
       './dist/wasm.js',
       [
-        `import { decode } from "https://deno.land/std@0.100.0/encoding/base64.ts";`,
+        `import { decode } from "https://deno.land/std@0.106.0/encoding/base64.ts";`,
         `import { decompress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";`,
         `const dataRaw = "${encode(compress(wasmData))}";`,
         `export default () => decompress(decode(dataRaw));`
@@ -43,7 +43,7 @@ if (import.meta.main) {
     )
     await Deno.writeTextFile(
       './dist/compiler.js',
-      `import { red } from 'https://deno.land/std@0.100.0/fmt/colors.ts';` + jsCode.replace('console.error(getStringFromWasm0(arg0, arg1));', `
+      `import { red } from 'https://deno.land/std@0.106.0/fmt/colors.ts';` + jsCode.replace('console.error(getStringFromWasm0(arg0, arg1));', `
         const msg = getStringFromWasm0(arg0, arg1);
         if (msg.includes('DiagnosticBuffer(["')) {
           const diagnostic = msg.split('DiagnosticBuffer(["')[1].split('"])')[0]

@@ -17,6 +17,6 @@ export default async function (v = 'latest') {
     Deno.exit(0)
   }
 
-  const { install } = await import(`https://deno.land/x/aleph${version}/install.ts`)
+  const { install } = await import(`https://deno.land/x/aleph@${version}/install.ts`)
   await install(version)
 }

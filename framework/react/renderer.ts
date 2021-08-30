@@ -91,17 +91,17 @@ export async function render(
 
   // `renderToString` might be invoked repeatedly when asyncchronous callbacks exist.
   while (true) {
+    if (asyncCalls.length > 0) {
+      const calls = asyncCalls.splice(0, asyncCalls.length)
+      const datas = await Promise.all(calls.map(a => a[2]))
+      calls.forEach(([id, expires], i) => {
+        const value = datas[i]
+        renderingData[id] = value
+        data[id] = { value, expires }
+      })
+    }
     try {
-      if (asyncCalls.length > 0) {
-        const calls = asyncCalls.splice(0, asyncCalls.length)
-        const datas = await Promise.all(calls.map(a => a[2]))
-        calls.forEach(([id, expires], i) => {
-          const value = datas[i]
-          renderingData[id] = value
-          data[id] = { value, expires }
-        })
-      }
-      Object.keys(rendererStore).forEach(key => rendererStore[key as keyof typeof rendererStore].clear())
+      Object.values(rendererStore).forEach(map => map.clear())
       ret.body = renderToString(createElement(
         SSRContext.Provider,
         { value: rendererStore },

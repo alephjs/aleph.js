@@ -714,18 +714,18 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.127"
+version = "1.0.129"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f03b9878abf6d14e6779d3f24f07b2cfa90352cfec4acc5aab8f1ac7f146fae8"
+checksum = "d1f72836d2aa753853178eda473a3b9d8e4eefdaf20523b919677e6de489f8f1"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.127"
+version = "1.0.129"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a024926d3432516606328597e0f224a51355a493b49fdd67e9209187cbe55ecc"
+checksum = "e57ae87ad533d9a56427558b516d0adac283614e347abf85b0dc0cbbf0a249f3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -852,9 +852,9 @@ dependencies = [
 
 [[package]]
 name = "swc_common"
-version = "0.11.6"
+version = "0.11.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fc89b8c9f2fa3fc646e7d1a05ebc2063b1396b3ba5277afc741505bd7414fff"
+checksum = "f2bcafc4aad3933ee8e00a560521dcf77b39f66713a073de19841c1bd2c4c49c"
 dependencies = [
  "ahash",
  "ast_node",
@@ -877,9 +877,9 @@ dependencies = [
 
 [[package]]
 name = "swc_ecma_ast"
-version = "0.49.4"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3efef728f69665d765c52b233155dcb3290424f56a9f978ecfbd53f136804461"
+checksum = "72f135a9c200f058d5bec4e63b34712f412db0d2e894bf22b8b44b0740be6607"
 dependencies = [
  "is-macro",
  "num-bigint",
@@ -1051,9 +1051,9 @@ dependencies = [
 
 [[package]]
 name = "swc_ecma_utils"
-version = "0.41.3"
+version = "0.41.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50bacaf860e4224e1a12bea8730c94de28f990f92685dad57aa572e3473043f7"
+checksum = "50339f726a63cde28f74ae2b4b98949bced74841ba7e02a135b915063c8e1566"
 dependencies = [
  "once_cell",
  "scoped-tls",
@@ -1079,9 +1079,9 @@ dependencies = [
 
 [[package]]
 name = "swc_ecmascript"
-version = "0.57.0"
+version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e41615d9e65c7b148950211dacd0b2343a646d84493b9c8efa8795ee1a6e2f4f"
+checksum = "fa252b1a2dfce5b8c1d7d1a17bda2cb9100a28a91bdd08b31f1e2252b9885f99"
 dependencies = [
  "swc_ecma_ast",
  "swc_ecma_codegen",

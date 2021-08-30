@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.100.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.106.0/http/server.ts'
 import { Aleph } from '../server/aleph.ts'
 import { getFlag, parsePortNumber } from '../shared/flags.ts'
 import log from '../shared/log.ts'

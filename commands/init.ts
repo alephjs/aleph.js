@@ -1,16 +1,17 @@
-import { Untar } from 'https://deno.land/std@0.100.0/archive/tar.ts'
-import { Buffer } from 'https://deno.land/std@0.100.0/io/buffer.ts'
-import { readAll } from 'https://deno.land/std@0.100.0/io/util.ts'
-import { green, blue, dim, red, cyan } from 'https://deno.land/std@0.100.0/fmt/colors.ts'
-import { validateDenoLand } from "https://deno.land/x/is_valid_package_name/mod.ts";
-import { ensureDir } from 'https://deno.land/std@0.100.0/fs/ensure_dir.ts'
-import { join } from 'https://deno.land/std@0.100.0/path/mod.ts'
+import { Untar } from 'https://deno.land/std@0.106.0/archive/tar.ts'
+import { Buffer } from 'https://deno.land/std@0.106.0/io/buffer.ts'
+import { readAll } from 'https://deno.land/std@0.106.0/io/util.ts'
+import { green, blue, dim, red, cyan } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
+import { ensureDir } from 'https://deno.land/std@0.106.0/fs/ensure_dir.ts'
+import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
 import { ensureTextFile, existsDir } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
 import { deno_x_brotli, deno_x_flate } from '../server/compress.ts'
+
+const vercelRuntimeVersion = '0.7.0'
 
 export const helpMessage = `
 Usage:
@@ -35,10 +36,8 @@ export default async function (
     return
   }
 
-  const [valid, error] = validateDenoLand(name)
-
-  if (!valid) {
-    console.error(`Invalid project name: ${red(error)}`)
+  if (!/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) {
+    console.error(`Invalid project name: ${red(name)}`)
     return
   }
 
@@ -60,6 +59,7 @@ export default async function (
 
   // ask to create vscode files
   const vscode = await confirm('Using VS Code?')
+  const vercel = await confirm('Deploy to Vercel?')
 
   // download template
   console.log('Downloading template. This might take a moment...')
@@ -142,13 +142,26 @@ export default async function (
     ])
   }
 
+  if (vercel) {
+    Deno.writeTextFile(
+      join(name, 'vercel.json'),
+      JSON.stringify({
+        functions: {
+          'api/**/*.{j,t}s': {
+            runtime: `vercel-aleph@${vercelRuntimeVersion}`
+          }
+        }
+      }, undefined, 2),
+    )
+  }
+
   // cache deps in import maps
   console.log('Cache deps...')
   const urls = Object.values(importMap.imports).filter((v) => !v.endsWith('/'))
   const p = Deno.run({
     cmd: [Deno.execPath(), 'cache', ...urls, deno_x_brotli, deno_x_flate],
-    stderr: 'null',
-    stdout: 'null',
+    stderr: 'inherit',
+    stdout: 'inherit',
   })
   await p.status()
   p.close()
@@ -162,7 +175,8 @@ ${dim('▲')} aleph start  ${dim('# start the app in `production` mode')}
 ${dim('▲')} aleph build  ${dim('# build the app to a static site (SSG)')}
 
 Docs: ${cyan('https://alephjs.org/docs')}
-Bugs: ${cyan('https://alephjs.org.com/alephjs/aleph.js/issues')}`
+Bugs: ${cyan('https://alephjs.org.com/alephjs/aleph.js/issues')}
+`
   )
 
   Deno.exit(0)
