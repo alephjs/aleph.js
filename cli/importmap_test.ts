@@ -20,8 +20,8 @@ import * as im from './importmap.ts'
 import {
   assertEquals,
   assertMatch
-} from 'https://deno.land/std@0.96.0/testing/asserts.ts'
-import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.96.0/path/mod.ts'
+} from 'https://deno.land/std@0.106.0/testing/asserts.ts'
+import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import log from '../shared/log.ts'
 
 log.setLevel('error')
@@ -56,7 +56,7 @@ for (const tc of removeTests) {
  * These tests will fail the moment the packages used to test them update.
  * So they are commented out.
  */
-/*
+
 const updateTests = readTests('update')
 
 for (const tc of updateTests) {
@@ -65,7 +65,7 @@ for (const tc of updateTests) {
     assertEquals(tc.input, tc.output)
   })
 }
-*/
+
 
 function readTests(folderName: string) {
   const folderPath = join(fromFileUrl(dirname(import.meta.url)), `/importmap_tests/${folderName}/`)

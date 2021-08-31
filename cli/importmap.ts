@@ -1,5 +1,5 @@
-import { exists } from 'https://deno.land/std@0.96.0/fs/mod.ts'
-import { join } from 'https://deno.land/std@0.96.0/path/mod.ts'
+import { exists } from 'https://deno.land/std@0.106.0/fs/mod.ts'
+import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { getFlag } from '../shared/flags.ts'
 import log from '../shared/log.ts'
 
@@ -34,8 +34,10 @@ Examples:
  - std/ -> https://deno.land/std@<LATEST>/
  - std/hash -> https://deno.land/std@<LATEST>/hash/mod.ts
  - std/path/posix.ts -> https://deno.land/std@<LATEST>/path/posix.ts
- - std@0.96.0/hash -> https://deno.land/std@0.96.0/hash/mod.ts
+ - std@0.106.0/hash -> https://deno.land/std@0.106.0/hash/mod.ts
  - aleph/framework/core -> https://deno.land/x/aleph/framework/core/mod.ts
+ - @npm/react-dom -> https://esm.sh/react-dom@<LATEST>
+ - @npm/react@17.0.2 -> https://esm.sh/react@17.0.2
 `
 /**
  * https://github.com/WICG/import-maps
