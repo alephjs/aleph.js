@@ -2,17 +2,17 @@ export default {
   isString(a: any): a is string {
     return typeof a === 'string'
   },
-  isNEString(a: any): a is string {
+  isFilledString(a: any): a is string {
     return typeof a === 'string' && a.length > 0
   },
   isArray(a: any): a is Array<any> {
     return Array.isArray(a)
   },
-  isNEArray(a: any): a is Array<any> {
+  isFilledArray(a: any): a is Array<any> {
     return Array.isArray(a) && a.length > 0
   },
   isPlainObject(a: any): a is Record<string, any> {
-    return typeof a === 'object' && a !== null && !Array.isArray(a) && Object.getPrototypeOf(a) == Object.prototype
+    return typeof a === 'object' && a !== null && Object.getPrototypeOf(a) === Object.prototype
   },
   isFunction(a: any): a is Function {
     return typeof a === 'function'
@@ -33,8 +33,8 @@ export default {
     }
     return s
   },
-  splitBy(s: string, searchString: string): [string, string] {
-    const i = s.indexOf(searchString)
+  splitBy(s: string, searchString: string, fromLast = false): [string, string] {
+    const i = fromLast ? s.lastIndexOf(searchString) : s.indexOf(searchString)
     if (i >= 0) {
       return [s.slice(0, i), s.slice(i + 1)]
     }
@@ -56,22 +56,29 @@ export default {
     return atob(b64)
   },
   formatBytes(bytes: number) {
+    const fix = (n: number) => {
+      if (n >= 10) {
+        return Math.ceil(n)
+      } else {
+        return (Math.round(10 * n) / 10).toFixed(1).replace(/\.0$/, '')
+      }
+    }
     if (bytes < 1024) {
       return bytes.toString() + 'B'
     }
     if (bytes < 1024 ** 2) {
-      return Math.ceil(bytes / 1024) + 'KB'
+      return fix(bytes / 1024) + 'KB'
     }
     if (bytes < 1024 ** 3) {
-      return Math.ceil(bytes / 1024 ** 2) + 'MB'
+      return fix(bytes / 1024 ** 2) + 'MB'
     }
     if (bytes < 1024 ** 4) {
-      return Math.ceil(bytes / 1024 ** 3) + 'GB'
+      return fix(bytes / 1024 ** 3) + 'GB'
     }
     if (bytes < 1024 ** 5) {
-      return Math.ceil(bytes / 1024 ** 4) + 'TB'
+      return fix(bytes / 1024 ** 4) + 'TB'
     }
-    return Math.ceil(bytes / 1024 ** 5) + 'PB'
+    return fix(bytes / 1024 ** 5) + 'PB'
   },
   splitPath(path: string): string[] {
     return path
@@ -93,7 +100,7 @@ export default {
   debounce<T extends Function>(callback: T, delay: number): T {
     let timer: number | null = null
     return ((...args: any[]) => {
-      if (timer != null) {
+      if (timer !== null) {
         clearTimeout(timer)
       }
       timer = setTimeout(() => {
@@ -102,7 +109,7 @@ export default {
       }, delay)
     }) as any
   },
-  debounceX(id: string, callback: () => void, delay: number) {
+  debounceById(id: string, callback: () => void, delay: number) {
     const self = this as any
     const timers: Map<string, number> = self.__debounce_timers || (self.__debounce_timers = new Map())
     if (timers.has(id)) {
@@ -112,5 +119,10 @@ export default {
       timers.delete(id)
       callback()
     }, delay))
+  },
+  async isUrlOk(url: string): Promise<boolean> {
+    const res = await fetch(url).catch((e) => e)
+    await res.body?.cancel();
+    return res.status === 200
   }
 }

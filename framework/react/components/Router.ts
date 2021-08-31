@@ -1,45 +1,58 @@
-import {
-  ComponentType,
-  createElement,
-  useCallback,
-  useEffect,
-  useState,
-} from 'https://esm.sh/react@17.0.2'
+import { ComponentType, createElement, useCallback, useEffect, useState } from 'https://esm.sh/react@17.0.2'
+import { RouterURL } from '../../../types.d.ts'
 import events from '../../core/events.ts'
-import { importModule } from '../../core/module.ts'
-import { RouteModule, Routing } from '../../core/routing.ts'
+import { importModule, trimBuiltinModuleExts } from '../../core/module.ts'
+import { Routing } from '../../core/routing.ts'
 import { RouterContext } from '../context.ts'
 import { isLikelyReactComponent } from '../helper.ts'
-import { loadPageData } from '../pagedata.ts'
+import { shouldLoadData, loadPageData } from '../pagedata.ts'
+import type { PageProps } from '../pageprops.ts'
 import { createPageProps } from '../pageprops.ts'
 import { E400MissingComponent, E404Page, ErrorBoundary } from './ErrorBoundary.ts'
-import type { PageRoute } from './pageprops.ts'
+
+type PageRoute = PageProps & {
+  url: RouterURL
+}
+
+export async function importPageModules(url: RouterURL, nestedModules: string[], refresh = false): Promise<{ specifier: string, Component: any }[]> {
+  return await Promise.all(nestedModules.map(async specifier => {
+    const { default: Component } = await importModule(url.basePath, specifier, refresh)
+    return {
+      specifier,
+      Component
+    }
+  }))
+}
+
+export function createPageRoute(url: RouterURL, nestedModules: { specifier: string, Component: any }[]): PageRoute {
+  const nest = nestedModules.map(({ specifier, Component }) => {
+    const data = (window as any)[`pagedata://${url.toString()}#props-${btoa(specifier)}`] || {}
+    return {
+      specifier,
+      Component,
+      props: { ...data.value }
+    }
+  })
+  return { ...createPageProps(nest), url }
+}
 
 export default function Router({
-  customComponents,
+  appModule,
   pageRoute,
   routing,
 }: {
-  customComponents: Record<'E404' | 'App', { C: ComponentType, withData?: boolean }>
-  pageRoute: PageRoute,
+  appModule: {
+    default?: ComponentType
+    Loading?: ComponentType
+  }
+  pageRoute: PageRoute
   routing: Routing
 }) {
-  const appWithData = !!customComponents.App?.withData
-  const [e404, setE404] = useState<{ Component: ComponentType<any>, props?: Record<string, any> }>(() => {
-    const { E404 } = customComponents
-    if (E404) {
-      if (isLikelyReactComponent(E404.C)) {
-        return { Component: E404.C }
-      }
-      return { Component: E400MissingComponent, props: { name: 'Custom 404 Page' } }
-    }
-    return { Component: E404Page }
-  })
-  const [app, setApp] = useState<{ Component: ComponentType<any> | null, props?: Record<string, any> }>(() => {
-    const { App } = customComponents
+  const [app, setApp] = useState<{ Component: ComponentType<any> | null }>(() => {
+    const App = appModule.default
     if (App) {
-      if (isLikelyReactComponent(App.C)) {
-        return { Component: App.C }
+      if (isLikelyReactComponent(App)) {
+        return { Component: App }
       }
       return { Component: E400MissingComponent, props: { name: 'Custom App' } }
     }
@@ -47,20 +60,13 @@ export default function Router({
   })
   const [route, setRoute] = useState<PageRoute>(pageRoute)
   const onpopstate = useCallback(async (e: any) => {
-    const { basePath } = routing
     const [url, nestedModules] = routing.createRouter()
     if (url.routePath !== '') {
-      const imports = nestedModules.map(async mod => {
-        const { default: Component } = await importModule(basePath, mod.url, e.forceRefetch)
-        return {
-          url: mod.url,
-          Component
-        }
-      })
-      if (appWithData || nestedModules.findIndex(mod => !!mod.withData) > -1) {
+      const components = await importPageModules(url, nestedModules, e.forceRefetch)
+      if (await shouldLoadData(url)) {
         await loadPageData(url)
       }
-      setRoute({ ...createPageProps(await Promise.all(imports)), url })
+      setRoute(createPageRoute(url, components))
       if (e.resetScroll) {
         (window as any).scrollTo(0, 0)
       }
@@ -81,63 +87,40 @@ export default function Router({
   }, [])
 
   useEffect(() => {
-    const isDev = !('__ALEPH' in window)
+    const isDev = !('__ALEPH__' in window)
     const { basePath } = routing
-    const onAddModule = async (mod: RouteModule & { routePath?: string, isIndex?: boolean }) => {
-      switch (mod.url) {
-        case '/404.js': {
-          const { default: Component } = await importModule(basePath, mod.url, true)
-          if (isLikelyReactComponent(Component)) {
-            setE404({ Component })
-          } else {
-            setE404({ Component: E404Page })
-          }
-          break
+    const onAddModule = async (mod: { specifier: string, routePath?: string, isIndex?: boolean }) => {
+      const name = trimBuiltinModuleExts(mod.specifier)
+      if (name === '/app') {
+        const { default: Component } = await importModule(basePath, mod.specifier, true)
+        if (isLikelyReactComponent(Component)) {
+          setApp({ Component })
+        } else {
+          setApp({ Component: () => createElement(E400MissingComponent, { name: 'Custom App' }) })
         }
-        case '/app.js': {
-          const { default: Component } = await importModule(basePath, mod.url, true)
-          if (isLikelyReactComponent(Component)) {
-            setApp({ Component })
-          } else {
-            setApp({ Component: E400MissingComponent, props: { name: 'Custom App' } })
-          }
-          break
-        }
-        default: {
-          const { routePath, url, ...rest } = mod
-          if (routePath) {
-            routing.update(routePath, url, rest)
-            events.emit('popstate', { type: 'popstate', forceRefetch: true })
-          }
-          break
+      } else {
+        const { routePath, specifier, isIndex } = mod
+        if (routePath) {
+          routing.update(routePath, specifier, isIndex)
+          events.emit('popstate', { type: 'popstate', forceRefetch: true })
         }
       }
     }
-    const onRemoveModule = (url: string) => {
-      switch (url) {
-        case '/404.js':
-          setE404({ Component: E404Page })
-          break
-        case '/app.js':
-          setApp({ Component: null })
-          break
-        default:
-          if (url.startsWith('/pages/')) {
-            routing.removeRoute(url)
-            events.emit('popstate', { type: 'popstate' })
-          }
-          break
+    const onRemoveModule = (specifier: string) => {
+      const name = trimBuiltinModuleExts(specifier)
+      if (name === '/app') {
+        setApp({ Component: null })
+      } else if (specifier.startsWith('/pages/')) {
+        routing.removeRouteByModule(specifier)
+        events.emit('popstate', { type: 'popstate' })
       }
     }
     const onFetchPageModule = async ({ href }: { href: string }) => {
       const [url, nestedModules] = routing.createRouter({ pathname: href })
       if (url.routePath !== '') {
-        nestedModules.map(mod => {
-          importModule(basePath, mod.url)
+        nestedModules.map(modUrl => {
+          importModule(basePath, modUrl)
         })
-        if (appWithData || nestedModules.findIndex(mod => !!mod.withData) > -1) {
-          loadPageData(url)
-        }
       }
     }
 
@@ -180,9 +163,9 @@ export default function Router({
         RouterContext.Provider,
         { value: route.url },
         ...[
-          (route.Page && app.Component) && createElement(app.Component, Object.assign({}, app.props, { Page: route.Page, pageProps: route.pageProps })),
+          (route.Page && app.Component) && createElement(app.Component, route),
           (route.Page && !app.Component) && createElement(route.Page, route.pageProps),
-          !route.Page && createElement(e404.Component, e404.props)
+          !route.Page && createElement(E404Page)
         ].filter(Boolean),
       )
     )

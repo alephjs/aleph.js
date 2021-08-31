@@ -10,6 +10,10 @@ Deno.test(`util`, async () => {
   assertEquals(util.isLikelyHttpURL('file:///deno.land'), false)
   assertEquals(util.isLikelyHttpURL('www.deno.land'), false)
 
+  // test isUrlOk
+  assertEquals(await util.isUrlOk('https://deno.land'), true)
+  assertEquals(await util.isUrlOk('https://deno'), false)
+
   // test trimPrefix
   assertEquals(util.trimPrefix('foobar', 'foo'), 'bar')
   assertEquals(util.trimPrefix('foobar', 'baz'), 'foobar')
@@ -24,8 +28,10 @@ Deno.test(`util`, async () => {
   assertEquals(util.splitBy('foobar', '.'), ['foobar', ''])
 
   // test formatBytes
-  assertEquals(util.formatBytes(100), '100B')
-  assertEquals(util.formatBytes(1024 ** 1), '1KB')
+  assertEquals(util.formatBytes(1000), '1000B')
+  assertEquals(util.formatBytes(1024), '1KB')
+  assertEquals(util.formatBytes(2048), '2KB')
+  assertEquals(util.formatBytes(3000), '2.9KB')
   assertEquals(util.formatBytes(1024 ** 2), '1MB')
   assertEquals(util.formatBytes(1024 ** 3), '1GB')
   assertEquals(util.formatBytes(1024 ** 4), '1TB')
@@ -56,15 +62,15 @@ Deno.test(`util`, async () => {
   await delay(75)
   assertEquals(n, 2)
 
-  // test debounceX
+  // test debounceById
   n = 0
-  util.debounceX('key', () => n++, 50)
+  util.debounceById('id', () => n++, 50)
   assertEquals(n, 0)
   await delay(75)
   assertEquals(n, 1)
-  util.debounceX('key', () => n += 1, 50)
-  util.debounceX('key', () => n += 2, 50)
-  util.debounceX('key', () => n += 3, 50)
+  util.debounceById('id', () => n += 1, 50)
+  util.debounceById('id', () => n += 2, 50)
+  util.debounceById('id', () => n += 3, 50)
   assertEquals(n, 1)
   await delay(75)
   assertEquals(n, 4)

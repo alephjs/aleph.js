@@ -1,18 +1,13 @@
 import { ComponentType } from 'https://esm.sh/react@17.0.2'
-import type { RouterURL } from '../../types.ts'
 import { E400MissingComponent } from './components/ErrorBoundary.ts'
 import { isLikelyReactComponent } from './helper.ts'
 
 export type PageProps = {
   Page: ComponentType<any> | null
-  pageProps: (Partial<PageProps> & { name?: string }) | null
+  pageProps: Record<string, any> | null
 }
 
-export type PageRoute = PageProps & {
-  url: RouterURL
-}
-
-export function createPageProps(nestedComponents: { url: string, Component?: ComponentType<any> }[]): PageProps {
+export function createPageProps(nestedComponents: { specifier: string, Component?: ComponentType<any>, props?: Record<string, any> }[]): PageProps {
   const pageProps: PageProps = {
     Page: null,
     pageProps: null
@@ -27,20 +22,25 @@ export function createPageProps(nestedComponents: { url: string, Component?: Com
       return c
     }, pageProps)
   }
+
   return pageProps
 }
 
-function createPagePropsSegment(seg: { url: string, Component?: ComponentType<any> }): PageProps {
+function createPagePropsSegment(seg: {
+  specifier: string,
+  Component?: ComponentType<any>,
+  props?: Record<string, any>
+}): PageProps {
   const pageProps: PageProps = {
     Page: null,
-    pageProps: null
+    pageProps: seg.props || null
   }
   if (seg.Component) {
     if (isLikelyReactComponent(seg.Component)) {
       pageProps.Page = seg.Component
     } else {
       pageProps.Page = E400MissingComponent
-      pageProps.pageProps = { name: 'Page Component: ' + seg.url }
+      pageProps.pageProps = { name: 'Page Component: ' + seg.specifier }
     }
   }
   return pageProps

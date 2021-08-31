@@ -1,6 +1,6 @@
-import type { APIRequest } from 'aleph/types.ts'
+import type { APIHandler } from 'aleph/types.d.ts'
 
-export default async function handler(req: APIRequest) {
+export const handler: APIHandler = ({ response }) => {
   const count = parseInt(localStorage.getItem('count') || '0')
-  req.json({ count })
+  response.json({ count })
 }
