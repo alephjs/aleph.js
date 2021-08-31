@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .env.*
+**/.idea
 Thumbs.db
 compiler/target/
 compiler/pkg/

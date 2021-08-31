@@ -1,8 +1,8 @@
 import { createElement, ComponentType, ReactElement } from 'https://esm.sh/react@17.0.2'
 import { renderToString } from 'https://esm.sh/react-dom@17.0.2/server'
 import util from '../../shared/util.ts'
-import type { FrameworkRenderResult } from '../../server/ssr.ts'
-import type { RouterURL } from '../../types.ts'
+import type { FrameworkRenderResult } from '../../server/renderer.ts'
+import type { RouterURL } from '../../types.d.ts'
 import events from '../core/events.ts'
 import { RouterContext, SSRContext } from './context.ts'
 import { E400MissingComponent, E404Page } from './components/ErrorBoundary.ts'
@@ -19,10 +19,10 @@ export type RendererStore = {
 export async function render(
   url: RouterURL,
   App: ComponentType<any> | undefined,
-  nestedPageComponents: { url: string, Component?: any }[],
+  nestedPageComponents: { specifier: string, Component?: any, props?: Record<string, any> }[],
   styles: Record<string, { css?: string, href?: string }>
 ): Promise<FrameworkRenderResult> {
-  const global = globalThis as any
+  const global = window as any
   const ret: FrameworkRenderResult = {
     head: [],
     body: '',
@@ -35,17 +35,31 @@ export async function render(
     scripts: new Map(),
   }
   const dataUrl = 'pagedata://' + url.toString()
+  const dataKey = 'rendering-' + dataUrl
   const asyncCalls: Array<[string, number, Promise<any>]> = []
   const data: Record<string, any> = {}
   const renderingData: Record<string, any> = {}
   const pageProps = createPageProps(nestedPageComponents)
-  const defer = () => {
-    delete global['rendering-' + dataUrl]
+  const defer = async () => {
+    Reflect.deleteProperty(global, dataKey)
     events.removeAllListeners('useDeno-' + dataUrl)
   }
 
+  nestedPageComponents.forEach(({ specifier, props }) => {
+    if (util.isPlainObject(props)) {
+      let expires = 0
+      if (typeof props.$revalidate === 'number' && props.$revalidate > 0) {
+        expires = Date.now() + Math.round(props.$revalidate * 1000)
+      }
+      data[`props-${btoa(specifier)}`] = {
+        value: props,
+        expires
+      }
+    }
+  })
+
   // share rendering data
-  global['rendering-' + dataUrl] = renderingData
+  global[dataKey] = renderingData
 
   // listen `useDeno-*` events to get hooks callback result.
   events.on('useDeno-' + dataUrl, ({ id, value, expires }: { id: string, value: any, expires: number }) => {
@@ -77,17 +91,17 @@ export async function render(
 
   // `renderToString` might be invoked repeatedly when asyncchronous callbacks exist.
   while (true) {
+    if (asyncCalls.length > 0) {
+      const calls = asyncCalls.splice(0, asyncCalls.length)
+      const datas = await Promise.all(calls.map(a => a[2]))
+      calls.forEach(([id, expires], i) => {
+        const value = datas[i]
+        renderingData[id] = value
+        data[id] = { value, expires }
+      })
+    }
     try {
-      if (asyncCalls.length > 0) {
-        const calls = asyncCalls.splice(0, asyncCalls.length)
-        const datas = await Promise.all(calls.map(a => a[2]))
-        calls.forEach(([id, expires], i) => {
-          const value = datas[i]
-          renderingData[id] = value
-          data[id] = { value, expires }
-        })
-      }
-      Object.keys(rendererStore).forEach(key => rendererStore[key as keyof typeof rendererStore].clear())
+      Object.values(rendererStore).forEach(map => map.clear())
       ret.body = renderToString(createElement(
         SSRContext.Provider,
         { value: rendererStore },
@@ -115,18 +129,18 @@ export async function render(
   rendererStore.headElements.forEach(({ type, props }) => {
     const { children, ...rest } = props
     if (type === 'title') {
-      if (util.isNEString(children)) {
+      if (util.isFilledString(children)) {
         ret.head.push(`<title ssr>${children}</title>`)
-      } else if (util.isNEArray(children)) {
+      } else if (util.isFilledArray(children)) {
         ret.head.push(`<title ssr>${children.join('')}</title>`)
       }
     } else {
       const attrs = Object.entries(rest).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`).join('')
       if (type === 'script') {
         ret.head.push(`<${type}${attrs}>${Array.isArray(children) ? children.join('') : children || ''}</${type}>`)
-      } else if (util.isNEString(children)) {
+      } else if (util.isFilledString(children)) {
         ret.head.push(`<${type}${attrs} ssr>${children}</${type}>`)
-      } else if (util.isNEArray(children)) {
+      } else if (util.isFilledArray(children)) {
         ret.head.push(`<${type}${attrs} ssr>${children.join('')}</${type}>`)
       } else {
         ret.head.push(`<${type}${attrs} ssr />`)
@@ -137,11 +151,11 @@ export async function render(
   // insert script tags
   rendererStore.scripts.forEach(({ props }) => {
     const { children, dangerouslySetInnerHTML, ...attrs } = props
-    if (dangerouslySetInnerHTML && util.isNEString(dangerouslySetInnerHTML.__html)) {
+    if (dangerouslySetInnerHTML && util.isFilledString(dangerouslySetInnerHTML.__html)) {
       ret.scripts.push({ ...attrs, innerText: dangerouslySetInnerHTML.__html })
-    } if (util.isNEString(children)) {
+    } if (util.isFilledString(children)) {
       ret.scripts.push({ ...attrs, innerText: children })
-    } else if (util.isNEArray(children)) {
+    } else if (util.isFilledArray(children)) {
       ret.scripts.push({ ...attrs, innerText: children.join('') })
     } else {
       ret.scripts.push(props)

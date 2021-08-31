@@ -1,22 +1,13 @@
 import { assert, assertEquals } from 'std/testing/asserts.ts'
 import util from '../shared/util.ts'
-import type { LoaderPlugin, ServerPlugin } from '../types.ts'
 import { VERSION } from '../version.ts'
 import {
   computeHash,
   formatBytesWithColor,
   getAlephPkgUri,
   toRelativePath,
-  isLoaderPlugin,
   toLocalPath
 } from './helper.ts'
-
-Deno.test('server/helper: isLoaderPlugin', () => {
-  const loader: LoaderPlugin = { name: 'test', type: 'loader', test: /test/ }
-  const plugin: ServerPlugin = { name: 'test', type: 'server', setup: () => { } }
-  assert(isLoaderPlugin(loader))
-  assert(!isLoaderPlugin(plugin))
-})
 
 Deno.test('server/helper: getAlephPkgUri dev', () => {
   const port = 3000
@@ -52,13 +43,13 @@ Deno.test('server/helper: computeHash', () => {
 })
 
 Deno.test('server/helper: formatBytesWithColor', () => {
-  const OneLeftShift20 = 1048576 // 1 << 20 = 1048576 (1MB)
+  const OneLeftShift20 = 1048576   // 1 << 20 = 1048576 (1MB)
   const TenLeftShift20 = 10485760  // 10 << 20 = 10485760 (10MB)
   const OneMb = OneLeftShift20
-  const TwoMb = OneLeftShift20 + 1024
+  const OneHalfMb = OneLeftShift20 + 512 * 1024
   const ElevenMb = TenLeftShift20 + 1024
 
   assertEquals(formatBytesWithColor(OneMb), "\x1b[2m1MB\x1b[22m")
-  assertEquals(formatBytesWithColor(TwoMb), "\x1b[33m2MB\x1b[39m")
+  assertEquals(formatBytesWithColor(OneHalfMb), "\x1b[33m1.5MB\x1b[39m")
   assertEquals(formatBytesWithColor(ElevenMb), "\x1b[31m11MB\x1b[39m")
 })
