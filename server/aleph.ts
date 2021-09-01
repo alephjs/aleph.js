@@ -1186,8 +1186,6 @@ export class Aleph implements IAleph {
       }
     }
 
-    console.log('----', mod.specifier, !!source)
-
     defer()
     return [mod, source]
   }
