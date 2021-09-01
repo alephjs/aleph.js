@@ -9,7 +9,7 @@ import { isCSS, cssLoader } from './css.ts'
 Deno.test('plugin: css loader', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const aleph = new Aleph(dir, 'development')
+  const aleph = new Aleph(dir, { mode: 'development' })
   await ensureTextFile(
     join(dir, '/style/index.css'),
     'h1 { font-size: 18px; }'
@@ -31,7 +31,7 @@ Deno.test('plugin: css loader', async () => {
 Deno.test('plugin: css loader for remote external', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const aleph = new Aleph(dir, 'development')
+  const aleph = new Aleph(dir, { mode: 'development' })
   aleph.config.css.cache = false
   const { code } = await cssLoader({ specifier: 'https://esm.sh/tailwindcss/dist/tailwind.min.css', }, aleph)
   assertEquals(code, [
@@ -45,7 +45,7 @@ Deno.test('plugin: css loader for remote external', async () => {
 Deno.test('plugin: css loader for inline styles', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const aleph = new Aleph(dir, 'development')
+  const aleph = new Aleph(dir, { mode: 'development' })
   const { code, type } = await cssLoader({
     specifier: '#inline-style-{}',
     data: 'h1 { font-size: 18px; }'
@@ -59,7 +59,7 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DENO_TESTING', 'true')
     const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-    const aleph = new Aleph(dir, 'development')
+    const aleph = new Aleph(dir, { mode: 'development' })
     aleph.config.css.modules = {
       scopeBehaviour: 'local',
       generateScopedName: '[name]_[local]'
@@ -82,7 +82,7 @@ Deno.test({
 Deno.test('plugin: css loader with postcss plugins', async () => {
   Deno.env.set('DENO_TESTING', 'true')
   const dir = await Deno.makeTempDir({ prefix: 'aleph_plugin_testing' })
-  const aleph = new Aleph(dir, 'development')
+  const aleph = new Aleph(dir, { mode: 'development' })
   aleph.config.css.postcss = {
     plugins: ['postcss-nested']
   }
