@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.106.0/http/server.ts'
 import { Aleph } from '../server/aleph.ts'
 import { getFlag, parsePortNumber } from '../shared/flags.ts'
 import log from '../shared/log.ts'
@@ -18,28 +17,25 @@ Options:
 `
 
 export default async function (workingDir: string, flags: Record<string, any>) {
-  const aleph = new Aleph(workingDir, 'production', Boolean(flags.r || flags.reload))
+  const aleph = new Aleph(workingDir, { reload: Boolean(flags.r || flags.reload) })
   const port = parsePortNumber(getFlag(flags, ['p', 'port'], '9000'))
-  await aleph.ready
-  const entries = aleph.analyze()
-  const s = serve({ port })
-  log.info(`Server ready on http://localhost:${port}`)
-  for await (const r of s) {
-    r.respond({
-      headers: new Headers({
-        // todo: analyze page
-        'content-type': 'application/json',
-      }),
-      body: JSON.stringify(entries)
-    })
-  }
   const server = Deno.listen({ port })
+
+  await aleph.ready
   log.info(`Server ready on http://localhost:${port}`)
 
+  const entries = aleph.analyze()
   for await (const conn of server) {
     (async () => {
       const httpConn = Deno.serveHttp(conn)
-      for await (const requestEvent of httpConn) { }
+      for await (const e of httpConn) {
+        // todo: analyze UI
+        e.respondWith(new Response(JSON.stringify(entries), {
+          headers: new Headers({
+            'content-type': 'application/json',
+          })
+        }))
+      }
     })()
   }
 }

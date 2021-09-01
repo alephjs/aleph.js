@@ -14,7 +14,7 @@ Options:
 `
 
 export default async function (workingDir: string, options: Record<string, any>) {
-  const aleph = new Aleph(workingDir, 'production', Boolean(options.r || options.reload))
+  const aleph = new Aleph(workingDir, { reload: Boolean(options.r || options.reload) })
   await aleph.build()
   Deno.exit(0)
 }

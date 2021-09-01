@@ -14,7 +14,7 @@ import cssPlugin, { cssLoader } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, HtmlDescriptor, RouterURL, ResolveResult, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
+import type { Aleph as IAleph, DependencyDescriptor, FS, ImportMap, LoadInput, LoadOutput, Module, RouterURL, ResolveResult, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
@@ -57,6 +57,12 @@ type TransformListener = {
 
 type RenderListener = (input: RenderOutput & { path: string }) => void | Promise<void>
 
+type Options = {
+  mode?: 'development' | 'production',
+  reload?: boolean
+  fs?: FS
+}
+
 /** The class for Aleph server runtime. */
 export class Aleph implements IAleph {
   #config: RequiredConfig
@@ -82,17 +88,16 @@ export class Aleph implements IAleph {
 
   constructor(
     workingDir = '.',
-    mode: 'development' | 'production' = 'production',
-    reload = false
+    options: Options = {}
   ) {
     checkDenoVersion()
     checkAlephDev()
-    this.#mode = mode
+    this.#mode = options.mode || 'production'
     this.#workingDir = resolve(workingDir)
-    this.#buildDir = join(this.#workingDir, '.aleph', mode)
+    this.#buildDir = join(this.#workingDir, '.aleph', this.#mode)
     this.#config = { ...defaultConfig() }
     this.#importMap = { imports: {}, scopes: {} }
-    this.#ready = Deno.env.get('DENO_TESTING') ? Promise.resolve() : this.init(reload)
+    this.#ready = Deno.env.get('DENO_TESTING') ? Promise.resolve() : this.init(Boolean(options.reload))
   }
 
   /** initiate runtime */
@@ -645,7 +650,9 @@ export class Aleph implements IAleph {
   async #renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
     let [html, data] = await this.#renderer.renderPage(url, nestedModules)
     for (const callback of this.#renderListeners) {
-      callback({ path: url.toString(), html, data })
+      callback({
+        path: url.toString(), html, data
+      })
     }
     return [buildHtml(html, !this.isDev), data]
   }

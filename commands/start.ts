@@ -21,7 +21,7 @@ Options:
 `
 
 export default async function (workingDir: string, flags: Record<string, any>) {
-  const aleph = new Aleph(workingDir, 'production', Boolean(flags.r || flags.reload))
+  const aleph = new Aleph(workingDir, { reload: Boolean(flags.r || flags.reload) })
   const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
   const hostname = getFlag(flags, ['hostname'])
   const certFile = getFlag(flags, ['tls-cert'])

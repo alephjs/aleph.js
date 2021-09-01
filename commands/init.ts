@@ -12,6 +12,7 @@ import { VERSION } from '../version.ts'
 import { deno_x_brotli, deno_x_flate } from '../server/compress.ts'
 
 const vercelRuntimeVersion = '0.7.0'
+const namingRegexp = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
 
 export const helpMessage = `
 Usage:
@@ -36,7 +37,7 @@ export default async function (
     return
   }
 
-  if (!/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) {
+  if (!namingRegexp.test(name)) {
     console.error(`Invalid project name: ${red(name)}`)
     return
   }
