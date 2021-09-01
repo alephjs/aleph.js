@@ -230,7 +230,7 @@ export class Bundler {
     entry.map((specifier) => {
       let mod = this.#aleph.getModule(specifier)
       if (mod) {
-        hasher.update(this.#aleph.gteModuleHash(mod))
+        hasher.update(this.#aleph.computeModuleHash(mod))
       }
     })
     const bundleFilename = `${name}.bundle.${hasher.toString().slice(0, 8)}.js`

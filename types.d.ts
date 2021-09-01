@@ -6,11 +6,11 @@ export interface Aleph {
   readonly workingDir: string
   readonly config: RequiredConfig
   addDist(path: string, content: Uint8Array): Promise<void>
-  addModule(specifier: string, sourceCode: string): Promise<{ specifier: string, jsFile: string }>
+  addModule(specifier: string, sourceCode: string, forceRefresh?: boolean): Promise<Module>
   fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
-  onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformOutput & { module: Module }) => TransformOutput | void | Promise<TransformOutput> | Promise<void>): void
+  onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformInput) => TransformOutput | void | Promise<TransformOutput | void>): void
   onRender(callback: (input: RenderOutput) => Promise<void> | void): void
 }
 
@@ -86,10 +86,20 @@ export type LoadOutput = {
 }
 
 /**
+ * The input of the `onTransform` hook.
+ */
+export type TransformInput = {
+  module: Omit<Module, 'jsBuffer' | 'ready'>
+  code: string
+  map?: string
+}
+
+/**
  * The output of the `onTransform` hook.
  */
 export type TransformOutput = {
   code: string
+  extraDeps?: DependencyDescriptor[]
   map?: string
 }
 
@@ -113,6 +123,7 @@ export type Module = {
 /** The Dependency Descriptor. */
 type DependencyDescriptor = {
   readonly specifier: string
+  virtual?: boolean
   isDynamic?: boolean
   hashLoc?: number
 }
