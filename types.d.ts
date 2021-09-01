@@ -14,6 +14,18 @@ export interface Aleph {
   onRender(callback: (input: RenderOutput) => Promise<void> | void): void
 }
 
+export interface FS {
+  readonly root: string
+  exists(path: string): Promise<[boolean, boolean]>
+  readDir(path: string): AsyncIterable<Deno.DirEntry>
+  readFile(path: string): Promise<Uint8Array>
+  writeFile(path: string, data: Promise<Uint8Array>): Promise<void>
+  readTextFile(path: string): Promise<string>
+  writeTextFile(path: string, data: Promise<string>): Promise<void>
+  remove(path: string): Promise<void>
+  watch(callback: (type: 'remove' | 'change', path: string) => void, delay?: number): void
+}
+
 /**
  * The configuration for aleph application.
  */
