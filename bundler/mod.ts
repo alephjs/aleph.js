@@ -8,7 +8,8 @@ import type { DependencyGraph } from '../server/analyzer.ts'
 import type { Aleph } from '../server/aleph.ts'
 import { clearBuildCache, computeHash, getAlephPkgUri } from '../server/helper.ts'
 import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
-import type { BrowserName, Module } from '../types.d.ts'
+import util from '../shared/util.ts'
+import type { BrowserName, Module, DependencyDescriptor } from '../types.d.ts'
 import { VERSION } from '../version.ts'
 import { esbuild, stopEsbuild, esmLoader } from './esbuild.ts'
 
@@ -136,7 +137,7 @@ export class Bundler {
       return jsFile
     }
 
-    let source = await this.#aleph.resolveModuleSource(mod.specifier)
+    let source = 'source' in mod ? (mod as any).source : await this.#aleph.resolveModuleSource(mod.specifier)
     if (source === null) {
       this.#compiled.delete(mod.specifier)
       throw new Error(`Unsupported module '${mod.specifier}'`)
@@ -175,8 +176,22 @@ export class Bundler {
         }
       }
 
+      let extraDeps: DependencyDescriptor[] = []
+      for (const { test, transform } of this.#aleph.transformListeners) {
+        if (test instanceof RegExp && test.test(mod.specifier)) {
+          const { jsBuffer, ready, ...rest } = mod
+          const ret = await transform({ module: { ...structuredClone(rest) }, code, bundleMode: true })
+          if (util.isFilledString(ret?.code)) {
+            code = ret!.code
+          }
+          if (Array.isArray(ret?.extraDeps)) {
+            extraDeps.push(...ret!.extraDeps)
+          }
+        }
+      }
+
       // compile deps
-      await Promise.all(mod.deps.map(async dep => {
+      await Promise.all(mod.deps.concat(extraDeps).map(async dep => {
         if (!dep.specifier.startsWith('#') && !externals.includes(dep.specifier)) {
           const depMod = this.#aleph.getModule(dep.specifier)
           if (depMod !== null) {

@@ -8,6 +8,7 @@ export interface Aleph {
   addDist(path: string, content: Uint8Array): Promise<void>
   addModule(specifier: string, sourceCode: string, forceRefresh?: boolean): Promise<Module>
   fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
+  resolveImport(module: Module, importer: string, bundleMode?: boolean, timeStamp?: boolean): string
   onResolve(test: RegExp, resolve: (specifier: string) => ResolveResult): void
   onLoad(test: RegExp, load: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void
   onTransform(test: 'hmr' | 'main' | RegExp, transform: (input: TransformInput) => TransformOutput | void | Promise<TransformOutput | void>): void
@@ -91,6 +92,7 @@ export type LoadOutput = {
 export type TransformInput = {
   module: Omit<Module, 'jsBuffer' | 'ready'>
   code: string
+  bundleMode?: boolean
   map?: string
 }
 
