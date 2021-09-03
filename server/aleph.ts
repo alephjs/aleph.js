@@ -14,7 +14,10 @@ import cssPlugin, { cssLoader } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph as IAleph, DependencyDescriptor, FS, ImportMap, LoadInput, LoadOutput, Module, RouterURL, ResolveResult, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
+import type {
+  Aleph as IAleph, DependencyDescriptor, FS, ImportMap, LoadInput, LoadOutput,
+  Module, RouterURL, ResolveResult, RenderOutput, SSRData, TransformInput, TransformOutput
+} from '../types.d.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
