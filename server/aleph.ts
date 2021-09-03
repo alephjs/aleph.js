@@ -38,6 +38,7 @@ type CompileOptions = {
   forceRefresh?: boolean,
   ignoreDeps?: boolean,
   httpExternal?: boolean
+  virtual?: boolean
 }
 
 type ResolveListener = {
@@ -52,7 +53,7 @@ type LoadListener = {
 
 type TransformListener = {
   test: RegExp | 'hmr' | 'main',
-  transform(input: TransformOutput & { module: Module }): TransformOutput | void | Promise<TransformOutput> | Promise<void>,
+  transform(input: TransformInput): TransformOutput | void | Promise<TransformOutput | void>,
 }
 
 type RenderListener = (input: RenderOutput & { path: string }) => void | Promise<void>
@@ -323,7 +324,7 @@ export class Aleph implements IAleph {
           const module = await this.compile(specifier, {
             forceRefresh: true,
             ignoreDeps: true,
-            httpExternal: specifier.startsWith('/api/')
+            httpExternal: prevModule.httpExternal
           })
           const refreshPage = (
             this.#config.ssr &&
@@ -475,6 +476,10 @@ export class Aleph implements IAleph {
     return this.#ready
   }
 
+  get transformListeners() {
+    return this.#transformListeners
+  }
+
   /** get the module by given specifier. */
   getModule(specifier: string): Module | null {
     if (specifier === 'app') {
@@ -531,25 +536,28 @@ export class Aleph implements IAleph {
   }
 
   /** add a module by given path and optional source code. */
-  async addModule(specifier: string, sourceCode: string): Promise<Module> {
+  async addModule(specifier: string, sourceCode: string, forceRefresh?: boolean): Promise<Module> {
     let sourceType = getSourceType(specifier)
     if (sourceType === SourceType.Unknown) {
       throw new Error("addModule: unknown souce type")
     }
+    const source = {
+      code: sourceCode,
+      type: sourceType,
+    }
     const module = await this.compile(specifier, {
-      source: {
-        code: sourceCode,
-        type: sourceType,
-      }
+      source,
+      forceRefresh,
     })
     if (specifier.startsWith('pages/') || specifier.startsWith('api/')) {
       specifier = '/' + specifier
     }
-    if (specifier.startsWith('/pages/')) {
+    if (specifier.startsWith('/pages/') && this.isPageModule(specifier)) {
       this.#pageRouting.update(...this.createRouteUpdate(specifier))
     } else if (specifier.startsWith('/api/') && !specifier.startsWith('/api/_middlewares.')) {
       this.#apiRouting.update(...this.createRouteUpdate(specifier))
     }
+    Object.assign(module, { source })
     return module
   }
 
@@ -714,8 +722,7 @@ export class Aleph implements IAleph {
             specifier: '/main.js',
             deps: [],
             sourceHash: '',
-            jsFile: '',
-            ready: Promise.resolve()
+            jsFile: ''
           },
           code,
         })
@@ -782,7 +789,7 @@ export class Aleph implements IAleph {
     ]
   }
 
-  gteModuleHash(module: Module) {
+  computeModuleHash(module: Module) {
     const hasher = createHash('md5').update(module.sourceHash)
     this.lookupDeps(module.specifier, dep => {
       const depMod = this.getModule(dep.specifier)
@@ -946,7 +953,7 @@ export class Aleph implements IAleph {
 
   async importModule<T = any>(module: Module): Promise<T> {
     const path = join(this.#buildDir, module.jsFile)
-    const hash = this.gteModuleHash(module)
+    const hash = this.computeModuleHash(module)
     if (existsFile(path)) {
       return await import(`file://${path}#${(hash).slice(0, 6)}`)
     }
@@ -986,7 +993,8 @@ export class Aleph implements IAleph {
     }
     for (const { test, transform } of this.#transformListeners) {
       if (test === 'hmr') {
-        const ret = await transform({ module: { ...module }, code })
+        const { jsBuffer, ready, ...rest } = module
+        const ret = await transform({ module: structuredClone(rest), code })
         if (util.isFilledString(ret?.code)) {
           code = ret!.code
         }
@@ -1028,6 +1036,21 @@ export class Aleph implements IAleph {
       forceRefresh: this.#reloading,
       retryTimes: 10
     })
+  }
+
+  resolveImport({ jsFile, sourceHash }: Module, importer: string, bundleMode?: boolean, timeStamp?: boolean): string {
+    const relPath = toRelativePath(
+      dirname(toLocalPath(importer)),
+      jsFile
+    )
+    if (bundleMode) {
+      return util.trimSuffix(relPath, '.js') + '.bundling.js'
+    }
+    let hash = '#' + sourceHash.slice(0, 8)
+    if (timeStamp) {
+      hash += '-' + Date.now()
+    }
+    return relPath + hash
   }
 
   async resolveModuleSource(specifier: string, data?: any): Promise<ModuleSource> {
@@ -1084,7 +1107,7 @@ export class Aleph implements IAleph {
   /** init the module by given specifier, don't transpile the code when the returned `source` is equal to null */
   private async initModule(
     specifier: string,
-    { source: customSource, forceRefresh, httpExternal }: CompileOptions = {}
+    { source: customSource, forceRefresh, httpExternal, virtual }: CompileOptions = {}
   ): Promise<[Module, ModuleSource | null]> {
     let external = false
     let data: any = null
@@ -1155,21 +1178,21 @@ export class Aleph implements IAleph {
       this.#appModule = mod
     }
 
-    if (await existsFile(metaFp)) {
+    if (!forceRefresh && await existsFile(metaFp)) {
       try {
-        const { specifier: _specifier, sourceHash, deps, isStyle, ssrPropsFn, ssgPathsFn, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
-        if (_specifier === specifier && util.isFilledString(sourceHash) && util.isArray(deps)) {
-          mod.sourceHash = sourceHash
-          mod.deps = deps
-          mod.isStyle = Boolean(isStyle) || undefined
-          mod.ssrPropsFn = util.isFilledString(ssrPropsFn) ? ssrPropsFn : undefined
-          mod.ssgPathsFn = Boolean(ssgPathsFn) || undefined
-          mod.denoHooks = util.isFilledArray(denoHooks) ? denoHooks : undefined
+        const meta = JSON.parse(await Deno.readTextFile(metaFp))
+        if (meta.specifier === specifier && util.isFilledString(meta.sourceHash) && util.isArray(meta.deps)) {
+          Object.assign(mod, meta)
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
           Deno.remove(metaFp)
         }
       } catch (e) { }
+    }
+
+    if (virtual) {
+      defer()
+      return [mod, null]
     }
 
     if (!isRemote || this.#reloading || mod.sourceHash === '' || !await existsFile(cacheFp)) {
@@ -1279,14 +1302,19 @@ export class Aleph implements IAleph {
         }
       }
 
+      let extraDeps: DependencyDescriptor[] = []
       for (const { test, transform } of this.#transformListeners) {
         if (test instanceof RegExp && test.test(specifier)) {
-          const ret = await transform({ module: { ...module }, code: jsCode, map: sourceMap })
+          const { jsBuffer, ready, ...rest } = module
+          const ret = await transform({ module: { ...structuredClone(rest) }, code: jsCode, map: sourceMap })
           if (util.isFilledString(ret?.code)) {
             jsCode = ret!.code
           }
           if (util.isFilledString(ret?.map)) {
             sourceMap = ret!.map
+          }
+          if (Array.isArray(ret?.extraDeps)) {
+            extraDeps.push(...ret!.extraDeps)
           }
         }
       }
@@ -1298,7 +1326,7 @@ export class Aleph implements IAleph {
 
       module.jsBuffer = encoder.encode(jsCode)
       module.deps = deps.filter(({ specifier }) => specifier !== module.specifier).map(({ specifier, resolved, isDynamic }) => {
-        const dep: DependencyDescriptor = { specifier }
+        const dep: DependencyDescriptor = { specifier, }
         if (isDynamic) {
           dep.isDynamic = true
         }
@@ -1310,7 +1338,7 @@ export class Aleph implements IAleph {
           }
         }
         return dep
-      })
+      }).concat(extraDeps)
 
       ms.stop(`transpile '${specifier}'`)
 
@@ -1319,11 +1347,16 @@ export class Aleph implements IAleph {
 
     if (module.deps.length > 0) {
       let fsync = false
-      await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
-        let depModule: Module | null
-        if (ignoreDeps) {
+      await Promise.all(module.deps.map(async ({ specifier, hashLoc, virtual }) => {
+        let depModule: Module | null = null
+        if (ignoreDeps || virtual) {
           depModule = this.getModule(specifier)
-        } else {
+          if (depModule == null && virtual) {
+            const [mod] = await this.initModule(specifier, { virtual: true })
+            depModule = mod
+          }
+        }
+        if (depModule === null) {
           const [mod, src] = await this.initModule(specifier, { httpExternal })
           if (!mod.external) {
             await this.transpileModule(mod, src, false, __tracing)
@@ -1332,7 +1365,7 @@ export class Aleph implements IAleph {
         }
         if (depModule) {
           if (hashLoc !== undefined) {
-            const hash = this.gteModuleHash(depModule)
+            const hash = this.computeModuleHash(depModule)
             if (await this.replaceDepHash(module, hashLoc, hash)) {
               fsync = true
             }
@@ -1363,7 +1396,7 @@ export class Aleph implements IAleph {
           const { specifier, hashLoc } = dep
           if (specifier === by.specifier && hashLoc !== undefined) {
             if (hash == null) {
-              hash = this.gteModuleHash(by)
+              hash = this.computeModuleHash(by)
             }
             if (await this.replaceDepHash(mod, hashLoc, hash)) {
               fsync = true
@@ -1403,22 +1436,14 @@ export class Aleph implements IAleph {
   }
 
   private async cacheModule(module: Module, sourceMap?: string) {
-    const { specifier, jsBuffer, jsFile } = module
+    const { jsBuffer, jsFile, ready, ...rest } = module
     if (jsBuffer) {
       const cacheFp = join(this.#buildDir, jsFile)
       const metaFp = cacheFp.slice(0, -3) + '.meta.json'
       await ensureDir(dirname(cacheFp))
       await Promise.all([
         Deno.writeFile(cacheFp, jsBuffer),
-        Deno.writeTextFile(metaFp, JSON.stringify({
-          specifier,
-          sourceHash: module.sourceHash,
-          isStyle: module.isStyle,
-          ssrPropsFn: module.ssrPropsFn,
-          ssgPathsFn: module.ssgPathsFn,
-          denoHooks: module.denoHooks,
-          deps: module.deps,
-        }, undefined, 2)),
+        Deno.writeTextFile(metaFp, JSON.stringify({ ...rest }, undefined, 2)),
         sourceMap ? Deno.writeTextFile(`${cacheFp}.map`, sourceMap) : Promise.resolve(),
         lazyRemove(cacheFp.slice(0, -3) + '.bundling.js'),
       ])

@@ -45,16 +45,18 @@ export function applyCSS(url: string, { css, href }: { css?: string, href?: stri
         return el.getAttribute('data-module-id') === url
       })
       const clean = () => {
-        if (prevEls.length > 0) {
-          prevEls.forEach(el => document.head.removeChild(el))
-        }
+        setTimeout(() => {
+          if (prevEls.length > 0) {
+            prevEls.forEach(el => document.head.removeChild(el))
+          }
+        }, 0)
       }
       let el: any
       if (util.isFilledString(css)) {
         el = document.createElement('style')
         el.type = 'text/css'
         el.appendChild(document.createTextNode(css))
-        Promise.resolve().then(clean)
+        clean()
       } else if (util.isFilledString(href)) {
         el = document.createElement('link')
         el.rel = 'stylesheet'
