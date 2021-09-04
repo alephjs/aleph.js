@@ -27,15 +27,22 @@ export class Renderer {
   #aleph: Aleph
   #renderer: FrameworkRenderer
   #cache: Map<string, Map<string, { html: string, data: Record<string, SSRData> | null }>>
+  #ready: boolean
 
   constructor(app: Aleph) {
     this.#aleph = app
     this.#renderer = { render: async () => { throw new Error("framework renderer is undefined") } }
     this.#cache = new Map()
+    this.#ready = false
+  }
+
+  get ready() {
+    return this.#ready
   }
 
   setFrameworkRenderer(renderer: FrameworkRenderer) {
     this.#renderer = renderer
+    this.#ready = true
   }
 
   async cache(

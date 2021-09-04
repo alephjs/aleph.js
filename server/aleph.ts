@@ -216,15 +216,6 @@ export class Aleph implements IAleph {
     const { init } = await import(`../framework/${this.#config.framework}/init.ts`)
     await init(this)
 
-    // compile and import framework renderer
-    if (this.#config.ssr) {
-      const mod = await this.compile(`${alephPkgUri}/framework/${this.#config.framework}/renderer.ts`)
-      const { render } = await this.importModule(mod)
-      if (util.isFunction(render)) {
-        this.#renderer.setFrameworkRenderer({ render })
-      }
-    }
-
     ms.stop(`init ${this.#config.framework} framework`)
 
     const appFile = await findFile(srcDir, builtinModuleExts.map(ext => `app.${ext}`))
@@ -651,6 +642,14 @@ export class Aleph implements IAleph {
   }
 
   async #renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
+    // compile and import framework renderer
+    if (!this.#renderer.ready) {
+      const mod = await this.compile(`${getAlephPkgUri()}/framework/${this.#config.framework}/renderer.ts`)
+      const { render } = await this.importModule(mod)
+      if (util.isFunction(render)) {
+        this.#renderer.setFrameworkRenderer({ render })
+      }
+    }
     let [html, data] = await this.#renderer.renderPage(url, nestedModules)
     for (const callback of this.#renderListeners) {
       callback({ path: url.toString(), html, data })
