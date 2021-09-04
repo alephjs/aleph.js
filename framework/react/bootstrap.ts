@@ -19,6 +19,13 @@ export default async function bootstrap(options: BootstrapOptions) {
   const routing = new Routing({ routes, rewrites, basePath, defaultLocale, locales, redirect })
   const [url, nestedModules] = routing.createRouter()
   const components = await importPageModules(url, nestedModules)
+
+  if (renderMode === 'ssr') {
+    // restore ssr-data from HTML
+    // must be called before creating page props
+    loadSSRDataFromTag(url)
+  }
+
   const pageRoute = createPageRoute(url, components)
   const routerEl = createElement(Router, { appModule, pageRoute, routing })
   const mountPoint = document.getElementById('__aleph')
@@ -27,7 +34,6 @@ export default async function bootstrap(options: BootstrapOptions) {
     if (dataRoutes) {
       setStaticDataRoutes(dataRoutes)
     }
-    loadSSRDataFromTag(url)
     hydrate(routerEl, mountPoint)
   } else {
     render(routerEl, mountPoint)
