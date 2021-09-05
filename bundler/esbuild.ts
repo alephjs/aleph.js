@@ -40,8 +40,6 @@ export const denoPlugin: Plugin = {
       const isRemote = util.isLikelyHttpURL(args.path)
       const path = isRemote ? args.path : util.trimPrefix(args.path, 'file://')
 
-
-      console.log(args)
       if (
         args.kind === 'url-token' ||
         (args.kind === 'import-rule' && (isRemote || path.startsWith('/')))

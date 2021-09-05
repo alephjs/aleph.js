@@ -21,8 +21,8 @@ import { cache } from './cache.ts'
 import type { RequiredConfig } from './config.ts'
 import { defaultConfig, fixConfigAndImportMap, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
 import {
-  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile,
-  getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath
+  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, decoder, encoder, findFile,
+  getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath,
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { buildHtml, Renderer } from './renderer.ts'
@@ -798,7 +798,7 @@ export class Aleph implements IAleph {
     if (sourceType === SourceType.Unknown || sourceType === SourceType.CSS) {
       return []
     }
-    const code = (new TextDecoder).decode(content)
+    const code = decoder.decode(content)
     const names = await parseExportNames(specifier, code, { sourceType })
     return (await Promise.all(names.map(async name => {
       if (name.startsWith('{') && name.endsWith('}')) {
@@ -827,7 +827,7 @@ export class Aleph implements IAleph {
         if (type !== 'css') {
           for (const { test, load } of this.#loadListeners) {
             if (test.test(`.${type}`)) {
-              const { code, type: codeType } = await load({ specifier: key, data: (new TextEncoder).encode(tpl) })
+              const { code, type: codeType } = await load({ specifier: key, data: encoder.encode(tpl) })
               if (codeType === 'css') {
                 type = 'css'
                 tpl = code
@@ -836,7 +836,7 @@ export class Aleph implements IAleph {
             }
           }
         }
-        const { code } = await cssLoader({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
+        const { code } = await cssLoader({ specifier: key, data: encoder.encode(tpl) }, this)
         return code
       },
       isDev: this.isDev,
@@ -969,7 +969,7 @@ export class Aleph implements IAleph {
       return module.jsBuffer
     }
 
-    let code = new TextDecoder().decode(module.jsBuffer)
+    let code = decoder.decode(module.jsBuffer)
     if (module.denoHooks?.length || module.ssrPropsFn || module.ssgPathsFn) {
       if ('csrCode' in module) {
         code = (module as any).csrCode
@@ -992,7 +992,7 @@ export class Aleph implements IAleph {
         // todo: merge source map
       }
     }
-    return new TextEncoder().encode([
+    return encoder.encode([
       `import.meta.hot = $createHotContext(${JSON.stringify(specifier)});`,
       '',
       code,
@@ -1075,7 +1075,7 @@ export class Aleph implements IAleph {
       const source = await this.fetchModule(specifier)
       sourceType = getSourceType(specifier, source.contentType || undefined)
       if (sourceType !== SourceType.Unknown) {
-        sourceCode = (new TextDecoder).decode(source.content)
+        sourceCode = decoder.decode(source.content)
       }
     }
 
@@ -1234,7 +1234,6 @@ export class Aleph implements IAleph {
       }
 
       const ms = new Measure()
-      const encoder = new TextEncoder()
       const { code, deps = [], denoHooks, ssrPropsFn, ssgPathsFn, starExports, jsxStaticClassNames, map } = await transform(specifier, source.code, {
         ...this.commonCompilerOptions,
         sourceMap: this.isDev,
@@ -1405,7 +1404,7 @@ export class Aleph implements IAleph {
 
   /** replace dep hash in the `jsBuffer` and remove `csrCode` cache if it exits */
   private async replaceDepHash(module: Module, hashLoc: number, hash: string) {
-    const hashData = (new TextEncoder()).encode(hash.substr(0, 6))
+    const hashData = encoder.encode(hash.substr(0, 6))
     const jsBuffer = await this.getModuleJS(module)
     if (jsBuffer && !equals(hashData, jsBuffer.slice(hashLoc, hashLoc + 6))) {
       copy(hashData, jsBuffer, hashLoc)

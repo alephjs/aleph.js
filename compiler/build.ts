@@ -4,7 +4,6 @@ import { exists } from 'https://deno.land/std@0.106.0/fs/exists.ts'
 import { ensureDir } from 'https://deno.land/std@0.106.0/fs/ensure_dir.ts'
 import { createHash } from 'https://deno.land/std@0.106.0/hash/mod.ts'
 import { compress } from 'https://deno.land/x/brotli@v0.1.4/mod.ts'
-import util from '../shared/util.ts'
 
 async function run(cmd: string[]) {
   const p = Deno.run({

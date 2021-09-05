@@ -108,14 +108,15 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
     css = sourceCode
   }
 
+  // in testing env, we don't bundle the css
   if (!Deno.env.get('DENO_TESTING')) {
     try {
       const ret = await esbuild({
         stdin: {
           loader: 'css',
+          contents: css,
+          sourcefile: join(aleph.workingDir, specifier),
           resolveDir: join(aleph.workingDir, dirname(specifier)),
-          sourcefile: specifier,
-          contents: css
         },
         write: false,
         bundle: true,

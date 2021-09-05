@@ -167,6 +167,7 @@ export class Bundler {
         }
       )
 
+      // in production(bundle) mode we need to replace the star export with names
       if (starExports && starExports.length > 0) {
         for (let index = 0; index < starExports.length; index++) {
           const specifier = starExports[index]
