@@ -10,7 +10,7 @@ import { wasmChecksum, parseExportNames, SourceType, transform, stripSsrCode } f
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
-import cssPlugin, { cssLoader } from '../plugins/css.ts'
+import { cssLoader } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -194,7 +194,6 @@ export class Aleph implements IAleph {
     ms.stop(`init env`)
 
     // apply plugins
-    cssPlugin().setup(this)
     await Promise.all(
       this.#config.plugins.map(async plugin => {
         await plugin.setup(this)

@@ -1,14 +1,12 @@
-import { extname, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { esbuild, esmLoader } from '../bundler/esbuild.ts'
-import { toLocalPath, computeHash } from '../server/helper.ts'
 import { existsFile } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph, LoadInput, LoadOutput, Plugin, PostCSSPlugin } from '../types.d.ts'
+import type { Aleph, LoadInput, LoadOutput, PostCSSPlugin } from '../types.d.ts'
 
-const test = /\.(css|pcss|postcss)$/i
 const postcssVersion = '8.3.6'
-const postcssModulesVersion = '4.1.3'
+const postcssModulesVersion = '4.2.2'
 const productionOnlyPostcssPlugins = ['autoprefixer']
 const isModulesPluginName = (v: any): v is string => (typeof v === 'string' && /^postcss\-modules(@|$)/i.test(v.trim()))
 
@@ -144,8 +142,6 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
   }
 }
 
-export const isCSS = (specifier: string): boolean => test.test(specifier)
-
 async function initPostCSS(plugins: PostCSSPlugin[], isDev: boolean) {
   const postPlugins = await Promise.all(plugins.filter(p => {
     if (isDev) {
@@ -179,16 +175,7 @@ async function initPostCSS(plugins: PostCSSPlugin[], isDev: boolean) {
 }
 
 async function importPostcssPluginByName(name: string) {
-  const url = `https://esm.sh/${name}?deps=postcss@${postcssVersion}&no-check`
+  const url = `https://esm.sh/${name}?deps=postcss@${postcssVersion}&bundle&no-check`
   const { default: Plugin } = await import(url)
   return Plugin
-}
-
-export default (): Plugin => {
-  return {
-    name: 'css-loader',
-    setup: aleph => {
-      aleph.onResolve(test, () => ({ acceptHMR: true }))
-    }
-  }
 }
