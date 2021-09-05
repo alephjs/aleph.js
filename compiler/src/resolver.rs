@@ -21,7 +21,7 @@ lazy_static! {
     r"^https?://deno.land/x/aleph(@v?[0-9a-z\.\-]+)?/"
   ).unwrap();
   pub static ref RE_REACT_URL: Regex = Regex::new(
-    r"^https?://(esm.sh|cdn.esm.sh|cdn.esm.sh.cn|esm.x-static.io)(/v\d+)?/react(\-dom)?(@[\^|~]{0,1}[0-9a-z\.\-]+)?([/|\?].*)?$"
+    r"^https?://(esm\.sh|cdn\.esm\.sh|esm\.x-static\.io)(/v\d+)?/react(\-dom)?(@[^/]+)?(/.*)?$"
   )
   .unwrap();
 }
@@ -297,7 +297,7 @@ impl Resolver {
           ("".to_owned(), false)
         };
         let non_esm_sh_cdn = match host {
-          "esm.sh" | "cdn.esm.sh" | "cdn.esm.sh.cn" | "esm.x-static.io" => false,
+          "esm.sh" | "cdn.esm.sh" | "esm.x-static.io" => false,
           _ => true,
         };
         if non_esm_sh_cdn {
