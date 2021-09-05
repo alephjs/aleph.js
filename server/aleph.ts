@@ -5,8 +5,8 @@ import { walk } from 'https://deno.land/std@0.106.0/fs/walk.ts'
 import { createHash } from 'https://deno.land/std@0.106.0/hash/mod.ts'
 import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
-import type { TransformOptions } from '../compiler/mod.ts'
-import { wasmChecksum, parseExportNames, SourceType, transform, stripSsrCode } from '../compiler/mod.ts'
+import type { TransformOptions, TransformResult, ModuleSource } from '../compiler/mod.ts'
+import { wasmChecksum, parseExportNames, SourceType, fastTransform, transform, stripSsrCode } from '../compiler/mod.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
@@ -26,12 +26,6 @@ import {
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { buildHtml, Renderer } from './renderer.ts'
-
-type ModuleSource = {
-  code: string
-  type: SourceType
-  map?: string
-}
 
 type CompileOptions = {
   source?: ModuleSource,
@@ -820,8 +814,8 @@ export class Aleph implements IAleph {
   /** common compiler options */
   get commonCompilerOptions(): TransformOptions {
     return {
-      workingDir: this.#workingDir,
       alephPkgUri: getAlephPkgUri(),
+      workingDir: this.#workingDir,
       importMap: this.#importMap,
       inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
         if (type !== 'css') {
@@ -1225,6 +1219,8 @@ export class Aleph implements IAleph {
         return
       }
 
+      const ms = new Measure()
+
       if (source.type === SourceType.CSS) {
         const { code, map } = await cssLoader({ specifier, data: source.code }, this)
         source.code = code
@@ -1233,15 +1229,31 @@ export class Aleph implements IAleph {
         module.isStyle = true
       }
 
-      const ms = new Measure()
-      const { code, deps = [], denoHooks, ssrPropsFn, ssgPathsFn, starExports, jsxStaticClassNames, map } = await transform(specifier, source.code, {
-        ...this.commonCompilerOptions,
-        sourceMap: this.isDev,
-        swcOptions: {
-          sourceType: source.type
-        },
-        httpExternal
-      })
+      let ret: TransformResult
+      // use `fastTransform` when the module is remote non-jsx module in `development` mode
+      if (this.isDev && util.isLikelyHttpURL(specifier) && source.type !== SourceType.JSX && source.type !== SourceType.TSX) {
+        ret = await fastTransform(specifier, source, { react: this.#config.react })
+      } else {
+        ret = await transform(specifier, source.code, {
+          ...this.commonCompilerOptions,
+          sourceMap: this.isDev,
+          swcOptions: {
+            sourceType: source.type
+          },
+          httpExternal
+        })
+      }
+
+      const {
+        code,
+        deps = [],
+        denoHooks,
+        ssrPropsFn,
+        ssgPathsFn,
+        starExports,
+        jsxStaticClassNames,
+        map
+      } = ret
 
       let jsCode = code
       let sourceMap = map
@@ -1439,6 +1451,7 @@ export class Aleph implements IAleph {
       ])
     }
   }
+
 
   /** create bundled chunks for production. */
   private async bundle() {
