@@ -10,6 +10,7 @@ import { wasmChecksum, parseExportNames, SourceType, fastTransform, transform, s
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
+import { frameworks } from '../framework/mod.ts'
 import { cssLoader } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
@@ -206,9 +207,7 @@ export class Aleph implements IAleph {
     }
 
     // init framework
-    const { init } = await import(`../framework/${this.#config.framework}/init.ts`)
-    await init(this)
-
+    await frameworks[this.#config.framework].init(this)
     ms.stop(`init ${this.#config.framework} framework`)
 
     const appFile = await findFile(srcDir, builtinModuleExts.map(ext => `app.${ext}`))
