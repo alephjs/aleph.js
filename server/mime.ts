@@ -1,7 +1,7 @@
 // MIME Types for Web
 const mimeTypes: Record<string, string[]> = {
   // application
-  'application/javascript': ['js', 'mjs'],
+  'application/javascript': ['js', 'mjs', 'cjs'],
   'application/wasm': ['wasm'],
   'application/json': ['json', 'map'],
   'application/json5': ['json5'],
@@ -16,6 +16,7 @@ const mimeTypes: Record<string, string[]> = {
   'text/tsx': ['tsx'],
   'text/jsx': ['jsx'],
   'text/css': ['css'],
+  'text/postcss': ['pcss', 'postcss'],
   'text/less': ['less'],
   'text/sass': ['sass', 'scss'],
   'text/stylus': ['stylus', 'styl'],
@@ -48,7 +49,7 @@ const mimeTypes: Record<string, string[]> = {
   'video/webm': ['webm'],
 }
 
-// types map
+// map types
 const typesMap = Object.keys(mimeTypes).reduce((map, contentType) => {
   mimeTypes[contentType].forEach(ext => map.set(ext, contentType))
   return map
