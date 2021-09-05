@@ -1,5 +1,5 @@
-import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
-import { esbuild, esmLoader } from '../bundler/esbuild.ts'
+import { dirname, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { cssPlugin, esbuild } from '../bundler/esbuild.ts'
 import { existsFile } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
@@ -113,13 +113,14 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
       const ret = await esbuild({
         stdin: {
           loader: 'css',
+          resolveDir: join(aleph.workingDir, dirname(specifier)),
           sourcefile: specifier,
           contents: css
         },
         write: false,
         bundle: true,
         minify: aleph.mode === 'production',
-        plugins: [esmLoader],
+        plugins: [cssPlugin],
       })
       css = util.trimSuffix(ret.outputFiles[0].text, '\n')
     } catch (e) { }

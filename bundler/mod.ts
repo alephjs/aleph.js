@@ -11,7 +11,7 @@ import { ensureTextFile, existsFile, lazyRemove } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import type { BrowserName, Module, DependencyDescriptor } from '../types.d.ts'
 import { VERSION } from '../version.ts'
-import { esbuild, stopEsbuild, esmLoader } from './esbuild.ts'
+import { esbuild, stopEsbuild, denoPlugin } from './esbuild.ts'
 
 export const bundlerRuntimeCode = `
   window.__ALEPH__ = {
@@ -296,7 +296,7 @@ export class Bundler {
       minify: true,
       treeShaking: true,
       sourcemap: false,
-      plugins: [esmLoader],
+      plugins: [denoPlugin],
     })
   }
 }
