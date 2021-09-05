@@ -23,9 +23,9 @@ if (import.meta.main) {
     const wasmData = await Deno.readFile('./pkg/aleph_compiler_bg.wasm')
     const jsCode = await Deno.readTextFile('./pkg/aleph_compiler.js')
     const hash = createHash('sha1').update(wasmData).toString()
-    let prevWasmJsSize = 0
+    let prevWasmSize = 0
     if (await exists('./dist/checksum.js')) {
-      prevWasmJsSize = (await Deno.stat('./dist/wasm.js')).size
+      prevWasmSize = (await Deno.stat('./dist/wasm.js')).size
     }
     await ensureDir('./dist')
     await Deno.writeTextFile(
@@ -54,7 +54,10 @@ if (import.meta.main) {
       `)
     )
     await run(['deno', 'fmt', '-q', './dist/compiler.js'])
-    const wasmJsSize = (await Deno.stat('./dist/wasm.js')).size
-    console.log(`${dim('[INFO]')}: wasm.js (${[prevWasmJsSize, wasmJsSize].filter(Boolean).map(n => util.formatBytes(n)).join(' -> ')})`)
+    const wasmSize = (await Deno.stat('./dist/wasm.js')).size
+    const increased = ((wasmSize - prevWasmSize) / prevWasmSize) * 100
+    if (increased) {
+      console.log(`${dim('[INFO]')}: wasm.js ${increased.toFixed(2)}% (${[prevWasmSize, wasmSize].filter(Boolean).map(n => (n / (1024 * 1024)).toFixed(2) + 'MB').join(' -> ')})`)
+    }
   }
 }
