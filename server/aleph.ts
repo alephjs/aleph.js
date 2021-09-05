@@ -5,39 +5,35 @@ import { walk } from 'https://deno.land/std@0.106.0/fs/walk.ts'
 import { createHash } from 'https://deno.land/std@0.106.0/hash/mod.ts'
 import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
-import type { TransformOptions } from '../compiler/mod.ts'
-import { wasmChecksum, parseExportNames, SourceType, transform, stripSsrCode } from '../compiler/mod.ts'
+import type { TransformOptions, TransformResult, ModuleSource } from '../compiler/mod.ts'
+import { wasmChecksum, parseExportNames, SourceType, fastTransform, transform, stripSsrCode } from '../compiler/mod.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { Routing } from '../framework/core/routing.ts'
-import cssPlugin, { cssLoader } from '../plugins/css.ts'
+import { frameworks } from '../framework/mod.ts'
+import { cssLoader } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, HtmlDescriptor, RouterURL, ResolveResult, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
+import type { Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, RouterURL, ResolveResult, TransformInput, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import type { RequiredConfig } from './config.ts'
 import { defaultConfig, fixConfigAndImportMap, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
 import {
-  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, findFile,
-  getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath
+  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, decoder, encoder, findFile,
+  getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath,
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { buildHtml, Renderer } from './renderer.ts'
-
-type ModuleSource = {
-  code: string
-  type: SourceType
-  map?: string
-}
 
 type CompileOptions = {
   source?: ModuleSource,
   forceRefresh?: boolean,
   ignoreDeps?: boolean,
   httpExternal?: boolean
+  virtual?: boolean
 }
 
 type ResolveListener = {
@@ -52,7 +48,7 @@ type LoadListener = {
 
 type TransformListener = {
   test: RegExp | 'hmr' | 'main',
-  transform(input: TransformOutput & { module: Module }): TransformOutput | void | Promise<TransformOutput> | Promise<void>,
+  transform(input: TransformInput): TransformOutput | void | Promise<TransformOutput | void>,
 }
 
 type RenderListener = (input: RenderOutput & { path: string }) => void | Promise<void>
@@ -193,7 +189,6 @@ export class Aleph implements IAleph {
     ms.stop(`init env`)
 
     // apply plugins
-    cssPlugin().setup(this)
     await Promise.all(
       this.#config.plugins.map(async plugin => {
         await plugin.setup(this)
@@ -212,18 +207,15 @@ export class Aleph implements IAleph {
     }
 
     // init framework
-    const { init } = await import(`../framework/${this.#config.framework}/init.ts`)
-    await init(this)
-
+    await frameworks[this.#config.framework].init(this)
     // compile and import framework renderer
     if (this.#config.ssr) {
-      const mod = await this.compile(`${alephPkgUri}/framework/${this.#config.framework}/renderer.ts`)
+      const mod = await this.compile(`${getAlephPkgUri()}/framework/${this.#config.framework}/renderer.ts`)
       const { render } = await this.importModule(mod)
       if (util.isFunction(render)) {
         this.#renderer.setFrameworkRenderer({ render })
       }
     }
-
     ms.stop(`init ${this.#config.framework} framework`)
 
     const appFile = await findFile(srcDir, builtinModuleExts.map(ext => `app.${ext}`))
@@ -318,7 +310,7 @@ export class Aleph implements IAleph {
           const module = await this.compile(specifier, {
             forceRefresh: true,
             ignoreDeps: true,
-            httpExternal: specifier.startsWith('/api/')
+            httpExternal: prevModule.httpExternal
           })
           const refreshPage = (
             this.#config.ssr &&
@@ -470,6 +462,10 @@ export class Aleph implements IAleph {
     return this.#ready
   }
 
+  get transformListeners() {
+    return this.#transformListeners
+  }
+
   /** get the module by given specifier. */
   getModule(specifier: string): Module | null {
     if (specifier === 'app') {
@@ -526,25 +522,28 @@ export class Aleph implements IAleph {
   }
 
   /** add a module by given path and optional source code. */
-  async addModule(specifier: string, sourceCode: string): Promise<Module> {
+  async addModule(specifier: string, sourceCode: string, forceRefresh?: boolean): Promise<Module> {
     let sourceType = getSourceType(specifier)
     if (sourceType === SourceType.Unknown) {
       throw new Error("addModule: unknown souce type")
     }
+    const source = {
+      code: sourceCode,
+      type: sourceType,
+    }
     const module = await this.compile(specifier, {
-      source: {
-        code: sourceCode,
-        type: sourceType,
-      }
+      source,
+      forceRefresh,
     })
     if (specifier.startsWith('pages/') || specifier.startsWith('api/')) {
       specifier = '/' + specifier
     }
-    if (specifier.startsWith('/pages/')) {
+    if (specifier.startsWith('/pages/') && this.isPageModule(specifier)) {
       this.#pageRouting.update(...this.createRouteUpdate(specifier))
     } else if (specifier.startsWith('/api/') && !specifier.startsWith('/api/_middlewares.')) {
       this.#apiRouting.update(...this.createRouteUpdate(specifier))
     }
+    Object.assign(module, { source })
     return module
   }
 
@@ -707,8 +706,7 @@ export class Aleph implements IAleph {
             specifier: '/main.js',
             deps: [],
             sourceHash: '',
-            jsFile: '',
-            ready: Promise.resolve()
+            jsFile: ''
           },
           code,
         })
@@ -775,7 +773,7 @@ export class Aleph implements IAleph {
     ]
   }
 
-  gteModuleHash(module: Module) {
+  computeModuleHash(module: Module) {
     const hasher = createHash('md5').update(module.sourceHash)
     this.lookupDeps(module.specifier, dep => {
       const depMod = this.getModule(dep.specifier)
@@ -793,7 +791,7 @@ export class Aleph implements IAleph {
     if (sourceType === SourceType.Unknown || sourceType === SourceType.CSS) {
       return []
     }
-    const code = (new TextDecoder).decode(content)
+    const code = decoder.decode(content)
     const names = await parseExportNames(specifier, code, { sourceType })
     return (await Promise.all(names.map(async name => {
       if (name.startsWith('{') && name.endsWith('}')) {
@@ -815,14 +813,14 @@ export class Aleph implements IAleph {
   /** common compiler options */
   get commonCompilerOptions(): TransformOptions {
     return {
-      workingDir: this.#workingDir,
       alephPkgUri: getAlephPkgUri(),
+      workingDir: this.#workingDir,
       importMap: this.#importMap,
       inlineStylePreprocess: async (key: string, type: string, tpl: string) => {
         if (type !== 'css') {
           for (const { test, load } of this.#loadListeners) {
             if (test.test(`.${type}`)) {
-              const { code, type: codeType } = await load({ specifier: key, data: (new TextEncoder).encode(tpl) })
+              const { code, type: codeType } = await load({ specifier: key, data: encoder.encode(tpl) })
               if (codeType === 'css') {
                 type = 'css'
                 tpl = code
@@ -831,7 +829,7 @@ export class Aleph implements IAleph {
             }
           }
         }
-        const { code } = await cssLoader({ specifier: key, data: (new TextEncoder).encode(tpl) }, this)
+        const { code } = await cssLoader({ specifier: key, data: encoder.encode(tpl) }, this)
         return code
       },
       isDev: this.isDev,
@@ -939,7 +937,7 @@ export class Aleph implements IAleph {
 
   async importModule<T = any>(module: Module): Promise<T> {
     const path = join(this.#buildDir, module.jsFile)
-    const hash = this.gteModuleHash(module)
+    const hash = this.computeModuleHash(module)
     if (existsFile(path)) {
       return await import(`file://${path}#${(hash).slice(0, 6)}`)
     }
@@ -964,7 +962,7 @@ export class Aleph implements IAleph {
       return module.jsBuffer
     }
 
-    let code = new TextDecoder().decode(module.jsBuffer)
+    let code = decoder.decode(module.jsBuffer)
     if (module.denoHooks?.length || module.ssrPropsFn || module.ssgPathsFn) {
       if ('csrCode' in module) {
         code = (module as any).csrCode
@@ -979,14 +977,15 @@ export class Aleph implements IAleph {
     }
     for (const { test, transform } of this.#transformListeners) {
       if (test === 'hmr') {
-        const ret = await transform({ module: { ...module }, code })
+        const { jsBuffer, ready, ...rest } = module
+        const ret = await transform({ module: structuredClone(rest), code })
         if (util.isFilledString(ret?.code)) {
           code = ret!.code
         }
         // todo: merge source map
       }
     }
-    return new TextEncoder().encode([
+    return encoder.encode([
       `import.meta.hot = $createHotContext(${JSON.stringify(specifier)});`,
       '',
       code,
@@ -1023,6 +1022,21 @@ export class Aleph implements IAleph {
     })
   }
 
+  resolveImport({ jsFile, sourceHash }: Module, importer: string, bundleMode?: boolean, timeStamp?: boolean): string {
+    const relPath = toRelativePath(
+      dirname(toLocalPath(importer)),
+      jsFile
+    )
+    if (bundleMode) {
+      return util.trimSuffix(relPath, '.js') + '.bundling.js'
+    }
+    let hash = '#' + sourceHash.slice(0, 8)
+    if (timeStamp) {
+      hash += '-' + Date.now()
+    }
+    return relPath + hash
+  }
+
   async resolveModuleSource(specifier: string, data?: any): Promise<ModuleSource> {
     let sourceCode: string = ''
     let sourceType: SourceType = SourceType.Unknown
@@ -1054,7 +1068,7 @@ export class Aleph implements IAleph {
       const source = await this.fetchModule(specifier)
       sourceType = getSourceType(specifier, source.contentType || undefined)
       if (sourceType !== SourceType.Unknown) {
-        sourceCode = (new TextDecoder).decode(source.content)
+        sourceCode = decoder.decode(source.content)
       }
     }
 
@@ -1077,7 +1091,7 @@ export class Aleph implements IAleph {
   /** init the module by given specifier, don't transpile the code when the returned `source` is equal to null */
   private async initModule(
     specifier: string,
-    { source: customSource, forceRefresh, httpExternal }: CompileOptions = {}
+    { source: customSource, forceRefresh, httpExternal, virtual }: CompileOptions = {}
   ): Promise<[Module, ModuleSource | null]> {
     let external = false
     let data: any = null
@@ -1148,21 +1162,21 @@ export class Aleph implements IAleph {
       this.#appModule = mod
     }
 
-    if (await existsFile(metaFp)) {
+    if (!forceRefresh && await existsFile(metaFp)) {
       try {
-        const { specifier: _specifier, sourceHash, deps, isStyle, ssrPropsFn, ssgPathsFn, denoHooks } = JSON.parse(await Deno.readTextFile(metaFp))
-        if (_specifier === specifier && util.isFilledString(sourceHash) && util.isArray(deps)) {
-          mod.sourceHash = sourceHash
-          mod.deps = deps
-          mod.isStyle = Boolean(isStyle) || undefined
-          mod.ssrPropsFn = util.isFilledString(ssrPropsFn) ? ssrPropsFn : undefined
-          mod.ssgPathsFn = Boolean(ssgPathsFn) || undefined
-          mod.denoHooks = util.isFilledArray(denoHooks) ? denoHooks : undefined
+        const meta = JSON.parse(await Deno.readTextFile(metaFp))
+        if (meta.specifier === specifier && util.isFilledString(meta.sourceHash) && util.isArray(meta.deps)) {
+          Object.assign(mod, meta)
         } else {
           log.warn(`removing invalid metadata '${name}.meta.json'`)
           Deno.remove(metaFp)
         }
       } catch (e) { }
+    }
+
+    if (virtual) {
+      defer()
+      return [mod, null]
     }
 
     if (!isRemote || this.#reloading || mod.sourceHash === '' || !await existsFile(cacheFp)) {
@@ -1204,6 +1218,8 @@ export class Aleph implements IAleph {
         return
       }
 
+      const ms = new Measure()
+
       if (source.type === SourceType.CSS) {
         const { code, map } = await cssLoader({ specifier, data: source.code }, this)
         source.code = code
@@ -1212,16 +1228,31 @@ export class Aleph implements IAleph {
         module.isStyle = true
       }
 
-      const ms = new Measure()
-      const encoder = new TextEncoder()
-      const { code, deps = [], denoHooks, ssrPropsFn, ssgPathsFn, starExports, jsxStaticClassNames, map } = await transform(specifier, source.code, {
-        ...this.commonCompilerOptions,
-        sourceMap: this.isDev,
-        swcOptions: {
-          sourceType: source.type
-        },
-        httpExternal
-      })
+      let ret: TransformResult
+      // use `fastTransform` when the module is remote non-jsx module in `development` mode
+      if (this.isDev && util.isLikelyHttpURL(specifier) && source.type !== SourceType.JSX && source.type !== SourceType.TSX) {
+        ret = await fastTransform(specifier, source, { react: this.#config.react })
+      } else {
+        ret = await transform(specifier, source.code, {
+          ...this.commonCompilerOptions,
+          sourceMap: this.isDev,
+          swcOptions: {
+            sourceType: source.type
+          },
+          httpExternal
+        })
+      }
+
+      const {
+        code,
+        deps = [],
+        denoHooks,
+        ssrPropsFn,
+        ssgPathsFn,
+        starExports,
+        jsxStaticClassNames,
+        map
+      } = ret
 
       let jsCode = code
       let sourceMap = map
@@ -1272,14 +1303,19 @@ export class Aleph implements IAleph {
         }
       }
 
+      let extraDeps: DependencyDescriptor[] = []
       for (const { test, transform } of this.#transformListeners) {
         if (test instanceof RegExp && test.test(specifier)) {
-          const ret = await transform({ module: { ...module }, code: jsCode, map: sourceMap })
+          const { jsBuffer, ready, ...rest } = module
+          const ret = await transform({ module: { ...structuredClone(rest) }, code: jsCode, map: sourceMap })
           if (util.isFilledString(ret?.code)) {
             jsCode = ret!.code
           }
           if (util.isFilledString(ret?.map)) {
             sourceMap = ret!.map
+          }
+          if (Array.isArray(ret?.extraDeps)) {
+            extraDeps.push(...ret!.extraDeps)
           }
         }
       }
@@ -1291,7 +1327,7 @@ export class Aleph implements IAleph {
 
       module.jsBuffer = encoder.encode(jsCode)
       module.deps = deps.filter(({ specifier }) => specifier !== module.specifier).map(({ specifier, resolved, isDynamic }) => {
-        const dep: DependencyDescriptor = { specifier }
+        const dep: DependencyDescriptor = { specifier, }
         if (isDynamic) {
           dep.isDynamic = true
         }
@@ -1303,7 +1339,7 @@ export class Aleph implements IAleph {
           }
         }
         return dep
-      })
+      }).concat(extraDeps)
 
       ms.stop(`transpile '${specifier}'`)
 
@@ -1312,11 +1348,16 @@ export class Aleph implements IAleph {
 
     if (module.deps.length > 0) {
       let fsync = false
-      await Promise.all(module.deps.map(async ({ specifier, hashLoc }) => {
-        let depModule: Module | null
-        if (ignoreDeps) {
+      await Promise.all(module.deps.map(async ({ specifier, hashLoc, virtual }) => {
+        let depModule: Module | null = null
+        if (ignoreDeps || virtual) {
           depModule = this.getModule(specifier)
-        } else {
+          if (depModule == null && virtual) {
+            const [mod] = await this.initModule(specifier, { virtual: true })
+            depModule = mod
+          }
+        }
+        if (depModule === null) {
           const [mod, src] = await this.initModule(specifier, { httpExternal })
           if (!mod.external) {
             await this.transpileModule(mod, src, false, __tracing)
@@ -1325,7 +1366,7 @@ export class Aleph implements IAleph {
         }
         if (depModule) {
           if (hashLoc !== undefined) {
-            const hash = this.gteModuleHash(depModule)
+            const hash = this.computeModuleHash(depModule)
             if (await this.replaceDepHash(module, hashLoc, hash)) {
               fsync = true
             }
@@ -1356,7 +1397,7 @@ export class Aleph implements IAleph {
           const { specifier, hashLoc } = dep
           if (specifier === by.specifier && hashLoc !== undefined) {
             if (hash == null) {
-              hash = this.gteModuleHash(by)
+              hash = this.computeModuleHash(by)
             }
             if (await this.replaceDepHash(mod, hashLoc, hash)) {
               fsync = true
@@ -1374,7 +1415,7 @@ export class Aleph implements IAleph {
 
   /** replace dep hash in the `jsBuffer` and remove `csrCode` cache if it exits */
   private async replaceDepHash(module: Module, hashLoc: number, hash: string) {
-    const hashData = (new TextEncoder()).encode(hash.substr(0, 6))
+    const hashData = encoder.encode(hash.substr(0, 6))
     const jsBuffer = await this.getModuleJS(module)
     if (jsBuffer && !equals(hashData, jsBuffer.slice(hashLoc, hashLoc + 6))) {
       copy(hashData, jsBuffer, hashLoc)
@@ -1396,27 +1437,20 @@ export class Aleph implements IAleph {
   }
 
   private async cacheModule(module: Module, sourceMap?: string) {
-    const { specifier, jsBuffer, jsFile } = module
+    const { jsBuffer, jsFile, ready, ...rest } = module
     if (jsBuffer) {
       const cacheFp = join(this.#buildDir, jsFile)
       const metaFp = cacheFp.slice(0, -3) + '.meta.json'
       await ensureDir(dirname(cacheFp))
       await Promise.all([
         Deno.writeFile(cacheFp, jsBuffer),
-        Deno.writeTextFile(metaFp, JSON.stringify({
-          specifier,
-          sourceHash: module.sourceHash,
-          isStyle: module.isStyle,
-          ssrPropsFn: module.ssrPropsFn,
-          ssgPathsFn: module.ssgPathsFn,
-          denoHooks: module.denoHooks,
-          deps: module.deps,
-        }, undefined, 2)),
+        Deno.writeTextFile(metaFp, JSON.stringify({ ...rest }, undefined, 2)),
         sourceMap ? Deno.writeTextFile(`${cacheFp}.map`, sourceMap) : Promise.resolve(),
         lazyRemove(cacheFp.slice(0, -3) + '.bundling.js'),
       ])
     }
   }
+
 
   /** create bundled chunks for production. */
   private async bundle() {

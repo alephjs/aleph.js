@@ -1,14 +1,10 @@
 import events from './events.ts'
 
-interface Callback {
-  (...args: any[]): void
-}
-
 class Module {
   private _specifier: string
-  private _isLocked: boolean = false
   private _isAccepted: boolean = false
-  private _acceptCallbacks: Callback[] = []
+  private _isLocked: boolean = false
+  private _acceptCallbacks: CallableFunction[] = []
 
   get specifier() {
     return this._specifier
@@ -18,11 +14,8 @@ class Module {
     this._specifier = specifier
   }
 
-  lock(): void {
-    this._isLocked = true
-  }
 
-  accept(callback?: Callback): void {
+  accept(callback?: CallableFunction): void {
     if (this._isLocked) {
       return
     }
@@ -33,6 +26,10 @@ class Module {
     if (callback) {
       this._acceptCallbacks.push(callback)
     }
+  }
+
+  lock(): void {
+    this._isLocked = true
   }
 
   async applyUpdate(url: string) {
@@ -149,7 +146,6 @@ Object.assign(window, {
       mod.lock()
       return mod
     }
-
     const mod = new Module(specifier)
     modules.set(specifier, mod)
     return mod

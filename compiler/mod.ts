@@ -1,9 +1,12 @@
-import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { dirname, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.106.0/fs/ensure_dir.ts'
+import { esbuild } from '../bundler/esbuild.ts'
+import { trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { existsFile } from '../shared/fs.ts'
 import { Measure } from '../shared/log.ts'
+import util from '../shared/util.ts'
+import { decoder, getDenoDir, toLocalPath, toRelativePath } from '../server/helper.ts'
 import type { ImportMap } from '../types.d.ts'
-import { getDenoDir } from '../server/helper.ts'
 import { checksum } from './dist/checksum.js'
 import init, { parseExportNamesSync, stripSsrCodeSync, transformSync } from './dist/compiler.js'
 
@@ -14,6 +17,12 @@ export enum SourceType {
   TSX = 'tsx',
   CSS = 'css',
   Unknown = '??',
+}
+
+export type ModuleSource = {
+  code: string
+  type: SourceType
+  map?: string
 }
 
 export type SWCOptions = {
@@ -28,10 +37,10 @@ export type ReactOptions = {
 }
 
 export type TransformOptions = {
-  swcOptions?: SWCOptions
-  workingDir?: string
   alephPkgUri?: string
+  workingDir?: string
   importMap?: ImportMap
+  swcOptions?: SWCOptions
   react?: ReactOptions
   sourceMap?: boolean
   isDev?: boolean
@@ -43,7 +52,7 @@ export type TransformOptions = {
 
 export type TransformResult = {
   code: string
-  deps?: DependencyDescriptor[]
+  deps?: RawDependencyDescriptor[]
   ssrPropsFn?: string
   ssgPathsFn?: boolean
   denoHooks?: string[]
@@ -52,7 +61,7 @@ export type TransformResult = {
   map?: string
 }
 
-type DependencyDescriptor = {
+type RawDependencyDescriptor = {
   specifier: string
   resolved: string
   isDynamic: boolean
@@ -99,15 +108,17 @@ async function checkWasmReady() {
 }
 
 /**
- * transform module by swc.
+ * Transforms the module with esbuild/swc.
  *
  * ```tsx
  * transform(
  *   '/app.tsx',
  *   `
- *     export default App() {
- *       return <h1>Hello World</h1>
- *     }
+ *    import React from 'https://esm.sh/react';
+ *
+ *    export default App() {
+ *      return <h1>Hello World</h1>
+ *    }
  *   `
  * )
  * ```
@@ -116,17 +127,7 @@ export async function transform(specifier: string, code: string, options: Transf
   await checkWasmReady()
 
   const { inlineStylePreprocess, ...transformOptions } = options
-  let {
-    code: jsContent,
-    deps,
-    ssrPropsFn,
-    ssgPathsFn,
-    inlineStyles,
-    denoHooks,
-    starExports,
-    jsxStaticClassNames,
-    map,
-  } = transformSync(specifier, code, transformOptions)
+  let { code: jsContent, inlineStyles, ...rest } = transformSync(specifier, code, transformOptions)
 
   // resolve inline-style
   if (inlineStyles) {
@@ -154,15 +155,77 @@ export async function transform(specifier: string, code: string, options: Transf
     }))
   }
 
+  return { code: jsContent, ...rest }
+}
+
+export async function fastTransform(specifier: string, source: ModuleSource, { react }: TransformOptions = {}): Promise<TransformResult> {
+  if (!util.isLikelyHttpURL(specifier)) {
+    throw new Error('Expect a remote(http) module')
+  }
+  if (source.type === SourceType.Unknown) {
+    throw new Error('Unknown source type')
+  }
+  if (source.type === SourceType.JSX || source.type === SourceType.TSX || source.type === SourceType.CSS) {
+    throw new Error('Expect non-jsx/css module')
+  }
+  const deps: RawDependencyDescriptor[] = []
+  const r = await esbuild({
+    stdin: {
+      loader: source.type,
+      contents: source.code,
+      sourcefile: specifier,
+    },
+    format: 'esm',
+    write: false,
+    bundle: true,
+    plugins: [{
+      name: 'module-resolver',
+      setup(build) {
+        build.onResolve({ filter: /.*/ }, args => {
+          if (args.kind === 'entry-point') {
+            return { path: args.path }
+          }
+
+          const isRemote = util.isLikelyHttpURL(args.path)
+          const url = new URL(args.path, !isRemote ? specifier : undefined)
+
+          if (react) {
+            if (url.hostname === 'esm.sh' || url.hostname === 'cdn.esm.sh' || url.hostname === 'esm.x-static.io') {
+              const a = url.pathname.split('/').filter(Boolean)
+              const v = Boolean(a[0]) && a[0].startsWith('v')
+              const n = v ? a[1] : a[0]
+              if (n) {
+                const prefix = v ? '/v' + react.esmShBuildVersion + '/' : '/'
+                const subPath = '@' + react.version + '/' + a.slice(v ? 2 : 1).join('/')
+                if (n === 'react' || n === 'react-dom') {
+                  url.pathname = prefix + n + subPath
+                }
+                if (n.startsWith('react@') || n.startsWith('react-dom@')) {
+                  url.pathname = prefix + n.split('@')[0] + subPath
+                }
+              }
+            }
+          }
+
+          const path = util.trimSuffix(url.toString(), '/')
+          const resolved = toRelativePath(
+            dirname(toLocalPath(specifier)),
+            toLocalPath(trimBuiltinModuleExts(path) + '.js')
+          )
+          deps.push({
+            specifier: path,
+            resolved,
+            isDynamic: args.kind === 'dynamic-import',
+          })
+          return { path: resolved, external: true }
+        })
+      }
+    }],
+  })
+
   return {
-    code: jsContent,
-    deps,
-    ssrPropsFn,
-    ssgPathsFn,
-    denoHooks,
-    starExports,
-    jsxStaticClassNames,
-    map
+    code: decoder.decode(r.outputFiles[0].contents),
+    deps
   }
 }
 

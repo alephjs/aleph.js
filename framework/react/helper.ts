@@ -28,6 +28,6 @@ export function isLikelyReactComponent(type: any): Boolean {
 
 export function createNamedContext<T>(defaultValue: T, name: string) {
   const ctx = createContext<T>(defaultValue)
-  ctx.displayName = name // show in devTools
+  ctx.displayName = name // display name in devTools
   return ctx
 }

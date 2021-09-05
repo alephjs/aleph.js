@@ -3,10 +3,6 @@
   "files.trimTrailingWhitespace": true,
   "typescript.format.semicolons": "remove",
   "typescript.preferences.quoteStyle": "single",
-  "[javascript]": {
-    "editor.defaultFormatter": "vscode.typescript-language-features",
-    "editor.formatOnSave": false,
-  },
   "[typescript]": {
     "editor.defaultFormatter": "vscode.typescript-language-features",
     "editor.formatOnSave": true,
@@ -29,6 +25,7 @@
   "deno.unstable": true,
   "deno.importMap": "./import_map.json",
   "deno.suggest.imports.hosts": {
-    "https://deno.land": true
+    "https://deno.land": true,
+    "https://esm.sh": false
   }
 }

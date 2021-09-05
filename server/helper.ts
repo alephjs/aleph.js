@@ -50,6 +50,9 @@ export function checkAlephDev() {
   }
 }
 
+export const encoder = new TextEncoder()
+export const decoder = new TextDecoder()
+
 export const moduleExclude = [
   /(^|\/|\\)\./,
   /\.d\.ts$/i,
@@ -84,7 +87,7 @@ export async function getDenoDir() {
     stdout: 'piped',
     stderr: 'null'
   })
-  const output = (new TextDecoder).decode(await p.output())
+  const output = decoder.decode(await p.output())
   const { denoDir } = JSON.parse(output)
   p.close()
   if (denoDir === undefined || !await existsDir(denoDir)) {

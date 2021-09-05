@@ -9,6 +9,7 @@ import util from '../shared/util.ts'
 import { APIContext } from '../types.d.ts'
 import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
+import { encoder } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { APIResponse } from './response.ts'
 
@@ -102,7 +103,7 @@ export class Server {
         if (compress.enable && acceptEncoding && body && contentType) {
           let data = new Uint8Array()
           if (typeof body === 'string') {
-            data = new TextEncoder().encode(body)
+            data = encoder.encode(body)
           } else if (body instanceof Uint8Array) {
             data = body
           } else if (body instanceof ArrayBuffer) {
@@ -175,7 +176,7 @@ export class Server {
           if (module) {
             const content = await aleph.getModuleJS(module, aleph.isDev)
             if (content) {
-              const hash = aleph.gteModuleHash(module)
+              const hash = aleph.computeModuleHash(module)
               if (hash === req.headers.get('If-None-Match')) {
                 end(304)
                 return

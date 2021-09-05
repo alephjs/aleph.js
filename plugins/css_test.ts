@@ -1,10 +1,8 @@
-import { exists } from 'std/fs/exists.ts'
 import { join } from 'std/path/mod.ts'
-import { assert, assertEquals } from 'std/testing/asserts.ts'
+import { assertEquals } from 'std/testing/asserts.ts'
 import { Aleph } from '../server/aleph.ts'
-import { computeHash } from '../server/helper.ts'
 import { ensureTextFile } from '../shared/fs.ts'
-import { isCSS, cssLoader } from './css.ts'
+import { cssLoader } from './css.ts'
 
 Deno.test('plugin: css loader', async () => {
   Deno.env.set('DENO_TESTING', 'true')
@@ -21,11 +19,6 @@ Deno.test('plugin: css loader', async () => {
     'export default {}',
     'applyCSS("/style/index.css", { css })',
   ].join('\n'))
-  assert(isCSS('/style/index.css'))
-  assert(isCSS('/style/index.pcss'))
-  assert(isCSS('/style/index.postcss'))
-  assert(!isCSS('/style/index.less'))
-  assert(!isCSS('/style/index.sass'))
 })
 
 Deno.test('plugin: css loader for remote external', async () => {
