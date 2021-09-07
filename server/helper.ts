@@ -83,7 +83,7 @@ export async function getDenoDir() {
   }
 
   const p = Deno.run({
-    cmd: [Deno.execPath(), 'info', '--json', '--unstable'],
+    cmd: [Deno.execPath(), 'info', '--json'],
     stdout: 'piped',
     stderr: 'null'
   })
