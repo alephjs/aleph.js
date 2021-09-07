@@ -1,4 +1,5 @@
-import React, { ComponentType } from 'react'
+import React from 'react'
+import { AppProps } from 'aleph/types.d.ts'
 
 const links = {
   'Home': '/',
@@ -13,7 +14,7 @@ const links = {
   'Dark Green': '/colors/darkgreen?text=orange',
 }
 
-export default function App({ Page, pageProps }: { Page: ComponentType<any>, pageProps: any }) {
+export default function App({ Page, pageProps }: AppProps) {
   return (
     <main>
       <head>

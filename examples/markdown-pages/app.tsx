@@ -1,11 +1,13 @@
 import React, { ComponentType } from 'react'
+import { AppProps } from 'aleph/types.d.ts'
+
 
 type Metadata = {
   title?: string
   url?: string
 }
 
-export default function App({ Page, pageProps }: { Page: ComponentType<any> & { meta: Metadata }, pageProps: any }) {
+export default function App({ Page, pageProps }: AppProps<Record<string, any>, { meta: Metadata }>) {
   return (
     <main>
       <head>
