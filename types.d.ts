@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType } from 'https://esm.sh/react@17.0.2'
 
 /**
  * An interface that aligns to the parts of the `Aleph` class.
