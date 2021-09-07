@@ -14,7 +14,7 @@ Visit [https://alephjs.org/docs/get-started](https://alephjs.org/docs/get-starte
 
 Aleph.js (or **Aleph** or **א** or **阿莱夫**, **ˈɑːlɛf**) is a fullstack framework in [Deno](https://deno.land/), inspired by [Next.js](https://nextjs.org/). The name is taken from the book **The Aleph** by [Jorge Luis Borges](http://phinnweb.org/links/literature/borges/aleph.html).
 
-Different with Next.js, Aleph.js doesn't need webpack or other bundler since it uses the [ES Moudule](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) syntax during development. Every module only needs to be compiled once, and then cached on the disk. When a module changes, Aleph.js just needs to re-compile that single module. There is no time wasted re-bundling everytime a change is made. This, along with Hot Module Replacement (HMR) and Fast Refresh, leads to instant updates in the browser.
+Different with Next.js, Aleph.js doesn't need webpack or other bundler since it uses the [ES Module](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) syntax during development. Every module only needs to be compiled once, and then cached on the disk. When a module changes, Aleph.js just needs to re-compile that single module. There is no time wasted re-bundling everytime a change is made. This, along with Hot Module Replacement (HMR) and Fast Refresh, leads to instant updates in the browser.
 
 Aleph.js uses modern tools to build your app. It transpiles code using [swc](https://swc.rs/) in [WASM](https://webassembly.org/) with high performance, and bundles modules with [esbuild](https://github.com/evanw/esbuild) at build time extremely fast.
 
