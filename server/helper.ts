@@ -108,11 +108,11 @@ export function getAlephPkgUri() {
 
 /** get the relative path from `from` to `to`. */
 export function toRelativePath(from: string, to: string): string {
-  const r = relative(from, to).replaceAll('\\', '/')
-  if (!r.startsWith('.') && !r.startsWith('/')) {
-    return './' + r
+  const p = relative(from, to).replaceAll('\\', '/')
+  if (!p.startsWith('.') && !p.startsWith('/')) {
+    return './' + p
   }
-  return r
+  return p
 }
 
 /** get source type by given url and content type. */
