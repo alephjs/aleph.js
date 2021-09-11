@@ -1,7 +1,6 @@
-import React, { ComponentType } from 'react'
-import { AppProps } from 'aleph/types.d.ts'
+import React, { FC } from 'react'
 
-export default function App({ Page, pageProps }: AppProps) {
+export default function App({ Page, pageProps }: { Page: FC, pageProps: any }) {
   return (
     <main>
       <head>

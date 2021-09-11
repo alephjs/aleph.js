@@ -1,5 +1,3 @@
-import type { ComponentType } from 'https://esm.sh/react@17.0.2'
-
 /**
  * An interface that aligns to the parts of the `Aleph` class.
  */
@@ -329,12 +327,4 @@ export type RouterURL = {
   toString(): string
   push(url: string): void
   replace(url: string): void
-}
-
-/**
- * Custom `App` props
- */
-export interface AppProps<P extends Record<string, any> = Record<string, any>, T extends {} = {}> {
-  pageProps: P
-  Page: ComponentType<P> & T
 }

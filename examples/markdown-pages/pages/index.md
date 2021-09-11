@@ -1,8 +1,6 @@
 ---
-title: Aleph.js
-url: https://alephjs.org
-id: doc-page-welcome
-className: doc-page
+title: Welcome to use Aleph.js!
+className: markdown-page
 style:
   padding: '45px 90px'
   border: '1px solid #eee'
