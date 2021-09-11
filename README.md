@@ -12,7 +12,9 @@ Visit [https://alephjs.org/docs/get-started](https://alephjs.org/docs/get-starte
 
 ## Description
 
-Aleph.js (or **Aleph** or **א** or **阿莱夫**, **ˈɑːlɛf**) is a fullstack framework in [Deno](https://deno.land/), inspired by [Next.js](https://nextjs.org/). The name is taken from the book **The Aleph** by [Jorge Luis Borges](http://phinnweb.org/links/literature/borges/aleph.html).
+Aleph.js (or **Aleph** or **א** or **阿莱夫**, **ˈɑːlɛf**) is a fullstack framework in [Deno](https://deno.land/), inspired by [Next.js](https://nextjs.org/).
+
+> The name is taken from the book **The Aleph** by [Jorge Luis Borges](http://phinnweb.org/links/literature/borges/aleph.html).
 
 Different with Next.js, Aleph.js doesn't need webpack or other bundler since it uses the [ES Module](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) syntax during development. Every module only needs to be compiled once, and then cached on the disk. When a module changes, Aleph.js just needs to re-compile that single module. There is no time wasted re-bundling everytime a change is made. This, along with Hot Module Replacement (HMR) and Fast Refresh, leads to instant updates in the browser.
 
