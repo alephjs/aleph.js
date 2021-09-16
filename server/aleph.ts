@@ -644,7 +644,7 @@ export class Aleph implements IAleph {
   async #renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
     let [html, data] = await this.#renderer.renderPage(url, nestedModules)
     for (const callback of this.#renderListeners) {
-      callback({ path: url.toString(), html, data })
+      await callback({ path: url.toString(), html, data })
     }
     return [buildHtml(html, !this.isDev), data]
   }
