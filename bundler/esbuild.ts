@@ -1,5 +1,5 @@
-// @deno-types="https://deno.land/x/esbuild@v0.12.25/mod.d.ts"
-import { build, stop, Plugin } from 'https://deno.land/x/esbuild@v0.12.25/mod.js'
+// @deno-types="https://deno.land/x/esbuild@v0.12.28/mod.d.ts"
+import { build, stop, Plugin } from 'https://deno.land/x/esbuild@v0.12.28/mod.js'
 import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { cache } from '../server/cache.ts'
 import util from '../shared/util.ts'
