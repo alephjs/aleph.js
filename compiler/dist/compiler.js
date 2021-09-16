@@ -120,11 +120,10 @@ function addHeapObject(obj) {
   return idx;
 }
 /**
-* @param {string} specifier
-* @param {string} code
-* @param {any} options
-* @returns {any}
-*/
+ * @param {string} specifier
+ * @param {string} code
+ * @param {any} options
+ * @returns {any} */
 export function parseExportNamesSync(specifier, code, options) {
   var ptr0 = passStringToWasm0(
     specifier,
@@ -149,11 +148,10 @@ export function parseExportNamesSync(specifier, code, options) {
 }
 
 /**
-* @param {string} specifier
-* @param {string} code
-* @param {any} options
-* @returns {any}
-*/
+ * @param {string} specifier
+ * @param {string} code
+ * @param {any} options
+ * @returns {any} */
 export function stripSsrCodeSync(specifier, code, options) {
   var ptr0 = passStringToWasm0(
     specifier,
@@ -178,11 +176,10 @@ export function stripSsrCodeSync(specifier, code, options) {
 }
 
 /**
-* @param {string} specifier
-* @param {string} code
-* @param {any} options
-* @returns {any}
-*/
+ * @param {string} specifier
+ * @param {string} code
+ * @param {any} options
+ * @returns {any} */
 export function transformSync(specifier, code, options) {
   var ptr0 = passStringToWasm0(
     specifier,
