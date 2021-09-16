@@ -1441,7 +1441,6 @@ export class Aleph implements IAleph {
     }
   }
 
-
   /** create bundled chunks for production. */
   private async bundle() {
     const entries = this.analyze()
