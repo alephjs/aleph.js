@@ -938,7 +938,7 @@ export class Aleph implements IAleph {
   async importModule<T = any>(module: Module): Promise<T> {
     const path = join(this.#buildDir, module.jsFile)
     const hash = this.computeModuleHash(module)
-    if (existsFile(path)) {
+    if (await existsFile(path)) {
       return await import(`file://${path}#${(hash).slice(0, 6)}`)
     }
     throw new Error(`import ${module.specifier}: file not found: ${path}`)
