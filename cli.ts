@@ -100,11 +100,9 @@ async function main() {
     let verison: string | null = null
     for (const key in importMap.imports) {
       const url = importMap.imports[key]
-      console.log(url, /\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url))
       if (/\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)) {
         const [prefix, rest] = util.splitBy(url, '@')
         const [ver, suffix] = util.splitBy(rest, '/')
-        console.log(ver)
         if (ver !== 'v' + VERSION && updateImportMaps === null) {
           updateImportMaps = confirm(`You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${basename(importMapFile)}'?`)
         }
