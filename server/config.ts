@@ -178,13 +178,7 @@ export async function loadImportMap(importMapFile: string): Promise<ImportMap> {
     }
   }
 
-  // in aleph dev mode, replace default imports
-  if (Deno.env.get('ALEPH_DEV') !== undefined) {
-    Object.assign(importMap.imports, defaultImportMap.imports)
-  } else {
-    importMap.imports = Object.assign({}, defaultImportMap.imports, importMap.imports)
-  }
-
+  importMap.imports = Object.assign({}, defaultImportMap.imports, importMap.imports)
   return importMap
 }
 
@@ -194,7 +188,7 @@ export async function loadImportMap(importMapFile: string): Promise<ImportMap> {
  * - fix import map when the `srcDir` does not equal '/'
  * - respect react version in import map
  */
-export async function fixConfigAndImportMap(workingDir: string, config: RequiredConfig, importMap: ImportMap, importMapFile: string | null) {
+export async function fixConfig(workingDir: string, config: RequiredConfig, importMap: ImportMap) {
   // set default src directory
   if (
     config.srcDir === '/' &&
@@ -204,38 +198,17 @@ export async function fixConfigAndImportMap(workingDir: string, config: Required
     config.srcDir = '/src'
   }
 
-  if (importMapFile) {
-    let imports = { ...importMap.imports }
-    let updateImportMaps: boolean | null = null
-
-    Object.keys(importMap.imports).forEach(key => {
-      const url = importMap.imports[key]
-      // strip `srcDir` prefix
-      if (config.srcDir !== '/' && url.startsWith('.' + config.srcDir)) {
-        importMap.imports[key] = '.' + util.trimPrefix(url, '.' + config.srcDir)
-      }
-      // fix Aleph.js version
-      if (/\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)) {
-        const [prefix, rest] = util.splitBy(url, '@')
-        const [version, suffix] = util.splitBy(rest, '/')
-        if (version !== 'v' + VERSION && updateImportMaps === null) {
-          updateImportMaps = confirm(`You are using a different version of Aleph.js, expect ${version} -> v${bold(VERSION)}, update '${basename(importMapFile)}'?`)
-        }
-        if (updateImportMaps) {
-          imports[key] = `${prefix}@v${VERSION}/${suffix}`
-        }
-      }
-      // react verison should respect the import maps
-      if (/\/\/esm\.sh\/react@\d+\.\d+\.\d+(-[a-z0-9\.]+)?$/.test(url)) {
-        config.react.version = url.split('@').pop()!
-      }
-    })
-
-    if (updateImportMaps) {
-      const json = JSON.stringify({ ...importMap, imports }, undefined, 2)
-      await Deno.writeTextFile(importMapFile, json)
+  Object.keys(importMap.imports).forEach(key => {
+    const url = importMap.imports[key]
+    // strip `srcDir` prefix
+    if (config.srcDir !== '/' && url.startsWith('.' + config.srcDir)) {
+      importMap.imports[key] = '.' + util.trimPrefix(url, '.' + config.srcDir)
     }
-  }
+    // react verison should respect the import maps
+    if (/\/\/esm\.sh\/react@\d+\.\d+\.\d+(-[a-z0-9\.]+)?$/.test(url)) {
+      config.react.version = url.split('@').pop()!
+    }
+  })
 }
 
 function isFramework(v: any): v is 'react' {

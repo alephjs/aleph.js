@@ -1,4 +1,4 @@
-import { dirname } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { dirname, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.106.0/fs/ensure_dir.ts'
 
 /* check whether or not the given path exists as a directory. */
@@ -50,4 +50,15 @@ export async function lazyRemove(name: string, options?: { recursive?: boolean }
     }
     return Promise.reject(err)
   }
+}
+
+
+export async function findFile(wd: string, filenames: string[]) {
+  for (const filename of filenames) {
+    const fullPath = join(wd, filename)
+    if (await existsFile(fullPath)) {
+      return fullPath
+    }
+  }
+  return null
 }

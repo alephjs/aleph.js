@@ -1,7 +1,9 @@
-import { resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { bold } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
+import { basename, resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { parse } from 'https://deno.land/std@0.106.0/flags/mod.ts'
-import { existsDir } from './shared/fs.ts'
-import log, { LevelNames } from './shared/log.ts'
+import { loadImportMap } from './server/config.ts'
+import { existsDir, findFile } from './shared/fs.ts'
+import log from './shared/log.ts'
 import util from './shared/util.ts'
 import { VERSION } from './version.ts'
 
@@ -61,10 +63,10 @@ async function main() {
   }
 
   const command = String(args.shift()) as keyof typeof commands
-  const { default: cmd, helpMessage: cmdHelpMessage } = await import(`./commands/${command}.ts`)
 
   // prints command help message
   if (options.h || options.help) {
+    const { helpMessage: cmdHelpMessage } = await import(`./commands/${command}.ts`)
     console.log(commands[command])
     console.log(cmdHelpMessage)
     Deno.exit(0)
@@ -72,20 +74,16 @@ async function main() {
 
   // execute `init` command
   if (command === 'init') {
-    await cmd(options?.template, args[0])
+    const { default: init } = await import(`./commands/init.ts`)
+    await init(options?.template, args[0])
     return
   }
 
   // execute `upgrade` command
   if (command === 'upgrade') {
-    await cmd(options.v || options.version || args[0] || 'latest')
+    const { default: upgrade } = await import(`./commands/upgrade.ts`)
+    await upgrade(options.v || options.version || args[0] || 'latest')
     return
-  }
-
-  // set log level
-  const l = options.L || options['log-level']
-  if (util.isFilledString(l)) {
-    log.setLevel(l.toLowerCase() as LevelNames)
   }
 
   // check working dir
@@ -94,7 +92,66 @@ async function main() {
     log.fatal('No such directory:', workingDir)
   }
 
-  await cmd(workingDir, options)
+  // run the command if import maps exists
+  const importMapFile = await findFile(workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`))
+  if (importMapFile) {
+    const importMap = await loadImportMap(importMapFile)
+    let updateImportMaps: boolean | null = null
+    let verison: string | null = null
+    for (const key in importMap.imports) {
+      const url = importMap.imports[key]
+      console.log(url, /\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url))
+      if (/\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)) {
+        const [prefix, rest] = util.splitBy(url, '@')
+        const [ver, suffix] = util.splitBy(rest, '/')
+        console.log(ver)
+        if (ver !== 'v' + VERSION && updateImportMaps === null) {
+          updateImportMaps = confirm(`You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${basename(importMapFile)}'?`)
+        }
+        if (updateImportMaps) {
+          importMap.imports[key] = `${prefix}@v${VERSION}/${suffix}`
+        } else if (verison === null) {
+          verison = ver
+        }
+      }
+    }
+    if (updateImportMaps) {
+      await Deno.writeTextFile(importMapFile, JSON.stringify(importMap, undefined, 2))
+    }
+    await run(command, verison || undefined, importMapFile)
+  }
+
+  // run the command without import maps
+  await run(command)
+}
+
+async function run(name: string, version?: string, importMap?: string) {
+  const cmd: string[] = [
+    Deno.execPath(),
+    'run',
+    '-A',
+    '--unstable',
+    '--no-check',
+    '--location', 'http://localhost/'
+  ]
+  if (importMap) {
+    cmd.push('--import-map', importMap)
+  }
+  if (!version || version === 'v' + VERSION) {
+    cmd.push(`./commands/${name}.ts`)
+  } else {
+    cmd.push(`https://deno.land/x/aleph@${version}/commands/${name}.ts`)
+  }
+  cmd.push(...Deno.args.slice(1))
+  console.log(cmd.join(' '))
+  const p = Deno.run({
+    cmd,
+    stdout: 'inherit',
+    stderr: 'inherit'
+  })
+  const c = await p.status()
+  console.log(c)
+  p.close()
 }
 
 if (import.meta.main) {

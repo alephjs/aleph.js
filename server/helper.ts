@@ -2,7 +2,7 @@ import { dim, red, yellow } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.106.0/hash/mod.ts'
 import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { minDenoVersion } from '../shared/constants.ts'
-import { existsFile, existsDir } from '../shared/fs.ts'
+import { existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { SourceType } from '../compiler/mod.ts'
@@ -64,16 +64,6 @@ const reLocalUrl = /^https?:\/\/(localhost|0\.0\.0\.0|127\.0\.0\.1)(\:|\/|$)/
 /** check whether it is a localhost url. */
 export function isLocalUrl(url: string): boolean {
   return reLocalUrl.test(url)
-}
-
-export async function findFile(wd: string, filenames: string[]) {
-  for (const filename of filenames) {
-    const fullPath = join(wd, filename)
-    if (await existsFile(fullPath)) {
-      return fullPath
-    }
-  }
-  return null
 }
 
 /** get the deno cache dir. */

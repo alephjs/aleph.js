@@ -1,3 +1,19 @@
+import { parse as parseArgs } from 'https://deno.land/std@0.106.0/flags/mod.ts'
+import log, { LevelNames } from '../../shared/log.ts'
+import util from '../../shared/util.ts'
+
+export function parse() {
+  const { _: args, ...options } = parseArgs(Deno.args)
+
+  // set log level
+  const l = options.L || options['log-level']
+  if (util.isFilledString(l)) {
+    log.setLevel(l.toLowerCase() as LevelNames)
+  }
+
+  return { args, options }
+}
+
 /** parse port number */
 export function parsePortNumber(v: string): number {
   const num = parseInt(v)

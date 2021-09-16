@@ -1,4 +1,8 @@
+import { resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { Aleph } from '../server/aleph.ts'
+import { parse } from './helper/flags.ts'
+import log from '../shared/log.ts'
+import { existsDir } from '../shared/fs.ts'
 
 export const helpMessage = `
 Usage:
@@ -13,7 +17,15 @@ Options:
     -h, --help                   Prints help message
 `
 
-export default async function (workingDir: string, options: Record<string, any>) {
+if (import.meta.main) {
+  const { args, options } = parse()
+
+  // check working dir
+  const workingDir = resolve(String(args[0] || '.'))
+  if (!await existsDir(workingDir)) {
+    log.fatal('No such directory:', workingDir)
+  }
+
   const aleph = new Aleph(workingDir, 'production', Boolean(options.r || options.reload))
   await aleph.build()
   Deno.exit(0)

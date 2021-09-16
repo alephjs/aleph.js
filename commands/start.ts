@@ -1,6 +1,8 @@
+import { resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { existsDir } from '../shared/fs.ts'
 import { Aleph } from '../server/aleph.ts'
 import { serve } from '../server/mod.ts'
-import { getFlag, parsePortNumber } from '../shared/flags.ts'
+import { getFlag, parse, parsePortNumber } from './helper/flags.ts'
 import log from '../shared/log.ts'
 
 export const helpMessage = `
@@ -20,12 +22,20 @@ Options:
     -h, --help                   Prints help message
 `
 
-export default async function (workingDir: string, flags: Record<string, any>) {
-  const aleph = new Aleph(workingDir, 'production', Boolean(flags.r || flags.reload))
-  const port = parsePortNumber(getFlag(flags, ['p', 'port'], '8080'))
-  const hostname = getFlag(flags, ['hostname'])
-  const certFile = getFlag(flags, ['tls-cert'])
-  const keyFile = getFlag(flags, ['tls-key'])
+if (import.meta.main) {
+  const { args, options } = parse()
+
+  // check working dir
+  const workingDir = resolve(String(args[0] || '.'))
+  if (!await existsDir(workingDir)) {
+    log.fatal('No such directory:', workingDir)
+  }
+
+  const aleph = new Aleph(workingDir, 'production', Boolean(options.r || options.reload))
+  const port = parsePortNumber(getFlag(options, ['p', 'port'], '8080'))
+  const hostname = getFlag(options, ['hostname'])
+  const certFile = getFlag(options, ['tls-cert'])
+  const keyFile = getFlag(options, ['tls-key'])
   if (keyFile !== undefined && certFile === undefined) {
     log.fatal('missing `--tls-cert` option')
   } else if (certFile !== undefined && keyFile === undefined) {

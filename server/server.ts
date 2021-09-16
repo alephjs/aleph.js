@@ -238,13 +238,11 @@ export class Server {
         })
         if (route !== null) {
           try {
-            const [router, module] = route
+            const [router, handler] = route
             const data = new Map()
             const steps = [...middlewares, async (context: APIContext) => {
-              const { default: _handler, handler } = await aleph.importModule(module)
-              const h = _handler || handler
-              if (util.isFunction(h)) {
-                await h(context)
+              if (util.isFunction(handler)) {
+                await handler(context)
               } else {
                 resp.json({ status: 500, message: 'bad api handler' })
                 end(500)

@@ -12,17 +12,17 @@ import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framewo
 import { Routing } from '../framework/core/routing.ts'
 import { frameworks } from '../framework/mod.ts'
 import { cssLoader } from '../plugins/css.ts'
-import { ensureTextFile, existsDir, existsFile, lazyRemove } from '../shared/fs.ts'
+import { ensureTextFile, existsDir, existsFile, findFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, RouterURL, ResolveResult, TransformInput, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
+import type { APIHandler, Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, RouterURL, ResolveResult, TransformInput, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import type { RequiredConfig } from './config.ts'
-import { defaultConfig, fixConfigAndImportMap, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
+import { defaultConfig, fixConfig, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
 import {
-  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, decoder, encoder, findFile,
+  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, decoder, encoder,
   getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath,
 } from './helper.ts'
 import { getContentType } from './mime.ts'
@@ -105,15 +105,11 @@ export class Aleph implements IAleph {
       Object.assign(this.#importMap, getDefaultImportMap())
     }
     if (configFile) {
-      if (!configFile.endsWith('.json')) {
-        const mod = await this.compile(`/${basename(configFile)}`, { httpExternal: true })
-        configFile = join(this.#buildDir, mod.jsFile)
-      }
       Object.assign(this.#config, await loadConfig(configFile))
       this.#pageRouting = new Routing(this.#config)
     }
 
-    await fixConfigAndImportMap(this.#workingDir, this.#config, this.#importMap, importMapFile)
+    await fixConfig(this.#workingDir, this.#config, this.#importMap)
     ms.stop('load config')
 
     Deno.env.set('ALEPH_ENV', this.#mode)
@@ -302,11 +298,6 @@ export class Aleph implements IAleph {
       if (this.#modules.has(specifier)) {
         try {
           const prevModule = this.#modules.get(specifier)!
-          if (prevModule.jsFile === '/aleph.config.js') {
-            log.info(`${prevModule.specifier.slice(1)} has be changed, please restart the server.`)
-            return
-          }
-
           const module = await this.compile(specifier, {
             forceRefresh: true,
             ignoreDeps: true,
@@ -325,7 +316,7 @@ export class Aleph implements IAleph {
               e.emit('modify-' + module.specifier, { refreshPage: refreshPage || undefined })
             })
           }
-          this.applyCompilationSideEffect(module, (m) => {
+          this.applyCompilationSideEffect(module, () => {
             if (!hmrable && this.isHMRable(specifier)) {
               log.debug(`compilation side-effect: ${specifier} ${dim('<-')} ${module.specifier}(${module.sourceHash.substr(0, 6)})`)
               this.#fsWatchListeners.forEach(e => {
@@ -342,18 +333,18 @@ export class Aleph implements IAleph {
       } else {
         let routePath: string | undefined = undefined
         let isIndex: boolean | undefined = undefined
-        let unrouted = false
+        let emitHMR = false
         if (this.isPageModule(specifier)) {
-          unrouted = true
+          emitHMR = true
           this.#pageRouting.lookup(routes => {
             routes.forEach(({ module }) => {
               if (module === specifier) {
-                unrouted = false
+                emitHMR = false
                 return false // break loop
               }
             })
           })
-          if (unrouted) {
+          if (emitHMR) {
             const [_routePath, _specifier, _isIndex] = this.createRouteUpdate(specifier)
             routePath = _routePath
             specifier = _specifier
@@ -361,24 +352,24 @@ export class Aleph implements IAleph {
             this.#pageRouting.update(routePath, specifier, isIndex)
           }
         } else if (specifier.startsWith('/api/') && !specifier.startsWith('/api/_middlewares.')) {
-          unrouted = true
-          this.#pageRouting.lookup(routes => {
+          let routeExists = false
+          this.#apiRouting.lookup(routes => {
             routes.forEach(({ module }) => {
               if (module === specifier) {
-                unrouted = false
+                routeExists = true
                 return false // break loop
               }
             })
           })
-          if (unrouted) {
+          if (!routeExists) {
             this.#apiRouting.update(...this.createRouteUpdate(specifier))
           }
         }
         if (trimBuiltinModuleExts(specifier) === '/app') {
           await this.compile(specifier)
-          unrouted = true
+          emitHMR = true
         }
-        if (unrouted) {
+        if (emitHMR) {
           this.#fsWatchListeners.forEach(e => {
             e.emit('add', { specifier, routePath, isIndex })
           })
@@ -489,17 +480,16 @@ export class Aleph implements IAleph {
   }
 
   /** get api route by the given location. */
-  async getAPIRoute(location: { pathname: string, search?: string }): Promise<[RouterURL, Module] | null> {
+  async getAPIRoute(location: { pathname: string, search?: string }): Promise<[RouterURL, APIHandler] | null> {
     const router = this.#apiRouting.createRouter(location)
     if (router !== null) {
       const [url, nestedModules] = router
       if (url.routePath !== '') {
         const specifier = nestedModules.pop()!
-        if (this.#modules.has(specifier)) {
-          return [url, this.#modules.get(specifier)!]
-        }
-        const module = await this.compile(specifier, { httpExternal: true })
-        return [url, module]
+        const filepath = join(this.#workingDir, this.#config.srcDir, util.trimPrefix(specifier, 'file://'))
+        const state = await Deno.lstat(filepath)
+        const { handler } = await import(`file://${filepath}?mtime=${state.mtime?.getTime()}`)
+        return [url, handler]
       }
     }
     return null
