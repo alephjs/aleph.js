@@ -97,7 +97,7 @@ async function main() {
   if (importMapFile) {
     const importMap = await loadImportMap(importMapFile)
     let updateImportMaps: boolean | null = null
-    let verison: string | null = null
+    let verison = VERSION
     for (const key in importMap.imports) {
       const url = importMap.imports[key]
       if (/\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)) {
@@ -105,25 +105,27 @@ async function main() {
         const [ver, suffix] = util.splitBy(rest, '/')
         if (ver !== 'v' + VERSION && updateImportMaps === null) {
           updateImportMaps = confirm(`You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${basename(importMapFile)}'?`)
+          if (!updateImportMaps) {
+            verison = ver.slice(1)
+          }
         }
         if (updateImportMaps) {
           importMap.imports[key] = `${prefix}@v${VERSION}/${suffix}`
-        } else if (verison === null) {
-          verison = ver
         }
       }
     }
     if (updateImportMaps) {
       await Deno.writeTextFile(importMapFile, JSON.stringify(importMap, undefined, 2))
     }
-    await run(command, verison || undefined, importMapFile)
+    await run(command, verison, importMapFile)
+    return
   }
 
   // run the command without import maps
-  await run(command)
+  await run(command, VERSION)
 }
 
-async function run(name: string, version?: string, importMap?: string) {
+async function run(name: string, version: string, importMap?: string) {
   const cmd: string[] = [
     Deno.execPath(),
     'run',
@@ -135,20 +137,18 @@ async function run(name: string, version?: string, importMap?: string) {
   if (importMap) {
     cmd.push('--import-map', importMap)
   }
-  if (!version || version === 'v' + VERSION) {
+  if (Deno.env.get('ALEPH_DEV') && version === VERSION) {
     cmd.push(`./commands/${name}.ts`)
   } else {
-    cmd.push(`https://deno.land/x/aleph@${version}/commands/${name}.ts`)
+    cmd.push(`https://deno.land/x/aleph@v${version}/commands/${name}.ts`)
   }
   cmd.push(...Deno.args.slice(1))
-  console.log(cmd.join(' '))
   const p = Deno.run({
     cmd,
     stdout: 'inherit',
     stderr: 'inherit'
   })
   const c = await p.status()
-  console.log(c)
   p.close()
 }
 
