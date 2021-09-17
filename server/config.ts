@@ -1,4 +1,3 @@
-import { bold } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
 import { basename, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import type { ReactOptions } from '../compiler/mod.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
@@ -6,7 +5,6 @@ import { existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import type { BrowserName, Config, RequiredConfig as TRequiredConfig, ImportMap, PostCSSPlugin } from '../types.d.ts'
-import { VERSION } from '../version.ts'
 import { getAlephPkgUri } from './helper.ts'
 
 export type RequiredConfig = TRequiredConfig & {
@@ -43,7 +41,7 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     },
     react: {
       version: defaultReactVersion,
-      esmShBuildVersion: 48,
+      esmShBuildVersion: 52,
     }
   }
 }
