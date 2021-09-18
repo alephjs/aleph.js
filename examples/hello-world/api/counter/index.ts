@@ -1,6 +1,17 @@
-import type { APIHandler } from 'aleph/types.d.ts'
+import type { APIHandler, APIContext } from 'aleph/types.d.ts'
+import data from './data.json'
 
-export const handler: APIHandler = ({ response }) => {
+const create = async (
+  { response }: APIContext,
+  db: string,
+) => {
   const count = parseInt(localStorage.getItem('count') || '0')
-  response.json({ count })
+  response.json({ count, db: db, data })
 }
+
+const requestWithMongo = (handler: typeof create): APIHandler =>
+  async (context) => {
+    await handler(context, "mongo")
+  }
+
+export const handler: APIHandler = requestWithMongo(create)
