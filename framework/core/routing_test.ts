@@ -3,7 +3,10 @@ import { Routing } from './routing.ts'
 
 Deno.test(`routing`, () => {
   const routing = new Routing({
-    locales: ['en', 'zh-CN'],
+    i18n: {
+      defaultLocale: 'en',
+      locales: ['en', 'zh-CN'],
+    },
     rewrites: {
       '/Hello World': '/hello-world',
       '/你好世界': '/zh-CN/hello-world',
