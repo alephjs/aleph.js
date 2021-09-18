@@ -12,7 +12,6 @@ const commands = {
   'dev': 'Start the app in development mode',
   'start': 'Start the app in production mode',
   'build': 'Build the app to a static site (SSG)',
-  'analyze': 'Analyze the app deps',
   'upgrade': 'Upgrade Aleph.js command'
 }
 
@@ -98,19 +97,21 @@ async function main() {
     const importMap = await loadImportMap(importMapFile)
     let updateImportMaps: boolean | null = null
     let verison = VERSION
-    for (const key in importMap.imports) {
-      const url = importMap.imports[key]
-      if (/\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)) {
-        const [prefix, rest] = util.splitBy(url, '@')
-        const [ver, suffix] = util.splitBy(rest, '/')
-        if (ver !== 'v' + VERSION && updateImportMaps === null) {
-          updateImportMaps = confirm(`You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${basename(importMapFile)}'?`)
-          if (!updateImportMaps) {
-            verison = ver.slice(1)
+    if (command === 'dev') {
+      for (const key in importMap.imports) {
+        const url = importMap.imports[key]
+        if (/\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)) {
+          const [prefix, rest] = util.splitBy(url, '@')
+          const [ver, suffix] = util.splitBy(rest, '/')
+          if (ver !== 'v' + VERSION && updateImportMaps === null) {
+            updateImportMaps = confirm(`You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${basename(importMapFile)}'?`)
+            if (!updateImportMaps) {
+              verison = ver.slice(1)
+            }
           }
-        }
-        if (updateImportMaps) {
-          importMap.imports[key] = `${prefix}@v${VERSION}/${suffix}`
+          if (updateImportMaps) {
+            importMap.imports[key] = `${prefix}@v${VERSION}/${suffix}`
+          }
         }
       }
     }
