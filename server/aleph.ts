@@ -487,8 +487,8 @@ export class Aleph implements IAleph {
       if (url.routePath !== '') {
         const specifier = nestedModules.pop()!
         const filepath = join(this.#workingDir, this.#config.srcDir, util.trimPrefix(specifier, 'file://'))
-        const state = await Deno.lstat(filepath)
-        const { handler } = await import(`file://${filepath}?mtime=${state.mtime?.getTime()}`)
+        const qs = this.isDev ? '?mtime=' + (await Deno.lstat(filepath)).mtime?.getTime() : ''
+        const { handler } = await import(`file://${filepath}${qs}`)
         return [url, handler]
       }
     }
