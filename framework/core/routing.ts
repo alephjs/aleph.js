@@ -130,7 +130,7 @@ export class Routing {
       this._rewrites
     )
 
-    let locale = this._defaultLocale
+    let locale = null as null | string
     let pathname = decodeURI(url.pathname)
     let routePath = ''
     let params = {} as Record<string, string>
@@ -167,7 +167,7 @@ export class Routing {
     return [
       {
         basePath: this._basePath,
-        locale,
+        locale: locale || this._defaultLocale,
         defaultLocale: this._defaultLocale,
         locales: this._locales,
         pathname,
