@@ -14,13 +14,14 @@ Visit [https://alephjs.org/docs/get-started](https://alephjs.org/docs/get-starte
 
 Aleph.js (or **Aleph** or **א** or **阿莱夫**, **ˈɑːlɛf**) is a fullstack framework in [Deno](https://deno.land/), inspired by [Next.js](https://nextjs.org/).
 
-> The name is taken from the book **The Aleph** by [Jorge Luis Borges](http://phinnweb.org/links/literature/borges/aleph.html).
+> The name is taken from the book [_The Aleph_]( http://phinnweb.org/links/literature/borges/aleph.html)
+ by [Jorge Luis Borges](http://phinnweb.org/links/literature/borges/aleph.html).
 
 Different with Next.js, Aleph.js doesn't need webpack or other bundler since it uses the [ES Module](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) syntax during development. Every module only needs to be compiled once, and then cached on the disk. When a module changes, Aleph.js just needs to re-compile that single module. There is no time wasted re-bundling everytime a change is made. This, along with Hot Module Replacement (HMR) and Fast Refresh, leads to instant updates in the browser.
 
 Aleph.js uses modern tools to build your app. It transpiles code using [swc](https://swc.rs/) in [WASM](https://webassembly.org/) with high performance, and bundles modules with [esbuild](https://github.com/evanw/esbuild) at build time extremely fast.
 
-Aleph.js works in Deno, a simple, modern and secure runtime for JavaScript and TypeScript. All dependencies are imported using URLs, and managed by Deno cache system. No package.json and node_modules directory needed.
+Aleph.js works in Deno, a simple, modern and secure runtime for JavaScript and TypeScript. All dependencies are imported using URLs, and managed by Deno cache system. No `package.json` and `node_modules` directory needed.
 
 ```ts
 import React from 'https://esm.sh/react'
@@ -48,4 +49,4 @@ Please see our [contributing.md](https://github.com/alephjs/aleph.js/blob/master
 
 ## License
 
-Aleph.js [MIT licensed.](https://github.com/alephjs/aleph.js/blob/master/LICENSE)
+[MIT licensed.](https://github.com/alephjs/aleph.js/blob/master/LICENSE)
