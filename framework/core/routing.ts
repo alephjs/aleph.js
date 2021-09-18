@@ -1,5 +1,5 @@
 import util from '../../shared/util.ts'
-import type { RouterURL } from '../../types.d.ts'
+import type { Config, RouterURL } from '../../types.d.ts'
 
 const ghostRoute: Route = { path: '', module: '' }
 
@@ -9,12 +9,9 @@ export type Route = {
   children?: Route[]
 }
 
-export type RoutingOptions = {
-  basePath?: string
-  defaultLocale?: string
-  locales?: string[]
-  routes?: Route[]
+export type RoutingOptions = Pick<Config, 'basePath' | 'i18n'> & {
   rewrites?: Record<string, string>
+  routes?: Route[]
   redirect?: (url: string, replace?: boolean) => void
 }
 
@@ -28,17 +25,16 @@ export class Routing {
 
   constructor({
     basePath = '/',
-    defaultLocale = 'en',
-    locales = [],
+    i18n = { defaultLocale: 'en', locales: [] },
     routes = [],
     rewrites,
-    redirect
+    redirect,
   }: RoutingOptions = {}) {
     this._basePath = basePath
-    this._defaultLocale = defaultLocale
-    this._locales = locales
-    this._routes = routes
+    this._defaultLocale = i18n.defaultLocale || 'en'
+    this._locales = i18n.locales
     this._rewrites = rewrites
+    this._routes = routes
     this._redirect = redirect
   }
 

@@ -105,9 +105,13 @@ export class Aleph implements IAleph {
       Object.assign(this.#importMap, getDefaultImportMap())
     }
     if (configFile) {
-      const config = await loadConfig(configFile)
-      Object.assign(this.#config, config, config.i18n)
-      this.#pageRouting = new Routing(this.#config)
+      Object.assign(this.#config, await loadConfig(configFile))
+      const { basePath, i18n, server: { rewrites } } = this.#config
+      this.#pageRouting = new Routing({
+        basePath,
+        i18n,
+        rewrites,
+      })
     }
 
     await fixConfig(this.#workingDir, this.#config, this.#importMap)
@@ -660,16 +664,15 @@ export class Aleph implements IAleph {
   async createMainJS(bundleMode = false): Promise<string> {
     const alephPkgUri = getAlephPkgUri()
     const alephPkgPath = alephPkgUri.replace('https://', '').replace('http://localhost:', 'http_localhost_')
-    const { framework, basePath: basePath, i18n: { defaultLocale, locales } } = this.#config
+    const { framework, basePath, i18n, ssr, server: { rewrites } } = this.#config
     const { routes } = this.#pageRouting
     const config: Record<string, any> = {
+      renderMode: ssr ? 'ssr' : 'spa',
       basePath,
       appModule: this.#appModule?.specifier,
       routes,
-      renderMode: this.#config.ssr ? 'ssr' : 'spa',
-      defaultLocale,
-      locales,
-      rewrites: this.#config.server.rewrites,
+      i18n,
+      rewrites: rewrites,
     }
 
     let code: string

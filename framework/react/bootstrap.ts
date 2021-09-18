@@ -7,16 +7,16 @@ import Router, { createPageRoute, importPageModules } from './components/Router.
 import { loadSSRDataFromTag, setStaticDataRoutes } from './pagedata.ts'
 
 type BootstrapOptions = Required<RoutingOptions> & {
+  renderMode: 'ssr' | 'spa',
   dataRoutes?: string[],
   appModule?: string,
-  renderMode: 'ssr' | 'spa'
 }
 
 export default async function bootstrap(options: BootstrapOptions) {
-  const { basePath, defaultLocale, locales, appModule: appModuleSpcifier, routes, dataRoutes, rewrites, renderMode } = options
+  const { basePath, i18n, appModule: appModuleSpcifier, routes, dataRoutes, rewrites, renderMode } = options
   const { document } = window as any
   const appModule = appModuleSpcifier ? await importModule(basePath, appModuleSpcifier) : {}
-  const routing = new Routing({ routes, rewrites, basePath, defaultLocale, locales, redirect })
+  const routing = new Routing({ basePath, i18n, rewrites, routes, redirect })
   const [url, nestedModules] = routing.createRouter()
   const components = await importPageModules(url, nestedModules)
 
