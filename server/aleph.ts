@@ -1496,7 +1496,7 @@ export class Aleph implements IAleph {
     }
 
     // render route pages
-    await Promise.all(Array.from(paths).map(loc => ([loc, ...locales.map(locale => ({ ...loc, pathname: locale + loc.pathname }))])).flat().map(async ({ pathname, search }) => {
+    await Promise.all(Array.from(paths).map(loc => ([loc, ...locales.map(locale => ({ ...loc, pathname: '/' + locale + loc.pathname }))])).flat().map(async ({ pathname, search }) => {
       if (this.isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
         if (router.routePath !== '') {
