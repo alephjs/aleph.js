@@ -515,7 +515,7 @@ export class Aleph implements IAleph {
   async addModule(specifier: string, sourceCode: string, forceRefresh?: boolean): Promise<Module> {
     let sourceType = getSourceType(specifier)
     if (sourceType === SourceType.Unknown) {
-      throw new Error("addModule: unknown souce type")
+      throw new Error("addModule: unknown source type")
     }
     const source = {
       code: sourceCode,
@@ -937,9 +937,9 @@ export class Aleph implements IAleph {
   async getModuleJS(module: Module, injectHMRCode = false): Promise<Uint8Array | null> {
     const { specifier, jsFile, jsBuffer } = module
     if (!jsBuffer) {
-      const cacheFp = join(this.#buildDir, jsFile)
-      if (await existsFile(cacheFp)) {
-        module.jsBuffer = await Deno.readFile(cacheFp)
+      const cacheFile = join(this.#buildDir, jsFile)
+      if (await existsFile(cacheFile)) {
+        module.jsBuffer = await Deno.readFile(cacheFile)
         log.debug(`load '${jsFile}'` + dim(' • ' + util.formatBytes(module.jsBuffer.length)))
       }
     }
@@ -1119,10 +1119,9 @@ export class Aleph implements IAleph {
 
     const isRemote = util.isLikelyHttpURL(specifier) && !isLocalUrl(specifier)
     const localPath = toLocalPath(specifier)
-    const name = trimBuiltinModuleExts(basename(localPath))
-    const jsFile = join(dirname(localPath), `${name}.js`)
-    const cacheFp = join(this.#buildDir, jsFile)
-    const metaFp = cacheFp.slice(0, -3) + '.meta.json'
+    const jsFile = trimBuiltinModuleExts(localPath) + '.js'
+    const cacheFile = join(this.#buildDir, jsFile)
+    const metaFile = cacheFile.slice(0, -3) + '.meta.json'
     const isNew = !mod
 
     let defer = (err?: Error) => { }
@@ -1152,14 +1151,14 @@ export class Aleph implements IAleph {
       this.#appModule = mod
     }
 
-    if (!forceRefresh && await existsFile(metaFp)) {
+    if (!forceRefresh && await existsFile(metaFile)) {
       try {
-        const meta = JSON.parse(await Deno.readTextFile(metaFp))
+        const meta = JSON.parse(await Deno.readTextFile(metaFile))
         if (meta.specifier === specifier && util.isFilledString(meta.sourceHash) && util.isArray(meta.deps)) {
           Object.assign(mod, meta)
         } else {
-          log.warn(`removing invalid metadata '${name}.meta.json'`)
-          Deno.remove(metaFp)
+          log.warn(`removing invalid metadata of '${basename(specifier)}'`)
+          Deno.remove(metaFile)
         }
       } catch (e) { }
     }
@@ -1169,7 +1168,7 @@ export class Aleph implements IAleph {
       return [mod, null]
     }
 
-    if (!isRemote || this.#reloading || mod.sourceHash === '' || !await existsFile(cacheFp)) {
+    if (!isRemote || this.#reloading || mod.sourceHash === '' || !await existsFile(cacheFile)) {
       try {
         const src = customSource || await this.resolveModuleSource(specifier, data)
         const sourceHash = computeHash(src.code)
@@ -1429,14 +1428,14 @@ export class Aleph implements IAleph {
   private async cacheModule(module: Module, sourceMap?: string) {
     const { jsBuffer, jsFile, ready, ...rest } = module
     if (jsBuffer) {
-      const cacheFp = join(this.#buildDir, jsFile)
-      const metaFp = cacheFp.slice(0, -3) + '.meta.json'
-      await ensureDir(dirname(cacheFp))
+      const cacheFile = join(this.#buildDir, jsFile)
+      const metaFile = cacheFile.slice(0, -3) + '.meta.json'
+      await ensureDir(dirname(cacheFile))
       await Promise.all([
-        Deno.writeFile(cacheFp, jsBuffer),
-        Deno.writeTextFile(metaFp, JSON.stringify({ ...rest }, undefined, 2)),
-        sourceMap ? Deno.writeTextFile(`${cacheFp}.map`, sourceMap) : Promise.resolve(),
-        lazyRemove(cacheFp.slice(0, -3) + '.bundling.js'),
+        Deno.writeFile(cacheFile, jsBuffer),
+        Deno.writeTextFile(metaFile, JSON.stringify({ ...rest }, undefined, 2)),
+        sourceMap ? Deno.writeTextFile(`${cacheFile}.map`, sourceMap) : Promise.resolve(),
+        lazyRemove(cacheFile.slice(0, -3) + '.bundling.js'),
       ])
     }
   }
