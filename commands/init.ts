@@ -31,7 +31,7 @@ export default async function (
   const cwd = Deno.cwd()
   const rev = 'master'
 
-  const name = nameArg || (await ask('Name:')).trim()
+  const name = nameArg || (await ask('Project Name:')).trim()
   if (name === '') {
     return
   }
