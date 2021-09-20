@@ -134,6 +134,8 @@ export class Aleph implements IAleph {
     const apiDir = join(srcDir, 'api')
     const pagesDir = join(srcDir, 'pages')
     const manifestFile = join(this.#buildDir, 'build.manifest.json')
+    const { browsers, target: buildTarget } = this.#config.build
+    const buildBrowsers = Object.keys(browsers).sort().map(key => key + ':' + (browsers as any)[key]).join(' ')
 
     // remove the existent build dir when the compiler is updated,
     // or using a different aleph version, or build for different target/browsers.
@@ -146,8 +148,8 @@ export class Aleph implements IAleph {
             v.compiler !== wasmChecksum ||
             v.aleph !== VERSION ||
             (this.mode === 'production' && (
-              v.buildTarget !== this.#config.build.target ||
-              v.buildBrowsers !== this.#config.build.browsers
+              v.buildTarget !== buildTarget ||
+              v.buildBrowsers !== buildBrowsers
             ))
           )
         ) {
@@ -163,8 +165,8 @@ export class Aleph implements IAleph {
       aleph: VERSION,
       deno: Deno.version.deno,
       compiler: wasmChecksum,
-      buildTarget: this.#config.build.target,
-      buildBrowsers: this.#config.build.browsers
+      buildTarget,
+      buildBrowsers,
     }, undefined, 2))
 
     // load .env[.*] files
