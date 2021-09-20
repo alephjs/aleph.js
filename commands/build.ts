@@ -28,5 +28,4 @@ if (import.meta.main) {
 
   const aleph = new Aleph(workingDir, 'production', Boolean(options.r || options.reload))
   await aleph.build()
-  Deno.exit(0)
 }

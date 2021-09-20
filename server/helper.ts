@@ -54,7 +54,7 @@ export function checkDenoVersion() {
   Deno.exit(1)
 }
 
-export function checkAlephDev() {
+export function checkAlephDevEnv() {
   const v = Deno.env.get('ALEPH_DEV')
   if (v !== undefined && !_localProxy) {
     localProxy(Deno.cwd(), 2020)

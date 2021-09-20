@@ -2,6 +2,7 @@ import { bold } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
 import { basename, resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { parse } from 'https://deno.land/std@0.106.0/flags/mod.ts'
 import { loadImportMap } from './server/config.ts'
+import { checkAlephDevEnv } from './server/helper.ts'
 import { existsDir, findFile } from './shared/fs.ts'
 import log from './shared/log.ts'
 import util from './shared/util.ts'
@@ -91,6 +92,8 @@ async function main() {
     log.fatal('No such directory:', workingDir)
   }
 
+  checkAlephDevEnv()
+
   // run the command if import maps exists
   const importMapFile = await findFile(workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`))
   if (importMapFile) {
@@ -149,8 +152,11 @@ async function run(name: string, version: string, importMap?: string) {
     stdout: 'inherit',
     stderr: 'inherit'
   })
-  const c = await p.status()
+  await p.status()
   p.close()
+  if (name === 'build') {
+    Deno.exit(0)
+  }
 }
 
 if (import.meta.main) {

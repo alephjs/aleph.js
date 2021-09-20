@@ -25,7 +25,7 @@ import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import { defaultConfig, fixConfig, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
 import {
-  checkAlephDev, checkDenoVersion, clearBuildCache, decoder, encoder, getAlephPkgUri,
+  checkDenoVersion, clearBuildCache, decoder, encoder, getAlephPkgUri,
   getSourceType, isLocalhostUrl, loadPlugin, moduleExclude, toLocalPath, toRelativePath,
 } from './helper.ts'
 import { getContentType } from './mime.ts'
@@ -89,7 +89,6 @@ export class Aleph implements IAleph {
     reload = false
   ) {
     checkDenoVersion()
-    checkAlephDev()
     this.#mode = mode
     this.#workingDir = resolve(workingDir)
     this.#buildDir = join(this.#workingDir, '.aleph', mode)
