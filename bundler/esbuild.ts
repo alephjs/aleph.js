@@ -14,7 +14,7 @@ export const cssPlugin: Plugin = {
   setup(build) {
     build.onResolve({ filter: /.*/ }, args => {
       const isRemote = util.isLikelyHttpURL(args.path)
-      const path = isRemote ? args.path : util.trimPrefix(args.path, 'file://')
+      const [path] = util.splitBy(isRemote ? args.path : util.trimPrefix(args.path, 'file://'), '#')
 
       if (
         args.kind === 'url-token' ||
@@ -38,7 +38,7 @@ export const denoPlugin: Plugin = {
   setup(build) {
     build.onResolve({ filter: /.*/ }, args => {
       const isRemote = util.isLikelyHttpURL(args.path)
-      const path = isRemote ? args.path : util.trimPrefix(args.path, 'file://')
+      const [path] = util.splitBy(isRemote ? args.path : util.trimPrefix(args.path, 'file://'), '#')
 
       if (
         args.kind === 'url-token' ||
