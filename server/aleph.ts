@@ -1214,7 +1214,6 @@ export class Aleph implements IAleph {
         }
         const sourceHash = hasher.toString()
         if (mod.sourceHash !== sourceHash) {
-          console.log(specifier, sourceHash)
           mod.sourceHash = sourceHash
           source = src
         }
