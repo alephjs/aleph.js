@@ -8,11 +8,11 @@ export default function Index() {
         <div className="text-center space-y-2 sm:text-left">
           <div className="space-y-0.1">
             <p className="text-lg text-black font-semibold">Aleph.js</p>
-            <p className="text-gray-500 font-medium">CSS Powered by Windi.</p>
+            <p className="text-gray-500 font-medium">CSS Powered by TailwindCSS.</p>
           </div>
           <a
             href="https://alephjs.org/docs/get-started"
-            className="inline-block px-4 py-1 text-sm text-purple-600 font-semibold rounded-full border border-purple-200 hover:text-white hover:bg-purple-600 hover:border-transparent"
+            className="inline-block px-4 py-1 text-sm text-purple-600 font-semibold rounded-full border border-purple-200 hover:text-white hover:bg-purple-600 hover:border-transparent)  "
           >
             Get started
           </a>
