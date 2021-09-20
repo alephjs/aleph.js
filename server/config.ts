@@ -29,7 +29,7 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     ssr: {},
     plugins: [],
     css: {
-      cache: false,
+      cache: true,
       modules: {},
       postcss: { plugins: ['autoprefixer'] },
     },
@@ -41,7 +41,7 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     },
     react: {
       version: defaultReactVersion,
-      esmShBuildVersion: 52,
+      esmShBuildVersion: 53,
     }
   }
 }
@@ -74,7 +74,6 @@ export async function loadConfig(specifier: string): Promise<Config> {
     plugins,
     css,
     server,
-    env,
   } = data
   if (isFramework(framework)) {
     config.framework = framework
@@ -112,13 +111,13 @@ export async function loadConfig(specifier: string): Promise<Config> {
       headers: util.isPlainObject(server.headers) ? toStringMap(server.headers) : {},
       rewrites: util.isPlainObject(server.rewrites) ? toStringMap(server.rewrites) : {},
       middlewares: Array.isArray(server.middlewares) ? server.middlewares.filter(v => typeof v === 'function') : [],
-      compress: typeof server.compress === 'boolean' ? server.compress : true
+      compress: typeof server.compress === 'undefined' ? true : Boolean(server.compress)
     }
   }
   if (util.isPlainObject(css)) {
     const { cache, modules, postcss } = css
     config.css = {
-      cache: Boolean(cache),
+      cache: typeof cache === 'undefined' ? true : Boolean(cache),
       modules: util.isPlainObject(modules) ? modules : {},
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }
@@ -238,7 +237,7 @@ function toStringMap(v: any): Record<string, string> {
   const imports: Record<string, string> = {}
   if (util.isPlainObject(v)) {
     Object.entries(v).forEach(([key, value]) => {
-      if (key == '') {
+      if (key === '') {
         return
       }
       if (util.isFilledString(value)) {
