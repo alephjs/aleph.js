@@ -1,24 +1,23 @@
 /// <reference lib="dom" />
 
-import React, { useEffect, useRef, RefObject, PropsWithRef, HTMLAttributes } from 'https://esm.sh/react@17.0.2'
+import React, { useEffect, useRef, PropsWithRef, HTMLAttributes } from 'https://esm.sh/react@17.0.2'
 import { redirect } from '../../core/redirect.ts'
 
 type HTMLPageProps = PropsWithRef<HTMLAttributes<{}> & {
-  ref?: RefObject<HTMLDivElement>
   html: string
 }>
 
-export default function HTMLPage({
-  ref: pRef,
-  html,
-  children,
-  dangerouslySetInnerHTML,
-  ...rest
-}: HTMLPageProps) {
+const HTMLPage = React.forwardRef<HTMLDivElement, HTMLPageProps>((props, pRef) => {
+  const {
+    html,
+    children,
+    dangerouslySetInnerHTML,
+    ...rest
+  } = props
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const REF = pRef || ref
+    const REF: any = pRef || ref
     const anchors: HTMLAnchorElement[] = []
     const onClick = (e: MouseEvent) => {
       e.preventDefault()
@@ -45,4 +44,6 @@ export default function HTMLPage({
     ref: pRef || ref,
     dangerouslySetInnerHTML: { __html: html }
   })
-}
+})
+
+export default HTMLPage
