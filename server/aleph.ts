@@ -1381,7 +1381,7 @@ export class Aleph implements IAleph {
         let depModule: Module | null = null
         if (ignoreDeps || virtual) {
           depModule = this.getModule(specifier)
-          if (depModule == null && virtual) {
+          if (depModule === null && virtual) {
             const [mod] = await this.#initModule(specifier, { virtual: true })
             depModule = mod
           }
@@ -1425,7 +1425,7 @@ export class Aleph implements IAleph {
         for (const dep of deps) {
           const { specifier, hashLoc } = dep
           if (specifier === by.specifier && hashLoc !== undefined) {
-            if (hash == null) {
+            if (hash === null) {
               hash = this.computeModuleHash(by)
             }
             if (await this.#replaceDepHash(mod, hashLoc, hash)) {

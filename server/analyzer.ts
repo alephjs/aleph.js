@@ -90,7 +90,7 @@ export class Analyzer {
       deps: []
     }
 
-    if (__tracing.size == 0 && isPreload) {
+    if (__tracing.size === 0 && isPreload) {
       graph.isPreload = true
     }
 
