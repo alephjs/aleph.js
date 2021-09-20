@@ -151,7 +151,7 @@ impl JSXMagicFold {
               }
 
               let mut resolver = self.resolver.borrow_mut();
-              let (resolved_path, fixed_url) = resolver.resolve(href_prop_value, true);
+              let (resolved_path, fixed_url) = resolver.resolve(href_prop_value, false);
               resolver.add_extra_import(resolved_path.as_str());
 
               if href_prop_index >= 0 {
