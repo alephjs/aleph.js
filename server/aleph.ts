@@ -1,3 +1,9 @@
+import type { TransformOptions, TransformResult, ModuleSource } from '../compiler/mod.ts'
+import type {
+  APIHandler, Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput,
+  Module, RouterURL, ResolveResult, TransformInput, TransformOutput, SSRData, RenderOutput
+} from '../types.d.ts'
+import type { RequiredConfig } from './config.ts'
 import { dim } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
 import { indexOf, copy, equals } from 'https://deno.land/std@0.106.0/bytes/mod.ts'
 import { ensureDir } from 'https://deno.land/std@0.106.0/fs/ensure_dir.ts'
@@ -5,7 +11,6 @@ import { walk } from 'https://deno.land/std@0.106.0/fs/walk.ts'
 import { createHash } from 'https://deno.land/std@0.106.0/hash/mod.ts'
 import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
-import type { TransformOptions, TransformResult, ModuleSource } from '../compiler/mod.ts'
 import { wasmChecksum, parseExportNames, SourceType, fastTransform, transform, stripSsrCode } from '../compiler/mod.ts'
 import { EventEmitter } from '../framework/core/events.ts'
 import { builtinModuleExts, toPagePath, trimBuiltinModuleExts } from '../framework/core/module.ts'
@@ -15,15 +20,13 @@ import { cssLoader } from '../plugins/css.ts'
 import { ensureTextFile, existsDir, existsFile, findFile, lazyRemove } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { APIHandler, Aleph as IAleph, DependencyDescriptor, ImportMap, LoadInput, LoadOutput, Module, RouterURL, ResolveResult, TransformInput, TransformOutput, SSRData, RenderOutput } from '../types.d.ts'
 import { VERSION } from '../version.ts'
 import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
-import type { RequiredConfig } from './config.ts'
 import { defaultConfig, fixConfig, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
 import {
-  checkAlephDev, checkDenoVersion, clearBuildCache, computeHash, decoder, encoder,
-  getAlephPkgUri, getSourceType, isLocalUrl, moduleExclude, toLocalPath, toRelativePath,
+  checkAlephDev, checkDenoVersion, clearBuildCache, decoder, encoder, getAlephPkgUri,
+  getSourceType, isLocalhostUrl, loadPlugin, moduleExclude, toLocalPath, toRelativePath,
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { buildHtml, Renderer } from './renderer.ts'
@@ -37,16 +40,19 @@ type CompileOptions = {
 }
 
 type ResolveListener = {
+  pluginId: number,
   test: RegExp,
   resolve(specifier: string): ResolveResult,
 }
 
 type LoadListener = {
+  pluginId: number,
   test: RegExp,
   load(input: LoadInput): Promise<LoadOutput> | LoadOutput,
 }
 
 type TransformListener = {
+  pluginId: number,
   test: RegExp | 'hmr' | 'main',
   transform(input: TransformInput): TransformOutput | void | Promise<TransformOutput | void>,
 }
@@ -69,12 +75,13 @@ export class Aleph implements IAleph {
   #bundler: Bundler = new Bundler(this)
   #renderer: Renderer = new Renderer(this)
   #fsWatchListeners: Array<EventEmitter> = []
+  #pluginIndex: number = 0
   #resolverListeners: Array<ResolveListener> = []
   #loadListeners: Array<LoadListener> = []
   #transformListeners: Array<TransformListener> = []
   #renderListeners: Array<RenderListener> = []
   #dists: Set<string> = new Set()
-  #reloading = false
+  #reload: boolean = false
 
   constructor(
     workingDir = '.',
@@ -88,11 +95,12 @@ export class Aleph implements IAleph {
     this.#buildDir = join(this.#workingDir, '.aleph', mode)
     this.#config = { ...defaultConfig() }
     this.#importMap = { imports: {}, scopes: {} }
-    this.#ready = Deno.env.get('DENO_TESTING') ? Promise.resolve() : this.init(reload)
+    this.#reload = reload
+    this.#ready = Deno.env.get('DENO_TESTING') ? Promise.resolve() : this.#init()
   }
 
   /** initiate runtime */
-  private async init(reload: boolean) {
+  async #init() {
     const ms = new Measure()
 
     let [importMapFile, configFile] = await Promise.all([
@@ -117,65 +125,51 @@ export class Aleph implements IAleph {
     await fixConfig(this.#workingDir, this.#config, this.#importMap)
     ms.stop('load config')
 
+    Deno.env.set('ALEPH_VERSION', VERSION)
     Deno.env.set('ALEPH_ENV', this.#mode)
     Deno.env.set('ALEPH_FRAMEWORK', this.#config.framework)
     Deno.env.set('ALEPH_WORKING_DIR', this.#workingDir)
-    Deno.env.set('ALEPH_VERSION', VERSION)
 
     const alephPkgUri = getAlephPkgUri()
     const srcDir = join(this.#workingDir, this.#config.srcDir)
     const apiDir = join(srcDir, 'api')
     const pagesDir = join(srcDir, 'pages')
     const manifestFile = join(this.#buildDir, 'build.manifest.json')
-    const importMapString = JSON.stringify(this.#importMap)
-    const pluginNames = this.#config.plugins.map(({ name }) => name).join(',')
 
-    let shouldRebuild = !await existsFile(manifestFile)
-    let shouldUpdateManifest = shouldRebuild
-    if (!shouldRebuild) {
+    // remove the existent build dir when the compiler is updated,
+    // or using a different aleph version, or build for different target/browsers.
+    if (await existsFile(manifestFile)) {
       try {
         const v = JSON.parse(await Deno.readTextFile(manifestFile))
-        const confirmClean = (msg: string): boolean => {
-          shouldUpdateManifest = true
-          // in 'prodcution' mode, we don't ask user to clean build cache
-          if (!this.isDev) {
-            return true
+        if (
+          util.isPlainObject(v) &&
+          (
+            v.compiler !== wasmChecksum ||
+            v.aleph !== VERSION ||
+            (this.mode === 'production' && (
+              v.buildTarget !== this.#config.build.target ||
+              v.buildBrowsers !== this.#config.build.browsers
+            ))
+          )
+        ) {
+          if (await existsDir(this.#buildDir)) {
+            await Deno.remove(this.#buildDir, { recursive: true })
           }
-          return confirm(msg)
-        }
-        shouldRebuild = (
-          typeof v !== 'object' ||
-          v === null ||
-          v.compiler !== wasmChecksum ||
-          (v.importMap !== importMapString && confirmClean('The import-maps has been changed, clean build cache?')) ||
-          (v.plugins !== pluginNames && confirmClean('The plugin list has been updated, clean build cache?'))
-        )
-        if (shouldRebuild) {
-          shouldUpdateManifest = true
         }
       } catch (e) { }
     }
 
-    this.#reloading = reload
-    if (reload || shouldRebuild) {
-      if (await existsDir(this.#buildDir)) {
-        await Deno.remove(this.#buildDir, { recursive: true })
-      }
-      await ensureDir(this.#buildDir)
-    }
+    // write manifest
+    ensureTextFile(manifestFile, JSON.stringify({
+      aleph: VERSION,
+      deno: Deno.version.deno,
+      compiler: wasmChecksum,
+      buildTarget: this.#config.build.target,
+      buildBrowsers: this.#config.build.browsers
+    }, undefined, 2))
 
-    if (shouldUpdateManifest) {
-      ensureTextFile(manifestFile, JSON.stringify({
-        aleph: VERSION,
-        deno: Deno.version.deno,
-        compiler: wasmChecksum,
-        importMap: importMapString,
-        plugins: pluginNames,
-      }, undefined, 2))
-    }
-
-    // load .env.* files
-    for await (const { path: p, } of walk(this.workingDir, { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
+    // load .env[.*] files
+    for await (const { path: p } of walk(this.workingDir, { match: [/(^|\/|\\)\.env(\.|$)/i], maxDepth: 1 })) {
       const text = await Deno.readTextFile(p)
       text.split('\n').forEach(line => {
         let [key, value] = util.splitBy(line, '=')
@@ -190,11 +184,11 @@ export class Aleph implements IAleph {
     ms.stop(`init env`)
 
     // apply plugins
-    await Promise.all(
-      this.#config.plugins.map(async plugin => {
-        await plugin.setup(this)
-      })
-    )
+    const { plugins } = this.#config
+    for (let i = 0; i < this.#config.plugins.length; i++) {
+      this.#pluginIndex = i
+      await plugins[i].setup(this)
+    }
 
     ms.stop('apply plugins')
 
@@ -241,7 +235,7 @@ export class Aleph implements IAleph {
       for await (const { path: p } of walk(apiDir, { ...moduleWalkOptions, exts: builtinModuleExts })) {
         const specifier = util.cleanPath('/api/' + util.trimPrefix(p, apiDir))
         if (!specifier.startsWith('/api/_middlewares.')) {
-          this.#apiRouting.update(...this.createRouteUpdate(specifier))
+          this.#apiRouting.update(...this.#createRouteUpdate(specifier))
         }
       }
     }
@@ -250,8 +244,8 @@ export class Aleph implements IAleph {
     if (await existsDir(pagesDir)) {
       for await (const { path: p } of walk(pagesDir, moduleWalkOptions)) {
         const specifier = util.cleanPath('/pages/' + util.trimPrefix(p, pagesDir))
-        if (this.isPageModule(specifier)) {
-          this.#pageRouting.update(...this.createRouteUpdate(specifier))
+        if (this.#isPageModule(specifier)) {
+          this.#pageRouting.update(...this.#createRouteUpdate(specifier))
           if (!this.isDev) {
             modules.push(specifier)
           }
@@ -262,35 +256,30 @@ export class Aleph implements IAleph {
     // wait all compilation tasks are done
     await Promise.all(modules.map(specifier => this.compile(specifier)))
 
-    // bundle
+    // bundle modules in `production` mode
     if (!this.isDev) {
-      await this.bundle()
-    }
-
-    // end reload
-    if (reload) {
-      this.#reloading = false
+      await this.#bundle()
     }
 
     ms.stop('init project')
 
     if (this.isDev) {
-      this.watch()
+      this.#watch()
     }
   }
 
   /** watch file changes, re-compile modules, and send HMR signal to client. */
-  private async watch() {
+  async #watch() {
     const srcDir = join(this.#workingDir, this.#config.srcDir)
     const w = Deno.watchFs(srcDir, { recursive: true })
     log.info('Start watching code changes...')
     for await (const event of w) {
       for (const path of event.paths) {
         const specifier = util.cleanPath(util.trimPrefix(path, srcDir))
-        if (this.isScopedModule(specifier)) {
+        if (this.#isScopedModule(specifier)) {
           util.debounceById(
             specifier,
-            () => this.watchHandler(path, specifier),
+            () => this.#watchHandler(path, specifier),
             50
           )
         }
@@ -298,7 +287,7 @@ export class Aleph implements IAleph {
     }
   }
 
-  private async watchHandler(path: string, specifier: string): Promise<void> {
+  async #watchHandler(path: string, specifier: string): Promise<void> {
     if (await existsFile(path)) {
       if (this.#modules.has(specifier)) {
         try {
@@ -315,22 +304,22 @@ export class Aleph implements IAleph {
               (module.ssrPropsFn !== undefined && prevModule.ssrPropsFn !== module.ssrPropsFn)
             )
           )
-          const hmrable = this.isHMRable(specifier)
+          const hmrable = this.#isHMRable(specifier)
           if (hmrable) {
             this.#fsWatchListeners.forEach(e => {
               e.emit('modify-' + module.specifier, { refreshPage: refreshPage || undefined })
             })
           }
-          this.applyCompilationSideEffect(module, () => {
-            if (!hmrable && this.isHMRable(specifier)) {
+          this.#applyCompilationSideEffect(module, () => {
+            if (!hmrable && this.#isHMRable(specifier)) {
               log.debug(`compilation side-effect: ${specifier} ${dim('<-')} ${module.specifier}(${module.sourceHash.substr(0, 6)})`)
               this.#fsWatchListeners.forEach(e => {
                 e.emit('modify-' + specifier, { refreshPage: refreshPage || undefined })
               })
             }
-            this.clearSSRCache(specifier)
+            this.#clearSSRCache(specifier)
           })
-          this.clearSSRCache(specifier)
+          this.#clearSSRCache(specifier)
           log.debug('modify', specifier)
         } catch (err) {
           log.error(`compile(${specifier}):`, err.message)
@@ -339,7 +328,7 @@ export class Aleph implements IAleph {
         let routePath: string | undefined = undefined
         let isIndex: boolean | undefined = undefined
         let emitHMR = false
-        if (this.isPageModule(specifier)) {
+        if (this.#isPageModule(specifier)) {
           emitHMR = true
           this.#pageRouting.lookup(routes => {
             routes.forEach(({ module }) => {
@@ -350,7 +339,7 @@ export class Aleph implements IAleph {
             })
           })
           if (emitHMR) {
-            const [_routePath, _specifier, _isIndex] = this.createRouteUpdate(specifier)
+            const [_routePath, _specifier, _isIndex] = this.#createRouteUpdate(specifier)
             routePath = _routePath
             specifier = _specifier
             isIndex = _isIndex
@@ -367,7 +356,7 @@ export class Aleph implements IAleph {
             })
           })
           if (!routeExists) {
-            this.#apiRouting.update(...this.createRouteUpdate(specifier))
+            this.#apiRouting.update(...this.#createRouteUpdate(specifier))
           }
         }
         if (trimBuiltinModuleExts(specifier) === '/app') {
@@ -387,19 +376,19 @@ export class Aleph implements IAleph {
       }
       if (trimBuiltinModuleExts(specifier) === '/app') {
         this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
-      } else if (this.isPageModule(specifier)) {
+      } else if (this.#isPageModule(specifier)) {
         this.#pageRouting.removeRouteByModule(specifier)
         this.#fsWatchListeners.forEach(e => e.emit('remove', specifier))
       } else if (specifier.startsWith('/api/')) {
         this.#apiRouting.removeRouteByModule(specifier)
       }
-      this.clearSSRCache(specifier)
+      this.#clearSSRCache(specifier)
       log.debug('remove', specifier)
     }
   }
 
   /** check the file whether it is a scoped module. */
-  private isScopedModule(specifier: string) {
+  #isScopedModule(specifier: string) {
     if (moduleExclude.some(r => r.test(specifier))) {
       return false
     }
@@ -410,7 +399,7 @@ export class Aleph implements IAleph {
     }
 
     // is page module by plugin
-    if (this.isPageModule(specifier)) {
+    if (this.#isPageModule(specifier)) {
       return true
     }
 
@@ -501,15 +490,15 @@ export class Aleph implements IAleph {
   }
 
   onResolve(test: RegExp, callback: (specifier: string) => ResolveResult): void {
-    this.#resolverListeners.push({ test, resolve: callback })
+    this.#resolverListeners.push({ pluginId: this.#pluginIndex, test, resolve: callback })
   }
 
   onLoad(test: RegExp, callback: (input: LoadInput) => LoadOutput | Promise<LoadOutput>): void {
-    this.#loadListeners.push({ test, load: callback })
+    this.#loadListeners.push({ pluginId: this.#pluginIndex, test, load: callback })
   }
 
   onTransform(test: RegExp | 'hmr' | 'main', callback: (input: TransformOutput & { module: Module }) => TransformOutput | Promise<TransformOutput>): void {
-    this.#transformListeners.push({ test, transform: callback })
+    this.#transformListeners.push({ pluginId: this.#pluginIndex, test, transform: callback })
   }
 
   onRender(callback: (input: RenderOutput & { path: string }) => void | Promise<void>): void {
@@ -533,10 +522,10 @@ export class Aleph implements IAleph {
     if (specifier.startsWith('pages/') || specifier.startsWith('api/')) {
       specifier = '/' + specifier
     }
-    if (specifier.startsWith('/pages/') && this.isPageModule(specifier)) {
-      this.#pageRouting.update(...this.createRouteUpdate(specifier))
+    if (specifier.startsWith('/pages/') && this.#isPageModule(specifier)) {
+      this.#pageRouting.update(...this.#createRouteUpdate(specifier))
     } else if (specifier.startsWith('/api/') && !specifier.startsWith('/api/_middlewares.')) {
-      this.#apiRouting.update(...this.createRouteUpdate(specifier))
+      this.#apiRouting.update(...this.#createRouteUpdate(specifier))
     }
     Object.assign(module, { source })
     return module
@@ -559,7 +548,7 @@ export class Aleph implements IAleph {
   async getSSRData(loc: { pathname: string, search?: string }): Promise<Record<string, SSRData> | null> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { routePath } = router
-    if (routePath === '' || !this.isSSRable(router.pathname)) {
+    if (routePath === '' || !this.#isSSRable(router.pathname)) {
       return null
     }
 
@@ -615,9 +604,9 @@ export class Aleph implements IAleph {
     const { routePath } = router
     const path = loc.pathname + (loc.search || '')
 
-    if (!this.isSSRable(loc.pathname)) {
+    if (!this.#isSSRable(loc.pathname)) {
       const [html] = await this.#renderer.cache('-', 'spa-index-html', async () => {
-        return [await this.createSPAIndexHtml(), null]
+        return [await this.#createSPAIndexHtml(), null]
       })
       return [200, html]
     }
@@ -713,10 +702,10 @@ export class Aleph implements IAleph {
   }
 
   /** create the index html for SPA mode. */
-  private async createSPAIndexHtml(): Promise<string> {
+  async #createSPAIndexHtml(): Promise<string> {
     let html = {
       lang: this.#config.i18n.defaultLocale,
-      headElements: [],
+      head: [],
       scripts: this.getScripts(),
       body: '<div id="__aleph"></div>',
       bodyAttrs: {},
@@ -865,7 +854,7 @@ export class Aleph implements IAleph {
     await this.#bundler.copyDist()
 
     // ssg
-    await this.ssg()
+    await this.#ssg()
 
     // copy public assets
     const publicDir = join(this.#workingDir, 'public')
@@ -893,7 +882,7 @@ export class Aleph implements IAleph {
     log.info(`Done in ${Math.round(performance.now() - start)}ms`)
   }
 
-  private createRouteUpdate(specifier: string): [string, string, boolean | undefined] {
+  #createRouteUpdate(specifier: string): [string, string, boolean | undefined] {
     const isBuiltinModuleType = builtinModuleExts.some(ext => specifier.endsWith('.' + ext))
     let routePath = isBuiltinModuleType ? toPagePath(specifier) : util.trimSuffix(specifier, '/pages')
     let isIndex: boolean | undefined = undefined
@@ -941,9 +930,9 @@ export class Aleph implements IAleph {
   async getModuleJS(module: Module, injectHMRCode = false): Promise<Uint8Array | null> {
     const { specifier, jsFile, jsBuffer } = module
     if (!jsBuffer) {
-      const cacheFile = join(this.#buildDir, jsFile)
-      if (await existsFile(cacheFile)) {
-        module.jsBuffer = await Deno.readFile(cacheFile)
+      const jsFilePath = join(this.#buildDir, jsFile)
+      if (await existsFile(jsFilePath)) {
+        module.jsBuffer = await Deno.readFile(jsFilePath)
         log.debug(`load '${jsFile}'` + dim(' • ' + util.formatBytes(module.jsBuffer.length)))
       }
     }
@@ -952,7 +941,7 @@ export class Aleph implements IAleph {
       return null
     }
 
-    if (!injectHMRCode || !this.isHMRable(specifier)) {
+    if (!injectHMRCode || !this.#isHMRable(specifier)) {
       return module.jsBuffer
     }
 
@@ -1011,7 +1000,14 @@ export class Aleph implements IAleph {
     }
 
     return await cache(specifier, {
-      forceRefresh: this.#reloading,
+      forceRefresh: (() => {
+        const key = 'cache:' + specifier
+        const refresh = this.#reload && sessionStorage.getItem(key) === null
+        if (refresh) {
+          sessionStorage.setItem(key, '1')
+        }
+        return refresh
+      })(),
       retryTimes: 10
     })
   }
@@ -1075,15 +1071,15 @@ export class Aleph implements IAleph {
 
   /** compile the module by given specifier */
   async compile(specifier: string, options: CompileOptions = {}) {
-    const [module, source] = await this.initModule(specifier, options)
+    const [module, source] = await this.#initModule(specifier, options)
     if (!module.external) {
-      await this.transpileModule(module, source, options.ignoreDeps)
+      await this.#transpileModule(module, source, options.ignoreDeps)
     }
     return module
   }
 
   /** init the module by given specifier, don't transpile the code when the returned `source` is equal to null */
-  private async initModule(
+  async #initModule(
     specifier: string,
     { source: customSource, forceRefresh, httpExternal, virtual }: CompileOptions = {}
   ): Promise<[Module, ModuleSource | null]> {
@@ -1121,11 +1117,10 @@ export class Aleph implements IAleph {
       return [mod, null]
     }
 
-    const isRemote = util.isLikelyHttpURL(specifier) && !isLocalUrl(specifier)
     const localPath = toLocalPath(specifier)
     const jsFile = trimBuiltinModuleExts(localPath) + '.js'
-    const cacheFile = join(this.#buildDir, jsFile)
-    const metaFile = cacheFile.slice(0, -3) + '.meta.json'
+    const jsFilePath = join(this.#buildDir, jsFile)
+    const metaFilePath = jsFilePath.slice(0, -3) + '.meta.json'
     const isNew = !mod
 
     let defer = (err?: Error) => { }
@@ -1155,14 +1150,14 @@ export class Aleph implements IAleph {
       this.#appModule = mod
     }
 
-    if (!forceRefresh && await existsFile(metaFile)) {
+    if (!forceRefresh && await existsFile(metaFilePath)) {
       try {
-        const meta = JSON.parse(await Deno.readTextFile(metaFile))
+        const meta = JSON.parse(await Deno.readTextFile(metaFilePath))
         if (meta.specifier === specifier && util.isFilledString(meta.sourceHash) && util.isArray(meta.deps)) {
           Object.assign(mod, meta)
         } else {
-          log.warn(`removing invalid metadata of '${basename(specifier)}'`)
-          Deno.remove(metaFile)
+          log.warn(`removing invalid metadata of '${basename(specifier)}'...`)
+          Deno.remove(metaFilePath)
         }
       } catch (e) { }
     }
@@ -1172,11 +1167,54 @@ export class Aleph implements IAleph {
       return [mod, null]
     }
 
-    if (!isRemote || this.#reloading || mod.sourceHash === '' || !await existsFile(cacheFile)) {
+    const isRemote = util.isLikelyHttpURL(specifier) && !isLocalhostUrl(specifier)
+    const reload = this.#reload && sessionStorage.getItem('init:' + specifier) === null
+
+    if (
+      !isRemote || // always check local file changes
+      mod.sourceHash === '' || // first build
+      reload || // reload
+      !(await existsFile(jsFilePath)) // missing built js file
+    ) {
+      if (reload) {
+        sessionStorage.setItem('init:' + specifier, '1')
+      }
       try {
         const src = customSource || await this.resolveModuleSource(specifier, data)
-        const sourceHash = computeHash(src.code)
-        if (mod.sourceHash === '' || mod.sourceHash !== sourceHash) {
+        const hasher = createHash('sha1')
+        const plugins = new Set<number>()
+        const loader = this.#loadListeners.find(l => l.test.test(specifier))
+        hasher.update(src.code)
+        hasher.update(Object.keys(this.#importMap.imports).sort().map(key => key + ':' + this.#importMap.imports[key]).join('\n'))
+        if (loader) {
+          plugins.add(loader.pluginId)
+        }
+        for (const { pluginId, test } of this.#transformListeners) {
+          if (test instanceof RegExp && test.test(specifier)) {
+            plugins.add(pluginId)
+          }
+        }
+        if (plugins.size > 0) {
+          plugins.forEach(index => {
+            const p = this.#config.plugins[index]
+            if (p.checksum) {
+              hasher.update(p.name)
+              hasher.update(p.checksum())
+            }
+          })
+        }
+        if (src.type === SourceType.CSS) {
+          const { css } = this.#config
+          hasher.update(JSON.stringify({
+            ...css,
+            postcss: {
+              plugins: css.postcss.plugins.map(v => util.isFunction(v) ? v.toString() : v)
+            }
+          }))
+        }
+        const sourceHash = hasher.toString()
+        if (mod.sourceHash !== sourceHash) {
+          console.log(specifier, sourceHash)
           mod.sourceHash = sourceHash
           source = src
         }
@@ -1190,7 +1228,7 @@ export class Aleph implements IAleph {
     return [mod, source]
   }
 
-  private async transpileModule(
+  async #transpileModule(
     module: Module,
     source: ModuleSource | null,
     ignoreDeps = false,
@@ -1336,7 +1374,7 @@ export class Aleph implements IAleph {
 
       ms.stop(`transpile '${specifier}'`)
 
-      await this.cacheModule(module, sourceMap)
+      await this.#cacheModule(module, sourceMap)
     }
 
     if (module.deps.length > 0) {
@@ -1346,21 +1384,21 @@ export class Aleph implements IAleph {
         if (ignoreDeps || virtual) {
           depModule = this.getModule(specifier)
           if (depModule == null && virtual) {
-            const [mod] = await this.initModule(specifier, { virtual: true })
+            const [mod] = await this.#initModule(specifier, { virtual: true })
             depModule = mod
           }
         }
         if (depModule === null) {
-          const [mod, src] = await this.initModule(specifier, { httpExternal })
+          const [mod, src] = await this.#initModule(specifier, { httpExternal })
           if (!mod.external) {
-            await this.transpileModule(mod, src, false, __tracing)
+            await this.#transpileModule(mod, src, false, __tracing)
           }
           depModule = mod
         }
         if (depModule) {
           if (hashLoc !== undefined) {
             const hash = this.computeModuleHash(depModule)
-            if (await this.replaceDepHash(module, hashLoc, hash)) {
+            if (await this.#replaceDepHash(module, hashLoc, hash)) {
               fsync = true
             }
           }
@@ -1369,13 +1407,13 @@ export class Aleph implements IAleph {
         }
       }))
       if (fsync) {
-        await this.cacheModule(module)
+        await this.#cacheModule(module)
       }
     }
   }
 
   /** apply compilation side-effect caused by updating dependency graph. */
-  private async applyCompilationSideEffect(by: Module, callback: (mod: Module) => void, __tracing = new Set<string>()) {
+  async #applyCompilationSideEffect(by: Module, callback: (mod: Module) => void, __tracing = new Set<string>()) {
     if (__tracing.has(by.specifier)) {
       return
     }
@@ -1392,22 +1430,22 @@ export class Aleph implements IAleph {
             if (hash == null) {
               hash = this.computeModuleHash(by)
             }
-            if (await this.replaceDepHash(mod, hashLoc, hash)) {
+            if (await this.#replaceDepHash(mod, hashLoc, hash)) {
               fsync = true
             }
           }
         }
         if (fsync) {
           callback(mod)
-          this.applyCompilationSideEffect(mod, callback)
-          this.cacheModule(mod)
+          this.#applyCompilationSideEffect(mod, callback)
+          this.#cacheModule(mod)
         }
       }
     }
   }
 
   /** replace dep hash in the `jsBuffer` and remove `csrCode` cache if it exits */
-  private async replaceDepHash(module: Module, hashLoc: number, hash: string) {
+  async #replaceDepHash(module: Module, hashLoc: number, hash: string) {
     const hashData = encoder.encode(hash.substr(0, 6))
     const jsBuffer = await this.getModuleJS(module)
     if (jsBuffer && !equals(hashData, jsBuffer.slice(hashLoc, hashLoc + 6))) {
@@ -1420,43 +1458,43 @@ export class Aleph implements IAleph {
     return false
   }
 
-  private clearSSRCache(specifier: string) {
+  #clearSSRCache(specifier: string) {
     if (trimBuiltinModuleExts(specifier) === '/app') {
       this.#renderer.clearCache()
-    } else if (this.isPageModule(specifier)) {
-      const [routePath] = this.createRouteUpdate(specifier)
+    } else if (this.#isPageModule(specifier)) {
+      const [routePath] = this.#createRouteUpdate(specifier)
       this.#renderer.clearCache(routePath)
     }
   }
 
-  private async cacheModule(module: Module, sourceMap?: string) {
+  async #cacheModule(module: Module, sourceMap?: string) {
     const { jsBuffer, jsFile, ready, ...rest } = module
     if (jsBuffer) {
-      const cacheFile = join(this.#buildDir, jsFile)
-      const metaFile = cacheFile.slice(0, -3) + '.meta.json'
-      await ensureDir(dirname(cacheFile))
+      const jsFilePath = join(this.#buildDir, jsFile)
+      const metaFilePath = jsFilePath.slice(0, -3) + '.meta.json'
+      await ensureDir(dirname(jsFilePath))
       await Promise.all([
-        Deno.writeFile(cacheFile, jsBuffer),
-        Deno.writeTextFile(metaFile, JSON.stringify({ ...rest }, undefined, 2)),
-        sourceMap ? Deno.writeTextFile(`${cacheFile}.map`, sourceMap) : Promise.resolve(),
-        lazyRemove(cacheFile.slice(0, -3) + '.bundling.js'),
+        Deno.writeFile(jsFilePath, jsBuffer),
+        Deno.writeTextFile(metaFilePath, JSON.stringify({ ...rest }, undefined, 2)),
+        sourceMap ? Deno.writeTextFile(`${jsFilePath}.map`, sourceMap) : Promise.resolve(),
+        lazyRemove(jsFilePath.slice(0, -3) + '.bundling.js'),
       ])
     }
   }
 
   /** create bundled chunks for production. */
-  private async bundle() {
+  async #bundle() {
     const entries = this.analyze()
     await this.#bundler.bundle(entries)
   }
 
   /** render all pages in routing. */
-  private async ssg() {
+  async #ssg() {
     const { ssr } = this.#config
     const outputDir = join(this.#workingDir, this.#config.build.outputDir)
 
     if (ssr === false) {
-      const html = await this.createSPAIndexHtml()
+      const html = await this.#createSPAIndexHtml()
       await ensureTextFile(join(outputDir, 'index.html'), html)
       await ensureTextFile(join(outputDir, '404.html'), html)
       // todo: 500 page
@@ -1497,7 +1535,7 @@ export class Aleph implements IAleph {
 
     // render route pages
     await Promise.all(Array.from(paths).map(loc => ([loc, ...locales.map(locale => ({ ...loc, pathname: '/' + locale + loc.pathname }))])).flat().map(async ({ pathname, search }) => {
-      if (this.isSSRable(pathname)) {
+      if (this.#isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
         if (router.routePath !== '') {
           const href = router.toString()
@@ -1527,7 +1565,7 @@ export class Aleph implements IAleph {
   }
 
   /** check the module whether it is page. */
-  private isPageModule(specifier: string): boolean {
+  #isPageModule(specifier: string): boolean {
     if (!specifier.startsWith('/pages/')) {
       return false
     }
@@ -1539,7 +1577,7 @@ export class Aleph implements IAleph {
   }
 
   /** check the module whether it is hmrable. */
-  private isHMRable(specifier: string): boolean {
+  #isHMRable(specifier: string): boolean {
     if (util.isLikelyHttpURL(specifier)) {
       return false
     }
@@ -1560,12 +1598,16 @@ export class Aleph implements IAleph {
     }
 
     return this.#resolverListeners.some(({ test, resolve }) => (
-      test.test(specifier) && this.acceptHMR(resolve(specifier))
+      test.test(specifier) && this.#isAcceptHMR(resolve(specifier))
     ))
   }
 
+  #isAcceptHMR(ret: ResolveResult): boolean {
+    return ret.acceptHMR || !!ret.asPage
+  }
+
   /** check the page whether it supports SSR. */
-  private isSSRable(pathname: string): boolean {
+  #isSSRable(pathname: string): boolean {
     const { ssr } = this.#config
     if (util.isPlainObject(ssr)) {
       if (ssr.include) {
@@ -1585,10 +1627,6 @@ export class Aleph implements IAleph {
       return true
     }
     return ssr
-  }
-
-  private acceptHMR(ret: ResolveResult): boolean {
-    return ret.acceptHMR || !!ret.asPage
   }
 
   /** lookup app deps recurively. */

@@ -53,6 +53,8 @@ export type Plugin = {
   name: string
   /** `setup` inits the plugin. */
   setup(aleph: Aleph): Promise<void> | void
+  /** `checksum` returns different checksums to rebuild modules. */
+  checksum?(): string
 }
 
 /**
@@ -133,7 +135,7 @@ type DependencyDescriptor = {
 /** The HTML Descriptor. */
 type HtmlDescriptor = {
   lang: string,
-  headElements: string[],
+  head: string[],
   scripts: (string | { id?: string, type?: string, src?: string, innerText?: string, async?: boolean, preload?: boolean, nomodule?: boolean })[],
   body: string,
   bodyAttrs: Record<string, string>,
@@ -176,7 +178,7 @@ export type BrowserName = 'chrome' | 'edge' | 'firefox' | 'ios' | 'safari'
  * The config for ES Build.
  */
 export type BuildOptions = {
-  /** `target` specifies the build target in production mode (default is [**es2015**]). */
+  /** `target` specifies the build target in production mode (default is **es2015**). */
   target?: BuildTarget
   /** `browsers` specifies the target browsers for esbuild. */
   browsers?: Record<BrowserName, number>
@@ -196,8 +198,8 @@ export type ImportMap = {
  * The config for builtin CSS loader.
  */
 export type CSSOptions = {
-  /** `cache` caches remote css to local if it is true. */
-  cache?: boolean | RegExp | RegExp[]
+  /** `cache` caches remote css to local (default is false). */
+  cache?: boolean
   /** `postcss` specifies the postcss plugins. */
   postcss?: { plugins: PostCSSPlugin[] }
   /** `modules` specifies CSS modules behavior. */

@@ -1,3 +1,4 @@
+import type { Plugin } from '../types.d.ts'
 import { dim, red, yellow } from 'https://deno.land/std@0.106.0/fmt/colors.ts'
 import { createHash } from 'https://deno.land/std@0.106.0/hash/mod.ts'
 import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.106.0/path/mod.ts'
@@ -27,6 +28,17 @@ Object.assign((globalThis as any).navigator, {
   vendor: 'Deno Land'
 })
 
+export const encoder = new TextEncoder()
+export const decoder = new TextDecoder()
+export const moduleExclude = [
+  /(^|\/|\\)\./,
+  /\.d\.ts$/i,
+  /(\.|_)(test|spec|e2e)\.[a-z]+$/i
+]
+
+const reLocalhostUrl = /^https?:\/\/(localhost|0\.0\.0\.0|127\.0\.0\.1)(\:|\/|$)/
+const reEndsWithVersion = /@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$/
+
 let _denoDir: string | null = null
 let _localProxy = false
 
@@ -50,20 +62,9 @@ export function checkAlephDev() {
   }
 }
 
-export const encoder = new TextEncoder()
-export const decoder = new TextDecoder()
-
-export const moduleExclude = [
-  /(^|\/|\\)\./,
-  /\.d\.ts$/i,
-  /(\.|_)(test|spec|e2e)\.[a-z]+$/i
-]
-
-const reLocalUrl = /^https?:\/\/(localhost|0\.0\.0\.0|127\.0\.0\.1)(\:|\/|$)/
-
 /** check whether it is a localhost url. */
-export function isLocalUrl(url: string): boolean {
-  return reLocalUrl.test(url)
+export function isLocalhostUrl(url: string): boolean {
+  return reLocalhostUrl.test(url)
 }
 
 /** get the deno cache dir. */
@@ -94,6 +95,21 @@ export function getAlephPkgUri() {
     return `http://localhost:${DEV_PORT}`
   }
   return `https://deno.land/x/aleph@v${VERSION}`
+}
+
+/** load aleph plugin from `deno.land/x`, a aleph plugin should be named with `aleph_plugin_{name}`. */
+export async function loadPlugin(name: string, options?: any): Promise<Plugin> {
+  let { default: p } = await import(`https://deno.land/x/aleph_plugin_${name}/plugin.ts`)
+  if (util.isFunction(p)) {
+    p = p(options)
+  }
+  if (p instanceof Promise) {
+    p = await p
+  }
+  if (util.isFunction(p.setup)) {
+    return p
+  }
+  return Promise.reject(new Error(`invalid plugin '${name}': missing 'setup' method`))
 }
 
 /** get the relative path from `from` to `to`. */
@@ -142,8 +158,6 @@ export function getSourceType(url: string, contentType?: string): SourceType {
   }
   return SourceType.Unknown
 }
-
-const reEndsWithVersion = /@\d+(\.\d+){0,2}(\-[a-z0-9]+(\.[a-z0-9]+)?)?$/
 
 /**
  * fix remote import url to local

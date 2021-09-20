@@ -29,7 +29,7 @@ export function defaultConfig(): Readonly<RequiredConfig> {
     ssr: {},
     plugins: [],
     css: {
-      cache: true,
+      cache: false,
       modules: {},
       postcss: { plugins: ['autoprefixer'] },
     },
@@ -116,24 +116,15 @@ export async function loadConfig(specifier: string): Promise<Config> {
     }
   }
   if (util.isPlainObject(css)) {
-    const { cache: v, modules, postcss } = css
-    let cache: boolean | RegExp | RegExp[] = true
-    if (typeof v === 'boolean' || v instanceof RegExp) {
-      cache = v
-    } else if (Array.isArray(v)) {
-      cache = v.filter(test => test instanceof RegExp)
-      if (cache.length === 0) {
-        cache = false
-      }
-    }
+    const { cache, modules, postcss } = css
     config.css = {
-      cache,
+      cache: Boolean(cache),
       modules: util.isPlainObject(modules) ? modules : {},
       postcss: isPostcssConfig(postcss) ? postcss : { plugins: ['autoprefixer'] }
     }
   }
   if (util.isFilledArray(plugins)) {
-    config.plugins = plugins.filter(v => util.isPlainObject(v) && util.isFunction(v.setup))
+    config.plugins = plugins
   }
 
   return config
@@ -253,7 +244,8 @@ function toStringMap(v: any): Record<string, string> {
       if (util.isFilledString(value)) {
         imports[key] = value
         return
-      } else if (util.isFilledArray(value)) {
+      }
+      if (util.isFilledArray(value)) {
         for (const v of value) {
           if (util.isFilledString(v)) {
             imports[key] = v

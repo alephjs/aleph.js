@@ -131,7 +131,7 @@ export class Renderer {
     return [
       {
         lang: url.locale,
-        headElements: head,
+        head,
         scripts: [
           data ? {
             id: 'ssr-data',
@@ -178,12 +178,12 @@ export function buildHtml({
   body,
   bodyAttrs = {},
   lang = 'en',
-  headElements = [],
+  head = [],
   scripts = []
 }: HtmlDescriptor, minify = false) {
   const eol = minify ? '' : '\n'
   const indent = minify ? '' : ' '.repeat(2)
-  const headTags = headElements.map(tag => tag.trim()).concat(scripts.map(v => {
+  const headTags = head.map(tag => tag.trim()).concat(scripts.map(v => {
     if (!util.isString(v) && util.isFilledString(v.src)) {
       if (v.type === 'module') {
         return `<link rel="modulepreload" href=${JSON.stringify(v.src)} />`
@@ -206,7 +206,7 @@ export function buildHtml({
     }
   }).filter(Boolean)
 
-  if (!headElements.some(tag => tag.trimLeft().startsWith('<meta') && tag.includes('name="viewport"'))) {
+  if (!head.some(tag => tag.trimLeft().startsWith('<meta') && tag.includes('name="viewport"'))) {
     headTags.unshift('<meta name="viewport" content="width=device-width" />')
   }
 

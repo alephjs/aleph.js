@@ -17,14 +17,7 @@ export const cssLoader = async ({ specifier, data }: LoadInput, aleph: Aleph): P
   const isRemote = util.isLikelyHttpURL(specifier)
 
   // Don't process remote .css files if the cache is disabled
-  if (
-    (isRemote && specifier.endsWith('.css')) &&
-    (
-      cssConfig.cache === false ||
-      (cssConfig.cache instanceof RegExp && !cssConfig.cache.test(specifier)) ||
-      (Array.isArray(cssConfig.cache) && !cssConfig.cache.some(r => r.test(specifier)))
-    )
-  ) {
+  if (isRemote && specifier.endsWith('.css') && !cssConfig.cache) {
     return {
       code: [
         `import { applyCSS } from "https://deno.land/x/aleph/framework/core/style.ts"`,
