@@ -2,7 +2,7 @@ import { join } from 'std/path/mod.ts'
 import { assert, assertEquals } from 'std/testing/asserts.ts'
 import { Aleph } from '../server/aleph.ts'
 import { ensureTextFile } from '../shared/fs.ts'
-import { markdownResovler, markdownLoader, test } from './markdown.ts'
+import { markdownResovler, markdownLoader } from './markdown.ts'
 
 Deno.test('plugin: markdown loader', async () => {
   Deno.env.set('DENO_TESTING', 'true')
@@ -25,8 +25,6 @@ Deno.test('plugin: markdown loader', async () => {
   )
   const { code } = await markdownLoader({ specifier: '/pages/docs/index.md', }, aleph)
 
-  assert(test.test('/test.md'))
-  assert(test.test('/test.markdown'))
   assertEquals(markdownResovler('/pages/docs/index.md').asPage, { path: '/docs', isIndex: true })
   assertEquals(markdownResovler('/pages/docs/get-started.md').asPage, { path: '/docs/get-started', isIndex: false })
   assert(code.includes('html: "<h1 id=\\"alephjs\\">Aleph.js</h1>\\n<p>The Full-stack Framework in Deno.</p>\\n"'))
