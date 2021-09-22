@@ -236,16 +236,15 @@ export type GlobalSSROptions = {
 /**
  * The **SSR** props.
  */
-export type SSRProps = {
-  [key: string]: any
+export type SSRProps<Props> = Props & {
   $revalidate?: number
 }
 
 /**
  * The **SSR** options for pages.
  */
-export type SSROptions = {
-  props?(router: RouterURL): (SSRProps | Promise<SSRProps>)
+export type SSROptions<Props = {}> = {
+  props?(router: RouterURL): (SSRProps<Props> | Promise<SSRProps<Props>>)
   paths?(): (string[] | Promise<string[]>)
 }
 

@@ -1,7 +1,11 @@
-import React from 'https://esm.sh/react'
+import React, { FC } from 'https://esm.sh/react'
 import type { SSROptions } from 'https://deno.land/x/aleph/types.d.ts'
 
-export const ssr: SSROptions = {
+type Props = {
+  serverTime: number
+}
+
+export const ssr: SSROptions<Props> = {
   props: async router => {
     return {
       $revalidate: 1, // revalidate props after 1 second
@@ -13,8 +17,10 @@ export const ssr: SSROptions = {
   }
 }
 
-export default function Page(props) {
+const Page: FC<Props> = (props) => {
   return (
     <p>Now: {props.serverTime}</p>
   )
 }
+
+export default Page
