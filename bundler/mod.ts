@@ -37,7 +37,9 @@ export const bundlerRuntimeCode = `
         e.onload = function() {
           y(a[s]);
         };
-        e.onerror = n;
+        e.onerror = function(g) {
+          n(new Error('script failed to load ' + g.target.src));
+        };
         p += f;
         if (r) {
           p += '?t=' + (new Date).getTime();
