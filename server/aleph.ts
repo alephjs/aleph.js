@@ -546,7 +546,7 @@ export class Aleph implements IAleph {
   }
 
   /** get ssr data by the given location(page), return `null` if no data defined */
-  async getSSRData(loc: { pathname: string, search?: string }): Promise<Record<string, SSRData> | null> {
+  async getSSRData(request: Request, loc: { pathname: string, search?: string }): Promise<Record<string, SSRData> | null> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { routePath } = router
     if (routePath === '' || !this.#isSSRable(router.pathname)) {
@@ -566,7 +566,7 @@ export class Aleph implements IAleph {
 
     const path = loc.pathname + (loc.search || '')
     const [_, data] = await this.#renderer.cache(routePath, path, async () => {
-      return await this.#renderPage(router, nestedModules)
+      return await this.#renderPage(request, router, nestedModules)
     })
     return data
   }
@@ -600,7 +600,7 @@ export class Aleph implements IAleph {
   }
 
   /** render page to HTML by the given location */
-  async renderPage(loc: { pathname: string, search?: string }): Promise<[number, string]> {
+  async renderPage(request: Request, loc: { pathname: string, search?: string }): Promise<[number, string]> {
     const [router, nestedModules] = this.#pageRouting.createRouter(loc)
     const { routePath } = router
     const path = loc.pathname + (loc.search || '')
@@ -615,19 +615,19 @@ export class Aleph implements IAleph {
     if (routePath === '') {
       const [html] = await this.#renderer.cache('404', path, async () => {
         const [_, nestedModules] = this.#pageRouting.createRouter({ pathname: '/404' })
-        return await this.#renderPage(router, nestedModules.slice(0, 1))
+        return await this.#renderPage(request, router, nestedModules.slice(0, 1))
       })
       return [404, html]
     }
 
     const [html] = await this.#renderer.cache(routePath, path, async () => {
-      return await this.#renderPage(router, nestedModules)
+      return await this.#renderPage(request, router, nestedModules)
     })
     return [200, html]
   }
 
-  async #renderPage(url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
-    let [html, data] = await this.#renderer.renderPage(url, nestedModules)
+  async #renderPage(request: Request, url: RouterURL, nestedModules: string[]): Promise<[string, Record<string, SSRData> | null]> {
+    let [html, data] = await this.#renderer.renderPage(request, url, nestedModules)
     for (const callback of this.#renderListeners) {
       await callback({ path: url.toString(), html, data })
     }
@@ -1534,12 +1534,13 @@ export class Aleph implements IAleph {
     }
 
     // render route pages
+    const req = new Request('http://localhost/')
     await Promise.all(Array.from(paths).map(loc => ([loc, ...locales.map(locale => ({ ...loc, pathname: '/' + locale + loc.pathname }))])).flat().map(async ({ pathname, search }) => {
       if (this.#isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
         if (router.routePath !== '') {
           const href = router.toString()
-          const [html, data] = await this.#renderPage(router, nestedModules)
+          const [html, data] = await this.#renderPage(req, router, nestedModules)
           await ensureTextFile(join(outputDir, pathname, 'index.html' + (search || '')), html)
           if (data) {
             const dataFile = join(
@@ -1559,7 +1560,7 @@ export class Aleph implements IAleph {
       if (nestedModules.length > 0) {
         await this.compile(nestedModules[0])
       }
-      const [html] = await this.#renderPage(router, nestedModules.slice(0, 1))
+      const [html] = await this.#renderPage(req, router, nestedModules.slice(0, 1))
       await ensureTextFile(join(outputDir, '404.html'), html)
     }
   }
