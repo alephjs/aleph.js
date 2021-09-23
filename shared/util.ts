@@ -1,4 +1,7 @@
 export default {
+  isNumber(a: any): a is number {
+    return typeof a === 'number' && !isNaN(a)
+  },
   isString(a: any): a is string {
     return typeof a === 'string'
   },
@@ -122,7 +125,7 @@ export default {
   },
   async isUrlOk(url: string): Promise<boolean> {
     const res = await fetch(url).catch((e) => e)
-    await res.body?.cancel();
+    await res.body?.cancel()
     return res.status === 200
   }
 }

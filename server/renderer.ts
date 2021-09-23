@@ -1,8 +1,8 @@
+import type { HtmlDescriptor, Module, RouterURL, SSRData, SSRRequest } from '../types.d.ts'
+import type { Aleph } from './aleph.ts'
 import { basename, dirname } from 'https://deno.land/std@0.106.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import type { HtmlDescriptor, Module, RouterURL, SSRData } from '../types.d.ts'
-import type { Aleph } from './aleph.ts'
 
 /** The render result of framework SSR. */
 export type FrameworkRenderResult = {
@@ -15,6 +15,7 @@ export type FrameworkRenderResult = {
 /** The renderer of framework SSR. */
 export type FrameworkRenderer = {
   render(
+    request: Request,
     url: RouterURL,
     AppComponent: any,
     nestedPageComponents: { specifier: string, Component?: any, props?: Record<string, any> }[],
@@ -81,7 +82,7 @@ export class Renderer {
   }
 
   /** render page base the given location. */
-  async renderPage(url: RouterURL, nestedModules: string[]): Promise<[HtmlDescriptor, Record<string, SSRData> | null]> {
+  async renderPage(request: Request, url: RouterURL, nestedModules: string[]): Promise<[HtmlDescriptor, Record<string, SSRData> | null]> {
     const start = performance.now()
     const isDev = this.#aleph.isDev
     const state = { entryFile: '' }
@@ -96,7 +97,7 @@ export class Renderer {
         const { default: Component, ssr } = await this.#aleph.importModule(module)
         let ssrProps = ssr?.props
         if (util.isFunction(ssrProps)) {
-          ssrProps = ssrProps(url)
+          ssrProps = ssrProps(new SSRRequestImpl(url, request))
           if (ssrProps instanceof Promise) {
             ssrProps = await ssrProps
           }
@@ -115,6 +116,7 @@ export class Renderer {
     ].flat())
 
     const { head, body, data, scripts } = await this.#renderer.render(
+      request,
       url,
       App,
       nestedPageComponents,
@@ -170,6 +172,47 @@ export class Renderer {
       styles[specifier] = { css, href }
       return styles
     }, {} as Record<string, { css?: string, href?: string }>)
+  }
+}
+
+class SSRRequestImpl extends Request implements SSRRequest {
+  #url: RouterURL
+
+  constructor(url: RouterURL, raw: Request) {
+    super(raw)
+    this.#url = url
+  }
+
+  get basePath() {
+    return this.#url.basePath
+  }
+
+  get routePath() {
+    return this.#url.routePath
+  }
+
+  get locale() {
+    return this.#url.locale
+  }
+
+  get defaultLocale() {
+    return this.#url.defaultLocale
+  }
+
+  get locales() {
+    return this.#url.locales
+  }
+
+  get pathname() {
+    return this.#url.pathname
+  }
+
+  get params() {
+    return this.#url.params
+  }
+
+  get query() {
+    return this.#url.query
   }
 }
 

@@ -1,6 +1,6 @@
 import { join } from 'https://deno.land/std@0.106.0/path/mod.ts'
-import { readerFromStreamReader } from "https://deno.land/std@0.106.0/io/streams.ts"
-import { readAll } from "https://deno.land/std@0.106.0/io/util.ts"
+import { readerFromStreamReader } from 'https://deno.land/std@0.106.0/io/streams.ts'
+import { readAll } from 'https://deno.land/std@0.106.0/io/util.ts'
 import { builtinModuleExts, trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { resolveURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
@@ -142,7 +142,7 @@ export class Server {
       if (pathname.startsWith('/_aleph/')) {
         if (pathname.startsWith('/_aleph/data/') && pathname.endsWith('.json')) {
           const [path, search] = util.splitBy(util.atobUrl(util.trimSuffix(util.trimPrefix(pathname, '/_aleph/data/'), '.json')), '?')
-          const data = await aleph.getSSRData({ pathname: path, search: search ? '?' + search : undefined })
+          const data = await aleph.getSSRData(req, { pathname: path, search: search ? '?' + search : undefined })
           if (data === null) {
             resp.json(null)
             end()
@@ -299,7 +299,7 @@ export class Server {
       }
 
       // ssr
-      const [status, html] = await aleph.renderPage({
+      const [status, html] = await aleph.renderPage(req, {
         pathname,
         search: Array.from(url.searchParams.keys()).length > 0 ? '?' + url.searchParams.toString() : ''
       })

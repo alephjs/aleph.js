@@ -1,8 +1,8 @@
+import type { FrameworkRenderResult } from '../../server/renderer.ts'
+import type { RouterURL } from '../../types.d.ts'
 import { createElement, ComponentType, ReactElement } from 'https://esm.sh/react@17.0.2'
 import { renderToString } from 'https://esm.sh/react-dom@17.0.2/server'
 import util from '../../shared/util.ts'
-import type { FrameworkRenderResult } from '../../server/renderer.ts'
-import type { RouterURL } from '../../types.d.ts'
 import events from '../core/events.ts'
 import { RouterContext, SSRContext } from './context.ts'
 import { E400MissingComponent, E404Page } from './components/ErrorBoundary.ts'
@@ -11,12 +11,15 @@ import { isLikelyReactComponent } from './helper.ts'
 import { createPageProps } from './pageprops.ts'
 
 export type RendererStore = {
+  request: Request
+  dataCache: Record<string, any>
   headElements: Map<string, { type: string, props: Record<string, any> }>
   inlineStyles: Map<string, string>
   scripts: Map<string, { props: Record<string, any> }>
 }
 
 export async function render(
+  request: Request,
   url: RouterURL,
   App: ComponentType<any> | undefined,
   nestedPageComponents: { specifier: string, Component?: any, props?: Record<string, any> }[],
@@ -30,6 +33,8 @@ export async function render(
     data: null,
   }
   const rendererStore: RendererStore = {
+    request: request,
+    dataCache: {},
     headElements: new Map(),
     inlineStyles: new Map(),
     scripts: new Map(),
@@ -38,7 +43,6 @@ export async function render(
   const dataKey = 'rendering-' + dataUrl
   const asyncCalls: Array<[string, number, Promise<any>]> = []
   const data: Record<string, any> = {}
-  const renderingData: Record<string, any> = {}
   const pageProps = createPageProps(nestedPageComponents)
   const defer = async () => {
     Reflect.deleteProperty(global, dataKey)
@@ -47,9 +51,14 @@ export async function render(
 
   nestedPageComponents.forEach(({ specifier, props }) => {
     if (util.isPlainObject(props)) {
+      const { $revalidate } = props
       let expires = 0
-      if (typeof props.$revalidate === 'number' && props.$revalidate > 0) {
-        expires = Date.now() + Math.round(props.$revalidate * 1000)
+      if (util.isNumber($revalidate)) {
+        expires = Date.now() + Math.round($revalidate * 1000)
+      } else if ($revalidate === true) {
+        expires = Date.now() - 1000
+      } else if (util.isPlainObject($revalidate) && util.isNumber($revalidate.date)) {
+        expires = $revalidate.date
       }
       data[`props-${btoa(specifier)}`] = {
         value: props,
@@ -57,9 +66,6 @@ export async function render(
       }
     }
   })
-
-  // share rendering data
-  global[dataKey] = renderingData
 
   // listen `useDeno-*` events to get hooks callback result.
   events.on('useDeno-' + dataUrl, ({ id, value, expires }: { id: string, value: any, expires: number }) => {
@@ -96,12 +102,12 @@ export async function render(
       const datas = await Promise.all(calls.map(a => a[2]))
       calls.forEach(([id, expires], i) => {
         const value = datas[i]
-        renderingData[id] = value
+        rendererStore.dataCache[id] = value
         data[id] = { value, expires }
       })
     }
+    Object.values(rendererStore).forEach(v => v instanceof Map && v.clear())
     try {
-      Object.values(rendererStore).forEach(map => map.clear())
       ret.body = renderToString(createElement(
         SSRContext.Provider,
         { value: rendererStore },

@@ -237,14 +237,28 @@ export type GlobalSSROptions = {
  * The **SSR** props.
  */
 export type SSRProps<P> = P & {
-  $revalidate?: number
+  $revalidate?: number | boolean | { date: number }
+}
+
+/**
+ * The **Request** for SSR.
+ */
+interface SSRRequest extends Request {
+  readonly basePath: string
+  readonly routePath: string
+  readonly locale: string
+  readonly defaultLocale: string
+  readonly locales: string[]
+  readonly pathname: string
+  readonly params: Record<string, string>
+  readonly query: URLSearchParams
 }
 
 /**
  * The **SSR** options for pages.
  */
 export type SSROptions<P = {}> = {
-  props?(router: RouterURL): (SSRProps<P> | Promise<SSRProps<P>>)
+  props?(request: SSRRequest): (SSRProps<P> | Promise<SSRProps<P>>)
   paths?(): (string[] | Promise<string[]>)
 }
 
