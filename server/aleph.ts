@@ -962,7 +962,7 @@ export class Aleph implements IAleph {
     for (const { test, transform } of this.#transformListeners) {
       if (test === 'hmr') {
         const { jsBuffer, ready, ...rest } = module
-        const ret = await transform({ module: structuredClone(rest), code })
+        const ret = await transform({ module: rest, code })
         if (util.isFilledString(ret?.code)) {
           code = ret!.code
         }
@@ -1338,7 +1338,7 @@ export class Aleph implements IAleph {
       for (const { test, transform } of this.#transformListeners) {
         if (test instanceof RegExp && test.test(specifier)) {
           const { jsBuffer, ready, ...rest } = module
-          const ret = await transform({ module: { ...structuredClone(rest) }, code: jsCode, map: sourceMap })
+          const ret = await transform({ module: rest, code: jsCode, map: sourceMap })
           if (util.isFilledString(ret?.code)) {
             jsCode = ret!.code
           }

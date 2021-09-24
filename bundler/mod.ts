@@ -183,7 +183,7 @@ export class Bundler {
       for (const { test, transform } of this.#aleph.transformListeners) {
         if (test instanceof RegExp && test.test(mod.specifier)) {
           const { jsBuffer, ready, ...rest } = mod
-          const ret = await transform({ module: { ...structuredClone(rest) }, code, bundleMode: true })
+          const ret = await transform({ module: rest, code, bundleMode: true })
           if (util.isFilledString(ret?.code)) {
             code = ret!.code
           }

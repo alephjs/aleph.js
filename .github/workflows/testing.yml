@@ -34,7 +34,7 @@ jobs:
           version: latest
 
       - name: Deno test
-        run: deno test -A --unstable --import-map=import_map.json --location=https://deno.land/x/aleph
+        run: deno test -A --unstable --location=http://localhost -c=deno.json --import-map=import_map.json
 
       - name: Cargo test
         run: cd compiler && cargo test --all
