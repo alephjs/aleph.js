@@ -1,5 +1,5 @@
 /** `VERSION` managed by https://deno.land/x/publish */
-export const VERSION = '0.3.0-beta.17'
+export const VERSION = '0.3.0-beta.18'
 
 /** `prepublish` will be invoked before publish */
 export async function prepublish(version: string): Promise<boolean> {
