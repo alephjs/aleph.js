@@ -230,6 +230,11 @@ export class Server {
         return
       }
 
+      if (pathname === '/favicon.ico') {
+        resp.body = 'not found'
+        end(404)
+      }
+
       // serve APIs
       if (pathname.startsWith('/api/')) {
         const route = await aleph.getAPIRoute({
