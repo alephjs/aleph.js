@@ -25,8 +25,8 @@ import { Analyzer } from './analyzer.ts'
 import { cache } from './cache.ts'
 import { defaultConfig, fixConfig, getDefaultImportMap, loadConfig, loadImportMap } from './config.ts'
 import {
-  checkDenoVersion, clearBuildCache, decoder, encoder, getAlephPkgUri,
-  getSourceType, isLocalhostUrl, loadPlugin, moduleExclude, toLocalPath, toRelativePath,
+  checkDenoVersion, clearBuildCache, decoder, encoder, formatBytesWithColor, getAlephPkgUri,
+  getSourceType, isLocalhostUrl, moduleExclude, toLocalPath, toRelativePath,
 } from './helper.ts'
 import { getContentType } from './mime.ts'
 import { buildHtml, Renderer } from './renderer.ts'
@@ -1534,25 +1534,34 @@ export class Aleph implements IAleph {
     }
 
     // render route pages
+    let pageIndex = 0
     const req = new Request('http://localhost/')
     await Promise.all(Array.from(paths).map(loc => ([loc, ...locales.map(locale => ({ ...loc, pathname: '/' + locale + loc.pathname }))])).flat().map(async ({ pathname, search }) => {
       if (this.#isSSRable(pathname)) {
         const [router, nestedModules] = this.#pageRouting.createRouter({ pathname, search })
         if (router.routePath !== '') {
+          const ms = new Measure()
           const href = router.toString()
           const [html, data] = await this.#renderPage(req, router, nestedModules)
-          await ensureTextFile(join(outputDir, pathname, 'index.html' + (search || '')), html)
-          if (data) {
-            const dataFile = join(
-              outputDir,
-              `_aleph/data/${util.btoaUrl(href)}.json`
-            )
-            await ensureTextFile(dataFile, JSON.stringify(data))
+          await Promise.all([
+            ensureTextFile(join(outputDir, pathname, 'index.html' + (search || '')), html),
+            data ? ensureTextFile(join(outputDir, `_aleph/data/${util.btoaUrl(href)}.json`), JSON.stringify(data)) : Promise.resolve()
+          ])
+          ms.stop(`SSR ${href} (${formatBytesWithColor(html.length)})`)
+          if (pageIndex == 0) {
+            console.log('▲ SSG')
           }
-          log.debug('SSR', href, dim('• ' + util.formatBytes(html.length)))
+          if (pageIndex <= 20) {
+            console.log(' ', href, dim('•'), formatBytesWithColor(html.length))
+          }
+          pageIndex++
         }
       }
     }))
+
+    if (pageIndex > 20) {
+      console.log(` ... total ${pageIndex} pages`)
+    }
 
     // render 404 page
     {
