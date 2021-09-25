@@ -42,7 +42,6 @@ deno test -A --unstable --location=http://localhost -c=deno.json --import-map=im
 - **/framework**
   - **core** framework core
   - **react** framework in React
-- **/design** design drawings and assets
 - **/examples** examples to learn
 - **/plugins** official plugins
 - **/server** server to run apps
@@ -55,7 +54,8 @@ deno test -A --unstable --location=http://localhost -c=deno.json --import-map=im
 - 2 spaces indent
 - Types everything
 - Order your imports
-- Format code using vscode default TS Server
+- Remove unused variables
+- Format code before commit
 
 ## Code of Conduct
 
