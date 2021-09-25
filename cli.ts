@@ -129,7 +129,7 @@ async function main() {
   await run(command, VERSION)
 }
 
-async function run(name: string, version: string, importMap?: string) {
+async function run(command: string, version: string, importMap?: string) {
   const cmd: string[] = [
     Deno.execPath(),
     'run',
@@ -142,9 +142,9 @@ async function run(name: string, version: string, importMap?: string) {
     cmd.push('--import-map', importMap)
   }
   if (Deno.env.get('ALEPH_DEV') && version === VERSION) {
-    cmd.push(`./commands/${name}.ts`)
+    cmd.push(`./commands/${command}.ts`)
   } else {
-    cmd.push(`https://deno.land/x/aleph@v${version}/commands/${name}.ts`)
+    cmd.push(`https://deno.land/x/aleph@v${version}/commands/${command}.ts`)
   }
   cmd.push(...Deno.args.slice(1))
   const p = Deno.run({
@@ -152,11 +152,8 @@ async function run(name: string, version: string, importMap?: string) {
     stdout: 'inherit',
     stderr: 'inherit'
   })
-  await p.status()
-  p.close()
-  if (name === 'build') {
-    Deno.exit(0)
-  }
+  const { code } = await p.status()
+  Deno.exit(code)
 }
 
 if (import.meta.main) {
