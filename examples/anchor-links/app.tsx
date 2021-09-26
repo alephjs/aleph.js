@@ -13,7 +13,7 @@ const links = {
   'Dark Green': '/colors/darkgreen?text=orange',
 }
 
-export default function App({ Page, pageProps }: { Page: FC, pageProps: any }) {
+export default function App({ Page, pageProps }: { Page: FC, pageProps: Record<string, unknown> }) {
   return (
     <main>
       <head>

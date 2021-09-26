@@ -1,7 +1,7 @@
 import React, { FC } from 'react'
 import './style/index.css'
 
-export default function App({ Page, pageProps }: { Page: FC, pageProps: any }) {
+export default function App({ Page, pageProps }: { Page: FC, pageProps: Record<string, unknown> }) {
   return (
     <main>
       <head>
