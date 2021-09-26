@@ -110,11 +110,31 @@ export default async function (
     },
     scopes: {},
   }
+  const denoConfig = {
+    "compilerOptions": {
+      "allowJs": true,
+      "target": "esnext",
+      "lib": [
+        "dom",
+        "dom.iterable",
+        "dom.asynciterable",
+        "deno.ns",
+        "deno.unstable"
+      ],
+      "jsx": "react"
+    },
+    "lint": {},
+    "format": {},
+  }
   await Promise.all([
     Deno.writeTextFile(join(cwd, name, '.gitignore'), gitignore.join('\n')),
     Deno.writeTextFile(
       join(cwd, name, 'import_map.json'),
       JSON.stringify(importMap, undefined, 2),
+    ),
+    Deno.writeTextFile(
+      join(cwd, name, 'deno.json'),
+      JSON.stringify(denoConfig, undefined, 2),
     ),
   ])
 
@@ -127,6 +147,7 @@ export default async function (
     const settigns = {
       'deno.enable': true,
       'deno.unstable': true,
+      'deno.config': './deno.json',
       'deno.importMap': './import_map.json',
     }
     await ensureDir(join(name, '.vscode'))
