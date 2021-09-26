@@ -1260,8 +1260,8 @@ export class Aleph implements IAleph {
       }
 
       let ret: TransformResult
-      // use `fastTransform` when the module is remote non-jsx module in `development` mode
-      if (this.isDev && util.isLikelyHttpURL(specifier) && source.type !== SourceType.JSX && source.type !== SourceType.TSX) {
+      // use `fastTransform` when the module is remote non-jsx module
+      if (util.isLikelyHttpURL(specifier) && source.type !== SourceType.JSX && source.type !== SourceType.TSX) {
         ret = await fastTransform(specifier, source, { react: this.#config.react })
       } else {
         ret = await transform(specifier, source.code, {
