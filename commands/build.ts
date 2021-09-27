@@ -1,4 +1,4 @@
-import { resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { resolve } from 'https://deno.land/std@0.108.0/path/mod.ts'
 import { Aleph } from '../server/aleph.ts'
 import { parse } from './helper/flags.ts'
 import log from '../shared/log.ts'

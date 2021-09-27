@@ -1,6 +1,6 @@
 import type { HtmlDescriptor, Module, RouterURL, SSRData, SSRRequest } from '../types.d.ts'
 import type { Aleph } from './aleph.ts'
-import { basename, dirname } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { basename, dirname } from 'https://deno.land/std@0.108.0/path/mod.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 

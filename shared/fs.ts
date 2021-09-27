@@ -1,5 +1,5 @@
-import { dirname, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.106.0/fs/ensure_dir.ts'
+import { dirname, join } from 'https://deno.land/std@0.108.0/path/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.108.0/fs/ensure_dir.ts'
 
 /* check whether or not the given path exists as a directory. */
 export async function existsDir(path: string): Promise<boolean> {

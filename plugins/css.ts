@@ -1,4 +1,4 @@
-import { dirname, join } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { dirname, join } from 'https://deno.land/std@0.108.0/path/mod.ts'
 import { cssPlugin, esbuild } from '../bundler/esbuild.ts'
 import { existsFile } from '../shared/fs.ts'
 import log, { Measure } from '../shared/log.ts'

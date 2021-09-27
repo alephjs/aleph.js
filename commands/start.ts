@@ -1,4 +1,4 @@
-import { resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { resolve } from 'https://deno.land/std@0.108.0/path/mod.ts'
 import { existsDir } from '../shared/fs.ts'
 import { Aleph } from '../server/aleph.ts'
 import { serve } from '../server/mod.ts'

@@ -1,4 +1,4 @@
-import { resolve } from 'https://deno.land/std@0.106.0/path/mod.ts'
+import { resolve } from 'https://deno.land/std@0.108.0/path/mod.ts'
 import { Aleph } from '../server/aleph.ts'
 import { serve } from '../server/mod.ts'
 import { getFlag, parse, parsePortNumber } from './helper/flags.ts'
@@ -29,7 +29,7 @@ if (import.meta.main) {
   const workingDir = resolve(String(args[0] || '.'))
   if (!await existsDir(workingDir)) {
     log.fatal('No such directory:', workingDir)
-  } 
+  }
 
   const aleph = new Aleph(workingDir, 'development', Boolean(options.r || options.reload))
   const port = parsePortNumber(getFlag(options, ['p', 'port'], '8080'))
