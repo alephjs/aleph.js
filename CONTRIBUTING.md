@@ -16,7 +16,7 @@ You will need [Deno](https://deno.land/) 1.13+.
 2. Clone the repository to your local device.
 3. Create a new branch `git checkout -b BRANCH_NAME`.
 4. Change code then run the examples.
-5. Push your branch to Github after all tests passed.
+5. [Push your branch to Github after all tests passed.](#Testing)
 6. Make a [pull request](https://github.com/alephjs/aleph.js/pulls).
 7. Merge to master branch by our maintainers.
 
@@ -29,9 +29,21 @@ ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts start .
 
 # ssg
 ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts build ./examples/hello-world -L debug
+```
 
-# run all tests
-deno test -A --unstable --location=http://localhost -c=deno.json --import-map=import_map.json
+## Testing
+
+You can run all tests with the following command:
+
+```bash
+$ deno test -A --unstable --location=http://localhost -c=deno.json --import-map=import_map.json
+```
+
+After running `integration_test.ts`, a zombie subprocesse may remain alive. (See [denoland/deno#7087](https://github.com/denoland/deno/issues/7087) for details) You can get rid of it with the following command:
+
+```shell
+# On Unix
+$ kill $(lsof -i:8080 -t)
 ```
 
 ## Project Structure
