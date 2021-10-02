@@ -1,10 +1,10 @@
 /**
  * An interface that aligns to the parts of the `Aleph` class.
  */
-export interface Aleph {
+export interface Aleph<D extends APIContextDataObj = {}> {
   readonly mode: 'development' | 'production'
   readonly workingDir: string
-  readonly config: RequiredConfig
+  readonly config: RequiredConfig<D>
   addDist(path: string, content: Uint8Array): Promise<void>
   addModule(specifier: string, sourceCode: string, forceRefresh?: boolean): Promise<Module>
   fetchModule(specifier: string): Promise<{ content: Uint8Array, contentType: string | null }>
@@ -18,7 +18,7 @@ export interface Aleph {
 /**
  * The configuration for aleph application.
  */
-export type Config = {
+export type Config<D extends APIContextDataObj = {}> = {
   /** `framework` specifies the framework (default is 'react'). */
   framework?: 'react'
   /** `basePath` specifies the path prefix (default is '/'). */
@@ -32,27 +32,27 @@ export type Config = {
   /** `ssr` specifies the options for **SSR**. */
   ssr?: boolean | GlobalSSROptions
   /** `plugins` specifies some plugins to extend Aleph runtime. */
-  plugins?: Plugin[]
+  plugins?: Plugin<D>[]
   /** `server` specifies the options for **Server**. */
-  server?: ServerOptions
+  server?: ServerOptions<D>
 }
 
 /* The Requred configuration for aleph application. */
-export type RequiredConfig = Required<Config> & {
+export type RequiredConfig<D extends APIContextDataObj = {}> = Required<Config<D>> & {
   i18n: Required<I18nOptions>
   build: Required<BuildOptions>
-  server: Required<ServerOptions>
+  server: Required<ServerOptions<D>>
   css: Required<CSSOptions>
 }
 
 /**
  * The plugin to enhance Aleph server runtime.
  */
-export type Plugin = {
+export type Plugin<D extends APIContextDataObj = {}> = {
   /** `name` gives the plugin a name. */
   name: string
   /** `setup` inits the plugin. */
-  setup(aleph: Aleph): Promise<void> | void
+  setup(aleph: Aleph<D>): Promise<void> | void
   /** `checksum` returns different checksums to rebuild modules. */
   checksum?(): string
 }
@@ -265,9 +265,9 @@ export type SSROptions<P = {}> = {
 /**
  * The options for Server.
  */
-export type ServerOptions = {
+export type ServerOptions<D extends APIContextDataObj = {}> = {
   /** A list of `APIMiddleware` for api requests. */
-  middlewares?: APIMiddleware[]
+  middlewares?: APIMiddleware<D>[]
   /** `headers` appends custom headers for server requests. */
   headers?: Record<string, string>
   /** `rewrites` specifies the server rewrite map. */
@@ -277,25 +277,42 @@ export type ServerOptions = {
 }
 
 /**
+ * API Context Data Object
+ */
+type APIContextDataObj = Record<string | number | symbol, unknown>
+
+
+/**
+ * API Context Data
+ *
+ * This type represents a strongly typed Record object
+ * with an additional getter and setter.
+ */
+type APIContextData<D extends APIContextDataObj = {}> = {
+  readonly get: <K extends keyof D>(key: K) => D[K] | undefined
+  readonly set: <K extends keyof D>(key: K, value: D[K] | undefined) => void
+}
+
+/**
  * The handler for API requests.
  */
-export type APIHandler = {
-  (context: APIContext): Promise<void> | void
+export type APIHandler<D extends APIContextDataObj = {}> = {
+  (context: APIContext<D>): Promise<void> | void
 }
 
 /**
  * The middleware for API requests.
  */
-export type APIMiddleware = {
-  (context: APIContext, next: () => void): Promise<void> | void
+export type APIMiddleware<D extends APIContextDataObj = {}> = {
+  (context: APIContext<D>, next: () => void): Promise<void> | void
 }
 
 /**
  * An interface that aligns to the `Deno.RequestEvent`
  */
-export interface APIContext extends Deno.RequestEvent {
+export interface APIContext<D extends APIContextDataObj = {}> extends Deno.RequestEvent {
   /** The data handled by middlewares. */
-  readonly data: Map<string, any>
+  readonly data: APIContextData<D>
   /** An interface that aligns to the parts of the `Response` with helper methods */
   readonly response: APIResponse
   /** The router by the api routing. */

@@ -6,7 +6,7 @@ import { resolveURL } from '../framework/core/routing.ts'
 import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import { APIContext } from '../types.d.ts'
+import { APIContext, APIContextDataObj, APIContextData } from '../types.d.ts'
 import { Aleph } from './aleph.ts'
 import compress from './compress.ts'
 import { encoder } from './helper.ts'
@@ -244,8 +244,12 @@ export class Server {
         if (route !== null) {
           try {
             const [router, handler] = route
-            const data = new Map()
-            const steps = [...middlewares, async (context: APIContext) => {
+            const initData = (data: APIContextDataObj): APIContextData<APIContextDataObj> => ({
+              get: (k) => data[k],
+              set: (k, v) => { data[k] = v }
+            })
+            const data = initData({})
+            const steps = [...middlewares, async (context: APIContext<APIContextDataObj>) => {
               if (util.isFunction(handler)) {
                 await handler(context)
               } else {
