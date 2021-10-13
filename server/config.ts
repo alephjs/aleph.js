@@ -186,17 +186,31 @@ export async function fixConfig(workingDir: string, config: RequiredConfig, impo
     config.srcDir = '/src'
   }
 
+  let fuzzReactUrl: string | null = null
+
   Object.keys(importMap.imports).forEach(key => {
     const url = importMap.imports[key]
     // strip `srcDir` prefix
     if (config.srcDir !== '/' && url.startsWith('.' + config.srcDir)) {
       importMap.imports[key] = '.' + util.trimPrefix(url, '.' + config.srcDir)
     }
-    // react verison should respect the import maps
-    if (/\/\/esm\.sh\/react@\d+\.\d+\.\d+(-[a-z0-9\.]+)?$/.test(url)) {
-      config.react.version = url.split('@').pop()!
+    // respect the react verison in import maps
+    const m = url.match(/^https?:\/\/esm\.sh\/react@(\d+\.\d+\.\d+(-[a-z\d.]+)*)(\?|$)/)
+    if (m) {
+      config.react.version = m[1]
+    } else if (/^https?:\/\/esm\.sh\/react@.+/.test(url)) {
+      fuzzReactUrl = url
     }
   })
+
+  // get acctual react version from esm.sh
+  if (fuzzReactUrl) {
+    const text = await fetch(fuzzReactUrl).then(resp => resp.text())
+    const m = text.match(/\/react@(\d+\.\d+\.\d+(-[a-z\d.]+)*)\//)
+    if (m) {
+      config.react.version = m[1]
+    }
+  }
 }
 
 function isFramework(v: any): v is 'react' {
