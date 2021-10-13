@@ -1,6 +1,6 @@
 import type { Aleph, LoadInput, LoadOutput, ResolveResult, Plugin } from '../types.d.ts'
 import { safeLoadFront } from 'https://esm.sh/yaml-front-matter@4.1.1'
-import marked from 'https://esm.sh/marked@3.0.4'
+import marked from 'https://esm.sh/marked@3.0.4?no-check'
 import hljs from 'https://esm.sh/highlight.js@10.7.1?bundle'
 import unescape from 'https://esm.sh/unescape@1.0.1?bundle'
 import util from '../shared/util.ts'
@@ -32,7 +32,7 @@ export const markdownLoader = async ({ specifier }: LoadInput, aleph: Aleph, { h
       return prev
     }, {} as Record<string, any>) : undefined,
   }
-  let html = marked.parse(__content)
+  let html: string = marked.parse(__content)
   if (highlight) {
     html = html.replace(reCodeTag, (_, language, code) => {
       const h = hljs.highlight(unescape(code), { language }).value
