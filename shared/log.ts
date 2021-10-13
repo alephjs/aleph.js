@@ -1,6 +1,6 @@
 import { blue, green, yellow, red, dim } from 'https://deno.land/std@0.108.0/fmt/colors.ts'
 
-export type LevelNames = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+export type LevelName = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
 
 export enum Level {
   Debug = 0,
@@ -17,7 +17,7 @@ export class Logger {
     return this.#level
   }
 
-  setLevel(level: LevelNames): void {
+  setLevel(level: LevelName): void {
     switch (level) {
       case 'debug':
         this.#level = Level.Debug
