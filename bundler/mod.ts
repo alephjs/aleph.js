@@ -66,8 +66,9 @@ export class Bundler {
   async bundle(entries: DependencyGraph[]) {
     const vendorDeps = entries.find(({ specifier }) => specifier === 'virtual:/vendor.js')?.deps.map(({ specifier }) => specifier) || []
     const commonDeps = entries.find(({ specifier }) => specifier === 'virtual:/common.js')?.deps.map(({ specifier }) => specifier) || []
+    const { target } = this.#aleph.config.build
 
-    if (this.#aleph.config.build.target !== 'esnext') {
+    if (target !== 'es2021' && target !== 'esnext') {
       await this.bundlePolyfillsChunck()
     }
     await this.bundleChunk(
