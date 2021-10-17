@@ -5,7 +5,7 @@ import { green, blue, dim, red, cyan } from 'https://deno.land/std@0.108.0/fmt/c
 import { ensureDir } from 'https://deno.land/std@0.108.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.108.0/path/mod.ts'
 import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
-import { ensureTextFile, existsDir } from '../shared/fs.ts'
+import { ensureTextFile, existsDir, existsFile } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
@@ -163,9 +163,11 @@ export default async function (
     ])
   }
 
+  const vercelJson = join(name, 'vercel.json')
+
   if (vercel) {
     Deno.writeTextFile(
-      join(name, 'vercel.json'),
+      vercelJson,
       JSON.stringify({
         functions: {
           'api/**/*.{j,t}s': {
@@ -174,6 +176,9 @@ export default async function (
         }
       }, undefined, 2),
     )
+  } else if (await existsFile(vercelJson)) {
+    // The template may contain vercel.json
+    await Deno.remove(vercelJson)
   }
 
   // cache deps in import maps
