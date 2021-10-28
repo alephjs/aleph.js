@@ -101,6 +101,8 @@ export default async function (
   const importMap = {
     imports: {
       '~/': './',
+      'std/': 'https://deno.land/std@0.113.0/',
+      'x/': 'https://deno.land/x/',
       'aleph/': `https://deno.land/x/aleph@v${VERSION}/`,
       'aleph/types': `https://deno.land/x/aleph@v${VERSION}/types.d.ts`,
       'aleph/web': `https://deno.land/x/aleph@v${VERSION}/framework/core/mod.ts`,
