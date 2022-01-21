@@ -1,5 +1,5 @@
-import { dirname, join } from 'https://deno.land/std@0.108.0/path/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.108.0/fs/ensure_dir.ts'
+import { dirname, join } from 'https://deno.land/std@0.122.0/path/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.122.0/fs/ensure_dir.ts'
 import { esbuild } from '../bundler/esbuild.ts'
 import { trimBuiltinModuleExts } from '../framework/core/module.ts'
 import { existsFile } from '../shared/fs.ts'

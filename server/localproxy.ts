@@ -1,4 +1,4 @@
-import { join } from 'https://deno.land/std@0.108.0/path/mod.ts'
+import { join } from 'https://deno.land/std@0.122.0/path/mod.ts'
 import log from '../shared/log.ts'
 import { getContentType } from './mime.ts'
 
