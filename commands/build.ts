@@ -1,6 +1,6 @@
-import { resolve } from 'https://deno.land/std@0.122.0/path/mod.ts'
+import { resolve } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { Aleph } from '../server/aleph.ts'
-import { parse } from './helper/flags.ts'
+import { parse } from '../shared/flags.ts'
 import log from '../shared/log.ts'
 import { existsDir } from '../shared/fs.ts'
 

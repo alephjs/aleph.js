@@ -1,6 +1,6 @@
 import { delay } from 'std/async/delay.ts'
 import { assertEquals } from 'std/testing/asserts.ts'
-import util from './util.ts'
+import util from '../shared/util.ts'
 
 Deno.test(`util`, async () => {
   // test isLikelyHttpURL
@@ -28,14 +28,14 @@ Deno.test(`util`, async () => {
   assertEquals(util.splitBy('foobar', '.'), ['foobar', ''])
 
   // test formatBytes
-  assertEquals(util.formatBytes(1000), '1000B')
-  assertEquals(util.formatBytes(1024), '1KB')
-  assertEquals(util.formatBytes(2048), '2KB')
-  assertEquals(util.formatBytes(3000), '2.9KB')
-  assertEquals(util.formatBytes(1024 ** 2), '1MB')
-  assertEquals(util.formatBytes(1024 ** 3), '1GB')
-  assertEquals(util.formatBytes(1024 ** 4), '1TB')
-  assertEquals(util.formatBytes(1024 ** 5), '1PB')
+  assertEquals(util.prettyBytes(1000), '1000B')
+  assertEquals(util.prettyBytes(1024), '1KB')
+  assertEquals(util.prettyBytes(2048), '2KB')
+  assertEquals(util.prettyBytes(3000), '2.9KB')
+  assertEquals(util.prettyBytes(1024 ** 2), '1MB')
+  assertEquals(util.prettyBytes(1024 ** 3), '1GB')
+  assertEquals(util.prettyBytes(1024 ** 4), '1TB')
+  assertEquals(util.prettyBytes(1024 ** 5), '1PB')
 
   // test cleanPath
   assertEquals(util.cleanPath('./'), '/')

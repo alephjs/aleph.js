@@ -1,7 +1,7 @@
-import { resolve } from 'https://deno.land/std@0.122.0/path/mod.ts'
+import { resolve } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { Aleph } from '../server/aleph.ts'
 import { serve } from '../server/mod.ts'
-import { getFlag, parse, parsePortNumber } from './helper/flags.ts'
+import { getFlag, parse, parsePortNumber } from '../shared/flags.ts'
 import log from '../shared/log.ts'
 import { existsDir } from '../shared/fs.ts'
 

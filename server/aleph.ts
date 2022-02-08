@@ -4,12 +4,12 @@ import type {
   Module, RouterURL, ResolveResult, TransformInput, TransformOutput, SSRData, RenderOutput
 } from '../types.d.ts'
 import type { RequiredConfig } from './config.ts'
-import { dim } from 'https://deno.land/std@0.122.0/fmt/colors.ts'
-import { indexOf, copy, equals } from 'https://deno.land/std@0.122.0/bytes/mod.ts'
-import { ensureDir } from 'https://deno.land/std@0.122.0/fs/ensure_dir.ts'
-import { walk } from 'https://deno.land/std@0.122.0/fs/walk.ts'
-import { createHash } from 'https://deno.land/std@0.122.0/hash/mod.ts'
-import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.122.0/path/mod.ts'
+import { dim } from 'https://deno.land/std@0.125.0/fmt/colors.ts'
+import { indexOf, copy, equals } from 'https://deno.land/std@0.125.0/bytes/mod.ts'
+import { ensureDir } from 'https://deno.land/std@0.125.0/fs/ensure_dir.ts'
+import { walk } from 'https://deno.land/std@0.125.0/fs/walk.ts'
+import { createHash } from 'https://deno.land/std@0.125.0/hash/mod.ts'
+import { basename, dirname, extname, join, resolve } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { Bundler, bundlerRuntimeCode, simpleJSMinify } from '../bundler/mod.ts'
 import { wasmChecksum, parseExportNames, SourceType, fastTransform, transform, stripSsrCode } from '../compiler/mod.ts'
 import { EventEmitter } from '../framework/core/events.ts'
@@ -934,7 +934,7 @@ export class Aleph implements IAleph {
       const jsFilePath = join(this.#buildDir, jsFile)
       if (await existsFile(jsFilePath)) {
         module.jsBuffer = await Deno.readFile(jsFilePath)
-        log.debug(`load '${jsFile}'` + dim(' • ' + util.formatBytes(module.jsBuffer.length)))
+        log.debug(`load '${jsFile}'` + dim(' • ' + util.prettyBytes(module.jsBuffer.length)))
       }
     }
 

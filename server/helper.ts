@@ -1,7 +1,7 @@
 import type { Plugin } from '../types.d.ts'
-import { dim, red, yellow } from 'https://deno.land/std@0.122.0/fmt/colors.ts'
-import { createHash } from 'https://deno.land/std@0.122.0/hash/mod.ts'
-import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.122.0/path/mod.ts'
+import { dim, red, yellow } from 'https://deno.land/std@0.125.0/fmt/colors.ts'
+import { createHash } from 'https://deno.land/std@0.125.0/hash/mod.ts'
+import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { minDenoVersion } from '../shared/constants.ts'
 import { existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
@@ -208,7 +208,7 @@ export function formatBytesWithColor(bytes: number) {
   } else if (bytes > 1 << 20) { // 1MB
     cf = yellow
   }
-  return cf(util.formatBytes(bytes))
+  return cf(util.prettyBytes(bytes))
 }
 
 export async function clearBuildCache(filename: string, ext = 'js') {

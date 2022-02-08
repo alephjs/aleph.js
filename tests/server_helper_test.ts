@@ -7,7 +7,7 @@ import {
   getAlephPkgUri,
   toRelativePath,
   toLocalPath
-} from './helper.ts'
+} from '../server/helper.ts'
 
 Deno.test('server/helper: getAlephPkgUri dev', () => {
   const port = 3000
