@@ -1,10 +1,9 @@
 import { ensureDir } from 'https://deno.land/std@0.125.0/fs/ensure_dir.ts'
-import { createHash } from 'https://deno.land/std@0.125.0/hash/mod.ts'
 import { join } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { existsFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import { getDenoDir } from './helper.ts'
+import { getDenoDir, computeHash } from './helper.ts'
 
 /** download and cache remote contents */
 export async function cache(url: string, options?: { forceRefresh?: boolean, retryTimes?: number }): Promise<{ content: Uint8Array, contentType: string | null }> {
@@ -16,7 +15,7 @@ export async function cache(url: string, options?: { forceRefresh?: boolean, ret
     util.trimSuffix(protocol, ':'),
     hostname + (port ? '_PORT' + port : '')
   )
-  const hashname = createHash('sha256').update(pathname + search).toString()
+  const hashname = await computeHash('sha256', pathname + search)
   const contentFilepath = join(cacheDir, hashname)
   const metaFilepath = join(cacheDir, hashname + '.metadata.json')
 

@@ -1,34 +1,44 @@
-import { APIResponse as IResponse } from '../types.d.ts'
+export function json(data: unknown, init?: ResponseInit): Response {
+  const headers = new Headers(init?.headers)
+  headers.append("content-type", "application/json; charset=utf-8")
+  return new Response(JSON.stringify(data), {
+    ...init,
+    headers
+  })
+}
 
-export class APIResponse implements IResponse {
-  status = 200
-  headers = new Headers()
-  body?: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>
+export type CacheControl = {
+  maxAge?: number
+  sMaxAge?: number
+  public?: boolean
+  private?: boolean
+  immutable?: boolean
+  mustRevalidate?: boolean
+}
 
-  addHeader(key: string, value: string): this {
-    this.headers.append(key, value)
-    return this
+export function content(content: BodyInit, contentType: string, cacheContorl?: CacheControl | "immutable" | "no-cache"): Response {
+  let cc: any
+  if (cacheContorl) {
+    if (cacheContorl === "no-cache") {
+      cc = "no-chche"
+    } else if (cacheContorl === "immutable") {
+      cc = "public, max-age=31536000, immutable"
+    } else {
+      const { maxAge, sMaxAge, immutable, mustRevalidate } = cacheContorl
+      cc = [
+        cacheContorl.public && "public",
+        cacheContorl.private && "private",
+        maxAge && `max-age=${maxAge}`,
+        sMaxAge && `s-maxage=${sMaxAge}`,
+        immutable && "immutable",
+        mustRevalidate && "must-revalidate",
+      ].filter(Boolean).join(", ")
+    }
   }
-
-  setHeader(key: string, value: string): this {
-    this.headers.set(key, value)
-    return this
-  }
-
-  removeHeader(key: string): this {
-    this.headers.delete(key)
-    return this
-  }
-
-  redirect(url: string, status = 302): this {
-    this.setHeader('Location', url)
-    this.status = status
-    return this
-  }
-
-  json(data: any, space?: string | number): this {
-    this.setHeader('Content-Type', 'application/json; charset=utf-8')
-    this.body = JSON.stringify(data, undefined, space)
-    return this
-  }
+  return new Response(content, {
+    headers: {
+      "content-type": contentType,
+      "cache-control": cc
+    }
+  })
 }

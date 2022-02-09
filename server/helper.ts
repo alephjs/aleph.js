@@ -1,14 +1,13 @@
-import type { Plugin } from '../types.d.ts'
 import { dim, red, yellow } from 'https://deno.land/std@0.125.0/fmt/colors.ts'
-import { createHash } from 'https://deno.land/std@0.125.0/hash/mod.ts'
 import { dirname, basename, extname, join, relative } from 'https://deno.land/std@0.125.0/path/mod.ts'
-import { minDenoVersion } from '../shared/constants.ts'
 import { existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
 import { SourceType } from '../compiler/mod.ts'
 import { VERSION } from '../version.ts'
 import { localProxy } from './localproxy.ts'
+
+const minDenoVersion = "1.18.2"
 
 // inject browser navigator polyfill
 Object.assign((globalThis as any).navigator, {
@@ -27,6 +26,10 @@ Object.assign((globalThis as any).navigator, {
   userAgent: `Deno/${Deno.version.deno}`,
   vendor: 'Deno Land'
 })
+
+export function toHex(buf: ArrayBuffer) {
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("")
+}
 
 export const encoder = new TextEncoder()
 export const decoder = new TextDecoder()
@@ -97,20 +100,6 @@ export function getAlephPkgUri() {
   return `https://deno.land/x/aleph@v${VERSION}`
 }
 
-/** load aleph plugin from `deno.land/x`, a aleph plugin should be named with `aleph_plugin_{name}`. */
-export async function loadPlugin(name: string, options?: any): Promise<Plugin> {
-  let { default: p } = await import(`https://deno.land/x/aleph_plugin_${name}/plugin.ts`)
-  if (util.isFunction(p)) {
-    p = p(options)
-  }
-  if (p instanceof Promise) {
-    p = await p
-  }
-  if (util.isFunction(p.setup)) {
-    return p
-  }
-  return Promise.reject(new Error(`invalid plugin '${name}': missing 'setup' method`))
-}
 
 /** get the relative path from `from` to `to`. */
 export function toRelativePath(from: string, to: string): string {
@@ -191,8 +180,9 @@ export function toLocalPath(url: string): string {
 }
 
 /** compute hash of the content */
-export function computeHash(content: string | Uint8Array, algorithm: 'md5' | 'sha1' = 'sha1'): string {
-  return createHash(algorithm).update(content).toString()
+export async function computeHash(algorithm: AlgorithmIdentifier, content: string | Uint8Array): Promise<string> {
+  const buf = await crypto.subtle.digest(algorithm, typeof content === 'string' ? encoder.encode(content) : content)
+  return toHex(buf)
 }
 
 /**
@@ -201,7 +191,7 @@ export function computeHash(content: string | Uint8Array, algorithm: 'md5' | 'sh
  * - yellow: 1MB - 10MB
  * - red: > 10MB
  */
-export function formatBytesWithColor(bytes: number) {
+export function prettyBytesWithColor(bytes: number) {
   let cf = dim
   if (bytes > 10 << 20) { // 10MB
     cf = red

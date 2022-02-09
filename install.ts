@@ -1,6 +1,5 @@
 import { parse } from 'https://deno.land/std@0.125.0/flags/mod.ts'
 import { red } from 'https://deno.land/std@0.125.0/fmt/colors.ts'
-import { existsSync } from 'https://deno.land/std@0.125.0/fs/exists.ts'
 import { dirname, join } from 'https://deno.land/std@0.125.0/path/mod.ts'
 
 export async function checkVersion(version: string): Promise<string> {
@@ -24,7 +23,7 @@ export async function checkVersion(version: string): Promise<string> {
 
 export async function install(version: string, forceUpgrade = false) {
   const denoExecPath = Deno.execPath()
-  const cmdExists = existsSync(join(dirname(denoExecPath), 'aleph'))
+  const cmdExists = await existsFile(join(dirname(denoExecPath), 'aleph'))
   const p = Deno.run({
     cmd: [
       denoExecPath,
@@ -50,6 +49,19 @@ export async function install(version: string, forceUpgrade = false) {
     }
   }
   Deno.exit(status.code)
+}
+
+/* check whether or not the given path exists as regular file. */
+async function existsFile(path: string): Promise<boolean> {
+  try {
+    const fi = await Deno.lstat(path)
+    return fi.isFile
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
+      return false
+    }
+    throw err
+  }
 }
 
 if (import.meta.main) {

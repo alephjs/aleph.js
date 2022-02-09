@@ -1,8 +1,7 @@
 import { resolve } from 'https://deno.land/std@0.125.0/path/mod.ts'
-import { existsDir } from '../shared/fs.ts'
-import { Aleph } from '../server/aleph.ts'
-import { serve } from '../server/mod.ts'
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts"
 import { getFlag, parse, parsePortNumber } from '../shared/flags.ts'
+import { existsDir, findFile } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 
 export const helpMessage = `
@@ -30,8 +29,8 @@ if (import.meta.main) {
   if (!await existsDir(workingDir)) {
     log.fatal('No such directory:', workingDir)
   }
+  Deno.chdir(workingDir)
 
-  const aleph = new Aleph(workingDir, 'production', Boolean(options.r || options.reload))
   const port = parsePortNumber(getFlag(options, ['p', 'port'], '8080'))
   const hostname = getFlag(options, ['hostname'])
   const certFile = getFlag(options, ['tls-cert'])
@@ -41,5 +40,16 @@ if (import.meta.main) {
   } else if (certFile !== undefined && keyFile === undefined) {
     log.fatal('missing `--tls-key` option')
   }
-  await serve({ aleph, port, hostname, certFile, keyFile })
+  const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"])
+  if (serverEntry) {
+    await import(serverEntry)
+    const serverHandler: any = (window as any).__ALEPH_SERVER_HANDLER
+    if (certFile && keyFile) {
+      await serveTls(req => serverHandler.fetch(req), { port, hostname, certFile, keyFile })
+    } else {
+      await stdServe(req => serverHandler.fetch(req), { port, hostname })
+    }
+  } else {
+    log.fatal('No server entry found')
+  }
 }

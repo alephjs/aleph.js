@@ -10,10 +10,10 @@ import { VERSION } from './version.ts'
 
 const commands = {
   'init': 'Create a new app',
-  'dev': 'Start the app in development mode',
-  'start': 'Start the app in production mode',
-  'build': 'Build the app to a static site (SSG)',
-  'upgrade': 'Upgrade Aleph.js command'
+  'dev': 'Start the app in `development` mode',
+  'start': 'Start the app in `production` mode',
+  'compile': 'Compile the app into a worker',
+  'upgrade': 'Upgrade Aleph.js CLI'
 }
 
 const helpMessage = `Aleph.js v${VERSION}
@@ -72,14 +72,14 @@ async function main() {
     Deno.exit(0)
   }
 
-  // execute `init` command
+  // invoke `init` command
   if (command === 'init') {
     const { default: init } = await import(`./commands/init.ts`)
     await init(options?.template, args[0])
     return
   }
 
-  // execute `upgrade` command
+  // invoke `upgrade` command
   if (command === 'upgrade') {
     const { default: upgrade } = await import(`./commands/upgrade.ts`)
     await upgrade(options.v || options.version || args[0] || 'latest')
@@ -96,6 +96,7 @@ async function main() {
 
   // run the command if import maps exists
   const importMapFile = await findFile(workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`))
+  const configFile = await findFile(workingDir, ['deno.jsonc', 'deno.json', 'tsconfig.json'])
   if (importMapFile) {
     const importMap = await loadImportMap(importMapFile)
     let updateImportMaps: boolean | null = null
@@ -121,7 +122,7 @@ async function main() {
     if (updateImportMaps) {
       await Deno.writeTextFile(importMapFile, JSON.stringify(importMap, undefined, 2))
     }
-    await run(command, verison, importMapFile)
+    await run(command, verison, importMapFile, configFile)
     return
   }
 
@@ -129,7 +130,7 @@ async function main() {
   await run(command, VERSION)
 }
 
-async function run(command: string, version: string, importMap?: string) {
+async function run(command: string, version: string, importMap?: string, configFile?: string) {
   const cmd: string[] = [
     Deno.execPath(),
     'run',
@@ -140,6 +141,9 @@ async function run(command: string, version: string, importMap?: string) {
   ]
   if (importMap) {
     cmd.push('--import-map', importMap)
+  }
+  if (configFile) {
+    cmd.push('--config', configFile)
   }
   if (Deno.env.get('ALEPH_DEV') && version === VERSION) {
     cmd.push(`./commands/${command}.ts`)

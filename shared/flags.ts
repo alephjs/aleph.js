@@ -1,6 +1,6 @@
 import { parse as parseArgs } from 'https://deno.land/std@0.125.0/flags/mod.ts'
-import log, { LevelNames } from '../../shared/log.ts'
-import util from '../../shared/util.ts'
+import log, { type LevelName } from './log.ts'
+import util from './util.ts'
 
 export function parse() {
   const { _: args, ...options } = parseArgs(Deno.args)
@@ -8,7 +8,7 @@ export function parse() {
   // set log level
   const l = options.L || options['log-level']
   if (util.isFilledString(l)) {
-    log.setLevel(l.toLowerCase() as LevelNames)
+    log.setLevel(l.toLowerCase() as LevelName)
   }
 
   return { args, options }

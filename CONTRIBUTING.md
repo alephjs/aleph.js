@@ -26,9 +26,6 @@ ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts dev ./e
 
 # ssr/production
 ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts start ./examples/hello-world -L debug
-
-# ssg
-ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts build ./examples/hello-world -L debug
 ```
 
 ## Testing
@@ -55,7 +52,6 @@ $ kill $(lsof -i:8080 -t)
   - **core** framework core
   - **react** framework in React
 - **/examples** examples to learn
-- **/plugins** official plugins
 - **/server** server to run apps
 - **/shared** shared code
 

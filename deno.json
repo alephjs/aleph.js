@@ -3,9 +3,13 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "dom.asynciterable",
       "deno.ns",
+      "deno.worker",
+      "deno.asynciterable",
       "deno.unstable"
+    ],
+    "types": [
+      "./types.d.ts"
     ],
     "jsx": "react"
   }

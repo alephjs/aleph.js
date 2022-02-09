@@ -4,11 +4,8 @@ import { ensureDir } from 'https://deno.land/std@0.125.0/fs/ensure_dir.ts'
 /* check whether or not the given path exists as a directory. */
 export async function existsDir(path: string): Promise<boolean> {
   try {
-    const fi = await Deno.lstat(path)
-    if (fi.isDirectory) {
-      return true
-    }
-    return false
+    const stat = await Deno.lstat(path)
+    return stat.isDirectory
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) {
       return false
@@ -20,11 +17,8 @@ export async function existsDir(path: string): Promise<boolean> {
 /* check whether or not the given path exists as regular file. */
 export async function existsFile(path: string): Promise<boolean> {
   try {
-    const fi = await Deno.lstat(path)
-    if (fi.isFile) {
-      return true
-    }
-    return false
+    const stat = await Deno.lstat(path)
+    return stat.isFile
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) {
       return false
@@ -52,13 +46,12 @@ export async function lazyRemove(name: string, options?: { recursive?: boolean }
   }
 }
 
-
-export async function findFile(wd: string, filenames: string[]) {
+export async function findFile(wd: string, filenames: string[]): Promise<string | undefined> {
   for (const filename of filenames) {
     const fullPath = join(wd, filename)
     if (await existsFile(fullPath)) {
       return fullPath
     }
   }
-  return null
+  return void 0
 }

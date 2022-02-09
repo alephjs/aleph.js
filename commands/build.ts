@@ -1,5 +1,4 @@
 import { resolve } from 'https://deno.land/std@0.125.0/path/mod.ts'
-import { Aleph } from '../server/aleph.ts'
 import { parse } from '../shared/flags.ts'
 import log from '../shared/log.ts'
 import { existsDir } from '../shared/fs.ts'
@@ -25,7 +24,7 @@ if (import.meta.main) {
   if (!await existsDir(workingDir)) {
     log.fatal('No such directory:', workingDir)
   }
+  Deno.chdir(workingDir)
 
-  const aleph = new Aleph(workingDir, 'production', Boolean(options.r || options.reload))
-  await aleph.build()
+  // todo: implement
 }

@@ -1,5 +1,3 @@
-/// <reference lib="dom" />
-
 import util from '../../shared/util.ts'
 
 const styleMap = new Map<string, { css?: string, href?: string }>()

@@ -1,16 +1,15 @@
 import { Untar } from 'https://deno.land/std@0.125.0/archive/tar.ts'
 import { Buffer } from 'https://deno.land/std@0.125.0/io/buffer.ts'
-import { readAll } from 'https://deno.land/std@0.125.0/io/util.ts'
+import { readAll } from 'https://deno.land/std@0.125.0/streams/conversion.ts'
 import { green, blue, dim, red, cyan } from 'https://deno.land/std@0.125.0/fmt/colors.ts'
 import { ensureDir } from 'https://deno.land/std@0.125.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
 import { ensureTextFile, existsDir, existsFile } from '../shared/fs.ts'
 import util from '../shared/util.ts'
-import { defaultReactVersion } from '../shared/constants.ts'
 import { VERSION } from '../version.ts'
-import { deno_x_brotli, deno_x_flate } from '../server/compress.ts'
 
+const defaultReactVersion = '17.0.2'
 const vercelRuntimeVersion = '0.7.0'
 
 export const helpMessage = `
@@ -101,27 +100,27 @@ export default async function (
   const importMap = {
     imports: {
       '~/': './',
-      'std/': 'https://deno.land/std@0.113.0/',
-      'x/': 'https://deno.land/x/',
+      'std/': 'https://deno.land/std@0.125.0/',
       'aleph/': `https://deno.land/x/aleph@v${VERSION}/`,
-      'aleph/types': `https://deno.land/x/aleph@v${VERSION}/types.d.ts`,
-      'aleph/web': `https://deno.land/x/aleph@v${VERSION}/framework/core/mod.ts`,
+      'aleph/server': `https://deno.land/x/aleph@v${VERSION}/server/mod.ts`,
       'aleph/react': `https://deno.land/x/aleph@v${VERSION}/framework/react/mod.ts`,
       'react': `https://esm.sh/react@${defaultReactVersion}`,
       'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
+      'react-dom/server': `https://esm.sh/react-dom@${defaultReactVersion}/server`,
     },
     scopes: {},
   }
   const denoConfig = {
     "compilerOptions": {
-      "allowJs": true,
-      "target": "esnext",
       "lib": [
         "dom",
         "dom.iterable",
         "dom.asynciterable",
         "deno.ns",
         "deno.unstable"
+      ],
+      "types": [
+        `https://deno.land/x/aleph@v${VERSION}/types.d.ts`
       ],
       "jsx": "react"
     },
@@ -187,7 +186,7 @@ export default async function (
   console.log('Cache deps...')
   const urls = Object.values(importMap.imports).filter((v) => !v.endsWith('/'))
   const p = Deno.run({
-    cmd: [Deno.execPath(), 'cache', ...urls, deno_x_brotli, deno_x_flate],
+    cmd: [Deno.execPath(), 'cache', ...urls],
     stderr: 'inherit',
     stdout: 'inherit',
   })
@@ -204,9 +203,7 @@ ${dim('▲')} aleph build  ${dim('# build the app to a static site (SSG)')}
 
 Docs: ${cyan('https://alephjs.org/docs')}
 Bugs: ${cyan('https://alephjs.org.com/alephjs/aleph.js/issues')}
-`
-  )
-
+`)
   Deno.exit(0)
 }
 

@@ -1,5 +1,5 @@
-// @deno-types="https://deno.land/x/esbuild@v0.13.2/mod.d.ts"
-import { build, stop, Plugin } from 'https://deno.land/x/esbuild@v0.13.2/mod.js'
+// @deno-types="https://deno.land/x/esbuild@v0.14.20/mod.d.ts"
+import { build, stop, Plugin } from 'https://deno.land/x/esbuild@v0.14.20/mod.js'
 import { join } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { cache } from '../server/cache.ts'
 import util from '../shared/util.ts'
@@ -33,8 +33,8 @@ export const cssPlugin: Plugin = {
   }
 }
 
-export const denoPlugin: Plugin = {
-  name: 'deno-resolve-loader',
+export const httpImportPlugin: Plugin = {
+  name: 'http-import-loader',
   setup(build) {
     build.onResolve({ filter: /.*/ }, args => {
       const isRemote = util.isLikelyHttpURL(args.path)
