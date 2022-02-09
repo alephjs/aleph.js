@@ -2,7 +2,6 @@ import { bold } from 'https://deno.land/std@0.125.0/fmt/colors.ts'
 import { basename, resolve } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { parse } from 'https://deno.land/std@0.125.0/flags/mod.ts'
 import { loadImportMap } from './server/config.ts'
-import { checkAlephDevEnv } from './server/helper.ts'
 import { existsDir, findFile } from './shared/fs.ts'
 import log from './shared/log.ts'
 import util from './shared/util.ts'
@@ -86,21 +85,16 @@ async function main() {
     return
   }
 
-  // check working dir
-  const workingDir = resolve(String(args[0] || '.'))
-  if (!await existsDir(workingDir)) {
+  const workingDir = resolve(Deno.env.get('ALEPH_DEV') ? '.' : String(args[0] || '.'))
+  if (!(await existsDir(workingDir))) {
     log.fatal('No such directory:', workingDir)
   }
-
-  checkAlephDevEnv()
-
-  // run the command if import maps exists
   const importMapFile = await findFile(workingDir, ['import_map', 'import-map', 'importmap', 'importMap'].map(name => `${name}.json`))
   const configFile = await findFile(workingDir, ['deno.jsonc', 'deno.json', 'tsconfig.json'])
+  let cliVerison = VERSION
   if (importMapFile) {
     const importMap = await loadImportMap(importMapFile)
     let updateImportMaps: boolean | null = null
-    let verison = VERSION
     if (command === 'dev') {
       for (const key in importMap.imports) {
         const url = importMap.imports[key]
@@ -110,7 +104,7 @@ async function main() {
           if (ver !== 'v' + VERSION && updateImportMaps === null) {
             updateImportMaps = confirm(`You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${basename(importMapFile)}'?`)
             if (!updateImportMaps) {
-              verison = ver.slice(1)
+              cliVerison = ver.slice(1)
             }
           }
           if (updateImportMaps) {
@@ -122,22 +116,18 @@ async function main() {
     if (updateImportMaps) {
       await Deno.writeTextFile(importMapFile, JSON.stringify(importMap, undefined, 2))
     }
-    await run(command, verison, importMapFile, configFile)
-    return
   }
-
-  // run the command without import maps
-  await run(command, VERSION)
+  await runCli(command, cliVerison, importMapFile, configFile)
 }
 
-async function run(command: string, version: string, importMap?: string, configFile?: string) {
+async function runCli(command: string, version: string, importMap?: string, configFile?: string) {
   const cmd: string[] = [
     Deno.execPath(),
     'run',
     '-A',
     '--unstable',
-    '--no-check',
-    '--location', 'http://localhost/'
+    '--no-check=remote',
+    '--location=http://localhost'
   ]
   if (importMap) {
     cmd.push('--import-map', importMap)

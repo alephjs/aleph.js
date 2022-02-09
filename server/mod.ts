@@ -4,69 +4,71 @@ import { getContentType } from "./mime.ts"
 import ssr from "./ssr.ts"
 import util from "../shared/util.ts"
 import log from "../shared/log.ts"
-import type { Context, SSREvent } from "../types.d.ts"
+
+let indexHtml: string | null | undefined = undefined
 
 export type ServerOptions = {
-  routes?: string | string[]
-  fetch?: (request: Request, context: Context) => Promise<Response>,
+  fetch?: (request: Request, context: Context) => Promise<Response | void> | Response | void,
   ssr?: (e: SSREvent) => string
 }
 
 export const serve = (options: ServerOptions) => {
-  let indexHtml: string | null | undefined = undefined
+  const handler = async (req: Request, env: Record<string, string>) => {
+    const url = new URL(req.url)
+    const { pathname } = url
 
-  return {
-    async fetch(req: Request, env: Record<string, string>) {
-      const url = new URL(req.url)
-      const { pathname } = url
-
-      // request assets
-      try {
-        const file = await Deno.open(`./public/${pathname}`)
-        return new Response(readableStreamFromReader(file), { headers: { "content-type": getContentType(pathname) } })
-      } catch (err) {
-        if (!(err instanceof Deno.errors.NotFound)) {
-          log.error(err)
-          return new Response("Internal Server Error", { status: 500 })
-        }
-      }
-
-      const ctx: Context = { env, data: {} }
-      if (util.isFunction(options.fetch)) {
-        const resp = options.fetch(req, ctx)
-        if (resp instanceof Response) {
-          return resp
-        }
-      }
-
-      if (indexHtml === undefined) {
-        try {
-          indexHtml = await Deno.readTextFile("./index.html")
-          // since HTMLRewriter can't handle `<ssr-body />` correctly replace it to `<ssr-body></ssr-body>`
-          indexHtml = indexHtml.replace(/<ssr-(head|body)\s+\/>/g, "<ssr-$1></ssr-$1>")
-        } catch (err) {
-          if (err instanceof Deno.errors.NotFound) {
-            indexHtml = null
-          } else {
-            log.error(err)
-            return new Response("Internal Server Error", { status: 500 })
+    // request assets
+    const path = `./public/${pathname}`
+    try {
+      const stat = await Deno.lstat(path)
+      if (stat.isFile && stat.mtime) {
+        const ifModifiedSince = req.headers.get("If-Modified-Since")
+        if (ifModifiedSince) {
+          const ifModifiedSinceDate = new Date(ifModifiedSince)
+          if (ifModifiedSinceDate.getTime() === stat.mtime.getTime()) {
+            return new Response(null, { status: 304 })
           }
         }
+        const file = await Deno.open(path, { read: true })
+        return new Response(readableStreamFromReader(file), {
+          headers: {
+            "Content-Type": getContentType(pathname),
+            "Last-Modified": stat.mtime.toUTCString(),
+          }
+        })
       }
-
-      if (indexHtml === null) {
-        return new Response("Not Found", { status: 404 })
+    } catch (err) {
+      if (!(err instanceof Deno.errors.NotFound)) {
+        log.error(err)
+        return new Response("Internal Server Error", { status: 500 })
       }
+    }
 
-      // request page data
-      for (const routePath in dataRoutes) {
-        const [params, ok] = matchPath(routePath, pathname)
-        if (ok) {
-          if (req.method !== "GET" || req.headers.has("X-Fetch-Data") || !(routePath in routes)) {
-            const request = new Request(util.appendUrlParams(url, params).toString(), req)
-            const fetcher = dataRoutes[routePath][req.method.toLowerCase()]
+    switch (pathname) {
+      case "/favicon.ico":
+      case "/robots.txt":
+        return new Response('Not found', { status: 404 })
+    }
+
+    const ctx: Context = { env, data: {} }
+    if (util.isFunction(options.fetch)) {
+      const resp = options.fetch(req, ctx)
+      if (resp instanceof Response) {
+        return resp
+      }
+    }
+
+    // request page data
+    const dataRoutes: [URLPattern, Record<string, any>, boolean][] = (self as any).__ALEPH_DATA_ROUTES
+    if (util.isArray(dataRoutes)) {
+      for (const [pattern, config, hasCompoment] of dataRoutes) {
+        const ret = pattern.exec({ pathname })
+        if (ret) {
+          if (req.method !== "GET" || req.headers.has("X-Fetch-Data") || !hasCompoment) {
+            const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req)
+            const fetcher = config[req.method.toLowerCase()]
             if (util.isFunction(fetcher)) {
-              const allFetcher = dataRoutes[routePath].all
+              const allFetcher = config.all
               if (util.isFunction(allFetcher)) {
                 let res = allFetcher(request)
                 if (res instanceof Promise) {
@@ -82,12 +84,39 @@ export const serve = (options: ServerOptions) => {
           }
         }
       }
-
-      // request ssr
-      if (util.isFunction(options.ssr)) {
-        return ssr.fetch(req, ctx, { handler: options.ssr, htmlTpl: indexHtml })
-      }
-      return content(indexHtml, "text/html; charset=utf-8")
     }
+
+    if (indexHtml === undefined) {
+      try {
+        indexHtml = await Deno.readTextFile("./index.html")
+        // since HTMLRewriter can't handle `<ssr-body />` correctly replace it to `<ssr-body></ssr-body>`
+        indexHtml = indexHtml.replace(/<ssr-(head|body)[ \/]*> *(<\/ssr-(head|body)>)?/g, "<ssr-$1></ssr-$1>")
+      } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
+          indexHtml = null
+        } else {
+          log.error(err)
+          return new Response("Internal Server Error", { status: 500 })
+        }
+      }
+    }
+
+    if (indexHtml === null) {
+      return new Response("Not Found", { status: 404 })
+    }
+    // request ssr
+    if (util.isFunction(options.ssr)) {
+      return ssr.fetch(req, ctx, { handler: options.ssr, htmlTpl: indexHtml })
+    }
+    return content(indexHtml, "text/html; charset=utf-8")
+  }
+
+  if (Deno.env.get("DENO_DEPLOYMENT_ID")) {
+    // support deno deploy
+    self.addEventListener('fetch', (e: any) => {
+      e.respondWith(handler(e.request, Deno.env.toObject()))
+    })
+  } else {
+    Object.assign(globalThis, { __ALEPH_SERVER_HANDLER: handler })
   }
 }

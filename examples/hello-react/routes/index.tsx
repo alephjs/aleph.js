@@ -5,10 +5,7 @@ let count = 0
 
 export const data = {
   get: (req: Request, ctx: Context) => {
-    return new Response(JSON.stringify({
-      deno: Deno.version.deno,
-      count
-    }))
+    return new Response(JSON.stringify({ count }))
   },
   post: async (req: Request, ctx: Context) => {
     const { action } = await req.json()
@@ -17,15 +14,12 @@ export const data = {
     } else if (action === 'decrement') {
       count--
     }
-    return new Response(JSON.stringify({
-      deno: Deno.version.deno,
-      count
-    }))
+    return new Response(JSON.stringify({ count }))
   }
 }
 
-export default function Home() {
-  const { data, isLoading, isMutating, mutation } = useData<{ count: number, deno: string }>()
+export default function Index() {
+  const { data, isLoading, isMutating, mutation } = useData<{ count: number }>()
 
   return (
     <div className="page">
@@ -54,10 +48,16 @@ export default function Home() {
         {!isLoading && (
           <strong>{data?.count}</strong>
         )}
-        <button disabled={!!isMutating} onClick={() => mutation.post({ action: 'decrease' }, true)}>-</button>
-        <button disabled={!!isMutating} onClick={() => mutation.post({ action: 'increase' }, true)}>+</button>
+        <button
+          disabled={Boolean(isMutating)}
+          onClick={() => mutation.post({ action: 'decrease' }, true)}
+        >-</button>
+        <button
+          disabled={Boolean(isMutating)}
+          onClick={() => mutation.post({ action: 'increase' }, true)}
+        >+</button>
       </div>
-      <p className="copyinfo">Built by Aleph.js in Deno {data?.deno}</p>
+      <p className="copyinfo">Built by Aleph.js in Deno</p>
     </div>
   )
 }

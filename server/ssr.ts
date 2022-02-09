@@ -1,37 +1,38 @@
 import util from "../shared/util.ts"
-import type { Context } from "../types.d.ts"
 
-async function fetchData(req: Request, ctx: Context): Promise<void | Response | { data: object, cacheTtl?: number }> {
+async function fetchData(req: Request, ctx: any): Promise<void | Response | { data: object, cacheTtl?: number }> {
   const url = new URL(req.url)
   const pathname = util.cleanPath(url.pathname)
-  const dataRoutes: [URLPattern, Record<string, any>][] = (self as any).ESMD_DATA_ROUTES
-  for (const [pattern, config] of dataRoutes) {
-    const ret = pattern.exec(pathname)
-    if (ret) {
-      const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req)
-      const fetcher = config.get
-      if (util.isFunction(fetcher)) {
-        const allFetcher = config.all
-        if (util.isFunction(allFetcher)) {
-          let res = allFetcher(request)
+  const dataRoutes: [URLPattern, Record<string, any>][] = (self as any).__ALEPH_DATA_ROUTES
+  if (util.isArray(dataRoutes)) {
+    for (const [pattern, config] of dataRoutes) {
+      const ret = pattern.exec({ pathname })
+      if (ret) {
+        const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req)
+        const fetcher = config.get
+        if (util.isFunction(fetcher)) {
+          const allFetcher = config.all
+          if (util.isFunction(allFetcher)) {
+            let res = allFetcher(request)
+            if (res instanceof Promise) {
+              res = await res
+            }
+            if (res instanceof Response) {
+              return res
+            }
+          }
+          let res = fetcher(request, ctx)
           if (res instanceof Promise) {
             res = await res
           }
           if (res instanceof Response) {
-            return res
-          }
-        }
-        let res = fetcher(request, ctx)
-        if (res instanceof Promise) {
-          res = await res
-        }
-        if (res instanceof Response) {
-          if (res.status !== 200) {
-            return res
-          }
-          return {
-            data: await res.json(),
-            cacheTtl: config.cacheTtl,
+            if (res.status !== 200) {
+              return res
+            }
+            return {
+              data: await res.json(),
+              cacheTtl: config.cacheTtl,
+            }
           }
         }
       }
@@ -56,31 +57,32 @@ export default {
       headers.append("Cache-Control", "public, max-age=0, must-revalidate")
     }
     const htmlRes = new Response(ssr.htmlTpl, { headers })
-    return new HTMLRewriter().on("ssr-head", {
-      element(el) {
-        if (ssr.css) {
-          el.before(`<style>${ssr.css}</style>`, { html: true })
-        }
-        if (dataRes?.data) {
-          el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(dataRes?.data)}</script>`, { html: true })
-        }
-        headCollection.forEach(tag => el.before(tag, { html: true }))
-        el.remove()
-      }
-    }).on("ssr-body", {
-      element(el) {
-        el.replace(ssrBody, { html: true })
-      }
-    }).on("script", {
-      element(el) {
-        const type = el.getAttribute("type")
-        if (!type || type === "module") {
-          if (type) {
-            el.removeAttribute("type")
-          }
-          el.setAttribute("src", `/main.tsx?v=${ctx.env.VERSION}`)
-        }
-      }
-    }).transform(htmlRes)
+    return htmlRes
+    // return new HTMLRewriter().on("ssr-head", {
+    //   element(el) {
+    //     if (ssr.css) {
+    //       el.before(`<style>${ssr.css}</style>`, { html: true })
+    //     }
+    //     if (dataRes?.data) {
+    //       el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(dataRes?.data)}</script>`, { html: true })
+    //     }
+    //     headCollection.forEach(tag => el.before(tag, { html: true }))
+    //     el.remove()
+    //   }
+    // }).on("ssr-body", {
+    //   element(el) {
+    //     el.replace(ssrBody, { html: true })
+    //   }
+    // }).on("script", {
+    //   element(el) {
+    //     const type = el.getAttribute("type")
+    //     if (!type || type === "module") {
+    //       if (type) {
+    //         el.removeAttribute("type")
+    //       }
+    //       el.setAttribute("src", `/main.tsx?v=${ctx.env.VERSION}`)
+    //     }
+    //   }
+    // }).transform(htmlRes)
   }
 }

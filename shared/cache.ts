@@ -1,9 +1,32 @@
 import { ensureDir } from 'https://deno.land/std@0.125.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.125.0/path/mod.ts'
-import { existsFile } from '../shared/fs.ts'
+import { existsFile, existsDir } from '../shared/fs.ts'
 import log from '../shared/log.ts'
 import util from '../shared/util.ts'
-import { getDenoDir, computeHash } from './helper.ts'
+import { computeHash, decoder } from './crypto.ts'
+
+/** get the deno cache dir. */
+export async function getDenoDir() {
+  const global = (globalThis as any)
+  const dir = global.__DENO_DIR
+  if (util.isFilledString(dir)) {
+    return dir
+  }
+
+  const p = Deno.run({
+    cmd: [Deno.execPath(), 'info', '--json'],
+    stdout: 'piped',
+    stderr: 'null'
+  })
+  const output = decoder.decode(await p.output())
+  const { denoDir } = JSON.parse(output)
+  p.close()
+  if (denoDir === undefined || !await existsDir(denoDir)) {
+    throw new Error(`can't find the deno dir`)
+  }
+  global.__DENO_DIR = denoDir
+  return denoDir
+}
 
 /** download and cache remote contents */
 export async function cache(url: string, options?: { forceRefresh?: boolean, retryTimes?: number }): Promise<{ content: Uint8Array, contentType: string | null }> {

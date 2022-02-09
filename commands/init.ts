@@ -5,12 +5,11 @@ import { green, blue, dim, red, cyan } from 'https://deno.land/std@0.125.0/fmt/c
 import { ensureDir } from 'https://deno.land/std@0.125.0/fs/ensure_dir.ts'
 import { join } from 'https://deno.land/std@0.125.0/path/mod.ts'
 import { gunzip } from 'https://deno.land/x/denoflate@1.2.1/mod.ts'
-import { ensureTextFile, existsDir, existsFile } from '../shared/fs.ts'
+import { ensureTextFile, existsDir } from '../shared/fs.ts'
 import util from '../shared/util.ts'
 import { VERSION } from '../version.ts'
 
 const defaultReactVersion = '17.0.2'
-const vercelRuntimeVersion = '0.7.0'
 
 export const helpMessage = `
 Usage:
@@ -19,18 +18,18 @@ Usage:
 <name> represents the name of new app.
 
 Options:
-    -t, --template <path-to-template> Specify a template for the created project
-    -h, --help                        Prints help message
+    -t, --template [react,vue,svelte,vanilla,api] Specify a template for the created project
+    -h, --help                                Prints help message
 `
 
 export default async function (
-  template: string = 'hello-world',
+  template: string = 'react',
   nameArg?: string,
 ) {
   const cwd = Deno.cwd()
   const rev = 'master'
 
-  const name = nameArg || (await ask('Project Name:')).trim()
+  const name = nameArg || (prompt('Project Name:') || '').trim()
   if (name === '') {
     return
   }
@@ -40,30 +39,17 @@ export default async function (
     return
   }
 
-  const hasTemplate = await util.isUrlOk('https://api.github.com/repos/alephjs/alephjs-templates/contents/' + template)
-
-  if (!hasTemplate) {
-    console.error(
-      `Could not use a template named ${red(template)}. Please check your spelling and try again.`,
-    )
-    Deno.exit(1)
-  }
-
   // check dir is clean
   if (!await isFolderEmpty(cwd, name)) {
-    if (!await confirm('Continue?')) {
+    if (!confirm('Continue?')) {
       Deno.exit(1)
     }
   }
 
-  // ask to create vscode files
-  const vscode = await confirm('Using VS Code?')
-  const vercel = await confirm('Deploy to Vercel?')
-
   // download template
   console.log('Downloading template. This might take a moment...')
   const resp = await fetch(
-    'https://codeload.github.com/alephjs/alephjs-templates/tar.gz/' + rev,
+    'https://codeload.github.com/alephjs/aleph.js/tar.gz/' + rev,
   )
   const gzData = await readAll(new Buffer(await resp.arrayBuffer()))
 
@@ -72,13 +58,13 @@ export default async function (
   const entryList = new Untar(new Buffer(tarData))
 
   for await (const entry of entryList) {
-    if (entry.fileName.startsWith(`alephjs-templates-${rev}/${template}/`)) {
+    if (entry.fileName.startsWith(`aleph.js-${rev}/examples/hello-${template}/`)) {
       const fp = join(
         cwd,
         name,
         util.trimPrefix(
           entry.fileName,
-          `alephjs-templates-${rev}/${template}/`,
+          `aleph.js-${rev}/examples/hello-${template}/`,
         ),
       )
       if (entry.type === 'directory') {
@@ -107,8 +93,7 @@ export default async function (
       'react': `https://esm.sh/react@${defaultReactVersion}`,
       'react-dom': `https://esm.sh/react-dom@${defaultReactVersion}`,
       'react-dom/server': `https://esm.sh/react-dom@${defaultReactVersion}/server`,
-    },
-    scopes: {},
+    }
   }
   const denoConfig = {
     "compilerOptions": {
@@ -117,8 +102,6 @@ export default async function (
         "dom.iterable",
         "dom.asynciterable",
         "deno.ns",
-        "deno.url",
-        "deno.crypto",
         "deno.unstable"
       ],
       "types": [
@@ -141,7 +124,7 @@ export default async function (
     ),
   ])
 
-  if (vscode) {
+  if (confirm('Using VS Code?')) {
     const extensions = {
       'recommendations': [
         'denoland.vscode-deno',
@@ -166,37 +149,7 @@ export default async function (
     ])
   }
 
-  const vercelJson = join(name, 'vercel.json')
-
-  if (vercel) {
-    Deno.writeTextFile(
-      vercelJson,
-      JSON.stringify({
-        functions: {
-          'api/**/*.{j,t}s': {
-            runtime: `vercel-aleph@${vercelRuntimeVersion}`
-          }
-        }
-      }, undefined, 2),
-    )
-  } else if (await existsFile(vercelJson)) {
-    // The template may contain vercel.json
-    await Deno.remove(vercelJson)
-  }
-
-  // cache deps in import maps
-  console.log('Cache deps...')
-  const urls = Object.values(importMap.imports).filter((v) => !v.endsWith('/'))
-  const p = Deno.run({
-    cmd: [Deno.execPath(), 'cache', ...urls],
-    stderr: 'inherit',
-    stdout: 'inherit',
-  })
-  await p.status()
-  p.close()
-
-  console.log('Done')
-  console.log(`
+  const msg = `
 ${green('Aleph.js is ready to go!')}
 ${dim('▲')} cd ${name}
 ${dim('▲')} aleph dev    ${dim('# start the app in `development` mode')}
@@ -205,26 +158,9 @@ ${dim('▲')} aleph build  ${dim('# build the app to a static site (SSG)')}
 
 Docs: ${cyan('https://alephjs.org/docs')}
 Bugs: ${cyan('https://alephjs.org.com/alephjs/aleph.js/issues')}
-`)
+`
+  console.log(msg)
   Deno.exit(0)
-}
-
-async function ask(
-  question: string = ':',
-  stdin = Deno.stdin,
-  stdout = Deno.stdout,
-) {
-  await stdout.write(new TextEncoder().encode(question + ' '))
-  const buf = new Uint8Array(1024)
-  const n = <number>await stdin.read(buf)
-  const answer = new TextDecoder().decode(buf.subarray(0, n))
-  return answer.trim()
-}
-
-async function confirm(question: string = 'are you sure?') {
-  let a: string
-  while (!/^(y(es)?|no?)$/i.test(a = (await ask(question + ' ' + dim('[y/n]'))).trim())) { }
-  return a.charAt(0).toLowerCase() === 'y'
 }
 
 async function isFolderEmpty(root: string, name: string): Promise<boolean> {

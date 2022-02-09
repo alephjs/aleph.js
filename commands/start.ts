@@ -43,11 +43,12 @@ if (import.meta.main) {
   const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"])
   if (serverEntry) {
     await import(serverEntry)
-    const serverHandler: any = (window as any).__ALEPH_SERVER_HANDLER
+    const serverHandler: any = (globalThis as any).__ALEPH_SERVER_HANDLER
+    log.info(`Server ready on http://localhost:${port}`)
     if (certFile && keyFile) {
-      await serveTls(req => serverHandler.fetch(req), { port, hostname, certFile, keyFile })
+      await serveTls(serverHandler, { port, hostname, certFile, keyFile })
     } else {
-      await stdServe(req => serverHandler.fetch(req), { port, hostname })
+      await stdServe(serverHandler, { port, hostname })
     }
   } else {
     log.fatal('No server entry found')
