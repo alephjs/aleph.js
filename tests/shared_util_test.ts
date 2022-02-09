@@ -31,7 +31,7 @@ Deno.test(`util`, async () => {
   assertEquals(util.prettyBytes(1000), '1000B')
   assertEquals(util.prettyBytes(1024), '1KB')
   assertEquals(util.prettyBytes(2048), '2KB')
-  assertEquals(util.prettyBytes(3000), '2.9KB')
+  assertEquals(util.prettyBytes(3000), '2.93KB')
   assertEquals(util.prettyBytes(1024 ** 2), '1MB')
   assertEquals(util.prettyBytes(1024 ** 3), '1GB')
   assertEquals(util.prettyBytes(1024 ** 4), '1TB')

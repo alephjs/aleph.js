@@ -76,7 +76,7 @@ export default {
   prettyBytes(bytes: number) {
     const units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"]
     const exp = Math.floor(Math.log(bytes) / Math.log(1024))
-    return `${(bytes / Math.pow(1024, exp)).toFixed(2)} ${units[exp]}`
+    return `${Math.round(bytes * 100 / Math.pow(1024, exp)) / 100}${units[exp]}`
   },
   splitPath(path: string): string[] {
     return path

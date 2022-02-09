@@ -51,5 +51,5 @@ Deno.test('server/helper: prettyBytesWithColor', () => {
 
   assertEquals(prettyBytesWithColor(OneMb), "\x1b[2m1MB\x1b[22m")
   assertEquals(prettyBytesWithColor(OneHalfMb), "\x1b[33m1.5MB\x1b[39m")
-  assertEquals(prettyBytesWithColor(ElevenMb), "\x1b[31m11MB\x1b[39m")
+  assertEquals(prettyBytesWithColor(ElevenMb), "\x1b[31m10MB\x1b[39m")
 })
