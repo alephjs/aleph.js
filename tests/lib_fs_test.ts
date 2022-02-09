@@ -9,7 +9,7 @@ import {
   existsFile,
   ensureTextFile,
   lazyRemove
-} from '../shared/fs.ts'
+} from '../lib/fs.ts'
 
 Deno.test(`fs: existsDir`, async () => {
   // true test cases

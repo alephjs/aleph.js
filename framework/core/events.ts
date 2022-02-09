@@ -22,28 +22,28 @@
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // deno-lint-ignore no-explicit-any
-export type GenericFunction = (...args: any[]) => any
+export type GenericFunction = (...args: any[]) => any;
 
 export interface WrappedFunction extends Function {
-  listener: GenericFunction
+  listener: GenericFunction;
 }
 
 // deno-lint-ignore no-explicit-any
 function createIterResult(value: any, done: boolean): IteratorResult<any> {
-  return { value, done }
+  return { value, done };
 }
 
 interface AsyncIterable {
   // deno-lint-ignore no-explicit-any
-  next(): Promise<IteratorResult<any, any>>
+  next(): Promise<IteratorResult<any, any>>;
   // deno-lint-ignore no-explicit-any
-  return(): Promise<IteratorResult<any, any>>
-  throw(err: Error): void
+  return(): Promise<IteratorResult<any, any>>;
+  throw(err: Error): void;
   // deno-lint-ignore no-explicit-any
-  [Symbol.asyncIterator](): any
+  [Symbol.asyncIterator](): any;
 }
 
-export let defaultMaxListeners = 10
+export let defaultMaxListeners = 10;
 /**
  * See also https://nodejs.org/api/events.html
  */
@@ -51,20 +51,20 @@ export class EventEmitter {
   public static captureRejectionSymbol = Symbol.for("nodejs.rejection");
   public static errorMonitor = Symbol("events.errorMonitor");
   public static get defaultMaxListeners() {
-    return defaultMaxListeners
+    return defaultMaxListeners;
   }
   public static set defaultMaxListeners(value: number) {
-    defaultMaxListeners = value
+    defaultMaxListeners = value;
   }
 
-  private maxListeners: number | undefined
+  private maxListeners: number | undefined;
   private _events: Map<
     string | symbol,
     Array<GenericFunction | WrappedFunction>
-  >
+  >;
 
   public constructor() {
-    this._events = new Map()
+    this._events = new Map();
   }
 
   private _addListener(
@@ -72,31 +72,31 @@ export class EventEmitter {
     listener: GenericFunction | WrappedFunction,
     prepend: boolean,
   ): this {
-    this.emit("newListener", eventName, listener)
+    this.emit("newListener", eventName, listener);
     if (this._events.has(eventName)) {
       const listeners = this._events.get(eventName) as Array<
         GenericFunction | WrappedFunction
-      >
+      >;
       if (prepend) {
-        listeners.unshift(listener)
+        listeners.unshift(listener);
       } else {
-        listeners.push(listener)
+        listeners.push(listener);
       }
     } else {
-      this._events.set(eventName, [listener])
+      this._events.set(eventName, [listener]);
     }
-    const max = this.getMaxListeners()
+    const max = this.getMaxListeners();
     if (max > 0 && this.listenerCount(eventName) > max) {
       const warning = new Error(
         `Possible EventEmitter memory leak detected.
          ${this.listenerCount(eventName)} ${eventName.toString()} listeners.
          Use emitter.setMaxListeners() to increase limit`,
-      )
-      warning.name = "MaxListenersExceededWarning"
-      console.warn(warning)
+      );
+      warning.name = "MaxListenersExceededWarning";
+      console.warn(warning);
     }
 
-    return this
+    return this;
   }
 
   /** Alias for emitter.on(eventName, listener). */
@@ -104,7 +104,7 @@ export class EventEmitter {
     eventName: string | symbol,
     listener: GenericFunction | WrappedFunction,
   ): this {
-    return this._addListener(eventName, listener, false)
+    return this._addListener(eventName, listener, false);
   }
 
   /**
@@ -120,27 +120,27 @@ export class EventEmitter {
         eventName === "error" &&
         this._events.get(EventEmitter.errorMonitor)
       ) {
-        this.emit(EventEmitter.errorMonitor, ...args)
+        this.emit(EventEmitter.errorMonitor, ...args);
       }
       const listeners = (this._events.get(
         eventName,
-      ) as GenericFunction[]).slice() // We copy with slice() so array is not mutated during emit
+      ) as GenericFunction[]).slice(); // We copy with slice() so array is not mutated during emit
       for (const listener of listeners) {
         try {
-          listener.apply(this, args)
+          listener.apply(this, args);
         } catch (err) {
-          this.emit("error", err)
+          this.emit("error", err);
         }
       }
-      return true
+      return true;
     } else if (eventName === "error") {
       if (this._events.get(EventEmitter.errorMonitor)) {
-        this.emit(EventEmitter.errorMonitor, ...args)
+        this.emit(EventEmitter.errorMonitor, ...args);
       }
-      const errMsg = args.length > 0 ? args[0] : Error("Unhandled error.")
-      throw errMsg
+      const errMsg = args.length > 0 ? args[0] : Error("Unhandled error.");
+      throw errMsg;
     }
-    return false
+    return false;
   }
 
   /**
@@ -148,7 +148,7 @@ export class EventEmitter {
    * registered listeners.
    */
   public eventNames(): [string | symbol] {
-    return Array.from(this._events.keys()) as [string | symbol]
+    return Array.from(this._events.keys()) as [string | symbol];
   }
 
   /**
@@ -157,7 +157,7 @@ export class EventEmitter {
    * EventEmitter.defaultMaxListeners.
    */
   public getMaxListeners(): number {
-    return this.maxListeners || EventEmitter.defaultMaxListeners
+    return this.maxListeners || EventEmitter.defaultMaxListeners;
   }
 
   /**
@@ -166,9 +166,9 @@ export class EventEmitter {
    */
   public listenerCount(eventName: string | symbol): number {
     if (this._events.has(eventName)) {
-      return (this._events.get(eventName) as GenericFunction[]).length
+      return (this._events.get(eventName) as GenericFunction[]).length;
     } else {
-      return 0
+      return 0;
     }
   }
 
@@ -178,27 +178,27 @@ export class EventEmitter {
     unwrap: boolean,
   ): GenericFunction[] {
     if (!target._events.has(eventName)) {
-      return []
+      return [];
     }
-    const eventListeners = target._events.get(eventName) as GenericFunction[]
+    const eventListeners = target._events.get(eventName) as GenericFunction[];
 
     return unwrap
       ? this.unwrapListeners(eventListeners)
-      : eventListeners.slice(0)
+      : eventListeners.slice(0);
   }
 
   private unwrapListeners(arr: GenericFunction[]): GenericFunction[] {
-    const unwrappedListeners = new Array(arr.length) as GenericFunction[]
+    const unwrappedListeners = new Array(arr.length) as GenericFunction[];
     for (let i = 0; i < arr.length; i++) {
       // deno-lint-ignore no-explicit-any
-      unwrappedListeners[i] = (arr[i] as any)["listener"] || arr[i]
+      unwrappedListeners[i] = (arr[i] as any)["listener"] || arr[i];
     }
-    return unwrappedListeners
+    return unwrappedListeners;
   }
 
   /** Returns a copy of the array of listeners for the event named eventName.*/
   public listeners(eventName: string | symbol): GenericFunction[] {
-    return this._listeners(this, eventName, true)
+    return this._listeners(this, eventName, true);
   }
 
   /**
@@ -208,12 +208,12 @@ export class EventEmitter {
   public rawListeners(
     eventName: string | symbol,
   ): Array<GenericFunction | WrappedFunction> {
-    return this._listeners(this, eventName, false)
+    return this._listeners(this, eventName, false);
   }
 
   /** Alias for emitter.removeListener(). */
   public off(eventName: string | symbol, listener: GenericFunction): this {
-    return this.removeListener(eventName, listener)
+    return this.removeListener(eventName, listener);
   }
 
   /**
@@ -227,7 +227,7 @@ export class EventEmitter {
     eventName: string | symbol,
     listener: GenericFunction | WrappedFunction,
   ): this {
-    return this._addListener(eventName, listener, false)
+    return this._addListener(eventName, listener, false);
   }
 
   /**
@@ -235,9 +235,9 @@ export class EventEmitter {
    * time eventName is triggered, this listener is removed and then invoked.
    */
   public once(eventName: string | symbol, listener: GenericFunction): this {
-    const wrapped: WrappedFunction = this.onceWrap(eventName, listener)
-    this.on(eventName, wrapped)
-    return this
+    const wrapped: WrappedFunction = this.onceWrap(eventName, listener);
+    this.on(eventName, wrapped);
+    return this;
   }
 
   // Wrapped function that calls EventEmitter.removeListener(eventName, self) on execution.
@@ -247,10 +247,10 @@ export class EventEmitter {
   ): WrappedFunction {
     const wrapper = function (
       this: {
-        eventName: string | symbol
-        listener: GenericFunction
-        rawListener: GenericFunction | WrappedFunction
-        context: EventEmitter
+        eventName: string | symbol;
+        listener: GenericFunction;
+        rawListener: GenericFunction | WrappedFunction;
+        context: EventEmitter;
       },
       // deno-lint-ignore no-explicit-any
       ...args: any[]
@@ -258,21 +258,21 @@ export class EventEmitter {
       this.context.removeListener(
         this.eventName,
         this.rawListener as GenericFunction,
-      )
-      this.listener.apply(this.context, args)
-    }
+      );
+      this.listener.apply(this.context, args);
+    };
     const wrapperContext = {
       eventName: eventName,
       listener: listener,
       rawListener: (wrapper as unknown) as WrappedFunction,
       context: this,
-    }
+    };
     const wrapped = (wrapper.bind(
       wrapperContext,
-    ) as unknown) as WrappedFunction
-    wrapperContext.rawListener = wrapped
-    wrapped.listener = listener
-    return wrapped as WrappedFunction
+    ) as unknown) as WrappedFunction;
+    wrapperContext.rawListener = wrapped;
+    wrapped.listener = listener;
+    return wrapped as WrappedFunction;
   }
 
   /**
@@ -286,7 +286,7 @@ export class EventEmitter {
     eventName: string | symbol,
     listener: GenericFunction | WrappedFunction,
   ): this {
-    return this._addListener(eventName, listener, true)
+    return this._addListener(eventName, listener, true);
   }
 
   /**
@@ -298,35 +298,35 @@ export class EventEmitter {
     eventName: string | symbol,
     listener: GenericFunction,
   ): this {
-    const wrapped: WrappedFunction = this.onceWrap(eventName, listener)
-    this.prependListener(eventName, wrapped)
-    return this
+    const wrapped: WrappedFunction = this.onceWrap(eventName, listener);
+    this.prependListener(eventName, wrapped);
+    return this;
   }
 
   /** Removes all listeners, or those of the specified eventName. */
   public removeAllListeners(eventName?: string | symbol): this {
     if (this._events === undefined) {
-      return this
+      return this;
     }
 
     if (eventName) {
       if (this._events.has(eventName)) {
         const listeners = (this._events.get(eventName) as Array<
           GenericFunction | WrappedFunction
-        >).slice() // Create a copy; We use it AFTER it's deleted.
-        this._events.delete(eventName)
+        >).slice(); // Create a copy; We use it AFTER it's deleted.
+        this._events.delete(eventName);
         for (const listener of listeners) {
-          this.emit("removeListener", eventName, listener)
+          this.emit("removeListener", eventName, listener);
         }
       }
     } else {
-      const eventList: [string | symbol] = this.eventNames()
+      const eventList: [string | symbol] = this.eventNames();
       eventList.map((value: string | symbol) => {
-        this.removeAllListeners(value)
-      })
+        this.removeAllListeners(value);
+      });
     }
 
-    return this
+    return this;
   }
 
   /**
@@ -338,29 +338,29 @@ export class EventEmitter {
     listener: GenericFunction,
   ): this {
     if (this._events.has(eventName)) {
-      const arr = this._events.get(eventName)!
+      const arr = this._events.get(eventName)!;
 
-      let listenerIndex = -1
+      let listenerIndex = -1;
       for (let i = arr.length - 1; i >= 0; i--) {
         // arr[i]["listener"] is the reference to the listener inside a bound 'once' wrapper
         if (
           arr[i] == listener ||
           (arr[i] && (arr[i] as WrappedFunction)["listener"] == listener)
         ) {
-          listenerIndex = i
-          break
+          listenerIndex = i;
+          break;
         }
       }
 
       if (listenerIndex >= 0) {
-        arr.splice(listenerIndex, 1)
-        this.emit("removeListener", eventName, listener)
+        arr.splice(listenerIndex, 1);
+        this.emit("removeListener", eventName, listener);
         if (arr.length === 0) {
-          this._events.delete(eventName)
+          this._events.delete(eventName);
         }
       }
     }
-    return this
+    return this;
   }
 
   /**
@@ -374,19 +374,19 @@ export class EventEmitter {
   public setMaxListeners(n: number): this {
     if (n !== Infinity) {
       if (n === 0) {
-        n = Infinity
+        n = Infinity;
       } else {
         if (!Number.isInteger(n)) {
-          throw new Error('The max number of listeners must be an integer')
+          throw new Error("The max number of listeners must be an integer");
         }
         if (n < 0) {
-          throw new Error('The max number of listeners must be >= 0')
+          throw new Error("The max number of listeners must be >= 0");
         }
       }
     }
 
-    this.maxListeners = n
-    return this
+    this.maxListeners = n;
+    return this;
   }
 
   /**
@@ -406,20 +406,20 @@ export class EventEmitter {
         emitter.addEventListener(
           name,
           (...args) => {
-            resolve(args)
+            resolve(args);
           },
           { once: true, passive: false, capture: false },
-        )
-        return
+        );
+        return;
       } else if (emitter instanceof EventEmitter) {
         // deno-lint-ignore no-explicit-any
         const eventListener = (...args: any[]): void => {
           if (errorListener !== undefined) {
-            emitter.removeListener("error", errorListener)
+            emitter.removeListener("error", errorListener);
           }
-          resolve(args)
-        }
-        let errorListener: GenericFunction
+          resolve(args);
+        };
+        let errorListener: GenericFunction;
 
         // Adding an error listener is not optional because
         // if an error is thrown on an event emitter we cannot
@@ -430,17 +430,17 @@ export class EventEmitter {
         if (name !== "error") {
           // deno-lint-ignore no-explicit-any
           errorListener = (err: any): void => {
-            emitter.removeListener(name, eventListener)
-            reject(err)
-          }
+            emitter.removeListener(name, eventListener);
+            reject(err);
+          };
 
-          emitter.once("error", errorListener)
+          emitter.once("error", errorListener);
         }
 
-        emitter.once(name, eventListener)
-        return
+        emitter.once(name, eventListener);
+        return;
       }
-    })
+    });
   }
 
   /**
@@ -454,106 +454,106 @@ export class EventEmitter {
     event: string | symbol,
   ): AsyncIterable {
     // deno-lint-ignore no-explicit-any
-    const unconsumedEventValues: any[] = []
+    const unconsumedEventValues: any[] = [];
     // deno-lint-ignore no-explicit-any
-    const unconsumedPromises: any[] = []
-    let error: Error | null = null
-    let finished = false
+    const unconsumedPromises: any[] = [];
+    let error: Error | null = null;
+    let finished = false;
 
     const iterator = {
       // deno-lint-ignore no-explicit-any
       next(): Promise<IteratorResult<any>> {
         // First, we consume all unread events
         // deno-lint-ignore no-explicit-any
-        const value: any = unconsumedEventValues.shift()
+        const value: any = unconsumedEventValues.shift();
         if (value) {
-          return Promise.resolve(createIterResult(value, false))
+          return Promise.resolve(createIterResult(value, false));
         }
 
         // Then we error, if an error happened
         // This happens one time if at all, because after 'error'
         // we stop listening
         if (error) {
-          const p: Promise<never> = Promise.reject(error)
+          const p: Promise<never> = Promise.reject(error);
           // Only the first element errors
-          error = null
-          return p
+          error = null;
+          return p;
         }
 
         // If the iterator is finished, resolve to done
         if (finished) {
-          return Promise.resolve(createIterResult(undefined, true))
+          return Promise.resolve(createIterResult(undefined, true));
         }
 
         // Wait until an event happens
         return new Promise(function (resolve, reject) {
-          unconsumedPromises.push({ resolve, reject })
-        })
+          unconsumedPromises.push({ resolve, reject });
+        });
       },
 
       // deno-lint-ignore no-explicit-any
       return(): Promise<IteratorResult<any>> {
-        emitter.removeListener(event, eventHandler)
-        emitter.removeListener("error", errorHandler)
-        finished = true
+        emitter.removeListener(event, eventHandler);
+        emitter.removeListener("error", errorHandler);
+        finished = true;
 
         for (const promise of unconsumedPromises) {
-          promise.resolve(createIterResult(undefined, true))
+          promise.resolve(createIterResult(undefined, true));
         }
 
-        return Promise.resolve(createIterResult(undefined, true))
+        return Promise.resolve(createIterResult(undefined, true));
       },
 
       throw(err: Error): void {
-        error = err
-        emitter.removeListener(event, eventHandler)
-        emitter.removeListener("error", errorHandler)
+        error = err;
+        emitter.removeListener(event, eventHandler);
+        emitter.removeListener("error", errorHandler);
       },
 
       // deno-lint-ignore no-explicit-any
       [Symbol.asyncIterator](): any {
-        return this
+        return this;
       },
-    }
+    };
 
-    emitter.on(event, eventHandler)
-    emitter.on("error", errorHandler)
+    emitter.on(event, eventHandler);
+    emitter.on("error", errorHandler);
 
-    return iterator
+    return iterator;
 
     // deno-lint-ignore no-explicit-any
     function eventHandler(...args: any[]): void {
-      const promise = unconsumedPromises.shift()
+      const promise = unconsumedPromises.shift();
       if (promise) {
-        promise.resolve(createIterResult(args, false))
+        promise.resolve(createIterResult(args, false));
       } else {
-        unconsumedEventValues.push(args)
+        unconsumedEventValues.push(args);
       }
     }
 
     // deno-lint-ignore no-explicit-any
     function errorHandler(err: any): void {
-      finished = true
+      finished = true;
 
-      const toError = unconsumedPromises.shift()
+      const toError = unconsumedPromises.shift();
       if (toError) {
-        toError.reject(err)
+        toError.reject(err);
       } else {
         // The next time we call next()
-        error = err
+        error = err;
       }
 
-      iterator.return()
+      iterator.return();
     }
   }
 }
 
-export const once = EventEmitter.once
-export const on = EventEmitter.on
-export const captureRejectionSymbol = EventEmitter.captureRejectionSymbol
-export const errorMonitor = EventEmitter.errorMonitor
+export const once = EventEmitter.once;
+export const on = EventEmitter.on;
+export const captureRejectionSymbol = EventEmitter.captureRejectionSymbol;
+export const errorMonitor = EventEmitter.errorMonitor;
 
-const events = new EventEmitter()
-events.setMaxListeners(1 << 10) // 1024
+const events = new EventEmitter();
+events.setMaxListeners(1 << 10); // 1024
 
-export default events
+export default events;

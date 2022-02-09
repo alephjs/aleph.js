@@ -1,24 +1,26 @@
 import {
   AnchorHTMLAttributes,
-  CSSProperties,
   createElement,
+  CSSProperties,
   MouseEvent,
   PropsWithChildren,
   useCallback,
   useEffect,
   useMemo,
-} from 'https://esm.sh/react@17.0.2'
-import util from '../../shared/util.ts'
-import events from '../core/events.ts'
-import { redirect } from '../core/redirect.ts'
-import { useRouter } from './router.ts'
+} from "https://esm.sh/react@17.0.2";
+import util from "../../lib/util.ts";
+import events from "../core/events.ts";
+import { redirect } from "../core/redirect.ts";
+import { useRouter } from "./router.ts";
 
-const prefetchedPages = new Set<string>()
+const prefetchedPages = new Set<string>();
 
-type AnchorProps = PropsWithChildren<AnchorHTMLAttributes<{}> & {
-  'data-active-className'?: string
-  'data-active-style'?: CSSProperties
-}>
+type AnchorProps = PropsWithChildren<
+  AnchorHTMLAttributes<{}> & {
+    "data-active-className"?: string;
+    "data-active-style"?: CSSProperties;
+  }
+>;
 
 /**
  * Anchor Component to link between pages.
@@ -27,111 +29,116 @@ export function Anchor(props: AnchorProps) {
   const {
     rel,
     href: propHref,
-    ['aria-current']: propAriaCurrent,
-    ['data-active-className']: activeClassName = 'active',
-    ['data-active-style']: activeStyle,
+    ["aria-current"]: propAriaCurrent,
+    ["data-active-className"]: activeClassName = "active",
+    ["data-active-style"]: activeStyle,
     className: propClassName,
     style: propStyle,
     onClick: propOnClick,
     onMouseEnter: propOnMouseEnter,
     children,
     ...rest
-  } = props
-  const relKeys = useMemo(() => rel ? rel.split(' ') : [], [rel])
-  const prefetching = useMemo(() => relKeys.includes('prefetch'), [relKeys])
-  const replace = useMemo(() => relKeys.includes('replace'), [relKeys])
-  const isNav = useMemo(() => relKeys.includes('nav'), [relKeys])
-  const { url: { pathname, searchParams } } = useRouter()
+  } = props;
+  const relKeys = useMemo(() => rel ? rel.split(" ") : [], [rel]);
+  const prefetching = useMemo(() => relKeys.includes("prefetch"), [relKeys]);
+  const replace = useMemo(() => relKeys.includes("replace"), [relKeys]);
+  const isNav = useMemo(() => relKeys.includes("nav"), [relKeys]);
+  const { url: { pathname, searchParams } } = useRouter();
   const href = useMemo(() => {
     if (!util.isFilledString(propHref)) {
-      return ''
+      return "";
     }
     if (util.isLikelyHttpURL(propHref)) {
-      return propHref
+      return propHref;
     }
-    let [p, q] = util.splitBy(propHref, '?')
-    if (p.startsWith('/')) {
-      p = util.cleanPath(p)
+    let [p, q] = util.splitBy(propHref, "?");
+    if (p.startsWith("/")) {
+      p = util.cleanPath(p);
     } else {
-      p = util.cleanPath(pathname + '/' + p)
+      p = util.cleanPath(pathname + "/" + p);
     }
-    return [p, q].filter(Boolean).join('?')
-  }, [pathname, propHref])
+    return [p, q].filter(Boolean).join("?");
+  }, [pathname, propHref]);
   const isCurrent = useMemo(() => {
     if (!util.isFilledString(propHref)) {
-      return false
+      return false;
     }
 
-    const [p, q] = util.splitBy(propHref, '?')
-    if (util.trimSuffix(p, '/') !== pathname) {
-      return false
+    const [p, q] = util.splitBy(propHref, "?");
+    if (util.trimSuffix(p, "/") !== pathname) {
+      return false;
     }
 
-    const search = new URLSearchParams(q)
-    search.sort()
+    const search = new URLSearchParams(q);
+    search.sort();
     if (search.toString() !== searchParams.toString()) {
-      return false
+      return false;
     }
 
-    return true
-  }, [pathname, searchParams, propHref])
+    return true;
+  }, [pathname, searchParams, propHref]);
   const className = useMemo(() => {
     if (!isNav || !isCurrent) {
-      return propClassName
+      return propClassName;
     }
-    return [propClassName, activeClassName].filter(util.isFilledString).map(n => n.trim()).filter(Boolean).join(' ')
-  }, [propClassName, activeClassName, isCurrent, isNav])
+    return [propClassName, activeClassName].filter(util.isFilledString).map(
+      (n) => n.trim()
+    ).filter(Boolean).join(" ");
+  }, [propClassName, activeClassName, isCurrent, isNav]);
   const style = useMemo(() => {
     if (!isNav || !isCurrent) {
-      return propStyle
+      return propStyle;
     }
-    return Object.assign({}, propStyle, activeStyle)
-  }, [propStyle, activeStyle, isCurrent, isNav])
+    return Object.assign({}, propStyle, activeStyle);
+  }, [propStyle, activeStyle, isCurrent, isNav]);
   const ariaCurrent = useMemo(() => {
     if (util.isFilledString(propAriaCurrent)) {
-      return propAriaCurrent
+      return propAriaCurrent;
     }
-    if (href.startsWith('/')) {
-      return 'page'
+    if (href.startsWith("/")) {
+      return "page";
     }
-    return undefined
-  }, [href, propAriaCurrent])
+    return undefined;
+  }, [href, propAriaCurrent]);
   const prefetch = useCallback(() => {
-    if (href && !util.isLikelyHttpURL(href) && !isCurrent && !prefetchedPages.has(href)) {
-      events.emit('fetch-page-module', { href })
-      prefetchedPages.add(href)
+    if (
+      href && !util.isLikelyHttpURL(href) && !isCurrent &&
+      !prefetchedPages.has(href)
+    ) {
+      events.emit("fetch-page-module", { href });
+      prefetchedPages.add(href);
     }
-  }, [isCurrent])
+  }, [isCurrent]);
   const onMouseEnter = useCallback((e: MouseEvent) => {
     if (util.isFunction(propOnMouseEnter)) {
-      propOnMouseEnter(e)
+      propOnMouseEnter(e);
     }
     if (e.defaultPrevented) {
-      return
+      return;
     }
-    prefetch()
-  }, [prefetch])
+    prefetch();
+  }, [prefetch]);
   const onClick = useCallback((e: MouseEvent) => {
     if (util.isFunction(propOnClick)) {
-      propOnClick(e)
+      propOnClick(e);
     }
     if (e.defaultPrevented || isModifiedEvent(e)) {
-      return
+      return;
     }
-    e.preventDefault()
+    e.preventDefault();
     if (!isCurrent) {
-      redirect(href, replace)
+      redirect(href, replace);
     }
-  }, [isCurrent, href, replace])
+  }, [isCurrent, href, replace]);
 
   useEffect(() => {
     if (prefetching) {
-      prefetch()
+      prefetch();
     }
-  }, [prefetching, prefetch])
+  }, [prefetching, prefetch]);
 
   return createElement(
-    'a',
+    "a",
     {
       ...rest,
       className,
@@ -139,21 +146,21 @@ export function Anchor(props: AnchorProps) {
       href,
       onClick,
       onMouseEnter,
-      'aria-current': ariaCurrent
+      "aria-current": ariaCurrent,
     },
-    children
-  )
+    children,
+  );
 }
 
 function isModifiedEvent(event: MouseEvent): boolean {
-  const { target } = event.currentTarget as any
-  const nativeEvent = event.nativeEvent as any
+  const { target } = event.currentTarget as any;
+  const nativeEvent = event.nativeEvent as any;
   return (
-    (target && target !== '_self') ||
+    (target && target !== "_self") ||
     event.metaKey ||
     event.ctrlKey ||
     event.shiftKey ||
     event.altKey || // triggers resource download
     (nativeEvent && nativeEvent.which === 2)
-  )
+  );
 }

@@ -1,38 +1,45 @@
-import util from "../shared/util.ts"
+import util from "../lib/util.ts";
 
-async function fetchData(req: Request, ctx: any): Promise<void | Response | { data: object, cacheTtl?: number }> {
-  const url = new URL(req.url)
-  const pathname = util.cleanPath(url.pathname)
-  const dataRoutes: [URLPattern, Record<string, any>][] = (self as any).__ALEPH_DATA_ROUTES
+async function fetchData(
+  req: Request,
+  ctx: any,
+): Promise<void | Response | { data: object; cacheTtl?: number }> {
+  const url = new URL(req.url);
+  const pathname = util.cleanPath(url.pathname);
+  const dataRoutes: [URLPattern, Record<string, any>][] =
+    (self as any).__ALEPH_DATA_ROUTES;
   if (util.isArray(dataRoutes)) {
     for (const [pattern, config] of dataRoutes) {
-      const ret = pattern.exec({ pathname })
+      const ret = pattern.exec({ pathname });
       if (ret) {
-        const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req)
-        const fetcher = config.get
+        const request = new Request(
+          util.appendUrlParams(url, ret.pathname.groups).toString(),
+          req,
+        );
+        const fetcher = config.get;
         if (util.isFunction(fetcher)) {
-          const allFetcher = config.all
+          const allFetcher = config.all;
           if (util.isFunction(allFetcher)) {
-            let res = allFetcher(request)
+            let res = allFetcher(request);
             if (res instanceof Promise) {
-              res = await res
+              res = await res;
             }
             if (res instanceof Response) {
-              return res
+              return res;
             }
           }
-          let res = fetcher(request, ctx)
+          let res = fetcher(request, ctx);
           if (res instanceof Promise) {
-            res = await res
+            res = await res;
           }
           if (res instanceof Response) {
             if (res.status !== 200) {
-              return res
+              return res;
             }
             return {
               data: await res.json(),
               cacheTtl: config.cacheTtl,
-            }
+            };
           }
         }
       }
@@ -41,23 +48,31 @@ async function fetchData(req: Request, ctx: any): Promise<void | Response | { da
 }
 
 export default {
-  async fetch(req: Request, ctx: Context, ssr: { handler: (e: any) => string, htmlTpl: string, css?: string }): Promise<Response> {
+  async fetch(
+    req: Request,
+    ctx: Context,
+    ssr: { handler: (e: any) => string; htmlTpl: string; css?: string },
+  ): Promise<Response> {
     // get data
-    const dataRes = await fetchData(req, ctx)
+    const dataRes = await fetchData(req, ctx);
     if (dataRes instanceof Response) {
-      return dataRes
+      return dataRes;
     }
     // ssr
-    const headCollection: string[] = []
-    const ssrBody = ssr.handler({ data: dataRes?.data, url: new URL(req.url), headCollection })
-    const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" })
+    const headCollection: string[] = [];
+    const ssrBody = ssr.handler({
+      data: dataRes?.data,
+      url: new URL(req.url),
+      headCollection,
+    });
+    const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
     if (util.isNumber(dataRes?.cacheTtl)) {
-      headers.append("Cache-Control", `public, max-age=${dataRes?.cacheTtl}`)
+      headers.append("Cache-Control", `public, max-age=${dataRes?.cacheTtl}`);
     } else {
-      headers.append("Cache-Control", "public, max-age=0, must-revalidate")
+      headers.append("Cache-Control", "public, max-age=0, must-revalidate");
     }
-    const htmlRes = new Response(ssr.htmlTpl, { headers })
-    return htmlRes
+    const htmlRes = new Response(ssr.htmlTpl, { headers });
+    return htmlRes;
     // return new HTMLRewriter().on("ssr-head", {
     //   element(el) {
     //     if (ssr.css) {
@@ -84,5 +99,5 @@ export default {
     //     }
     //   }
     // }).transform(htmlRes)
-  }
-}
+  },
+};

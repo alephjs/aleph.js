@@ -2,23 +2,17 @@
   "files.eol": "\n",
   "files.trimTrailingWhitespace": true,
   "typescript.format.semicolons": "remove",
-  "typescript.preferences.quoteStyle": "single",
+  "typescript.preferences.quoteStyle": "double",
   "[typescript]": {
-    "editor.defaultFormatter": "vscode.typescript-language-features",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.organizeImports": true,
-    }
+    "editor.defaultFormatter": "denoland.vscode-deno",
+    "editor.formatOnSave": true
   },
   "[typescriptreact]": {
-    "editor.defaultFormatter": "vscode.typescript-language-features",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.organizeImports": true,
-    }
+    "editor.defaultFormatter": "denoland.vscode-deno",
+    "editor.formatOnSave": true
   },
   "[rust]": {
-    "editor.defaultFormatter": "rust-lang.rust",
+    "editor.defaultFormatter": "matklad.rust-analyzer",
     "editor.formatOnSave": true,
   },
   "deno.enable": true,

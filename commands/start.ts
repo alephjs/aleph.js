@@ -1,8 +1,11 @@
-import { resolve } from 'https://deno.land/std@0.125.0/path/mod.ts'
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts"
-import { getFlag, parse, parsePortNumber } from '../shared/flags.ts'
-import { existsDir, findFile } from '../shared/fs.ts'
-import log from '../shared/log.ts'
+import { resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
+import {
+  serve as stdServe,
+  serveTls,
+} from "https://deno.land/std@0.125.0/http/server.ts";
+import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
+import { existsDir, findFile } from "../lib/fs.ts";
+import log from "../lib/log.ts";
 
 export const helpMessage = `
 Usage:
@@ -19,38 +22,43 @@ Options:
     -L, --log-level <log-level>  Set log level [possible values: debug, info]
     -r, --reload                 Reload source code cache
     -h, --help                   Prints help message
-`
+`;
 
 if (import.meta.main) {
-  const { args, options } = parse()
+  const { args, options } = parse();
 
   // check working dir
-  const workingDir = resolve(String(args[0] || '.'))
+  const workingDir = resolve(String(args[0] || "."));
   if (!await existsDir(workingDir)) {
-    log.fatal('No such directory:', workingDir)
+    log.fatal("No such directory:", workingDir);
   }
-  Deno.chdir(workingDir)
+  Deno.chdir(workingDir);
 
-  const port = parsePortNumber(getFlag(options, ['p', 'port'], '8080'))
-  const hostname = getFlag(options, ['hostname'])
-  const certFile = getFlag(options, ['tls-cert'])
-  const keyFile = getFlag(options, ['tls-key'])
+  const port = parsePortNumber(getFlag(options, ["p", "port"], "8080"));
+  const hostname = getFlag(options, ["hostname"]);
+  const certFile = getFlag(options, ["tls-cert"]);
+  const keyFile = getFlag(options, ["tls-key"]);
   if (keyFile !== undefined && certFile === undefined) {
-    log.fatal('missing `--tls-cert` option')
+    log.fatal("missing `--tls-cert` option");
   } else if (certFile !== undefined && keyFile === undefined) {
-    log.fatal('missing `--tls-key` option')
+    log.fatal("missing `--tls-key` option");
   }
-  const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"])
+  const serverEntry = await findFile(Deno.cwd(), [
+    "server.tsx",
+    "server.jsx",
+    "server.ts",
+    "server.js",
+  ]);
   if (serverEntry) {
-    await import(serverEntry)
-    const serverHandler: any = (globalThis as any).__ALEPH_SERVER_HANDLER
-    log.info(`Server ready on http://localhost:${port}`)
+    await import(serverEntry);
+    const serverHandler: any = (globalThis as any).__ALEPH_SERVER_HANDLER;
+    log.info(`Server ready on http://localhost:${port}`);
     if (certFile && keyFile) {
-      await serveTls(serverHandler, { port, hostname, certFile, keyFile })
+      await serveTls(serverHandler, { port, hostname, certFile, keyFile });
     } else {
-      await stdServe(serverHandler, { port, hostname })
+      await stdServe(serverHandler, { port, hostname });
     }
   } else {
-    log.fatal('No server entry found')
+    log.fatal("No server entry found");
   }
 }

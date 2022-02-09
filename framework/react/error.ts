@@ -1,44 +1,54 @@
-import { Component, createElement, CSSProperties } from 'https://esm.sh/react@17.0.2'
+import {
+  Component,
+  createElement,
+  CSSProperties,
+} from "https://esm.sh/react@17.0.2";
 
-const inDeno = typeof Deno !== 'undefined' && typeof Deno.version?.deno === 'string'
+const inDeno = typeof Deno !== "undefined" &&
+  typeof Deno.version?.deno === "string";
 
-export class ErrorBoundary extends Component<{}, { error: Error | Promise<any> | null }> {
+export class ErrorBoundary
+  extends Component<{}, { error: Error | Promise<any> | null }> {
   constructor(props: {}) {
-    super(props)
-    this.state = { error: null }
+    super(props);
+    this.state = { error: null };
     if (!inDeno) {
-      Object.assign(window, { __ALEPH_ErrorBoundary: this })
+      Object.assign(window, { __ALEPH_ErrorBoundary: this });
     }
   }
 
   componentDidCatch(error: any, info: any) {
-    this.setState({ error })
+    this.setState({ error });
     if (error instanceof Promise) {
-      error.then(() => this.setState({ error: null })).catch(error => this.setState({ error }))
-      return
+      error.then(() => this.setState({ error: null })).catch((error) =>
+        this.setState({ error })
+      );
+      return;
     }
-    const event = new CustomEvent('componentDidCatch', { detail: { error, info } })
-    window.dispatchEvent(event)
+    const event = new CustomEvent("componentDidCatch", {
+      detail: { error, info },
+    });
+    window.dispatchEvent(event);
   }
 
   render() {
-    const { error } = this.state
+    const { error } = this.state;
 
     // todo: default loading UI
     if (error instanceof Promise) {
-      return null
+      return null;
     }
 
     // todo: error UI
     if (error instanceof Error) {
       return createElement(
-        'pre',
+        "pre",
         null,
-        error.stack || error.message || error.toString()
-      )
+        error.stack || error.message || error.toString(),
+      );
     }
 
-    return this.props.children
+    return this.props.children;
   }
 }
 
@@ -47,9 +57,9 @@ export function E404Page() {
     StatusError,
     {
       status: 404,
-      message: 'Page Not Found'
-    }
-  )
+      message: "Page Not Found",
+    },
+  );
 }
 
 export function E400MissingComponent({ name }: { name: string }) {
@@ -58,9 +68,9 @@ export function E400MissingComponent({ name }: { name: string }) {
     {
       status: 400,
       message: `Module '${name}' should export a React Component as default`,
-      showRefreshButton: true
-    }
-  )
+      showRefreshButton: true,
+    },
+  );
 }
 
 const resetStyle: CSSProperties = {
@@ -69,60 +79,62 @@ const resetStyle: CSSProperties = {
   lineHeight: 1.5,
   fontSize: 15,
   fontWeight: 400,
-  color: '#333',
-}
+  color: "#333",
+};
 
-export function StatusError({ status, message }: { status: number, message: string }) {
+export function StatusError(
+  { status, message }: { status: number; message: string },
+) {
   return (
     createElement(
-      'div',
+      "div",
       {
         style: {
           ...resetStyle,
-          position: 'fixed',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          width: '100vw',
-          height: '100vh',
-        }
+          position: "fixed",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          width: "100vw",
+          height: "100vh",
+        },
       },
       createElement(
-        'p',
+        "p",
         {
           style: {
             ...resetStyle,
             fontWeight: 500,
-          }
+          },
         },
         createElement(
-          'code',
+          "code",
           {
             style: {
               ...resetStyle,
               fontWeight: 700,
-            }
+            },
           },
-          status
+          status,
         ),
         createElement(
-          'small',
+          "small",
           {
             style: {
               ...resetStyle,
               fontSize: 14,
-              color: '#999'
-            }
+              color: "#999",
+            },
           },
-          ' - '
+          " - ",
         ),
         createElement(
-          'span',
+          "span",
           null,
-          message
-        )
-      )
+          message,
+        ),
+      ),
     )
-  )
+  );
 }

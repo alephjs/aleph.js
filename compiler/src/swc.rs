@@ -716,8 +716,8 @@ mod tests {
       import * as React_ from 'https://esm.sh/react'
       import Logo from '../components/logo.tsx'
       import Nav from '../components/nav.tsx'
-      import '../shared/iife.ts'
-      import '../shared/iife2.ts'
+      import '../lib/iife.ts'
+      import '../lib/iife2.ts'
       export * from "https://esm.sh/react"
       export * as ReactDom from "https://esm.sh/react-dom"
       export { render } from "https://esm.sh/react-dom"
@@ -764,7 +764,7 @@ mod tests {
         "https://deno.land/x/aleph/framework/react/mod.ts".into(),
         "https://deno.land/x/aleph/framework/react/components/Head.ts".into(),
         "/components/logo.tsx".into(),
-        "/shared/iife.ts".into(),
+        "/lib/iife.ts".into(),
       ],
       None,
       None,
@@ -778,8 +778,8 @@ mod tests {
     assert!(code.contains("const React_ = __ALEPH__.pack[\"https://esm.sh/react\"]"));
     assert!(code.contains("const { default: Logo  } = __ALEPH__.pack[\"/components/logo.tsx\"]"));
     assert!(code.contains("import Nav from \"../components/nav.bundling.js\""));
-    assert!(!code.contains("__ALEPH__.pack[\"/shared/iife.ts\"]"));
-    assert!(code.contains("import \"../shared/iife2.bundling.js\""));
+    assert!(!code.contains("__ALEPH__.pack[\"/lib/iife.ts\"]"));
+    assert!(code.contains("import \"../lib/iife2.bundling.js\""));
     assert!(
       code.contains("AsyncLogo = React.lazy(()=>__ALEPH__.import(\"/components/async-logo.tsx\"")
     );

@@ -1,10 +1,10 @@
-import React from "react"
-import { renderToString } from "react-dom/server"
-import { Router } from "aleph/react"
-import { serve } from "aleph/server"
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { Router } from "aleph/react";
+import { serve } from "aleph/server";
 
 serve({
   ssr: (e: SSREvent) => {
-    return renderToString(<Router ssr={e} />)
-  }
-})
+    return renderToString(<Router ssr={e} />);
+  },
+});
