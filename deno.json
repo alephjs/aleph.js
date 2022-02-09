@@ -3,9 +3,10 @@
     "lib": [
       "dom",
       "dom.iterable",
+      "dom.asynciterable",
       "deno.ns",
-      "deno.worker",
-      "deno.asynciterable",
+      "deno.url",
+      "deno.crypto",
       "deno.unstable"
     ],
     "types": [

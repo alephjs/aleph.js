@@ -117,6 +117,8 @@ export default async function (
         "dom.iterable",
         "dom.asynciterable",
         "deno.ns",
+        "deno.url",
+        "deno.crypto",
         "deno.unstable"
       ],
       "types": [
