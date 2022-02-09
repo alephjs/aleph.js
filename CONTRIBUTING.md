@@ -22,10 +22,10 @@ You will need [Deno](https://deno.land/) 1.13+.
 
 ```bash
 # ssr/development with HMR
-ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts dev ./examples/hello-world -L debug
+ALEPH_DEV=true deno run -A cli.ts dev ./examples/hello-react -L debug
 
 # ssr/production
-ALEPH_DEV=true deno run -A --unstable --location=http://localhost cli.ts start ./examples/hello-world -L debug
+ALEPH_DEV=true deno run -A cli.ts start ./examples/hello-react -L debug
 ```
 
 ## Testing
