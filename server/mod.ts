@@ -29,9 +29,8 @@ export const serve = (options: ServerOptions) => {
     language: "en",
     languages: ["en"],
     onLine: true,
-    platform: Deno.build.os,
     userAgent: `Deno/${Deno.version.deno}`,
-    vendor: "Deno Land",
+    vendor: "Deno Land Inc.",
   });
 
   const handler = async (req: Request, env: Record<string, string>) => {

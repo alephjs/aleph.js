@@ -1,8 +1,6 @@
 {
   "files.eol": "\n",
   "files.trimTrailingWhitespace": true,
-  "typescript.format.semicolons": "remove",
-  "typescript.preferences.quoteStyle": "double",
   "[typescript]": {
     "editor.defaultFormatter": "denoland.vscode-deno",
     "editor.formatOnSave": true
