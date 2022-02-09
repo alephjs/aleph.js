@@ -1,4 +1,4 @@
-import '../es2019/mod.ts'
+import "../es2019/mod.ts";
 
 /**
  * Available in:
@@ -13,22 +13,22 @@ import '../es2019/mod.ts'
 // Licensed MIT
 if (!Promise.prototype.finally) {
   Promise.prototype.finally = function (callback) {
-    if (typeof callback !== 'function') {
-      return this.then(callback, callback)
+    if (typeof callback !== "function") {
+      return this.then(callback, callback);
     }
 
-    var P = this.constructor || Promise
+    var P = this.constructor || Promise;
     return this.then(
       function (value) {
         return P.resolve(callback()).then(function () {
-          return value
-        })
+          return value;
+        });
       },
       function (err) {
         return P.resolve(callback()).then(function () {
-          throw err
-        })
-      }
-    )
-  }
+          throw err;
+        });
+      },
+    );
+  };
 }

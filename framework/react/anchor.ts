@@ -82,7 +82,7 @@ export function Anchor(props: AnchorProps) {
       return propClassName;
     }
     return [propClassName, activeClassName].filter(util.isFilledString).map(
-      (n) => n.trim()
+      (n) => n.trim(),
     ).filter(Boolean).join(" ");
   }, [propClassName, activeClassName, isCurrent, isNav]);
   const style = useMemo(() => {

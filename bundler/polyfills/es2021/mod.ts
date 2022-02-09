@@ -3,16 +3,16 @@
 // Licensed MIT
 if (!String.prototype.replaceAll) {
   String.prototype.replaceAll = function (str, newStr) {
-
     // If a regex pattern
-    if (Object.prototype.toString.call(str).toLowerCase() === '[object regexp]') {
-      return this.replace(str, newStr)
+    if (
+      Object.prototype.toString.call(str).toLowerCase() === "[object regexp]"
+    ) {
+      return this.replace(str, newStr);
     }
 
     // If a string
-    return this.replace(new RegExp(str, 'g'), newStr)
-
-  }
+    return this.replace(new RegExp(str, "g"), newStr);
+  };
 }
 
 /**
@@ -24,34 +24,32 @@ if (!String.prototype.replaceAll) {
  */
 if (!Promise.any) {
   Promise.any = async (values) => {
-
     return new Promise((resolve, reject) => {
-
-      let hasResolved = false
-      let iterableCount = 0
-      let rejectionReasons = []
+      let hasResolved = false;
+      let iterableCount = 0;
+      let rejectionReasons = [];
 
       const resolveOnce = (value) => {
         if (!hasResolved) {
-          hasResolved = true
-          resolve(value)
+          hasResolved = true;
+          resolve(value);
         }
-      }
+      };
       const rejectionCheck = (reason) => {
-        rejectionReasons.push(reason)
-        if (rejectionReasons.length >= iterableCount) reject(rejectionReasons)
-      }
+        rejectionReasons.push(reason);
+        if (rejectionReasons.length >= iterableCount) reject(rejectionReasons);
+      };
       for (let value of values) {
-        iterableCount++
+        iterableCount++;
         if ((value).then !== undefined) {
-          let promiseLikeValue = value
-          promiseLikeValue.then((result) => resolveOnce(result))
+          let promiseLikeValue = value;
+          promiseLikeValue.then((result) => resolveOnce(result));
           if ((value).catch !== undefined) {
-            let promiseValue = promiseLikeValue
-            promiseValue.catch((reason) => rejectionCheck(reason))
+            let promiseValue = promiseLikeValue;
+            promiseValue.catch((reason) => rejectionCheck(reason));
           }
         }
       }
-    })
-  }
+    });
+  };
 }

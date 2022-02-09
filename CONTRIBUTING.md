@@ -5,12 +5,11 @@ Welcome, and thank you for taking time in contributing to Aleph.js! You can impr
 - ∆ submit new features
 - ✘ find bugs
 - ✔︎ review code
-- ☇ write plugins
 - 𝔸 improve our [documentation](https://github.com/alephjs/alephjs.org)
 
 ## Development Setup
 
-You will need [Deno](https://deno.land/) 1.13+.
+You will need [Deno](https://deno.land/) 1.18.2+.
 
 1. Fork this repository to your own GitHub account.
 2. Clone the repository to your local device.
@@ -33,7 +32,7 @@ ALEPH_DEV=true deno run -A cli.ts start ./examples/hello-react -L debug
 You can run all tests with the following command:
 
 ```bash
-$ deno test -A --unstable --location=http://localhost -c=deno.json --import-map=import_map.json
+$ deno test -A --location=http://localhost --import-map=import_map.json
 ```
 
 After running `integration_test.ts`, a zombie subprocesse may remain alive. (See [denoland/deno#7087](https://github.com/denoland/deno/issues/7087) for details) You can get rid of it with the following command:
@@ -51,19 +50,23 @@ $ kill $(lsof -i:8080 -t)
 - **/framework**
   - **core** framework core
   - **react** framework in React
+- **/lib** shared lib
 - **/examples** examples to learn
 - **/server** server to run apps
-- **/shared** shared code
 
 ## Code Style We Followed
 
-- Single quote for string
-- No semicolons
+- Double quote for string
+- Semicolons is good
 - 2 spaces indent
 - Types everything
 - Order your imports
 - Remove unused variables
 - Format code before commit
+
+```bash
+deno fmt **/*.(ts|tsx)
+```
 
 ## Code of Conduct
 

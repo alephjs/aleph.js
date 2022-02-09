@@ -1,15 +1,15 @@
-import '../es2020/mod.ts'
+import "../es2020/mod.ts";
 
-if (!('fromEntries' in Object)) {
+if (!("fromEntries" in Object)) {
   Object.fromEntries = function fromEntries(iterable) {
-    if (iterable && typeof iterable.next === 'function') {
+    if (iterable && typeof iterable.next === "function") {
       return Array.from(iterable).reduce((obj, [key, val]) => {
-        obj[key] = val
-        return obj
-      }, {})
+        obj[key] = val;
+        return obj;
+      }, {});
     }
-    return {}
-  }
+    return {};
+  };
 }
 
 /**
@@ -24,11 +24,11 @@ if (!('fromEntries' in Object)) {
  */
 // Copied from https://github.com/vercel/next.js/blob/canary/packages/next-polyfill-module/src/index.js
 // Licensed MIT
-if (!('trimStart' in String.prototype)) {
-  String.prototype.trimStart = String.prototype.trimLeft
+if (!("trimStart" in String.prototype)) {
+  String.prototype.trimStart = String.prototype.trimLeft;
 }
-if (!('trimEnd' in String.prototype)) {
-  String.prototype.trimEnd = String.prototype.trimRight
+if (!("trimEnd" in String.prototype)) {
+  String.prototype.trimEnd = String.prototype.trimRight;
 }
 
 /**
@@ -42,14 +42,14 @@ if (!('trimEnd' in String.prototype)) {
  */
 // Copied from https://github.com/vercel/next.js/blob/canary/packages/next-polyfill-module/src/index.js
 // Licensed MIT
-if (!('description' in Symbol.prototype)) {
-  Object.defineProperty(Symbol.prototype, 'description', {
+if (!("description" in Symbol.prototype)) {
+  Object.defineProperty(Symbol.prototype, "description", {
     configurable: true,
     get: function get() {
-      var m = /\((.*)\)/.exec(this.toString())
-      return m ? m[1] : undefined
+      var m = /\((.*)\)/.exec(this.toString());
+      return m ? m[1] : undefined;
     },
-  })
+  });
 }
 
 /**
@@ -63,14 +63,14 @@ if (!('description' in Symbol.prototype)) {
  */
 // Copied from https://gist.github.com/developit/50364079cf0390a73e745e513fa912d9
 // Licensed Apache-2.0
-if (!('flat' in Array.prototype)) {
+if (!("flat" in Array.prototype)) {
   Array.prototype.flat = function flat(d, c) {
     return (
       (c = this.concat.apply([], this)),
-      d > 1 && c.some(Array.isArray) ? c.flat(d - 1) : c
-    )
-  }
+        d > 1 && c.some(Array.isArray) ? c.flat(d - 1) : c
+    );
+  };
   Array.prototype.flatMap = function flatMap(c, a) {
-    return this.map(c, a).flat()
-  }
+    return this.map(c, a).flat();
+  };
 }

@@ -157,21 +157,23 @@ export async function transform(
           }
           return tpl;
         }, "")
-          .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) =>
-            `: var(--aleph-inline-style-expr-${id})`)
-          .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) =>
-            `/*%%aleph-inline-style-expr-${id}%%*/`);
+          .replace(
+            /\:\s*%%aleph-inline-style-expr-(\d+)%%/g,
+            (_, id) => `: var(--aleph-inline-style-expr-${id})`,
+          )
+          .replace(
+            /%%aleph-inline-style-expr-(\d+)%%/g,
+            (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`,
+          );
         if (inlineStylePreprocess !== undefined) {
           tpl = await inlineStylePreprocess("#" + key, style.type, tpl);
         }
         tpl = tpl.replace(
           /\:\s*var\(--aleph-inline-style-expr-(\d+)\)/g,
-          (_, id) =>
-            ": ${" + style.exprs[parseInt(id)] + "}",
+          (_, id) => ": ${" + style.exprs[parseInt(id)] + "}",
         ).replace(
           /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
-          (_, id) =>
-            "${" + style.exprs[parseInt(id)] + "}",
+          (_, id) => "${" + style.exprs[parseInt(id)] + "}",
         );
         jsContent = jsContent.replace(
           `"%%${key}-placeholder%%"`,
