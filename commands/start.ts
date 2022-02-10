@@ -51,9 +51,9 @@ if (import.meta.main) {
     const serverHandler: any = (globalThis as any).__ALEPH_SERVER_HANDLER;
     log.info(`Server ready on http://localhost:${port}`);
     if (certFile && keyFile) {
-      await serveTls(serverHandler, { port, hostname, certFile, keyFile });
+      await serveTls((req) => serverHandler(req, Deno.env.toObject()), { port, hostname, certFile, keyFile });
     } else {
-      await stdServe(serverHandler, { port, hostname });
+      await stdServe((req) => serverHandler(req, Deno.env.toObject()), { port, hostname });
     }
   } else {
     log.fatal("No server entry found");

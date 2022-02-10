@@ -36,7 +36,7 @@ export const serve = (options: ServerOptions) => {
 
     /* handle '/-/http_localhost_7070/framework/react/mod.ts' */
     if (pathname.startsWith("/-/")) {
-      return serveCode(pathname);
+      return serveCode(pathname, env);
     }
 
     try {
@@ -53,7 +53,7 @@ export const serve = (options: ServerOptions) => {
           builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
           searchParams.has("module")
         ) {
-          return serveCode(pathname, stat.mtime);
+          return serveCode(pathname, env, stat.mtime);
         } else {
           const file = await Deno.open(`.${pathname}`, { read: true });
           return new Response(readableStreamFromReader(file), {
@@ -132,7 +132,7 @@ export const serve = (options: ServerOptions) => {
       }
     }
 
-    if (Deno.env.get("ALEPH_ENV") !== "development") {
+    if (env.ALEPH_ENV !== "development") {
       (globalThis as any).__ALEPH_INDEX_HTML = indexHtml;
     }
 
