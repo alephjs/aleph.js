@@ -1,9 +1,17 @@
 use crate::import_map::{ImportHashMap, ImportMap};
 use path_slash::PathBufExt;
+use regex::Regex;
 use relative_path::RelativePath;
+use serde::Deserialize;
 use serde::Serialize;
 use std::{path::Path, path::PathBuf, str::FromStr};
 use url::Url;
+
+lazy_static! {
+    pub static ref RE_REACT_URL: Regex =
+        Regex::new(r"^https?://(esm\.sh|cdn\.esm\.sh)(/v\d+)?/react(\-dom)?(@[^/]+)?(/.*)?$")
+            .unwrap();
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,15 +31,42 @@ pub struct Resolver {
     pub deps: Vec<DependencyDescriptor>,
     // internal
     import_map: ImportMap,
+    versions: Versions,
+    is_dev: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct Versions {
+    #[serde(default)]
+    pub esm_sh: String,
+    #[serde(default)]
+    pub react: Option<String>,
+}
+
+impl Default for Versions {
+    fn default() -> Self {
+        Versions {
+            esm_sh: "v66".into(),
+            react: None,
+        }
+    }
 }
 
 impl Resolver {
-    pub fn new(specifier: &str, import_map: ImportHashMap) -> Self {
+    pub fn new(
+        specifier: &str,
+        import_map: ImportHashMap,
+        versions: Versions,
+        is_dev: bool,
+    ) -> Self {
         Resolver {
             specifier: specifier.into(),
             specifier_is_remote: is_remote_url(specifier),
             deps: Vec::new(),
             import_map: ImportMap::from_hashmap(import_map),
+            versions,
+            is_dev,
         }
     }
 
@@ -130,6 +165,52 @@ impl Resolver {
             }
         };
 
+        // fix react/react-dom url
+        if let Some(react_version) = &self.versions.react {
+            if RE_REACT_URL.is_match(fixed_url.as_str()) {
+                let caps = RE_REACT_URL.captures(fixed_url.as_str()).unwrap();
+                let host = caps.get(1).map_or("", |m| m.as_str());
+                let build_version = caps
+                    .get(2)
+                    .map_or("", |m| m.as_str().strip_prefix("/v").unwrap());
+                let dom = caps.get(3).map_or("", |m| m.as_str());
+                let ver = caps.get(4).map_or("", |m| m.as_str());
+                let path = caps.get(5).map_or("", |m| m.as_str());
+                let (target_build_version, should_replace_build_version) = if build_version != ""
+                    && !self.versions.esm_sh.is_empty()
+                    && !build_version.eq(self.versions.esm_sh.as_str())
+                {
+                    (self.versions.esm_sh.to_string(), true)
+                } else {
+                    ("".to_owned(), false)
+                };
+                if ver != react_version || should_replace_build_version {
+                    if should_replace_build_version {
+                        fixed_url = format!(
+                            "https://{}/v{}/react{}@{}{}",
+                            host, target_build_version, dom, react_version, path
+                        );
+                    } else if build_version != "" {
+                        fixed_url = format!(
+                            "https://{}/v{}/react{}@{}{}",
+                            host, build_version, dom, react_version, path
+                        );
+                    } else {
+                        fixed_url =
+                            format!("https://{}/react{}@{}{}", host, dom, react_version, path);
+                    }
+                }
+            }
+        }
+
+        if self.is_dev && is_esm_sh(&fixed_url) {
+            if fixed_url.contains("?") {
+                fixed_url = fixed_url + "&dev"
+            } else {
+                fixed_url = fixed_url + "?dev"
+            }
+        }
+
         if fixed_url.ends_with(".css") {
             fixed_url = fixed_url + "?module"
         }
@@ -143,6 +224,10 @@ impl Resolver {
 
         self.fix_import_url(fixed_url.as_str())
     }
+}
+
+pub fn is_esm_sh(url: &str) -> bool {
+    return url.starts_with("https://esm.sh") || url.starts_with("http://esm.sh");
 }
 
 pub fn is_remote_url(url: &str) -> bool {

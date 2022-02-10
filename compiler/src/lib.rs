@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 mod css;
 mod error;
 mod import_map;
@@ -10,7 +13,7 @@ mod swc;
 mod tests;
 
 use import_map::ImportHashMap;
-use resolver::{DependencyDescriptor, Resolver};
+use resolver::{DependencyDescriptor, Resolver, Versions};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, SWC};
@@ -27,6 +30,9 @@ pub struct Options {
 
     #[serde(default)]
     pub import_map: ImportHashMap,
+
+    #[serde(default)]
+    pub versions: Versions,
 
     #[serde(default)]
     pub jsx: String,
@@ -55,7 +61,12 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
         .into_serde()
         .map_err(|err| format!("failed to parse options: {}", err))
         .unwrap();
-    let resolver = Rc::new(RefCell::new(Resolver::new(specifier, options.import_map)));
+    let resolver = Rc::new(RefCell::new(Resolver::new(
+        specifier,
+        options.import_map,
+        options.versions,
+        options.is_dev,
+    )));
     let module = SWC::parse(specifier, code).expect("could not parse the module");
     let (code, map) = module
         .transform(

@@ -16,6 +16,8 @@ fn transform(
             imports,
             scopes: HashMap::new(),
         },
+        Default::default(),
+        false,
     )));
     let (code, _) = module.transform(resolver.clone(), options).unwrap();
     println!("{}", code);
