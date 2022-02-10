@@ -1,9 +1,11 @@
 import { bold } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { basename, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { parse } from "https://deno.land/std@0.125.0/flags/mod.ts";
-import { loadImportMap } from "./server/config.ts";
+import { readImportMap } from "./server/importmap.ts";
+import { getFlag } from "./lib/flags.ts";
 import { existsDir, findFile } from "./lib/fs.ts";
 import log from "./lib/log.ts";
+import { serveDir } from "./lib/serve.ts";
 import util from "./lib/util.ts";
 import { minDenoVersion, VERSION } from "./version.ts";
 
@@ -39,9 +41,7 @@ async function main() {
   const { _: args, ...options } = parse(Deno.args);
 
   // check deno version
-  const [major, minor, patch] = minDenoVersion.split(".").map((p) =>
-    parseInt(p)
-  );
+  const [major, minor, patch] = minDenoVersion.split(".").map((p) => parseInt(p));
   const [currentMajor, currentMinor, currentPatch] = Deno.version.deno.split(
     ".",
   ).map((p) => parseInt(p));
@@ -76,6 +76,12 @@ async function main() {
     Deno.exit(0);
   }
 
+  // set log level
+  const logLevel = getFlag(options, ["L", "log-level"], "info");
+  if (logLevel === "debug") {
+    log.setLevel("debug");
+  }
+
   const command = String(args.shift()) as keyof typeof commands;
 
   // prints command help message
@@ -102,67 +108,73 @@ async function main() {
     return;
   }
 
-  const workingDir = resolve(
-    Deno.env.get("ALEPH_DEV") ? "." : String(args[0] || "."),
-  );
-  if (!(await existsDir(workingDir))) {
-    log.fatal("No such directory:", workingDir);
-  }
-  const importMapFile = await findFile(
-    workingDir,
-    ["import_map", "import-map", "importmap", "importMap"].map((name) =>
-      `${name}.json`
-    ),
-  );
-  const configFile = await findFile(workingDir, [
-    "deno.jsonc",
-    "deno.json",
-    "tsconfig.json",
-  ]);
+  let workingDir: string;
+  let importMapFile: string | undefined;
+  let denoConfigFile: string | undefined;
   let cliVerison = VERSION;
-  if (importMapFile) {
-    const importMap = await loadImportMap(importMapFile);
-    let updateImportMaps: boolean | null = null;
-    if (command === "dev") {
-      for (const key in importMap.imports) {
-        const url = importMap.imports[key];
-        if (
-          /\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)
-        ) {
-          const [prefix, rest] = util.splitBy(url, "@");
-          const [ver, suffix] = util.splitBy(rest, "/");
-          if (ver !== "v" + VERSION && updateImportMaps === null) {
-            updateImportMaps = confirm(
-              `You are using a different version of Aleph.js, expect ${ver} -> v${
-                bold(VERSION)
-              }, update '${basename(importMapFile)}'?`,
-            );
-            if (!updateImportMaps) {
-              cliVerison = ver.slice(1);
+
+  if (Deno.env.get("ALEPH_DEV")) {
+    workingDir = Deno.cwd();
+    denoConfigFile = resolve("./deno.json");
+    importMapFile = resolve("./import_map.json");
+    Deno.env.set("ALEPH_ROOT", workingDir);
+    Deno.env.set("ALEPH_DEV_PORT", "7070");
+    serveDir(workingDir, 7070);
+    log.debug(`Proxy https://deno.land/x/aleph on http://localhost:7070`);
+  } else {
+    workingDir = resolve(String(args[0] || "."));
+    if (!(await existsDir(workingDir))) {
+      log.fatal("No such directory:", workingDir);
+    }
+    denoConfigFile = await findFile(workingDir, ["deno.jsonc", "deno.json", "tsconfig.json"]);
+    importMapFile = await findFile(
+      workingDir,
+      ["import_map", "import-map", "importmap", "importMap"].map((name) => `${name}.json`),
+    );
+    if (importMapFile) {
+      try {
+        const importMap = await readImportMap(importMapFile);
+        let updateImportMaps: boolean | null = null;
+        for (const key in importMap.imports) {
+          const url = importMap.imports[key];
+          if (
+            /\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)
+          ) {
+            const [prefix, rest] = util.splitBy(url, "@");
+            const [ver, suffix] = util.splitBy(rest, "/");
+            if (command === "dev" && ver !== "v" + VERSION && updateImportMaps === null) {
+              updateImportMaps = confirm(
+                `You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${
+                  basename(importMapFile)
+                }'?`,
+              );
+              if (!updateImportMaps) {
+                cliVerison = ver.slice(1);
+              }
+            }
+            if (updateImportMaps) {
+              importMap.imports[key] = `${prefix}@v${VERSION}/${suffix}`;
             }
           }
-          if (updateImportMaps) {
-            importMap.imports[key] = `${prefix}@v${VERSION}/${suffix}`;
-          }
+        }
+        if (updateImportMaps) {
+          await Deno.writeTextFile(
+            importMapFile,
+            JSON.stringify(importMap, undefined, 2),
+          );
+        }
+      } catch (e) {
+        log.error(`invalid '${basename(importMapFile)}':`, e.message);
+        if (!confirm("Continue?")) {
+          Deno.exit(1);
         }
       }
     }
-    if (updateImportMaps) {
-      await Deno.writeTextFile(
-        importMapFile,
-        JSON.stringify(importMap, undefined, 2),
-      );
-    }
   }
-  await runCli(command, cliVerison, importMapFile, configFile);
+  await runCli(command, cliVerison, denoConfigFile, importMapFile);
 }
 
-async function runCli(
-  command: string,
-  version: string,
-  importMap?: string,
-  configFile?: string,
-) {
+async function runCli(command: string, version: string, denoConfigFile?: string, importMapFile?: string) {
   const cmd: string[] = [
     Deno.execPath(),
     "run",
@@ -171,13 +183,13 @@ async function runCli(
     "--no-check=remote",
     "--location=http://localhost",
   ];
-  if (importMap) {
-    cmd.push("--import-map", importMap);
+  if (denoConfigFile) {
+    cmd.push("--config", denoConfigFile);
   }
-  if (configFile) {
-    cmd.push("--config", configFile);
+  if (importMapFile) {
+    cmd.push("--import-map", importMapFile);
   }
-  if (Deno.env.get("ALEPH_DEV") && version === VERSION) {
+  if (Deno.env.get("ALEPH_DEV")) {
     cmd.push(`./commands/${command}.ts`);
   } else {
     cmd.push(`https://deno.land/x/aleph@v${version}/commands/${command}.ts`);

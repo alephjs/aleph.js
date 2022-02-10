@@ -4,37 +4,7 @@ import { existsFile } from "../lib/fs.ts";
 import { Measure } from "../lib/log.ts";
 import { getDenoDir } from "../lib/cache.ts";
 import { checksum } from "./dist/checksum.js";
-import init, {
-  parseExportNamesSync,
-  stripSsrCodeSync,
-  transformSync,
-} from "./dist/compiler.js";
-
-export enum SourceType {
-  JS = "js",
-  JSX = "jsx",
-  TS = "ts",
-  TSX = "tsx",
-  CSS = "css",
-  Unknown = "??",
-}
-
-export type ModuleSource = {
-  code: string;
-  type: SourceType;
-  map?: string;
-};
-
-export type SWCOptions = {
-  sourceType?: SourceType;
-  jsxFactory?: string;
-  jsxFragmentFactory?: string;
-};
-
-export type ReactOptions = {
-  version: string;
-  esmShBuildVersion: number;
-};
+import init, { transformSync } from "./dist/compiler.js";
 
 export type ImportMap = {
   imports: Record<string, string>;
@@ -43,29 +13,15 @@ export type ImportMap = {
 
 export type TransformOptions = {
   alephPkgUri?: string;
-  workingDir?: string;
   importMap?: ImportMap;
-  swcOptions?: SWCOptions;
-  react?: ReactOptions;
-  sourceMap?: boolean;
   isDev?: boolean;
-  httpExternal?: boolean;
-  bundleMode?: boolean;
-  bundleExternals?: string[];
-  inlineStylePreprocess?(
-    key: string,
-    type: string,
-    tpl: string,
-  ): Promise<string>;
+  jsx?: string;
+  jsx_import_source?: string;
 };
 
 export type TransformResult = {
   code: string;
   deps?: RawDependencyDescriptor[];
-  ssrPropsFn?: string;
-  ssgPathsFn?: boolean;
-  denoHooks?: string[];
-  starExports?: string[];
   jsxStaticClassNames?: string[];
   map?: string;
 };
@@ -75,14 +31,6 @@ type RawDependencyDescriptor = {
   resolved: string;
   isDynamic: boolean;
 };
-
-type InlineStyle = {
-  type: string;
-  quasis: string[];
-  exprs: string[];
-};
-
-type InlineStyles = Record<string, InlineStyle>;
 
 let wasmReady: Promise<void> | boolean = false;
 
@@ -139,71 +87,11 @@ export async function transform(
 ): Promise<TransformResult> {
   await checkWasmReady();
 
-  const { inlineStylePreprocess, ...transformOptions } = options;
-  let { code: jsContent, inlineStyles, ...rest } = transformSync(
+  return transformSync(
     specifier,
     code,
-    transformOptions,
+    options,
   );
-
-  // resolve inline-style
-  if (inlineStyles) {
-    await Promise.all(
-      Object.entries(inlineStyles as InlineStyles).map(async ([key, style]) => {
-        let tpl = style.quasis.reduce((tpl, quais, i, a) => {
-          tpl += quais;
-          if (i < a.length - 1) {
-            tpl += `%%aleph-inline-style-expr-${i}%%`;
-          }
-          return tpl;
-        }, "")
-          .replace(
-            /\:\s*%%aleph-inline-style-expr-(\d+)%%/g,
-            (_, id) => `: var(--aleph-inline-style-expr-${id})`,
-          )
-          .replace(
-            /%%aleph-inline-style-expr-(\d+)%%/g,
-            (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`,
-          );
-        if (inlineStylePreprocess !== undefined) {
-          tpl = await inlineStylePreprocess("#" + key, style.type, tpl);
-        }
-        tpl = tpl.replace(
-          /\:\s*var\(--aleph-inline-style-expr-(\d+)\)/g,
-          (_, id) => ": ${" + style.exprs[parseInt(id)] + "}",
-        ).replace(
-          /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
-          (_, id) => "${" + style.exprs[parseInt(id)] + "}",
-        );
-        jsContent = jsContent.replace(
-          `"%%${key}-placeholder%%"`,
-          "`" + tpl + "`",
-        );
-      }),
-    );
-  }
-
-  return { code: jsContent, ...rest };
-}
-
-/* strip SSR code. */
-export async function stripSsrCode(
-  specifier: string,
-  code: string,
-  options: TransformOptions = {},
-): Promise<TransformResult> {
-  await checkWasmReady();
-  return stripSsrCodeSync(specifier, code, options);
-}
-
-/* parse export names of the module. */
-export async function parseExportNames(
-  specifier: string,
-  code: string,
-  options: SWCOptions = {},
-): Promise<string[]> {
-  await checkWasmReady();
-  return parseExportNamesSync(specifier, code, options);
 }
 
 /**

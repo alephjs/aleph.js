@@ -66,8 +66,7 @@ if (!("description" in Symbol.prototype)) {
 if (!("flat" in Array.prototype)) {
   Array.prototype.flat = function flat(d, c) {
     return (
-      (c = this.concat.apply([], this)),
-        d > 1 && c.some(Array.isArray) ? c.flat(d - 1) : c
+      (c = this.concat.apply([], this)), d > 1 && c.some(Array.isArray) ? c.flat(d - 1) : c
     );
   };
   Array.prototype.flatMap = function flatMap(c, a) {

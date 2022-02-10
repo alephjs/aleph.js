@@ -6,8 +6,7 @@ async function fetchData(
 ): Promise<void | Response | { data: object; cacheTtl?: number }> {
   const url = new URL(req.url);
   const pathname = util.cleanPath(url.pathname);
-  const dataRoutes: [URLPattern, Record<string, any>][] =
-    (self as any).__ALEPH_DATA_ROUTES;
+  const dataRoutes: [URLPattern, Record<string, any>][] = (self as any).__ALEPH_DATA_ROUTES;
   if (util.isArray(dataRoutes)) {
     for (const [pattern, config] of dataRoutes) {
       const ret = pattern.exec({ pathname });

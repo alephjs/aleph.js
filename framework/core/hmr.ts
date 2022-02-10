@@ -77,9 +77,7 @@ export function connect(basePath: string) {
 
   ws.addEventListener("open", () => {
     state.socket = ws;
-    state.messageQueue.splice(0, state.messageQueue.length).forEach((msg) =>
-      ws.send(msg)
-    );
+    state.messageQueue.splice(0, state.messageQueue.length).forEach((msg) => ws.send(msg));
     console.log("[HMR] listening for file changes...");
   });
 

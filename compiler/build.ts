@@ -1,9 +1,8 @@
 import { dim } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { encode } from "https://deno.land/std@0.125.0/encoding/base64.ts";
-import { exists } from "https://deno.land/std@0.125.0/fs/exists.ts";
 import { ensureDir } from "https://deno.land/std@0.125.0/fs/ensure_dir.ts";
-import { createHash } from "https://deno.land/std@0.125.0/hash/mod.ts";
 import { compress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";
+import { computeHash } from "../lib/crypto.ts";
 
 async function run(cmd: string[]) {
   const p = Deno.run({
@@ -21,11 +20,11 @@ if (import.meta.main) {
   if (ok) {
     const wasmData = await Deno.readFile("./pkg/aleph_compiler_bg.wasm");
     const jsCode = await Deno.readTextFile("./pkg/aleph_compiler.js");
-    const hash = createHash("sha1").update(wasmData).toString();
+    const hash = await computeHash("sha-1", wasmData);
     let prevWasmSize = 0;
-    if (await exists("./dist/checksum.js")) {
+    try {
       prevWasmSize = (await Deno.stat("./dist/wasm.js")).size;
-    }
+    } catch (e) {}
     await ensureDir("./dist");
     await Deno.writeTextFile(
       "./dist/wasm.js",
@@ -42,19 +41,22 @@ if (import.meta.main) {
     );
     await Deno.writeTextFile(
       "./dist/compiler.js",
-      `import { red } from 'https://deno.land/std@0.125.0/fmt/colors.ts';` +
-        jsCode.replace(
-          "console.error(getStringFromWasm0(arg0, arg1));",
-          `
-        const msg = getStringFromWasm0(arg0, arg1);
-        if (msg.includes('DiagnosticBuffer(["')) {
-          const diagnostic = msg.split('DiagnosticBuffer(["')[1].split('"])')[0]
-          console.error(red("ERROR"), "swc:", diagnostic)
-        } else {
-          console.error(red("ERROR"), msg)
-        }
-      `,
-        ),
+      "import { red } from 'https://deno.land/std@0.125.0/fmt/colors.ts';" +
+        jsCode
+          .replace(`import * as __wbg_star0 from 'env';`, "")
+          .replace(`imports['env'] = __wbg_star0;`, `imports['env'] = { now: () => Date.now() };`)
+          .replace(
+            "console.error(getStringFromWasm0(arg0, arg1));",
+            `
+              const msg = getStringFromWasm0(arg0, arg1);
+              if (msg.includes('DiagnosticBuffer(["')) {
+                const diagnostic = msg.split('DiagnosticBuffer(["')[1].split('"])')[0]
+                console.error(red("ERROR"), "swc:", diagnostic)
+              } else {
+                console.error(red("ERROR"), msg)
+              }
+            `,
+          ),
     );
     await run(["deno", "fmt", "-q", "./dist/compiler.js"]);
     const wasmSize = (await Deno.stat("./dist/wasm.js")).size;
@@ -62,9 +64,8 @@ if (import.meta.main) {
     if (increased) {
       console.log(
         `${dim("[INFO]")}: wasm.js ${increased.toFixed(2)}% (${
-          [prevWasmSize, wasmSize].filter(Boolean).map((n) =>
-            (n / (1024 * 1024)).toFixed(2) + "MB"
-          ).join(" -> ")
+          [prevWasmSize, wasmSize].filter(Boolean).map((n) => (n / (1024 * 1024)).toFixed(2) + "MB")
+            .join(" -> ")
         })`,
       );
     }

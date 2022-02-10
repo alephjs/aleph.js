@@ -3,7 +3,7 @@ const mimeTypes: Record<string, string[]> = {
   // application
   "application/javascript": ["js", "mjs", "cjs"],
   "application/wasm": ["wasm"],
-  "application/json": ["json", "map"],
+  "application/json": ["json", "jsonc", "map"],
   "application/json5": ["json5"],
   "application/pdf": ["pdf"],
   "application/xml": ["xml", "xsl"],

@@ -1,5 +1,5 @@
-import type { FC } from "react";
-import { createElement, useContext, useEffect, useMemo, useState } from "react";
+import type { FC } from "https://esm.sh/react@17.0.2";
+import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
 import MainContext from "./context.ts";
 import util from "../../lib/util.ts";
 
@@ -8,9 +8,7 @@ export type RouterProps = {
 };
 
 export const Router: FC<RouterProps> = ({ ssr }) => {
-  const [url, setUrl] = useState<URL>(() =>
-    ssr?.url || new URL(self.location?.href || "http://localhost/")
-  );
+  const [url, setUrl] = useState<URL>(() => ssr?.url || new URL(self.location?.href || "http://localhost/"));
   const page = useMemo<{ Component: FC<any>; params: Record<string, string> }>(
     () => {
       const pathname = util.cleanPath(url.pathname);
@@ -28,15 +26,11 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
     [url],
   );
   const pageUrl = useMemo(() => {
-    return Object.keys(page.params).length > 0
-      ? util.appendUrlParams(url, page.params)
-      : url;
+    return Object.keys(page.params).length > 0 ? util.appendUrlParams(url, page.params) : url;
   }, [url, page]);
   const dataCache = useMemo<any>(() => {
     const cache = new Map();
-    const [data, expires] = ssr
-      ? [ssr.data, ssr.dataExpires]
-      : loadSSRDataFromTag();
+    const [data, expires] = ssr ? [ssr.data, ssr.dataExpires] : loadSSRDataFromTag();
     cache.set(pageUrl.pathname + pageUrl.search, { data, expires });
     return cache;
   }, []);

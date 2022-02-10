@@ -11,5 +11,10 @@
       "./types.d.ts"
     ],
     "jsx": "react"
+  },
+  "fmt": {
+    "options": {
+      "lineWidth": 120
+    }
   }
 }

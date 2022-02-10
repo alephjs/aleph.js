@@ -1,17 +1,14 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
-import { content } from "./response.ts";
-import { getContentType } from "./mime.ts";
+import { content, json } from "./response.ts";
 import ssr from "./ssr.ts";
-import util from "../lib/util.ts";
+import { getContentType } from "../lib/mime.ts";
+import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
-
-let indexHtml: string | null | undefined = undefined;
+import util from "../lib/util.ts";
+import { serveCode } from "./transformer.ts";
 
 export type ServerOptions = {
-  fetch?: (
-    request: Request,
-    context: Context,
-  ) => Promise<Response | void> | Response | void;
+  fetch?: (request: Request, context: Context) => Promise<Response | void> | Response | void;
   ssr?: (e: SSREvent) => string;
 };
 
@@ -37,10 +34,8 @@ export const serve = (options: ServerOptions) => {
     const url = new URL(req.url);
     const { pathname } = url;
 
-    // request assets
-    const path = `./public/${pathname}`;
     try {
-      const stat = await Deno.lstat(path);
+      const stat = await Deno.lstat(`.${pathname}`);
       if (stat.isFile && stat.mtime) {
         const ifModifiedSince = req.headers.get("If-Modified-Since");
         if (ifModifiedSince) {
@@ -49,13 +44,17 @@ export const serve = (options: ServerOptions) => {
             return new Response(null, { status: 304 });
           }
         }
-        const file = await Deno.open(path, { read: true });
-        return new Response(readableStreamFromReader(file), {
-          headers: {
-            "Content-Type": getContentType(pathname),
-            "Last-Modified": stat.mtime.toUTCString(),
-          },
-        });
+        if (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`))) {
+          return serveCode(pathname, stat.mtime);
+        } else {
+          const file = await Deno.open(`.${pathname}`, { read: true });
+          return new Response(readableStreamFromReader(file), {
+            headers: {
+              "Content-Type": getContentType(pathname),
+              "Last-Modified": stat.mtime.toUTCString(),
+            },
+          });
+        }
       }
     } catch (err) {
       if (!(err instanceof Deno.errors.NotFound)) {
@@ -79,20 +78,13 @@ export const serve = (options: ServerOptions) => {
     }
 
     // request page data
-    const dataRoutes: [URLPattern, Record<string, any>, boolean][] =
-      (self as any).__ALEPH_DATA_ROUTES;
+    const dataRoutes: [URLPattern, Record<string, any>, boolean][] = (self as any).__ALEPH_DATA_ROUTES;
     if (util.isArray(dataRoutes)) {
       for (const [pattern, config, hasCompoment] of dataRoutes) {
         const ret = pattern.exec({ pathname });
         if (ret) {
-          if (
-            req.method !== "GET" || req.headers.has("X-Fetch-Data") ||
-            !hasCompoment
-          ) {
-            const request = new Request(
-              util.appendUrlParams(url, ret.pathname.groups).toString(),
-              req,
-            );
+          if (req.method !== "GET" || req.headers.has("X-Fetch-Data") || !hasCompoment) {
+            const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
             const fetcher = config[req.method.toLowerCase()];
             if (util.isFunction(fetcher)) {
               const allFetcher = config.all;
@@ -113,6 +105,7 @@ export const serve = (options: ServerOptions) => {
       }
     }
 
+    let indexHtml: string | null | undefined = (globalThis as any).__ALEPH_INDEX_HTML;
     if (indexHtml === undefined) {
       try {
         indexHtml = await Deno.readTextFile("./index.html");
@@ -131,13 +124,20 @@ export const serve = (options: ServerOptions) => {
       }
     }
 
+    if (Deno.env.get("ALEPH_ENV") !== "development") {
+      (globalThis as any).__ALEPH_INDEX_HTML = indexHtml;
+    }
+
     if (indexHtml === null) {
       return new Response("Not Found", { status: 404 });
     }
+
     // request ssr
     if (util.isFunction(options.ssr)) {
       return ssr.fetch(req, ctx, { handler: options.ssr, htmlTpl: indexHtml });
     }
+
+    // fallback to the index html
     return content(indexHtml, "text/html; charset=utf-8");
   };
 
@@ -150,3 +150,5 @@ export const serve = (options: ServerOptions) => {
     Object.assign(globalThis, { __ALEPH_SERVER_HANDLER: handler });
   }
 };
+
+export { content, json };

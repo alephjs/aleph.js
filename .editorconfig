@@ -2,7 +2,7 @@
 
 root = true
 
-[*.{ts,tsx}]
+[*.{ts,tsx,rust}]
 end_of_line = lf
 insert_final_newline = true
 indent_style = space

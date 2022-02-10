@@ -1,8 +1,5 @@
 import { resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
-import {
-  serve as stdServe,
-  serveTls,
-} from "https://deno.land/std@0.125.0/http/server.ts";
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
@@ -43,7 +40,6 @@ if (import.meta.main) {
   } else if (certFile !== undefined && keyFile === undefined) {
     log.fatal("missing `--tls-key` option");
   }
-  Object.assign(globalThis, { IS_DEV: true });
   const serverEntry = await findFile(Deno.cwd(), [
     "server.tsx",
     "server.jsx",
@@ -51,6 +47,7 @@ if (import.meta.main) {
     "server.js",
   ]);
   if (serverEntry) {
+    Deno.env.set("ALEPH_ENV", "development");
     await import(serverEntry);
     const serverHandler: any = (globalThis as any).__ALEPH_SERVER_HANDLER;
     log.info(`Server ready on http://localhost:${port}`);

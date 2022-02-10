@@ -1,7 +1,7 @@
 import { assertEquals } from "std/testing/asserts.ts";
 import { computeHash } from "../lib/crypto.ts";
 
-Deno.test("shared/crypto: computeHash", async () => {
+Deno.test("lib/crypto: computeHash", async () => {
   assertEquals(
     await computeHash("sha-1", "hello world!"),
     "430ce34d020724ed75a196dfc2ad67c77772d169",

@@ -1,4 +1,4 @@
-import type { FC, ReactNode } from "react";
+import type { FC, ReactNode } from "https://esm.sh/react@17.0.2";
 import {
   Children,
   createElement,
@@ -7,7 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
-} from "react";
+} from "https://esm.sh/react@17.0.2";
 import util from "../../lib/util.ts";
 import MainContext from "./context.ts";
 
@@ -27,9 +27,8 @@ export const Head: FC = (props) => {
           ssrHeadCollection.push(`<title ssr>${children.join("")}</title>`);
         }
       } else {
-        const attrs = Object.entries(rest).map(([key, value]) =>
-          ` ${key}=${JSON.stringify(value)}`
-        ).join("");
+        const attrs = Object.entries(rest).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`)
+          .join("");
         if (util.isFilledString(children)) {
           ssrHeadCollection.push(`<${type}${attrs} ssr>${children}</${type}>`);
         } else if (util.isFilledArray(children)) {

@@ -1,4 +1,5 @@
 import { red } from "https://deno.land/std@0.125.0/fmt/colors.ts";
+
 let wasm;
 
 const heap = new Array(32).fill(undefined);
@@ -13,10 +14,7 @@ let WASM_VECTOR_LEN = 0;
 
 let cachegetUint8Memory0 = null;
 function getUint8Memory0() {
-  if (
-    cachegetUint8Memory0 === null ||
-    cachegetUint8Memory0.buffer !== wasm.memory.buffer
-  ) {
+  if (cachegetUint8Memory0 === null || cachegetUint8Memory0.buffer !== wasm.memory.buffer) {
     cachegetUint8Memory0 = new Uint8Array(wasm.memory.buffer);
   }
   return cachegetUint8Memory0;
@@ -24,19 +22,18 @@ function getUint8Memory0() {
 
 let cachedTextEncoder = new TextEncoder("utf-8");
 
-const encodeString =
-  (typeof cachedTextEncoder.encodeInto === "function"
-    ? function (arg, view) {
-      return cachedTextEncoder.encodeInto(arg, view);
-    }
-    : function (arg, view) {
-      const buf = cachedTextEncoder.encode(arg);
-      view.set(buf);
-      return {
-        read: arg.length,
-        written: buf.length,
-      };
-    });
+const encodeString = (typeof cachedTextEncoder.encodeInto === "function"
+  ? function (arg, view) {
+    return cachedTextEncoder.encodeInto(arg, view);
+  }
+  : function (arg, view) {
+    const buf = cachedTextEncoder.encode(arg);
+    view.set(buf);
+    return {
+      read: arg.length,
+      written: buf.length,
+    };
+  });
 
 function passStringToWasm0(arg, malloc, realloc) {
   if (realloc === undefined) {
@@ -77,10 +74,7 @@ function passStringToWasm0(arg, malloc, realloc) {
 
 let cachegetInt32Memory0 = null;
 function getInt32Memory0() {
-  if (
-    cachegetInt32Memory0 === null ||
-    cachegetInt32Memory0.buffer !== wasm.memory.buffer
-  ) {
+  if (cachegetInt32Memory0 === null || cachegetInt32Memory0.buffer !== wasm.memory.buffer) {
     cachegetInt32Memory0 = new Int32Array(wasm.memory.buffer);
   }
   return cachegetInt32Memory0;
@@ -100,10 +94,7 @@ function takeObject(idx) {
   return ret;
 }
 
-let cachedTextDecoder = new TextDecoder("utf-8", {
-  ignoreBOM: true,
-  fatal: true,
-});
+let cachedTextDecoder = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
 
 cachedTextDecoder.decode();
 
@@ -123,78 +114,26 @@ function addHeapObject(obj) {
  * @param {string} specifier
  * @param {string} code
  * @param {any} options
- * @returns {any} */
-export function parseExportNamesSync(specifier, code, options) {
-  var ptr0 = passStringToWasm0(
-    specifier,
-    wasm.__wbindgen_malloc,
-    wasm.__wbindgen_realloc,
-  );
-  var len0 = WASM_VECTOR_LEN;
-  var ptr1 = passStringToWasm0(
-    code,
-    wasm.__wbindgen_malloc,
-    wasm.__wbindgen_realloc,
-  );
-  var len1 = WASM_VECTOR_LEN;
-  var ret = wasm.parseExportNamesSync(
-    ptr0,
-    len0,
-    ptr1,
-    len1,
-    addHeapObject(options),
-  );
-  return takeObject(ret);
-}
-
-/**
- * @param {string} specifier
- * @param {string} code
- * @param {any} options
- * @returns {any} */
-export function stripSsrCodeSync(specifier, code, options) {
-  var ptr0 = passStringToWasm0(
-    specifier,
-    wasm.__wbindgen_malloc,
-    wasm.__wbindgen_realloc,
-  );
-  var len0 = WASM_VECTOR_LEN;
-  var ptr1 = passStringToWasm0(
-    code,
-    wasm.__wbindgen_malloc,
-    wasm.__wbindgen_realloc,
-  );
-  var len1 = WASM_VECTOR_LEN;
-  var ret = wasm.stripSsrCodeSync(
-    ptr0,
-    len0,
-    ptr1,
-    len1,
-    addHeapObject(options),
-  );
-  return takeObject(ret);
-}
-
-/**
- * @param {string} specifier
- * @param {string} code
- * @param {any} options
- * @returns {any} */
+ * @returns {any}
+ */
 export function transformSync(specifier, code, options) {
-  var ptr0 = passStringToWasm0(
-    specifier,
-    wasm.__wbindgen_malloc,
-    wasm.__wbindgen_realloc,
-  );
-  var len0 = WASM_VECTOR_LEN;
-  var ptr1 = passStringToWasm0(
-    code,
-    wasm.__wbindgen_malloc,
-    wasm.__wbindgen_realloc,
-  );
-  var len1 = WASM_VECTOR_LEN;
-  var ret = wasm.transformSync(ptr0, len0, ptr1, len1, addHeapObject(options));
-  return takeObject(ret);
+  try {
+    const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+    var ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len0 = WASM_VECTOR_LEN;
+    var ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len1 = WASM_VECTOR_LEN;
+    wasm.transformSync(retptr, ptr0, len0, ptr1, len1, addHeapObject(options));
+    var r0 = getInt32Memory0()[retptr / 4 + 0];
+    var r1 = getInt32Memory0()[retptr / 4 + 1];
+    var r2 = getInt32Memory0()[retptr / 4 + 2];
+    if (r2) {
+      throw takeObject(r1);
+    }
+    return takeObject(r0);
+  } finally {
+    wasm.__wbindgen_add_to_stack_pointer(16);
+  }
 }
 
 async function load(module, imports) {
@@ -236,11 +175,7 @@ async function init(input) {
   imports.wbg.__wbindgen_json_serialize = function (arg0, arg1) {
     const obj = getObject(arg1);
     var ret = JSON.stringify(obj === undefined ? null : obj);
-    var ptr0 = passStringToWasm0(
-      ret,
-      wasm.__wbindgen_malloc,
-      wasm.__wbindgen_realloc,
-    );
+    var ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len0 = WASM_VECTOR_LEN;
     getInt32Memory0()[arg0 / 4 + 1] = len0;
     getInt32Memory0()[arg0 / 4 + 0] = ptr0;
@@ -252,22 +187,18 @@ async function init(input) {
     var ret = JSON.parse(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
   };
-  imports.wbg.__wbg_new_59cb74e423758ede = function () {
+  imports.wbg.__wbg_new_693216e109162396 = function () {
     var ret = new Error();
     return addHeapObject(ret);
   };
-  imports.wbg.__wbg_stack_558ba5917b466edd = function (arg0, arg1) {
+  imports.wbg.__wbg_stack_0ddaca5d1abfb52f = function (arg0, arg1) {
     var ret = getObject(arg1).stack;
-    var ptr0 = passStringToWasm0(
-      ret,
-      wasm.__wbindgen_malloc,
-      wasm.__wbindgen_realloc,
-    );
+    var ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len0 = WASM_VECTOR_LEN;
     getInt32Memory0()[arg0 / 4 + 1] = len0;
     getInt32Memory0()[arg0 / 4 + 0] = ptr0;
   };
-  imports.wbg.__wbg_error_4bb6c2a97407129a = function (arg0, arg1) {
+  imports.wbg.__wbg_error_09919627ac0992f5 = function (arg0, arg1) {
     try {
       const msg = getStringFromWasm0(arg0, arg1);
       if (msg.includes('DiagnosticBuffer(["')) {
@@ -280,10 +211,10 @@ async function init(input) {
       wasm.__wbindgen_free(arg0, arg1);
     }
   };
+  imports["env"] = { now: () => Date.now() };
 
   if (
-    typeof input === "string" ||
-    (typeof Request === "function" && input instanceof Request) ||
+    typeof input === "string" || (typeof Request === "function" && input instanceof Request) ||
     (typeof URL === "function" && input instanceof URL)
   ) {
     input = fetch(input);

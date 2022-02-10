@@ -44,6 +44,7 @@ impl SourceType {
     match path.extension() {
       None => SourceType::Unknown,
       Some(os_str) => match os_str.to_str() {
+        Some("mts") => SourceType::TS,
         Some("ts") => SourceType::TS,
         Some("tsx") => SourceType::TSX,
         Some("mjs") => SourceType::JS,
@@ -61,6 +62,7 @@ mod tests {
 
   #[test]
   fn map_file_extension() {
+    assert_eq!(SourceType::from(Path::new("/foo/bar.mts")), SourceType::TS);
     assert_eq!(SourceType::from(Path::new("/foo/bar.ts")), SourceType::TS);
     assert_eq!(SourceType::from(Path::new("/foo/bar.tsx")), SourceType::TSX);
     assert_eq!(SourceType::from(Path::new("/foo/bar.js")), SourceType::JS);

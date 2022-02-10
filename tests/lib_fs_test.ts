@@ -1,13 +1,8 @@
 import { assert, assertEquals, assertNotEquals } from "std/testing/asserts.ts";
 import { SEP } from "std/path/separator.ts";
-import {
-  ensureTextFile,
-  existsDir,
-  existsFile,
-  lazyRemove,
-} from "../lib/fs.ts";
+import { ensureTextFile, existsDir, existsFile, lazyRemove } from "../lib/fs.ts";
 
-Deno.test(`fs: existsDir`, async () => {
+Deno.test(`lib/fs: existsDir`, async () => {
   // true test cases
   const dir = await Deno.makeTempDir();
   assert(await existsDir(dir));
@@ -18,7 +13,7 @@ Deno.test(`fs: existsDir`, async () => {
   assertEquals(await existsDir(`${dir}${SEP}foo${SEP}bar`), false);
 });
 
-Deno.test(`fs: existsFile`, async () => {
+Deno.test(`lib/fs: existsFile`, async () => {
   // true test cases
   const file = await Deno.makeTempFile();
   assert(await existsFile(file));
@@ -28,7 +23,7 @@ Deno.test(`fs: existsFile`, async () => {
   assert(!await existsFile(`${dir}${SEP}foo${SEP}bar`));
 });
 
-Deno.test("fs: ensureTextFile", async () => {
+Deno.test("lib/fs: ensureTextFile", async () => {
   // true test case
   const dirPath = await Deno.makeTempDir();
   const textFilePath = `${dirPath}${SEP}test.txt`;
@@ -49,7 +44,7 @@ Deno.test("fs: ensureTextFile", async () => {
   }
 });
 
-Deno.test("fs: lazyRemove", async () => {
+Deno.test("lib/fs: lazyRemove", async () => {
   // true test case
   const filePath = await Deno.makeTempFile();
   await lazyRemove(filePath);

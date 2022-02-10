@@ -111,9 +111,7 @@ export const useData = <T = any>(
         if (res.ok) {
           const data = await res.json();
           const cc = res.headers.get("cache-control");
-          const expires = cc && cc.includes("max-age")
-            ? Date.now() + parseInt(cc.split("=")[1]) * 1000
-            : undefined;
+          const expires = cc && cc.includes("max-age") ? Date.now() + parseInt(cc.split("=")[1]) * 1000 : undefined;
           dataCache.set(path, { data, expires });
           setDataStore({ data });
         }

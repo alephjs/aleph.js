@@ -1,13 +1,7 @@
 import { Untar } from "https://deno.land/std@0.125.0/archive/tar.ts";
 import { Buffer } from "https://deno.land/std@0.125.0/io/buffer.ts";
 import { readAll } from "https://deno.land/std@0.125.0/streams/conversion.ts";
-import {
-  blue,
-  cyan,
-  dim,
-  green,
-  red,
-} from "https://deno.land/std@0.125.0/fmt/colors.ts";
+import { blue, cyan, dim, green, red } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { ensureDir } from "https://deno.land/std@0.125.0/fs/ensure_dir.ts";
 import { join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
@@ -97,12 +91,10 @@ export default async function (
       "std/": "https://deno.land/std@0.125.0/",
       "aleph/": `https://deno.land/x/aleph@v${VERSION}/`,
       "aleph/server": `https://deno.land/x/aleph@v${VERSION}/server/mod.ts`,
-      "aleph/react":
-        `https://deno.land/x/aleph@v${VERSION}/framework/react/mod.ts`,
+      "aleph/react": `https://deno.land/x/aleph@v${VERSION}/framework/react/mod.ts`,
       "react": `https://esm.sh/react@${defaultReactVersion}`,
       "react-dom": `https://esm.sh/react-dom@${defaultReactVersion}`,
-      "react-dom/server":
-        `https://esm.sh/react-dom@${defaultReactVersion}/server`,
+      "react-dom/server": `https://esm.sh/react-dom@${defaultReactVersion}/server`,
     },
   };
   const denoConfig = {
@@ -220,12 +212,8 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
       [
         `The directory ${green(name)} contains files that could conflict:`,
         "",
-        ...conflicts.filter((name) => name.endsWith("/")).sort().map((name) =>
-          dim("- ") + name
-        ),
-        ...conflicts.filter((name) => !name.endsWith("/")).sort().map((name) =>
-          dim("- ") + name
-        ),
+        ...conflicts.filter((name) => name.endsWith("/")).sort().map((name) => dim("- ") + name),
+        ...conflicts.filter((name) => !name.endsWith("/")).sort().map((name) => dim("- ") + name),
         "",
       ].join("\n"),
     );

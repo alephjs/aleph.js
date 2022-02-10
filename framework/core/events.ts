@@ -182,9 +182,7 @@ export class EventEmitter {
     }
     const eventListeners = target._events.get(eventName) as GenericFunction[];
 
-    return unwrap
-      ? this.unwrapListeners(eventListeners)
-      : eventListeners.slice(0);
+    return unwrap ? this.unwrapListeners(eventListeners) : eventListeners.slice(0);
   }
 
   private unwrapListeners(arr: GenericFunction[]): GenericFunction[] {

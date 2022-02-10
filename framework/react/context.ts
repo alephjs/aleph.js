@@ -1,5 +1,5 @@
-import type { Dispatch, SetStateAction } from "react";
-import { createContext } from "react";
+import type { Dispatch, SetStateAction } from "https://esm.sh/react@17.0.2";
+import { createContext } from "https://esm.sh/react@17.0.2";
 
 export type ContextProps = {
   url: URL;

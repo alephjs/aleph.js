@@ -1,14 +1,9 @@
-import {
-  Component,
-  createElement,
-  CSSProperties,
-} from "https://esm.sh/react@17.0.2";
+import { Component, createElement, CSSProperties } from "https://esm.sh/react@17.0.2";
 
 const inDeno = typeof Deno !== "undefined" &&
   typeof Deno.version?.deno === "string";
 
-export class ErrorBoundary
-  extends Component<{}, { error: Error | Promise<any> | null }> {
+export class ErrorBoundary extends Component<{}, { error: Error | Promise<any> | null }> {
   constructor(props: {}) {
     super(props);
     this.state = { error: null };
@@ -20,9 +15,7 @@ export class ErrorBoundary
   componentDidCatch(error: any, info: any) {
     this.setState({ error });
     if (error instanceof Promise) {
-      error.then(() => this.setState({ error: null })).catch((error) =>
-        this.setState({ error })
-      );
+      error.then(() => this.setState({ error: null })).catch((error) => this.setState({ error }));
       return;
     }
     const event = new CustomEvent("componentDidCatch", {

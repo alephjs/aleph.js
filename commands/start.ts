@@ -1,8 +1,5 @@
 import { resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
-import {
-  serve as stdServe,
-  serveTls,
-} from "https://deno.land/std@0.125.0/http/server.ts";
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";

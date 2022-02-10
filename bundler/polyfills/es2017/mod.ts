@@ -82,9 +82,7 @@ if (!Object.getOwnPropertyDescriptors) {
       obj,
       "__proto__",
     );
-    const descriptors = protoPropDescriptor
-      ? { ["__proto__"]: protoPropDescriptor }
-      : {};
+    const descriptors = protoPropDescriptor ? { ["__proto__"]: protoPropDescriptor } : {};
 
     for (const name of Object.getOwnPropertyNames(obj)) {
       descriptors[name] = Object.getOwnPropertyDescriptor(obj, name);
