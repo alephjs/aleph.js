@@ -7,20 +7,19 @@ import { resolveImportMap } from "./importmap.ts";
 
 export const serveCode = async (pathname: string, env: Record<string, string>, mtime?: Date) => {
   const rawCode = await readCode(pathname);
+  const isDev = env.ALEPH_ENV === "development";
   let js: string;
   if (pathname.endsWith(".css")) {
-    const css = await bundleCSS(pathname, rawCode, env.ALEPH_ENV !== "development", false);
-    js = [
-      `import { applyCSS } from "${toLocalPath(getAlephPkgUri())}framework/core/style.ts"`,
-      `export const css = ${JSON.stringify(css)}`,
-      `export default ${JSON.stringify({})}`, // todo: moudles
-      `applyCSS(${JSON.stringify(pathname)}, { css })`,
-    ].join("\n");
+    js = await bundleCSS(pathname, rawCode, {
+      minify: !isDev,
+      cssModules: false,
+      toJs: true,
+    });
   } else {
     const importMap = await resolveImportMap();
     const ret = await transform(pathname, rawCode, {
-      isDev: env.ALEPH_ENV === "development",
       alephPkgUri: getAlephPkgUri(),
+      isDev,
       importMap,
     });
     js = ret.code;
@@ -35,17 +34,19 @@ export const serveCode = async (pathname: string, env: Record<string, string>, m
 async function bundleCSS(
   pathname: string,
   rawCode: string,
-  minify: boolean,
-  cssModules: boolean,
+  options: {
+    minify?: boolean;
+    cssModules?: boolean;
+    toJs?: boolean;
+  },
   tracing = new Set<string>(),
 ): Promise<string> {
+  const eof = options.minify ? "" : "\n";
   let { code: css, dependencies } = await transformCSS(pathname, rawCode, {
-    cssModules,
-    minify,
+    ...options,
     analyzeDependencies: true,
   });
   if (dependencies && dependencies.length > 0) {
-    const sp = minify ? "" : "\n";
     const csses = await Promise.all(
       dependencies.filter((dep) => dep.type === "import").map(async (dep) => {
         const p = join(dirname(pathname), dep.url);
@@ -53,10 +54,18 @@ async function bundleCSS(
           return "";
         }
         tracing.add(p);
-        return await bundleCSS(p, await readCode(p), minify, false, tracing);
+        return await bundleCSS(p, await readCode(p), { minify: options.minify }, tracing);
       }),
     );
-    return csses.join(sp) + sp + css;
+    css = csses.join(eof) + eof + css;
+  }
+  if (options.toJs) {
+    return [
+      `import { applyCSS } from "${toLocalPath(getAlephPkgUri())}framework/core/style.ts";`,
+      `export const css = ${JSON.stringify(css)};`,
+      `export default ${JSON.stringify({})};`, // todo: moudles
+      `applyCSS(${JSON.stringify(pathname)}, { css });`,
+    ].join(eof);
   }
   return css;
 }

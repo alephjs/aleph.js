@@ -1,4 +1,11 @@
+import { concat } from "https://deno.land/std@0.125.0/bytes/mod.ts";
+import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
+import init, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
+import wasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import util from "../lib/util.ts";
+import { encoder } from "../lib/crypto.ts";
+
+let lolHtmlReady = false;
 
 async function fetchData(
   req: Request,
@@ -70,33 +77,51 @@ export default {
     } else {
       headers.append("Cache-Control", "public, max-age=0, must-revalidate");
     }
-    const htmlRes = new Response(ssr.htmlTpl, { headers });
-    return htmlRes;
-    // return new HTMLRewriter().on("ssr-head", {
-    //   element(el) {
-    //     if (ssr.css) {
-    //       el.before(`<style>${ssr.css}</style>`, { html: true })
-    //     }
-    //     if (dataRes?.data) {
-    //       el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(dataRes?.data)}</script>`, { html: true })
-    //     }
-    //     headCollection.forEach(tag => el.before(tag, { html: true }))
-    //     el.remove()
-    //   }
-    // }).on("ssr-body", {
-    //   element(el) {
-    //     el.replace(ssrBody, { html: true })
-    //   }
-    // }).on("script", {
-    //   element(el) {
-    //     const type = el.getAttribute("type")
-    //     if (!type || type === "module") {
-    //       if (type) {
-    //         el.removeAttribute("type")
-    //       }
-    //       el.setAttribute("src", `/main.tsx?v=${ctx.env.VERSION}`)
-    //     }
-    //   }
-    // }).transform(htmlRes)
+    if (!lolHtmlReady) {
+      await init(wasm());
+      lolHtmlReady = true;
+    }
+    const chunks: Uint8Array[] = [];
+    const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
+      chunks.push(chunk);
+    });
+    rewriter.on("ssr-head", {
+      element(el: Element) {
+        if (ssr.css) {
+          el.before(`<style>${ssr.css}</style>`, { html: true });
+        }
+        if (dataRes?.data) {
+          el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(dataRes?.data)}</script>`, {
+            html: true,
+          });
+        }
+        headCollection.forEach((tag) => el.before(tag, { html: true }));
+        el.remove();
+      },
+    });
+    rewriter.on("ssr-body", {
+      element(el: Element) {
+        el.replace(ssrBody, { html: true });
+      },
+    });
+    rewriter.on("link", {
+      element(el: Element) {
+        const href = el.getAttribute("href");
+        if (href?.startsWith("./")) {
+          el.setAttribute("href", href.slice(1));
+        }
+      },
+    });
+    rewriter.on("script", {
+      element(el: Element) {
+        const src = el.getAttribute("src");
+        if (src?.startsWith("./")) {
+          el.setAttribute("src", src.slice(1));
+        }
+      },
+    });
+    rewriter.write(encoder.encode(ssr.htmlTpl));
+    rewriter.end();
+    return new Response(concat(...chunks), { headers });
   },
 };
