@@ -116,14 +116,40 @@ function addHeapObject(obj) {
  * @param {any} options
  * @returns {any}
  */
-export function transformSync(specifier, code, options) {
+export function transform(specifier, code, options) {
   try {
     const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
     var ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len0 = WASM_VECTOR_LEN;
     var ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len1 = WASM_VECTOR_LEN;
-    wasm.transformSync(retptr, ptr0, len0, ptr1, len1, addHeapObject(options));
+    wasm.transform(retptr, ptr0, len0, ptr1, len1, addHeapObject(options));
+    var r0 = getInt32Memory0()[retptr / 4 + 0];
+    var r1 = getInt32Memory0()[retptr / 4 + 1];
+    var r2 = getInt32Memory0()[retptr / 4 + 2];
+    if (r2) {
+      throw takeObject(r1);
+    }
+    return takeObject(r0);
+  } finally {
+    wasm.__wbindgen_add_to_stack_pointer(16);
+  }
+}
+
+/**
+ * @param {string} filename
+ * @param {string} code
+ * @param {any} config_val
+ * @returns {any}
+ */
+export function transformCSS(filename, code, config_val) {
+  try {
+    const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+    var ptr0 = passStringToWasm0(filename, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len0 = WASM_VECTOR_LEN;
+    var ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len1 = WASM_VECTOR_LEN;
+    wasm.transformCSS(retptr, ptr0, len0, ptr1, len1, addHeapObject(config_val));
     var r0 = getInt32Memory0()[retptr / 4 + 0];
     var r1 = getInt32Memory0()[retptr / 4 + 1];
     var r2 = getInt32Memory0()[retptr / 4 + 2];
@@ -210,6 +236,13 @@ async function init(input) {
     } finally {
       wasm.__wbindgen_free(arg0, arg1);
     }
+  };
+  imports.wbg.__wbg_new_55259b13834a484c = function (arg0, arg1) {
+    var ret = new Error(getStringFromWasm0(arg0, arg1));
+    return addHeapObject(ret);
+  };
+  imports.wbg.__wbindgen_throw = function (arg0, arg1) {
+    throw new Error(getStringFromWasm0(arg0, arg1));
   };
   imports["env"] = { now: () => Date.now() };
 

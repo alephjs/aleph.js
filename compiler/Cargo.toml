@@ -20,7 +20,13 @@ path-slash = "0.1.4"
 regex = "1.5.4"
 relative-path = "1.6.1"
 serde = { version = "1.0.136", features = ["derive"] }
+serde_json = "*"
 url = "2.2.2"
+
+# parcel css
+cssparser = "0.29.2"
+parcel_css = "1.0.0-alpha.14"
+parcel_sourcemap = "2.0.2"
 
 # swc
 # docs: https://swc.rs
@@ -38,6 +44,7 @@ swc_ecmascript = { version = "0.113.0", features = ["codegen", "parser", "react"
 # docs: https://rustwasm.github.io/docs/wasm-bindgen
 wasm-bindgen = {version = "0.2.79", features = ["serde-serialize"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
+js-sys = "0.3.56"
 
 [profile.release]
 # Tell `rustc` to optimize for speed and size

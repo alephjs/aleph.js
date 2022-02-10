@@ -2,7 +2,6 @@ import { dim } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { encode } from "https://deno.land/std@0.125.0/encoding/base64.ts";
 import { ensureDir } from "https://deno.land/std@0.125.0/fs/ensure_dir.ts";
 import { compress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";
-import { computeHash } from "../lib/crypto.ts";
 
 async function run(cmd: string[]) {
   const p = Deno.run({
@@ -20,7 +19,6 @@ if (import.meta.main) {
   if (ok) {
     const wasmData = await Deno.readFile("./pkg/aleph_compiler_bg.wasm");
     const jsCode = await Deno.readTextFile("./pkg/aleph_compiler.js");
-    const hash = await computeHash("sha-1", wasmData);
     let prevWasmSize = 0;
     try {
       prevWasmSize = (await Deno.stat("./dist/wasm.js")).size;
@@ -34,10 +32,6 @@ if (import.meta.main) {
         `const dataRaw = "${encode(compress(wasmData))}";`,
         `export default () => decompress(decode(dataRaw));`,
       ].join("\n"),
-    );
-    await Deno.writeTextFile(
-      "./dist/checksum.js",
-      `export const checksum = ${JSON.stringify(hash)};`,
     );
     await Deno.writeTextFile(
       "./dist/compiler.js",

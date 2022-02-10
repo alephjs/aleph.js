@@ -19,7 +19,7 @@ export function toRelativePath(from: string, to: string): string {
 }
 
 /**
- * fix remote url to local
+ * fix remote url to local path
  * e.g.: https://esm.sh/react@17.0.2?target=es2018 -> /-/esm.sh/react@17.0.2?target=es2018
  */
 export function toLocalPath(url: string, defaultExtname = "js"): string {
@@ -39,6 +39,21 @@ export function toLocalPath(url: string, defaultExtname = "js"): string {
     ].filter(Boolean).join("");
   }
   return url;
+}
+
+/**
+ * fix local path to remote url
+ * e.g.: /-/esm.sh/react@17.0.2?target=es2018 -> https://esm.sh/react@17.0.2?target=es2018
+ */
+export function toRemoteUrl(pathname: string) {
+  let [h, ...rest] = pathname.substring(3).split("/");
+  let protocol = "https";
+  if (h.startsWith("http_")) {
+    h = h.substring(5);
+    protocol = "http";
+  }
+  const [host, port] = h.split("_");
+  return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
 }
 
 export { builtinModuleExts };

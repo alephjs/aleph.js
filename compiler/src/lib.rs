@@ -1,3 +1,4 @@
+mod css;
 mod error;
 mod import_map;
 mod resolve_fold;
@@ -46,8 +47,8 @@ pub struct TransformOutput {
     pub map: Option<String>,
 }
 
-#[wasm_bindgen(js_name = "transformSync")]
-pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = "transform")]
+pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
     console_error_panic_hook::set_once();
 
     let options: Options = options
@@ -74,4 +75,14 @@ pub fn transform_sync(specifier: &str, code: &str, options: JsValue) -> Result<J
         map,
     })
     .unwrap())
+}
+
+#[wasm_bindgen(js_name = "transformCSS")]
+pub fn transform_css(filename: &str, code: &str, config_val: JsValue) -> Result<JsValue, JsValue> {
+    let config: css::Config = config_val
+        .into_serde()
+        .map_err(|err| format!("failed to parse options: {}", err))
+        .unwrap();
+    let res = css::compile(filename.into(), code, &config)?;
+    Ok(JsValue::from_serde(&res).unwrap())
 }

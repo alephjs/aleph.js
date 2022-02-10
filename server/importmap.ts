@@ -1,5 +1,5 @@
 import { join } from "https://deno.land/std@0.125.0/path/mod.ts";
-import type { ImportMap } from "../compiler/mod.ts";
+import type { ImportMap } from "../compiler/types.d.ts";
 import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";

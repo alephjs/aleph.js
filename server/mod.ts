@@ -32,7 +32,12 @@ export const serve = (options: ServerOptions) => {
 
   const handler = async (req: Request, env: Record<string, string>) => {
     const url = new URL(req.url);
-    const { pathname } = url;
+    const { pathname, searchParams } = url;
+
+    /* handle '/-/http_localhost_7070/framework/react/mod.ts' */
+    if (pathname.startsWith("/-/")) {
+      return serveCode(pathname);
+    }
 
     try {
       const stat = await Deno.lstat(`.${pathname}`);
@@ -44,7 +49,10 @@ export const serve = (options: ServerOptions) => {
             return new Response(null, { status: 304 });
           }
         }
-        if (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`))) {
+        if (
+          builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
+          searchParams.has("module")
+        ) {
           return serveCode(pathname, stat.mtime);
         } else {
           const file = await Deno.open(`.${pathname}`, { read: true });
