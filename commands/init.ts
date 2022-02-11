@@ -104,15 +104,14 @@ export default async function (
         "dom.iterable",
         "dom.asynciterable",
         "deno.ns",
-        "deno.unstable",
       ],
       "types": [
         `https://deno.land/x/aleph@v${VERSION}/types.d.ts`,
       ],
       "jsx": "react",
     },
-    "lint": {},
     "format": {},
+    "lint": {},
   };
   await Promise.all([
     Deno.writeTextFile(join(cwd, name, ".gitignore"), gitignore.join("\n")),

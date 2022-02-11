@@ -1,5 +1,6 @@
 import React from "react";
 import { useData } from "aleph/react";
+// import "../style/index.css";
 
 let count = 0;
 
@@ -27,10 +28,9 @@ export default function Index() {
     <div className="page">
       <head>
         <title>Hello World - Aleph.js</title>
-        <link rel="stylesheet" href="../style/index.css" />
       </head>
       <p className="logo">
-        <img src="/logo.svg" height="75" title="Aleph.js" />
+        <img src="/assets/logo.svg" height="75" title="Aleph.js" />
       </p>
       <h1>
         Welcome to use <strong>Aleph.js</strong>!

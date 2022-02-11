@@ -1,6 +1,6 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
 import { content, json } from "./response.ts";
-import ssr from "./ssr.ts";
+import render from "./render.ts";
 import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
@@ -42,12 +42,9 @@ export const serve = (options: ServerOptions) => {
     try {
       const stat = await Deno.lstat(`.${pathname}`);
       if (stat.isFile && stat.mtime) {
-        const ifModifiedSince = req.headers.get("If-Modified-Since");
-        if (ifModifiedSince) {
-          const ifModifiedSinceDate = new Date(ifModifiedSince);
-          if (ifModifiedSinceDate.getTime() === stat.mtime.getTime()) {
-            return new Response(null, { status: 304 });
-          }
+        const mtimeUTC = stat.mtime.toUTCString();
+        if (req.headers.get("If-Modified-Since") === mtimeUTC) {
+          return new Response(null, { status: 304 });
         }
         if (
           builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
@@ -59,7 +56,7 @@ export const serve = (options: ServerOptions) => {
           return new Response(readableStreamFromReader(file), {
             headers: {
               "Content-Type": getContentType(pathname),
-              "Last-Modified": stat.mtime.toUTCString(),
+              "Last-Modified": mtimeUTC,
             },
           });
         }
@@ -77,7 +74,7 @@ export const serve = (options: ServerOptions) => {
         return new Response("Not found", { status: 404 });
     }
 
-    const ctx: Context = { env, data: {} };
+    const ctx: Context = { env, data: {}, config: {} };
     if (util.isFunction(options.fetch)) {
       const resp = options.fetch(req, ctx);
       if (resp instanceof Response) {
@@ -120,7 +117,7 @@ export const serve = (options: ServerOptions) => {
     if (indexHtml === undefined) {
       try {
         indexHtml = await Deno.readTextFile("./index.html");
-        // since HTMLRewriter can't handle `<ssr-body />` correctly replace it to `<ssr-body></ssr-body>`
+        // since `lol-html` can't handle `<ssr-body />` correctly then replace it to `<ssr-body></ssr-body>`
         indexHtml = indexHtml.replace(
           /<ssr-(head|body)[ \/]*> *(<\/ssr-(head|body)>)?/g,
           "<ssr-$1></ssr-$1>",
@@ -143,13 +140,7 @@ export const serve = (options: ServerOptions) => {
       return new Response("Not Found", { status: 404 });
     }
 
-    // request ssr
-    if (util.isFunction(options.ssr)) {
-      return ssr.fetch(req, ctx, { handler: options.ssr, htmlTpl: indexHtml });
-    }
-
-    // fallback to the index html
-    return content(indexHtml, "text/html; charset=utf-8");
+    return render.fetch(req, ctx, { indexHtml, ssrFn: options.ssr });
   };
 
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {

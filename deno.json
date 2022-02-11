@@ -4,8 +4,7 @@
       "dom",
       "dom.iterable",
       "dom.asynciterable",
-      "deno.ns",
-      "deno.unstable"
+      "deno.ns"
     ],
     "types": [
       "./types.d.ts"
