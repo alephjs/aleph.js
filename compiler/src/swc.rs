@@ -193,7 +193,7 @@ impl SWC {
     pub fn apply_fold<T: Fold>(
         &self,
         mut fold: T,
-        source_map: bool,
+        is_dev: bool,
     ) -> Result<(String, Option<String>), anyhow::Error> {
         let program = Program::Module(self.module.clone());
         let program = helpers::HELPERS.set(&helpers::Helpers::new(false), || {
@@ -201,11 +201,7 @@ impl SWC {
         });
         let mut buf = Vec::new();
         let mut src_map_buf = Vec::new();
-        let src_map = if source_map {
-            Some(&mut src_map_buf)
-        } else {
-            None
-        };
+        let src_map = if is_dev { Some(&mut src_map_buf) } else { None };
         {
             let writer = Box::new(JsWriter::new(
                 self.source_map.clone(),
@@ -214,7 +210,7 @@ impl SWC {
                 src_map,
             ));
             let mut emitter = swc_ecmascript::codegen::Emitter {
-                cfg: swc_ecmascript::codegen::Config { minify: false },
+                cfg: swc_ecmascript::codegen::Config { minify: !is_dev },
                 comments: Some(&self.comments),
                 cm: self.source_map.clone(),
                 wr: writer,
@@ -224,7 +220,7 @@ impl SWC {
 
         // output
         let src = String::from_utf8(buf).unwrap();
-        if source_map {
+        if is_dev {
             let mut buf = Vec::new();
             self.source_map
                 .build_source_map_from(&mut src_map_buf, None)
