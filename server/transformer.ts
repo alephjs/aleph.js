@@ -78,15 +78,17 @@ async function readCode(pathname: string): Promise<string> {
 }
 
 function getAlephPkgUri() {
-  const gl = globalThis as any;
-  if (util.isFilledString(gl.__ALEPH_PKG_URI)) {
-    return gl.__ALEPH_PKG_URI;
+  // @ts-ignore
+  if (util.isFilledString(globalThis.__ALEPH_PKG_URI)) {
+    // @ts-ignore
+    return globalThis.__ALEPH_PKG_URI;
   }
   let uri = `https://deno.land/x/aleph@v${VERSION}`;
   const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
   if (DEV_PORT) {
     uri = `http://localhost:${DEV_PORT}`;
   }
-  gl.__ALEPH_PKG_URI = uri;
+  // @ts-ignore
+  globalThis.__ALEPH_PKG_URI = uri;
   return uri;
 }

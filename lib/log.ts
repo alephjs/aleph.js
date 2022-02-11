@@ -101,3 +101,5 @@ export class Measure {
 const logger = new Logger();
 
 export default logger;
+
+export { blue, dim, green, red, yellow };

@@ -14,8 +14,9 @@ declare type SSREvent = {
   dataExpires?: number;
 };
 
-declare type URLPattern = {
+declare class URLPattern {
+  constructor(pattern: { pathname: string });
   exec(
     location: { pathname: string },
   ): null | { pathname: { groups: Record<string, string>; input: string } };
-};
+}

@@ -30,6 +30,9 @@ export default {
     await res.body?.cancel();
     return res.status === 200;
   },
+  inDeno(): boolean {
+    return typeof Deno !== "undefined" && typeof Deno.version?.deno === "string";
+  },
   trimPrefix(s: string, prefix: string): string {
     if (prefix !== "" && s.startsWith(prefix)) {
       return s.slice(prefix.length);

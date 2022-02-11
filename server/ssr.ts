@@ -4,6 +4,7 @@ import init, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
 import wasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import util from "../lib/util.ts";
 import { encoder } from "../lib/crypto.ts";
+import { VERSION } from "../version.ts";
 
 let lolHtmlReady = false;
 
@@ -13,39 +14,41 @@ async function fetchData(
 ): Promise<void | Response | { data: object; cacheTtl?: number }> {
   const url = new URL(req.url);
   const pathname = util.cleanPath(url.pathname);
-  const dataRoutes: [URLPattern, Record<string, any>][] = (self as any).__ALEPH_DATA_ROUTES;
-  if (util.isArray(dataRoutes)) {
-    for (const [pattern, config] of dataRoutes) {
-      const ret = pattern.exec({ pathname });
-      if (ret) {
-        const request = new Request(
-          util.appendUrlParams(url, ret.pathname.groups).toString(),
-          req,
-        );
-        const fetcher = config.get;
-        if (util.isFunction(fetcher)) {
-          const allFetcher = config.all;
-          if (util.isFunction(allFetcher)) {
-            let res = allFetcher(request);
+  const routes: [URLPattern, { data?: Record<string, any> }][] = (self as any).__ALEPH_ROUTES;
+  if (util.isArray(routes)) {
+    for (const [pattern, route] of routes) {
+      if (route.data) {
+        const ret = pattern.exec({ pathname });
+        if (ret) {
+          const request = new Request(
+            util.appendUrlParams(url, ret.pathname.groups).toString(),
+            req,
+          );
+          const fetcher = route.data.get;
+          if (util.isFunction(fetcher)) {
+            const allFetcher = route.data.all;
+            if (util.isFunction(allFetcher)) {
+              let res = allFetcher(request);
+              if (res instanceof Promise) {
+                res = await res;
+              }
+              if (res instanceof Response) {
+                return res;
+              }
+            }
+            let res = fetcher(request, ctx);
             if (res instanceof Promise) {
               res = await res;
             }
             if (res instanceof Response) {
-              return res;
+              if (res.status !== 200) {
+                return res;
+              }
+              return {
+                data: await res.json(),
+                cacheTtl: route.data.cacheTtl,
+              };
             }
-          }
-          let res = fetcher(request, ctx);
-          if (res instanceof Promise) {
-            res = await res;
-          }
-          if (res instanceof Response) {
-            if (res.status !== 200) {
-              return res;
-            }
-            return {
-              data: await res.json(),
-              cacheTtl: config.cacheTtl,
-            };
           }
         }
       }
@@ -85,6 +88,7 @@ export default {
     const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
       chunks.push(chunk);
     });
+    let nomoduleInserted = false;
     rewriter.on("ssr-head", {
       element(el: Element) {
         if (ssr.css) {
@@ -115,6 +119,13 @@ export default {
     rewriter.on("script", {
       element(el: Element) {
         const src = el.getAttribute("src");
+        const type = el.getAttribute("type");
+        if (type === "module" && !nomoduleInserted) {
+          el.after(`<script nomodule src="https://deno.land/x/aleph@v${VERSION}/lib/module.js"></script>`, {
+            html: true,
+          });
+          nomoduleInserted = true;
+        }
         if (src?.startsWith("./")) {
           el.setAttribute("src", src.slice(1));
         }

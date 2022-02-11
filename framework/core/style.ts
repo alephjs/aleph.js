@@ -1,8 +1,7 @@
 import util from "../../lib/util.ts";
 
 const styleMap = new Map<string, { css?: string; href?: string }>();
-const inDeno = typeof Deno !== "undefined" &&
-  typeof Deno.version?.deno === "string";
+const inDeno = util.inDeno();
 
 export function removeCSS(url: string, recoverable?: boolean) {
   const { document } = window;

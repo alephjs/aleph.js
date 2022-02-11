@@ -1,8 +1,9 @@
-import { resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { extname, globToRegExp, join, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
-import log from "../lib/log.ts";
+import log, { dim } from "../lib/log.ts";
+import util from "../lib/util.ts";
 
 export const helpMessage = `
 Usage:
@@ -47,9 +48,11 @@ if (import.meta.main) {
     "server.js",
   ]);
   if (serverEntry) {
+    const global = globalThis as any;
     Deno.env.set("ALEPH_ENV", "development");
+    global.__ALEPH_ROUTES = await readRoutes("./routes/**/*.tsx");
     await import(serverEntry);
-    const serverHandler: any = (globalThis as any).__ALEPH_SERVER_HANDLER;
+    const serverHandler = global.__ALEPH_SERVER_HANDLER;
     log.info(`Server ready on http://localhost:${port}`);
     if (certFile && keyFile) {
       await serveTls((req) => serverHandler(req, Deno.env.toObject()), { port, hostname, certFile, keyFile });
@@ -59,4 +62,46 @@ if (import.meta.main) {
   } else {
     log.fatal("No server entry found");
   }
+}
+
+async function readRoutes(glob: string) {
+  const reg = globToRegExp(glob);
+  const files = await getFiles(Deno.cwd(), (filename) => reg.test(filename));
+  return Promise.all(files.map(async (filename) => {
+    const mod = await import(join(Deno.cwd(), filename));
+    const [prefix] = glob.split("*");
+    const p = "/" + util.splitPath(util.trimPrefix(filename, util.trimSuffix(prefix, "/"))).map((part) => {
+      part = part.toLowerCase();
+      if (part.startsWith("[") && part.startsWith("]")) {
+        return ":" + part.slice(1, -1);
+      } else if (part.startsWith("$")) {
+        return ":" + part.slice(1);
+      }
+      return part;
+    }).join("/");
+    const pathname = util.trimSuffix(util.trimSuffix(p, extname(p)), "/index") || "/";
+    log.debug(dim("[route]"), pathname);
+    return [
+      new URLPattern({ pathname }),
+      {
+        component: mod.default,
+        data: mod.data,
+      },
+    ];
+  }));
+}
+
+async function getFiles(dir: string, filter?: (filename: string) => boolean, path: string[] = []): Promise<string[]> {
+  const list: string[] = [];
+  for await (const dirEntry of Deno.readDir(dir)) {
+    if (dirEntry.isDirectory) {
+      list.push(...await getFiles(join(dir, dirEntry.name), filter, [...path, dirEntry.name]));
+    } else {
+      const filename = [".", ...path, dirEntry.name].join("/");
+      if (!filter || filter(filename)) {
+        list.push(filename);
+      }
+    }
+  }
+  return list;
 }

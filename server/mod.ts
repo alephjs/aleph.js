@@ -86,28 +86,31 @@ export const serve = (options: ServerOptions) => {
     }
 
     // request page data
-    const dataRoutes: [URLPattern, Record<string, any>, boolean][] = (self as any).__ALEPH_DATA_ROUTES;
-    if (util.isArray(dataRoutes)) {
-      for (const [pattern, config, hasCompoment] of dataRoutes) {
-        const ret = pattern.exec({ pathname });
-        if (ret) {
-          if (req.method !== "GET" || req.headers.has("X-Fetch-Data") || !hasCompoment) {
-            const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
-            const fetcher = config[req.method.toLowerCase()];
-            if (util.isFunction(fetcher)) {
-              const allFetcher = config.all;
-              if (util.isFunction(allFetcher)) {
-                let res = allFetcher(request);
-                if (res instanceof Promise) {
-                  res = await res;
+    const routes: [URLPattern, { component?: CallableFunction; data?: Record<string, any> }][] =
+      (self as any).__ALEPH_ROUTES;
+    if (util.isArray(routes)) {
+      for (const [pattern, route] of routes) {
+        if (route.data) {
+          const ret = pattern.exec({ pathname });
+          if (ret) {
+            if (req.method !== "GET" || req.headers.has("X-Fetch-Data") || route.component === undefined) {
+              const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
+              const fetcher = route.data[req.method.toLowerCase()];
+              if (util.isFunction(fetcher)) {
+                const allFetcher = route.data.all;
+                if (util.isFunction(allFetcher)) {
+                  let res = allFetcher(request);
+                  if (res instanceof Promise) {
+                    res = await res;
+                  }
+                  if (res instanceof Response) {
+                    return res;
+                  }
                 }
-                if (res instanceof Response) {
-                  return res;
-                }
+                return fetcher(request, ctx);
               }
-              return fetcher(request, ctx);
+              return new Response("Method not allowed", { status: 405 });
             }
-            return new Response("Method not allowed", { status: 405 });
           }
         }
       }

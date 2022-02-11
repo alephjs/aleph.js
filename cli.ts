@@ -118,9 +118,9 @@ async function main() {
     denoConfigFile = resolve("./deno.json");
     importMapFile = resolve("./import_map.json");
     Deno.env.set("ALEPH_ROOT", workingDir);
-    Deno.env.set("ALEPH_DEV_PORT", "7070");
-    serveDir(workingDir, 7070);
-    log.debug(`Proxy https://deno.land/x/aleph on http://localhost:7070`);
+    Deno.env.set("ALEPH_DEV_PORT", "6060");
+    serveDir(workingDir, 6060);
+    log.debug(`Proxy https://deno.land/x/aleph on http://localhost:6060`);
   } else {
     workingDir = resolve(String(args[0] || "."));
     if (!(await existsDir(workingDir))) {

@@ -16,10 +16,10 @@ export async function resolveImportMap(): Promise<ImportMap> {
       "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
     };
   } else {
-    const gl = globalThis as any;
-    if (util.isPlainObject(gl.__IMPORT_MAP)) {
-      Object.assign(importMap, gl.__IMPORT_MAP);
-    } else if (gl.__IMPORT_MAP !== undefined) {
+    const global = globalThis as any;
+    if (util.isPlainObject(global.__IMPORT_MAP)) {
+      Object.assign(importMap, global.__IMPORT_MAP);
+    } else if (global.__IMPORT_MAP !== undefined) {
       try {
         const importMapFile = await findFile(
           Deno.cwd(),
@@ -30,11 +30,11 @@ export async function resolveImportMap(): Promise<ImportMap> {
           const m = await readImportMap(importMapFile);
           Object.assign(importMap, m);
           if (!isDev) {
-            gl.__IMPORT_MAP = m;
+            global.__IMPORT_MAP = m;
           }
         } else {
           if (!isDev) {
-            gl.__IMPORT_MAP = null;
+            global.__IMPORT_MAP = null;
           }
         }
       } catch (e) {

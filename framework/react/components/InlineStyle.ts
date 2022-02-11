@@ -1,8 +1,9 @@
 import { StyleHTMLAttributes, useContext, useEffect, useLayoutEffect } from "https://esm.sh/react@17.0.2";
+import util from "../../../lib/util.ts";
 import { applyCSS, removeCSS } from "../../core/style.ts";
 import Context from "../context.ts";
 
-const inDeno = typeof Deno !== "undefined" && typeof Deno.version?.deno === "string";
+const inDeno = util.inDeno();
 const useIsomorphicLayoutEffect = inDeno ? useEffect : useLayoutEffect;
 
 export default function InlineStyle({ children, ...rest }: StyleHTMLAttributes<{}>) {

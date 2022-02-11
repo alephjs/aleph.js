@@ -1,6 +1,7 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
 import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
 import util from "../../lib/util.ts";
+import events from "../core/events.ts";
 import MainContext from "./context.ts";
 
 export type RouterProps = {
@@ -11,17 +12,20 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
   const [url, setUrl] = useState<URL>(() => ssr?.url || new URL(self.location?.href || "http://localhost/"));
   const page = useMemo<{ Component: FC<any>; params: Record<string, string> }>(
     () => {
+      const gt = (globalThis as any);
       const pathname = util.cleanPath(url.pathname);
-      const routes: [URLPattern, FC<any>][] = (self as any).__ALEPH_ROUTES;
+      const routes: [URLPattern, { component?: FC<any> }][] = gt.__ALEPH_ROUTES;
       if (util.isArray(routes)) {
-        for (const [pattern, fc] of routes) {
-          const p = pattern.exec({ pathname });
-          if (p) {
-            return { Component: fc, params: p.pathname.groups };
+        for (const [pattern, route] of routes) {
+          if (route.component) {
+            const p = pattern.exec({ pathname });
+            if (p) {
+              return { Component: route.component, params: p.pathname.groups };
+            }
           }
         }
       }
-      return { Component: E404, params: {} };
+      return gt.__ALEPH_CURRENT_PAGE || { Component: E404, params: {} };
     },
     [url],
   );
@@ -41,6 +45,12 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
     Array.from(head.children).forEach((el: any) => {
       if (el.hasAttribute("ssr")) {
         head.removeChild(el);
+      }
+    });
+    events.addListener("popstate", (e) => {
+      setUrl(new URL(location.href));
+      if (e.resetScroll) {
+        (window as any).scrollTo(0, 0);
       }
     });
   }, []);
