@@ -1,7 +1,13 @@
 import { Measure } from "../lib/log.ts";
 import init, { transform as swc, transformCSS as parcelCSS } from "./dist/compiler.js";
 import getWasmData from "./dist/wasm.js";
-import { InlineStyle, TransformCSSOptions, TransformCSSResult, TransformOptions, TransformResult } from "./types.d.ts";
+import {
+  InlineStyleExpr,
+  TransformCSSOptions,
+  TransformCSSResult,
+  TransformOptions,
+  TransformResult,
+} from "./types.d.ts";
 
 let wasmReady: Promise<void> | boolean = false;
 
@@ -51,7 +57,7 @@ export async function transform(
   // resolve inline-style
   if (inlineStyles) {
     await Promise.all(
-      Object.entries(inlineStyles as Record<string, InlineStyle>).map(async ([key, style]) => {
+      Object.entries(inlineStyles as Record<string, InlineStyleExpr>).map(async ([key, style]) => {
         let tpl = style.quasis.reduce((tpl, quais, i, a) => {
           tpl += quais;
           if (i < a.length - 1) {

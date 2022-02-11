@@ -20,7 +20,7 @@ impl Fold for ResolveFold {
     fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
         let mut items = Vec::<ModuleItem>::new();
         let aleph_pkg_uri = self.resolver.borrow().aleph_pkg_uri.clone();
-        let jsx_lib = self.resolver.borrow().jsx_lib.clone();
+        let jsx_runtime = self.resolver.borrow().jsx_runtime.clone();
         let jsx_magic_tags = self.resolver.borrow().jsx_magic_tags.clone();
 
         for name in jsx_magic_tags.clone() {
@@ -28,7 +28,7 @@ impl Fold for ResolveFold {
             let resolved_url = resolver.resolve(
                 format!(
                     "{}/framework/{}/components/{}.ts",
-                    aleph_pkg_uri, jsx_lib, name
+                    aleph_pkg_uri, jsx_runtime, name
                 )
                 .as_str(),
                 false,

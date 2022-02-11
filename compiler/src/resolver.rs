@@ -35,7 +35,7 @@ pub struct Resolver {
     /// a ordered dependencies of the module
     pub deps: Vec<DependencyDescriptor>,
     /// jsx library: react | preact
-    pub jsx_lib: String,
+    pub jsx_runtime: String,
     /// jsx magic tags like `a`, `link`, `head`, etc...
     pub jsx_magic_tags: IndexSet<String>,
     /// jsx static class names
@@ -78,7 +78,7 @@ impl Resolver {
     pub fn new(
         specifier: &str,
         aleph_pkg_uri: &str,
-        jsx_lib: &str,
+        jsx_runtime: &str,
         import_map: ImportHashMap,
         versions: Versions,
         is_dev: bool,
@@ -87,7 +87,7 @@ impl Resolver {
             specifier: specifier.into(),
             specifier_is_remote: is_remote_url(specifier),
             deps: Vec::new(),
-            jsx_lib: jsx_lib.into(),
+            jsx_runtime: jsx_runtime.into(),
             jsx_magic_tags: IndexSet::new(),
             jsx_inline_styles: HashMap::new(),
             jsx_static_class_names: IndexSet::new(),

@@ -6,14 +6,14 @@ export type ImportMap = {
 export type TransformOptions = {
   alephPkgUri?: string;
   importMap?: ImportMap;
-  isDev?: boolean;
   analyzeJsxStaticClassNames?: boolean;
-  jsx?: string;
-  jsx_import_source?: string;
+  jsxRuntime?: "react" | "preact";
+  jsxImportSource?: string;
+  isDev?: boolean;
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>;
 };
 
-export type InlineStyle = {
+export type InlineStyleExpr = {
   type: string;
   quasis: string[];
   exprs: string[];

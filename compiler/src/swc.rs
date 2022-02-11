@@ -100,7 +100,7 @@ impl SWC {
     ) -> Result<(String, Option<String>), anyhow::Error> {
         swc_common::GLOBALS.set(&Globals::new(), || {
             let top_level_mark = Mark::fresh(Mark::root());
-            let jsx_lib = resolver.borrow().jsx_lib.clone();
+            let jsx_runtime = resolver.borrow().jsx_runtime.clone();
             let specifier_is_remote = resolver.borrow().specifier_is_remote;
             let is_jsx = match self.source_type {
                 SourceType::JSX => true,
@@ -114,7 +114,7 @@ impl SWC {
                     ..Default::default()
                 }
             } else {
-                match jsx_lib.as_str() {
+                match jsx_runtime.as_str() {
                     "preact" => react::Options {
                         pragma: "h".into(),
                         pragma_frag: "Fragment".into(),
@@ -166,7 +166,7 @@ impl SWC {
                         self.source_map.clone(),
                         Some(&self.comments),
                     ),
-                    !specifier_is_remote && jsx_lib.eq("react")
+                    !specifier_is_remote && jsx_runtime.eq("react")
                 ),
                 Optional::new(
                     react::jsx(

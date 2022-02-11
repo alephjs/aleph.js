@@ -38,11 +38,15 @@ pub struct Options {
     #[serde(default)]
     pub versions: Versions,
 
-    #[serde(default)]
-    pub jsx: String,
+    #[serde(default = "default_jsx_runtime")]
+    pub jsx_runtime: String,
 
     #[serde(default)]
     pub jsx_import_source: String,
+}
+
+fn default_jsx_runtime() -> String {
+    return "react".into();
 }
 
 #[derive(Serialize)]
@@ -71,7 +75,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     let resolver = Rc::new(RefCell::new(Resolver::new(
         specifier,
         &options.aleph_pkg_uri,
-        &options.jsx,
+        &options.jsx_runtime,
         options.import_map,
         options.versions,
         options.is_dev,
