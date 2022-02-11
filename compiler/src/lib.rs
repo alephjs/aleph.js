@@ -30,6 +30,9 @@ pub struct Options {
     pub is_dev: bool,
 
     #[serde(default)]
+    pub analyze_jsx_static_class_names: bool,
+
+    #[serde(default)]
     pub import_map: ImportHashMap,
 
     #[serde(default)]
@@ -49,6 +52,9 @@ pub struct TransformOutput {
 
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub deps: Vec<DependencyDescriptor>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub jsx_static_class_names: Vec<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub map: Option<String>,
@@ -76,6 +82,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
             resolver.clone(),
             &EmitOptions {
                 jsx_import_source: options.jsx_import_source,
+                analyze_jsx_static_class_names: options.analyze_jsx_static_class_names,
                 is_dev: options.is_dev,
             },
         )
@@ -85,6 +92,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     Ok(JsValue::from_serde(&TransformOutput {
         code,
         deps: r.deps.clone(),
+        jsx_static_class_names: r.jsx_static_class_names.clone().into_iter().collect(),
         map,
     })
     .unwrap())

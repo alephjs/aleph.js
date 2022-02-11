@@ -9,11 +9,13 @@ use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 pub fn jsx_magic_fold(
     resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
+    analyze_static_class_names: bool,
     is_dev: bool,
 ) -> impl Fold {
     JSXMagicFold {
         resolver: resolver.clone(),
         source,
+        analyze_static_class_names,
         is_dev,
         inline_style_idx: 0,
     }
@@ -28,6 +30,7 @@ pub fn jsx_magic_fold(
 struct JSXMagicFold {
     resolver: Rc<RefCell<Resolver>>,
     source: Rc<SourceMap>,
+    analyze_static_class_names: bool,
     is_dev: bool,
     inline_style_idx: i32,
 }
@@ -199,30 +202,34 @@ impl JSXMagicFold {
         };
 
         // record jsx static class names
-        for (_index, attr) in el.attrs.iter().enumerate() {
-            match &attr {
-                JSXAttrOrSpread::JSXAttr(JSXAttr {
-                    name: JSXAttrName::Ident(id),
-                    value: Some(value),
-                    ..
-                }) => {
-                    if id.sym.eq("className") {
-                        match value {
-                            JSXAttrValue::Lit(lit) => {
-                                self.mark_class_name(Box::new(Expr::Lit(lit.clone())));
-                            }
-                            JSXAttrValue::JSXExprContainer(JSXExprContainer { expr, .. }) => {
-                                if let JSXExpr::Expr(expr) = expr {
-                                    self.mark_class_name(expr.clone());
+        if self.analyze_static_class_names {
+            for (_index, attr) in el.attrs.iter().enumerate() {
+                match &attr {
+                    JSXAttrOrSpread::JSXAttr(JSXAttr {
+                        name: JSXAttrName::Ident(id),
+                        value: Some(value),
+                        ..
+                    }) => {
+                        if id.sym.eq("className") {
+                            match value {
+                                JSXAttrValue::Lit(lit) => {
+                                    self.mark_class_name(Box::new(Expr::Lit(lit.clone())));
                                 }
-                            }
-                            _ => {}
-                        };
-                        break;
+                                JSXAttrValue::JSXExprContainer(JSXExprContainer {
+                                    expr, ..
+                                }) => {
+                                    if let JSXExpr::Expr(expr) = expr {
+                                        self.mark_class_name(expr.clone());
+                                    }
+                                }
+                                _ => {}
+                            };
+                            break;
+                        }
                     }
-                }
-                _ => {}
-            };
+                    _ => {}
+                };
+            }
         }
 
         // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs

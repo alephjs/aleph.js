@@ -25,6 +25,7 @@ use swc_ecmascript::{
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
     pub jsx_import_source: String,
+    pub analyze_jsx_static_class_names: bool,
     pub is_dev: bool,
 }
 
@@ -32,6 +33,7 @@ impl Default for EmitOptions {
     fn default() -> Self {
         EmitOptions {
             jsx_import_source: "".into(),
+            analyze_jsx_static_class_names: false,
             is_dev: false,
         }
     }
@@ -126,7 +128,12 @@ impl SWC {
             let passes = chain!(
                 resolver_with_mark(top_level_mark),
                 Optional::new(
-                    jsx_magic_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+                    jsx_magic_fold(
+                        resolver.clone(),
+                        self.source_map.clone(),
+                        options.analyze_jsx_static_class_names,
+                        options.is_dev
+                    ),
                     is_jsx
                 ),
                 resolve_fold(resolver.clone()),

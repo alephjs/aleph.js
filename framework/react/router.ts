@@ -1,7 +1,7 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
 import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
-import MainContext from "./context.ts";
 import util from "../../lib/util.ts";
+import MainContext from "./context.ts";
 
 export type RouterProps = {
   ssr?: SSREvent;
@@ -52,6 +52,7 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
         url: pageUrl,
         setUrl,
         dataCache,
+        inlineStyles: new Map(),
         ssrHeadCollection: ssr?.headCollection,
       },
     },

@@ -7,6 +7,7 @@ export type TransformOptions = {
   alephPkgUri?: string;
   importMap?: ImportMap;
   isDev?: boolean;
+  analyzeJsxStaticClassNames?: boolean;
   jsx?: string;
   jsx_import_source?: string;
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>;
@@ -27,8 +28,8 @@ export type TransformResult = {
 
 export type DependencyDescriptor = {
   specifier: string;
-  resolved: string;
   isDynamic: boolean;
+  isStarExport: boolean;
 };
 
 export interface Targets {
