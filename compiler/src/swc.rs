@@ -1,6 +1,7 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
+use crate::jsx::jsx_magic_fold;
 use crate::resolve_fold::resolve_fold;
-use crate::resolver::{DependencyDescriptor, Resolver};
+use crate::resolver::Resolver;
 use crate::source_type::SourceType;
 
 use std::{cell::RefCell, path::Path, rc::Rc};
@@ -23,7 +24,6 @@ use swc_ecmascript::{
 /// Options for transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
-    pub jsx: String,
     pub jsx_import_source: String,
     pub is_dev: bool,
 }
@@ -31,8 +31,7 @@ pub struct EmitOptions {
 impl Default for EmitOptions {
     fn default() -> Self {
         EmitOptions {
-            jsx: "react".into(),
-            jsx_import_source: "https://esm.sh/react".into(),
+            jsx_import_source: "".into(),
             is_dev: false,
         }
     }
@@ -99,9 +98,9 @@ impl SWC {
     ) -> Result<(String, Option<String>), anyhow::Error> {
         swc_common::GLOBALS.set(&Globals::new(), || {
             let top_level_mark = Mark::fresh(Mark::root());
+            let jsx_lib = resolver.borrow().jsx_lib.clone();
             let specifier_is_remote = resolver.borrow().specifier_is_remote;
             let is_jsx = match self.source_type {
-                SourceType::JS => true,
                 SourceType::JSX => true,
                 SourceType::TSX => true,
                 _ => false,
@@ -113,7 +112,7 @@ impl SWC {
                     ..Default::default()
                 }
             } else {
-                match options.jsx.as_str() {
+                match jsx_lib.as_str() {
                     "preact" => react::Options {
                         pragma: "h".into(),
                         pragma_frag: "Fragment".into(),
@@ -126,6 +125,10 @@ impl SWC {
             };
             let passes = chain!(
                 resolver_with_mark(top_level_mark),
+                Optional::new(
+                    jsx_magic_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+                    is_jsx
+                ),
                 resolve_fold(resolver.clone()),
                 decorators::decorators(decorators::Config {
                     legacy: true,
@@ -156,7 +159,7 @@ impl SWC {
                         self.source_map.clone(),
                         Some(&self.comments),
                     ),
-                    !specifier_is_remote && options.jsx.eq("react")
+                    !specifier_is_remote && jsx_lib.eq("react")
                 ),
                 Optional::new(
                     react::jsx(
@@ -175,20 +178,7 @@ impl SWC {
                 hygiene()
             );
 
-            let (code, map) = self.apply_fold(passes, options.is_dev).unwrap();
-            let mut resolver = resolver.borrow_mut();
-
-            // remove unused deps after tree-shaking
-            let mut deps: Vec<DependencyDescriptor> = Vec::new();
-            for dep in resolver.deps.clone() {
-                if dep.is_star_export || code.contains(to_str_lit(dep.specifier.as_str()).as_str())
-                {
-                    deps.push(dep);
-                }
-            }
-            resolver.deps = deps;
-
-            Ok((code, map))
+            Ok(self.apply_fold(passes, options.is_dev).unwrap())
         })
     }
 
@@ -278,11 +268,4 @@ fn strip_config_from_emit_options() -> strip::Config {
         no_empty_export: true,
         ..Default::default()
     }
-}
-
-fn to_str_lit(sub_text: &str) -> String {
-    let mut s = "\"".to_owned();
-    s.push_str(sub_text);
-    s.push('"');
-    s
 }

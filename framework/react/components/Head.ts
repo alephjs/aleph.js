@@ -8,10 +8,10 @@ import {
   useEffect,
   useMemo,
 } from "https://esm.sh/react@17.0.2";
-import util from "../../lib/util.ts";
-import MainContext from "./context.ts";
+import util from "../../../lib/util.ts";
+import MainContext from "../context.ts";
 
-export const Head: FC = (props) => {
+const Head: FC = (props) => {
   const { ssrHeadCollection } = useContext(MainContext);
   const [els, forwardNodes] = useMemo(() => parse(props.children), [
     props.children,
@@ -117,3 +117,5 @@ function parse(
   parseFn(node);
   return [els, forwardNodes];
 }
+
+export default Head;

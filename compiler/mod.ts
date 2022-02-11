@@ -1,7 +1,7 @@
 import { Measure } from "../lib/log.ts";
 import init, { transform as swc, transformCSS as parcelCSS } from "./dist/compiler.js";
 import getWasmData from "./dist/wasm.js";
-import { TransformCSSOptions, TransformCSSResult, TransformOptions, TransformResult } from "./types.d.ts";
+import { InlineStyle, TransformCSSOptions, TransformCSSResult, TransformOptions, TransformResult } from "./types.d.ts";
 
 let wasmReady: Promise<void> | boolean = false;
 
@@ -45,11 +45,38 @@ export async function transform(
   options: TransformOptions = {},
 ): Promise<TransformResult> {
   await checkWasmReady();
-  return swc(
-    specifier,
-    code,
-    options,
-  );
+  const { inlineStylePreprocess, ...transformOptions } = options;
+  let { code: jsContent, inlineStyles, ...rest } = swc(specifier, code, transformOptions);
+
+  // resolve inline-style
+  if (inlineStyles) {
+    await Promise.all(
+      Object.entries(inlineStyles as Record<string, InlineStyle>).map(async ([key, style]) => {
+        let tpl = style.quasis.reduce((tpl, quais, i, a) => {
+          tpl += quais;
+          if (i < a.length - 1) {
+            tpl += `%%aleph-inline-style-expr-${i}%%`;
+          }
+          return tpl;
+        }, "")
+          .replace(/\:\s*%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `: var(--aleph-inline-style-expr-${id})`)
+          .replace(/%%aleph-inline-style-expr-(\d+)%%/g, (_, id) => `/*%%aleph-inline-style-expr-${id}%%*/`);
+        if (inlineStylePreprocess !== undefined) {
+          tpl = await inlineStylePreprocess("#" + key, style.type, tpl);
+        }
+        tpl = tpl.replace(
+          /\:\s*var\(--aleph-inline-style-expr-(\d+)\)/g,
+          (_, id) => ": ${" + style.exprs[parseInt(id)] + "}",
+        ).replace(
+          /\/\*%%aleph-inline-style-expr-(\d+)%%\*\//g,
+          (_, id) => "${" + style.exprs[parseInt(id)] + "}",
+        );
+        jsContent = jsContent.replace(`"%%${key}-placeholder%%"`, "`" + tpl + "`");
+      }),
+    );
+  }
+
+  return { code: jsContent, ...rest };
 }
 
 /**

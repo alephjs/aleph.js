@@ -4,6 +4,7 @@ extern crate lazy_static;
 mod css;
 mod error;
 mod import_map;
+mod jsx;
 mod resolve_fold;
 mod resolver;
 mod source_type;
@@ -63,6 +64,8 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
         .unwrap();
     let resolver = Rc::new(RefCell::new(Resolver::new(
         specifier,
+        &options.aleph_pkg_uri,
+        &options.jsx,
         options.import_map,
         options.versions,
         options.is_dev,
@@ -72,7 +75,6 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
         .transform(
             resolver.clone(),
             &EmitOptions {
-                jsx: options.jsx,
                 jsx_import_source: options.jsx_import_source,
                 is_dev: options.is_dev,
             },

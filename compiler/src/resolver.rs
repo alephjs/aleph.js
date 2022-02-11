@@ -1,10 +1,13 @@
 use crate::import_map::{ImportHashMap, ImportMap};
+use indexmap::IndexSet;
 use path_slash::PathBufExt;
 use regex::Regex;
 use relative_path::RelativePath;
 use serde::Deserialize;
 use serde::Serialize;
-use std::{path::Path, path::PathBuf, str::FromStr};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use url::Url;
 
 lazy_static! {
@@ -23,16 +26,34 @@ pub struct DependencyDescriptor {
 
 /// A Resolver to resolve esm import/export URL.
 pub struct Resolver {
+    /// aleph pkg uri
+    pub aleph_pkg_uri: String,
     /// the text specifier associated with the import/export statement.
     pub specifier: String,
     /// a flag indicating if the specifier is a remote(http) url.
     pub specifier_is_remote: bool,
     /// a ordered dependencies of the module
     pub deps: Vec<DependencyDescriptor>,
+    /// jsx library: react | preact
+    pub jsx_lib: String,
+    /// jsx magic tags like `a`, `link`, `head`, etc...
+    pub jsx_magic_tags: IndexSet<String>,
+    /// jsx static class names
+    pub jsx_static_class_names: IndexSet<String>,
+    /// jsx inline styles
+    pub jsx_inline_styles: HashMap<String, InlineStyle>,
     // internal
     import_map: ImportMap,
     versions: Versions,
     is_dev: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InlineStyle {
+    pub r#type: String,
+    pub quasis: Vec<String>,
+    pub exprs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -56,6 +77,8 @@ impl Default for Versions {
 impl Resolver {
     pub fn new(
         specifier: &str,
+        aleph_pkg_uri: &str,
+        jsx_lib: &str,
         import_map: ImportHashMap,
         versions: Versions,
         is_dev: bool,
@@ -64,6 +87,11 @@ impl Resolver {
             specifier: specifier.into(),
             specifier_is_remote: is_remote_url(specifier),
             deps: Vec::new(),
+            jsx_lib: jsx_lib.into(),
+            jsx_magic_tags: IndexSet::new(),
+            jsx_inline_styles: HashMap::new(),
+            jsx_static_class_names: IndexSet::new(),
+            aleph_pkg_uri: aleph_pkg_uri.into(),
             import_map: ImportMap::from_hashmap(import_map),
             versions,
             is_dev,

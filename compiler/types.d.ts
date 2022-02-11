@@ -9,6 +9,13 @@ export type TransformOptions = {
   isDev?: boolean;
   jsx?: string;
   jsx_import_source?: string;
+  inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>;
+};
+
+export type InlineStyle = {
+  type: string;
+  quasis: string[];
+  exprs: string[];
 };
 
 export type TransformResult = {

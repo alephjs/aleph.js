@@ -8,10 +8,10 @@ import {
   useEffect,
   useMemo,
 } from "https://esm.sh/react@17.0.2";
-import util from "../../lib/util.ts";
-import events from "../core/events.ts";
-import { redirect } from "../core/redirect.ts";
-import { useRouter } from "./router.ts";
+import util from "../../../lib/util.ts";
+import events from "../../core/events.ts";
+import { redirect } from "../../core/redirect.ts";
+import { useRouter } from "../router.ts";
 
 const prefetchedPages = new Set<string>();
 
@@ -25,7 +25,7 @@ type AnchorProps = PropsWithChildren<
 /**
  * Anchor Component to link between pages.
  */
-export function Anchor(props: AnchorProps) {
+export default function Anchor(props: AnchorProps) {
   const {
     rel,
     href: propHref,

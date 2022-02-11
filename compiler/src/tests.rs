@@ -12,6 +12,8 @@ fn transform(
     let module = SWC::parse(specifer, source).expect("could not parse module");
     let resolver = Rc::new(RefCell::new(Resolver::new(
         specifer,
+        "https://deno.land/x/aleph",
+        "react",
         ImportHashMap {
             imports,
             scopes: HashMap::new(),
@@ -55,11 +57,7 @@ fn typescript() {
         bar() {}
       }
     "#;
-    let (code, _) = transform(
-        "https://deno.land/x/mod.ts",
-        source,
-        &EmitOptions::default(),
-    );
+    let (code, _) = transform("mod.ts", source, &EmitOptions::default());
     assert!(code.contains("var D;\n(function(D) {\n"));
     assert!(code.contains("_applyDecoratedDescriptor("));
 }
@@ -101,7 +99,7 @@ fn react_jsx_dev() {
       }
     "#;
     let (code, _) = transform(
-        "/app.tsx",
+        "app.tsx",
         source,
         &EmitOptions {
             is_dev: true,
@@ -112,4 +110,69 @@ fn react_jsx_dev() {
     assert!(code.contains("_s()"));
     assert!(code.contains("_c = App"));
     assert!(code.contains("$RefreshReg$(_c, \"App\")"));
+}
+
+#[test]
+fn jsx_magic() {
+    let source = r#"
+      import React from "https://esm.sh/react"
+      export default function Index() {
+        return (
+          <>
+            <head>
+              <title>Hello World!</title>
+              <link rel="stylesheet" href="../style/index.css" />
+            </head>
+            <a href="/about">About</a>
+            <a href="https://github.com">About</a>
+            <a href="/about" target="_blank">About</a>
+          </>
+        )
+      }
+    "#;
+    let (code, resolver) = transform("app.tsx", source, &EmitOptions::default());
+    let r = resolver.borrow();
+    assert!(code.contains(
+        "import __ALEPH__Head from \"/-/deno.land/x/aleph/framework/react/components/Head.ts\""
+    ));
+    assert!(code.contains(
+        "import __ALEPH__Anchor from \"/-/deno.land/x/aleph/framework/react/components/Anchor.ts\""
+    ));
+    assert!(code.contains("React.createElement(\"a\","));
+    assert!(code.contains("React.createElement(__ALEPH__Anchor,"));
+    assert!(code.contains("React.createElement(__ALEPH__Head,"));
+    assert_eq!(r.jsx_magic_tags.len(), 2);
+    assert_eq!(r.deps.len(), 3);
+}
+
+#[test]
+fn jsx_inlie_style() {
+    let source = r#"
+      export default function Index() {
+        const [color, setColor] = useState('white');
+
+        return (
+          <>
+            <style>{`
+              :root {
+                --color: ${color};
+              }
+            `}</style>
+            <style>{`
+              h1 {
+                font-size: 12px;
+              }
+            `}</style>
+          </>
+        )
+      }
+    "#;
+    let (code, resolver) = transform("app.tsx", source, &EmitOptions::default());
+    let r = resolver.borrow();
+    assert!(code.contains(
+      "import __ALEPH__InlineStyle from \"/-/deno.land/x/aleph/framework/react/components/InlineStyle.ts\""
+    ));
+    assert!(code.contains("React.createElement(__ALEPH__InlineStyle,"));
+    assert!(code.contains("__styleId: \"inline-style-"));
+    assert_eq!(r.jsx_inline_styles.len(), 2);
 }
