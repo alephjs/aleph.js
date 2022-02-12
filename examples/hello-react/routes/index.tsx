@@ -1,5 +1,5 @@
 import { useData } from "aleph/react";
-// import "../style/index.css";
+import "../style/index.css";
 
 let count = 0;
 

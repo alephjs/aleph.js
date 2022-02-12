@@ -50,9 +50,11 @@ if (import.meta.main) {
   if (serverEntry) {
     const global = globalThis as any;
     Deno.env.set("ALEPH_ENV", "development");
-    global.__ALEPH_ROUTES = await readRoutes("./routes/**/*.tsx");
     await import(serverEntry);
     const serverHandler = global.__ALEPH_SERVER_HANDLER;
+    if (global.__ALEPH_ROUTES_GLOB) {
+      global.__ALEPH_ROUTES = await readRoutes(global.__ALEPH_ROUTES_GLOB);
+    }
     log.info(`Server ready on http://localhost:${port}`);
     if (certFile && keyFile) {
       await serveTls((req) => serverHandler(req, Deno.env.toObject()), { port, hostname, certFile, keyFile });

@@ -3,7 +3,10 @@ import { Router } from "aleph/react";
 import { serve } from "aleph/server";
 
 serve({
-  ssr: (e: SSREvent) => {
-    return renderToString(<Router ssr={e} />);
+  config: {
+    routes: "./routes/**/*.tsx",
+  },
+  ssr: (ssrEvent) => {
+    return renderToString(<Router ssr={ssrEvent} />);
   },
 });

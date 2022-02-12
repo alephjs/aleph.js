@@ -6,9 +6,11 @@ import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { serveCode } from "./transformer.ts";
-import type { Context, RouteConfig, SSREvent } from "./types.d.ts";
+import type { AlephConfig, AlephJSXConfig, Context, RouteConfig, SSREvent } from "./types.d.ts";
+import { loadDenoJSXConfig } from "./config.ts";
 
 export type ServerOptions = {
+  config?: AlephConfig;
   fetch?: (request: Request, context: Context) => Promise<Response | void> | Response | void;
   ssr?: (e: SSREvent) => string;
 };
@@ -31,13 +33,20 @@ export const serve = (options: ServerOptions) => {
     vendor: "Deno Land Inc.",
   });
 
+  if (options.config?.routes) {
+    // @ts-ignore
+    globalThis.__ALEPH_ROUTES_GLOB = options.config.routes;
+  }
+
   const handler = async (req: Request, env: Record<string, string>) => {
     const url = new URL(req.url);
     const { pathname, searchParams } = url;
+    const jsxConfig: AlephJSXConfig = Object.assign({ jsxMagic: true }, options.config, await loadDenoJSXConfig());
+    const isDev = env.ALEPH_ENV === "development";
 
     /* handle '/-/http_localhost_7070/framework/react/mod.ts' */
     if (pathname.startsWith("/-/")) {
-      return serveCode(pathname, env);
+      return serveCode(pathname, jsxConfig, isDev);
     }
 
     try {
@@ -51,7 +60,7 @@ export const serve = (options: ServerOptions) => {
           builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
           searchParams.has("module")
         ) {
-          return serveCode(pathname, env, stat.mtime);
+          return serveCode(pathname, jsxConfig, isDev, stat.mtime);
         } else {
           const file = await Deno.open(`.${pathname}`, { read: true });
           return new Response(readableStreamFromReader(file), {
@@ -75,8 +84,7 @@ export const serve = (options: ServerOptions) => {
         return new Response("Not found", { status: 404 });
     }
 
-    const isDev = env.ALEPH_ENV === "development";
-    const ctx: Context = { env, data: {}, config: {} };
+    const ctx: Context = { env, data: {} };
     if (util.isFunction(options.fetch)) {
       const resp = options.fetch(req, ctx);
       if (resp instanceof Response) {

@@ -3,11 +3,11 @@ import { transform, transformCSS } from "../compiler/mod.ts";
 import { toLocalPath, toUrl } from "../lib/path.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
-import { resolveImportMap } from "./config.ts";
+import { loadImportMap } from "./config.ts";
+import type { AlephJSXConfig } from "./types.d.ts";
 
-export const serveCode = async (pathname: string, env: Record<string, string>, mtime?: Date) => {
+export const serveCode = async (pathname: string, jsxConfig: AlephJSXConfig, isDev: boolean, mtime?: Date) => {
   const [sepcifier, rawCode] = await readCode(pathname);
-  const isDev = env.ALEPH_ENV === "development";
   let js: string;
   if (pathname.endsWith(".css")) {
     js = await bundleCSS(sepcifier, rawCode, {
@@ -16,8 +16,9 @@ export const serveCode = async (pathname: string, env: Record<string, string>, m
       toJs: true,
     });
   } else {
-    const importMap = await resolveImportMap();
+    const importMap = await loadImportMap();
     const ret = await transform(sepcifier, rawCode, {
+      ...jsxConfig,
       alephPkgUri: getAlephPkgUri(),
       importMap,
       isDev,

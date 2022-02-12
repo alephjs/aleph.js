@@ -1,5 +1,6 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
 import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import type { SSREvent } from "../../server/types.d.ts";
 import events from "../core/events.ts";
 import MainContext from "./context.ts";
 

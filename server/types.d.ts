@@ -1,15 +1,15 @@
 export type AlephConfig = {
   routes?: string;
+  jsxMagic?: boolean;
 };
 
-export type AlephJsxConfig = {
-  readonly runtime?: "react" | "preact";
-  readonly importSource?: string;
-  readonly magic?: boolean;
+export type AlephJSXConfig = {
+  jsxRuntime?: "react" | "preact";
+  jsxImportSource?: string;
+  jsxMagic?: boolean;
 };
 
 export type Context<Data = Record<string, any>, Env = Record<string, string>> = {
-  readonly config: Readonly<AlephConfig> & AlephJsxConfig;
   readonly env: Env;
   readonly data: Data;
 };
