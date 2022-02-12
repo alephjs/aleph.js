@@ -5,21 +5,27 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 
 export async function resolveImportMap(): Promise<ImportMap> {
-  let importMap: ImportMap = { imports: {}, scopes: {} };
   if (Deno.env.get("ALEPH_DEV") && Deno.env.get("ALEPH_DEV_PORT")) {
     const alephPkgUri = `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
-    const { imports } = JSON.parse(await Deno.readTextFile(join(Deno.env.get("ALEPH_ROOT")!, "import_map.json")));
-    Object.assign(importMap.imports, {
-      ...imports,
-      "aleph/": `${alephPkgUri}/`,
-      "aleph/server": `${alephPkgUri}/server/mod.ts`,
-      "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
+    const jsonFile = join(Deno.env.get("ALEPH_ROOT")!, "import_map.json");
+    const stat = await Deno.stat(jsonFile);
+    const { default: { imports, scopes } } = await import(`${jsonFile}#mtime-${stat.mtime?.getTime()}`, {
+      assert: { type: "json" },
     });
+    return {
+      imports: {
+        ...imports,
+        "aleph/": `${alephPkgUri}/`,
+        "aleph/server": `${alephPkgUri}/server/mod.ts`,
+        "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
+      },
+      scopes,
+    };
   } else {
     const global = globalThis as any;
     if (util.isPlainObject(global.__IMPORT_MAP)) {
-      Object.assign(importMap, global.__IMPORT_MAP);
-    } else if (global.__IMPORT_MAP !== undefined) {
+      return global.__IMPORT_MAP;
+    } else if (global.__IMPORT_MAP === undefined) {
       try {
         const importMapFile = await findFile(
           Deno.cwd(),
@@ -28,10 +34,10 @@ export async function resolveImportMap(): Promise<ImportMap> {
         const isDev = Deno.env.get("ALEPH_DEV") === "development";
         if (importMapFile) {
           const m = await readImportMap(importMapFile);
-          Object.assign(importMap, m);
           if (!isDev) {
             global.__IMPORT_MAP = m;
           }
+          return m;
         } else {
           if (!isDev) {
             global.__IMPORT_MAP = null;
@@ -42,7 +48,7 @@ export async function resolveImportMap(): Promise<ImportMap> {
       }
     }
   }
-  return importMap;
+  return { imports: {}, scopes: {} };
 }
 
 export async function readImportMap(importMapFile: string): Promise<ImportMap> {
