@@ -1,4 +1,5 @@
 import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import type { ImportMap } from "../compiler/types.d.ts";
 import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
@@ -9,8 +10,8 @@ export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
   const global = globalThis as any;
   const config: AlephJSXConfig = {};
 
-  if (Deno.env.get("ALEPH_DEV")) {
-    const jsonFile = join(Deno.env.get("ALEPH_ROOT")!, "deno.json");
+  if (Deno.env.get("ALEPH_DEV") && Deno.env.get("ALEPH_DEV_ROOT")) {
+    const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
     const stat = await Deno.stat(jsonFile);
     const { default: { compilerOptions } } = await import(`${jsonFile}#mtime-${stat.mtime?.getTime()}`, {
       assert: { type: "json" },
@@ -27,10 +28,10 @@ export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
     Object.assign(config, global.__DENO_JSX_CONFIG);
   } else if (global.__DENO_JSX_CONFIG === undefined) {
     const jsxConfig: AlephJSXConfig = {};
-    const denoConfigFile = await findFile(Deno.cwd(), ["deno.json", "deno.jsonc"]);
+    const denoConfigFile = await findFile(Deno.cwd(), ["deno.jsonc", "deno.json", "tsconfig.json"]);
     if (denoConfigFile) {
       try {
-        const { compilerOptions } = JSON.parse(await Deno.readTextFile(denoConfigFile));
+        const { compilerOptions } = await parseJSONFile(denoConfigFile);
         if (compilerOptions?.jsx === "react-jsx" && util.isFilledString(compilerOptions?.jsxImportSource)) {
           jsxConfig.jsxImportSource = compilerOptions.jsxImportSource;
           jsxConfig.jsxRuntime = compilerOptions.jsxImportSource.includes("preact") ? "preact" : "react";
@@ -49,9 +50,9 @@ export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
 }
 
 export async function loadImportMap(): Promise<ImportMap> {
-  if (Deno.env.get("ALEPH_DEV") && Deno.env.get("ALEPH_DEV_PORT")) {
+  if (Deno.env.get("ALEPH_DEV") && Deno.env.get("ALEPH_DEV_PORT") && Deno.env.get("ALEPH_DEV_ROOT")) {
     const alephPkgUri = `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
-    const jsonFile = join(Deno.env.get("ALEPH_ROOT")!, "import_map.json");
+    const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "import_map.json");
     const stat = await Deno.stat(jsonFile);
     const { default: { imports, scopes } } = await import(`${jsonFile}#mtime-${stat.mtime?.getTime()}`, {
       assert: { type: "json" },
@@ -90,9 +91,17 @@ export async function loadImportMap(): Promise<ImportMap> {
   return { imports: {}, scopes: {} };
 }
 
+export async function parseJSONFile(jsonFile: string): Promise<any> {
+  let raw = await Deno.readTextFile(jsonFile);
+  if (jsonFile.endsWith(".jsonc")) {
+    return JSONC.parse(raw);
+  }
+  return JSON.parse(raw);
+}
+
 export async function readImportMap(importMapFile: string): Promise<ImportMap> {
   const importMap: ImportMap = { imports: {}, scopes: {} };
-  const data = JSON.parse(await Deno.readTextFile(importMapFile));
+  const data = await parseJSONFile(importMapFile);
   const imports: Record<string, string> = toStringMap(data.imports);
   const scopes: Record<string, Record<string, string>> = {};
   if (util.isPlainObject(data.scopes)) {
@@ -105,25 +114,25 @@ export async function readImportMap(importMapFile: string): Promise<ImportMap> {
 }
 
 function toStringMap(v: any): Record<string, string> {
-  const imports: Record<string, string> = {};
+  const m: Record<string, string> = {};
   if (util.isPlainObject(v)) {
     Object.entries(v).forEach(([key, value]) => {
       if (key === "") {
         return;
       }
       if (util.isFilledString(value)) {
-        imports[key] = value;
+        m[key] = value;
         return;
       }
       if (util.isFilledArray(value)) {
         for (const v of value) {
           if (util.isFilledString(v)) {
-            imports[key] = v;
+            m[key] = v;
             return;
           }
         }
       }
     });
   }
-  return imports;
+  return m;
 }

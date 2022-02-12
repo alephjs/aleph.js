@@ -85,23 +85,25 @@ async function bundleCSS(
 async function readCode(pathname: string): Promise<[string, string]> {
   if (pathname.startsWith("/-/")) {
     const url = toUrl(pathname);
-    return [url, await fetch(url).then((res) => res.text())];
+    const res = await fetch(url);
+    if (res.status >= 400) {
+      throw new Error(`fetch ${url}: ${res.status} - ${res.statusText}`);
+    }
+    return [url, await res.text()];
   }
   return [`.${pathname}`, await Deno.readTextFile(`.${pathname}`)];
 }
 
 function getAlephPkgUri() {
-  // @ts-ignore
-  if (util.isFilledString(globalThis.__ALEPH_PKG_URI)) {
-    // @ts-ignore
-    return globalThis.__ALEPH_PKG_URI;
+  const global = globalThis as any;
+  if (util.isFilledString(global.__ALEPH_PKG_URI)) {
+    return global.__ALEPH_PKG_URI;
   }
   let uri = `https://deno.land/x/aleph@v${VERSION}`;
   const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
   if (DEV_PORT) {
     uri = `http://localhost:${DEV_PORT}`;
   }
-  // @ts-ignore
-  globalThis.__ALEPH_PKG_URI = uri;
+  global.__ALEPH_PKG_URI = uri;
   return uri;
 }

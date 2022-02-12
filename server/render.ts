@@ -2,7 +2,6 @@ import { concat } from "https://deno.land/std@0.125.0/bytes/mod.ts";
 import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
 import getWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
-import { encoder } from "../lib/crypto.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
@@ -96,7 +95,7 @@ export default {
           }
         },
       });
-      rewriter.write(encoder.encode(indexHtml));
+      rewriter.write((new TextEncoder()).encode(indexHtml));
       rewriter.end();
       return new Response(concat(...chunks), { headers });
     } catch (err) {

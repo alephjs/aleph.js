@@ -15,7 +15,7 @@ export type ServerOptions = {
   ssr?: (e: SSREvent) => string;
 };
 
-export const serve = (options: ServerOptions) => {
+export const serve = (options: ServerOptions = {}) => {
   // inject browser navigator polyfill
   Object.assign(globalThis.navigator, {
     connection: {
@@ -41,8 +41,11 @@ export const serve = (options: ServerOptions) => {
   const handler = async (req: Request, env: Record<string, string>) => {
     const url = new URL(req.url);
     const { pathname, searchParams } = url;
-    const jsxConfig: AlephJSXConfig = Object.assign({ jsxMagic: true }, options.config, await loadDenoJSXConfig());
     const isDev = env.ALEPH_ENV === "development";
+    const jsxConfig: AlephJSXConfig = Object.assign(
+      { jsxMagic: options.config?.jsxMagic ?? true },
+      await loadDenoJSXConfig(),
+    );
 
     /* handle '/-/http_localhost_7070/framework/react/mod.ts' */
     if (pathname.startsWith("/-/")) {

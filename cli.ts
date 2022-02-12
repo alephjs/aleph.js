@@ -76,12 +76,6 @@ async function main() {
     Deno.exit(0);
   }
 
-  // set log level
-  const logLevel = getFlag(options, ["L", "log-level"], "info");
-  if (logLevel === "debug") {
-    log.setLevel("debug");
-  }
-
   const command = String(args.shift()) as keyof typeof commands;
 
   // prints command help message
@@ -108,16 +102,41 @@ async function main() {
     return;
   }
 
+  // set log level
+  const logLevel = getFlag(options, ["L", "log-level"], "info");
+  if (logLevel === "debug") {
+    log.setLevel("debug");
+  }
+
   let workingDir: string;
   let importMapFile: string | undefined;
   let denoConfigFile: string | undefined;
   let cliVerison = VERSION;
 
+  // get denoDir
+  const p = Deno.run({
+    cmd: [Deno.execPath(), "info", "--json"],
+    stdout: "piped",
+    stderr: "null",
+  });
+  const output = (new TextDecoder()).decode(await p.output());
+  const { denoDir } = JSON.parse(output);
+  if (util.isString(denoDir)) {
+    Deno.env.set("DENO_DIR", denoDir);
+  }
+  p.close();
+
+  if (command === "dev" || command === "start") {
+    Deno.env.set("ALEPH_PROJECT_PORT", "7070");
+    serveDir({ cwd: resolve(String(args[0] || ".")), port: 7070 });
+    log.debug(`Proxy project on http://localhost:7070`);
+  }
+
   if (Deno.env.get("ALEPH_DEV")) {
     workingDir = Deno.cwd();
     denoConfigFile = resolve("./deno.json");
     importMapFile = resolve("./import_map.json");
-    Deno.env.set("ALEPH_ROOT", workingDir);
+    Deno.env.set("ALEPH_DEV_ROOT", workingDir);
     Deno.env.set("ALEPH_DEV_PORT", "6060");
     serveDir({ cwd: workingDir, port: 6060 });
     log.debug(`Proxy https://deno.land/x/aleph on http://localhost:6060`);
@@ -133,8 +152,8 @@ async function main() {
     );
     if (importMapFile) {
       try {
+        let update: boolean | null = null;
         const importMap = await readImportMap(importMapFile);
-        let updateImportMaps: boolean | null = null;
         for (const key in importMap.imports) {
           const url = importMap.imports[key];
           if (
@@ -142,22 +161,23 @@ async function main() {
           ) {
             const [prefix, rest] = util.splitBy(url, "@");
             const [ver, suffix] = util.splitBy(rest, "/");
-            if (command === "dev" && ver !== "v" + VERSION && updateImportMaps === null) {
-              updateImportMaps = confirm(
+            if (command === "dev" && ver !== "v" + VERSION && update === null) {
+              update = confirm(
                 `You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${
                   basename(importMapFile)
                 }'?`,
               );
-              if (!updateImportMaps) {
+              if (!update) {
                 cliVerison = ver.slice(1);
+                break;
               }
             }
-            if (updateImportMaps) {
+            if (update) {
               importMap.imports[key] = `${prefix}@v${VERSION}/${suffix}`;
             }
           }
         }
-        if (updateImportMaps) {
+        if (update) {
           await Deno.writeTextFile(
             importMapFile,
             JSON.stringify(importMap, undefined, 2),
@@ -195,11 +215,7 @@ async function runCli(command: string, version: string, denoConfigFile?: string,
     cmd.push(`https://deno.land/x/aleph@v${version}/commands/${command}.ts`);
   }
   cmd.push(...Deno.args.slice(1));
-  const p = Deno.run({
-    cmd,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  const p = Deno.run({ cmd, stdout: "inherit", stderr: "inherit" });
   const { code } = await p.status();
   Deno.exit(code);
 }

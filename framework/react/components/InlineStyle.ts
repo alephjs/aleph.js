@@ -3,7 +3,7 @@ import util from "../../../lib/util.ts";
 import { applyCSS, removeCSS } from "../../core/style.ts";
 import Context from "../context.ts";
 
-const inDeno = util.inDeno();
+const inDeno = typeof Deno !== "undefined" && typeof Deno.env === "object";
 const useIsomorphicLayoutEffect = inDeno ? useEffect : useLayoutEffect;
 
 export default function InlineStyle({ children, ...rest }: StyleHTMLAttributes<{}>) {

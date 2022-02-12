@@ -4,17 +4,17 @@ import { getContentType } from "./mime.ts";
 
 export type ServerOptions = {
   port: number;
-  loaders?: Loader[];
   cwd?: string;
+  loaders?: Loader[];
 };
 
 export type Loader = {
-  test: (url: URL) => boolean;
-  load(code: string): Promise<Text> | Text;
+  test: (req: Request) => boolean;
+  load(code: Uint8Array): Promise<Content> | Content;
 };
 
-export type Text = {
-  content: string;
+export type Content = {
+  content: Uint8Array;
   contentType: string;
 };
 
@@ -55,9 +55,9 @@ export async function serveDir(options: ServerOptions) {
         return;
       }
 
-      const loader = options.loaders?.find((loader) => loader.test(url));
+      const loader = options.loaders?.find((loader) => loader.test(request));
       if (loader) {
-        let ret = loader.load(await Deno.readTextFile(filepath));
+        let ret = loader.load(await Deno.readFile(filepath));
         if (ret instanceof Promise) {
           ret = await ret;
         }

@@ -1,7 +1,7 @@
 import { Component, createElement, CSSProperties } from "https://esm.sh/react@17.0.2";
 import util from "../../lib/util.ts";
 
-const inDeno = util.inDeno();
+const inDeno = typeof Deno !== "undefined" && typeof Deno.env === "object";
 
 export class ErrorBoundary extends Component<{}, { error: Error | Promise<any> | null }> {
   constructor(props: {}) {

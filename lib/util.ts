@@ -25,14 +25,6 @@ export default {
     const p = s.slice(0, 8).toLowerCase();
     return p === "https://" || p.slice(0, 7) === "http://";
   },
-  async isUrlOk(url: string): Promise<boolean> {
-    const res = await fetch(url).catch((e) => e);
-    await res.body?.cancel();
-    return res.status === 200;
-  },
-  inDeno(): boolean {
-    return typeof Deno !== "undefined" && typeof Deno.version?.deno === "string";
-  },
   trimPrefix(s: string, prefix: string): string {
     if (prefix !== "" && s.startsWith(prefix)) {
       return s.slice(prefix.length);
@@ -51,21 +43,6 @@ export default {
       return [s.slice(0, i), s.slice(i + 1)];
     }
     return [s, ""];
-  },
-  btoaUrl(s: string) {
-    return btoa(s).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
-  },
-  atobUrl(b64: string) {
-    const b = b64.length % 4;
-    if (b === 3) {
-      b64 += "=";
-    } else if (b === 2) {
-      b64 += "==";
-    } else if (b === 1) {
-      throw new TypeError("Illegal base64 Url String");
-    }
-    b64 = b64.replace(/\-/g, "+").replace(/_/g, "/");
-    return atob(b64);
   },
   appendUrlParams(url: URL, params: Record<string, string>): URL {
     const newUrl = new URL(url);

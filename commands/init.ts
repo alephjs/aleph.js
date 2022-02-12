@@ -1,11 +1,11 @@
 import { Untar } from "https://deno.land/std@0.125.0/archive/tar.ts";
 import { Buffer } from "https://deno.land/std@0.125.0/io/buffer.ts";
-import { readAll } from "https://deno.land/std@0.125.0/streams/conversion.ts";
+import { copy, readAll } from "https://deno.land/std@0.125.0/streams/conversion.ts";
 import { blue, cyan, dim, green, red } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { ensureDir } from "https://deno.land/std@0.125.0/fs/ensure_dir.ts";
 import { join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
-import { ensureTextFile, existsDir } from "../lib/fs.ts";
+import { existsDir } from "../lib/fs.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 
@@ -73,9 +73,8 @@ export default async function (
         await ensureDir(fp);
         continue;
       }
-      await ensureTextFile(fp, "");
-      const file = await Deno.open(fp, { write: true });
-      await Deno.copy(entry, file);
+      const file = await Deno.open(fp, { write: true, create: true });
+      await copy(entry, file);
     }
   }
 
