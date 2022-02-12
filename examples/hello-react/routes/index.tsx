@@ -1,4 +1,3 @@
-import React from "react";
 import { useData } from "aleph/react";
 // import "../style/index.css";
 
@@ -20,9 +19,7 @@ export const data = {
 };
 
 export default function Index() {
-  const { data, isLoading, isMutating, mutation } = useData<
-    { count: number }
-  >();
+  const { data, isLoading, isMutating, mutation } = useData<{ count: number }>();
 
   return (
     <div className="page">
