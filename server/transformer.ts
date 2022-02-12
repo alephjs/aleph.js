@@ -1,26 +1,26 @@
 import { dirname, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { transform, transformCSS } from "../compiler/mod.ts";
-import { toLocalPath, toRemoteUrl } from "../lib/path.ts";
+import { toLocalPath, toUrl } from "../lib/path.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
-import { resolveImportMap } from "./importmap.ts";
+import { resolveImportMap } from "./config.ts";
 
 export const serveCode = async (pathname: string, env: Record<string, string>, mtime?: Date) => {
-  const rawCode = await readCode(pathname);
+  const [sepcifier, rawCode] = await readCode(pathname);
   const isDev = env.ALEPH_ENV === "development";
   let js: string;
   if (pathname.endsWith(".css")) {
-    js = await bundleCSS(pathname, rawCode, {
+    js = await bundleCSS(sepcifier, rawCode, {
       minify: !isDev,
-      cssModules: false,
+      cssModules: pathname.endsWith(".module.css"),
       toJs: true,
     });
   } else {
     const importMap = await resolveImportMap();
-    const ret = await transform(pathname, rawCode, {
+    const ret = await transform(sepcifier, rawCode, {
       alephPkgUri: getAlephPkgUri(),
-      isDev,
       importMap,
+      isDev,
     });
     js = ret.code;
   }
@@ -42,9 +42,13 @@ async function bundleCSS(
   tracing = new Set<string>(),
 ): Promise<string> {
   const eof = options.minify ? "" : "\n";
-  let { code: css, dependencies } = await transformCSS(pathname, rawCode, {
+  let { code: css, dependencies, exports } = await transformCSS(pathname, rawCode, {
     ...options,
     analyzeDependencies: true,
+    drafts: {
+      nesting: true,
+      customMedia: true,
+    },
   });
   if (dependencies && dependencies.length > 0) {
     const csses = await Promise.all(
@@ -54,27 +58,35 @@ async function bundleCSS(
           return "";
         }
         tracing.add(p);
-        return await bundleCSS(p, await readCode(p), { minify: options.minify }, tracing);
+        const [filename, css] = await readCode(p);
+        return await bundleCSS(filename, css, { minify: options.minify }, tracing);
       }),
     );
     css = csses.join(eof) + eof + css;
   }
   if (options.toJs) {
+    const cssModulesExports: Record<string, string> = {};
+    if (exports) {
+      for (const [key, value] of Object.entries(exports)) {
+        cssModulesExports[key] = value.name;
+      }
+    }
     return [
       `import { applyCSS } from "${toLocalPath(getAlephPkgUri())}framework/core/style.ts";`,
       `export const css = ${JSON.stringify(css)};`,
-      `export default ${JSON.stringify({})};`, // todo: moudles
+      `export default ${JSON.stringify(cssModulesExports)};`,
       `applyCSS(${JSON.stringify(pathname)}, { css });`,
     ].join(eof);
   }
   return css;
 }
 
-async function readCode(pathname: string): Promise<string> {
+async function readCode(pathname: string): Promise<[string, string]> {
   if (pathname.startsWith("/-/")) {
-    return await fetch(toRemoteUrl(pathname)).then((res) => res.text());
+    const url = toUrl(pathname);
+    return [url, await fetch(url).then((res) => res.text())];
   }
-  return await Deno.readTextFile(`.${pathname}`);
+  return [`.${pathname}`, await Deno.readTextFile(`.${pathname}`)];
 }
 
 function getAlephPkgUri() {

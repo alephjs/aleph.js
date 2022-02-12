@@ -1,7 +1,7 @@
 import { bold } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { basename, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { parse } from "https://deno.land/std@0.125.0/flags/mod.ts";
-import { readImportMap } from "./server/importmap.ts";
+import { readImportMap } from "./server/config.ts";
 import { getFlag } from "./lib/flags.ts";
 import { existsDir, findFile } from "./lib/fs.ts";
 import log from "./lib/log.ts";

@@ -10,6 +10,7 @@ import {
 } from "https://esm.sh/react@17.0.2";
 import util from "../../../lib/util.ts";
 import MainContext from "../context.ts";
+import InlineStyle from "./InlineStyle.ts";
 
 const Head: FC = (props) => {
   const { ssrHeadCollection } = useContext(MainContext);
@@ -91,9 +92,9 @@ function parse(
           parseFn(props.children);
           break;
 
-        // case InlineStyle:
-        //   forwardNodes.push(createElement(InlineStyle, props))
-        //   break
+        case InlineStyle:
+          forwardNodes.push(createElement(InlineStyle, props));
+          break;
 
         // ingore `script` and `no-script` tag
 

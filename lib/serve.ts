@@ -9,7 +9,7 @@ export type ServerOptions = {
 };
 
 export type Loader = {
-  test: string[];
+  test: (url: URL) => boolean;
   load(code: string): Promise<Text> | Text;
 };
 
@@ -28,17 +28,17 @@ export async function serveDir(options: ServerOptions) {
     }
   };
   const handle = async (request: Request, respondWith: (r: Response | Promise<Response>) => Promise<void>) => {
-    const { pathname } = new URL(request.url);
-    const filepath = join(cwd, pathname);
+    const url = new URL(request.url);
+    const filepath = join(cwd, url.pathname);
     try {
       const stat = await Deno.lstat(filepath);
       if (stat.isDirectory) {
-        const r = Deno.readDir(filepath);
+        const title = basename(cwd) + url.pathname;
         const items: string[] = [];
-        for await (const item of r) {
+        for await (const item of Deno.readDir(filepath)) {
           if (!item.name.startsWith(".")) {
             items.push(
-              `<li><a href='${join(pathname, encodeURI(item.name))}'>${item.name}${
+              `<li><a href='${join(url.pathname, encodeURI(item.name))}'>${item.name}${
                 item.isDirectory ? "/" : ""
               }<a></li>`,
             );
@@ -46,9 +46,7 @@ export async function serveDir(options: ServerOptions) {
         }
         respondWith(
           new Response(
-            `<!DOCTYPE html><title>${basename(cwd)}${pathname}</title><h2>&nbsp;aleph.js${pathname}</h2><ul>${
-              Array.from(items).join("")
-            }</ul>`,
+            `<!DOCTYPE html><title>${title}</title><h2>&nbsp;${title}</h2><ul>${Array.from(items).join("")}</ul>`,
             {
               headers: new Headers({ "Content-Type": "text/html; charset=utf-8" }),
             },
@@ -57,31 +55,28 @@ export async function serveDir(options: ServerOptions) {
         return;
       }
 
-      const ext = basename(filepath).split(".").pop();
-      if (ext) {
-        const loader = options.loaders?.find((loader) => loader.test.includes(ext));
-        if (loader) {
-          let ret = loader.load(await Deno.readTextFile(filepath));
-          if (ret instanceof Promise) {
-            ret = await ret;
-          }
-          respondWith(
-            new Response(ret.content, {
-              headers: {
-                "Content-Type": ret.contentType,
-                "Last-Modified": stat.mtime?.toUTCString() || "",
-              },
-            }),
-          );
-          return;
+      const loader = options.loaders?.find((loader) => loader.test(url));
+      if (loader) {
+        let ret = loader.load(await Deno.readTextFile(filepath));
+        if (ret instanceof Promise) {
+          ret = await ret;
         }
+        respondWith(
+          new Response(ret.content, {
+            headers: {
+              "Content-Type": ret.contentType,
+              "Last-Modified": stat.mtime?.toUTCString() || "",
+            },
+          }),
+        );
+        return;
       }
 
       const file = await Deno.open(filepath, { read: true });
       respondWith(
         new Response(readableStreamFromReader(file), {
           headers: {
-            "Content-Type": getContentType(pathname),
+            "Content-Type": getContentType(filepath),
             "Last-Modified": stat.mtime?.toUTCString() || "",
           },
         }),

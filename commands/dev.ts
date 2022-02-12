@@ -68,7 +68,6 @@ async function readRoutes(glob: string) {
   const reg = globToRegExp(glob);
   const files = await getFiles(Deno.cwd(), (filename) => reg.test(filename));
   return Promise.all(files.map(async (filename) => {
-    const mod = await import(join(Deno.cwd(), filename));
     const [prefix] = glob.split("*");
     const p = "/" + util.splitPath(util.trimPrefix(filename, util.trimSuffix(prefix, "/"))).map((part) => {
       part = part.toLowerCase();
@@ -80,12 +79,17 @@ async function readRoutes(glob: string) {
       return part;
     }).join("/");
     const pathname = util.trimSuffix(util.trimSuffix(p, extname(p)), "/index") || "/";
+    const importUrl = join(Deno.cwd(), filename);
     log.debug(dim("[route]"), pathname);
     return [
+      // @ts-ignore
       new URLPattern({ pathname }),
-      {
-        component: mod.default,
-        data: mod.data,
+      async () => {
+        const mod = await import(importUrl);
+        return {
+          component: mod.default,
+          data: mod.data,
+        };
       },
     ];
   }));

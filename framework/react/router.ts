@@ -1,43 +1,23 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
 import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
-import util from "../../lib/util.ts";
 import events from "../core/events.ts";
 import MainContext from "./context.ts";
 
 export type RouterProps = {
-  ssr?: SSREvent;
+  readonly ssr?: SSREvent;
 };
 
 export const Router: FC<RouterProps> = ({ ssr }) => {
-  const [url, setUrl] = useState<URL>(() => ssr?.url || new URL(self.location?.href || "http://localhost/"));
-  const page = useMemo<{ Component: FC<any>; params: Record<string, string> }>(
-    () => {
-      const gt = (globalThis as any);
-      const pathname = util.cleanPath(url.pathname);
-      const routes: [URLPattern, { component?: FC<any> }][] = gt.__ALEPH_ROUTES;
-      if (util.isArray(routes)) {
-        for (const [pattern, route] of routes) {
-          if (route.component) {
-            const p = pattern.exec({ pathname });
-            if (p) {
-              return { Component: route.component, params: p.pathname.groups };
-            }
-          }
-        }
-      }
-      return gt.__ALEPH_CURRENT_PAGE || { Component: E404, params: {} };
-    },
-    [url],
+  const [url, setUrl] = useState<URL & { _component?: FC<any> }>(() =>
+    ssr?.url || new URL(self.location?.href || "http://localhost/")
   );
-  const pageUrl = useMemo(() => {
-    return Object.keys(page.params).length > 0 ? util.appendUrlParams(url, page.params) : url;
-  }, [url, page]);
   const dataCache = useMemo<any>(() => {
     const cache = new Map();
     const [data, expires] = ssr ? [ssr.data, ssr.dataExpires] : loadSSRDataFromTag();
-    cache.set(pageUrl.pathname + pageUrl.search, { data, expires });
+    cache.set(url.pathname + url.search, { data, expires });
     return cache;
   }, []);
+  const Component = useMemo<FC<any>>(() => ssr?.component || url._component || E404, [url]);
 
   useEffect(() => {
     // remove ssr head elements
@@ -59,14 +39,14 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
     MainContext.Provider,
     {
       value: {
-        url: pageUrl,
+        url,
         setUrl,
         dataCache,
         inlineStyles: new Map(),
         ssrHeadCollection: ssr?.headCollection,
       },
     },
-    createElement(page.Component, { url: pageUrl }),
+    createElement(Component, { url }),
   );
 };
 

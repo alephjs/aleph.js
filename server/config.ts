@@ -9,12 +9,12 @@ export async function resolveImportMap(): Promise<ImportMap> {
   if (Deno.env.get("ALEPH_DEV") && Deno.env.get("ALEPH_DEV_PORT")) {
     const alephPkgUri = `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
     const { imports } = JSON.parse(await Deno.readTextFile(join(Deno.env.get("ALEPH_ROOT")!, "import_map.json")));
-    importMap.imports = {
+    Object.assign(importMap.imports, {
       ...imports,
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
       "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
-    };
+    });
   } else {
     const global = globalThis as any;
     if (util.isPlainObject(global.__IMPORT_MAP)) {

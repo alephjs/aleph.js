@@ -6,6 +6,7 @@ import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { serveCode } from "./transformer.ts";
+import type { Context, RouteConfig, SSREvent } from "./types.d.ts";
 
 export type ServerOptions = {
   fetch?: (request: Request, context: Context) => Promise<Response | void> | Response | void;
@@ -83,18 +84,18 @@ export const serve = (options: ServerOptions) => {
     }
 
     // request page data
-    const routes: [URLPattern, { component?: CallableFunction; data?: Record<string, any> }][] =
-      (self as any).__ALEPH_ROUTES;
+    const routes: RouteConfig[] = (self as any).__ALEPH_ROUTES;
     if (util.isArray(routes)) {
-      for (const [pattern, route] of routes) {
-        if (route.data) {
+      for (const [pattern, load] of routes) {
+        const mod = await load();
+        if (mod.data) {
           const ret = pattern.exec({ pathname });
           if (ret) {
-            if (req.method !== "GET" || req.headers.has("X-Fetch-Data") || route.component === undefined) {
+            if (req.method !== "GET" || req.headers.has("X-Fetch-Data") || mod.component === undefined) {
               const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
-              const fetcher = route.data[req.method.toLowerCase()];
+              const fetcher = mod.data[req.method.toLowerCase()];
               if (util.isFunction(fetcher)) {
-                const allFetcher = route.data.all;
+                const allFetcher = mod.data.all;
                 if (util.isFunction(allFetcher)) {
                   let res = allFetcher(request);
                   if (res instanceof Promise) {

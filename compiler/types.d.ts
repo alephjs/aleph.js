@@ -1,6 +1,6 @@
 export type ImportMap = {
-  imports: Record<string, string>;
-  scopes: Record<string, Record<string, string>>;
+  readonly imports: Record<string, string>;
+  readonly scopes: Record<string, Record<string, string>>;
 };
 
 export type TransformOptions = {
@@ -14,22 +14,22 @@ export type TransformOptions = {
 };
 
 export type InlineStyleExpr = {
-  type: string;
-  quasis: string[];
-  exprs: string[];
+  readonly type: string;
+  readonly quasis: ReadonlyArray<string>;
+  readonly exprs: ReadonlyArray<string>;
 };
 
 export type TransformResult = {
-  code: string;
-  deps?: DependencyDescriptor[];
-  jsxStaticClassNames?: string[];
-  map?: string;
+  readonly code: string;
+  readonly map?: string;
+  readonly deps?: DependencyDescriptor[];
+  readonly jsxStaticClassNames?: ReadonlyArray<string>;
 };
 
 export type DependencyDescriptor = {
-  specifier: string;
-  isDynamic: boolean;
-  isStarExport: boolean;
+  readonly specifier: string;
+  readonly isDynamic: boolean;
+  readonly isStarExport: boolean;
 };
 
 export interface Targets {
@@ -92,87 +92,87 @@ export interface PseudoClasses {
 
 export interface TransformCSSResult {
   /** The transformed code. */
-  code: string;
+  readonly code: string;
   /** The generated source map, if enabled. */
-  map?: string;
+  readonly map?: string;
   /** CSS module exports, if enabled. */
-  exports?: CSSModuleExports;
+  readonly exports?: CSSModuleExports;
   /** `@import` and `url()` dependencies, if enabled. */
-  dependencies?: Dependency[];
+  readonly dependencies?: Dependency[];
 }
 
 export type CSSModuleExports = {
   /** Maps exported (i.e. original) names to local names. */
-  [name: string]: CSSModuleExport;
+  readonly [name: string]: CSSModuleExport;
 };
 
 export interface CSSModuleExport {
   /** The local (compiled) name for this export. */
-  name: string;
+  readonly name: string;
   /** Whether the export is referenced in this file. */
-  isReferenced: boolean;
+  readonly isReferenced: boolean;
   /** Other names that are composed by this export. */
-  composes: CSSModuleReference[];
+  readonly composes: CSSModuleReference[];
 }
 
 export type CSSModuleReference = LocalCSSModuleReference | GlobalCSSModuleReference | DependencyCSSModuleReference;
 
 export interface LocalCSSModuleReference {
-  type: "local";
+  readonly type: "local";
   /** The local (compiled) name for the reference. */
-  name: string;
+  readonly name: string;
 }
 
 export interface GlobalCSSModuleReference {
-  type: "global";
+  readonly type: "global";
   /** The referenced global name. */
-  name: string;
+  readonly name: string;
 }
 
 export interface DependencyCSSModuleReference {
-  type: "dependency";
+  readonly type: "dependency";
   /** The name to reference within the dependency. */
-  name: string;
+  readonly name: string;
   /** The dependency specifier for the referenced file. */
-  specifier: string;
+  readonly specifier: string;
 }
 
 export type Dependency = ImportDependency | UrlDependency;
 
 export interface ImportDependency {
-  type: "import";
+  readonly type: "import";
   /** The url of the `@import` dependency. */
-  url: string;
+  readonly url: string;
   /** The media query for the `@import` rule. */
-  media: string | null;
+  readonly media: string | null;
   /** The `supports()` query for the `@import` rule. */
-  supports: string | null;
+  readonly supports: string | null;
   /** The source location where the `@import` rule was found. */
-  loc: SourceLocation;
+  readonly loc: SourceLocation;
 }
 
 export interface UrlDependency {
-  type: "url";
+  readonly type: "url";
   /** The url of the dependency. */
-  url: string;
+  readonly url: string;
   /** The source location where the `url()` was found. */
-  loc: SourceLocation;
+  readonly loc: SourceLocation;
   /** The placeholder that the url was replaced with. */
-  placeholder: string;
+  readonly placeholder: string;
 }
 
 export interface SourceLocation {
   /** The file path in which the dependency exists. */
-  filePath: string;
+  readonly filePath: string;
   /** The start location of the dependency. */
-  start: Location;
+  readonly start: Location;
   /** The end location (inclusive) of the dependency. */
-  end: Location;
+  readonly end: Location;
 }
 
 export interface Location {
   /** The line number (1-based). */
-  line: number;
+  readonly line: number;
   /** The column number (0-based). */
-  column: number;
+  readonly column: number;
 }

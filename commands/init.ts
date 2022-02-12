@@ -108,7 +108,8 @@ export default async function (
       "types": [
         `https://deno.land/x/aleph@v${VERSION}/types.d.ts`,
       ],
-      "jsx": "react",
+      "jsx": "react-jsx",
+      "jsxImportSource": `https://esm.sh/react@${defaultReactVersion}`,
     },
     "format": {},
     "lint": {},

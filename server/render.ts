@@ -5,12 +5,13 @@ import wasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import util from "../lib/util.ts";
 import { encoder } from "../lib/crypto.ts";
 import { VERSION } from "../version.ts";
+import type { Context, RouteConfig, SSREvent } from "./types.d.ts";
 
 let lolHtmlReady = false;
 
 type Options = {
   indexHtml: string;
-  ssrFn?: (e: any) => string;
+  ssrFn?: (e: SSREvent) => string;
 };
 
 export default {
@@ -27,25 +28,19 @@ export default {
     });
 
     if (ssrFn) {
-      // get data
-      const dataRes = await fetchData(req, ctx);
-      if (dataRes instanceof Response) {
-        return dataRes;
+      // get route
+      const route = await getRoute(req, ctx);
+      if (route instanceof Response) {
+        return route;
       }
+
       // ssr
       const headCollection: string[] = [];
-      const ssrBody = ssrFn({
-        data: dataRes?.data,
-        url: new URL(req.url),
-        headCollection,
-      });
+      const ssrBody = ssrFn({ ...route, headCollection });
       rewriter.on("ssr-head", {
         element(el: Element) {
-          // if (ssr.css) {
-          //   el.before(`<style>${ssr.css}</style>`, { html: true });
-          // }
-          if (dataRes?.data) {
-            el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(dataRes?.data)}</script>`, {
+          if (route?.data) {
+            el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(route?.data)}</script>`, {
               html: true,
             });
           }
@@ -58,8 +53,8 @@ export default {
           el.replace(ssrBody, { html: true });
         },
       });
-      if (util.isNumber(dataRes?.cacheTtl)) {
-        headers.append("Cache-Control", `public, max-age=${dataRes?.cacheTtl}`);
+      if (util.isNumber(route?.dataExpires)) {
+        headers.append("Cache-Control", `public, max-age=${route?.dataExpires}`);
       } else {
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
       }
@@ -105,25 +100,29 @@ export default {
   },
 };
 
-async function fetchData(
+async function getRoute(
   req: Request,
-  ctx: any,
-): Promise<void | Response | { data: object; cacheTtl?: number }> {
+  ctx: Context,
+): Promise<Response | { url: URL; component?: any; data?: any; dataExpires?: number }> {
   const url = new URL(req.url);
   const pathname = util.cleanPath(url.pathname);
-  const routes: [URLPattern, { data?: Record<string, any> }][] = (self as any).__ALEPH_ROUTES;
+  const routes: RouteConfig[] = (self as any).__ALEPH_ROUTES;
   if (util.isArray(routes)) {
-    for (const [pattern, route] of routes) {
-      if (route.data) {
-        const ret = pattern.exec({ pathname });
-        if (ret) {
-          const request = new Request(
-            util.appendUrlParams(url, ret.pathname.groups).toString(),
-            req,
-          );
-          const fetcher = route.data.get;
+    for (const [pattern, load] of routes) {
+      const mod = await load();
+      const route = {
+        url,
+        component: mod.component,
+        dataExpires: mod.data?.cacheTtl,
+      };
+      const ret = pattern.exec({ pathname });
+      if (ret) {
+        route.url = util.appendUrlParams(url, ret.pathname.groups);
+        const request = new Request(route.url.toString(), req);
+        if (mod.data) {
+          const fetcher = mod.data.get;
           if (util.isFunction(fetcher)) {
-            const allFetcher = route.data.all;
+            const allFetcher = mod.data.all;
             if (util.isFunction(allFetcher)) {
               let res = allFetcher(request);
               if (res instanceof Promise) {
@@ -141,14 +140,14 @@ async function fetchData(
               if (res.status !== 200) {
                 return res;
               }
-              return {
-                data: await res.json(),
-                cacheTtl: route.data.cacheTtl,
-              };
+              // @ts-ignore
+              route.data = await res.json();
             }
           }
         }
       }
+      return route;
     }
   }
+  return { url };
 }

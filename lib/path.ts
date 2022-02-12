@@ -45,7 +45,7 @@ export function toLocalPath(url: string, defaultExtname = "js"): string {
  * fix local path to remote url
  * e.g.: /-/esm.sh/react@17.0.2?target=es2018 -> https://esm.sh/react@17.0.2?target=es2018
  */
-export function toRemoteUrl(pathname: string) {
+export function toUrl(pathname: string) {
   let [h, ...rest] = pathname.substring(3).split("/");
   let protocol = "https";
   if (h.startsWith("http_")) {
