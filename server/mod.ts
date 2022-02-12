@@ -75,6 +75,7 @@ export const serve = (options: ServerOptions) => {
         return new Response("Not found", { status: 404 });
     }
 
+    const isDev = env.ALEPH_ENV === "development";
     const ctx: Context = { env, data: {}, config: {} };
     if (util.isFunction(options.fetch)) {
       const resp = options.fetch(req, ctx);
@@ -87,11 +88,11 @@ export const serve = (options: ServerOptions) => {
     const routes: RouteConfig[] = (self as any).__ALEPH_ROUTES;
     if (util.isArray(routes)) {
       for (const [pattern, load] of routes) {
-        const mod = await load();
-        if (mod.data) {
-          const ret = pattern.exec({ pathname });
-          if (ret) {
-            if (req.method !== "GET" || req.headers.has("X-Fetch-Data") || mod.component === undefined) {
+        const ret = pattern.exec({ pathname });
+        if (ret) {
+          try {
+            const mod = await load();
+            if (mod.data && (req.method !== "GET" || mod.component === undefined || req.headers.has("X-Fetch-Data"))) {
               const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
               const fetcher = mod.data[req.method.toLowerCase()];
               if (util.isFunction(fetcher)) {
@@ -109,6 +110,9 @@ export const serve = (options: ServerOptions) => {
               }
               return new Response("Method not allowed", { status: 405 });
             }
+          } catch (err) {
+            log.error(err.stack);
+            return new Response(isDev ? err.message.split("\n")[0] : "Internal Server Error", { status: 500 });
           }
         }
       }
@@ -128,12 +132,13 @@ export const serve = (options: ServerOptions) => {
           indexHtml = null;
         } else {
           log.error(err);
-          return new Response("Internal Server Error", { status: 500 });
+          return new Response(isDev ? err.message.split("\n")[0] : "Internal Server Error", { status: 500 });
         }
       }
     }
 
-    if (env.ALEPH_ENV !== "development") {
+    // cache indexHtml to global(memory) in production env
+    if (!isDev) {
       (globalThis as any).__ALEPH_INDEX_HTML = indexHtml;
     }
 
