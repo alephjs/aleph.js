@@ -24,16 +24,18 @@ use swc_ecmascript::{
 /// Options for transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
+    pub jsx_magic: bool,
     pub jsx_import_source: String,
-    pub analyze_jsx_static_class_names: bool,
+    pub minify: bool,
     pub is_dev: bool,
 }
 
 impl Default for EmitOptions {
     fn default() -> Self {
         EmitOptions {
+            jsx_magic: false,
             jsx_import_source: "".into(),
-            analyze_jsx_static_class_names: false,
+            minify: false,
             is_dev: false,
         }
     }
@@ -128,13 +130,8 @@ impl SWC {
             let passes = chain!(
                 resolver_with_mark(top_level_mark),
                 Optional::new(
-                    jsx_magic_fold(
-                        resolver.clone(),
-                        self.source_map.clone(),
-                        options.analyze_jsx_static_class_names,
-                        options.is_dev
-                    ),
-                    is_jsx
+                    jsx_magic_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+                    is_jsx && options.jsx_magic
                 ),
                 resolve_fold(resolver.clone()),
                 decorators::decorators(decorators::Config {
@@ -185,7 +182,9 @@ impl SWC {
                 hygiene()
             );
 
-            Ok(self.apply_fold(passes, options.is_dev).unwrap())
+            Ok(self
+                .apply_fold(passes, options.is_dev, options.minify)
+                .unwrap())
         })
     }
 
@@ -193,7 +192,8 @@ impl SWC {
     pub fn apply_fold<T: Fold>(
         &self,
         mut fold: T,
-        is_dev: bool,
+        source_map: bool,
+        minify: bool,
     ) -> Result<(String, Option<String>), anyhow::Error> {
         let program = Program::Module(self.module.clone());
         let program = helpers::HELPERS.set(&helpers::Helpers::new(false), || {
@@ -201,7 +201,11 @@ impl SWC {
         });
         let mut buf = Vec::new();
         let mut src_map_buf = Vec::new();
-        let src_map = if is_dev { Some(&mut src_map_buf) } else { None };
+        let src_map = if source_map {
+            Some(&mut src_map_buf)
+        } else {
+            None
+        };
         {
             let writer = Box::new(JsWriter::new(
                 self.source_map.clone(),
@@ -210,7 +214,7 @@ impl SWC {
                 src_map,
             ));
             let mut emitter = swc_ecmascript::codegen::Emitter {
-                cfg: swc_ecmascript::codegen::Config { minify: !is_dev },
+                cfg: swc_ecmascript::codegen::Config { minify },
                 comments: Some(&self.comments),
                 cm: self.source_map.clone(),
                 wr: writer,
@@ -220,7 +224,7 @@ impl SWC {
 
         // output
         let src = String::from_utf8(buf).unwrap();
-        if is_dev {
+        if source_map {
             let mut buf = Vec::new();
             self.source_map
                 .build_source_map_from(&mut src_map_buf, None)

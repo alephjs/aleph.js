@@ -6,7 +6,7 @@ export type ImportMap = {
 export type TransformOptions = {
   alephPkgUri?: string;
   importMap?: ImportMap;
-  analyzeJsxStaticClassNames?: boolean;
+  jsxMagic?: boolean;
   jsxRuntime?: "react" | "preact";
   jsxImportSource?: string;
   isDev?: boolean;

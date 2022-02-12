@@ -30,9 +30,6 @@ pub struct Options {
     pub is_dev: bool,
 
     #[serde(default)]
-    pub analyze_jsx_static_class_names: bool,
-
-    #[serde(default)]
     pub import_map: ImportHashMap,
 
     #[serde(default)]
@@ -43,6 +40,9 @@ pub struct Options {
 
     #[serde(default)]
     pub jsx_import_source: String,
+
+    #[serde(default)]
+    pub jsx_magic: bool,
 }
 
 fn default_jsx_runtime() -> String {
@@ -85,8 +85,9 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
         .transform(
             resolver.clone(),
             &EmitOptions {
+                jsx_magic: options.jsx_magic,
                 jsx_import_source: options.jsx_import_source,
-                analyze_jsx_static_class_names: options.analyze_jsx_static_class_names,
+                minify: !options.is_dev,
                 is_dev: options.is_dev,
             },
         )

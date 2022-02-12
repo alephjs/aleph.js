@@ -130,7 +130,14 @@ fn jsx_magic() {
         )
       }
     "#;
-    let (code, resolver) = transform("app.tsx", source, &EmitOptions::default());
+    let (code, resolver) = transform(
+        "app.tsx",
+        source,
+        &EmitOptions {
+            jsx_magic: true,
+            ..Default::default()
+        },
+    );
     let r = resolver.borrow();
     assert!(code.contains(
         "import __ALEPH__Head from \"/-/deno.land/x/aleph/framework/react/components/Head.ts\""
@@ -167,7 +174,14 @@ fn jsx_inlie_style() {
         )
       }
     "#;
-    let (code, resolver) = transform("app.tsx", source, &EmitOptions::default());
+    let (code, resolver) = transform(
+        "app.tsx",
+        source,
+        &EmitOptions {
+            jsx_magic: true,
+            ..Default::default()
+        },
+    );
     let r = resolver.borrow();
     assert!(code.contains(
       "import __ALEPH__InlineStyle from \"/-/deno.land/x/aleph/framework/react/components/InlineStyle.ts\""
