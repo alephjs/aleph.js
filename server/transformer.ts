@@ -1,9 +1,7 @@
 import { dirname, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { transform, transformCSS } from "../compiler/mod.ts";
-import { toLocalPath, toUrl } from "../lib/path.ts";
-import util from "../lib/util.ts";
-import { VERSION } from "../version.ts";
-import { loadImportMap } from "./config.ts";
+import { restoreUrl, toLocalPath } from "../lib/path.ts";
+import { getAlephPkgUri, loadImportMap } from "./config.ts";
 import type { AlephJSXConfig } from "./types.d.ts";
 
 export const serveCode = async (pathname: string, jsxConfig: AlephJSXConfig, isDev: boolean, mtime?: Date) => {
@@ -84,7 +82,7 @@ async function bundleCSS(
 
 async function readCode(pathname: string): Promise<[string, string]> {
   if (pathname.startsWith("/-/")) {
-    const url = toUrl(pathname);
+    const url = restoreUrl(pathname);
     const res = await fetch(url);
     if (res.status >= 400) {
       throw new Error(`fetch ${url}: ${res.status} - ${res.statusText}`);
@@ -92,18 +90,4 @@ async function readCode(pathname: string): Promise<[string, string]> {
     return [url, await res.text()];
   }
   return [`.${pathname}`, await Deno.readTextFile(`.${pathname}`)];
-}
-
-function getAlephPkgUri() {
-  const global = globalThis as any;
-  if (util.isFilledString(global.__ALEPH_PKG_URI)) {
-    return global.__ALEPH_PKG_URI;
-  }
-  let uri = `https://deno.land/x/aleph@v${VERSION}`;
-  const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
-  if (DEV_PORT) {
-    uri = `http://localhost:${DEV_PORT}`;
-  }
-  global.__ALEPH_PKG_URI = uri;
-  return uri;
 }

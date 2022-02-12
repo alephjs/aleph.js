@@ -10,6 +10,35 @@ export enum Level {
   Fatal = 4,
 }
 
+export class Timing {
+  #t: number;
+
+  constructor(quit?: boolean) {
+    this.#t = !quit ? performance.now() : 0;
+  }
+
+  reset() {
+    if (this.#t > 0) {
+      this.#t = performance.now();
+    }
+  }
+
+  stop(message: string) {
+    if (this.#t > 0) {
+      const now = performance.now();
+      const d = Math.round(now - this.#t);
+      let cf = green;
+      if (d > 10000) {
+        cf = red;
+      } else if (d > 1000) {
+        cf = yellow;
+      }
+      this.#t = now;
+      console.debug(dim("TIMING"), message, "in", cf(d + "ms"));
+    }
+  }
+}
+
 export class Logger {
   #level: Level = Level.Info;
 
@@ -67,39 +96,11 @@ export class Logger {
       Deno.exit(1);
     }
   }
-}
 
-export class Measure {
-  #t: number;
-
-  constructor() {
-    this.#t = logger.level === Level.Debug ? performance.now() : 0;
-  }
-
-  reset() {
-    if (this.#t > 0) {
-      this.#t = performance.now();
-    }
-  }
-
-  stop(message: string) {
-    if (this.#t > 0) {
-      const now = performance.now();
-      const d = Math.round(now - this.#t);
-      let cf = green;
-      if (d > 10000) {
-        cf = red;
-      } else if (d > 1000) {
-        cf = yellow;
-      }
-      this.#t = now;
-      console.debug(dim("TIMING"), message, "in", cf(d + "ms"));
-    }
+  timing(): Timing {
+    return new Timing(this.level === Level.Debug);
   }
 }
 
-const logger = new Logger();
-
-export default logger;
-
+export default new Logger();
 export { blue, dim, green, red, yellow };

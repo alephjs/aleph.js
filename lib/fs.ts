@@ -26,12 +26,10 @@ export async function existsFile(path: string): Promise<boolean> {
   }
 }
 
-export async function findFile(
-  wd: string,
-  filenames: string[],
-): Promise<string | undefined> {
+/* find file in the directory */
+export async function findFile(dir: string, filenames: string[]): Promise<string | undefined> {
   for (const filename of filenames) {
-    const fullPath = join(wd, filename);
+    const fullPath = join(dir, filename);
     if (await existsFile(fullPath)) {
       return fullPath;
     }

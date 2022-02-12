@@ -1,4 +1,3 @@
-import { Measure } from "../lib/log.ts";
 import init, { transform as swc, transformCSS as parcelCSS } from "./dist/compiler.js";
 import getWasmData from "./dist/wasm.js";
 import {
@@ -12,16 +11,13 @@ import {
 let wasmReady: Promise<void> | boolean = false;
 
 async function checkWasmReady() {
-  let ms: Measure | null = null;
   if (wasmReady === false) {
-    ms = new Measure();
     wasmReady = initWasm();
   }
   if (wasmReady instanceof Promise) {
     await wasmReady;
     wasmReady = true;
   }
-  ms?.stop("init compiler wasm");
 }
 
 async function initWasm() {
@@ -39,7 +35,7 @@ async function initWasm() {
  *    import React from 'https://esm.sh/react';
  *
  *    export default App() {
- *      return <h1>Hello World</h1>
+ *      return <h1>Hello world!</h1>
  *    }
  *   `
  * )

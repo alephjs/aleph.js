@@ -1,22 +1,6 @@
-import { relative } from "https://deno.land/std@0.125.0/path/mod.ts";
 import util from "./util.ts";
 
-const reLocalhostUrl = /^https?:\/\/(localhost|0\.0\.0\.0|127\.0\.0\.1)(\:|\/|$)/;
-const builtinModuleExts = ["tsx", "jsx", "ts", "js", "mjs", "mts"];
-
-/** check whether it is a localhost url. */
-export function isLocalhostUrl(url: string): boolean {
-  return reLocalhostUrl.test(url);
-}
-
-/** get the relative path from `from` to `to`. */
-export function toRelativePath(from: string, to: string): string {
-  const p = relative(from, to).replaceAll("\\", "/");
-  if (!p.startsWith(".") && !p.startsWith("/")) {
-    return "./" + p;
-  }
-  return p;
-}
+export const builtinModuleExts = ["tsx", "jsx", "ts", "js", "mjs", "mts"];
 
 /**
  * fix remote url to local path
@@ -42,10 +26,10 @@ export function toLocalPath(url: string, defaultExtname = "js"): string {
 }
 
 /**
- * fix local path to remote url
+ * store local path to remote url
  * e.g.: /-/esm.sh/react@17.0.2?target=es2018 -> https://esm.sh/react@17.0.2?target=es2018
  */
-export function toUrl(pathname: string) {
+export function restoreUrl(pathname: string) {
   let [h, ...rest] = pathname.substring(3).split("/");
   let protocol = "https";
   if (h.startsWith("http_")) {
@@ -55,5 +39,3 @@ export function toUrl(pathname: string) {
   const [host, port] = h.split("_");
   return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
 }
-
-export { builtinModuleExts };

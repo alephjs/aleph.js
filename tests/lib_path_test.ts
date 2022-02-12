@@ -1,11 +1,5 @@
 import { assertEquals } from "std/testing/asserts.ts";
-import { toLocalPath, toRelativePath } from "../lib/path.ts";
-
-Deno.test("lib/path: toRelativePath", () => {
-  assertEquals(toRelativePath("/baz/foobar", "/baz/aleph"), "../aleph");
-  assertEquals(toRelativePath("baz/foobar", "baz/aleph"), "../aleph");
-  assertEquals(toRelativePath("baz/foobar", "baz/foobar/aleph"), "./aleph");
-});
+import { restoreUrl, toLocalPath } from "../lib/path.ts";
 
 Deno.test("lib/path: toLocalPath", () => {
   assertEquals(toLocalPath("https://foo.com/lib@0.1.0?action"), "/-/foo.com/lib@0.1.0?action");
@@ -14,4 +8,11 @@ Deno.test("lib/path: toLocalPath", () => {
   assertEquals(toLocalPath("http://foo.com:8080/bar"), "/-/http_foo.com_8080/bar");
   assertEquals(toLocalPath("file://foo/bar/"), "file://foo/bar/");
   assertEquals(toLocalPath("/foo/bar/"), "/foo/bar/");
+});
+
+Deno.test("lib/path: restoreUrl", () => {
+  assertEquals(restoreUrl("/-/foo.com/lib@0.1.0?action"), "https://foo.com/lib@0.1.0?action");
+  assertEquals(restoreUrl("/-/deno.land/x/aleph@v0.3.0-alpha.29/"), "https://deno.land/x/aleph@v0.3.0-alpha.29/");
+  assertEquals(restoreUrl("/-/http_foo.com/bar?lang=us-en"), "http://foo.com/bar?lang=us-en");
+  assertEquals(restoreUrl("/-/http_foo.com_8080/bar"), "http://foo.com:8080/bar");
 });

@@ -4,7 +4,22 @@ import type { ImportMap } from "../compiler/types.d.ts";
 import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
+import { VERSION } from "../version.ts";
 import type { AlephJSXConfig } from "./types.d.ts";
+
+export function getAlephPkgUri() {
+  const global = globalThis as any;
+  if (util.isFilledString(global.__ALEPH_PKG_URI)) {
+    return global.__ALEPH_PKG_URI;
+  }
+  let uri = `https://deno.land/x/aleph@v${VERSION}`;
+  const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
+  if (DEV_PORT) {
+    uri = `http://localhost:${DEV_PORT}`;
+  }
+  global.__ALEPH_PKG_URI = uri;
+  return uri;
+}
 
 export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
   const global = globalThis as any;

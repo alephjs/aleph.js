@@ -93,19 +93,4 @@ export default {
       }, delay);
     }) as any;
   },
-  debounceById(id: string, callback: () => void, delay: number) {
-    const self = this as any;
-    const timers: Map<string, number> = self.__debounce_timers ||
-      (self.__debounce_timers = new Map());
-    if (timers.has(id)) {
-      clearTimeout(timers.get(id)!);
-    }
-    timers.set(
-      id,
-      setTimeout(() => {
-        timers.delete(id);
-        callback();
-      }, delay),
-    );
-  },
 };

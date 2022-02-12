@@ -57,17 +57,4 @@ Deno.test("lib/util", async () => {
   assertEquals(n, 1);
   await delay(75);
   assertEquals(n, 2);
-
-  // test `debounceById`
-  n = 0;
-  util.debounceById("id", () => n++, 50);
-  assertEquals(n, 0);
-  await delay(75);
-  assertEquals(n, 1);
-  util.debounceById("id", () => n += 1, 50);
-  util.debounceById("id", () => n += 2, 50);
-  util.debounceById("id", () => n += 3, 50);
-  assertEquals(n, 1);
-  await delay(75);
-  assertEquals(n, 4);
 });
