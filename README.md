@@ -5,35 +5,21 @@
   <a href="https://twitter.com/intent/follow?screen_name=alephjs"><img src="https://img.shields.io/twitter/follow/alephjs?style=social" alt="Twitter"></a>
 </p>
 
+## Features
+
+- Modern tooling in Deno
+- Follow the web standard
+- Filesystem routing
+- Static file server
+- Multiple UI library support (React, Vue, and more...)
+- Server side rendering
+- Middlewares
+- Plugins
+- Severless friendly
+
 ## Getting Started
 
 Visit [https://alephjs.org/docs/get-started](https://alephjs.org/docs/get-started) to get started with Aleph.js.
-
-
-## Description
-
-Aleph.js (or **Aleph** or **א** or **阿莱夫**, **ˈɑːlɛf**) is a fullstack framework in [Deno](https://deno.land/).
-
-> The name is taken from the book [_The Aleph_]( http://phinnweb.org/links/literature/borges/aleph.html)
- by [Jorge Luis Borges](http://phinnweb.org/links/literature/borges/aleph.html).
-
-Aleph.js is a modern tool to build your web applications. It transpiles code using [swc](https://swc.rs/) with high performance, and bundles modules with [esbuild](https://github.com/evanw/esbuild) at build time extremely fast.
-
-Aleph.js works in Deno, a simple, modern and secure runtime for JavaScript and TypeScript. All dependencies are imported using URLs, and managed by Deno cache system. No `package.json` and `node_modules` directory needed.
-
-```ts
-import React from 'https://esm.sh/react'
-import Logo from '../components/logo.tsx'
-
-export default function App() {
-  return (
-    <div>
-      <Logo />
-      <h1>Hello World!</h1>
-    </div>
-  )
-}
-```
 
 ## Community
 
