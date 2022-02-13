@@ -6,7 +6,7 @@ export const builtinModuleExts = ["tsx", "jsx", "ts", "js", "mjs", "mts"];
  * fix remote url to local path
  * e.g.: https://esm.sh/react@17.0.2?target=es2018 -> /-/esm.sh/react@17.0.2?target=es2018
  */
-export function toLocalPath(url: string, defaultExtname = "js"): string {
+export function toLocalPath(url: string): string {
   if (util.isLikelyHttpURL(url)) {
     let { hostname, pathname, port, protocol, search } = new URL(url);
     const isHttp = protocol === "http:";

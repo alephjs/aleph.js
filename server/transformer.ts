@@ -1,8 +1,29 @@
 import { dirname, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { transform, transformCSS } from "../compiler/mod.ts";
 import { restoreUrl, toLocalPath } from "../lib/path.ts";
+import { Loader, serveDir } from "../lib/serve.ts";
+import util from "../lib/util.ts";
 import { getAlephPkgUri, loadImportMap } from "./config.ts";
 import type { AlephJSXConfig } from "./types.d.ts";
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+const cssLoader: Loader = {
+  test: (url) => url.endsWith(".css"),
+  load: async (url, rawContent) => {
+    const { pathname } = new URL(url);
+    const js = await bundleCSS(`.${pathname}`, dec.decode(rawContent), {
+      minify: Deno.env.get("ALEPH_ENV") !== "development",
+      cssModules: pathname.endsWith(".module.css"),
+      toJS: true,
+    });
+    return {
+      content: enc.encode(js),
+      contentType: "application/javascript; charset=utf-8",
+    };
+  },
+};
 
 export const serveCode = async (pathname: string, jsxConfig: AlephJSXConfig, isDev: boolean, mtime?: Date) => {
   const [sepcifier, rawCode] = await readCode(pathname);
@@ -11,7 +32,8 @@ export const serveCode = async (pathname: string, jsxConfig: AlephJSXConfig, isD
     js = await bundleCSS(sepcifier, rawCode, {
       minify: !isDev,
       cssModules: pathname.endsWith(".module.css"),
-      toJs: true,
+      toJS: true,
+      resolveAlephPkgUri: true,
     });
   } else {
     const importMap = await loadImportMap();
@@ -30,18 +52,24 @@ export const serveCode = async (pathname: string, jsxConfig: AlephJSXConfig, isD
   return new Response(js, { headers });
 };
 
+export function proxyProject(cwd: string, port: number) {
+  serveDir({ cwd, port, loaders: [cssLoader] });
+  Deno.env.set("ALEPH_BUILD_PORT", port.toString());
+}
+
 async function bundleCSS(
-  pathname: string,
+  sepcifier: string,
   rawCode: string,
   options: {
     minify?: boolean;
     cssModules?: boolean;
-    toJs?: boolean;
+    toJS?: boolean;
+    resolveAlephPkgUri?: boolean;
   },
   tracing = new Set<string>(),
 ): Promise<string> {
   const eof = options.minify ? "" : "\n";
-  let { code: css, dependencies, exports } = await transformCSS(pathname, rawCode, {
+  let { code: css, dependencies, exports } = await transformCSS(sepcifier, rawCode, {
     ...options,
     analyzeDependencies: true,
     drafts: {
@@ -52,18 +80,20 @@ async function bundleCSS(
   if (dependencies && dependencies.length > 0) {
     const csses = await Promise.all(
       dependencies.filter((dep) => dep.type === "import").map(async (dep) => {
+        const pathname = util.isLikelyHttpURL(sepcifier) ? toLocalPath(sepcifier) : sepcifier;
         const p = join(dirname(pathname), dep.url);
         if (tracing.has(p)) {
           return "";
         }
         tracing.add(p);
-        const [filename, css] = await readCode(p);
-        return await bundleCSS(filename, css, { minify: options.minify }, tracing);
+        const [s, css] = await readCode(p);
+        return await bundleCSS(s, css, { minify: options.minify }, tracing);
       }),
     );
     css = csses.join(eof) + eof + css;
   }
-  if (options.toJs) {
+  if (options.toJS) {
+    const alephPkgUri = getAlephPkgUri();
     const cssModulesExports: Record<string, string> = {};
     if (exports) {
       for (const [key, value] of Object.entries(exports)) {
@@ -71,10 +101,12 @@ async function bundleCSS(
       }
     }
     return [
-      `import { applyCSS } from "${toLocalPath(getAlephPkgUri())}framework/core/style.ts";`,
+      `import { applyCSS } from "${
+        options.resolveAlephPkgUri ? toLocalPath(alephPkgUri).slice(0, -1) : alephPkgUri
+      }/framework/core/style.ts";`,
       `export const css = ${JSON.stringify(css)};`,
       `export default ${JSON.stringify(cssModulesExports)};`,
-      `applyCSS(${JSON.stringify(pathname)}, { css });`,
+      `applyCSS(${JSON.stringify(sepcifier)}, { css });`,
     ].join(eof);
   }
   return css;
@@ -89,5 +121,10 @@ async function readCode(pathname: string): Promise<[string, string]> {
     }
     return [url, await res.text()];
   }
-  return [`.${pathname}`, await Deno.readTextFile(`.${pathname}`)];
+  if (pathname.startsWith("/")) {
+    pathname = `.${pathname}`;
+  } else {
+    pathname = `./${pathname}`;
+  }
+  return [pathname, await Deno.readTextFile(pathname)];
 }

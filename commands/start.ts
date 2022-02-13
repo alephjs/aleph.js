@@ -3,6 +3,7 @@ import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
+import { proxyProject } from "../server/transformer.ts";
 
 export const helpMessage = `
 Usage:
@@ -40,6 +41,10 @@ if (import.meta.main) {
   } else if (certFile !== undefined && keyFile === undefined) {
     log.fatal("missing `--tls-key` option");
   }
+
+  proxyProject(workingDir, 6060);
+  log.debug(`Proxy project on http://localhost:6060`);
+
   const serverEntry = await findFile(Deno.cwd(), [
     "server.tsx",
     "server.jsx",

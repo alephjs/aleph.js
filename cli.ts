@@ -2,6 +2,7 @@ import { bold } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { basename, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { parse } from "https://deno.land/std@0.125.0/flags/mod.ts";
 import { readImportMap } from "./server/config.ts";
+import { proxyProject } from "./server/transformer.ts";
 import { getFlag } from "./lib/flags.ts";
 import { existsDir, findFile } from "./lib/fs.ts";
 import log from "./lib/log.ts";
@@ -108,7 +109,6 @@ async function main() {
     log.setLevel("debug");
   }
 
-  let workingDir: string;
   let importMapFile: string | undefined;
   let denoConfigFile: string | undefined;
   let cliVerison = VERSION;
@@ -126,22 +126,15 @@ async function main() {
   }
   p.close();
 
-  if (command === "dev" || command === "start") {
-    Deno.env.set("ALEPH_PROJECT_PORT", "7070");
-    serveDir({ cwd: resolve(String(args[0] || ".")), port: 7070 });
-    log.debug(`Proxy project on http://localhost:7070`);
-  }
-
   if (Deno.env.get("ALEPH_DEV")) {
-    workingDir = Deno.cwd();
     denoConfigFile = resolve("./deno.json");
     importMapFile = resolve("./import_map.json");
-    Deno.env.set("ALEPH_DEV_ROOT", workingDir);
-    Deno.env.set("ALEPH_DEV_PORT", "6060");
-    serveDir({ cwd: workingDir, port: 6060 });
-    log.debug(`Proxy https://deno.land/x/aleph on http://localhost:6060`);
+    Deno.env.set("ALEPH_DEV_ROOT", Deno.cwd());
+    Deno.env.set("ALEPH_DEV_PORT", "2020");
+    serveDir({ cwd: Deno.cwd(), port: 2020 });
+    log.debug(`Proxy https://deno.land/x/aleph on http://localhost:2020`);
   } else {
-    workingDir = resolve(String(args[0] || "."));
+    const workingDir = resolve(String(args[0] || "."));
     if (!(await existsDir(workingDir))) {
       log.fatal("No such directory:", workingDir);
     }
@@ -191,6 +184,7 @@ async function main() {
       }
     }
   }
+
   await runCli(command, cliVerison, denoConfigFile, importMapFile);
 }
 
@@ -198,9 +192,11 @@ async function runCli(command: string, version: string, denoConfigFile?: string,
   const cmd: string[] = [
     Deno.execPath(),
     "run",
-    "-A",
-    "--unstable",
-    "--no-check=remote",
+    "--allow-env",
+    "--allow-net",
+    "--allow-read",
+    "--no-check",
+    "--quiet",
     "--location=http://localhost",
   ];
   if (denoConfigFile) {
