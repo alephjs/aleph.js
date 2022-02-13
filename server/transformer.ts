@@ -25,7 +25,21 @@ const cssLoader: Loader = {
   },
 };
 
-export const serveCode = async (pathname: string, jsxConfig: AlephJSXConfig, isDev: boolean, mtime?: Date) => {
+export async function serveServerModules(cwd: string, port: number) {
+  Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
+  await serveDir({ cwd, port, loaders: [cssLoader] });
+}
+
+type Options = {
+  jsxConfig: AlephJSXConfig;
+  isDev: boolean;
+  mtime?: Date;
+};
+
+export const fetchClientModule = async (
+  pathname: string,
+  { jsxConfig, isDev, mtime }: Options,
+): Promise<Response> => {
   const [sepcifier, rawCode] = await readCode(pathname);
   let js: string;
   if (pathname.endsWith(".css")) {
@@ -52,12 +66,7 @@ export const serveCode = async (pathname: string, jsxConfig: AlephJSXConfig, isD
   return new Response(js, { headers });
 };
 
-export function proxyProject(cwd: string, port: number) {
-  serveDir({ cwd, port, loaders: [cssLoader] });
-  Deno.env.set("ALEPH_BUILD_PORT", port.toString());
-}
-
-async function bundleCSS(
+export async function bundleCSS(
   sepcifier: string,
   rawCode: string,
   options: {
@@ -78,7 +87,7 @@ async function bundleCSS(
     },
   });
   if (dependencies && dependencies.length > 0) {
-    const csses = await Promise.all(
+    const imports = await Promise.all(
       dependencies.filter((dep) => dep.type === "import").map(async (dep) => {
         const pathname = util.isLikelyHttpURL(sepcifier) ? toLocalPath(sepcifier) : sepcifier;
         const p = join(dirname(pathname), dep.url);
@@ -90,7 +99,7 @@ async function bundleCSS(
         return await bundleCSS(s, css, { minify: options.minify }, tracing);
       }),
     );
-    css = csses.join(eof) + eof + css;
+    css = imports.join(eof) + eof + css;
   }
   if (options.toJS) {
     const alephPkgUri = getAlephPkgUri();

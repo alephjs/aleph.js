@@ -4,7 +4,7 @@ import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import log, { dim } from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { proxyProject } from "../server/transformer.ts";
+import { serveServerModules } from "../server/transformer.ts";
 
 export const helpMessage = `
 Usage:
@@ -43,8 +43,8 @@ if (import.meta.main) {
     log.fatal("missing `--tls-key` option");
   }
 
-  proxyProject(workingDir, 6060);
-  log.debug(`Proxy project on http://localhost:6060`);
+  serveServerModules(workingDir, 6060);
+  log.debug(`Serve project modules on http://localhost:6060`);
 
   const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"]);
   if (serverEntry) {
@@ -52,7 +52,7 @@ if (import.meta.main) {
     Deno.env.set("ALEPH_ENV", "development");
     Deno.env.set("ALEPH_BUILD_ID", Date.now().toString(16));
     await import(
-      `http://localhost:${Deno.env.get("ALEPH_BUILD_PORT")}/${basename(serverEntry)}?BUILD=${
+      `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/${basename(serverEntry)}?BUILD=${
         Deno.env.get("ALEPH_BUILD_ID")
       }`
     );
@@ -74,7 +74,7 @@ if (import.meta.main) {
 async function readRoutes(glob: string) {
   const reg = globToRegExp(glob);
   const files = await getFiles(Deno.cwd(), (filename) => reg.test(filename));
-  const ppPort = Deno.env.get("ALEPH_BUILD_PORT");
+  const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
   return Promise.all(files.map(async (filename) => {
     const [prefix] = glob.split("*");
     const p = "/" + util.splitPath(util.trimPrefix(filename, util.trimSuffix(prefix, "/"))).map((part) => {
@@ -87,7 +87,7 @@ async function readRoutes(glob: string) {
       return part;
     }).join("/");
     const pathname = util.trimSuffix(util.trimSuffix(p, extname(p)), "/index") || "/";
-    const importUrl = `http://localhost:${ppPort}${filename.slice(1)}`;
+    const importUrl = `http://localhost:${port}${filename.slice(1)}`;
     log.debug(dim("[route]"), pathname);
     return [
       // @ts-ignore

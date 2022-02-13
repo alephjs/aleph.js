@@ -1,7 +1,7 @@
 import { assertEquals } from "std/testing/asserts.ts";
 import { restoreUrl, toLocalPath } from "../lib/path.ts";
 
-Deno.test("lib/path: toLocalPath", () => {
+Deno.test("lib/path.ts: toLocalPath", () => {
   assertEquals(toLocalPath("https://foo.com/lib@0.1.0?action"), "/-/foo.com/lib@0.1.0?action");
   assertEquals(toLocalPath("https://deno.land/x/aleph@v0.3.0-alpha.29/"), "/-/deno.land/x/aleph@v0.3.0-alpha.29/");
   assertEquals(toLocalPath("http://foo.com/bar?lang=us-en"), "/-/http_foo.com/bar?lang=us-en");
@@ -10,7 +10,7 @@ Deno.test("lib/path: toLocalPath", () => {
   assertEquals(toLocalPath("/foo/bar/"), "/foo/bar/");
 });
 
-Deno.test("lib/path: restoreUrl", () => {
+Deno.test("lib/path.ts: restoreUrl", () => {
   assertEquals(restoreUrl("/-/foo.com/lib@0.1.0?action"), "https://foo.com/lib@0.1.0?action");
   assertEquals(restoreUrl("/-/deno.land/x/aleph@v0.3.0-alpha.29/"), "https://deno.land/x/aleph@v0.3.0-alpha.29/");
   assertEquals(restoreUrl("/-/http_foo.com/bar?lang=us-en"), "http://foo.com/bar?lang=us-en");

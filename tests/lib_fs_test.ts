@@ -2,7 +2,7 @@ import { assert, assertEquals, assertNotEquals } from "std/testing/asserts.ts";
 import { SEP } from "std/path/separator.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
 
-Deno.test(`lib/fs: existsDir`, async () => {
+Deno.test(`lib/fs.ts: existsDir`, async () => {
   // true test cases
   const dir = await Deno.makeTempDir();
   assert(await existsDir(dir));
@@ -13,7 +13,7 @@ Deno.test(`lib/fs: existsDir`, async () => {
   assertEquals(await existsDir(`${dir}${SEP}foo${SEP}bar`), false);
 });
 
-Deno.test(`lib/fs: existsFile`, async () => {
+Deno.test(`lib/fs.ts: existsFile`, async () => {
   // true test cases
   const file = await Deno.makeTempFile();
   assert(await existsFile(file));

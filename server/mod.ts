@@ -1,13 +1,13 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
-import { content, json } from "./response.ts";
-import render from "./render.ts";
 import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { serveCode } from "./transformer.ts";
-import type { AlephConfig, AlephJSXConfig, Context, RouteConfig, SSREvent } from "./types.d.ts";
 import { loadDenoJSXConfig } from "./config.ts";
+import { content, json } from "./response.ts";
+import ssr from "./ssr.ts";
+import { fetchClientModule } from "./transformer.ts";
+import type { AlephConfig, AlephJSXConfig, Context, RouteConfig, SSREvent } from "./types.d.ts";
 
 export type ServerOptions = {
   config?: AlephConfig;
@@ -49,7 +49,7 @@ export const serve = (options: ServerOptions = {}) => {
 
     /* handle '/-/http_localhost_7070/framework/react/mod.ts' */
     if (pathname.startsWith("/-/")) {
-      return serveCode(pathname, jsxConfig, isDev);
+      return fetchClientModule(pathname, { jsxConfig, isDev });
     }
 
     try {
@@ -63,7 +63,7 @@ export const serve = (options: ServerOptions = {}) => {
           builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
           searchParams.has("module")
         ) {
-          return serveCode(pathname, jsxConfig, isDev, stat.mtime);
+          return fetchClientModule(pathname, { jsxConfig, isDev, mtime: stat.mtime });
         } else {
           const file = await Deno.open(`.${pathname}`, { read: true });
           return new Response(readableStreamFromReader(file), {
@@ -157,7 +157,7 @@ export const serve = (options: ServerOptions = {}) => {
       return new Response("Not Found", { status: 404 });
     }
 
-    return render.fetch(req, ctx, { indexHtml, ssrFn: options.ssr });
+    return ssr.fetch(req, ctx, { indexHtml, ssrFn: options.ssr });
   };
 
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {
