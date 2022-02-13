@@ -1,5 +1,5 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
-use crate::jsx::jsx_magic_fold;
+use crate::jsx_magic::jsx_magic_fold;
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::Resolver;
 use crate::source_type::SourceType;

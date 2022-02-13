@@ -1,4 +1,4 @@
-use crate::resolver::{is_remote_url, InlineStyle, Resolver};
+use crate::resolver::{InlineStyle, Resolver, RE_PROTOCOL_URL};
 use sha1::{Digest, Sha1};
 use std::{cell::RefCell, rc::Rc};
 use swc_common::{SourceMap, Spanned, DUMMY_SP};
@@ -114,7 +114,7 @@ impl JSXMagicFold {
                 }) => {
                   let key = id.sym.as_ref();
                   let value = value.as_ref();
-                  if (key == "href" && is_remote_url(value)) || (key == "target" && value == "_blank") {
+                  if (key == "href" && RE_PROTOCOL_URL.is_match(value)) || (key == "target" && value == "_blank") {
                     should_replace = false
                   }
                 }

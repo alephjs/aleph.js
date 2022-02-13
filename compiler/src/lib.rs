@@ -4,7 +4,7 @@ extern crate lazy_static;
 mod css;
 mod error;
 mod import_map;
-mod jsx;
+mod jsx_magic;
 mod resolve_fold;
 mod resolver;
 mod source_type;

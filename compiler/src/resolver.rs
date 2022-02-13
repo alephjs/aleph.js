@@ -13,6 +13,7 @@ use url::Url;
 lazy_static! {
   pub static ref RE_REACT_URL: Regex =
     Regex::new(r"^https?://(esm\.sh|cdn\.esm\.sh)(/v\d+)?/react(\-dom)?(@[^/]+)?(/.*)?$").unwrap();
+  pub static ref RE_PROTOCOL_URL: Regex = Regex::new(r"^(mailto:|[a-z]+://)").unwrap();
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -112,18 +113,18 @@ impl Resolver {
     }
     let url = Url::from_str(url).unwrap();
     let pathname = Path::new(url.path());
-    let mut unsupported = false;
+    let mut nonjs = false;
     if let Some(os_str) = pathname.extension() {
       if let Some(s) = os_str.to_str() {
         match s {
           "ts" | "jsx" | "mts" | "tsx" => {
-            unsupported = true;
+            nonjs = true;
           }
           _ => {}
         }
       }
     };
-    if !unsupported {
+    if !nonjs {
       return url.into();
     }
 
@@ -230,7 +231,11 @@ impl Resolver {
     }
 
     if fixed_url.ends_with(".css") {
-      fixed_url = fixed_url + "?module"
+      if fixed_url.contains("?") {
+        fixed_url = fixed_url + "&module"
+      } else {
+        fixed_url = fixed_url + "?module"
+      }
     }
 
     // push to dep graph
