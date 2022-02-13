@@ -14,15 +14,13 @@ export type Context<Data = Record<string, any>, Env = Record<string, string>> = 
   readonly data: Data;
 };
 
-export type SSREvent = {
-  readonly url: URL;
-  readonly headCollection: string[];
-  readonly component?: any;
-  readonly data?: any;
-  readonly dataExpires?: number;
-};
+export interface IURLPattern {
+  exec(input: { host?: string; pathname: string }): {
+    pathname: { groups: Record<string, string> };
+  };
+}
 
 export type RouteConfig = [
-  { exec(input: { pathname: string }): { pathname: { groups: Record<string, string> } } }, // URLPattern
+  IURLPattern,
   () => Promise<{ component?: CallableFunction | object; data?: Record<string, any> }>,
 ];

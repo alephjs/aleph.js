@@ -4,7 +4,11 @@ import { restoreUrl, toLocalPath } from "../lib/path.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri, loadImportMap } from "./config.ts";
+import { DependencyGraph } from "./graph.ts";
 import type { AlephJSXConfig } from "./types.d.ts";
+
+export const clientDependencyGraph = new DependencyGraph();
+export const serverDependencyGraph = new DependencyGraph();
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -37,10 +41,10 @@ type Options = {
 };
 
 export const fetchClientModule = async (pathname: string, { jsxConfig, isDev, mtime }: Options): Promise<Response> => {
-  const [sepcifier, rawCode] = await readCode(pathname);
+  const [specifier, rawCode] = await readCode(pathname);
   let js: string;
   if (pathname.endsWith(".css")) {
-    js = await bundleCSS(sepcifier, rawCode, {
+    js = await bundleCSS(specifier, rawCode, {
       minify: !isDev,
       cssModules: pathname.endsWith(".module.css"),
       toJS: true,
@@ -48,34 +52,49 @@ export const fetchClientModule = async (pathname: string, { jsxConfig, isDev, mt
     });
   } else {
     const importMap = await loadImportMap();
-    const ret = await transform(sepcifier, rawCode, {
+    const graphVersions = clientDependencyGraph.modules.filter((mod) =>
+      !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
+    ).reduce((acc, { specifier, version }) => {
+      acc[specifier] = version;
+      return acc;
+    }, {} as Record<string, number>);
+    const ret = await transform(specifier, rawCode, {
       ...jsxConfig,
       alephPkgUri: getAlephPkgUri(),
+      graphVersions,
       importMap,
       isDev,
     });
+    if (!clientDependencyGraph.has(specifier)) {
+      clientDependencyGraph.add({
+        specifier,
+        version: 0,
+        deps: ret.deps || [],
+      });
+    }
     js = ret.code;
   }
   const headers = new Headers({ "Content-Type": "application/javascript; charset=utf-8" });
   if (mtime) {
     headers.set("Last-Modified", mtime.toUTCString());
   }
+  headers.set("Cache-Control", "public, max-age=0, must-revalidate");
   return new Response(js, { headers });
 };
 
 export async function bundleCSS(
-  sepcifier: string,
+  specifier: string,
   rawCode: string,
   options: {
-    minify?: boolean;
     cssModules?: boolean;
+    minify?: boolean;
     toJS?: boolean;
     resolveAlephPkgUri?: boolean;
   },
   tracing = new Set<string>(),
 ): Promise<string> {
   const eof = options.minify ? "" : "\n";
-  let { code: css, dependencies, exports } = await transformCSS(sepcifier, rawCode, {
+  let { code: css, dependencies, exports } = await transformCSS(specifier, rawCode, {
     ...options,
     analyzeDependencies: true,
     drafts: {
@@ -86,7 +105,7 @@ export async function bundleCSS(
   if (dependencies && dependencies.length > 0) {
     const imports = await Promise.all(
       dependencies.filter((dep) => dep.type === "import").map(async (dep) => {
-        const pathname = util.isLikelyHttpURL(sepcifier) ? toLocalPath(sepcifier) : sepcifier;
+        const pathname = util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier;
         const p = join(dirname(pathname), dep.url);
         if (tracing.has(p)) {
           return "";
@@ -112,7 +131,7 @@ export async function bundleCSS(
       }/framework/core/style.ts";`,
       `export const css = ${JSON.stringify(css)};`,
       `export default ${JSON.stringify(cssModulesExports)};`,
-      `applyCSS(${JSON.stringify(sepcifier)}, { css });`,
+      `applyCSS(${JSON.stringify(specifier)}, { css });`,
     ].join(eof);
   }
   return css;

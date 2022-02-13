@@ -6,9 +6,12 @@ export type ImportMap = {
 export type TransformOptions = {
   alephPkgUri?: string;
   importMap?: ImportMap;
-  jsxMagic?: boolean;
+  graphVersions?: Record<string, number>;
   jsxRuntime?: "react" | "preact";
+  jsxRuntimeVersion?: string;
+  jsxRuntimeCdnVersion?: string;
   jsxImportSource?: string;
+  jsxMagic?: boolean;
   isDev?: boolean;
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>;
 };
@@ -28,8 +31,8 @@ export type TransformResult = {
 
 export type DependencyDescriptor = {
   readonly specifier: string;
-  readonly isDynamic: boolean;
-  readonly isStarExport: boolean;
+  readonly isDynamic?: boolean;
+  readonly isStarExport?: boolean;
 };
 
 export interface Targets {

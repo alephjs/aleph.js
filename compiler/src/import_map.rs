@@ -1,9 +1,6 @@
 use indexmap::IndexMap;
-use path_slash::PathBufExt;
-use relative_path::RelativePath;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::path::Path;
 
 type SpecifierHashMap = HashMap<String, String>;
 type SpecifierMap = IndexMap<String, String>;
@@ -37,34 +34,12 @@ impl ImportMap {
     let mut imports = IndexMap::new();
     let mut scopes = IndexMap::new();
     for (k, v) in map.imports.iter() {
-      let alias = if v.starts_with("./") {
-        let path = if v.ends_with("/") {
-          RelativePath::new(v).normalize().to_relative_path_buf().join("/")
-        } else {
-          RelativePath::new(v).normalize().to_relative_path_buf()
-        };
-        format!("/{}", path)
-      } else {
-        v.into()
-      };
-      imports.insert(k.into(), alias);
+      imports.insert(k.into(), v.into());
     }
     for (k, v) in map.scopes.iter() {
       let mut map = IndexMap::new();
       for (k, v) in v.iter() {
-        if v.starts_with("./") {
-          map.insert(
-            k.into(),
-            RelativePath::new(v)
-              .normalize()
-              .to_path(Path::new("/"))
-              .to_slash()
-              .unwrap()
-              .into(),
-          );
-        } else {
-          map.insert(k.into(), v.into());
-        }
+        map.insert(k.into(), v.into());
       }
       scopes.insert(k.into(), map);
     }
@@ -119,36 +94,36 @@ mod tests {
     imports.insert("~/".into(), "./".into());
     imports.insert("comps/".into(), "./components/".into());
     imports.insert("lib".into(), "./lib/mod.ts".into());
-    imports.insert("react".into(), "https://esm.sh/react".into());
-    imports.insert("react-dom/".into(), "https://esm.sh/react-dom/".into());
+    imports.insert("react".into(), "https://esm.sh/react@17.0.2".into());
+    imports.insert("react-dom/".into(), "https://esm.sh/react-dom@17.0.2/".into());
     imports.insert("https://cdn.skypack.dev/".into(), "https://esm.sh/".into());
     scope_imports.insert("react".into(), "https://esm.sh/react@16.4.0".into());
-    scopes.insert("/scope/".into(), scope_imports);
+    scopes.insert("./scope/".into(), scope_imports);
     let import_map = ImportMap::from_hashmap(ImportHashMap { imports, scopes });
     assert_eq!(
-      import_map.resolve("/pages/index.tsx", "@/components/logo.tsx"),
-      "/components/logo.tsx"
+      import_map.resolve("./pages/index.tsx", "@/components/logo.tsx"),
+      "./components/logo.tsx"
     );
     assert_eq!(
-      import_map.resolve("/pages/index.tsx", "~/components/logo.tsx"),
-      "/components/logo.tsx"
+      import_map.resolve("./pages/index.tsx", "~/components/logo.tsx"),
+      "./components/logo.tsx"
     );
     assert_eq!(
-      import_map.resolve("/pages/index.tsx", "comps/logo.tsx"),
-      "/components/logo.tsx"
+      import_map.resolve("./pages/index.tsx", "comps/logo.tsx"),
+      "./components/logo.tsx"
     );
-    assert_eq!(import_map.resolve("/pages/index.tsx", "lib"), "/lib/mod.ts");
-    assert_eq!(import_map.resolve("/app.tsx", "react"), "https://esm.sh/react");
+    assert_eq!(import_map.resolve("./pages/index.tsx", "lib"), "./lib/mod.ts");
+    assert_eq!(import_map.resolve("./app.tsx", "react"), "https://esm.sh/react@17.0.2");
     assert_eq!(
-      import_map.resolve("/app.tsx", "https://cdn.skypack.dev/mod.ts"),
+      import_map.resolve("./app.tsx", "https://cdn.skypack.dev/mod.ts"),
       "https://esm.sh/mod.ts"
     );
     assert_eq!(
-      import_map.resolve("/framework/react/renderer.ts", "react-dom/server"),
-      "https://esm.sh/react-dom/server"
+      import_map.resolve("./framework/react/renderer.ts", "react-dom/server"),
+      "https://esm.sh/react-dom@17.0.2/server"
     );
     assert_eq!(
-      import_map.resolve("/scope/react-dom", "react"),
+      import_map.resolve("./scope/react-dom", "react"),
       "https://esm.sh/react@16.4.0"
     );
   }

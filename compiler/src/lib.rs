@@ -14,8 +14,9 @@ mod swc;
 mod tests;
 
 use import_map::ImportHashMap;
-use resolver::{DependencyDescriptor, Resolver, Versions};
+use resolver::{DependencyDescriptor, Resolver};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, SWC};
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
@@ -33,10 +34,16 @@ pub struct Options {
   pub import_map: ImportHashMap,
 
   #[serde(default)]
-  pub versions: Versions,
+  pub graph_versions: HashMap<String, usize>,
 
   #[serde(default = "default_jsx_runtime")]
   pub jsx_runtime: String,
+
+  #[serde(default)]
+  pub jsx_runtime_version: String,
+
+  #[serde(default)]
+  pub jsx_runtime_cdn_version: String,
 
   #[serde(default)]
   pub jsx_import_source: String,
@@ -76,8 +83,10 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     specifier,
     &options.aleph_pkg_uri,
     &options.jsx_runtime,
+    &options.jsx_runtime_version,
+    &options.jsx_runtime_cdn_version,
     options.import_map,
-    options.versions,
+    options.graph_versions,
     options.is_dev,
   )));
   let module = SWC::parse(specifier, code).expect("could not parse the module");

@@ -1,6 +1,6 @@
 @import url('./reset.css');
 
-main {
+#root {
   display: flex;
   align-items: center;
   justify-content: center;

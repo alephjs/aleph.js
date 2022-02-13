@@ -3,18 +3,23 @@ use std::collections::HashMap;
 
 fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
   let mut imports: HashMap<String, String> = HashMap::new();
+  let mut graph_versions: HashMap<String, usize> = HashMap::new();
   imports.insert("~/".into(), "./".into());
   imports.insert("react".into(), "https://esm.sh/react".into());
+  graph_versions.insert("./foo.ts".into(), 100);
+  let import_map = ImportHashMap {
+    imports,
+    scopes: HashMap::new(),
+  };
   let module = SWC::parse(specifer, source).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
     "https://deno.land/x/aleph",
     "react",
-    ImportHashMap {
-      imports,
-      scopes: HashMap::new(),
-    },
-    Default::default(),
+    "17.0.2",
+    "v64",
+    import_map,
+    graph_versions,
     false,
   )));
   let (code, _) = module.transform(resolver.clone(), options).unwrap();
@@ -25,6 +30,10 @@ fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc
 #[test]
 fn typescript() {
   let source = r#"
+      import { foo } from "./foo.ts"
+
+      foo();
+
       enum D {
         A,
         B,
@@ -54,12 +63,13 @@ fn typescript() {
       }
     "#;
   let (code, _) = transform("mod.ts", source, &EmitOptions::default());
+  assert!(code.contains("./foo.ts?v=100"));
   assert!(code.contains("var D;\n(function(D) {\n"));
   assert!(code.contains("_applyDecoratedDescriptor("));
 }
 
 #[test]
-fn react_jsx() {
+fn react_jsx_automtic() {
   let source = r#"
       export default function App() {
         return (
@@ -70,7 +80,7 @@ fn react_jsx() {
       }
     "#;
   let (code, _) = transform(
-    "app.tsx",
+    "./app.tsx",
     source,
     &EmitOptions {
       jsx_import_source: "https://esm.sh/react@17.0.2".into(),
@@ -86,24 +96,25 @@ fn react_jsx() {
 }
 
 #[test]
-fn react_jsx_dev() {
+fn react_dev() {
   let source = r#"
-      import { useState } from "https://esm.sh/react"
+      import { useState } from "react"
       export default function App() {
 				const [ msg ] = useState('Hello world!')
         return (
-					<h1 className="title">{msg}</h1>
+					<h1 className="title">{msg}{foo()}</h1>
         )
       }
     "#;
   let (code, _) = transform(
-    "app.tsx",
+    "./app.tsx",
     source,
     &EmitOptions {
       is_dev: true,
       ..Default::default()
     },
   );
+  assert!(code.contains("https://esm.sh/react@17.0.2"));
   assert!(code.contains("var _s = $RefreshSig$()"));
   assert!(code.contains("_s()"));
   assert!(code.contains("_c = App"));
@@ -129,7 +140,7 @@ fn jsx_magic() {
       }
     "#;
   let (code, resolver) = transform(
-    "app.tsx",
+    "./app.tsx",
     source,
     &EmitOptions {
       jsx_magic: true,
@@ -169,7 +180,7 @@ fn jsx_inlie_style() {
       }
     "#;
   let (code, resolver) = transform(
-    "app.tsx",
+    "./app.tsx",
     source,
     &EmitOptions {
       jsx_magic: true,

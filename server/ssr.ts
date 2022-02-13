@@ -5,9 +5,17 @@ import getWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
-import type { Context, RouteConfig, SSREvent } from "./types.d.ts";
+import type { Context, RouteConfig } from "./types.d.ts";
 
 let lolHtmlReady = false;
+
+export type SSREvent = {
+  readonly url: URL;
+  readonly headCollection: string[];
+  readonly component?: any;
+  readonly data?: any;
+  readonly dataExpires?: number;
+};
 
 type Options = {
   indexHtml: string;
@@ -67,9 +75,8 @@ export default {
             return new Response(null, { status: 304 });
           }
           headers.append("Last-Modified", mtimeUTC);
-        } else {
-          headers.append("Cache-Control", "public, max-age=0, must-revalidate");
         }
+        headers.append("Cache-Control", "public, max-age=0, must-revalidate");
       }
       let nomoduleInserted = false;
       rewriter.on("script", {

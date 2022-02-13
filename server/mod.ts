@@ -5,9 +5,9 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { loadDenoJSXConfig } from "./config.ts";
 import { content, json } from "./response.ts";
-import ssr from "./ssr.ts";
+import ssr, { type SSREvent } from "./ssr.ts";
 import { fetchClientModule } from "./transformer.ts";
-import type { AlephConfig, AlephJSXConfig, Context, RouteConfig, SSREvent } from "./types.d.ts";
+import type { AlephConfig, AlephJSXConfig, Context, RouteConfig } from "./types.d.ts";
 
 export type ServerOptions = {
   config?: AlephConfig;
@@ -70,6 +70,7 @@ export const serve = (options: ServerOptions = {}) => {
             headers: {
               "Content-Type": getContentType(pathname),
               "Last-Modified": mtimeUTC,
+              "Cache-Control": "public, max-age=0, must-revalidate",
             },
           });
         }
