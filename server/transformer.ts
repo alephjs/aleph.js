@@ -9,7 +9,7 @@ import type { AlephJSXConfig } from "./types.d.ts";
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-const cssLoader: Loader = {
+const cssModuleLoader: Loader = {
   test: (url) => url.endsWith(".css"),
   load: async (url, rawContent) => {
     const { pathname } = new URL(url);
@@ -27,7 +27,7 @@ const cssLoader: Loader = {
 
 export async function serveServerModules(cwd: string, port: number) {
   Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
-  await serveDir({ cwd, port, loaders: [cssLoader] });
+  await serveDir({ cwd, port, loaders: [cssModuleLoader] });
 }
 
 type Options = {
@@ -36,10 +36,7 @@ type Options = {
   mtime?: Date;
 };
 
-export const fetchClientModule = async (
-  pathname: string,
-  { jsxConfig, isDev, mtime }: Options,
-): Promise<Response> => {
+export const fetchClientModule = async (pathname: string, { jsxConfig, isDev, mtime }: Options): Promise<Response> => {
   const [sepcifier, rawCode] = await readCode(pathname);
   let js: string;
   if (pathname.endsWith(".css")) {

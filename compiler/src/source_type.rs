@@ -68,10 +68,7 @@ mod tests {
     assert_eq!(SourceType::from(Path::new("/foo/bar.js")), SourceType::JS);
     assert_eq!(SourceType::from(Path::new("/foo/bar.mjs")), SourceType::JS);
     assert_eq!(SourceType::from(Path::new("/foo/bar.jsx")), SourceType::JSX);
-    assert_eq!(
-      SourceType::from(Path::new("/foo/bar.txt")),
-      SourceType::Unknown
-    );
+    assert_eq!(SourceType::from(Path::new("/foo/bar.txt")), SourceType::Unknown);
     assert_eq!(SourceType::from(Path::new("/foo/bar")), SourceType::Unknown);
   }
 }

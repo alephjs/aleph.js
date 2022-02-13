@@ -1,8 +1,6 @@
 use std::{fmt, sync::Arc, sync::RwLock};
-use swc_common::{
-  errors::{Diagnostic, DiagnosticBuilder, Emitter},
-  Loc, Span,
-};
+use swc_common::errors::{Diagnostic, DiagnosticBuilder, Emitter};
+use swc_common::{Loc, Span};
 
 /// A buffer for collecting errors from the AST parser.
 #[derive(Debug, Clone)]
@@ -22,11 +20,7 @@ impl ErrorBuffer {
 
 impl Emitter for ErrorBuffer {
   fn emit(&mut self, diagnostic_builder: &DiagnosticBuilder) {
-    self
-      .diagnostics
-      .write()
-      .unwrap()
-      .push((**diagnostic_builder).clone());
+    self.diagnostics.write().unwrap().push((**diagnostic_builder).clone());
   }
 }
 

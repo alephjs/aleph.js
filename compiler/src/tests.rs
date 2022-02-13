@@ -1,34 +1,30 @@
 use super::*;
 use std::collections::HashMap;
 
-fn transform(
-    specifer: &str,
-    source: &str,
-    options: &EmitOptions,
-) -> (String, Rc<RefCell<Resolver>>) {
-    let mut imports: HashMap<String, String> = HashMap::new();
-    imports.insert("~/".into(), "./".into());
-    imports.insert("react".into(), "https://esm.sh/react".into());
-    let module = SWC::parse(specifer, source).expect("could not parse module");
-    let resolver = Rc::new(RefCell::new(Resolver::new(
-        specifer,
-        "https://deno.land/x/aleph",
-        "react",
-        ImportHashMap {
-            imports,
-            scopes: HashMap::new(),
-        },
-        Default::default(),
-        false,
-    )));
-    let (code, _) = module.transform(resolver.clone(), options).unwrap();
-    println!("{}", code);
-    (code, resolver)
+fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
+  let mut imports: HashMap<String, String> = HashMap::new();
+  imports.insert("~/".into(), "./".into());
+  imports.insert("react".into(), "https://esm.sh/react".into());
+  let module = SWC::parse(specifer, source).expect("could not parse module");
+  let resolver = Rc::new(RefCell::new(Resolver::new(
+    specifer,
+    "https://deno.land/x/aleph",
+    "react",
+    ImportHashMap {
+      imports,
+      scopes: HashMap::new(),
+    },
+    Default::default(),
+    false,
+  )));
+  let (code, _) = module.transform(resolver.clone(), options).unwrap();
+  println!("{}", code);
+  (code, resolver)
 }
 
 #[test]
 fn typescript() {
-    let source = r#"
+  let source = r#"
       enum D {
         A,
         B,
@@ -57,14 +53,14 @@ fn typescript() {
         bar() {}
       }
     "#;
-    let (code, _) = transform("mod.ts", source, &EmitOptions::default());
-    assert!(code.contains("var D;\n(function(D) {\n"));
-    assert!(code.contains("_applyDecoratedDescriptor("));
+  let (code, _) = transform("mod.ts", source, &EmitOptions::default());
+  assert!(code.contains("var D;\n(function(D) {\n"));
+  assert!(code.contains("_applyDecoratedDescriptor("));
 }
 
 #[test]
 fn react_jsx() {
-    let source = r#"
+  let source = r#"
       export default function App() {
         return (
           <>
@@ -73,23 +69,25 @@ fn react_jsx() {
         )
       }
     "#;
-    let (code, _) = transform(
-        "app.tsx",
-        source,
-        &EmitOptions {
-            jsx_import_source: "https://esm.sh/react@17.0.2".into(),
-            ..Default::default()
-        },
-    );
-    assert!(code.contains("import { jsx as _jsx, Fragment as _Fragment } from \"https://esm.sh/react@17.0.2/jsx-runtime\""));
-    assert!(code.contains("_jsx(_Fragment, {"));
-    assert!(code.contains("_jsx(\"h1\", {"));
-    assert!(code.contains("children: \"Hello world!\""));
+  let (code, _) = transform(
+    "app.tsx",
+    source,
+    &EmitOptions {
+      jsx_import_source: "https://esm.sh/react@17.0.2".into(),
+      ..Default::default()
+    },
+  );
+  assert!(
+    code.contains("import { jsx as _jsx, Fragment as _Fragment } from \"https://esm.sh/react@17.0.2/jsx-runtime\"")
+  );
+  assert!(code.contains("_jsx(_Fragment, {"));
+  assert!(code.contains("_jsx(\"h1\", {"));
+  assert!(code.contains("children: \"Hello world!\""));
 }
 
 #[test]
 fn react_jsx_dev() {
-    let source = r#"
+  let source = r#"
       import { useState } from "https://esm.sh/react"
       export default function App() {
 				const [ msg ] = useState('Hello world!')
@@ -98,23 +96,23 @@ fn react_jsx_dev() {
         )
       }
     "#;
-    let (code, _) = transform(
-        "app.tsx",
-        source,
-        &EmitOptions {
-            is_dev: true,
-            ..Default::default()
-        },
-    );
-    assert!(code.contains("var _s = $RefreshSig$()"));
-    assert!(code.contains("_s()"));
-    assert!(code.contains("_c = App"));
-    assert!(code.contains("$RefreshReg$(_c, \"App\")"));
+  let (code, _) = transform(
+    "app.tsx",
+    source,
+    &EmitOptions {
+      is_dev: true,
+      ..Default::default()
+    },
+  );
+  assert!(code.contains("var _s = $RefreshSig$()"));
+  assert!(code.contains("_s()"));
+  assert!(code.contains("_c = App"));
+  assert!(code.contains("$RefreshReg$(_c, \"App\")"));
 }
 
 #[test]
 fn jsx_magic() {
-    let source = r#"
+  let source = r#"
       import React from "https://esm.sh/react"
       export default function Index() {
         return (
@@ -130,31 +128,27 @@ fn jsx_magic() {
         )
       }
     "#;
-    let (code, resolver) = transform(
-        "app.tsx",
-        source,
-        &EmitOptions {
-            jsx_magic: true,
-            ..Default::default()
-        },
-    );
-    let r = resolver.borrow();
-    assert!(code.contains(
-        "import __ALEPH__Head from \"/-/deno.land/x/aleph/framework/react/components/Head.ts\""
-    ));
-    assert!(code.contains(
-        "import __ALEPH__Anchor from \"/-/deno.land/x/aleph/framework/react/components/Anchor.ts\""
-    ));
-    assert!(code.contains("React.createElement(\"a\","));
-    assert!(code.contains("React.createElement(__ALEPH__Anchor,"));
-    assert!(code.contains("React.createElement(__ALEPH__Head,"));
-    assert_eq!(r.jsx_magic_tags.len(), 2);
-    assert_eq!(r.deps.len(), 3);
+  let (code, resolver) = transform(
+    "app.tsx",
+    source,
+    &EmitOptions {
+      jsx_magic: true,
+      ..Default::default()
+    },
+  );
+  let r = resolver.borrow();
+  assert!(code.contains("import __ALEPH__Head from \"/-/deno.land/x/aleph/framework/react/components/Head.ts\""));
+  assert!(code.contains("import __ALEPH__Anchor from \"/-/deno.land/x/aleph/framework/react/components/Anchor.ts\""));
+  assert!(code.contains("React.createElement(\"a\","));
+  assert!(code.contains("React.createElement(__ALEPH__Anchor,"));
+  assert!(code.contains("React.createElement(__ALEPH__Head,"));
+  assert_eq!(r.jsx_magic_tags.len(), 2);
+  assert_eq!(r.deps.len(), 3);
 }
 
 #[test]
 fn jsx_inlie_style() {
-    let source = r#"
+  let source = r#"
       export default function Index() {
         const [color, setColor] = useState('white');
 
@@ -174,19 +168,18 @@ fn jsx_inlie_style() {
         )
       }
     "#;
-    let (code, resolver) = transform(
-        "app.tsx",
-        source,
-        &EmitOptions {
-            jsx_magic: true,
-            ..Default::default()
-        },
-    );
-    let r = resolver.borrow();
-    assert!(code.contains(
-      "import __ALEPH__InlineStyle from \"/-/deno.land/x/aleph/framework/react/components/InlineStyle.ts\""
-    ));
-    assert!(code.contains("React.createElement(__ALEPH__InlineStyle,"));
-    assert!(code.contains("__styleId: \"inline-style-"));
-    assert_eq!(r.jsx_inline_styles.len(), 2);
+  let (code, resolver) = transform(
+    "app.tsx",
+    source,
+    &EmitOptions {
+      jsx_magic: true,
+      ..Default::default()
+    },
+  );
+  let r = resolver.borrow();
+  assert!(code
+    .contains("import __ALEPH__InlineStyle from \"/-/deno.land/x/aleph/framework/react/components/InlineStyle.ts\""));
+  assert!(code.contains("React.createElement(__ALEPH__InlineStyle,"));
+  assert!(code.contains("__styleId: \"inline-style-"));
+  assert_eq!(r.jsx_inline_styles.len(), 2);
 }
