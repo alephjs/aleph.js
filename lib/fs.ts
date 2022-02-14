@@ -36,3 +36,36 @@ export async function findFile(dir: string, filenames: string[]): Promise<string
   }
   return void 0;
 }
+
+export const watchFs = async (dir: string, listener: (path: string, info: Deno.FileInfo | null) => void) => {
+  const timers = new Map();
+  const debounce = (id: string, callback: () => void, delay: number) => {
+    if (timers.has(id)) {
+      clearTimeout(timers.get(id)!);
+    }
+    timers.set(
+      id,
+      setTimeout(() => {
+        timers.delete(id);
+        callback();
+      }, delay),
+    );
+  };
+  const w = Deno.watchFs(dir, { recursive: true });
+  for await (const { kind, paths } of w) {
+    for (const path of paths) {
+      debounce(kind + path, async () => {
+        try {
+          const info = await Deno.lstat(path);
+          listener(path, info);
+        } catch (error) {
+          if (error instanceof Deno.errors.NotFound) {
+            listener(path, null);
+          } else {
+            console.warn("watchFs:", error);
+          }
+        }
+      }, 50);
+    }
+  }
+};

@@ -42,7 +42,7 @@ type Options = {
 };
 
 export const fetchClientModule = async (pathname: string, { jsxConfig, isDev, mtime }: Options): Promise<Response> => {
-  const [specifier, rawCode] = await readCode(pathname);
+  const [specifier, rawCode] = await readCode(pathname.startsWith("/-/") ? restoreUrl(pathname) : `.${pathname}`);
   let js: string;
   if (pathname.endsWith(".css")) {
     js = await bundleCSS(specifier, rawCode, {
@@ -66,13 +66,11 @@ export const fetchClientModule = async (pathname: string, { jsxConfig, isDev, mt
       importMap,
       isDev,
     });
-    if (!clientDependencyGraph.has(specifier)) {
-      clientDependencyGraph.add({
-        specifier,
-        version: 0,
-        deps: ret.deps || [],
-      });
-    }
+    clientDependencyGraph.mark({
+      specifier,
+      version: mtime?.getTime() || 0,
+      deps: ret.deps || [],
+    });
     js = ret.code;
   }
   const headers = new Headers({ "Content-Type": "application/javascript; charset=utf-8" });
@@ -106,13 +104,19 @@ export async function bundleCSS(
   if (dependencies && dependencies.length > 0) {
     const imports = await Promise.all(
       dependencies.filter((dep) => dep.type === "import").map(async (dep) => {
-        const pathname = util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier;
-        const p = join(dirname(pathname), dep.url);
-        if (tracing.has(p)) {
+        let url = dep.url;
+        if (util.isLikelyHttpURL(specifier)) {
+          if (!util.isLikelyHttpURL(url)) {
+            url = new URL(url, specifier).toString();
+          }
+        } else {
+          url = join(dirname(specifier), url);
+        }
+        if (tracing.has(url)) {
           return "";
         }
-        tracing.add(p);
-        const [s, css] = await readCode(p);
+        tracing.add(url);
+        const [s, css] = await readCode(url);
         return await bundleCSS(s, css, { minify: options.minify }, tracing);
       }),
     );
@@ -138,19 +142,22 @@ export async function bundleCSS(
   return css;
 }
 
-async function readCode(pathname: string): Promise<[string, string]> {
-  if (pathname.startsWith("/-/")) {
-    const url = restoreUrl(pathname);
-    const res = await fetch(url);
+async function readCode(filename: string): Promise<[string, string]> {
+  if (util.isLikelyHttpURL(filename)) {
+    const res = await fetch(filename);
     if (res.status >= 400) {
-      throw new Error(`fetch ${url}: ${res.status} - ${res.statusText}`);
+      throw new Error(`fetch ${filename}: ${res.status} - ${res.statusText}`);
     }
-    return [url, await res.text()];
+    return [filename, await res.text()];
   }
-  if (pathname.startsWith("/")) {
-    pathname = `.${pathname}`;
+  let specifier = filename;
+  if (filename.startsWith("/")) {
+    const cwd = Deno.cwd();
+    if (filename.startsWith(cwd)) {
+      specifier = `.${util.trimPrefix(filename, cwd)}`;
+    }
   } else {
-    pathname = `./${pathname}`;
+    specifier = `./${util.trimPrefix(filename, "./")}`;
   }
-  return [pathname, await Deno.readTextFile(pathname)];
+  return [specifier, await Deno.readTextFile(filename)];
 }

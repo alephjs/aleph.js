@@ -17,36 +17,40 @@ export class DependencyGraph {
     return modules;
   }
 
-  has(specifier: string) {
-    return this.#modules.has(specifier);
-  }
-
   get(specifier: string): Module | undefined {
     return this.#modules.get(specifier);
   }
 
-  add(module: Module) {
-    this.#modules.set(module.specifier, module);
+  mark(module: Module) {
+    const prev = this.#modules.get(module.specifier);
+    if (prev) {
+      prev.deps = module.deps;
+    } else {
+      this.#modules.set(module.specifier, module);
+    }
+  }
+
+  unmark(specifier: string) {
+    this.#modules.delete(specifier);
+  }
+
+  update(specifier: string) {
+    this.#update(specifier);
   }
 
   // version++
-  update(specifier: string, deps: DependencyDescriptor[], __tracing = new Set<string>()) {
+  #update(specifier: string, __tracing = new Set<string>()) {
     const module = this.get(specifier);
     if (module) {
-      module.deps = deps;
       module.version++;
       __tracing.add(specifier);
       this.#modules.forEach((module) => {
         if (module.deps.find((dep) => dep.specifier === specifier)) {
           if (!__tracing.has(module.specifier)) {
-            this.update(module.specifier, module.deps);
+            this.#update(module.specifier, __tracing);
           }
         }
       });
     }
-  }
-
-  remove(specifier: string) {
-    this.#modules.delete(specifier);
   }
 }

@@ -4,26 +4,23 @@ import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.j
 import getWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
+import type { RouteConfig, SSREvent } from "../types.d.ts";
 import { VERSION } from "../version.ts";
-import type { Context, RouteConfig } from "./types.d.ts";
 
 let lolHtmlReady = false;
 
-export type SSREvent = {
-  readonly url: URL;
-  readonly headCollection: string[];
-  readonly component?: any;
-  readonly data?: any;
-  readonly dataExpires?: number;
-};
-
 type Options = {
   indexHtml: string;
+  routes: RouteConfig[];
   ssrFn?: (e: SSREvent) => string;
 };
 
 export default {
-  async fetch(req: Request, ctx: Context, { indexHtml, ssrFn }: Options): Promise<Response> {
+  async fetch(
+    req: Request,
+    ctx: Record<string | symbol, any>,
+    { indexHtml, routes, ssrFn }: Options,
+  ): Promise<Response> {
     if (!lolHtmlReady) {
       await initWasm(getWasm());
       lolHtmlReady = true;
@@ -38,7 +35,7 @@ export default {
     try {
       if (ssrFn) {
         // get route
-        const route = await getRoute(req, ctx);
+        const route = await matchRoute(req, ctx, routes);
         if (route instanceof Response) {
           return route;
         }
@@ -48,12 +45,28 @@ export default {
         const ssrBody = ssrFn({ ...route, headCollection });
         rewriter.on("ssr-head", {
           element(el: Element) {
-            if (route?.data) {
-              el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(route?.data)}</script>`, {
-                html: true,
-              });
-            }
             headCollection.forEach((tag) => el.before(tag, { html: true }));
+            if (route.data) {
+              const expiresAttr = route.dataExpires ? ` data-expires="route.dataExpires"` : "";
+              el.before(
+                `<script id="aleph-ssr-data" type="application/json"${expiresAttr}>${
+                  JSON.stringify(route.data)
+                }</script>`,
+                {
+                  html: true,
+                },
+              );
+            }
+            if (route.filename) {
+              el.before(
+                `<script type="module">import __ssrComponent from ${
+                  JSON.stringify(route.filename)
+                };Object.assign({__ssrComponent})</script>`,
+                {
+                  html: true,
+                },
+              );
+            }
             el.remove();
           },
         });
@@ -62,13 +75,13 @@ export default {
             el.replace(ssrBody, { html: true });
           },
         });
-        if (util.isNumber(route?.dataExpires)) {
-          headers.append("Cache-Control", `public, max-age=${route?.dataExpires}`);
+        if (util.isNumber(route.dataExpires)) {
+          headers.append("Cache-Control", `public, max-age=${route.dataExpires}`);
         } else {
           headers.append("Cache-Control", "public, max-age=0, must-revalidate");
         }
       } else {
-        const stat = await Deno.lstat(`./index.html`);
+        const stat = await Deno.lstat("./index.html");
         if (stat.mtime) {
           const mtimeUTC = stat.mtime.toUTCString();
           if (req.headers.get("If-Modified-Since") === mtimeUTC) {
@@ -102,41 +115,58 @@ export default {
           }
         },
       });
+      if (routes.length > 0) {
+        const config = routes.map((r) => r[2]);
+        rewriter.on("head", {
+          element(el: Element) {
+            el.append(
+              `<script id="aleph-routes" type="application/json">${JSON.stringify(config)}</script>\n`,
+              {
+                html: true,
+              },
+            );
+          },
+        });
+      }
       rewriter.write((new TextEncoder()).encode(indexHtml));
       rewriter.end();
       return new Response(concat(...chunks), { headers });
     } catch (err) {
       log.error(err.stack);
-      return new Response(ctx.env.ALEPH_ENV === "devlopment" ? err.message.split("\n")[0] : "Internal Server Error", {
-        status: 500,
-      });
+      return new Response(
+        Deno.env.get("ALEPH_ENV") === "devlopment" ? err.message.split("\n")[0] : "Internal Server Error",
+        {
+          status: 500,
+        },
+      );
     }
   },
 };
 
-async function getRoute(
+async function matchRoute(
   req: Request,
-  ctx: Context,
-): Promise<Response | { url: URL; component?: any; data?: any; dataExpires?: number }> {
+  ctx: Record<string | symbol, any>,
+  routes: RouteConfig[],
+): Promise<Response | { url: URL; component?: any; filename?: string; data?: any; dataExpires?: number }> {
   const url = new URL(req.url);
-  const pathname = util.cleanPath(url.pathname);
-  const routes: RouteConfig[] = (self as any).__ALEPH_ROUTES;
-  if (util.isArray(routes)) {
-    for (const [pattern, load] of routes) {
-      const mod = await load();
-      const route = {
-        url,
-        component: mod.component,
-        dataExpires: mod.data?.cacheTtl,
-      };
+  if (routes.length > 0) {
+    const pathname = util.cleanPath(url.pathname);
+    for (const [pattern, load, meta] of routes) {
+      const route = { url };
       const ret = pattern.exec({ pathname });
       if (ret) {
-        route.url = util.appendUrlParams(url, ret.pathname.groups);
+        const mod = await load();
+        Object.assign(route, {
+          url: util.appendUrlParams(url, ret.pathname.groups),
+          component: mod.component,
+          dataExpires: mod.dataMethods?.cacheTtl,
+          filename: meta.filename,
+        });
         const request = new Request(route.url.toString(), req);
-        if (mod.data) {
-          const fetcher = mod.data.get;
+        if (mod.dataMethods) {
+          const fetcher = mod.dataMethods.get;
           if (util.isFunction(fetcher)) {
-            const allFetcher = mod.data.all;
+            const allFetcher = mod.dataMethods.all;
             if (util.isFunction(allFetcher)) {
               let res = allFetcher(request);
               if (res instanceof Promise) {

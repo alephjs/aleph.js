@@ -4,10 +4,10 @@ import "../style/index.css";
 let count = 0;
 
 export const data = {
-  get: (req: Request, ctx: Context) => {
+  get: (req: Request) => {
     return new Response(JSON.stringify({ count }));
   },
-  post: async (req: Request, ctx: Context) => {
+  post: async (req: Request) => {
     const { action } = await req.json();
     if (action === "increment") {
       count++;

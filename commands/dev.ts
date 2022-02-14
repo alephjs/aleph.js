@@ -1,10 +1,10 @@
-import { extname, globToRegExp, join, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { relative, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
-import { existsDir, findFile } from "../lib/fs.ts";
-import log, { dim } from "../lib/log.ts";
-import util from "../lib/util.ts";
-import { serveAppModules } from "../server/transformer.ts";
+import { existsDir, findFile, watchFs } from "../lib/fs.ts";
+import log from "../lib/log.ts";
+import { serve } from "../server/mod.ts";
+import { clientDependencyGraph, serveAppModules, serverDependencyGraph } from "../server/transformer.ts";
 
 export const helpMessage = `
 Usage:
@@ -43,81 +43,42 @@ if (import.meta.main) {
     log.fatal("missing `--tls-key` option");
   }
 
+  Deno.env.set("ALEPH_ENV", "development");
+
   serveAppModules(6060);
-  log.debug(`Serve project modules on http://localhost:6060`);
+  log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
+
+  watchFs(workingDir, (path, info) => {
+    const relPath = "./" + relative(workingDir, path);
+    if (info) {
+      clientDependencyGraph.update(relPath);
+      serverDependencyGraph.update(relPath);
+    } else {
+      clientDependencyGraph.unmark(relPath);
+      serverDependencyGraph.unmark(relPath);
+    }
+  });
+  log.info(`Watching files for changes...`);
 
   const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"]);
   if (serverEntry) {
-    const global = globalThis as any;
-    Deno.env.set("ALEPH_ENV", "development");
-    Deno.env.set("ALEPH_BUILD_ID", Date.now().toString(16));
-    console.log(
-      `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?BUILD=${
-        Deno.env.get("ALEPH_BUILD_ID")
-      }`,
-    );
-    await import(
-      `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?BUILD=${Deno.env.get("ALEPH_BUILD_ID")}`
-    );
+    const serverVersion = (await Deno.lstat(serverEntry)).mtime?.getTime().toString(16);
+    await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?v=${serverVersion}`);
+  }
+
+  const global = globalThis as any;
+  if (global.__ALEPH_SERVER_HANDLER === undefined) {
+    serve(); // make default handler
+  }
+
+  const handler = (req: Request) => {
     const serverHandler = global.__ALEPH_SERVER_HANDLER;
-    if (global.__ALEPH_ROUTES_GLOB) {
-      global.__ALEPH_ROUTES = await readRoutes(global.__ALEPH_ROUTES_GLOB);
-    }
-    log.info(`Server ready on http://localhost:${port}`);
-    if (certFile && keyFile) {
-      await serveTls((req) => serverHandler(req, Deno.env.toObject()), { port, hostname, certFile, keyFile });
-    } else {
-      await stdServe((req) => serverHandler(req, Deno.env.toObject()), { port, hostname });
-    }
+    return serverHandler(req, Deno.env.toObject());
+  };
+  log.info(`Server ready on http://localhost:${port}`);
+  if (certFile && keyFile) {
+    await serveTls(handler, { port, hostname, certFile, keyFile });
   } else {
-    log.fatal("No server entry found");
+    await stdServe(handler, { port, hostname });
   }
-}
-
-async function readRoutes(glob: string) {
-  const reg = globToRegExp(glob);
-  const cwd = Deno.cwd();
-  const files = await getFiles(cwd, (filename) => reg.test(filename));
-  const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
-  return Promise.all(files.map(async (filename) => {
-    const [prefix] = glob.split("*");
-    const p = "/" + util.splitPath(util.trimPrefix(filename, util.trimSuffix(prefix, "/"))).map((part) => {
-      part = part.toLowerCase();
-      if (part.startsWith("[") && part.startsWith("]")) {
-        return ":" + part.slice(1, -1);
-      } else if (part.startsWith("$")) {
-        return ":" + part.slice(1);
-      }
-      return part;
-    }).join("/");
-    const pathname = util.trimSuffix(util.trimSuffix(p, extname(p)), "/index") || "/";
-    const importUrl = `http://localhost:${port}${join(cwd, filename)}`;
-    log.debug(dim("[route]"), pathname, importUrl);
-    return [
-      // @ts-ignore
-      new URLPattern({ pathname }),
-      async () => {
-        const mod = await import(`${importUrl}?BUILD=${Deno.env.get("ALEPH_BUILD_ID")}`);
-        return {
-          component: mod.default,
-          data: mod.data,
-        };
-      },
-    ];
-  }));
-}
-
-async function getFiles(dir: string, filter?: (filename: string) => boolean, path: string[] = []): Promise<string[]> {
-  const list: string[] = [];
-  for await (const dirEntry of Deno.readDir(dir)) {
-    if (dirEntry.isDirectory) {
-      list.push(...await getFiles(join(dir, dirEntry.name), filter, [...path, dirEntry.name]));
-    } else {
-      const filename = [".", ...path, dirEntry.name].join("/");
-      if (!filter || filter(filename)) {
-        list.push(filename);
-      }
-    }
-  }
-  return list;
 }

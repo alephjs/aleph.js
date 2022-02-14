@@ -1,6 +1,6 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
 import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
-import type { SSREvent } from "../../server/types.d.ts";
+import type { SSREvent } from "../../types.d.ts";
 import events from "../core/events.ts";
 import MainContext from "./context.ts";
 
@@ -10,7 +10,7 @@ export type RouterProps = {
 
 export const Router: FC<RouterProps> = ({ ssr }) => {
   const [url, setUrl] = useState<URL & { _component?: FC<any> }>(() =>
-    ssr?.url || new URL(self.location?.href || "http://localhost/")
+    ssr?.url || new URL(globalThis.location?.href || "http://localhost/")
   );
   const dataCache = useMemo<any>(() => {
     const cache = new Map();
@@ -18,18 +18,24 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
     cache.set(url.pathname + url.search, { data, expires });
     return cache;
   }, []);
-  const Component = useMemo<FC<any>>(() => ssr?.component || url._component || E404, [url]);
+  const Component = useMemo<FC<any>>(
+    () => ssr?.component || (globalThis as any).__ssrComponent || url._component || E404,
+    [url],
+  );
 
   useEffect(() => {
     // remove ssr head elements
-    const { head } = self.document;
+    const { head } = globalThis.document;
     Array.from(head.children).forEach((el: any) => {
       if (el.hasAttribute("ssr")) {
         head.removeChild(el);
       }
     });
     events.addListener("popstate", (e) => {
-      setUrl(new URL(location.href));
+      const url = new URL(location.href);
+      // todo: cacha data
+      // todo: load comonent
+      setUrl(url);
       if (e.resetScroll) {
         (window as any).scrollTo(0, 0);
       }
@@ -76,7 +82,7 @@ const E404 = () => {
 };
 
 function loadSSRDataFromTag(): [any, number | undefined] {
-  const ssrDataEl = self.document?.getElementById("ssr-data");
+  const ssrDataEl = self.document?.getElementById("aleph-ssr-data");
   if (ssrDataEl) {
     try {
       const ssrData = JSON.parse(ssrDataEl.innerText);

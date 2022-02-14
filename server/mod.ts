@@ -4,10 +4,11 @@ import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { loadDenoJSXConfig } from "./config.ts";
+import { getRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
-import ssr, { type SSREvent } from "./ssr.ts";
+import ssr from "./ssr.ts";
 import { fetchClientModule } from "./transformer.ts";
-import type { AlephConfig, AlephJSXConfig, Context, Fetcher, Middleware, RouteConfig } from "./types.d.ts";
+import type { AlephConfig, AlephJSXConfig, Fetcher, Middleware, SSREvent } from "../types.d.ts";
 
 export type ServerOptions = {
   config?: AlephConfig;
@@ -33,11 +34,6 @@ export const serve = (options: ServerOptions = {}) => {
     userAgent: `Deno/${Deno.version.deno}`,
     vendor: "Deno Land Inc.",
   });
-
-  if (options.config?.routes) {
-    // @ts-ignore
-    globalThis.__ALEPH_ROUTES_GLOB = options.config.routes;
-  }
 
   const handler = async (req: Request, env: Record<string, string>) => {
     const url = new URL(req.url);
@@ -89,7 +85,7 @@ export const serve = (options: ServerOptions = {}) => {
         return new Response("Not found", { status: 404 });
     }
 
-    const ctx: Context = { env, data: {} };
+    const ctx: Record<string | symbol, any> = {};
     if (util.isArray(options.middlewares)) {
       for (const mw of options.middlewares) {
         let fetcher = mw;
@@ -118,18 +114,21 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request page data
-    const routes: RouteConfig[] = (self as any).__ALEPH_ROUTES;
-    if (util.isArray(routes)) {
+    const routes = options.config?.routes ? await getRoutes(options.config.routes) : [];
+    if (routes.length > 0) {
       for (const [pattern, load] of routes) {
         const ret = pattern.exec({ pathname });
         if (ret) {
           try {
             const mod = await load();
-            if (mod.data && (req.method !== "GET" || mod.component === undefined || req.headers.has("X-Fetch-Data"))) {
+            if (
+              mod.dataMethods &&
+              (req.method !== "GET" || mod.component === undefined || req.headers.has("X-Fetch-Data"))
+            ) {
               const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
-              const fetcher = mod.data[req.method.toLowerCase()];
+              const fetcher = mod.dataMethods[req.method.toLowerCase()];
               if (util.isFunction(fetcher)) {
-                const allFetcher = mod.data.all;
+                const allFetcher = mod.dataMethods.all;
                 if (util.isFunction(allFetcher)) {
                   let res = allFetcher(request);
                   if (res instanceof Promise) {
@@ -179,7 +178,7 @@ export const serve = (options: ServerOptions = {}) => {
       return new Response("Not Found", { status: 404 });
     }
 
-    return ssr.fetch(req, ctx, { indexHtml, ssrFn: options.ssr });
+    return ssr.fetch(req, ctx, { indexHtml, ssrFn: options.ssr, routes });
   };
 
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {

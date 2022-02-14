@@ -98,7 +98,7 @@ export class Logger {
   }
 
   timing(): Timing {
-    return new Timing(this.level === Level.Debug);
+    return new Timing(this.level > Level.Debug);
   }
 }
 

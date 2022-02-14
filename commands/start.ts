@@ -3,7 +3,8 @@ import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
-import { serveServerModules } from "../server/transformer.ts";
+import { serve } from "../server/mod.ts";
+import { serveAppModules } from "../server/transformer.ts";
 
 export const helpMessage = `
 Usage:
@@ -42,25 +43,28 @@ if (import.meta.main) {
     log.fatal("missing `--tls-key` option");
   }
 
-  serveServerModules(workingDir, 6060);
-  log.debug(`Serve project modules on http://localhost:6060`);
+  serveAppModules(6060);
+  log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
 
-  const serverEntry = await findFile(Deno.cwd(), [
-    "server.tsx",
-    "server.jsx",
-    "server.ts",
-    "server.js",
-  ]);
+  const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"]);
   if (serverEntry) {
-    await import(serverEntry);
-    const serverHandler: any = (globalThis as any).__ALEPH_SERVER_HANDLER;
-    log.info(`Server ready on http://localhost:${port}`);
-    if (certFile && keyFile) {
-      await serveTls((req) => serverHandler(req, Deno.env.toObject()), { port, hostname, certFile, keyFile });
-    } else {
-      await stdServe((req) => serverHandler(req, Deno.env.toObject()), { port, hostname });
-    }
+    const serverVersion = (await Deno.lstat(serverEntry)).mtime?.getTime().toString(16);
+    await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?v=${serverVersion}`);
+  }
+
+  const global = globalThis as any;
+  if (global.__ALEPH_SERVER_HANDLER === undefined) {
+    serve(); // make default handler
+  }
+
+  const handler = (req: Request) => {
+    const serverHandler = global.__ALEPH_SERVER_HANDLER;
+    return serverHandler(req, Deno.env.toObject());
+  };
+  log.info(`Server ready on http://localhost:${port}`);
+  if (certFile && keyFile) {
+    await serveTls(handler, { port, hostname, certFile, keyFile });
   } else {
-    log.fatal("No server entry found");
+    await stdServe(handler, { port, hostname });
   }
 }
