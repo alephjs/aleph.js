@@ -7,11 +7,12 @@ import { loadDenoJSXConfig } from "./config.ts";
 import { content, json } from "./response.ts";
 import ssr, { type SSREvent } from "./ssr.ts";
 import { fetchClientModule } from "./transformer.ts";
-import type { AlephConfig, AlephJSXConfig, Context, RouteConfig } from "./types.d.ts";
+import type { AlephConfig, AlephJSXConfig, Context, Fetcher, Middleware, RouteConfig } from "./types.d.ts";
 
 export type ServerOptions = {
   config?: AlephConfig;
-  fetch?: (request: Request, context: Context) => Promise<Response | void> | Response | void;
+  middlewares?: Middleware[];
+  fetch?: Fetcher;
   ssr?: (e: SSREvent) => string;
 };
 
@@ -89,10 +90,30 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     const ctx: Context = { env, data: {} };
+    if (util.isArray(options.middlewares)) {
+      for (const mw of options.middlewares) {
+        let fetcher = mw;
+        if (util.isPlainObject<{ fetch: Fetcher }>(mw)) {
+          fetcher = mw.fetch;
+        }
+        if (util.isFunction(fetcher)) {
+          let res = fetcher(req, ctx);
+          if (res instanceof Promise) {
+            res = await res;
+          }
+          if (res instanceof Response) {
+            return res;
+          }
+        }
+      }
+    }
     if (util.isFunction(options.fetch)) {
-      const resp = options.fetch(req, ctx);
-      if (resp instanceof Response) {
-        return resp;
+      let res = options.fetch(req, ctx);
+      if (res instanceof Promise) {
+        res = await res;
+      }
+      if (res instanceof Response) {
+        return res;
       }
     }
 

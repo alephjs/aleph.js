@@ -14,10 +14,11 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 const cssModuleLoader: Loader = {
-  test: (url) => url.endsWith(".css"),
+  test: (url) => url.split("?").shift()!.endsWith(".css"),
   load: async (url, rawContent) => {
     const { pathname } = new URL(url);
-    const js = await bundleCSS(`.${pathname}`, dec.decode(rawContent), {
+    const specifier = "." + util.trimPrefix(pathname, Deno.cwd());
+    const js = await bundleCSS(specifier, dec.decode(rawContent), {
       minify: Deno.env.get("ALEPH_ENV") !== "development",
       cssModules: pathname.endsWith(".module.css"),
       toJS: true,
@@ -29,9 +30,9 @@ const cssModuleLoader: Loader = {
   },
 };
 
-export async function serveServerModules(cwd: string, port: number) {
+export async function serveAppModules(port: number) {
   Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
-  await serveDir({ cwd, port, loaders: [cssModuleLoader] });
+  await serveDir({ cwd: "/", port, loaders: [cssModuleLoader] });
 }
 
 type Options = {

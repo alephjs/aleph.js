@@ -1,10 +1,10 @@
-import { basename, extname, globToRegExp, join, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { extname, globToRegExp, join, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import log, { dim } from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { serveServerModules } from "../server/transformer.ts";
+import { serveAppModules } from "../server/transformer.ts";
 
 export const helpMessage = `
 Usage:
@@ -43,7 +43,7 @@ if (import.meta.main) {
     log.fatal("missing `--tls-key` option");
   }
 
-  serveServerModules(workingDir, 6060);
+  serveAppModules(6060);
   log.debug(`Serve project modules on http://localhost:6060`);
 
   const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"]);
@@ -51,10 +51,13 @@ if (import.meta.main) {
     const global = globalThis as any;
     Deno.env.set("ALEPH_ENV", "development");
     Deno.env.set("ALEPH_BUILD_ID", Date.now().toString(16));
-    await import(
-      `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/${basename(serverEntry)}?BUILD=${
+    console.log(
+      `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?BUILD=${
         Deno.env.get("ALEPH_BUILD_ID")
-      }`
+      }`,
+    );
+    await import(
+      `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?BUILD=${Deno.env.get("ALEPH_BUILD_ID")}`
     );
     const serverHandler = global.__ALEPH_SERVER_HANDLER;
     if (global.__ALEPH_ROUTES_GLOB) {
@@ -73,7 +76,8 @@ if (import.meta.main) {
 
 async function readRoutes(glob: string) {
   const reg = globToRegExp(glob);
-  const files = await getFiles(Deno.cwd(), (filename) => reg.test(filename));
+  const cwd = Deno.cwd();
+  const files = await getFiles(cwd, (filename) => reg.test(filename));
   const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
   return Promise.all(files.map(async (filename) => {
     const [prefix] = glob.split("*");
@@ -87,8 +91,8 @@ async function readRoutes(glob: string) {
       return part;
     }).join("/");
     const pathname = util.trimSuffix(util.trimSuffix(p, extname(p)), "/index") || "/";
-    const importUrl = `http://localhost:${port}${filename.slice(1)}`;
-    log.debug(dim("[route]"), pathname);
+    const importUrl = `http://localhost:${port}${join(cwd, filename)}`;
+    log.debug(dim("[route]"), pathname, importUrl);
     return [
       // @ts-ignore
       new URLPattern({ pathname }),

@@ -14,7 +14,7 @@ export default {
   isFilledArray(a: any): a is Array<any> {
     return Array.isArray(a) && a.length > 0;
   },
-  isPlainObject(a: any): a is Record<string, any> {
+  isPlainObject<T = Record<string, any>>(a: any): a is T {
     return typeof a === "object" && a !== null && Array.isArray(a) &&
       Object.getPrototypeOf(a) === Object.prototype;
   },

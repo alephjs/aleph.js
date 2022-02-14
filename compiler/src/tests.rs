@@ -100,9 +100,9 @@ fn react_dev() {
   let source = r#"
       import { useState } from "react"
       export default function App() {
-				const [ msg ] = useState('Hello world!')
+        const [ msg ] = useState('Hello world!')
         return (
-					<h1 className="title">{msg}{foo()}</h1>
+          <h1 className="title">{msg}{foo()}</h1>
         )
       }
     "#;
