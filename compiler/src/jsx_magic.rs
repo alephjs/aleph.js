@@ -20,7 +20,7 @@ pub fn jsx_magic_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>, is
 /// - resolve `<a>` to `<Anchor>`
 /// - resolve `<head>` to `<Head>`
 /// - resolve `<style>` to `<InlineStyle>`
-/// - mark JSX static class names
+/// - mark JSX static class names (for atomic css like tailwindcss)
 struct JSXMagicFold {
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
@@ -207,7 +207,7 @@ impl JSXMagicFold {
       };
     }
 
-    // copy from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
+    // copied from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
     if self.is_dev {
       let resolver = self.resolver.borrow();
       match self.source.span_to_lines(el.span) {

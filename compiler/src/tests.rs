@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
   let mut imports: HashMap<String, String> = HashMap::new();
-  let mut graph_versions: HashMap<String, usize> = HashMap::new();
+  let mut graph_versions: HashMap<String, i64> = HashMap::new();
   imports.insert("~/".into(), "./".into());
   imports.insert("react".into(), "https://esm.sh/react".into());
   graph_versions.insert("./foo.ts".into(), 100);
@@ -30,11 +30,7 @@ fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc
 #[test]
 fn typescript() {
   let source = r#"
-      import { foo } from "./foo.ts"
-
-      foo();
-
-      enum D {
+       enum D {
         A,
         B,
         C,
@@ -63,9 +59,24 @@ fn typescript() {
       }
     "#;
   let (code, _) = transform("mod.ts", source, &EmitOptions::default());
-  assert!(code.contains("./foo.ts?v=100"));
   assert!(code.contains("var D;\n(function(D) {\n"));
   assert!(code.contains("_applyDecoratedDescriptor("));
+}
+
+#[test]
+fn import_resolving() {
+  let source = r#"
+      import React from "react"
+      import { foo } from "./foo.ts"
+      import "../style/index.css"
+
+      foo();
+      <div/>
+    "#;
+  let (code, _) = transform("./App.tsx", source, &EmitOptions::default());
+  assert!(code.contains("\"https://esm.sh/react@17.0.2\""));
+  assert!(code.contains("\"./foo.ts?v=100\""));
+  assert!(code.contains("\"../style/index.css?module\""));
 }
 
 #[test]
@@ -114,7 +125,6 @@ fn react_dev() {
       ..Default::default()
     },
   );
-  assert!(code.contains("https://esm.sh/react@17.0.2"));
   assert!(code.contains("var _s = $RefreshSig$()"));
   assert!(code.contains("_s()"));
   assert!(code.contains("_c = App"));

@@ -34,7 +34,7 @@ pub struct Options {
   pub import_map: ImportHashMap,
 
   #[serde(default)]
-  pub graph_versions: HashMap<String, usize>,
+  pub graph_versions: HashMap<String, i64>,
 
   #[serde(default = "default_jsx_runtime")]
   pub jsx_runtime: String,

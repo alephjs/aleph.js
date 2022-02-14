@@ -47,7 +47,7 @@ pub struct Resolver {
   jsx_runtime_version: String,
   jsx_runtime_cdn_version: String,
   import_map: ImportMap,
-  graph_versions: HashMap<String, usize>,
+  graph_versions: HashMap<String, i64>,
   is_dev: bool,
 }
 
@@ -67,7 +67,7 @@ impl Resolver {
     jsx_runtime_version: &str,
     jsx_runtime_cdn_version: &str,
     import_map: ImportHashMap,
-    graph_versions: HashMap<String, usize>,
+    graph_versions: HashMap<String, i64>,
     is_dev: bool,
   ) -> Self {
     Resolver {
@@ -224,7 +224,11 @@ impl Resolver {
       is_star_export,
     });
 
-    let mut import_url = fixed_url.to_owned();
+    let mut import_url = if is_remote {
+      fixed_url.to_owned()
+    } else {
+      url.to_owned()
+    };
     if import_url.ends_with(".css") {
       import_url = import_url + "?module"
     }
