@@ -23,7 +23,7 @@ Aleph.js uses modern tools to build your app. It transpiles code using [swc](htt
 
 Aleph.js works in Deno, a simple, modern and secure runtime for JavaScript and TypeScript. All dependencies are imported using URLs, and managed by Deno cache system. No `package.json` and `node_modules` directory needed.
 
-```ts
+```tsx
 import React from 'https://esm.sh/react'
 import Logo from '../components/logo.tsx'
 
