@@ -63,7 +63,7 @@ export function connect(basePath: string) {
   const { location } = window as any;
   const { protocol, host } = location;
   const wsUrl = (protocol === "https:" ? "wss" : "ws") + "://" + host +
-    basePath.replace(/\/+$/, "") + "/_hmr";
+    basePath.replace(/\/+$/, "") + "/-/hmr";
   const ws = new WebSocket(wsUrl);
   const contact = (callback: () => void) => {
     setTimeout(() => {

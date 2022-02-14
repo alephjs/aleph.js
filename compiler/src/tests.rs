@@ -20,7 +20,7 @@ fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc
     "v64",
     import_map,
     graph_versions,
-    false,
+    options.is_dev,
   )));
   let (code, _) = module.transform(resolver.clone(), options).unwrap();
   println!("{}", code);
@@ -125,10 +125,20 @@ fn react_dev() {
       ..Default::default()
     },
   );
+  assert!(code.contains("import { __REACT_REFRESH_RUNTIME__, __REACT_REFRESH__ } from \"/-/react-refresh-runtime.js\""));
+  assert!(code.contains("const prevRefreshReg = $RefreshReg$"));
+  assert!(code.contains("const prevRefreshSig = $RefreshSig$"));
+  assert!(code.contains(
+    "window.$RefreshReg$ = (type, id)=>__REACT_REFRESH_RUNTIME__.register(type, \"./app.tsx\" + (\"#\" + id))"
+  ));
+  assert!(code.contains("window.$RefreshSig$ = __REACT_REFRESH_RUNTIME__.createSignatureFunctionForTransform"));
   assert!(code.contains("var _s = $RefreshSig$()"));
   assert!(code.contains("_s()"));
   assert!(code.contains("_c = App"));
   assert!(code.contains("$RefreshReg$(_c, \"App\")"));
+  assert!(code.contains("window.$RefreshReg$ = prevRefreshReg"));
+  assert!(code.contains("window.$RefreshSig$ = prevRefreshSig;"));
+  assert!(code.contains("import.meta.hot?.accept(__REACT_REFRESH__)"));
 }
 
 #[test]

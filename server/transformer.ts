@@ -3,9 +3,9 @@ import { transform, transformCSS } from "../compiler/mod.ts";
 import { restoreUrl, toLocalPath } from "../lib/path.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
-import { getAlephPkgUri, loadImportMap } from "./config.ts";
+import { getAlephPkgUri, loadDenoJSXConfig, loadImportMap } from "./config.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { AlephJSXConfig } from "./types.d.ts";
+import type { AlephJSXConfig } from "../types.d.ts";
 
 export const clientDependencyGraph = new DependencyGraph();
 export const serverDependencyGraph = new DependencyGraph();
@@ -36,12 +36,12 @@ export async function serveAppModules(port: number) {
 }
 
 type Options = {
-  jsxConfig: AlephJSXConfig;
   isDev: boolean;
+  jsxMagic: boolean;
   mtime?: Date;
 };
 
-export const fetchClientModule = async (pathname: string, { jsxConfig, isDev, mtime }: Options): Promise<Response> => {
+export const fetchClientModule = async (pathname: string, { isDev, jsxMagic, mtime }: Options): Promise<Response> => {
   const [specifier, rawCode] = await readCode(pathname.startsWith("/-/") ? restoreUrl(pathname) : `.${pathname}`);
   let js: string;
   if (pathname.endsWith(".css")) {
@@ -53,6 +53,7 @@ export const fetchClientModule = async (pathname: string, { jsxConfig, isDev, mt
     });
   } else {
     const importMap = await loadImportMap();
+    const jsxConfig: AlephJSXConfig = { jsxMagic, ...(await loadDenoJSXConfig()) };
     const graphVersions = clientDependencyGraph.modules.filter((mod) =>
       !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
     ).reduce((acc, { specifier, version }) => {

@@ -61,7 +61,7 @@ export default {
               el.before(
                 `<script type="module">import __ssrComponent from ${
                   JSON.stringify(route.filename)
-                };Object.assign({__ssrComponent})</script>`,
+                };Object.assign(window,{__ssrComponent})</script>`,
                 {
                   html: true,
                 },

@@ -59,7 +59,7 @@ if (import.meta.main) {
 
   const handler = (req: Request) => {
     const serverHandler = global.__ALEPH_SERVER_HANDLER;
-    return serverHandler(req, Deno.env.toObject());
+    return serverHandler(req);
   };
   log.info(`Server ready on http://localhost:${port}`);
   if (certFile && keyFile) {

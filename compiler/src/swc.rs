@@ -1,4 +1,5 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
+use crate::hmr::hmr;
 use crate::jsx_magic::jsx_magic_fold;
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::Resolver;
@@ -117,8 +118,9 @@ impl SWC {
       };
       let passes = chain!(
         resolver_with_mark(top_level_mark),
+        Optional::new(react::jsx_src(options.is_dev, self.source_map.clone()), is_jsx),
         Optional::new(
-          jsx_magic_fold(resolver.clone(), self.source_map.clone(), options.is_dev),
+          jsx_magic_fold(resolver.clone(), self.source_map.clone()),
           is_jsx && options.jsx_magic
         ),
         resolve_fold(resolver.clone()),
@@ -153,6 +155,7 @@ impl SWC {
           ),
           !specifier_is_remote && jsx_runtime.eq("react")
         ),
+        Optional::new(hmr(resolver.clone()), !specifier_is_remote && jsx_runtime.eq("react")),
         Optional::new(
           react::jsx(
             self.source_map.clone(),

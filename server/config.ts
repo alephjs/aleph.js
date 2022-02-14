@@ -31,10 +31,14 @@ export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
     const { default: { compilerOptions } } = await import(`${jsonFile}#mtime-${stat.mtime?.getTime()}`, {
       assert: { type: "json" },
     });
-    if (compilerOptions?.jsx === "react-jsx" && util.isFilledString(compilerOptions?.jsxImportSource)) {
-      config.jsxImportSource = compilerOptions.jsxImportSource;
-      config.jsxRuntime = compilerOptions.jsxImportSource.includes("preact") ? "preact" : "react";
-    } else {
+    const { jsx, jsxImportSource } = compilerOptions || {};
+    if (
+      (jsx === "react-jsx" || jsx === "react-jsxdev") &&
+      util.isFilledString(jsxImportSource)
+    ) {
+      config.jsxImportSource = jsxImportSource;
+      config.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
+    } else if (jsx === "react") {
       config.jsxRuntime = compilerOptions.jsxFactory === "h" ? "preact" : "react";
     }
   }
@@ -47,10 +51,14 @@ export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
     if (denoConfigFile) {
       try {
         const { compilerOptions } = await parseJSONFile(denoConfigFile);
-        if (compilerOptions?.jsx === "react-jsx" && util.isFilledString(compilerOptions?.jsxImportSource)) {
-          jsxConfig.jsxImportSource = compilerOptions.jsxImportSource;
-          jsxConfig.jsxRuntime = compilerOptions.jsxImportSource.includes("preact") ? "preact" : "react";
-        } else {
+        const { jsx, jsxImportSource } = compilerOptions || {};
+        if (
+          (jsx === "react-jsx" || jsx === "react-jsxdev") &&
+          util.isFilledString(jsxImportSource)
+        ) {
+          jsxConfig.jsxImportSource = jsxImportSource;
+          jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
+        } else if (jsx === "react") {
           jsxConfig.jsxRuntime = compilerOptions.jsxFactory === "h" ? "preact" : "react";
         }
       } catch (error) {

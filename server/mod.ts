@@ -3,12 +3,11 @@ import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { loadDenoJSXConfig } from "./config.ts";
 import { getRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import ssr from "./ssr.ts";
 import { fetchClientModule } from "./transformer.ts";
-import type { AlephConfig, AlephJSXConfig, Fetcher, Middleware, SSREvent } from "../types.d.ts";
+import type { AlephConfig, Fetcher, Middleware, SSREvent } from "../types.d.ts";
 
 export type ServerOptions = {
   config?: AlephConfig;
@@ -31,22 +30,20 @@ export const serve = (options: ServerOptions = {}) => {
     language: "en",
     languages: ["en"],
     onLine: true,
-    userAgent: `Deno/${Deno.version.deno}`,
+    userAgent: `Deno/${Deno.version?.deno || "deploy"}`,
     vendor: "Deno Land Inc.",
   });
 
-  const handler = async (req: Request, env: Record<string, string>) => {
+  const { jsxMagic = true } = options.config || {};
+
+  const handler = async (req: Request) => {
     const url = new URL(req.url);
     const { pathname, searchParams } = url;
-    const isDev = env.ALEPH_ENV === "development";
-    const jsxConfig: AlephJSXConfig = Object.assign(
-      { jsxMagic: options.config?.jsxMagic ?? true },
-      await loadDenoJSXConfig(),
-    );
+    const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
     /* handle '/-/http_localhost_7070/framework/react/mod.ts' */
     if (pathname.startsWith("/-/")) {
-      return fetchClientModule(pathname, { jsxConfig, isDev });
+      return fetchClientModule(pathname, { isDev, jsxMagic });
     }
 
     try {
@@ -60,7 +57,7 @@ export const serve = (options: ServerOptions = {}) => {
           builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
           searchParams.has("module")
         ) {
-          return fetchClientModule(pathname, { jsxConfig, isDev, mtime: stat.mtime });
+          return fetchClientModule(pathname, { isDev, jsxMagic, mtime: stat.mtime });
         } else {
           const file = await Deno.open(`.${pathname}`, { read: true });
           return new Response(readableStreamFromReader(file), {
@@ -184,7 +181,7 @@ export const serve = (options: ServerOptions = {}) => {
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {
     // support deno deploy
     self.addEventListener("fetch", (e: any) => {
-      e.respondWith(handler(e.request, Deno.env.toObject()));
+      e.respondWith(handler(e.request));
     });
   } else {
     Object.assign(globalThis, { __ALEPH_SERVER_HANDLER: handler });

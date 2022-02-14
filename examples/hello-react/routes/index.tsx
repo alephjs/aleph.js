@@ -9,9 +9,9 @@ export const data = {
   },
   post: async (req: Request) => {
     const { action } = await req.json();
-    if (action === "increment") {
+    if (action === "increase") {
       count++;
-    } else if (action === "decrement") {
+    } else if (action === "decrease") {
       count--;
     }
     return new Response(JSON.stringify({ count }));

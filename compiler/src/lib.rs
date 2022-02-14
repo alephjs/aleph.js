@@ -3,6 +3,7 @@ extern crate lazy_static;
 
 mod css;
 mod error;
+mod hmr;
 mod import_map;
 mod jsx_magic;
 mod resolve_fold;

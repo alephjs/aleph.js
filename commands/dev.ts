@@ -4,6 +4,7 @@ import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile, watchFs } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import { serve } from "../server/mod.ts";
+import { refreshRuntime } from "../framework/react/refresh.ts";
 import { clientDependencyGraph, serveAppModules, serverDependencyGraph } from "../server/transformer.ts";
 
 export const helpMessage = `
@@ -72,8 +73,15 @@ if (import.meta.main) {
   }
 
   const handler = (req: Request) => {
-    const serverHandler = global.__ALEPH_SERVER_HANDLER;
-    return serverHandler(req, Deno.env.toObject());
+    const { pathname } = new URL(req.url);
+
+    switch (pathname) {
+      // todo: case "/-/hmr":
+      case "/-/react-refresh-runtime.js":
+        return new Response(refreshRuntime, { headers: { "content-type": "application/javascript" } });
+    }
+
+    return global.__ALEPH_SERVER_HANDLER(req);
   };
   log.info(`Server ready on http://localhost:${port}`);
   if (certFile && keyFile) {

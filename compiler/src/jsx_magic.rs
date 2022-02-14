@@ -6,17 +6,15 @@ use swc_ecma_ast::*;
 use swc_ecma_utils::quote_ident;
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 
-pub fn jsx_magic_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>, is_dev: bool) -> impl Fold {
+pub fn jsx_magic_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>) -> impl Fold {
   JSXMagicFold {
     resolver: resolver.clone(),
     source,
-    is_dev,
     inline_style_idx: 0,
   }
 }
 
 /// Aleph JSX magic fold, functions include:
-/// - add `__source` prop in development mode
 /// - resolve `<a>` to `<Anchor>`
 /// - resolve `<head>` to `<Head>`
 /// - resolve `<style>` to `<InlineStyle>`
@@ -24,7 +22,6 @@ pub fn jsx_magic_fold(resolver: Rc<RefCell<Resolver>>, source: Rc<SourceMap>, is
 struct JSXMagicFold {
   resolver: Rc<RefCell<Resolver>>,
   source: Rc<SourceMap>,
-  is_dev: bool,
   inline_style_idx: i32,
 }
 
@@ -202,47 +199,6 @@ impl JSXMagicFold {
             };
             break;
           }
-        }
-        _ => {}
-      };
-    }
-
-    // copied from https://github.com/swc-project/swc/blob/master/ecmascript/transforms/src/react/jsx_src.rs
-    if self.is_dev {
-      let resolver = self.resolver.borrow();
-      match self.source.span_to_lines(el.span) {
-        Ok(file_lines) => {
-          el.attrs.push(JSXAttrOrSpread::JSXAttr(JSXAttr {
-            span: DUMMY_SP,
-            name: JSXAttrName::Ident(quote_ident!("__source")),
-            value: Some(JSXAttrValue::JSXExprContainer(JSXExprContainer {
-              span: DUMMY_SP,
-              expr: JSXExpr::Expr(Box::new(
-                ObjectLit {
-                  span: DUMMY_SP,
-                  props: vec![
-                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                      key: PropName::Ident(quote_ident!("fileName")),
-                      value: Box::new(Expr::Lit(Lit::Str(Str {
-                        span: DUMMY_SP,
-                        value: resolver.specifier.as_str().into(),
-                        has_escape: false,
-                        kind: Default::default(),
-                      }))),
-                    }))),
-                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                      key: PropName::Ident(quote_ident!("lineNumber")),
-                      value: Box::new(Expr::Lit(Lit::Num(Number {
-                        span: DUMMY_SP,
-                        value: (file_lines.lines[0].line_index + 1) as _,
-                      }))),
-                    }))),
-                  ],
-                }
-                .into(),
-              )),
-            })),
-          }));
         }
         _ => {}
       };
