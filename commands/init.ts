@@ -125,8 +125,16 @@ export default async function (
       ],
       "jsx": "react"
     },
-    "lint": {},
-    "format": {},
+    "lint": {
+      "files": {
+        "exclude": [".aleph/"]
+      },
+    },
+    "fmt": {
+      "files": {
+        "exclude": [".aleph/"]
+      },
+    },
   }
   await Promise.all([
     Deno.writeTextFile(join(cwd, name, '.gitignore'), gitignore.join('\n')),
