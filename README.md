@@ -8,10 +8,10 @@
 ## Features
 
 - Modern tooling in Deno
-- Follow the web standard
+- Use standard web API
 - Filesystem routing
 - Static file server
-- Multiple UI library support (React, Vue, and more...)
+- Support multiple UI libraries (React/Vue/Sevlet...)
 - Server side rendering
 - Middlewares
 - Plugins
