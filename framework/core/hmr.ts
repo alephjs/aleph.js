@@ -31,9 +31,9 @@ class Module {
     this._isLocked = true;
   }
 
-  async applyUpdate(url: string) {
+  async applyUpdate(filname: string) {
     try {
-      const module = await import(url + "?t=" + Date.now());
+      const module = await import(filname + "?t=" + Date.now());
       this._acceptCallbacks.forEach((cb) => cb(module));
     } catch (e) {
       location.reload();
@@ -41,29 +41,23 @@ class Module {
   }
 }
 
-const modules: Map<string, Module> = new Map();
-const state: {
-  socket: WebSocket | null;
-  messageQueue: string[];
-} = {
-  socket: null,
-  messageQueue: [],
-};
+let modules: Map<string, Module> = new Map();
+let messageQueue: string[] = [];
+let conn: WebSocket | null = null;
 
 function sendMessage(msg: any) {
   const json = JSON.stringify(msg);
-  if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
-    state.messageQueue.push(json);
+  if (!conn || conn.readyState !== WebSocket.OPEN) {
+    messageQueue.push(json);
   } else {
-    state.socket.send(json);
+    conn.send(json);
   }
 }
 
-export function connect(basePath: string) {
+export function connect() {
   const { location } = window as any;
   const { protocol, host } = location;
-  const wsUrl = (protocol === "https:" ? "wss" : "ws") + "://" + host +
-    basePath.replace(/\/+$/, "") + "/-/hmr";
+  const wsUrl = (protocol === "https:" ? "wss" : "ws") + "://" + host + "/-/HMR";
   const ws = new WebSocket(wsUrl);
   const contact = (callback: () => void) => {
     setTimeout(() => {
@@ -76,19 +70,19 @@ export function connect(basePath: string) {
   };
 
   ws.addEventListener("open", () => {
-    state.socket = ws;
-    state.messageQueue.splice(0, state.messageQueue.length).forEach((msg) => ws.send(msg));
+    conn = ws;
+    messageQueue.splice(0, messageQueue.length).forEach((msg) => ws.send(msg));
     console.log("[HMR] listening for file changes...");
   });
 
   ws.addEventListener("close", () => {
-    if (state.socket !== null) {
-      state.socket = null;
+    if (conn !== null) {
+      conn = null;
       console.log("[HMR] closed.");
-      // re-connect
+      // re-connect after 0.5s
       setTimeout(() => {
-        connect(basePath);
-      }, 300);
+        connect();
+      }, 500);
     } else {
       // reload the page when re-connected
       contact(() => location.reload());
@@ -100,10 +94,8 @@ export function connect(basePath: string) {
       try {
         const {
           type,
-          specifier,
-          updateUrl,
-          routePath,
-          isIndex,
+          filename,
+          routePattern,
           refreshPage,
         } = JSON.parse(data);
         if (refreshPage === true) {
@@ -112,26 +104,26 @@ export function connect(basePath: string) {
         }
         switch (type) {
           case "add":
-            events.emit("add-module", {
-              specifier,
-              routePath,
-              isIndex,
-            });
+            if (routePattern) {
+              events.emit("add-route", { pattern: routePattern, filename });
+            }
             break;
           case "update":
-            const mod = modules.get(specifier);
+            const mod = modules.get(filename);
             if (mod) {
-              mod.applyUpdate(updateUrl);
+              mod.applyUpdate(filename);
             }
             break;
           case "remove":
-            if (modules.has(specifier)) {
-              modules.delete(specifier);
-              events.emit("remove-module", specifier);
+            if (modules.has(filename)) {
+              modules.delete(filename);
+            }
+            if (routePattern) {
+              events.emit("remove-route", filename);
             }
             break;
         }
-        console.log(`[HMR] ${type} module '${specifier}'`);
+        console.log(`[HMR] ${type} file changed '${filename}'`);
       } catch (err) {
         console.warn(err);
       }
@@ -139,15 +131,13 @@ export function connect(basePath: string) {
   });
 }
 
-Object.assign(window, {
-  $createHotContext: (specifier: string) => {
-    if (modules.has(specifier)) {
-      const mod = modules.get(specifier)!;
-      mod.lock();
-      return mod;
-    }
-    const mod = new Module(specifier);
-    modules.set(specifier, mod);
+export default function createHotContext(specifier: string) {
+  if (modules.has(specifier)) {
+    const mod = modules.get(specifier)!;
+    mod.lock();
     return mod;
-  },
-});
+  }
+  const mod = new Module(specifier);
+  modules.set(specifier, mod);
+  return mod;
+}

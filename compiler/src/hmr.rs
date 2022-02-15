@@ -22,8 +22,40 @@ impl Fold for HmrFold {
 
   // resolve import/export url
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
+    let resolver = self.resolver.borrow();
     let mut items = Vec::<ModuleItem>::new();
     let mut react_refresh = false;
+    let aleph_pkg_uri = resolver.aleph_pkg_uri.to_owned();
+
+    // import __CREATE_HOT_CONTEXT__ from "$aleph_pkg_uri/framework/core/hmr.ts"
+    items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+      span: DUMMY_SP,
+      specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+        span: DUMMY_SP,
+        local: quote_ident!("__CREATE_HOT_CONTEXT__"),
+      })],
+      src: new_str(&resolver.fix_remote_url(&(aleph_pkg_uri + "/framework/core/hmr.ts"))),
+      type_only: false,
+      asserts: None,
+    })));
+    // import.meta.hot = __CREATE_HOT_CONTEXT__($specifier)
+    items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+      span: DUMMY_SP,
+      expr: Box::new(Expr::Assign(AssignExpr {
+        span: DUMMY_SP,
+        op: AssignOp::Assign,
+        left: PatOrExpr::Expr(Box::new(new_member_expr(simple_member_expr("import", "meta"), "hot"))),
+        right: Box::new(Expr::Call(CallExpr {
+          span: DUMMY_SP,
+          callee: Callee::Expr(Box::new(Expr::Ident(quote_ident!("__CREATE_HOT_CONTEXT__")))),
+          args: vec![ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Lit(Lit::Str(new_str(&resolver.specifier)))),
+          }],
+          type_args: None,
+        })),
+      })),
+    })));
 
     for item in &module_items {
       if let ModuleItem::Stmt(Stmt::Expr(ExprStmt { expr, .. })) = &item {
@@ -37,15 +69,15 @@ impl Fold for HmrFold {
     }
 
     if react_refresh {
-      let resolver = self.resolver.borrow();
-      // import { __REACT_REFRESH_RUNTIME__, __REACT_REFRESH__ } from "/-/react-refresh-runtime.js"
+      let aleph_pkg_uri = resolver.aleph_pkg_uri.to_owned();
+      // import { __REACT_REFRESH_RUNTIME__, __REACT_REFRESH__ } from "$aleph_pkg_uri/framework/react/refresh.ts"
       items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
         span: DUMMY_SP,
         specifiers: vec![
           import_name("__REACT_REFRESH_RUNTIME__"),
           import_name("__REACT_REFRESH__"),
         ],
-        src: new_str("/-/react-refresh-runtime.js"),
+        src: new_str(&resolver.fix_remote_url(&(aleph_pkg_uri + "/framework/react/refresh.ts"))),
         type_only: false,
         asserts: None,
       })));

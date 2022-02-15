@@ -22,11 +22,7 @@ pub fn window_assign(name: &str, expr: Expr) -> ModuleItem {
     expr: Box::new(Expr::Assign(AssignExpr {
       span: DUMMY_SP,
       op: AssignOp::Assign,
-      left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
-        span: DUMMY_SP,
-        obj: Box::new(Expr::Ident(quote_ident!("window"))),
-        prop: MemberProp::Ident(quote_ident!(name)),
-      }))),
+      left: PatOrExpr::Expr(Box::new(simple_member_expr("window", name))),
       right: Box::new(expr),
     })),
   }))

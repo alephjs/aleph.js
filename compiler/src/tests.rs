@@ -125,7 +125,9 @@ fn react_dev() {
       ..Default::default()
     },
   );
-  assert!(code.contains("import { __REACT_REFRESH_RUNTIME__, __REACT_REFRESH__ } from \"/-/react-refresh-runtime.js\""));
+  assert!(code.contains(
+    "import { __REACT_REFRESH_RUNTIME__, __REACT_REFRESH__ } from \"/-/deno.land/x/aleph/framework/react/refresh.ts\""
+  ));
   assert!(code.contains("const prevRefreshReg = $RefreshReg$"));
   assert!(code.contains("const prevRefreshSig = $RefreshSig$"));
   assert!(code.contains(

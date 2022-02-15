@@ -50,6 +50,7 @@ export const fetchClientModule = async (pathname: string, { isDev, jsxMagic, mti
       cssModules: pathname.endsWith(".module.css"),
       toJS: true,
       resolveAlephPkgUri: true,
+      hmr: isDev,
     });
   } else {
     const importMap = await loadImportMap();
@@ -82,15 +83,18 @@ export const fetchClientModule = async (pathname: string, { isDev, jsxMagic, mti
   return new Response(js, { headers });
 };
 
+type BundleCssOptions = {
+  cssModules?: boolean;
+  minify?: boolean;
+  toJS?: boolean;
+  resolveAlephPkgUri?: boolean;
+  hmr?: boolean;
+};
+
 export async function bundleCSS(
   specifier: string,
   rawCode: string,
-  options: {
-    cssModules?: boolean;
-    minify?: boolean;
-    toJS?: boolean;
-    resolveAlephPkgUri?: boolean;
-  },
+  options: BundleCssOptions,
   tracing = new Set<string>(),
 ): Promise<string> {
   const eof = options.minify ? "" : "\n";
@@ -132,13 +136,16 @@ export async function bundleCSS(
       }
     }
     return [
+      options.hmr && `import createHotContext from "${toLocalPath(alephPkgUri)}framework/core/hmr.ts";`,
+      options.hmr && `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
       `import { applyCSS } from "${
         options.resolveAlephPkgUri ? toLocalPath(alephPkgUri).slice(0, -1) : alephPkgUri
       }/framework/core/style.ts";`,
       `export const css = ${JSON.stringify(css)};`,
       `export default ${JSON.stringify(cssModulesExports)};`,
       `applyCSS(${JSON.stringify(specifier)}, { css });`,
-    ].join(eof);
+      options.hmr && `import.meta.hot.accept();`,
+    ].filter(Boolean).join(eof);
   }
   return css;
 }
