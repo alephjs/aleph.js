@@ -11,7 +11,7 @@ fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc
     imports,
     scopes: HashMap::new(),
   };
-  let module = SWC::parse(specifer, source).expect("could not parse module");
+  let module = SWC::parse(specifer, source, swc_ecma_ast::EsVersion::Es2022).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
     "https://deno.land/x/aleph",

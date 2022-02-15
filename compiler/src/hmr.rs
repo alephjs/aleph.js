@@ -1,3 +1,7 @@
+use crate::expr_utils::{
+  import_name, is_call_expr_by_name, new_member_expr, new_str, pat_id, rename_var_decl, simple_member_expr,
+  window_assign,
+};
 use crate::resolver::Resolver;
 use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;
@@ -19,55 +23,45 @@ impl Fold for HmrFold {
   // resolve import/export url
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
-    let mut hmr = false;
+    let mut react_refresh = false;
 
     for item in &module_items {
       if let ModuleItem::Stmt(Stmt::Expr(ExprStmt { expr, .. })) = &item {
         if let Expr::Call(call) = expr.as_ref() {
           if is_call_expr_by_name(&call, "$RefreshReg$") {
-            hmr = true;
+            react_refresh = true;
             break;
           }
         }
       }
     }
 
-    if hmr {
+    if react_refresh {
       let resolver = self.resolver.borrow();
+      // import { __REACT_REFRESH_RUNTIME__, __REACT_REFRESH__ } from "/-/react-refresh-runtime.js"
       items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
         span: DUMMY_SP,
         specifiers: vec![
-          ImportSpecifier::Named(ImportNamedSpecifier {
-            span: DUMMY_SP,
-            local: quote_ident!("__REACT_REFRESH_RUNTIME__"),
-            imported: None,
-            is_type_only: false,
-          }),
-          ImportSpecifier::Named(ImportNamedSpecifier {
-            span: DUMMY_SP,
-            local: quote_ident!("__REACT_REFRESH__"),
-            imported: None,
-            is_type_only: false,
-          }),
+          import_name("__REACT_REFRESH_RUNTIME__"),
+          import_name("__REACT_REFRESH__"),
         ],
         src: new_str("/-/react-refresh-runtime.js"),
         type_only: false,
         asserts: None,
-      }))); // import { __REACT_REFRESH_RUNTIME__, __REACT_REFRESH__ } from "/-/react-refresh-runtime.js"
-      items.push(rename_var_decl("prevRefreshReg", "$RefreshReg$")); // const prevRefreshReg = $RefreshReg$
-      items.push(rename_var_decl("prevRefreshSig", "$RefreshSig$")); // const prevRefreshSig = $RefreshSig$
-      items.push(rename_assign(
+      })));
+      // const prevRefreshReg = $RefreshReg$
+      items.push(rename_var_decl("prevRefreshReg", "$RefreshReg$"));
+      // const prevRefreshSig = $RefreshSig$
+      items.push(rename_var_decl("prevRefreshSig", "$RefreshSig$"));
+      // window.$RefreshReg$ = (type, id) => __REACT_REFRESH_RUNTIME__.register(type, $specifier + "#" + id);
+      items.push(window_assign(
         "$RefreshReg$",
         Expr::Arrow(ArrowExpr {
           span: DUMMY_SP,
           params: vec![pat_id("type"), pat_id("id")],
           body: BlockStmtOrExpr::Expr(Box::new(Expr::Call(CallExpr {
             span: DUMMY_SP,
-            callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-              span: DUMMY_SP,
-              obj: Box::new(Expr::Ident(quote_ident!("__REACT_REFRESH_RUNTIME__"))),
-              prop: MemberProp::Ident(quote_ident!("register")),
-            }))),
+            callee: Callee::Expr(Box::new(simple_member_expr("__REACT_REFRESH_RUNTIME__", "register"))),
             args: vec![
               ExprOrSpread {
                 spread: None,
@@ -95,30 +89,30 @@ impl Fold for HmrFold {
           type_params: None,
           return_type: None,
         }),
-      )); // window.$RefreshReg$ = (type, id) => __REACT_REFRESH_RUNTIME__.register(type, ${JSON.stringify(specifier)} + "#" + id);
-      items.push(rename_assign(
+      ));
+      // window.$RefreshSig$ = __REACT_REFRESH_RUNTIME__.createSignatureFunctionForTransform
+      items.push(window_assign(
         "$RefreshSig$",
-        Expr::Member(MemberExpr {
-          span: DUMMY_SP,
-          obj: Box::new(Expr::Ident(quote_ident!("__REACT_REFRESH_RUNTIME__"))),
-          prop: MemberProp::Ident(quote_ident!("createSignatureFunctionForTransform")),
-        }),
-      )); // window.$RefreshSig$ = __REACT_REFRESH_RUNTIME__.createSignatureFunctionForTransform
+        simple_member_expr("__REACT_REFRESH_RUNTIME__", "createSignatureFunctionForTransform"),
+      ));
     }
 
     for item in module_items {
       items.push(item);
     }
 
-    if hmr {
-      items.push(rename_assign(
+    if react_refresh {
+      // window.$RefreshReg$ = prevRefreshReg
+      items.push(window_assign(
         "$RefreshReg$",
         Expr::Ident(quote_ident!("prevRefreshReg")),
-      )); // window.$RefreshReg$ = prevRefreshReg
-      items.push(rename_assign(
+      ));
+      // window.$RefreshSig$ = prevRefreshSig
+      items.push(window_assign(
         "$RefreshSig$",
         Expr::Ident(quote_ident!("prevRefreshSig")),
-      )); // window.$RefreshSig$ = prevRefreshSig
+      ));
+      // import.meta.hot.accept(__REACT_REFRESH__)
       items.push(ModuleItem::Stmt(Stmt::Expr(ExprStmt {
         span: DUMMY_SP,
         expr: Box::new(Expr::Call(CallExpr {
@@ -126,19 +120,10 @@ impl Fold for HmrFold {
           callee: Callee::Expr(Box::new(Expr::OptChain(OptChainExpr {
             span: DUMMY_SP,
             question_dot_token: DUMMY_SP,
-            expr: Box::new(Expr::Member(MemberExpr {
-              span: DUMMY_SP,
-              obj: Box::new(Expr::Member(MemberExpr {
-                span: DUMMY_SP,
-                obj: Box::new(Expr::Member(MemberExpr {
-                  span: DUMMY_SP,
-                  obj: Box::new(Expr::Ident(quote_ident!("import"))),
-                  prop: MemberProp::Ident(quote_ident!("meta")),
-                })),
-                prop: MemberProp::Ident(quote_ident!("hot")),
-              })),
-              prop: MemberProp::Ident(quote_ident!("accept")),
-            })),
+            expr: Box::new(new_member_expr(
+              new_member_expr(simple_member_expr("import", "meta"), "hot"),
+              "accept",
+            )),
           }))),
           args: vec![ExprOrSpread {
             spread: None,
@@ -146,68 +131,9 @@ impl Fold for HmrFold {
           }],
           type_args: None,
         })),
-      }))); // import.meta.hot.accept(__REACT_REFRESH__)
+      })));
     }
 
     items
-  }
-}
-
-pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
-  let callee = match &call.callee {
-    Callee::Super(_) => return false,
-    Callee::Import(_) => return false,
-    Callee::Expr(callee) => callee.as_ref(),
-  };
-
-  match callee {
-    Expr::Ident(id) => id.sym.as_ref().eq(name),
-    _ => false,
-  }
-}
-
-fn rename_var_decl(new_name: &str, old: &str) -> ModuleItem {
-  ModuleItem::Stmt(Stmt::Decl(Decl::Var(VarDecl {
-    span: DUMMY_SP,
-    kind: VarDeclKind::Const,
-    declare: false,
-    decls: vec![VarDeclarator {
-      span: DUMMY_SP,
-      name: pat_id(new_name),
-      init: Some(Box::new(Expr::Ident(quote_ident!(old)))),
-      definite: false,
-    }],
-  })))
-}
-
-fn rename_assign(name: &str, expr: Expr) -> ModuleItem {
-  ModuleItem::Stmt(Stmt::Expr(ExprStmt {
-    span: DUMMY_SP,
-    expr: Box::new(Expr::Assign(AssignExpr {
-      span: DUMMY_SP,
-      op: AssignOp::Assign,
-      left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
-        span: DUMMY_SP,
-        obj: Box::new(Expr::Ident(quote_ident!("window"))),
-        prop: MemberProp::Ident(quote_ident!(name)),
-      }))),
-      right: Box::new(expr),
-    })),
-  }))
-}
-
-fn pat_id(id: &str) -> Pat {
-  Pat::Ident(BindingIdent {
-    id: quote_ident!(id),
-    type_ann: None,
-  })
-}
-
-fn new_str(s: &str) -> Str {
-  Str {
-    span: DUMMY_SP,
-    value: s.into(),
-    has_escape: false,
-    kind: Default::default(),
   }
 }

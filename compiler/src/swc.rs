@@ -48,7 +48,7 @@ pub struct SWC {
 
 impl SWC {
   /// parse source code.
-  pub fn parse(specifier: &str, source: &str) -> Result<Self, anyhow::Error> {
+  pub fn parse(specifier: &str, source: &str, target: EsVersion) -> Result<Self, anyhow::Error> {
     let source_map = SourceMap::default();
     let source_file = source_map.new_source_file(FileName::Real(Path::new(specifier).to_path_buf()), source.into());
     let sm = &source_map;
@@ -57,7 +57,7 @@ impl SWC {
     let syntax = get_syntax(&source_type);
     let input = StringInput::from(&*source_file);
     let comments = SingleThreadedComments::default();
-    let lexer = Lexer::new(syntax, EsVersion::Es2020, input, Some(&comments));
+    let lexer = Lexer::new(syntax, target, input, Some(&comments));
     let mut parser = swc_ecmascript::parser::Parser::new_from(lexer);
     let handler = Handler::with_emitter_and_flags(
       Box::new(error_buffer.clone()),
@@ -155,7 +155,6 @@ impl SWC {
           ),
           !specifier_is_remote && jsx_runtime.eq("react")
         ),
-        Optional::new(hmr(resolver.clone()), !specifier_is_remote && jsx_runtime.eq("react")),
         Optional::new(
           react::jsx(
             self.source_map.clone(),
@@ -169,6 +168,7 @@ impl SWC {
           ),
           is_jsx
         ),
+        Optional::new(hmr(resolver.clone()), options.is_dev && !specifier_is_remote),
         fixer(Some(&self.comments)),
         hygiene()
       );

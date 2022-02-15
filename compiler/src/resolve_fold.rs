@@ -1,3 +1,4 @@
+use crate::expr_utils::{is_call_expr_by_name, new_str};
 use crate::resolver::Resolver;
 use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;
@@ -36,7 +37,7 @@ impl Fold for ResolveFold {
           span: DUMMY_SP,
           local: quote_ident!("__ALEPH__".to_owned() + name.as_str()),
         })],
-        src: new_str(resolved_url),
+        src: new_str(&resolved_url),
         type_only: false,
         asserts: None,
       })));
@@ -55,7 +56,7 @@ impl Fold for ResolveFold {
                 let mut resolver = self.resolver.borrow_mut();
                 let resolved_url = resolver.resolve(import_decl.src.value.as_ref(), false, false);
                 ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-                  src: new_str(resolved_url),
+                  src: new_str(&resolved_url),
                   ..import_decl
                 }))
               }
@@ -83,7 +84,7 @@ impl Fold for ResolveFold {
                 ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(NamedExport {
                   span: DUMMY_SP,
                   specifiers,
-                  src: Some(new_str(resolved_url)),
+                  src: Some(new_str(&resolved_url)),
                   type_only: false,
                   asserts: None,
                 }))
@@ -95,7 +96,7 @@ impl Fold for ResolveFold {
               let resolved_url = resolver.resolve(src.value.as_ref(), false, true);
               ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
                 span: DUMMY_SP,
-                src: new_str(resolved_url.into()),
+                src: new_str(&resolved_url),
                 asserts: None,
               }))
             }
@@ -129,32 +130,10 @@ impl Fold for ResolveFold {
       let resolved_url = resolver.resolve(url, true, false);
       call.args = vec![ExprOrSpread {
         spread: None,
-        expr: Box::new(Expr::Lit(Lit::Str(new_str(resolved_url)))),
+        expr: Box::new(Expr::Lit(Lit::Str(new_str(&resolved_url)))),
       }];
     }
 
     call.fold_children_with(self)
-  }
-}
-
-pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
-  let callee = match &call.callee {
-    Callee::Super(_) => return false,
-    Callee::Import(_) => return false,
-    Callee::Expr(callee) => callee.as_ref(),
-  };
-
-  match callee {
-    Expr::Ident(id) => id.sym.as_ref().eq(name),
-    _ => false,
-  }
-}
-
-fn new_str(str: String) -> Str {
-  Str {
-    span: DUMMY_SP,
-    value: str.into(),
-    has_escape: false,
-    kind: Default::default(),
   }
 }
