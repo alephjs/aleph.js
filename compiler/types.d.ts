@@ -7,6 +7,7 @@ export type TransformOptions = {
   alephPkgUri?: string;
   importMap?: ImportMap;
   graphVersions?: Record<string, number>;
+  target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
   jsxRuntime?: "react" | "preact";
   jsxRuntimeVersion?: string;
   jsxRuntimeCdnVersion?: string;

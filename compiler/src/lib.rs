@@ -3,6 +3,7 @@ extern crate lazy_static;
 
 mod css;
 mod error;
+mod expr_utils;
 mod hmr;
 mod import_map;
 mod jsx_magic;
@@ -20,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, SWC};
+use swc_ecma_ast::EsVersion;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
 #[derive(Deserialize)]
@@ -37,6 +39,9 @@ pub struct Options {
   #[serde(default)]
   pub graph_versions: HashMap<String, i64>,
 
+  #[serde(default = "default_target")]
+  pub target: String,
+
   #[serde(default = "default_jsx_runtime")]
   pub jsx_runtime: String,
 
@@ -51,6 +56,10 @@ pub struct Options {
 
   #[serde(default)]
   pub jsx_magic: bool,
+}
+
+fn default_target() -> String {
+  return "es2015".into();
 }
 
 fn default_jsx_runtime() -> String {
@@ -90,7 +99,18 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     options.graph_versions,
     options.is_dev,
   )));
-  let module = SWC::parse(specifier, code).expect("could not parse the module");
+  let target = match options.target.as_str() {
+    "es2015" => EsVersion::Es2015,
+    "es2016" => EsVersion::Es2016,
+    "es2017" => EsVersion::Es2017,
+    "es2018" => EsVersion::Es2018,
+    "es2019" => EsVersion::Es2019,
+    "es2020" => EsVersion::Es2020,
+    "es2021" => EsVersion::Es2021,
+    "es2022" => EsVersion::Es2022,
+    _ => EsVersion::Es2015, // minium version
+  };
+  let module = SWC::parse(specifier, code, target).expect("could not parse the module");
   let (code, map) = module
     .transform(
       resolver.clone(),
