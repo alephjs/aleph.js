@@ -31,9 +31,9 @@ class Module {
     this._isLocked = true;
   }
 
-  async applyUpdate(filname: string) {
+  async applyUpdate(specifier: string) {
     try {
-      const module = await import(filname + "?t=" + Date.now());
+      const module = await import(specifier.slice(1) + "?t=" + Date.now());
       this._acceptCallbacks.forEach((cb) => cb(module));
     } catch (e) {
       location.reload();
@@ -92,12 +92,7 @@ export function connect() {
   ws.addEventListener("message", ({ data }: { data?: string }) => {
     if (data) {
       try {
-        const {
-          type,
-          filename,
-          routePattern,
-          refreshPage,
-        } = JSON.parse(data);
+        const { type, specifier, routePattern, refreshPage } = JSON.parse(data);
         if (refreshPage === true) {
           location.reload();
           return;
@@ -105,25 +100,25 @@ export function connect() {
         switch (type) {
           case "add":
             if (routePattern) {
-              events.emit("add-route", { pattern: routePattern, filename });
+              events.emit("add-route", { pattern: routePattern, specifier });
             }
             break;
-          case "update":
-            const mod = modules.get(filename);
+          case "modify":
+            const mod = modules.get(specifier);
             if (mod) {
-              mod.applyUpdate(filename);
+              mod.applyUpdate(specifier);
             }
             break;
           case "remove":
-            if (modules.has(filename)) {
-              modules.delete(filename);
+            if (modules.has(specifier)) {
+              modules.delete(specifier);
             }
             if (routePattern) {
-              events.emit("remove-route", filename);
+              events.emit("remove-route", specifier);
             }
             break;
         }
-        console.log(`[HMR] ${type} file changed '${filename}'`);
+        console.log(`[HMR] ${type} ${JSON.stringify(specifier)}`);
       } catch (err) {
         console.warn(err);
       }

@@ -7,13 +7,14 @@ import { getRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import ssr from "./ssr.ts";
 import { fetchClientModule } from "./transformer.ts";
-import type { AlephConfig, Fetcher, Middleware, SSREvent } from "../types.d.ts";
+import type { Fetcher, Middleware, SSREvent } from "../types.d.ts";
 
 export type ServerOptions = {
-  config?: AlephConfig;
+  routes?: string;
+  jsxMagic?: boolean;
   middlewares?: Middleware[];
   fetch?: Fetcher;
-  ssr?: (e: SSREvent) => string;
+  ssr?: (e: SSREvent) => string | null | undefined;
 };
 
 export const serve = (options: ServerOptions = {}) => {
@@ -34,7 +35,7 @@ export const serve = (options: ServerOptions = {}) => {
     vendor: "Deno Land Inc.",
   });
 
-  const { jsxMagic = true } = options.config || {};
+  const { jsxMagic = true } = options;
 
   const handler = async (req: Request) => {
     const url = new URL(req.url);
@@ -111,7 +112,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request page data
-    const routes = options.config?.routes ? await getRoutes(options.config.routes) : [];
+    const routes = options.routes ? await getRoutes(options.routes) : [];
     if (routes.length > 0) {
       for (const [pattern, load] of routes) {
         const ret = pattern.exec({ pathname });
@@ -119,13 +120,13 @@ export const serve = (options: ServerOptions = {}) => {
           try {
             const mod = await load();
             if (
-              mod.dataMethods &&
-              (req.method !== "GET" || mod.component === undefined || req.headers.has("X-Fetch-Data"))
+              mod.data &&
+              (req.method !== "GET" || mod.default === undefined || req.headers.has("X-Fetch-Data"))
             ) {
               const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
-              const fetcher = mod.dataMethods[req.method.toLowerCase()];
+              const fetcher = mod.data[req.method.toLowerCase()];
               if (util.isFunction(fetcher)) {
-                const allFetcher = mod.dataMethods.all;
+                const allFetcher = mod.data.all;
                 if (util.isFunction(allFetcher)) {
                   let res = allFetcher(request);
                   if (res instanceof Promise) {

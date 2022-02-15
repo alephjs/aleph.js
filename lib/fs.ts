@@ -37,7 +37,7 @@ export async function findFile(dir: string, filenames: string[]): Promise<string
   return void 0;
 }
 
-export const watchFs = async (dir: string, listener: (path: string, info: Deno.FileInfo | null) => void) => {
+export const watchFs = async (dir: string, listener: (path: string, kind: "create" | "remove" | "modify") => void) => {
   const timers = new Map();
   const debounce = (id: string, callback: () => void, delay: number) => {
     if (timers.has(id)) {
@@ -56,11 +56,11 @@ export const watchFs = async (dir: string, listener: (path: string, info: Deno.F
     for (const path of paths) {
       debounce(kind + path, async () => {
         try {
-          const info = await Deno.lstat(path);
-          listener(path, info);
+          await Deno.lstat(path);
+          listener(path, kind === "create" ? "create" : "modify");
         } catch (error) {
           if (error instanceof Deno.errors.NotFound) {
-            listener(path, null);
+            listener(path, "remove");
           } else {
             console.warn("watchFs:", error);
           }

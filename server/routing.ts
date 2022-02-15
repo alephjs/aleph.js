@@ -5,8 +5,8 @@ import { RouteConfig } from "../types.d.ts";
 
 const routeModules: Map<string, any> = new Map();
 
-export async function registerRoute(filename: string, component?: unknown, dataMehtods?: Record<string, any>) {
-  routeModules.set(filename, { default: component, data: dataMehtods });
+export async function registerRoute(filename: string, component?: unknown, dataMethods?: Record<string, unknown>) {
+  routeModules.set(filename, { default: component, data: dataMethods });
 }
 
 export async function getRoutes(glob: string): Promise<RouteConfig[]> {
@@ -44,10 +44,7 @@ export async function getRoutes(glob: string): Promise<RouteConfig[]> {
           const mtime = (await Deno.lstat(filename)).mtime?.getTime().toString(16);
           mod = await import(`${importUrl}?v=${mtime}`);
         }
-        return {
-          component: mod.default,
-          dataMethods: mod.data,
-        };
+        return mod;
       },
       { pattern: { pathname }, filename },
     ];

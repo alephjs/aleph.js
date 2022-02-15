@@ -3,16 +3,17 @@ import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
 import getWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import log from "../lib/log.ts";
+import { toLocalPath } from "../lib/path.ts";
 import util from "../lib/util.ts";
 import type { RouteConfig, SSREvent } from "../types.d.ts";
-import { VERSION } from "../version.ts";
+import { getAlephPkgUri } from "./config.ts";
 
 let lolHtmlReady = false;
 
 type Options = {
   indexHtml: string;
   routes: RouteConfig[];
-  ssrFn?: (e: SSREvent) => string;
+  ssrFn?: (e: SSREvent) => string | null | undefined;
 };
 
 export default {
@@ -31,6 +32,7 @@ export default {
     const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
       chunks.push(chunk);
     });
+    let withSSR = false;
 
     try {
       if (ssrFn) {
@@ -42,45 +44,50 @@ export default {
 
         // ssr
         const headCollection: string[] = [];
-        const ssrBody = ssrFn({ ...route, headCollection });
-        rewriter.on("ssr-head", {
-          element(el: Element) {
-            headCollection.forEach((tag) => el.before(tag, { html: true }));
-            if (route.data) {
-              const expiresAttr = route.dataExpires ? ` data-expires="route.dataExpires"` : "";
-              el.before(
-                `<script id="aleph-ssr-data" type="application/json"${expiresAttr}>${
-                  JSON.stringify(route.data)
-                }</script>`,
-                {
-                  html: true,
-                },
-              );
-            }
-            if (route.filename) {
-              el.before(
-                `<script type="module">import __ssrComponent from ${
-                  JSON.stringify(route.filename)
-                };Object.assign(window,{__ssrComponent})</script>`,
-                {
-                  html: true,
-                },
-              );
-            }
-            el.remove();
-          },
-        });
-        rewriter.on("ssr-body", {
-          element(el: Element) {
-            el.replace(ssrBody, { html: true });
-          },
-        });
-        if (util.isNumber(route.dataExpires)) {
-          headers.append("Cache-Control", `public, max-age=${route.dataExpires}`);
-        } else {
-          headers.append("Cache-Control", "public, max-age=0, must-revalidate");
+        const ssrOutput = ssrFn({ ...route, headCollection });
+        if (typeof ssrOutput === "string") {
+          rewriter.on("ssr-head", {
+            element(el: Element) {
+              headCollection.forEach((tag) => el.before(tag, { html: true }));
+              if (route.data) {
+                const expiresAttr = route.dataExpires ? ` data-expires="route.dataExpires"` : "";
+                el.before(
+                  `<script id="aleph-ssr-data" type="application/json"${expiresAttr}>${
+                    JSON.stringify(route.data)
+                  }</script>`,
+                  {
+                    html: true,
+                  },
+                );
+              }
+              if (route.filename) {
+                el.before(
+                  `<script type="module">import __ssrComponent from ${
+                    JSON.stringify(route.filename)
+                  };Object.assign(window,{__ssrComponent})</script>`,
+                  {
+                    html: true,
+                  },
+                );
+              }
+              el.remove();
+            },
+          });
+          rewriter.on("ssr-body", {
+            element(el: Element) {
+              el.replace(ssrOutput, { html: true });
+            },
+          });
+          if (util.isNumber(route.dataExpires)) {
+            headers.append("Cache-Control", `public, max-age=${route.dataExpires}`);
+          } else {
+            headers.append("Cache-Control", "public, max-age=0, must-revalidate");
+          }
+          withSSR = true;
         }
-      } else {
+      }
+
+      if (!withSSR) {
         const stat = await Deno.lstat("./index.html");
         if (stat.mtime) {
           const mtimeUTC = stat.mtime.toUTCString();
@@ -91,13 +98,15 @@ export default {
         }
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
       }
+
+      let alephPkgUri = getAlephPkgUri();
       let nomoduleInserted = false;
       rewriter.on("script", {
         element(el: Element) {
           const src = el.getAttribute("src");
           const type = el.getAttribute("type");
           if (type === "module" && !nomoduleInserted) {
-            el.after(`<script nomodule src="https://deno.land/x/aleph@v${VERSION}/lib/module.js"></script>`, {
+            el.after(`<script nomodule src="${toLocalPath(alephPkgUri)}lib/nomodule.ts"></script>`, {
               html: true,
             });
             nomoduleInserted = true;
@@ -115,19 +124,29 @@ export default {
           }
         },
       });
-      if (routes.length > 0) {
-        const config = routes.map((r) => r[2]);
-        rewriter.on("head", {
-          element(el: Element) {
+      rewriter.on("head", {
+        element(el: Element) {
+          if (routes.length > 0) {
+            const config = routes.map((r) => r[2]);
             el.append(
               `<script id="aleph-routes" type="application/json">${JSON.stringify(config)}</script>\n`,
               {
                 html: true,
               },
             );
-          },
-        });
-      }
+          }
+          if (Deno.env.get("ALEPH_ENV") === "development") {
+            el.append(
+              `<script type="module">import { connect } from ${
+                JSON.stringify(`${toLocalPath(alephPkgUri)}framework/core/hmr.ts`)
+              };addEventListener("load", connect)</script>`,
+              {
+                html: true,
+              },
+            );
+          }
+        },
+      });
       rewriter.write((new TextEncoder()).encode(indexHtml));
       rewriter.end();
       return new Response(concat(...chunks), { headers });
@@ -147,7 +166,7 @@ async function matchRoute(
   req: Request,
   ctx: Record<string | symbol, any>,
   routes: RouteConfig[],
-): Promise<Response | { url: URL; component?: any; filename?: string; data?: any; dataExpires?: number }> {
+): Promise<Response | { url: URL; moduleDefaultExport?: any; filename?: string; data?: any; dataExpires?: number }> {
   const url = new URL(req.url);
   if (routes.length > 0) {
     const pathname = util.cleanPath(url.pathname);
@@ -158,15 +177,15 @@ async function matchRoute(
         const mod = await load();
         Object.assign(route, {
           url: util.appendUrlParams(url, ret.pathname.groups),
-          component: mod.component,
-          dataExpires: mod.dataMethods?.cacheTtl,
+          moduleDefaultExport: mod.default,
+          dataExpires: mod.data?.cacheTtl,
           filename: meta.filename,
         });
         const request = new Request(route.url.toString(), req);
-        if (mod.dataMethods) {
-          const fetcher = mod.dataMethods.get;
+        if (mod.data) {
+          const fetcher = mod.data.get;
           if (util.isFunction(fetcher)) {
-            const allFetcher = mod.dataMethods.all;
+            const allFetcher = mod.data.all;
             if (util.isFunction(allFetcher)) {
               let res = allFetcher(request);
               if (res instanceof Promise) {

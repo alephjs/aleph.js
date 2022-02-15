@@ -19,7 +19,7 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
     return cache;
   }, []);
   const Component = useMemo<FC<any>>(
-    () => ssr?.component || (globalThis as any).__ssrComponent || url._component || E404,
+    () => ssr?.moduleDefaultExport || (globalThis as any).__ssrComponent || url._component || E404,
     [url],
   );
 

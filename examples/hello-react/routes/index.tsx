@@ -27,7 +27,7 @@ export default function Index() {
         <title>Hello World - Aleph.js</title>
       </head>
       <p className="logo">
-        <img src="/assets/logo.svg" height="75" title="Aleph.js" />
+        <img src="/assets/logo.svg" height="60" title="Aleph.js" />
       </p>
       <h1>
         Welcome to use <strong>Aleph.js</strong>!

@@ -1,8 +1,3 @@
-export type AlephConfig = {
-  routes?: string;
-  jsxMagic?: boolean;
-};
-
 export type AlephJSXConfig = {
   jsxRuntime?: "react" | "preact";
   jsxImportSource?: string;
@@ -17,7 +12,7 @@ export interface IURLPattern {
 
 export type RouteConfig = [
   IURLPattern,
-  () => Promise<{ component?: unknown; dataMethods?: Record<string, any> }>,
+  () => Promise<{ default?: unknown; data?: Record<string, any> }>,
   { pattern: { pathname: string }; filename: string },
 ];
 
@@ -30,7 +25,7 @@ export type Middleware = Fetcher | { fetch: Fetcher };
 export type SSREvent = {
   readonly url: URL;
   readonly headCollection: string[];
-  readonly component?: any;
+  readonly moduleDefaultExport?: any;
   readonly data?: any;
   readonly dataExpires?: number;
 };

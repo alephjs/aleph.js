@@ -1,4 +1,4 @@
 import { hydrate } from "react-dom";
-import App from "./app.tsx";
+import { Router } from "aleph/react";
 
-hydrate(<App />, document.querySelector("#root"));
+hydrate(<Router />, document.querySelector("#root"));

@@ -2,7 +2,7 @@
   var containerEl = document.createElement("div");
   var hEl = document.createElement("h2");
   var pEl = document.createElement("p");
-  var contarinStyle = {
+  var contarinStyle: Partial<CSSStyleDeclaration> = {
     position: "fixed",
     top: "0",
     left: "0",
@@ -15,7 +15,7 @@
     borderBottom: "1px solid #eee",
     boxShadow: "0 1px 5px rgba(0,0,0,0.1)",
   };
-  var hStyle = {
+  var hStyle: Partial<CSSStyleDeclaration> = {
     padding: "0",
     margin: "0",
     lineHeight: "1.2",
@@ -23,7 +23,7 @@
     fontWeight: "700",
     color: "#000",
   };
-  var pStyle = {
+  var pStyle: Partial<CSSStyleDeclaration> = {
     padding: "6px 0 0 0",
     margin: "0",
     lineHeight: "1.2",
@@ -31,13 +31,13 @@
     color: "#454545",
   };
   for (var key in contarinStyle) {
-    containerEl.style[key] = contarinStyle[key];
+    (containerEl.style as any)[key] = contarinStyle[key];
   }
   for (var key in hStyle) {
-    hEl.style[key] = hStyle[key];
+    (hEl.style as any)[key] = hStyle[key];
   }
   for (var key in pStyle) {
-    pEl.style[key] = pStyle[key];
+    (pEl.style as any)[key] = pStyle[key];
   }
   // todo: i18n
   // todo: add browser info
