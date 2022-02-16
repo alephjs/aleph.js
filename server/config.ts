@@ -25,7 +25,7 @@ export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
   const global = globalThis as any;
   const config: AlephJSXConfig = {};
 
-  if (Deno.env.get("ALEPH_DEV") && Deno.env.get("ALEPH_DEV_ROOT")) {
+  if (Deno.env.get("ALEPH_DEV")) {
     const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
     const stat = await Deno.stat(jsonFile);
     const { default: { compilerOptions } } = await import(`${jsonFile}#mtime-${stat.mtime?.getTime()}`, {
@@ -73,7 +73,7 @@ export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
 }
 
 export async function loadImportMap(): Promise<ImportMap> {
-  if (Deno.env.get("ALEPH_DEV") && Deno.env.get("ALEPH_DEV_PORT") && Deno.env.get("ALEPH_DEV_ROOT")) {
+  if (Deno.env.get("ALEPH_DEV")) {
     const alephPkgUri = `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
     const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "import_map.json");
     const stat = await Deno.stat(jsonFile);

@@ -5,8 +5,8 @@ import { RouteConfig } from "../types.d.ts";
 
 const routeModules: Map<string, any> = new Map();
 
-export async function registerRoute(filename: string, component?: unknown, dataMethods?: Record<string, unknown>) {
-  routeModules.set(filename, { default: component, data: dataMethods });
+export async function register(filename: string, module: any) {
+  routeModules.set(filename, module);
 }
 
 export async function getRoutes(glob: string): Promise<RouteConfig[]> {

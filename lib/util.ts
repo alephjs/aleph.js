@@ -59,6 +59,10 @@ export default {
     });
     return cookie;
   },
+  toHex(buffer: ArrayBuffer) {
+    const bytes = new Uint8Array(buffer);
+    return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  },
   prettyBytes(bytes: number) {
     const units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
     const exp = Math.floor(Math.log(bytes) / Math.log(1024));

@@ -3,9 +3,10 @@ import { transform, transformCSS } from "../compiler/mod.ts";
 import { restoreUrl, toLocalPath } from "../lib/path.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
+import type { AlephJSXConfig } from "../types.d.ts";
+import { VERSION } from "../version.ts";
 import { getAlephPkgUri, loadDenoJSXConfig, loadImportMap } from "./config.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { AlephJSXConfig } from "../types.d.ts";
 
 export const clientDependencyGraph = new DependencyGraph();
 export const serverDependencyGraph = new DependencyGraph();
@@ -14,9 +15,8 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 const cssModuleLoader: Loader = {
-  test: (url) => url.split("?").shift()!.endsWith(".css"),
-  load: async (url, rawContent) => {
-    const { pathname } = new URL(url);
+  test: (url) => url.pathname.endsWith(".css"),
+  load: async ({ pathname }, rawContent) => {
     const specifier = "." + util.trimPrefix(pathname, Deno.cwd());
     const js = await bundleCSS(specifier, dec.decode(rawContent), {
       minify: Deno.env.get("ALEPH_ENV") !== "development",
@@ -31,64 +31,91 @@ const cssModuleLoader: Loader = {
 };
 
 export async function serveAppModules(port: number) {
-  Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
-  await serveDir({ cwd: "/", port, loaders: [cssModuleLoader] });
+  try {
+    Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
+    await serveDir({ cwd: "/", port, loaders: [cssModuleLoader] });
+  } catch (error) {
+    if (error instanceof Deno.errors.AddrInUse) {
+      await serveAppModules(port + 1);
+    } else {
+      throw error;
+    }
+  }
 }
 
-type Options = {
+type TransformeOptions = {
   isDev: boolean;
-  jsxMagic: boolean;
-  mtime?: Date;
+  jsxMagic?: boolean;
 };
 
-export const fetchClientModule = async (pathname: string, { isDev, jsxMagic, mtime }: Options): Promise<Response> => {
-  const [specifier, rawCode] = await readCode(pathname.startsWith("/-/") ? restoreUrl(pathname) : `.${pathname}`);
-  let js: string;
-  if (pathname.endsWith(".css")) {
-    js = await bundleCSS(specifier, rawCode, {
-      minify: !isDev,
-      cssModules: pathname.endsWith(".module.css"),
-      toJS: true,
-      resolveAlephPkgUri: true,
-      hmr: isDev,
+export const clientModuleTransformer = {
+  fetch: async (req: Request, options: TransformeOptions): Promise<Response> => {
+    const { pathname, searchParams, search } = new URL(req.url);
+    const { isDev, jsxMagic } = options;
+    const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
+    const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
+    const jsxConfig: AlephJSXConfig = isJSX ? { ...(await loadDenoJSXConfig()), jsxMagic: jsxMagic ?? true } : {};
+    const [rawCode, mtime] = await readCode(specifier);
+    const buildArgs = VERSION + JSON.stringify(jsxConfig) + isDev;
+    const etag = mtime
+      ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${(await computeHash(buildArgs)).slice(0, 8)}`
+      : await computeHash(rawCode + buildArgs);
+    if (req.headers.get("If-None-Match") === etag) {
+      return new Response(null, { status: 304 });
+    }
+
+    let code: string;
+    let codeType = "application/javascript";
+    if (pathname.endsWith(".css")) {
+      const toJS = searchParams.has("module");
+      code = await bundleCSS(specifier, rawCode, {
+        minify: !isDev,
+        cssModules: pathname.endsWith(".module.css"),
+        resolveAlephPkgUri: true,
+        hmr: isDev,
+        toJS,
+      });
+      if (!toJS) {
+        codeType = "text/css";
+      }
+    } else {
+      const importMap = await loadImportMap();
+      const graphVersions = clientDependencyGraph.modules.filter((mod) =>
+        !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
+      ).reduce((acc, { specifier, version }) => {
+        acc[specifier] = version;
+        return acc;
+      }, {} as Record<string, number>);
+      const ret = await transform(specifier, rawCode, {
+        ...jsxConfig,
+        alephPkgUri: getAlephPkgUri(),
+        graphVersions,
+        importMap,
+        isDev,
+      });
+      clientDependencyGraph.mark({
+        specifier,
+        version: 0,
+        deps: ret.deps || [],
+      });
+      code = ret.code;
+    }
+    return new Response(code, {
+      headers: {
+        "Content-Type": `${codeType}; charset=utf-8`,
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Etag": etag,
+      },
     });
-  } else {
-    const importMap = await loadImportMap();
-    const jsxConfig: AlephJSXConfig = { jsxMagic, ...(await loadDenoJSXConfig()) };
-    const graphVersions = clientDependencyGraph.modules.filter((mod) =>
-      !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
-    ).reduce((acc, { specifier, version }) => {
-      acc[specifier] = version;
-      return acc;
-    }, {} as Record<string, number>);
-    const ret = await transform(specifier, rawCode, {
-      ...jsxConfig,
-      alephPkgUri: getAlephPkgUri(),
-      graphVersions,
-      importMap,
-      isDev,
-    });
-    clientDependencyGraph.mark({
-      specifier,
-      version: mtime?.getTime() || 0,
-      deps: ret.deps || [],
-    });
-    js = ret.code;
-  }
-  const headers = new Headers({ "Content-Type": "application/javascript; charset=utf-8" });
-  if (mtime) {
-    headers.set("Last-Modified", mtime.toUTCString());
-  }
-  headers.set("Cache-Control", "public, max-age=0, must-revalidate");
-  return new Response(js, { headers });
+  },
 };
 
 type BundleCssOptions = {
   cssModules?: boolean;
   minify?: boolean;
-  toJS?: boolean;
   resolveAlephPkgUri?: boolean;
   hmr?: boolean;
+  toJS?: boolean;
 };
 
 export async function bundleCSS(
@@ -115,14 +142,14 @@ export async function bundleCSS(
             url = new URL(url, specifier).toString();
           }
         } else {
-          url = join(dirname(specifier), url);
+          url = `./${join(dirname(specifier), url)}`;
         }
         if (tracing.has(url)) {
           return "";
         }
         tracing.add(url);
-        const [s, css] = await readCode(url);
-        return await bundleCSS(s, css, { minify: options.minify }, tracing);
+        const [css] = await readCode(url);
+        return await bundleCSS(url, css, { minify: options.minify }, tracing);
       }),
     );
     css = imports.join(eof) + eof + css;
@@ -150,22 +177,24 @@ export async function bundleCSS(
   return css;
 }
 
-async function readCode(filename: string): Promise<[string, string]> {
+async function readCode(filename: string): Promise<[string, number | undefined]> {
   if (util.isLikelyHttpURL(filename)) {
-    const res = await fetch(filename);
+    const url = new URL(filename);
+    if (url.hostname === "esm.sh") {
+      url.searchParams.set("target", "es2021");
+    }
+    const res = await fetch(url.toString());
     if (res.status >= 400) {
       throw new Error(`fetch ${filename}: ${res.status} - ${res.statusText}`);
     }
-    return [filename, await res.text()];
+    const val = res.headers.get("Last-Modified");
+    const mtime = val ? new Date(val).getTime() : undefined;
+    return [await res.text(), mtime];
   }
-  let specifier = filename;
-  if (filename.startsWith("/")) {
-    const cwd = Deno.cwd();
-    if (filename.startsWith(cwd)) {
-      specifier = `.${util.trimPrefix(filename, cwd)}`;
-    }
-  } else {
-    specifier = `./${util.trimPrefix(filename, "./")}`;
-  }
-  return [specifier, await Deno.readTextFile(filename)];
+  const stat = await Deno.stat(filename);
+  return [await Deno.readTextFile(filename), stat.mtime?.getTime()];
+}
+
+async function computeHash(content: string): Promise<string> {
+  return util.toHex(await crypto.subtle.digest("sha-1", enc.encode(content)));
 }

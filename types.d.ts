@@ -1,3 +1,8 @@
+export type AlephConfig = {
+  routes?: string;
+  jsxMagic?: boolean;
+};
+
 export type AlephJSXConfig = {
   jsxRuntime?: "react" | "preact";
   jsxImportSource?: string;
@@ -6,6 +11,7 @@ export type AlephJSXConfig = {
 
 export interface IURLPattern {
   exec(input: { host?: string; pathname: string }): {
+    host: { groups: Record<string, string> };
     pathname: { groups: Record<string, string> };
   };
 }
@@ -13,7 +19,7 @@ export interface IURLPattern {
 export type RouteConfig = [
   IURLPattern,
   () => Promise<{ default?: unknown; data?: Record<string, any> }>,
-  { pattern: { pathname: string }; filename: string },
+  { filename: string; pattern: { host?: string; pathname: string } },
 ];
 
 export type Fetcher = {

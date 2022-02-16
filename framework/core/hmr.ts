@@ -1,14 +1,14 @@
 import events from "./events.ts";
 
+// ESM Hot Module Replacement (ESM-HMR) Specification
+// https://github.com/withastro/esm-hmr
+
 class Module {
   private _specifier: string;
   private _isAccepted: boolean = false;
+  private _isDeclined: boolean = false;
   private _isLocked: boolean = false;
   private _acceptCallbacks: CallableFunction[] = [];
-
-  get specifier() {
-    return this._specifier;
-  }
 
   constructor(specifier: string) {
     this._specifier = specifier;
@@ -27,14 +27,23 @@ class Module {
     }
   }
 
+  decline(): void {
+    this._isDeclined = true;
+    this.accept();
+  }
+
   lock(): void {
     this._isLocked = true;
   }
 
-  async applyUpdate(specifier: string) {
+  async applyUpdate() {
+    if (this._isDeclined) {
+      location.reload();
+      return;
+    }
     try {
-      const module = await import(specifier.slice(1) + "?t=" + Date.now());
-      this._acceptCallbacks.forEach((cb) => cb(module));
+      const module = await import(this._specifier.slice(1) + "?t=" + Date.now());
+      this._acceptCallbacks.forEach((cb) => cb({ module }));
     } catch (e) {
       location.reload();
     }
@@ -59,12 +68,12 @@ export function connect() {
   const { protocol, host } = location;
   const wsUrl = (protocol === "https:" ? "wss" : "ws") + "://" + host + "/-/HMR";
   const ws = new WebSocket(wsUrl);
-  const contact = (callback: () => void) => {
+  const ping = (callback: () => void) => {
     setTimeout(() => {
       const ws = new WebSocket(wsUrl);
       ws.addEventListener("open", callback);
       ws.addEventListener("close", () => {
-        contact(callback); // retry
+        ping(callback); // retry
       });
     }, 500);
   };
@@ -85,7 +94,7 @@ export function connect() {
       }, 500);
     } else {
       // reload the page when re-connected
-      contact(() => location.reload());
+      ping(() => location.reload());
     }
   });
 
@@ -106,7 +115,7 @@ export function connect() {
           case "modify":
             const mod = modules.get(specifier);
             if (mod) {
-              mod.applyUpdate(specifier);
+              mod.applyUpdate();
             }
             break;
           case "remove":

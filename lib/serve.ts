@@ -9,8 +9,8 @@ export type ServerOptions = {
 };
 
 export type Loader = {
-  test: (url: string) => boolean;
-  load(filepath: string, code: Uint8Array): Promise<Content> | Content;
+  test: (url: URL) => boolean;
+  load(url: URL, code: Uint8Array): Promise<Content> | Content;
 };
 
 export type Content = {
@@ -55,9 +55,9 @@ export async function serveDir(options: ServerOptions) {
         return;
       }
 
-      const loader = options.loaders?.find((loader) => loader.test(request.url));
+      const loader = options.loaders?.find((loader) => loader.test(url));
       if (loader) {
-        let ret = loader.load(request.url, await Deno.readFile(filepath));
+        let ret = loader.load(url, await Deno.readFile(filepath));
         if (ret instanceof Promise) {
           ret = await ret;
         }

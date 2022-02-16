@@ -5,19 +5,18 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { getRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
-import ssr from "./ssr.ts";
-import { fetchClientModule } from "./transformer.ts";
-import type { Fetcher, Middleware, SSREvent } from "../types.d.ts";
+import renderer from "./renderer.ts";
+import { clientModuleTransformer } from "./transformer.ts";
+import type { AlephConfig, Fetcher, Middleware, SSREvent } from "../types.d.ts";
 
 export type ServerOptions = {
-  routes?: string;
-  jsxMagic?: boolean;
+  config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: Fetcher;
   ssr?: (e: SSREvent) => string | null | undefined;
 };
 
-export const serve = (options: ServerOptions = {}) => {
+export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) => {
   // inject browser navigator polyfill
   Object.assign(globalThis.navigator, {
     connection: {
@@ -35,40 +34,40 @@ export const serve = (options: ServerOptions = {}) => {
     vendor: "Deno Land Inc.",
   });
 
-  const { jsxMagic = true } = options;
-
-  const handler = async (req: Request) => {
+  const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
-    const { pathname, searchParams } = url;
+    const { pathname } = url;
     const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
-    /* handle '/-/http_localhost_7070/framework/react/mod.ts' */
-    if (pathname.startsWith("/-/")) {
-      return fetchClientModule(pathname, { isDev, jsxMagic });
+    if (
+      pathname.startsWith("/-/") ||
+      builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
+      pathname.endsWith(".css")
+    ) {
+      return clientModuleTransformer.fetch(req, { isDev, jsxMagic: config?.jsxMagic });
     }
 
     try {
-      const stat = await Deno.lstat(`.${pathname}`);
+      let filePath = `.${pathname}`;
+      let stat = await Deno.lstat(filePath);
+      if (stat.isDirectory && pathname !== "/") {
+        filePath = `${util.trimSuffix(filePath, "/")}/index.html`;
+        stat = await Deno.lstat(filePath);
+      }
       if (stat.isFile && stat.mtime) {
-        const mtimeUTC = stat.mtime.toUTCString();
-        if (req.headers.get("If-Modified-Since") === mtimeUTC) {
+        const etag = stat.mtime.getTime().toString(16) + "-" + stat.size.toString(16);
+        if (req.headers.get("If-None-Match") === etag) {
           return new Response(null, { status: 304 });
         }
-        if (
-          builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
-          searchParams.has("module")
-        ) {
-          return fetchClientModule(pathname, { isDev, jsxMagic, mtime: stat.mtime });
-        } else {
-          const file = await Deno.open(`.${pathname}`, { read: true });
-          return new Response(readableStreamFromReader(file), {
-            headers: {
-              "Content-Type": getContentType(pathname),
-              "Last-Modified": mtimeUTC,
-              "Cache-Control": "public, max-age=0, must-revalidate",
-            },
-          });
-        }
+        const file = await Deno.open(`.${pathname}`, { read: true });
+        return new Response(readableStreamFromReader(file), {
+          headers: {
+            "Content-Type": getContentType(pathname),
+            "Etag": etag,
+            "Last-Modified": stat.mtime.toUTCString(),
+            "Cache-Control": "public, max-age=0, must-revalidate",
+          },
+        });
       }
     } catch (err) {
       if (!(err instanceof Deno.errors.NotFound)) {
@@ -77,15 +76,9 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    switch (pathname) {
-      case "/favicon.ico":
-      case "/robots.txt":
-        return new Response("Not found", { status: 404 });
-    }
-
     const ctx: Record<string | symbol, any> = {};
-    if (util.isArray(options.middlewares)) {
-      for (const mw of options.middlewares) {
+    if (util.isArray(middlewares)) {
+      for (const mw of middlewares) {
         let fetcher = mw;
         if (util.isPlainObject<{ fetch: Fetcher }>(mw)) {
           fetcher = mw.fetch;
@@ -101,8 +94,8 @@ export const serve = (options: ServerOptions = {}) => {
         }
       }
     }
-    if (util.isFunction(options.fetch)) {
-      let res = options.fetch(req, ctx);
+    if (util.isFunction(fetch)) {
+      let res = fetch(req, ctx);
       if (res instanceof Promise) {
         res = await res;
       }
@@ -112,7 +105,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request page data
-    const routes = options.routes ? await getRoutes(options.routes) : [];
+    const routes = config?.routes ? await getRoutes(config.routes) : [];
     if (routes.length > 0) {
       for (const [pattern, load] of routes) {
         const ret = pattern.exec({ pathname });
@@ -148,6 +141,13 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
+    // don't render this special asset files
+    switch (pathname) {
+      case "/favicon.ico":
+      case "/robots.txt":
+        return new Response("Not found", { status: 404 });
+    }
+
     let indexHtml: string | null | undefined = (globalThis as any).__ALEPH_INDEX_HTML;
     if (indexHtml === undefined) {
       try {
@@ -176,7 +176,7 @@ export const serve = (options: ServerOptions = {}) => {
       return new Response("Not Found", { status: 404 });
     }
 
-    return ssr.fetch(req, ctx, { indexHtml, ssrFn: options.ssr, routes });
+    return renderer.fetch(req, ctx, { indexHtml, ssrFn: ssr, routes });
   };
 
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {

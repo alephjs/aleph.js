@@ -48,8 +48,9 @@ if (import.meta.main) {
 
   const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"]);
   if (serverEntry) {
-    const serverVersion = (await Deno.lstat(serverEntry)).mtime?.getTime().toString(16);
-    await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?v=${serverVersion}`);
+    const stat = await Deno.lstat(serverEntry);
+    const version = stat.mtime?.getTime().toString(16) + stat.size.toString(16);
+    await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?v=${version}`);
   }
 
   const global = globalThis as any;
