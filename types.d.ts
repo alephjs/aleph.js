@@ -1,12 +1,11 @@
 export type AlephConfig = {
-  routes?: string;
-  jsxMagic?: boolean;
+  routeFiles?: string;
+  windicss?: boolean;
 };
 
-export type AlephJSXConfig = {
+export type JSXConfig = {
   jsxRuntime?: "react" | "preact";
   jsxImportSource?: string;
-  jsxMagic?: boolean;
 };
 
 export interface IURLPattern {

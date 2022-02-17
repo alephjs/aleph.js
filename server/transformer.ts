@@ -3,9 +3,9 @@ import { transform, transformCSS } from "../compiler/mod.ts";
 import { restoreUrl, toLocalPath } from "../lib/path.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
-import type { AlephJSXConfig } from "../types.d.ts";
+import type { JSXConfig } from "../types.d.ts";
 import { VERSION } from "../version.ts";
-import { getAlephPkgUri, loadDenoJSXConfig, loadImportMap } from "./config.ts";
+import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "./config.ts";
 import { DependencyGraph } from "./graph.ts";
 
 export const clientDependencyGraph = new DependencyGraph();
@@ -44,19 +44,19 @@ export async function serveAppModules(port: number) {
 }
 
 type TransformeOptions = {
+  windicss?: boolean;
   isDev: boolean;
-  jsxMagic?: boolean;
 };
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformeOptions): Promise<Response> => {
     const { pathname, searchParams, search } = new URL(req.url);
-    const { isDev, jsxMagic } = options;
+    const { isDev, windicss } = options;
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
-    const jsxConfig: AlephJSXConfig = isJSX ? { ...(await loadDenoJSXConfig()), jsxMagic: jsxMagic ?? true } : {};
+    const jsxConfig: JSXConfig = isJSX ? await loadJSXConfig() : {};
     const [rawCode, mtime] = await readCode(specifier);
-    const buildArgs = VERSION + JSON.stringify(jsxConfig) + isDev;
+    const buildArgs = VERSION + JSON.stringify(jsxConfig) + JSON.stringify(windicss) + isDev;
     const etag = mtime
       ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${(await computeHash(buildArgs)).slice(0, 8)}`
       : await computeHash(rawCode + buildArgs);
@@ -83,11 +83,12 @@ export const clientModuleTransformer = {
       const graphVersions = clientDependencyGraph.modules.filter((mod) =>
         !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
       ).reduce((acc, { specifier, version }) => {
-        acc[specifier] = version;
+        acc[specifier] = version.toString(16);
         return acc;
-      }, {} as Record<string, number>);
+      }, {} as Record<string, string>);
       const ret = await transform(specifier, rawCode, {
         ...jsxConfig,
+        parseJsxStaticClasses: Boolean(windicss),
         alephPkgUri: getAlephPkgUri(),
         graphVersions,
         importMap,

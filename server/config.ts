@@ -5,7 +5,7 @@ import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
-import type { AlephJSXConfig } from "../types.d.ts";
+import type { JSXConfig } from "../types.d.ts";
 
 export function getAlephPkgUri() {
   const global = globalThis as any;
@@ -21,9 +21,9 @@ export function getAlephPkgUri() {
   return uri;
 }
 
-export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
+export async function loadJSXConfig(): Promise<JSXConfig> {
   const global = globalThis as any;
-  const config: AlephJSXConfig = {};
+  const config: JSXConfig = {};
 
   if (Deno.env.get("ALEPH_DEV")) {
     const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
@@ -46,7 +46,7 @@ export async function loadDenoJSXConfig(): Promise<AlephJSXConfig> {
   if (util.isPlainObject(global.__DENO_JSX_CONFIG)) {
     Object.assign(config, global.__DENO_JSX_CONFIG);
   } else if (global.__DENO_JSX_CONFIG === undefined) {
-    const jsxConfig: AlephJSXConfig = {};
+    const jsxConfig: JSXConfig = {};
     const denoConfigFile = await findFile(Deno.cwd(), ["deno.jsonc", "deno.json", "tsconfig.json"]);
     if (denoConfigFile) {
       try {

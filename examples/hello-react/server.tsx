@@ -4,7 +4,7 @@ import { serve } from "aleph/server";
 
 serve({
   config: {
-    routes: "./routes/**/*.tsx",
+    routeFiles: "./routes/**/*.tsx",
   },
   ssr: (ssrEvent) => {
     return renderToString(<Router ssr={ssrEvent} />);

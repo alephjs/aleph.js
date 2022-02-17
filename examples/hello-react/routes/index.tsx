@@ -1,4 +1,4 @@
-import { useData } from "aleph/react";
+import { Head, useData } from "aleph/react";
 
 let count = 0;
 
@@ -22,9 +22,9 @@ export default function Index() {
 
   return (
     <div className="page">
-      <head>
+      <Head>
         <title>Hello World - Aleph.js</title>
-      </head>
+      </Head>
       <p className="logo">
         <img src="/assets/logo.svg" height="60" title="Aleph.js" />
       </p>

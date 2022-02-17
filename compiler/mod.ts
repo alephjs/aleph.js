@@ -1,4 +1,8 @@
-import init, { transform as swc, transformCSS as parcelCSS } from "./dist/compiler.js";
+import init, {
+  parseJsxStaticClasses as getStaticClasses,
+  transform as swc,
+  transformCSS as parcelCSS,
+} from "./dist/compiler.js";
 import getWasmData from "./dist/wasm.js";
 import {
   InlineStyleExpr,
@@ -23,6 +27,11 @@ async function checkWasmReady() {
 async function initWasm() {
   const wasmData = getWasmData();
   await init(wasmData);
+}
+
+export async function parseJsxStaticClasses(specifier: string, code: string): Promise<string[]> {
+  await checkWasmReady();
+  return getStaticClasses(specifier, code);
 }
 
 /**

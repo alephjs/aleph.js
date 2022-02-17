@@ -6,7 +6,7 @@ mod error;
 mod expr_utils;
 mod hmr;
 mod import_map;
-mod jsx_magic;
+mod jsx_attr;
 mod resolve_fold;
 mod resolver;
 mod source_type;
@@ -37,7 +37,7 @@ pub struct Options {
   pub import_map: ImportHashMap,
 
   #[serde(default)]
-  pub graph_versions: HashMap<String, i64>,
+  pub graph_versions: HashMap<String, String>,
 
   #[serde(default = "default_target")]
   pub target: String,
@@ -55,7 +55,7 @@ pub struct Options {
   pub jsx_import_source: String,
 
   #[serde(default)]
-  pub jsx_magic: bool,
+  pub parse_jsx_static_classes: bool,
 }
 
 fn default_target() -> String {
@@ -79,6 +79,26 @@ pub struct TransformOutput {
 
   #[serde(skip_serializing_if = "Option::is_none")]
   pub map: Option<String>,
+}
+
+#[wasm_bindgen(js_name = "parseJsxStaticClasses")]
+pub fn parse_jsx_static_classes(specifier: &str, code: &str) -> Result<JsValue, JsValue> {
+  let resolver = Rc::new(RefCell::new(Resolver::new(
+    specifier,
+    "",
+    "",
+    "",
+    "",
+    ImportHashMap::default(),
+    HashMap::new(),
+    false,
+  )));
+  let module = SWC::parse(specifier, code, EsVersion::Es2022).expect("could not parse the module");
+  let jsx_static_class_names = module
+    .parse_jsx_static_classes(resolver.clone())
+    .expect("could not parse");
+
+  Ok(JsValue::from_serde(&jsx_static_class_names).unwrap())
 }
 
 #[wasm_bindgen(js_name = "transform")]
@@ -115,7 +135,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     .transform(
       resolver.clone(),
       &EmitOptions {
-        jsx_magic: options.jsx_magic,
+        parse_jsx_static_classes: options.parse_jsx_static_classes,
         jsx_import_source: options.jsx_import_source,
         minify: !options.is_dev,
         is_dev: options.is_dev,

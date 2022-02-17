@@ -8,41 +8,37 @@ import {
   useEffect,
   useMemo,
 } from "https://esm.sh/react@17.0.2";
-import util from "../../../lib/util.ts";
-import events from "../../core/events.ts";
-import { redirect } from "../../core/redirect.ts";
-import { useRouter } from "../router.ts";
+import util from "../../lib/util.ts";
+import events from "../core/events.ts";
+import { redirect } from "../core/redirect.ts";
+import { useRouter } from "./router.ts";
 
 const prefetchedPages = new Set<string>();
 
-type AnchorProps = PropsWithChildren<
-  AnchorHTMLAttributes<{}> & {
-    "data-active-className"?: string;
-    "data-active-style"?: CSSProperties;
-  }
+export type LinkProps = PropsWithChildren<
+  {
+    to: string;
+    replace?: boolean;
+    prefetch?: boolean;
+  } & Omit<AnchorHTMLAttributes<{}>, "herf" | "hrefLang">
 >;
 
 /**
- * Anchor Component to link between pages.
+ * Link Component to link between pages.
  */
-export default function Anchor(props: AnchorProps) {
+export function Link(props: LinkProps) {
   const {
-    rel,
-    href: propHref,
-    ["aria-current"]: propAriaCurrent,
-    ["data-active-className"]: activeClassName = "active",
-    ["data-active-style"]: activeStyle,
-    className: propClassName,
-    style: propStyle,
+    to: propHref,
+    prefetch: propPrefetch,
+    replace,
+    className,
+    style,
     onClick: propOnClick,
     onMouseEnter: propOnMouseEnter,
+    ["aria-current"]: propAriaCurrent,
     children,
     ...rest
   } = props;
-  const relKeys = useMemo(() => rel ? rel.split(" ") : [], [rel]);
-  const prefetching = useMemo(() => relKeys.includes("prefetch"), [relKeys]);
-  const replace = useMemo(() => relKeys.includes("replace"), [relKeys]);
-  const isNav = useMemo(() => relKeys.includes("nav"), [relKeys]);
   const { url: { pathname, searchParams } } = useRouter();
   const href = useMemo(() => {
     if (!util.isFilledString(propHref)) {
@@ -77,20 +73,6 @@ export default function Anchor(props: AnchorProps) {
 
     return true;
   }, [pathname, searchParams, propHref]);
-  const className = useMemo(() => {
-    if (!isNav || !isCurrent) {
-      return propClassName;
-    }
-    return [propClassName, activeClassName].filter(util.isFilledString).map(
-      (n) => n.trim(),
-    ).filter(Boolean).join(" ");
-  }, [propClassName, activeClassName, isCurrent, isNav]);
-  const style = useMemo(() => {
-    if (!isNav || !isCurrent) {
-      return propStyle;
-    }
-    return Object.assign({}, propStyle, activeStyle);
-  }, [propStyle, activeStyle, isCurrent, isNav]);
   const ariaCurrent = useMemo(() => {
     if (util.isFilledString(propAriaCurrent)) {
       return propAriaCurrent;
@@ -132,10 +114,10 @@ export default function Anchor(props: AnchorProps) {
   }, [isCurrent, href, replace]);
 
   useEffect(() => {
-    if (prefetching) {
+    if (propPrefetch) {
       prefetch();
     }
-  }, [prefetching, prefetch]);
+  }, [propPrefetch, prefetch]);
 
   return createElement(
     "a",
@@ -149,6 +131,61 @@ export default function Anchor(props: AnchorProps) {
       "aria-current": ariaCurrent,
     },
     children,
+  );
+}
+
+/**
+ * Link Component to link between pages.
+ */
+export function NavLink(props: LinkProps & { activeClassName?: string; activeStyle?: CSSProperties }) {
+  const {
+    to: propHref,
+    className: propClassName,
+    style: propStyle,
+    activeStyle,
+    activeClassName,
+  } = props;
+  const { url: { pathname, searchParams } } = useRouter();
+  const isCurrent = useMemo(() => {
+    if (!util.isFilledString(propHref)) {
+      return false;
+    }
+
+    const [p, q] = util.splitBy(propHref, "?");
+    if (util.trimSuffix(p, "/") !== pathname) {
+      return false;
+    }
+
+    const search = new URLSearchParams(q);
+    search.sort();
+    if (search.toString() !== searchParams.toString()) {
+      return false;
+    }
+
+    return true;
+  }, [pathname, searchParams, propHref]);
+  const className = useMemo(() => {
+    if (!isCurrent) {
+      return propClassName;
+    }
+    return [propClassName, activeClassName].filter(util.isFilledString).map(
+      (n) => n.trim(),
+    ).filter(Boolean).join(" ");
+  }, [propClassName, activeClassName, isCurrent]);
+  const style = useMemo(() => {
+    if (!isCurrent) {
+      return propStyle;
+    }
+    return Object.assign({}, propStyle, activeStyle);
+  }, [propStyle, activeStyle, isCurrent]);
+
+  return createElement(
+    Link,
+    {
+      ...props,
+      className,
+      style,
+    },
   );
 }
 

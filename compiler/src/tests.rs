@@ -3,10 +3,10 @@ use std::collections::HashMap;
 
 fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
   let mut imports: HashMap<String, String> = HashMap::new();
-  let mut graph_versions: HashMap<String, i64> = HashMap::new();
+  let mut graph_versions: HashMap<String, String> = HashMap::new();
   imports.insert("~/".into(), "./".into());
   imports.insert("react".into(), "https://esm.sh/react".into());
-  graph_versions.insert("./foo.ts".into(), 100);
+  graph_versions.insert("./foo.ts".into(), "100".into());
   let import_map = ImportHashMap {
     imports,
     scopes: HashMap::new(),
@@ -80,7 +80,7 @@ fn import_resolving() {
 }
 
 #[test]
-fn react_jsx_automtic() {
+fn jsx_automtic() {
   let source = r#"
       export default function App() {
         return (
@@ -144,75 +144,28 @@ fn react_dev() {
 }
 
 #[test]
-fn jsx_magic() {
-  let source = r#"
-      import React from "https://esm.sh/react"
-      export default function Index() {
-        return (
-          <>
-            <head>
-              <title>Hello World!</title>
-              <link rel="stylesheet" href="../style/index.css" />
-            </head>
-            <a href="/about">About</a>
-            <a href="https://github.com">About</a>
-            <a href="/about" target="_blank">About</a>
-          </>
-        )
-      }
-    "#;
-  let (code, resolver) = transform(
-    "./app.tsx",
-    source,
-    &EmitOptions {
-      jsx_magic: true,
-      ..Default::default()
-    },
-  );
-  let r = resolver.borrow();
-  assert!(code.contains("import __ALEPH__Head from \"/-/deno.land/x/aleph/framework/react/components/Head.ts\""));
-  assert!(code.contains("import __ALEPH__Anchor from \"/-/deno.land/x/aleph/framework/react/components/Anchor.ts\""));
-  assert!(code.contains("React.createElement(\"a\","));
-  assert!(code.contains("React.createElement(__ALEPH__Anchor,"));
-  assert!(code.contains("React.createElement(__ALEPH__Head,"));
-  assert_eq!(r.jsx_magic_tags.len(), 2);
-  assert_eq!(r.deps.len(), 3);
-}
-
-#[test]
-fn jsx_inlie_style() {
+fn jsx_class_names() {
   let source = r#"
       export default function Index() {
         const [color, setColor] = useState('white');
 
         return (
-          <>
-            <style>{`
-              :root {
-                --color: ${color};
-              }
-            `}</style>
-            <style>{`
-              h1 {
-                font-size: 12px;
-              }
-            `}</style>
-          </>
+          <div className="mt-4 flex">
+            <div className={"p-4" + " " + (bold ? "bold" : "font-sm")}>
+              <div class={`font-lg ${"fw-600"}`} />
+            </div>
+          </div>
         )
       }
     "#;
-  let (code, resolver) = transform(
+  let (_, resolver) = transform(
     "./app.tsx",
     source,
     &EmitOptions {
-      jsx_magic: true,
+      parse_jsx_static_classes: true,
       ..Default::default()
     },
   );
   let r = resolver.borrow();
-  assert!(code
-    .contains("import __ALEPH__InlineStyle from \"/-/deno.land/x/aleph/framework/react/components/InlineStyle.ts\""));
-  assert!(code.contains("React.createElement(__ALEPH__InlineStyle,"));
-  assert!(code.contains("__styleId: \"inline-style-"));
-  assert_eq!(r.jsx_inline_styles.len(), 2);
+  assert_eq!(r.jsx_static_class_names.len(), 7);
 }

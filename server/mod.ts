@@ -44,7 +44,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
       builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
       pathname.endsWith(".css")
     ) {
-      return clientModuleTransformer.fetch(req, { isDev, jsxMagic: config?.jsxMagic });
+      return clientModuleTransformer.fetch(req, { isDev, windicss: config?.windicss });
     }
 
     try {
@@ -105,7 +105,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
     }
 
     // request page data
-    const routes = config?.routes ? await getRoutes(config.routes) : [];
+    const routes = config?.routeFiles ? await getRoutes(config.routeFiles) : [];
     if (routes.length > 0) {
       for (const [pattern, load] of routes) {
         const ret = pattern.exec({ pathname });

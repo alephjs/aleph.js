@@ -1,6 +1,6 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::hmr::hmr;
-use crate::jsx_magic::jsx_magic_fold;
+use crate::jsx_attr::jsx_attr_fold;
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::Resolver;
 use crate::source_type::SourceType;
@@ -20,8 +20,8 @@ use swc_ecmascript::visit::{Fold, FoldWith};
 /// Options for transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
-  pub jsx_magic: bool,
   pub jsx_import_source: String,
+  pub parse_jsx_static_classes: bool,
   pub minify: bool,
   pub is_dev: bool,
 }
@@ -29,8 +29,8 @@ pub struct EmitOptions {
 impl Default for EmitOptions {
   fn default() -> Self {
     EmitOptions {
-      jsx_magic: false,
       jsx_import_source: "".into(),
+      parse_jsx_static_classes: false,
       minify: false,
       is_dev: false,
     }
@@ -85,6 +85,18 @@ impl SWC {
     })
   }
 
+  /// parse jsx static classes
+  pub fn parse_jsx_static_classes(self, resolver: Rc<RefCell<Resolver>>) -> Result<Vec<String>, anyhow::Error> {
+    let is_jsx = match self.source_type {
+      SourceType::JSX => true,
+      SourceType::TSX => true,
+      _ => false,
+    };
+    let program = Program::Module(self.module.clone());
+    program.fold_with(&mut Optional::new(jsx_attr_fold(resolver.clone()), is_jsx));
+    Ok(resolver.borrow().jsx_static_class_names.clone().into_iter().collect())
+  }
+
   /// transform a JS/TS/JSX/TSX file into a JS file, based on the supplied options.
   pub fn transform(
     self,
@@ -120,8 +132,8 @@ impl SWC {
         resolver_with_mark(top_level_mark),
         Optional::new(react::jsx_src(options.is_dev, self.source_map.clone()), is_jsx),
         Optional::new(
-          jsx_magic_fold(resolver.clone(), self.source_map.clone()),
-          is_jsx && options.jsx_magic
+          jsx_attr_fold(resolver.clone()),
+          is_jsx && options.parse_jsx_static_classes
         ),
         resolve_fold(resolver.clone()),
         decorators::decorators(decorators::Config {

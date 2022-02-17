@@ -41,13 +41,11 @@ pub struct Resolver {
   pub jsx_magic_tags: IndexSet<String>,
   /// jsx static class names
   pub jsx_static_class_names: IndexSet<String>,
-  /// jsx inline styles
-  pub jsx_inline_styles: HashMap<String, InlineStyle>,
   // internal
   jsx_runtime_version: String,
   jsx_runtime_cdn_version: String,
   import_map: ImportMap,
-  graph_versions: HashMap<String, i64>,
+  graph_versions: HashMap<String, String>,
   is_dev: bool,
 }
 
@@ -67,7 +65,7 @@ impl Resolver {
     jsx_runtime_version: &str,
     jsx_runtime_cdn_version: &str,
     import_map: ImportHashMap,
-    graph_versions: HashMap<String, i64>,
+    graph_versions: HashMap<String, String>,
     is_dev: bool,
   ) -> Self {
     Resolver {
@@ -78,7 +76,6 @@ impl Resolver {
       jsx_runtime_version: jsx_runtime_version.into(),
       jsx_runtime_cdn_version: jsx_runtime_cdn_version.into(),
       jsx_magic_tags: IndexSet::new(),
-      jsx_inline_styles: HashMap::new(),
       jsx_static_class_names: IndexSet::new(),
       aleph_pkg_uri: aleph_pkg_uri.into(),
       import_map: ImportMap::from_hashmap(import_map),
