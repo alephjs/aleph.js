@@ -17,16 +17,13 @@ export type RenderOptions = {
 };
 
 export default {
-  async fetch(
-    req: Request,
-    ctx: Record<string | symbol, any>,
-    { indexHtml, routes, ssrHandler }: RenderOptions,
-  ): Promise<Response> {
+  async fetch(req: Request, ctx: Record<string | symbol, any>, options: RenderOptions): Promise<Response> {
     if (!lolHtmlReady) {
       await initWasm(decodeWasm());
       lolHtmlReady = true;
     }
 
+    const { indexHtml, routes, ssrHandler } = options;
     const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
     const chunks: Uint8Array[] = [];
     const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
@@ -80,7 +77,7 @@ export default {
               el.replace(ssrOutput, { html: true });
             },
           });
-          if (util.isNumber(route.dataExpires)) {
+          if (typeof route.dataExpires === "number") {
             headers.append("Cache-Control", `public, max-age=${route.dataExpires}`);
           } else {
             headers.append("Cache-Control", "public, max-age=0, must-revalidate");
@@ -186,9 +183,9 @@ async function matchRoute(
         const request = new Request(route.url.toString(), req);
         if (mod.data) {
           const fetcher = mod.data.get;
-          if (util.isFunction(fetcher)) {
+          if (typeof fetcher === "function") {
             const allFetcher = mod.data.all;
-            if (util.isFunction(allFetcher)) {
+            if (typeof allFetcher === "function") {
               let res = allFetcher(request);
               if (res instanceof Promise) {
                 res = await res;

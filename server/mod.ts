@@ -83,7 +83,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
         if (util.isPlainObject<{ fetch: Fetcher }>(mw)) {
           fetcher = mw.fetch;
         }
-        if (util.isFunction(fetcher)) {
+        if (typeof fetcher === "function") {
           let res = fetcher(req, ctx);
           if (res instanceof Promise) {
             res = await res;
@@ -94,7 +94,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
         }
       }
     }
-    if (util.isFunction(fetch)) {
+    if (typeof fetch === "function") {
       let res = fetch(req, ctx);
       if (res instanceof Promise) {
         res = await res;
@@ -118,9 +118,9 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
             ) {
               const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
               const fetcher = mod.data[req.method.toLowerCase()];
-              if (util.isFunction(fetcher)) {
+              if (typeof fetcher === "function") {
                 const allFetcher = mod.data.all;
-                if (util.isFunction(allFetcher)) {
+                if (typeof allFetcher === "function") {
                   let res = allFetcher(request);
                   if (res instanceof Promise) {
                     res = await res;

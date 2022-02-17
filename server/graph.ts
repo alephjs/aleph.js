@@ -1,4 +1,4 @@
-import { type DependencyDescriptor } from "../compiler/types.d.ts";
+import type { DependencyDescriptor } from "../compiler/types.d.ts";
 
 export type Module = {
   specifier: string;

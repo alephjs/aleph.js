@@ -1,10 +1,4 @@
 export default {
-  isNumber(a: any): a is number {
-    return typeof a === "number" && !isNaN(a);
-  },
-  isString(a: any): a is string {
-    return typeof a === "string";
-  },
   isFilledString(a: any): a is string {
     return typeof a === "string" && a.length > 0;
   },
@@ -12,11 +6,7 @@ export default {
     return Array.isArray(a) && a.length > 0;
   },
   isPlainObject<T = Record<string, any>>(a: any): a is T {
-    return typeof a === "object" && a !== null && Array.isArray(a) &&
-      Object.getPrototypeOf(a) === Object.prototype;
-  },
-  isFunction(a: any): a is Function {
-    return typeof a === "function";
+    return typeof a === "object" && a !== null && !Array.isArray(a) && Object.getPrototypeOf(a) === Object.prototype;
   },
   isLikelyHttpURL(s: string): boolean {
     const p = s.slice(0, 8).toLowerCase();

@@ -4,8 +4,8 @@ import type { ImportMap } from "../compiler/types.d.ts";
 import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { VERSION } from "../version.ts";
 import type { JSXConfig } from "../types.d.ts";
+import { VERSION } from "../version.ts";
 
 export function getAlephPkgUri() {
   const global = globalThis as any;
