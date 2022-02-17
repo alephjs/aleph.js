@@ -167,7 +167,7 @@ fn jsx_class_names() {
     },
   );
   let r = resolver.borrow();
-  assert_eq!(r.jsx_static_class_names.len(), 7);
+  assert_eq!(r.jsx_static_classes.len(), 7);
 }
 
 #[test]

@@ -36,7 +36,7 @@ pub struct Resolver {
   /// jsx runtime: react | preact
   pub jsx_runtime: String,
   /// jsx static class names
-  pub jsx_static_class_names: IndexSet<String>,
+  pub jsx_static_classes: IndexSet<String>,
   // internal
   jsx_runtime_version: String,
   jsx_runtime_cdn_version: String,
@@ -72,7 +72,7 @@ impl Resolver {
       jsx_runtime: jsx_runtime.into(),
       jsx_runtime_version: jsx_runtime_version.into(),
       jsx_runtime_cdn_version: jsx_runtime_cdn_version.into(),
-      jsx_static_class_names: IndexSet::new(),
+      jsx_static_classes: IndexSet::new(),
       import_map: ImportMap::from_hashmap(import_map),
       graph_versions,
       is_dev,

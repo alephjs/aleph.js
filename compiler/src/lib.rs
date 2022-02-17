@@ -78,7 +78,7 @@ pub struct TransformOutput {
   pub deps: Vec<DependencyDescriptor>,
 
   #[serde(skip_serializing_if = "Vec::is_empty")]
-  pub jsx_static_class_names: Vec<String>,
+  pub jsx_static_classes: Vec<String>,
 
   #[serde(skip_serializing_if = "Option::is_none")]
   pub map: Option<String>,
@@ -152,7 +152,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     JsValue::from_serde(&TransformOutput {
       code,
       deps: r.deps.clone(),
-      jsx_static_class_names: r.jsx_static_class_names.clone().into_iter().collect(),
+      jsx_static_classes: r.jsx_static_classes.clone().into_iter().collect(),
       map,
     })
     .unwrap(),

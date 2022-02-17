@@ -22,13 +22,13 @@ impl JSXAttrFold {
       Expr::Lit(Lit::Str(Str { value, .. })) => {
         let s = value.as_ref();
         if s != "" {
-          self.resolver.borrow_mut().jsx_static_class_names.insert(s.into());
+          self.resolver.borrow_mut().jsx_static_classes.insert(s.into());
         }
       }
       Expr::Lit(Lit::JSXText(JSXText { value, .. })) => {
         let s = value.as_ref();
         if s != "" {
-          self.resolver.borrow_mut().jsx_static_class_names.insert(s.into());
+          self.resolver.borrow_mut().jsx_static_classes.insert(s.into());
         }
       }
       Expr::Paren(ParenExpr { expr, .. }) => {
@@ -52,7 +52,7 @@ impl JSXAttrFold {
         for quasi in quasis {
           let s = quasi.raw.value.as_ref();
           if s != "" {
-            resolver.jsx_static_class_names.insert(s.into());
+            resolver.jsx_static_classes.insert(s.into());
           }
         }
       }

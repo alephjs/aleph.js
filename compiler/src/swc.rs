@@ -96,7 +96,7 @@ impl SWC {
     };
     let program = Program::Module(self.module.clone());
     program.fold_with(&mut Optional::new(jsx_attr_fold(resolver.clone()), is_jsx));
-    Ok(resolver.borrow().jsx_static_class_names.clone().into_iter().collect())
+    Ok(resolver.borrow().jsx_static_classes.clone().into_iter().collect())
   }
 
   /// transform a JS/TS/JSX/TSX file into a JS file, based on the supplied options.
