@@ -62,9 +62,9 @@ export default {
               }
               if (route.filename) {
                 el.before(
-                  `<script type="module">import __ssrComponent from ${
+                  `<script type="module">import e from ${
                     JSON.stringify(route.filename)
-                  };Object.assign(window,{__ssrComponent})</script>`,
+                  };window.__ssrModuleDefaultExport=e;</script>`,
                   {
                     html: true,
                   },
@@ -130,16 +130,6 @@ export default {
             const config = routes.map((r) => r[2]);
             el.append(
               `<script id="aleph-routes" type="application/json">${JSON.stringify(config)}</script>\n`,
-              {
-                html: true,
-              },
-            );
-          }
-          if (Deno.env.get("ALEPH_ENV") === "development") {
-            el.append(
-              `<script type="module">import { connect } from ${
-                JSON.stringify(`${toLocalPath(alephPkgUri)}framework/core/hmr.ts`)
-              };addEventListener("load", connect)</script>`,
               {
                 html: true,
               },

@@ -13,6 +13,7 @@ export type TransformOptions = {
   jsxRuntimeCdnVersion?: string;
   jsxImportSource?: string;
   parseJsxStaticClasses?: boolean;
+  stripDataExport?: boolean;
   isDev?: boolean;
   inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>;
 };
@@ -32,7 +33,6 @@ export type TransformResult = {
 
 export type DependencyDescriptor = {
   readonly specifier: string;
-  readonly isDynamic?: boolean;
   readonly isStarExport?: boolean;
 };
 

@@ -8,9 +8,6 @@ export default {
   isFilledString(a: any): a is string {
     return typeof a === "string" && a.length > 0;
   },
-  isArray(a: any): a is Array<any> {
-    return Array.isArray(a);
-  },
   isFilledArray(a: any): a is Array<any> {
     return Array.isArray(a) && a.length > 0;
   },

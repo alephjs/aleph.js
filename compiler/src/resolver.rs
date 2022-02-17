@@ -20,8 +20,6 @@ lazy_static! {
 pub struct DependencyDescriptor {
   pub specifier: String,
   #[serde(skip_serializing_if = "is_false")]
-  pub is_dynamic: bool,
-  #[serde(skip_serializing_if = "is_false")]
   pub is_star_export: bool,
 }
 
@@ -37,8 +35,6 @@ pub struct Resolver {
   pub deps: Vec<DependencyDescriptor>,
   /// jsx runtime: react | preact
   pub jsx_runtime: String,
-  /// jsx magic tags like `a`, `link`, `head`, etc...
-  pub jsx_magic_tags: IndexSet<String>,
   /// jsx static class names
   pub jsx_static_class_names: IndexSet<String>,
   // internal
@@ -69,15 +65,14 @@ impl Resolver {
     is_dev: bool,
   ) -> Self {
     Resolver {
+      aleph_pkg_uri: aleph_pkg_uri.into(),
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
       deps: Vec::new(),
       jsx_runtime: jsx_runtime.into(),
       jsx_runtime_version: jsx_runtime_version.into(),
       jsx_runtime_cdn_version: jsx_runtime_cdn_version.into(),
-      jsx_magic_tags: IndexSet::new(),
       jsx_static_class_names: IndexSet::new(),
-      aleph_pkg_uri: aleph_pkg_uri.into(),
       import_map: ImportMap::from_hashmap(import_map),
       graph_versions,
       is_dev,
@@ -135,7 +130,7 @@ impl Resolver {
   }
 
   /// Resolve import/export URLs.
-  pub fn resolve(&mut self, url: &str, is_dynamic: bool, is_star_export: bool) -> String {
+  pub fn resolve(&mut self, url: &str, is_star_export: bool) -> String {
     // apply import maps
     let url = self.import_map.resolve(self.specifier.as_str(), url);
     let url = url.as_str();
@@ -217,7 +212,6 @@ impl Resolver {
     // push into dep graph
     self.deps.push(DependencyDescriptor {
       specifier: fixed_url.clone(),
-      is_dynamic,
       is_star_export,
     });
 

@@ -22,6 +22,7 @@ use swc_ecmascript::visit::{Fold, FoldWith};
 pub struct EmitOptions {
   pub jsx_import_source: String,
   pub parse_jsx_static_classes: bool,
+  pub strip_data_export: bool,
   pub minify: bool,
   pub is_dev: bool,
 }
@@ -31,6 +32,7 @@ impl Default for EmitOptions {
     EmitOptions {
       jsx_import_source: "".into(),
       parse_jsx_static_classes: false,
+      strip_data_export: false,
       minify: false,
       is_dev: false,
     }
@@ -135,7 +137,7 @@ impl SWC {
           jsx_attr_fold(resolver.clone()),
           is_jsx && options.parse_jsx_static_classes
         ),
-        resolve_fold(resolver.clone()),
+        resolve_fold(resolver.clone(), options.strip_data_export),
         decorators::decorators(decorators::Config {
           legacy: true,
           emit_metadata: false

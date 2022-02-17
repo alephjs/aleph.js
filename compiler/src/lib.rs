@@ -56,6 +56,9 @@ pub struct Options {
 
   #[serde(default)]
   pub parse_jsx_static_classes: bool,
+
+  #[serde(default)]
+  pub strip_data_export: bool,
 }
 
 fn default_target() -> String {
@@ -136,6 +139,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
       resolver.clone(),
       &EmitOptions {
         parse_jsx_static_classes: options.parse_jsx_static_classes,
+        strip_data_export: options.strip_data_export,
         jsx_import_source: options.jsx_import_source,
         minify: !options.is_dev,
         is_dev: options.is_dev,

@@ -50,6 +50,17 @@ class Module {
   }
 }
 
+export default function createHotContext(specifier: string) {
+  if (modules.has(specifier)) {
+    const mod = modules.get(specifier)!;
+    mod.lock();
+    return mod;
+  }
+  const mod = new Module(specifier);
+  modules.set(specifier, mod);
+  return mod;
+}
+
 let modules: Map<string, Module> = new Map();
 let messageQueue: string[] = [];
 let conn: WebSocket | null = null;
@@ -63,7 +74,7 @@ function sendMessage(msg: any) {
   }
 }
 
-export function connect() {
+function connect() {
   const { location } = window as any;
   const { protocol, host } = location;
   const wsUrl = (protocol === "https:" ? "wss" : "ws") + "://" + host + "/-/HMR";
@@ -135,13 +146,4 @@ export function connect() {
   });
 }
 
-export default function createHotContext(specifier: string) {
-  if (modules.has(specifier)) {
-    const mod = modules.get(specifier)!;
-    mod.lock();
-    return mod;
-  }
-  const mod = new Module(specifier);
-  modules.set(specifier, mod);
-  return mod;
-}
+addEventListener("load", connect);

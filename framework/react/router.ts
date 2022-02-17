@@ -19,7 +19,7 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
     return cache;
   }, []);
   const Component = useMemo<FC<any>>(
-    () => ssr?.moduleDefaultExport || (globalThis as any).__ssrComponent || url._component || E404,
+    () => ssr?.moduleDefaultExport || (globalThis as any).__ssrModuleDefaultExport || url._component || E404,
     [url],
   );
 
@@ -49,7 +49,6 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
         url,
         setUrl,
         dataCache,
-        inlineStyles: new Map(),
         ssrHeadCollection: ssr?.headCollection,
       },
     },

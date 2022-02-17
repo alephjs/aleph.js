@@ -9,6 +9,14 @@ export async function register(filename: string, module: any) {
   routeModules.set(filename, module);
 }
 
+export function isRouteFile(filename: string): boolean {
+  const { __ALEPH_ROUTES: routes } = globalThis as any;
+  if (Array.isArray(routes)) {
+    return routes.findIndex((r) => r[2].filename === filename) !== -1;
+  }
+  return false;
+}
+
 export async function getRoutes(glob: string): Promise<RouteConfig[]> {
   const global = globalThis as any;
   if (global.__ALEPH_ROUTES) {

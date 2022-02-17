@@ -6,6 +6,7 @@ import util from "../lib/util.ts";
 import type { JSXConfig } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "./config.ts";
+import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
 
 export const clientDependencyGraph = new DependencyGraph();
@@ -88,8 +89,9 @@ export const clientModuleTransformer = {
       }, {} as Record<string, string>);
       const ret = await transform(specifier, rawCode, {
         ...jsxConfig,
-        parseJsxStaticClasses: Boolean(windicss),
         alephPkgUri: getAlephPkgUri(),
+        stripDataExport: isRouteFile(specifier),
+        parseJsxStaticClasses: Boolean(windicss),
         graphVersions,
         importMap,
         isDev,

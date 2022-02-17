@@ -169,3 +169,29 @@ fn jsx_class_names() {
   let r = resolver.borrow();
   assert_eq!(r.jsx_static_class_names.len(), 7);
 }
+
+#[test]
+fn strip_data_export() {
+  let source = r#"
+      import { json } from "./helper.ts"
+      const count = 0;
+      export const data = {
+        get: (req: Request) => {
+         return json({ count })
+        },
+        post: (req: Request) => {
+          return json({ count })
+         }
+      }
+    "#;
+  let (code, _) = transform(
+    "./app.tsx",
+    source,
+    &EmitOptions {
+      strip_data_export: true,
+      ..Default::default()
+    },
+  );
+  assert!(code.contains("export const data = true"));
+  assert!(!code.contains("import { json } from \"./helper.ts\""));
+}

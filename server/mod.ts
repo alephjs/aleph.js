@@ -77,7 +77,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
     }
 
     const ctx: Record<string | symbol, any> = {};
-    if (util.isArray(middlewares)) {
+    if (Array.isArray(middlewares)) {
       for (const mw of middlewares) {
         let fetcher = mw;
         if (util.isPlainObject<{ fetch: Fetcher }>(mw)) {
