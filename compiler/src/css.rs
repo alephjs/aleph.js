@@ -2,15 +2,37 @@
   parcel css - A CSS parser, transformer, and minifier written in Rust. - https://parcel-css.vercel.app
   MPL-2.0 License
 */
+
+use parcel_css::bundler::BundleErrorKind;
 use parcel_css::css_modules::CssModuleExports;
 use parcel_css::dependencies::Dependency;
-use parcel_css::error::{MinifyError, ParserError, PrinterError};
+use parcel_css::error::{Error, MinifyErrorKind, ParserError, PrinterErrorKind};
 use parcel_css::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, PseudoClasses, StyleSheet};
 use parcel_css::targets::Browsers;
-use parcel_sourcemap::SourceMapError;
+use parcel_sourcemap::SourceMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use wasm_bindgen::JsValue;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SourceMapJson<'a> {
+  version: u8,
+  mappings: String,
+  sources: &'a Vec<String>,
+  sources_content: &'a Vec<String>,
+  names: &'a Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransformResult {
+  code: String,
+  map: Option<String>,
+  exports: Option<CssModuleExports>,
+  dependencies: Option<Vec<Dependency>>,
+}
+
+// ---------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,15 +45,6 @@ pub struct Config {
   pub analyze_dependencies: Option<bool>,
   pub pseudo_classes: Option<OwnedPseudoClasses>,
   pub unused_symbols: Option<HashSet<String>>,
-}
-
-#[derive(Serialize, Debug, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct Drafts {
-  #[serde(default)]
-  nesting: bool,
-  #[serde(default)]
-  custom_media: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,23 +69,13 @@ impl<'a> Into<PseudoClasses<'a>> for &'a OwnedPseudoClasses {
   }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct TransformResult {
-  code: String,
-  map: Option<String>,
-  exports: Option<CssModuleExports>,
-  dependencies: Option<Vec<Dependency>>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SourceMapJson<'a> {
-  version: u8,
-  mappings: String,
-  sources: &'a Vec<String>,
-  sources_content: &'a Vec<String>,
-  names: &'a Vec<String>,
+pub struct Drafts {
+  #[serde(default)]
+  nesting: bool,
+  #[serde(default)]
+  custom_media: bool,
 }
 
 pub fn compile<'i>(filename: String, code: &'i str, config: &Config) -> Result<TransformResult, CompileError<'i>> {
@@ -84,32 +87,33 @@ pub fn compile<'i>(filename: String, code: &'i str, config: &Config) -> Result<T
       nesting: matches!(drafts, Some(d) if d.nesting),
       custom_media: matches!(drafts, Some(d) if d.custom_media),
       css_modules: config.css_modules.unwrap_or(false),
+      source_index: 0,
     },
   )?;
   stylesheet.minify(MinifyOptions {
     targets: config.targets,
     unused_symbols: config.unused_symbols.clone().unwrap_or_default(),
   })?;
+
+  let mut source_map = if config.source_map.unwrap_or(false) {
+    let mut sm = SourceMap::new("/");
+    sm.add_source(&filename);
+    sm.set_source_content(0, code)?;
+    Some(sm)
+  } else {
+    None
+  };
+
   let res = stylesheet.to_css(PrinterOptions {
     minify: config.minify.unwrap_or(false),
-    source_map: config.source_map.unwrap_or(false),
+    source_map: source_map.as_mut(),
     targets: config.targets,
     analyze_dependencies: config.analyze_dependencies.unwrap_or(false),
     pseudo_classes: config.pseudo_classes.as_ref().map(|p| p.into()),
   })?;
 
-  let map = if let Some(mut source_map) = res.source_map {
-    source_map.set_source_content(0, code)?;
-    let mut vlq_output: Vec<u8> = Vec::new();
-    source_map.write_vlq(&mut vlq_output)?;
-    let sm = SourceMapJson {
-      version: 3,
-      mappings: unsafe { String::from_utf8_unchecked(vlq_output) },
-      sources: source_map.get_sources(),
-      sources_content: source_map.get_sources_content(),
-      names: source_map.get_names(),
-    };
-    serde_json::to_string(&sm).ok()
+  let map = if let Some(mut source_map) = source_map {
+    Some(source_map_to_json(&mut source_map)?)
   } else {
     None
   };
@@ -122,62 +126,90 @@ pub fn compile<'i>(filename: String, code: &'i str, config: &Config) -> Result<T
   })
 }
 
+#[inline]
+fn source_map_to_json<'i>(source_map: &mut SourceMap) -> Result<String, CompileError<'i>> {
+  let mut vlq_output: Vec<u8> = Vec::new();
+  source_map.write_vlq(&mut vlq_output)?;
+
+  let sm = SourceMapJson {
+    version: 3,
+    mappings: unsafe { String::from_utf8_unchecked(vlq_output) },
+    sources: source_map.get_sources(),
+    sources_content: source_map.get_sources_content(),
+    names: source_map.get_names(),
+  };
+
+  Ok(serde_json::to_string(&sm).unwrap())
+}
+
+#[derive(Serialize, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AttrConfig {
+  pub code: String,
+  pub targets: Option<Browsers>,
+  pub minify: Option<bool>,
+  pub analyze_dependencies: Option<bool>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AttrResult {
+  code: String,
+  dependencies: Option<Vec<Dependency>>,
+}
+
 pub enum CompileError<'i> {
-  ParseError(cssparser::ParseError<'i, ParserError<'i>>),
-  MinifyError(MinifyError),
-  PrinterError(PrinterError),
-  SourceMapError(SourceMapError),
+  ParseError(Error<ParserError<'i>>),
+  MinifyError(Error<MinifyErrorKind>),
+  PrinterError(Error<PrinterErrorKind>),
+  SourceMapError(parcel_sourcemap::SourceMapError),
+  BundleError(Error<BundleErrorKind<'i>>),
 }
 
 impl<'i> CompileError<'i> {
   fn reason(&self) -> String {
     match self {
-      CompileError::ParseError(e) => match &e.kind {
-        cssparser::ParseErrorKind::Basic(b) => {
-          use cssparser::BasicParseErrorKind::*;
-          match b {
-            AtRuleBodyInvalid => "Invalid at rule body".into(),
-            EndOfInput => "Unexpected end of input".into(),
-            AtRuleInvalid(name) => format!("Unknown at rule: @{}", name),
-            QualifiedRuleInvalid => "Invalid qualified rule".into(),
-            UnexpectedToken(token) => format!("Unexpected token {:?}", token),
-          }
-        }
-        cssparser::ParseErrorKind::Custom(e) => e.reason(),
-      },
-      CompileError::MinifyError(err) => err.reason(),
-      CompileError::PrinterError(err) => err.reason(),
+      CompileError::ParseError(e) => e.kind.reason(),
+      CompileError::MinifyError(err) => err.kind.reason(),
+      CompileError::PrinterError(err) => err.kind.reason(),
+      CompileError::BundleError(err) => err.kind.reason(),
       _ => "Unknown error".into(),
     }
   }
 }
 
-impl<'i> From<cssparser::ParseError<'i, ParserError<'i>>> for CompileError<'i> {
-  fn from(e: cssparser::ParseError<'i, ParserError<'i>>) -> CompileError<'i> {
+impl<'i> From<Error<ParserError<'i>>> for CompileError<'i> {
+  fn from(e: Error<ParserError<'i>>) -> CompileError<'i> {
     CompileError::ParseError(e)
   }
 }
 
-impl<'i> From<MinifyError> for CompileError<'i> {
-  fn from(err: MinifyError) -> CompileError<'i> {
+impl<'i> From<Error<MinifyErrorKind>> for CompileError<'i> {
+  fn from(err: Error<MinifyErrorKind>) -> CompileError<'i> {
     CompileError::MinifyError(err)
   }
 }
 
-impl<'i> From<PrinterError> for CompileError<'i> {
-  fn from(err: PrinterError) -> CompileError<'i> {
+impl<'i> From<Error<PrinterErrorKind>> for CompileError<'i> {
+  fn from(err: Error<PrinterErrorKind>) -> CompileError<'i> {
     CompileError::PrinterError(err)
   }
 }
 
-impl<'i> From<SourceMapError> for CompileError<'i> {
-  fn from(e: SourceMapError) -> CompileError<'i> {
+impl<'i> From<parcel_sourcemap::SourceMapError> for CompileError<'i> {
+  fn from(e: parcel_sourcemap::SourceMapError) -> CompileError<'i> {
     CompileError::SourceMapError(e)
   }
 }
 
-impl<'i> From<CompileError<'i>> for JsValue {
-  fn from(e: CompileError) -> JsValue {
+impl<'i> From<Error<BundleErrorKind<'i>>> for CompileError<'i> {
+  fn from(e: Error<BundleErrorKind<'i>>) -> CompileError<'i> {
+    CompileError::BundleError(e)
+  }
+}
+
+impl<'i> From<CompileError<'i>> for wasm_bindgen::JsValue {
+  fn from(e: CompileError) -> wasm_bindgen::JsValue {
     match e {
       CompileError::SourceMapError(e) => js_sys::Error::new(&e.to_string()).into(),
       _ => js_sys::Error::new(&e.reason()).into(),
