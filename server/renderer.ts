@@ -1,29 +1,29 @@
 import { concat } from "https://deno.land/std@0.125.0/bytes/mod.ts";
 import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
-import getWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
+import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import log from "../lib/log.ts";
 import { toLocalPath } from "../lib/path.ts";
 import util from "../lib/util.ts";
-import type { RouteConfig, SSREvent } from "../types.d.ts";
+import type { RouteConfig, SSRContext } from "../types.d.ts";
 import { getAlephPkgUri } from "./config.ts";
 
 let lolHtmlReady = false;
 
-type Options = {
+export type RenderOptions = {
   indexHtml: string;
   routes: RouteConfig[];
-  ssrFn?: (e: SSREvent) => string | null | undefined;
+  ssrHandler?: (ctx: SSRContext) => string | null | undefined;
 };
 
 export default {
   async fetch(
     req: Request,
     ctx: Record<string | symbol, any>,
-    { indexHtml, routes, ssrFn }: Options,
+    { indexHtml, routes, ssrHandler }: RenderOptions,
   ): Promise<Response> {
     if (!lolHtmlReady) {
-      await initWasm(getWasm());
+      await initWasm(decodeWasm());
       lolHtmlReady = true;
     }
 
@@ -32,10 +32,12 @@ export default {
     const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
       chunks.push(chunk);
     });
-    let withSSR = false;
+    const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
     try {
-      if (ssrFn) {
+      let withSSR = false;
+
+      if (ssrHandler) {
         // get route
         const route = await matchRoute(req, ctx, routes);
         if (route instanceof Response) {
@@ -44,7 +46,7 @@ export default {
 
         // ssr
         const headCollection: string[] = [];
-        const ssrOutput = ssrFn({ ...route, headCollection });
+        const ssrOutput = ssrHandler({ ...route, headCollection });
         if (typeof ssrOutput === "string") {
           rewriter.on("ssr-head", {
             element(el: Element) {
@@ -135,6 +137,16 @@ export default {
               },
             );
           }
+          if (isDev) {
+            el.append(
+              `<script type="module">import hot from "${
+                toLocalPath(alephPkgUri)
+              }framework/core/hmr.ts";hot("./index.html").decline();</script>\n`,
+              {
+                html: true,
+              },
+            );
+          }
         },
       });
       rewriter.write((new TextEncoder()).encode(indexHtml));
@@ -143,7 +155,7 @@ export default {
     } catch (err) {
       log.error(err.stack);
       return new Response(
-        Deno.env.get("ALEPH_ENV") === "devlopment" ? err.message.split("\n")[0] : "Internal Server Error",
+        isDev ? err.message.split("\n")[0] : "Internal Server Error",
         {
           status: 500,
         },

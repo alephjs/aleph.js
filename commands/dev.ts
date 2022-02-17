@@ -113,7 +113,6 @@ if (import.meta.main) {
           listener.removeAllListeners(`modify:${specifier}`);
           send({ type: "remove", specifier });
         });
-        log.debug("hmr connected");
       });
       socket.addEventListener("message", (e) => {
         if (util.isFilledString(e.data)) {
@@ -127,7 +126,6 @@ if (import.meta.main) {
       });
       socket.addEventListener("close", () => {
         removeFSWatchListener(listener);
-        log.debug("hmr closed");
       });
       return response;
     }

@@ -7,13 +7,13 @@ import { getRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
 import { clientModuleTransformer } from "./transformer.ts";
-import type { AlephConfig, Fetcher, Middleware, SSREvent } from "../types.d.ts";
+import type { AlephConfig, Fetcher, Middleware, SSRContext } from "../types.d.ts";
 
 export type ServerOptions = {
   config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: Fetcher;
-  ssr?: (e: SSREvent) => string | null | undefined;
+  ssr?: (ctx: SSRContext) => string | null | undefined;
 };
 
 export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) => {
@@ -44,7 +44,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
       builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
       pathname.endsWith(".css")
     ) {
-      return clientModuleTransformer.fetch(req, { isDev, windicss: config?.windicss });
+      return clientModuleTransformer.fetch(req, { isDev, atomicCSS: config?.atomicCSS });
     }
 
     try {
@@ -176,7 +176,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
       return new Response("Not Found", { status: 404 });
     }
 
-    return renderer.fetch(req, ctx, { indexHtml, ssrFn: ssr, routes });
+    return renderer.fetch(req, ctx, { indexHtml, routes, ssrHandler: ssr });
   };
 
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {

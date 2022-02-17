@@ -3,7 +3,8 @@ import { type DependencyDescriptor } from "../compiler/types.d.ts";
 export type Module = {
   specifier: string;
   version: number;
-  deps: DependencyDescriptor[];
+  deps?: DependencyDescriptor[];
+  inlineCSS?: boolean;
 };
 
 export class DependencyGraph {
@@ -12,7 +13,7 @@ export class DependencyGraph {
   get modules(): Module[] {
     const modules: Module[] = [];
     this.#modules.forEach((module) => {
-      modules.push({ ...module, deps: module.deps.map((dep) => ({ ...dep })) });
+      modules.push({ ...module, deps: module.deps?.map((dep) => ({ ...dep })) });
     });
     return modules;
   }
@@ -25,6 +26,7 @@ export class DependencyGraph {
     const prev = this.#modules.get(module.specifier);
     if (prev) {
       prev.deps = module.deps;
+      prev.inlineCSS = module.inlineCSS;
     } else {
       this.#modules.set(module.specifier, module);
     }
@@ -45,7 +47,7 @@ export class DependencyGraph {
       module.version++;
       __tracing.add(specifier);
       this.#modules.forEach((module) => {
-        if (module.deps.find((dep) => dep.specifier === specifier)) {
+        if (module.deps?.find((dep) => dep.specifier === specifier)) {
           if (!__tracing.has(module.specifier)) {
             this.#update(module.specifier, __tracing);
           }

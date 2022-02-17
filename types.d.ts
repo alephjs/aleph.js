@@ -1,6 +1,10 @@
+import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.24.4";
+
+export { AtomicCSSConfig };
+
 export type AlephConfig = {
   routeFiles?: string;
-  windicss?: boolean;
+  atomicCSS?: AtomicCSSConfig;
 };
 
 export type JSXConfig = {
@@ -27,7 +31,7 @@ export type Fetcher = {
 
 export type Middleware = Fetcher | { fetch: Fetcher };
 
-export type SSREvent = {
+export type SSRContext = {
   readonly url: URL;
   readonly headCollection: string[];
   readonly moduleDefaultExport?: any;

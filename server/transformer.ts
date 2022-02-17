@@ -1,9 +1,9 @@
-import { dirname, join } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.24.4";
 import { transform, transformCSS } from "../compiler/mod.ts";
 import { restoreUrl, toLocalPath } from "../lib/path.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
-import type { JSXConfig } from "../types.d.ts";
+import type { AtomicCSSConfig, JSXConfig } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
@@ -19,13 +19,13 @@ const cssModuleLoader: Loader = {
   test: (url) => url.pathname.endsWith(".css"),
   load: async ({ pathname }, rawContent) => {
     const specifier = "." + util.trimPrefix(pathname, Deno.cwd());
-    const js = await bundleCSS(specifier, dec.decode(rawContent), {
+    const { code } = await bundleCSS(specifier, dec.decode(rawContent), {
       minify: Deno.env.get("ALEPH_ENV") !== "development",
       cssModules: pathname.endsWith(".module.css"),
       toJS: true,
     });
     return {
-      content: enc.encode(js),
+      content: enc.encode(code),
       contentType: "application/javascript; charset=utf-8",
     };
   },
@@ -45,19 +45,19 @@ export async function serveAppModules(port: number) {
 }
 
 type TransformeOptions = {
-  windicss?: boolean;
+  atomicCSS?: AtomicCSSConfig;
   isDev: boolean;
 };
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformeOptions): Promise<Response> => {
     const { pathname, searchParams, search } = new URL(req.url);
-    const { isDev, windicss } = options;
+    const { isDev, atomicCSS } = options;
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
     const jsxConfig: JSXConfig = isJSX ? await loadJSXConfig() : {};
     const [rawCode, mtime] = await readCode(specifier);
-    const buildArgs = VERSION + JSON.stringify(jsxConfig) + JSON.stringify(windicss) + isDev;
+    const buildArgs = VERSION + JSON.stringify(jsxConfig) + JSON.stringify(atomicCSS) + isDev;
     const etag = mtime
       ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${(await computeHash(buildArgs)).slice(0, 8)}`
       : await computeHash(rawCode + buildArgs);
@@ -65,20 +65,27 @@ export const clientModuleTransformer = {
       return new Response(null, { status: 304 });
     }
 
-    let code: string;
-    let codeType = "application/javascript";
+    let resBody = "";
+    let resType = "application/javascript";
+
     if (pathname.endsWith(".css")) {
       const toJS = searchParams.has("module");
-      code = await bundleCSS(specifier, rawCode, {
+      const { code, deps } = await bundleCSS(specifier, rawCode, {
         minify: !isDev,
-        cssModules: pathname.endsWith(".module.css"),
+        cssModules: toJS && pathname.endsWith(".module.css"),
         resolveAlephPkgUri: true,
         hmr: isDev,
         toJS,
       });
+      resBody = code;
       if (!toJS) {
-        codeType = "text/css";
+        resType = "text/css";
       }
+      clientDependencyGraph.mark({
+        specifier,
+        version: 0,
+        deps: deps?.map((specifier) => ({ specifier })),
+      });
     } else {
       const importMap = await loadImportMap();
       const graphVersions = clientDependencyGraph.modules.filter((mod) =>
@@ -87,25 +94,33 @@ export const clientModuleTransformer = {
         acc[specifier] = version.toString(16);
         return acc;
       }, {} as Record<string, string>);
-      const ret = await transform(specifier, rawCode, {
+      const useUnocss = Boolean(atomicCSS?.presets?.length) && isJSX;
+      const alephPkgUri = getAlephPkgUri();
+      const { code, jsxStaticClasses, deps } = await transform(specifier, rawCode, {
         ...jsxConfig,
-        alephPkgUri: getAlephPkgUri(),
+        alephPkgUri,
         stripDataExport: isRouteFile(specifier),
-        parseJsxStaticClasses: Boolean(windicss),
+        parseJsxStaticClasses: useUnocss,
         graphVersions,
         importMap,
         isDev,
       });
-      clientDependencyGraph.mark({
-        specifier,
-        version: 0,
-        deps: ret.deps || [],
-      });
-      code = ret.code;
+      const atomicStyle = new Set(jsxStaticClasses?.map((name) => name.split(" ").map((name) => name.trim())).flat());
+      let inlineCSS: string | null = null;
+      if (useUnocss && atomicStyle.size > 0) {
+        const uno = createGenerator(atomicCSS);
+        const { css } = await uno.generate(atomicStyle, { id: specifier, minify: !isDev });
+        inlineCSS = css;
+      }
+      resBody = code + (inlineCSS
+        ? `\nimport { applyCSS } from "${toLocalPath(alephPkgUri)}framework/core/style.ts";` +
+          `\napplyCSS(${JSON.stringify(specifier)}, { css: ${JSON.stringify(inlineCSS)} });`
+        : "");
+      clientDependencyGraph.mark({ specifier, version: 0, deps, inlineCSS: Boolean(inlineCSS) });
     }
-    return new Response(code, {
+    return new Response(resBody, {
       headers: {
-        "Content-Type": `${codeType}; charset=utf-8`,
+        "Content-Type": `${resType}; charset=utf-8`,
         "Cache-Control": "public, max-age=0, must-revalidate",
         "Etag": etag,
       },
@@ -126,7 +141,7 @@ export async function bundleCSS(
   rawCode: string,
   options: BundleCssOptions,
   tracing = new Set<string>(),
-): Promise<string> {
+): Promise<{ code: string; deps?: string[] }> {
   const eof = options.minify ? "" : "\n";
   let { code: css, dependencies, exports } = await transformCSS(specifier, rawCode, {
     ...options,
@@ -136,25 +151,27 @@ export async function bundleCSS(
       customMedia: true,
     },
   });
-  if (dependencies && dependencies.length > 0) {
-    const imports = await Promise.all(
-      dependencies.filter((dep) => dep.type === "import").map(async (dep) => {
-        let url = dep.url;
-        if (util.isLikelyHttpURL(specifier)) {
-          if (!util.isLikelyHttpURL(url)) {
-            url = new URL(url, specifier).toString();
-          }
-        } else {
-          url = `./${join(dirname(specifier), url)}`;
-        }
-        if (tracing.has(url)) {
-          return "";
-        }
-        tracing.add(url);
-        const [css] = await readCode(url);
-        return await bundleCSS(url, css, { minify: options.minify }, tracing);
-      }),
-    );
+  const deps = dependencies?.filter((dep) => dep.type === "import").map((dep) => {
+    let url = dep.url;
+    if (util.isLikelyHttpURL(specifier)) {
+      if (!util.isLikelyHttpURL(url)) {
+        url = new URL(url, specifier).toString();
+      }
+    } else {
+      url = "." + new URL(url, `http://-${specifier.slice(1)}`).pathname;
+    }
+    return url;
+  });
+  if (deps) {
+    const imports = await Promise.all(deps.map(async (url) => {
+      if (tracing.has(url)) {
+        return "";
+      }
+      tracing.add(url);
+      const [css] = await readCode(url);
+      const { code } = await bundleCSS(url, css, { minify: options.minify }, tracing);
+      return code;
+    }));
     css = imports.join(eof) + eof + css;
   }
   if (options.toJS) {
@@ -165,19 +182,22 @@ export async function bundleCSS(
         cssModulesExports[key] = value.name;
       }
     }
-    return [
-      options.hmr && `import createHotContext from "${toLocalPath(alephPkgUri)}framework/core/hmr.ts";`,
-      options.hmr && `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
-      `import { applyCSS } from "${
-        options.resolveAlephPkgUri ? toLocalPath(alephPkgUri).slice(0, -1) : alephPkgUri
-      }/framework/core/style.ts";`,
-      `export const css = ${JSON.stringify(css)};`,
-      `export default ${JSON.stringify(cssModulesExports)};`,
-      `applyCSS(${JSON.stringify(specifier)}, { css });`,
-      options.hmr && `import.meta.hot.accept();`,
-    ].filter(Boolean).join(eof);
+    return {
+      code: [
+        options.hmr && `import createHotContext from "${toLocalPath(alephPkgUri)}framework/core/hmr.ts";`,
+        options.hmr && `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
+        `import { applyCSS } from "${
+          options.resolveAlephPkgUri ? toLocalPath(alephPkgUri).slice(0, -1) : alephPkgUri
+        }/framework/core/style.ts";`,
+        `export const css = ${JSON.stringify(css)};`,
+        `export default ${JSON.stringify(cssModulesExports)};`,
+        `applyCSS(${JSON.stringify(specifier)}, { css });`,
+        options.hmr && `import.meta.hot.accept();`,
+      ].filter(Boolean).join(eof),
+      deps,
+    };
   }
-  return css;
+  return { code: css, deps };
 }
 
 async function readCode(filename: string): Promise<[string, number | undefined]> {

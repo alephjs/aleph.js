@@ -1,11 +1,11 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
 import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
-import type { SSREvent } from "../../types.d.ts";
+import type { SSRContext } from "../../types.d.ts";
 import events from "../core/events.ts";
 import MainContext from "./context.ts";
 
 export type RouterProps = {
-  readonly ssr?: SSREvent;
+  readonly ssr?: SSRContext;
 };
 
 export const Router: FC<RouterProps> = ({ ssr }) => {

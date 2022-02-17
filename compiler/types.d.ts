@@ -15,7 +15,6 @@ export type TransformOptions = {
   parseJsxStaticClasses?: boolean;
   stripDataExport?: boolean;
   isDev?: boolean;
-  inlineStylePreprocess?(key: string, type: string, tpl: string): Promise<string>;
 };
 
 export type InlineStyleExpr = {
