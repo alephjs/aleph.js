@@ -20,7 +20,7 @@ use swc_ecmascript::visit::{Fold, FoldWith};
 /// Options for transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
-  pub jsx_import_source: String,
+  pub jsx_import_source: Option<String>,
   pub parse_jsx_static_classes: bool,
   pub strip_data_export: bool,
   pub minify: bool,
@@ -30,7 +30,7 @@ pub struct EmitOptions {
 impl Default for EmitOptions {
   fn default() -> Self {
     EmitOptions {
-      jsx_import_source: "".into(),
+      jsx_import_source: None,
       parse_jsx_static_classes: false,
       strip_data_export: false,
       minify: false,
@@ -114,10 +114,10 @@ impl SWC {
         SourceType::TSX => true,
         _ => false,
       };
-      let react_options = if !options.jsx_import_source.is_empty() {
+      let react_options = if let Some(jsx_import_source) = &options.jsx_import_source {
         react::Options {
           runtime: Some(react::Runtime::Automatic),
-          import_source: options.jsx_import_source.clone(),
+          import_source: jsx_import_source.clone(),
           ..Default::default()
         }
       } else {

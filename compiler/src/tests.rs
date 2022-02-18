@@ -16,8 +16,8 @@ fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc
     specifer,
     "https://deno.land/x/aleph",
     "react",
-    "17.0.2",
-    "v64",
+    Some("17.0.2".into()),
+    Some("v64".into()),
     import_map,
     graph_versions,
     options.is_dev,
@@ -94,7 +94,7 @@ fn jsx_automtic() {
     "./app.tsx",
     source,
     &EmitOptions {
-      jsx_import_source: "https://esm.sh/react@17.0.2".into(),
+      jsx_import_source: Some("https://esm.sh/react@17.0.2".to_owned()),
       ..Default::default()
     },
   );

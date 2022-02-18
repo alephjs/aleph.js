@@ -38,8 +38,8 @@ pub struct Resolver {
   /// jsx static class names
   pub jsx_static_classes: IndexSet<String>,
   // internal
-  jsx_runtime_version: String,
-  jsx_runtime_cdn_version: String,
+  jsx_runtime_version: Option<String>,
+  jsx_runtime_cdn_version: Option<String>,
   import_map: ImportMap,
   graph_versions: HashMap<String, String>,
   is_dev: bool,
@@ -58,8 +58,8 @@ impl Resolver {
     specifier: &str,
     aleph_pkg_uri: &str,
     jsx_runtime: &str,
-    jsx_runtime_version: &str,
-    jsx_runtime_cdn_version: &str,
+    jsx_runtime_version: Option<String>,
+    jsx_runtime_cdn_version: Option<String>,
     import_map: ImportHashMap,
     graph_versions: HashMap<String, String>,
     is_dev: bool,
@@ -70,8 +70,8 @@ impl Resolver {
       specifier_is_remote: is_remote_url(specifier),
       deps: Vec::new(),
       jsx_runtime: jsx_runtime.into(),
-      jsx_runtime_version: jsx_runtime_version.into(),
-      jsx_runtime_cdn_version: jsx_runtime_cdn_version.into(),
+      jsx_runtime_version: jsx_runtime_version,
+      jsx_runtime_cdn_version: jsx_runtime_cdn_version,
       jsx_static_classes: IndexSet::new(),
       import_map: ImportMap::from_hashmap(import_map),
       graph_versions,
@@ -81,6 +81,7 @@ impl Resolver {
 
   /// fix remote url.
   //  - `https://esm.sh/react` -> `https://esm.sh/react`
+  //  - `https://esm.sh/react` -> `/-/esm.sh/react` (dev)
   //  - `https://deno.land/std/path/mod.ts` -> `/-/deno.land/std/path/mod.ts`
   //  - `http://localhost:8080/mod.ts` -> `/-/http_localhost_8080/mod.ts`
   pub fn fix_remote_url(&self, url: &str) -> String {
@@ -97,7 +98,8 @@ impl Resolver {
         }
       }
     };
-    if !nonjs {
+
+    if !nonjs && !self.is_dev {
       return url.into();
     }
 
@@ -117,14 +119,16 @@ impl Resolver {
     }
     local_path.push_str(pathname.to_owned().to_slash().unwrap().as_str());
     if url.path().ends_with(".css") {
-      if url.query().is_some() {
-        local_path.push_str(url.query().unwrap());
+      if let Some(query) = url.query() {
+        local_path.push('?');
+        local_path.push_str(query);
         local_path.push_str("&module");
       } else {
         local_path.push_str("?module");
       }
-    } else if url.query().is_some() {
-      local_path.push_str(url.query().unwrap());
+    } else if let Some(query) = url.query() {
+      local_path.push('?');
+      local_path.push_str(query);
     }
     local_path
   }
@@ -169,34 +173,37 @@ impl Resolver {
     };
 
     // fix react/react-dom url
-    if is_remote && RE_REACT_URL.is_match(fixed_url.as_str()) && !self.jsx_runtime_version.is_empty() {
-      let caps = RE_REACT_URL.captures(fixed_url.as_str()).unwrap();
-      let host = caps.get(1).map_or("", |m| m.as_str());
-      let build_version = caps.get(2).map_or("", |m| m.as_str().strip_prefix("/v").unwrap());
-      let dom = caps.get(3).map_or("", |m| m.as_str());
-      let ver = caps.get(4).map_or("", |m| m.as_str());
-      let path = caps.get(5).map_or("", |m| m.as_str());
-      let (target_build_version, should_replace_build_version) = if !self.jsx_runtime_cdn_version.is_empty() {
-        (
-          self.jsx_runtime_cdn_version.clone(),
-          build_version != "" && !build_version.eq(&self.jsx_runtime_cdn_version),
-        )
-      } else {
-        ("".to_owned(), false)
-      };
-      if ver != self.jsx_runtime_version || should_replace_build_version {
-        if should_replace_build_version {
-          fixed_url = format!(
-            "https://{}/v{}/react{}@{}{}",
-            host, target_build_version, dom, self.jsx_runtime_version, path
-          );
-        } else if build_version != "" {
-          fixed_url = format!(
-            "https://{}/v{}/react{}@{}{}",
-            host, build_version, dom, self.jsx_runtime_version, path
-          );
-        } else {
-          fixed_url = format!("https://{}/react{}@{}{}", host, dom, self.jsx_runtime_version, path);
+    if is_remote && RE_REACT_URL.is_match(fixed_url.as_str()) {
+      if let Some(jsx_runtime_version) = &self.jsx_runtime_version {
+        let caps = RE_REACT_URL.captures(fixed_url.as_str()).unwrap();
+        let host = caps.get(1).map_or("", |m| m.as_str());
+        let build_version = caps.get(2).map_or("", |m| m.as_str().strip_prefix("/v").unwrap());
+        let dom = caps.get(3).map_or("", |m| m.as_str());
+        let ver = caps.get(4).map_or("", |m| m.as_str());
+        let path = caps.get(5).map_or("", |m| m.as_str());
+        let (target_build_version, should_replace_build_version) =
+          if let Some(jsx_runtime_cdn_version) = &self.jsx_runtime_cdn_version {
+            (
+              jsx_runtime_cdn_version.clone(),
+              build_version != "" && !build_version.eq(jsx_runtime_cdn_version),
+            )
+          } else {
+            ("".to_owned(), false)
+          };
+        if ver != jsx_runtime_version || should_replace_build_version {
+          if should_replace_build_version {
+            fixed_url = format!(
+              "https://{}/v{}/react{}@{}{}",
+              host, target_build_version, dom, jsx_runtime_version, path
+            );
+          } else if build_version != "" {
+            fixed_url = format!(
+              "https://{}/v{}/react{}@{}{}",
+              host, build_version, dom, jsx_runtime_version, path
+            );
+          } else {
+            fixed_url = format!("https://{}/react{}@{}{}", host, dom, jsx_runtime_version, path);
+          }
         }
       }
     }

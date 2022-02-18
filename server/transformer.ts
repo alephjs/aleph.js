@@ -1,5 +1,6 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.24.4";
 import { transform, transformCSS } from "../compiler/mod.ts";
+import cache from "../lib/cache.ts";
 import { restoreUrl, toLocalPath } from "../lib/path.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
@@ -98,10 +99,13 @@ export const clientModuleTransformer = {
       const useAtomicCSS = Boolean(atomicCSS?.presets?.length) && isJSX;
       const alephPkgUri = getAlephPkgUri();
       const { code, jsxStaticClasses, deps } = await transform(specifier, rawCode, {
-        ...jsxConfig,
-        alephPkgUri,
+        jsxRuntime: jsxConfig.jsxRuntime,
+        jsxImportSource: jsxConfig.jsxImportSource && isDev
+          ? toLocalPath(jsxConfig.jsxImportSource)
+          : jsxConfig.jsxImportSource,
         stripDataExport: isRouteFile(specifier),
         parseJsxStaticClasses: useAtomicCSS,
+        alephPkgUri,
         graphVersions,
         importMap,
         isDev,
@@ -210,9 +214,9 @@ async function readCode(filename: string): Promise<[string, number | undefined]>
     if (url.hostname === "esm.sh") {
       url.searchParams.set("target", "es2021");
     }
-    const res = await fetch(url.toString());
+    const res = await cache(url.toString());
     if (res.status >= 400) {
-      throw new Error(`fetch ${filename}: ${res.status} - ${res.statusText}`);
+      throw new Error(`fetch ${url} ${filename}: ${res.status} - ${res.statusText}`);
     }
     const val = res.headers.get("Last-Modified");
     const mtime = val ? new Date(val).getTime() : undefined;

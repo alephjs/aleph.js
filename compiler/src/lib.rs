@@ -46,13 +46,13 @@ pub struct Options {
   pub jsx_runtime: String,
 
   #[serde(default)]
-  pub jsx_runtime_version: String,
+  pub jsx_runtime_version: Option<String>,
 
   #[serde(default)]
-  pub jsx_runtime_cdn_version: String,
+  pub jsx_runtime_cdn_version: Option<String>,
 
   #[serde(default)]
-  pub jsx_import_source: String,
+  pub jsx_import_source: Option<String>,
 
   #[serde(default)]
   pub parse_jsx_static_classes: bool,
@@ -90,8 +90,8 @@ pub fn parse_jsx_static_classes(specifier: &str, code: &str) -> Result<JsValue, 
     specifier,
     "",
     "",
-    "",
-    "",
+    None,
+    None,
     ImportHashMap::default(),
     HashMap::new(),
     false,
@@ -116,8 +116,8 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     specifier,
     &options.aleph_pkg_uri,
     &options.jsx_runtime,
-    &options.jsx_runtime_version,
-    &options.jsx_runtime_cdn_version,
+    options.jsx_runtime_version,
+    options.jsx_runtime_cdn_version,
     options.import_map,
     options.graph_versions,
     options.is_dev,
