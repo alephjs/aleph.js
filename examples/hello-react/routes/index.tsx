@@ -1,6 +1,6 @@
 import { Head, useData } from "aleph/react";
 
-let count = 0;
+let count = parseInt(window.localStorage?.getItem("count") || "0") || 0;
 
 export const data = {
   get: (req: Request) => {
@@ -13,6 +13,7 @@ export const data = {
     } else if (action === "decrease") {
       count--;
     }
+    window.localStorage?.setItem("count", count.toString());
     return new Response(JSON.stringify({ count }));
   },
 };
@@ -48,13 +49,13 @@ export default function Index() {
         {!isLoading && <strong>{data?.count}</strong>}
         <button
           disabled={Boolean(isMutating)}
-          onClick={() => mutation.post({ action: "decrease" }, true)}
+          onClick={() => mutation.post({ action: "decrease" })}
         >
           -
         </button>
         <button
           disabled={Boolean(isMutating)}
-          onClick={() => mutation.post({ action: "increase" }, true)}
+          onClick={() => mutation.post({ action: "increase" })}
         >
           +
         </button>

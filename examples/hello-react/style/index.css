@@ -61,10 +61,10 @@
   justify-content: center;
   align-items: center;
   width: 270px;
-  height: 48px;
+  height: 50px;
   margin: 30px auto 0;
   border: 1px solid #eee;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: border-color 0.15s ease-in;
 }
 
@@ -91,22 +91,28 @@
   display: line-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 3px;
   border: 1px solid #ddd;
   line-height: 1;
-  font-size: 12px;
-  font-family: Courier, monospace;
-  font-weight: 600;
+  font-size: 14px;
+  font-family: monospace;
+  font-weight: 500;
   color: #999;
-  transition: color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+  opacity: 1;
+  transition: all 0.15s ease;
   cursor: pointer;
 }
 
 .counter button:hover {
-  color: #000;
+  color: #333;
   border-color:#ccc;
+}
+
+.counter button:disabled {
+  color: #999;
+  border-color:#ddd;
 }
 
 .counter button + button {
