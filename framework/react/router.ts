@@ -3,6 +3,7 @@ import { createElement, useContext, useEffect, useMemo, useState } from "https:/
 import type { SSRContext } from "../../types.d.ts";
 import events from "../core/events.ts";
 import MainContext from "./context.ts";
+import { E404Page } from "./error.ts";
 
 export type RouterProps = {
   readonly ssr?: SSRContext;
@@ -19,7 +20,7 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
     return cache;
   }, []);
   const Component = useMemo<FC<any>>(
-    () => ssr?.moduleDefaultExport || (globalThis as any).__ssrModuleDefaultExport || url._component || E404,
+    () => ssr?.moduleDefaultExport || (globalThis as any).__ssrModuleDefaultExport || url._component || E404Page,
     [url],
   );
 
@@ -59,25 +60,6 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
 export const useRouter = (): { url: URL } => {
   const { url } = useContext(MainContext);
   return { url };
-};
-
-const E404 = () => {
-  return createElement(
-    "div",
-    {
-      style: {
-        width: "100vw",
-        height: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-      },
-    },
-    createElement("strong", null, "404"),
-    createElement("em", { style: { color: "#999" } }, "-"),
-    "page not found",
-  );
 };
 
 function loadSSRDataFromTag(): [any, number | undefined] {

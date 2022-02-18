@@ -1,39 +1,20 @@
-import { Component, createElement, CSSProperties } from "https://esm.sh/react@17.0.2";
-import util from "../../lib/util.ts";
+import { Component, createElement, type CSSProperties } from "https://esm.sh/react@17.0.2";
 
-const inDeno = typeof Deno !== "undefined" && typeof Deno.env === "object";
-
-export class ErrorBoundary extends Component<{}, { error: Error | Promise<any> | null }> {
+export class ErrorBoundary extends Component<{}, { error: Error | null }> {
   constructor(props: {}) {
     super(props);
     this.state = { error: null };
-    if (!inDeno) {
-      Object.assign(window, { __ALEPH_ErrorBoundary: this });
-    }
   }
 
   componentDidCatch(error: any, info: any) {
     this.setState({ error });
-    if (error instanceof Promise) {
-      error.then(() => this.setState({ error: null })).catch((error) => this.setState({ error }));
-      return;
-    }
-    const event = new CustomEvent("componentDidCatch", {
-      detail: { error, info },
-    });
-    window.dispatchEvent(event);
   }
 
   render() {
     const { error } = this.state;
 
-    // todo: default loading UI
-    if (error instanceof Promise) {
-      return null;
-    }
-
     // todo: error UI
-    if (error instanceof Error) {
+    if (error !== null) {
       return createElement(
         "pre",
         null,
@@ -55,29 +36,13 @@ export function E404Page() {
   );
 }
 
-export function E400MissingComponent({ name }: { name: string }) {
-  return createElement(
-    StatusError,
-    {
-      status: 400,
-      message: `Module '${name}' should export a React Component as default`,
-      showRefreshButton: true,
-    },
-  );
-}
-
 const resetStyle: CSSProperties = {
   padding: 0,
   margin: 0,
   lineHeight: 1.5,
-  fontSize: 15,
-  fontWeight: 400,
-  color: "#333",
 };
 
-export function StatusError(
-  { status, message }: { status: number; message: string },
-) {
+export function StatusError({ status, message }: { status: number; message: string }) {
   return (
     createElement(
       "div",
@@ -98,14 +63,17 @@ export function StatusError(
         {
           style: {
             ...resetStyle,
+            fontFamily: "sans-serif",
+            fontSize: 15,
             fontWeight: 500,
+            color: "#333",
           },
         },
         createElement(
           "code",
           {
             style: {
-              ...resetStyle,
+              fontFamily: "monospace",
               fontWeight: 700,
             },
           },
@@ -115,7 +83,6 @@ export function StatusError(
           "small",
           {
             style: {
-              ...resetStyle,
               fontSize: 14,
               color: "#999",
             },

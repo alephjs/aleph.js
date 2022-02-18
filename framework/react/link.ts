@@ -92,7 +92,7 @@ export function Link(props: LinkProps) {
     }
   }, [isCurrent]);
   const onMouseEnter = useCallback((e: MouseEvent) => {
-    if (util.isFunction(propOnMouseEnter)) {
+    if (typeof propOnMouseEnter === "function") {
       propOnMouseEnter(e);
     }
     if (e.defaultPrevented) {
@@ -101,7 +101,7 @@ export function Link(props: LinkProps) {
     prefetch();
   }, [prefetch]);
   const onClick = useCallback((e: MouseEvent) => {
-    if (util.isFunction(propOnClick)) {
+    if (typeof propOnClick === "function") {
       propOnClick(e);
     }
     if (e.defaultPrevented || isModifiedEvent(e)) {
