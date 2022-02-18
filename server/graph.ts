@@ -36,11 +36,11 @@ export class DependencyGraph {
     this.#modules.delete(specifier);
   }
 
+  // version++
   update(specifier: string) {
     this.#update(specifier);
   }
 
-  // version++
   #update(specifier: string, __tracing = new Set<string>()) {
     const module = this.get(specifier);
     if (module) {
@@ -53,6 +53,21 @@ export class DependencyGraph {
           }
         }
       });
+    }
+  }
+
+  lookup(specifier: string, callback: (specifier: string) => void | false) {
+    this.#lookup(specifier, callback);
+  }
+
+  #lookup(specifier: string, callback: (specifier: string) => void | false, __tracing = new Set<string>()) {
+    __tracing.add(specifier);
+    for (const module of this.#modules.values()) {
+      if (module.deps?.find((dep) => dep.specifier === specifier)) {
+        if (!__tracing.has(module.specifier) && callback(module.specifier) !== false) {
+          this.#lookup(module.specifier, callback, __tracing);
+        }
+      }
     }
   }
 }

@@ -74,9 +74,19 @@ if (import.meta.main) {
       serverDependencyGraph.update(specifier);
     }
     if (kind === "modify") {
-      fsWatchListeners.forEach((e) => e.emit(`modify:${specifier}`));
+      fsWatchListeners.forEach((e) => {
+        if (!e.emit(`hotUpdate:${specifier}`)) {
+          clientDependencyGraph.lookup(specifier, (specifier) => {
+            if (e.emit(`hotUpdate:${specifier}`)) {
+              return false;
+            }
+          });
+        }
+      });
     } else {
-      fsWatchListeners.forEach((e) => e.emit(kind, specifier));
+      fsWatchListeners.forEach((e) => {
+        e.emit(kind, specifier);
+      });
     }
   });
   log.info(`Watching files for changes...`);
@@ -110,7 +120,7 @@ if (import.meta.main) {
       socket.addEventListener("open", () => {
         listener.on("add", (specifier: string) => send({ type: "add", specifier }));
         listener.on("remove", (specifier: string) => {
-          listener.removeAllListeners(`modify:${specifier}`);
+          listener.removeAllListeners(`hotUpdate:${specifier}`);
           send({ type: "remove", specifier });
         });
       });
@@ -119,7 +129,7 @@ if (import.meta.main) {
           try {
             const { type, specifier } = JSON.parse(e.data);
             if (type === "hotAccept" && util.isFilledString(specifier)) {
-              listener.on(`modify:${specifier}`, () => send({ type: "modify", specifier }));
+              listener.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
             }
           } catch (e) {}
         }

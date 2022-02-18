@@ -45,16 +45,17 @@ export async function serveAppModules(port: number) {
 }
 
 type TransformeOptions = {
-  atomicCSS?: AtomicCSSConfig;
   isDev: boolean;
+  atomicCSS?: AtomicCSSConfig;
 };
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformeOptions): Promise<Response> => {
-    const { pathname, searchParams, search } = new URL(req.url);
     const { isDev, atomicCSS } = options;
+    const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
+    const isCSS = pathname.endsWith(".css");
     const jsxConfig: JSXConfig = isJSX ? await loadJSXConfig() : {};
     const [rawCode, mtime] = await readCode(specifier);
     const buildArgs = VERSION + JSON.stringify(jsxConfig) + JSON.stringify(atomicCSS) + isDev;
@@ -68,7 +69,7 @@ export const clientModuleTransformer = {
     let resBody = "";
     let resType = "application/javascript";
 
-    if (pathname.endsWith(".css")) {
+    if (isCSS) {
       const toJS = searchParams.has("module");
       const { code, deps } = await bundleCSS(specifier, rawCode, {
         minify: !isDev,
@@ -94,20 +95,20 @@ export const clientModuleTransformer = {
         acc[specifier] = version.toString(16);
         return acc;
       }, {} as Record<string, string>);
-      const useUnocss = Boolean(atomicCSS?.presets?.length) && isJSX;
+      const useAtomicCSS = Boolean(atomicCSS?.presets?.length) && isJSX;
       const alephPkgUri = getAlephPkgUri();
       const { code, jsxStaticClasses, deps } = await transform(specifier, rawCode, {
         ...jsxConfig,
         alephPkgUri,
         stripDataExport: isRouteFile(specifier),
-        parseJsxStaticClasses: useUnocss,
+        parseJsxStaticClasses: useAtomicCSS,
         graphVersions,
         importMap,
         isDev,
       });
       const atomicStyle = new Set(jsxStaticClasses?.map((name) => name.split(" ").map((name) => name.trim())).flat());
       let inlineCSS: string | null = null;
-      if (useUnocss && atomicStyle.size > 0) {
+      if (useAtomicCSS && atomicStyle.size > 0) {
         const uno = createGenerator(atomicCSS);
         const { css } = await uno.generate(atomicStyle, { id: specifier, minify: !isDev });
         inlineCSS = css;
@@ -158,7 +159,7 @@ export async function bundleCSS(
         url = new URL(url, specifier).toString();
       }
     } else {
-      url = "." + new URL(url, `http://-${specifier.slice(1)}`).pathname;
+      url = "." + new URL(url, `file://${specifier.slice(1)}`).pathname;
     }
     return url;
   });
@@ -169,7 +170,10 @@ export async function bundleCSS(
       }
       tracing.add(url);
       const [css] = await readCode(url);
-      const { code } = await bundleCSS(url, css, { minify: options.minify }, tracing);
+      const { code, deps: subDeps } = await bundleCSS(url, css, { minify: options.minify }, tracing);
+      if (subDeps) {
+        deps.push(...subDeps);
+      }
       return code;
     }));
     css = imports.join(eof) + eof + css;

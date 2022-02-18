@@ -13,6 +13,7 @@ let lolHtmlReady = false;
 export type RenderOptions = {
   indexHtml: string;
   routes: RouteConfig[];
+  isDev: boolean;
   ssrHandler?: (ctx: SSRContext) => string | null | undefined;
 };
 
@@ -23,13 +24,12 @@ export default {
       lolHtmlReady = true;
     }
 
-    const { indexHtml, routes, ssrHandler } = options;
+    const { indexHtml, routes, isDev, ssrHandler } = options;
     const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
     const chunks: Uint8Array[] = [];
     const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
       chunks.push(chunk);
     });
-    const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
     try {
       let withSSR = false;
@@ -98,56 +98,66 @@ export default {
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
       }
 
-      let alephPkgUri = getAlephPkgUri();
-      let nomoduleInserted = false;
-      rewriter.on("script", {
+      const alephPkgUri = toLocalPath(getAlephPkgUri());
+      const linkHandler = {
+        element(el: Element) {
+          const href = el.getAttribute("href");
+          if (href?.startsWith("./")) {
+            el.setAttribute("href", href.slice(1));
+            if (href.endsWith(".css") && isDev) {
+              el.after(
+                `<script type="module">import hot from "${alephPkgUri}framework/core/hmr.ts";hot(${
+                  JSON.stringify(href)
+                }).accept();</script>`,
+                { html: true },
+              );
+            }
+          }
+        },
+      };
+      const scriptHandler = {
+        nomoduleInserted: false,
         element(el: Element) {
           const src = el.getAttribute("src");
           const type = el.getAttribute("type");
-          if (type === "module" && !nomoduleInserted) {
-            el.after(`<script nomodule src="${toLocalPath(alephPkgUri)}lib/nomodule.ts"></script>`, {
-              html: true,
-            });
-            nomoduleInserted = true;
+          if (type === "module" && !scriptHandler.nomoduleInserted) {
+            el.after(`<script nomodule src="${alephPkgUri}lib/nomodule.ts"></script>`, { html: true });
+            scriptHandler.nomoduleInserted = true;
           }
           if (src?.startsWith("./")) {
             el.setAttribute("src", src.slice(1));
           }
         },
-      });
-      rewriter.on("link", {
+      };
+      const commonHandler = {
+        handled: false,
         element(el: Element) {
-          const href = el.getAttribute("href");
-          if (href?.startsWith("./")) {
-            el.setAttribute("href", href.slice(1));
+          if (commonHandler.handled) {
+            return;
           }
-        },
-      });
-      rewriter.on("head", {
-        element(el: Element) {
+          commonHandler.handled = true;
           if (routes.length > 0) {
             const config = routes.map((r) => r[2]);
-            el.append(
-              `<script id="aleph-routes" type="application/json">${JSON.stringify(config)}</script>\n`,
-              {
-                html: true,
-              },
-            );
+            el.append(`<script id="aleph-routes" type="application/json">${JSON.stringify(config)}</script>`, {
+              html: true,
+            });
           }
           if (isDev) {
             el.append(
-              `<script type="module">import hot from "${
-                toLocalPath(alephPkgUri)
-              }framework/core/hmr.ts";hot("./index.html").decline();</script>\n`,
-              {
-                html: true,
-              },
+              `<script type="module">import hot from "${alephPkgUri}framework/core/hmr.ts";hot("./index.html").decline();</script>`,
+              { html: true },
             );
           }
         },
-      });
+      };
+
+      rewriter.on("link", linkHandler);
+      rewriter.on("script", scriptHandler);
+      rewriter.on("head", commonHandler);
+      rewriter.on("body", commonHandler);
       rewriter.write((new TextEncoder()).encode(indexHtml));
       rewriter.end();
+
       return new Response(concat(...chunks), { headers });
     } catch (err) {
       log.error(err.stack);

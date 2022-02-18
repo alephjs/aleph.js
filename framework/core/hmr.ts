@@ -42,7 +42,8 @@ class Module {
       return;
     }
     try {
-      const module = await import(this._specifier.slice(1) + "?t=" + Date.now());
+      const url = this._specifier.slice(1) + (this._specifier.endsWith(".css") ? "?module&" : "?") + "t=" + Date.now();
+      const module = await import(url);
       this._acceptCallbacks.forEach((cb) => cb({ module }));
     } catch (e) {
       location.reload();

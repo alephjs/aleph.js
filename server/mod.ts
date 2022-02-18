@@ -34,10 +34,10 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
     vendor: "Deno Land Inc.",
   });
 
+  const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const { pathname } = url;
-    const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
     if (
       pathname.startsWith("/-/") ||
@@ -77,6 +77,8 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
     }
 
     const ctx: Record<string | symbol, any> = {};
+
+    // use middlewares
     if (Array.isArray(middlewares)) {
       for (const mw of middlewares) {
         let fetcher = mw;
@@ -94,6 +96,8 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
         }
       }
     }
+
+    // use fetch handler if available
     if (typeof fetch === "function") {
       let res = fetch(req, ctx);
       if (res instanceof Promise) {
@@ -134,8 +138,17 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
               return new Response("Method not allowed", { status: 405 });
             }
           } catch (err) {
-            log.error(err.stack);
-            return new Response(isDev ? err.message.split("\n")[0] : "Internal Server Error", { status: 500 });
+            if (err.stack) {
+              log.error(err.stack);
+            }
+            return new Response(
+              isDev || (typeof err.status === "number" && err.status < 500)
+                ? err.message || "Server Error"
+                : "Internal Server Error",
+              {
+                status: err.status || 500,
+              },
+            );
           }
         }
       }
@@ -176,7 +189,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
       return new Response("Not Found", { status: 404 });
     }
 
-    return renderer.fetch(req, ctx, { indexHtml, routes, ssrHandler: ssr });
+    return renderer.fetch(req, ctx, { indexHtml, routes, ssrHandler: ssr, isDev });
   };
 
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {
