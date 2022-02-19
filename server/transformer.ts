@@ -120,10 +120,11 @@ export const clientModuleTransformer = {
         const { css } = await uno.generate(atomicStyle, { id: specifier, minify: !isDev });
         inlineCSS = css;
       }
-      resBody = code + (inlineCSS
-        ? `\nimport { applyCSS } from "${toLocalPath(alephPkgUri)}framework/core/style.ts";` +
-          `\napplyCSS(${JSON.stringify(specifier)}, { css: ${JSON.stringify(inlineCSS)} });`
-        : "");
+      resBody = code +
+        (inlineCSS
+          ? `\nimport { applyCSS as __applyCSS } from "${toLocalPath(alephPkgUri)}framework/core/style.ts";` +
+            `\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`
+          : "");
       clientDependencyGraph.mark({ specifier, version: 0, deps, inlineCSS: Boolean(inlineCSS) });
     }
     return new Response(resBody, {

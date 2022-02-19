@@ -70,7 +70,7 @@ export async function bundleCSS(
         }/framework/core/style.ts";`,
         `export const css = ${JSON.stringify(css)};`,
         `export default ${JSON.stringify(cssModulesExports)};`,
-        `applyCSS(${JSON.stringify(specifier)}, { css });`,
+        `applyCSS(${JSON.stringify(specifier)}, css);`,
         options.hmr && `import.meta.hot.accept();`,
       ].filter(Boolean).join(eof),
       deps,
