@@ -133,9 +133,7 @@ function connect() {
               if (modules.has(specifier)) {
                 modules.delete(specifier);
               }
-              if (routePattern) {
-                events.emit("remove-route", specifier);
-              }
+              events.emit("remove-route", { specifier });
             }
             break;
         }

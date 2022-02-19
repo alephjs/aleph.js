@@ -6,12 +6,14 @@ const routerState = {
   hasPreRedirect: false,
 };
 
-events.once("routerstate", (state) => {
+const onrouterstate = (state: Record<string, unknown>) => {
+  events.off("routerstate", onrouterstate);
   if (routerState.hasPreRedirect) {
     events.emit("popstate", { type: "popstate", resetScroll: true });
   }
   Object.assign(routerState, state);
-});
+};
+events.on("routerstate", onrouterstate);
 
 export function redirect(url: string, replace?: boolean) {
   const { location, history } = window;

@@ -1,6 +1,6 @@
 import { basename, relative, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
-import { EventEmitter } from "../framework/core/events.ts";
+import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/path.ts";
@@ -28,14 +28,18 @@ Options:
     -h, --help                   Prints help message
 `;
 
-const fswListeners = new Set<EventEmitter>();
-const createFSWListener = (): EventEmitter => {
-  const e = new EventEmitter();
+type FsEvents = {
+  [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: { specifier: string };
+};
+
+const fswListeners = new Set<Emitter<FsEvents>>();
+const createFSWListener = () => {
+  const e = mitt<FsEvents>();
   fswListeners.add(e);
   return e;
 };
-const removeFSWListener = (e: EventEmitter) => {
-  e.removeAllListeners();
+const removeFSWListener = (e: Emitter<FsEvents>) => {
+  e.all.clear();
   fswListeners.delete(e);
 };
 
@@ -74,20 +78,24 @@ if (import.meta.main) {
       clientDependencyGraph.update(specifier);
       serverDependencyGraph.update(specifier);
     }
-    fswListeners.forEach((e) => {
-      e.emit(kind, specifier);
-    });
     if (kind === "modify") {
       fswListeners.forEach((e) => {
-        e.emit(`modify:${specifier}`);
+        e.emit(`modify:${specifier}`, { specifier });
         // emit HMR event
-        if (!e.emit(`hotUpdate:${specifier}`)) {
+        if (e.all.has(`hotUpdate:${specifier}`)) {
+          e.emit(`hotUpdate:${specifier}`, { specifier });
+        } else {
           clientDependencyGraph.lookup(specifier, (specifier) => {
-            if (e.emit(`hotUpdate:${specifier}`)) {
+            if (e.all.has(`hotUpdate:${specifier}`)) {
+              e.emit(`hotUpdate:${specifier}`, { specifier });
               return false;
             }
           });
         }
+      });
+    } else {
+      fswListeners.forEach((e) => {
+        e.emit(kind, { specifier });
       });
     }
   });
@@ -95,12 +103,11 @@ if (import.meta.main) {
   const fswListener = createFSWListener();
   const peekFile = async (filename: string) => {
     const stat = await Deno.lstat(filename);
-    const evtName = `modify:./${basename(filename)}`;
-    fswListener.removeAllListeners(evtName);
-    fswListener.on(evtName, importServerHandler);
+    fswListener.off(`modify:./${basename(filename)}`);
+    fswListener.on(`modify:./${basename(filename)}`, importServerHandler);
     return stat.mtime?.getTime().toString(16) + "-" + stat.size.toString(16);
   };
-  const importServerHandler = async (forceUpdate = false): Promise<void> => {
+  const importServerHandler = async (): Promise<void> => {
     const cwd = Deno.cwd();
     const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
       findFile(cwd, ["deno.jsonc", "deno.json", "tsconfig.json"]),
@@ -115,14 +122,11 @@ if (import.meta.main) {
       if (importMapFile) {
         hash += "-" + await peekFile(importMapFile);
       }
-      if (forceUpdate) {
-        hash += "-" + Date.now().toString(16);
-      }
       await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?hash=${hash}`);
       log.info(`Server handler imported from ${basename(serverEntry)}`);
     }
   };
-  const updateRoutes = (specifier: string) => {
+  const updateRoutes = ({ specifier }: { specifier: string }) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     if (config && config.routeFiles) {
       const reg = toRoutingRegExp(config.routeFiles);
@@ -170,7 +174,7 @@ function handleHMRSocket(req: Request): Response {
     }
   };
   socket.addEventListener("open", () => {
-    listener.on("create", (specifier: string) => {
+    listener.on("create", ({ specifier }) => {
       const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
       if (config && config.routeFiles) {
         const reg = toRoutingRegExp(config.routeFiles);
@@ -182,8 +186,8 @@ function handleHMRSocket(req: Request): Response {
       }
       send({ type: "create", specifier });
     });
-    listener.on("remove", (specifier: string) => {
-      listener.removeAllListeners(`hotUpdate:${specifier}`);
+    listener.on("remove", ({ specifier }) => {
+      listener.off(`hotUpdate:${specifier}`);
       send({ type: "remove", specifier });
     });
   });

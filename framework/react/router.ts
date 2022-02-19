@@ -40,7 +40,7 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
         head.removeChild(el);
       }
     });
-    events.addListener("popstate", (e) => {
+    events.on("popstate", (e) => {
       const url = new URL(location.href);
       // todo: cacha data
       // todo: load comonent
