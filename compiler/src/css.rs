@@ -2,7 +2,7 @@
   [parcel css] - A CSS parser, transformer, and minifier written in Rust.
   https://github.com/parcel-bundler/parcel-css
   MPL-2.0 License
-  ! below code was copied from https://github.com/parcel-bundler/parcel-css/blob/master/node/src/lib.rs, and removed node napi code
+  ! below code was copied from https://github.com/parcel-bundler/parcel-css/blob/510df4e2d825927115427b690d6706da395d2170/node/src/lib.rs, and removed node napi code
 */
 
 use parcel_css::bundler::BundleErrorKind;
