@@ -28,11 +28,6 @@ jobs:
         with:
           rust-version: stable
 
-      - name: Setup wasm-pack
-        uses: jetli/wasm-pack-action@v0.3.0
-        with:
-          version: latest
-
       - name: Deno test
         run: deno test -A --location=http://localhost --import-map=import_map.json
 
