@@ -68,7 +68,7 @@ export class Logger {
 
   debug(...args: unknown[]): void {
     if (this.#level <= Level.Debug) {
-      console.debug(blue("DEBUG"), ...args);
+      console.debug(dim("DEBUG"), ...args);
     }
   }
 

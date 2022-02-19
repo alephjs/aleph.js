@@ -1,6 +1,6 @@
 import util from "./util.ts";
 
-export const builtinModuleExts = ["tsx", "jsx", "ts", "js", "mjs", "mts"];
+export const builtinModuleExts = ["tsx", "jsx", "ts", "mts", "js", "mjs"];
 
 /**
  * fix remote url to local path
