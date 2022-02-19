@@ -1,6 +1,6 @@
 # Aleph.js Compiler
 
-The compiler of Aleph.js written in Rust, powered by [swc](https://github.com/swc-project/swc).
+The compiler of Aleph.js written in Rust, powered by [swc](https://github.com/swc-project/swc) and [parcel css](https://github.com/parcel-bundler/parcel-css).
 
 ## Development Setup
 

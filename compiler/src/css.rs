@@ -1,6 +1,8 @@
 /*
-  parcel css - A CSS parser, transformer, and minifier written in Rust. - https://parcel-css.vercel.app
+  [parcel css] - A CSS parser, transformer, and minifier written in Rust.
+  https://github.com/parcel-bundler/parcel-css
   MPL-2.0 License
+  ! below code was copied from https://github.com/parcel-bundler/parcel-css/blob/master/node/src/lib.rs, and removed node napi code
 */
 
 use parcel_css::bundler::BundleErrorKind;
@@ -31,8 +33,6 @@ pub struct TransformResult {
   exports: Option<CssModuleExports>,
   dependencies: Option<Vec<Dependency>>,
 }
-
-// ---------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
