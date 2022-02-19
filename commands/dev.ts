@@ -28,18 +28,15 @@ Options:
     -h, --help                   Prints help message
 `;
 
-const fsWatchListeners: EventEmitter[] = [];
-const createFSWatchListener = (): EventEmitter => {
+const fswListeners = new Set<EventEmitter>();
+const createFSWListener = (): EventEmitter => {
   const e = new EventEmitter();
-  fsWatchListeners.push(e);
+  fswListeners.add(e);
   return e;
 };
-const removeFSWatchListener = (e: EventEmitter) => {
+const removeFSWListener = (e: EventEmitter) => {
   e.removeAllListeners();
-  const index = fsWatchListeners.indexOf(e);
-  if (index > -1) {
-    fsWatchListeners.splice(index, 1);
-  }
+  fswListeners.delete(e);
 };
 
 if (import.meta.main) {
@@ -77,11 +74,11 @@ if (import.meta.main) {
       clientDependencyGraph.update(specifier);
       serverDependencyGraph.update(specifier);
     }
-    fsWatchListeners.forEach((e) => {
+    fswListeners.forEach((e) => {
       e.emit(kind, specifier);
     });
     if (kind === "modify") {
-      fsWatchListeners.forEach((e) => {
+      fswListeners.forEach((e) => {
         e.emit(`modify:${specifier}`);
         // emit HMR event
         if (!e.emit(`hotUpdate:${specifier}`)) {
@@ -95,15 +92,15 @@ if (import.meta.main) {
     }
   });
 
-  const fswListener = createFSWatchListener();
-  const watchFile = async (filename: string) => {
+  const fswListener = createFSWListener();
+  const peekFile = async (filename: string) => {
     const stat = await Deno.lstat(filename);
     const evtName = `modify:./${basename(filename)}`;
     fswListener.removeAllListeners(evtName);
-    fswListener.on(evtName, importServer);
+    fswListener.on(evtName, importServerHandler);
     return stat.mtime?.getTime().toString(16) + "-" + stat.size.toString(16);
   };
-  const importServer = async (forceUpdate = false): Promise<void> => {
+  const importServerHandler = async (forceUpdate = false): Promise<void> => {
     const cwd = Deno.cwd();
     const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
       findFile(cwd, ["deno.jsonc", "deno.json", "tsconfig.json"]),
@@ -111,12 +108,12 @@ if (import.meta.main) {
       findFile(cwd, builtinModuleExts.map((ext) => `server.${ext}`)),
     ]);
     if (serverEntry) {
-      let hash = await watchFile(serverEntry);
+      let hash = await peekFile(serverEntry);
       if (denoConfigFile) {
-        hash += "-" + await watchFile(denoConfigFile);
+        hash += "-" + await peekFile(denoConfigFile);
       }
       if (importMapFile) {
-        hash += "-" + await watchFile(importMapFile);
+        hash += "-" + await peekFile(importMapFile);
       }
       if (forceUpdate) {
         hash += "-" + Date.now().toString(16);
@@ -136,7 +133,7 @@ if (import.meta.main) {
   };
   fswListener.on("create", updateRoutes);
   fswListener.on("remove", updateRoutes);
-  importServer();
+  importServerHandler();
 
   // make the default handler
   if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
@@ -148,7 +145,7 @@ if (import.meta.main) {
 
     // handle HMR sockets
     if (pathname === "/-/HMR") {
-      return hmrWS(req);
+      return handleHMRSocket(req);
     }
 
     return Reflect.get(globalThis, "__ALEPH_SERVER_HANDLER")?.(req);
@@ -162,9 +159,9 @@ if (import.meta.main) {
   }
 }
 
-function hmrWS(req: Request): Response {
+function handleHMRSocket(req: Request): Response {
   const { socket, response } = Deno.upgradeWebSocket(req, {});
-  const listener = createFSWatchListener();
+  const listener = createFSWListener();
   const send = (message: Record<string, unknown>) => {
     try {
       socket.send(JSON.stringify(message));
@@ -203,7 +200,7 @@ function hmrWS(req: Request): Response {
     }
   });
   socket.addEventListener("close", () => {
-    removeFSWatchListener(listener);
+    removeFSWListener(listener);
   });
   return response;
 }
