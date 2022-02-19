@@ -49,13 +49,13 @@ export default function Index() {
         {!isLoading && <strong>{data?.count}</strong>}
         <button
           disabled={Boolean(isMutating)}
-          onClick={() => mutation.post({ action: "decrease" })}
+          onClick={() => mutation.post({ action: "decrease" }, "replace")}
         >
           -
         </button>
         <button
           disabled={Boolean(isMutating)}
-          onClick={() => mutation.post({ action: "increase" })}
+          onClick={() => mutation.post({ action: "increase" }, "replace")}
         >
           +
         </button>

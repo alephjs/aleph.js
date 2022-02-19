@@ -3,17 +3,18 @@ import util from "../../lib/util.ts";
 import MainContext from "./context.ts";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
-export type HttpError = { method: HttpMethod; status: number; message: string };
-export type UpdateStrategy<T> = "none" | "pending" | {
-  optimisticUpdate: (data: T) => T;
-  onFail?: (error: HttpError) => void;
+export type FetchError = { method: HttpMethod; status: number; message: string };
+export type DataState<T> = { data?: T; error?: FetchError; isLoading?: boolean; isMutating?: HttpMethod };
+export type UpdateStrategy<T> = "none" | "replace" | {
+  replace?: boolean;
+  optimisticUpdate?: (data: T) => T;
+  onFailure?: (error: FetchError) => void;
 };
-export type DataState<T = any> = { data?: T; error?: HttpError; isLoading?: boolean; isMutating?: HttpMethod };
 
 export const useData = <T = any>(path?: string): DataState<T> & { mutation: typeof mutation } => {
   const { dataCache, url: routeUrl } = useContext(MainContext);
   const dataUrl = useMemo(() => path || (routeUrl.pathname + routeUrl.search), [path, routeUrl]);
-  const [dataStore, setDataStore] = useState<DataState>(() => {
+  const [dataStore, setDataStore] = useState<DataState<T>>(() => {
     if (dataCache.has(dataUrl)) {
       const { data, expires } = dataCache.get(dataUrl)!;
       if (!expires || Date.now() < expires) {
@@ -23,10 +24,20 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
     return {};
   });
   const action = useCallback(async (method: HttpMethod, fetcher: Promise<Response>, update: UpdateStrategy<T>) => {
-    const optimistic = update && typeof update === "object" && update !== null &&
-      typeof update.optimisticUpdate === "function";
+    const updateIsObject = update && typeof update === "object" && update !== null;
+    const optimistic = updateIsObject && typeof update.optimisticUpdate === "function";
+    const replace = update === "replace" || (updateIsObject && !!update.replace);
+    const rollback: { data?: T } = {};
+
     if (optimistic) {
-      setDataStore(({ data }) => ({ data: update.optimisticUpdate(clone(data)), __data: data }));
+      const optimisticUpdate = update.optimisticUpdate!;
+      setDataStore((store) => {
+        if (store.data) {
+          rollback.data = store.data;
+          return { data: optimisticUpdate(clone(store.data)) };
+        }
+        return store;
+      });
     } else {
       setDataStore(({ data }) => ({ data, isMutating: method }));
     }
@@ -34,11 +45,11 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
     const res = await fetcher;
     if (res.status >= 400) {
       const message = await res.text();
-      const error: HttpError = { method, status: res.status, message };
+      const error: FetchError = { method, status: res.status, message };
       if (optimistic) {
         // @ts-ignore
-        setDataStore(({ __data }) => ({ data: __data }));
-        update.onFail?.(error);
+        setDataStore({ data: rollback.data });
+        update.onFailure?.(error);
       } else {
         setDataStore(({ data }) => ({ data, error }));
       }
@@ -50,19 +61,25 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
       if (redirectUrl) {
         location.href = redirectUrl;
       }
+      if (optimistic) {
+        // @ts-ignore
+        setDataStore({ data: rollback.data });
+      } else {
+        setDataStore(({ data }) => ({ data }));
+      }
       return res;
     }
 
-    if (update && res.ok) {
+    if (replace && res.ok) {
       try {
         const data = await res.json();
         setDataStore({ data });
       } catch (err) {
-        const error: HttpError = { method, status: 0, message: "Invalid JSON data: " + err.message };
+        const error: FetchError = { method, status: 0, message: "Invalid JSON data: " + err.message };
         if (optimistic) {
           // @ts-ignore
-          setDataStore(({ __data }) => ({ data: __data }));
-          update.onFail?.(error);
+          setDataStore({ data: rollback.data });
+          update.onFailure?.(error);
         } else {
           setDataStore(({ data }) => ({ data, error }));
         }
@@ -76,13 +93,13 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
   const mutation = useMemo(() => {
     return {
       post: async (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("post", jsonFetch("post", data, path), update ?? "pending");
+        return action("post", jsonFetch("post", data, path), update ?? "none");
       },
       put: async (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("put", jsonFetch("put", data, path), update ?? "pending");
+        return action("put", jsonFetch("put", data, path), update ?? "none");
       },
       patch: async (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("patch", jsonFetch("patch", data, path), update ?? "pending");
+        return action("patch", jsonFetch("patch", data, path), update ?? "none");
       },
       delete: async (params?: Record<string, string>, update?: UpdateStrategy<T>) => {
         let url = routeUrl;
@@ -90,14 +107,14 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
           url = new URL(self.location?.href);
           const [pathname, search] = util.splitBy(path, "?");
           url.pathname = util.cleanPath(pathname);
-          url.search = search;
+          url.search = search ? "?" + search : "";
         }
         if (params) {
           for (const [key, value] of Object.entries(params)) {
             url.searchParams.set(key, value);
           }
         }
-        return action("delete", fetch(url.toString(), { method: "delete" }), update ?? "pending");
+        return action("delete", fetch(url.toString(), { method: "delete" }), update ?? "none");
       },
     };
   }, [path, routeUrl]);
