@@ -62,7 +62,7 @@ pub struct Options {
 }
 
 fn default_target() -> String {
-  return "es2015".into();
+  return "es2022".into();
 }
 
 fn default_jsx_runtime() -> String {
