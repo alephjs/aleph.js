@@ -26,7 +26,7 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
   const Component = useMemo<FC<PegeProps>>(
     () =>
       ssr?.moduleDefaultExport as FC ||
-      (globalThis as Record<string, unknown>).__ssrModuleDefaultExport ||
+      (window as { __ssrModuleDefaultExport?: FC }).__ssrModuleDefaultExport ||
       url._component ||
       E404Page,
     [url],
@@ -34,13 +34,14 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
 
   useEffect(() => {
     // remove ssr head elements
-    const { head } = globalThis.document;
+    const { head } = window.document;
     Array.from(head.children).forEach((el: Element) => {
       if (el.hasAttribute("ssr")) {
         head.removeChild(el);
       }
     });
-    events.on("popstate", (e) => {
+
+    const onpopstate = (e: Record<string, unknown>) => {
       const url = new URL(location.href);
       // todo: cacha data
       // todo: load comonent
@@ -48,7 +49,19 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
       if (e.resetScroll) {
         window.scrollTo(0, 0);
       }
-    });
+    };
+    // deno-lint-ignore ban-ts-comment
+    // @ts-ignore
+    addEventListener("popstate", onpopstate);
+    events.on("popstate", onpopstate);
+    events.emit("routerready", { type: "routerready" });
+
+    return () => {
+      // deno-lint-ignore ban-ts-comment
+      // @ts-ignore
+      removeEventListener("popstate", onpopstate);
+      events.off("popstate", onpopstate);
+    };
   }, []);
 
   return createElement(
