@@ -8,14 +8,15 @@
 ## Features
 
 - Modern tooling in Deno
-- Use standard web API
+- Deno Deploy first
+- Use standard Web API
 - Filesystem routing
 - Static file server
-- Support multiple UI libraries (React/Vue/Sevlet...)
+- Web framework for React/Vue/Svelet
 - Server side rendering
+- Better data fecthing
+- Bulitin atomic CSS
 - Middlewares
-- Plugins
-- Severless friendly
 
 ## Getting Started
 
