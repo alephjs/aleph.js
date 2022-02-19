@@ -20,7 +20,7 @@ export type LinkProps = PropsWithChildren<
     to: string;
     replace?: boolean;
     prefetch?: boolean;
-  } & Omit<AnchorHTMLAttributes<{}>, "herf" | "hrefLang">
+  } & Omit<AnchorHTMLAttributes<Record<never, never>>, "herf" | "hrefLang">
 >;
 
 /**
@@ -190,8 +190,8 @@ export function NavLink(props: LinkProps & { activeClassName?: string; activeSty
 }
 
 function isModifiedEvent(event: MouseEvent): boolean {
-  const { target } = event.currentTarget as any;
-  const nativeEvent = event.nativeEvent as any;
+  const { target } = event.currentTarget as HTMLAnchorElement;
+  const nativeEvent = event.nativeEvent;
   return (
     (target && target !== "_self") ||
     event.metaKey ||

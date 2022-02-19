@@ -1,4 +1,6 @@
 import { join } from "https://deno.land/std@0.125.0/path/mod.ts";
+import cache from "./cache.ts";
+import util from "./util.ts";
 
 /* check whether or not the given path exists as a directory. */
 export async function existsDir(path: string): Promise<boolean> {
@@ -37,6 +39,26 @@ export async function findFile(dir: string, filenames: string[]): Promise<string
   return void 0;
 }
 
+/* read source code from fs/cdn/cache */
+export async function readCode(specifier: string): Promise<[string, number | undefined]> {
+  if (util.isLikelyHttpURL(specifier)) {
+    const url = new URL(specifier);
+    if (url.hostname === "esm.sh") {
+      url.searchParams.set("target", "esnext");
+    }
+    const res = await cache(url.toString());
+    if (res.status >= 400) {
+      throw new Error(`fetch ${url} ${specifier}: ${res.status} - ${res.statusText}`);
+    }
+    const val = res.headers.get("Last-Modified");
+    const mtime = val ? new Date(val).getTime() : undefined;
+    return [await res.text(), mtime];
+  }
+  const stat = await Deno.stat(specifier);
+  return [await Deno.readTextFile(specifier), stat.mtime?.getTime()];
+}
+
+/* watch the given directory and its subdirectories */
 export const watchFs = async (dir: string, listener: (path: string, kind: "create" | "remove" | "modify") => void) => {
   const timers = new Map();
   const debounce = (id: string, callback: () => void, delay: number) => {

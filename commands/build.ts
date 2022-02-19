@@ -17,7 +17,7 @@ Options:
 `;
 
 if (import.meta.main) {
-  const { args, options } = parse();
+  const { args } = parse();
 
   // check working dir
   const workingDir = resolve(String(args[0] || "."));

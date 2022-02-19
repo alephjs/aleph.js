@@ -5,7 +5,7 @@ export const VERSION = "0.3.0";
 export const minDenoVersion = "1.18.2";
 
 /** `prepublish` will be invoked before publish */
-export async function prepublish(version: string): Promise<boolean> {
+export async function prepublish(): Promise<boolean> {
   const p = Deno.run({
     cmd: ["deno", "run", "-A", "build.ts"],
     cwd: "./compiler",

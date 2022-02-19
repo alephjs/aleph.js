@@ -17,12 +17,14 @@ async function run(cmd: string[]) {
 if (import.meta.main) {
   const ok = await run(["wasm-pack", "build", "--target", "web"]);
   if (ok) {
-    const wasmData = await Deno.readFile("./pkg/aleph_compiler_bg.wasm");
-    const jsCode = await Deno.readTextFile("./pkg/aleph_compiler.js");
-    let prevWasmSize = 0;
+    let prevWasmSize: number;
     try {
       prevWasmSize = (await Deno.stat("./dist/wasm.js")).size;
-    } catch (e) {}
+    } catch (_e) {
+      prevWasmSize = 0;
+    }
+    const wasmData = await Deno.readFile("./pkg/aleph_compiler_bg.wasm");
+    const jsCode = await Deno.readTextFile("./pkg/aleph_compiler.js");
     await ensureDir("./dist");
     await Deno.writeTextFile(
       "./dist/wasm.js",

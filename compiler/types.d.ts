@@ -17,12 +17,6 @@ export type TransformOptions = {
   isDev?: boolean;
 };
 
-export type InlineStyleExpr = {
-  readonly type: string;
-  readonly quasis: ReadonlyArray<string>;
-  readonly exprs: ReadonlyArray<string>;
-};
-
 export type TransformResult = {
   readonly code: string;
   readonly map?: string;

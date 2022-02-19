@@ -9,7 +9,7 @@ import type { JSXConfig } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 
 export function getAlephPkgUri() {
-  const global = globalThis as any;
+  const global = globalThis as Record<string, unknown>;
   if (util.isFilledString(global.__ALEPH_PKG_URI)) {
     return global.__ALEPH_PKG_URI;
   }
@@ -49,7 +49,7 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
   if (denoConfigFile) {
     try {
       const { compilerOptions } = await parseJSONFile(denoConfigFile);
-      const { jsx, jsxImportSource } = compilerOptions || {};
+      const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
       if (
         (jsx === "react-jsx" || jsx === "react-jsxdev") &&
         util.isFilledString(jsxImportSource)
@@ -57,7 +57,7 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
         appJsxConfig.jsxImportSource = jsxImportSource;
         appJsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
       } else if (jsx === "react") {
-        appJsxConfig.jsxRuntime = compilerOptions.jsxFactory === "h" ? "preact" : "react";
+        appJsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
       }
     } catch (error) {
       log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
@@ -106,8 +106,8 @@ export async function loadImportMap(): Promise<ImportMap> {
   return importMap;
 }
 
-export async function parseJSONFile(jsonFile: string): Promise<any> {
-  let raw = await Deno.readTextFile(jsonFile);
+export async function parseJSONFile(jsonFile: string): Promise<Record<string, unknown>> {
+  const raw = await Deno.readTextFile(jsonFile);
   if (jsonFile.endsWith(".jsonc")) {
     return JSONC.parse(raw);
   }
@@ -128,7 +128,7 @@ export async function readImportMap(importMapFile: string): Promise<ImportMap> {
   return importMap;
 }
 
-function toStringMap(v: any): Record<string, string> {
+function toStringMap(v: unknown): Record<string, string> {
   const m: Record<string, string> = {};
   if (util.isPlainObject(v)) {
     Object.entries(v).forEach(([key, value]) => {

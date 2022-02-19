@@ -1,12 +1,14 @@
 import { Component, createElement, type CSSProperties } from "https://esm.sh/react@17.0.2";
 
-export class ErrorBoundary extends Component<{}, { error: Error | null }> {
-  constructor(props: {}) {
+type Props = Record<never, never>;
+
+export class ErrorBoundary extends Component<Props, { error: Error | null }> {
+  constructor(props: Props) {
     super(props);
     this.state = { error: null };
   }
 
-  componentDidCatch(error: any, info: any) {
+  componentDidCatch(error: Error) {
     this.setState({ error });
   }
 

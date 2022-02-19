@@ -18,7 +18,7 @@ export type RenderOptions = {
 };
 
 export default {
-  async fetch(req: Request, ctx: Record<string | symbol, any>, options: RenderOptions): Promise<Response> {
+  async fetch(req: Request, ctx: Record<string | symbol, unknown>, options: RenderOptions): Promise<Response> {
     if (!lolHtmlReady) {
       await initWasm(decodeWasm());
       lolHtmlReady = true;
@@ -124,7 +124,7 @@ export default {
           const src = el.getAttribute("src");
           const type = el.getAttribute("type");
           if (type === "module" && !scriptHandler.nomoduleInserted) {
-            el.after(`<script nomodule src="${alephPkgUri}lib/nomodule.ts"></script>`, { html: true });
+            el.after(`<script nomodule src="${alephPkgUri}lib/nomodule.js"></script>`, { html: true });
             scriptHandler.nomoduleInserted = true;
           }
           if (src?.startsWith("./")) {
@@ -174,16 +174,14 @@ export default {
   },
 };
 
-async function matchRoute(
-  req: Request,
-  ctx: Record<string | symbol, any>,
-  routes: RouteConfig[],
-): Promise<Response | { url: URL; moduleDefaultExport?: any; filename?: string; data?: any; dataExpires?: number }> {
+async function matchRoute(req: Request, ctx: Record<string, unknown>, routes: RouteConfig[]): Promise<
+  Response | { url: URL; moduleDefaultExport?: unknown; filename?: string; data?: unknown; dataExpires?: number }
+> {
   const url = new URL(req.url);
   if (routes.length > 0) {
     const pathname = util.cleanPath(url.pathname);
     for (const [pattern, load, meta] of routes) {
-      const route = { url };
+      const route: { url: URL; data?: unknown } = { url };
       const ret = pattern.exec({ pathname });
       if (ret) {
         const mod = await load();
@@ -215,7 +213,6 @@ async function matchRoute(
               if (res.status !== 200) {
                 return res;
               }
-              // @ts-ignore
               route.data = await res.json();
             }
           }

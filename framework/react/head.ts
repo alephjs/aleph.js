@@ -18,7 +18,7 @@ export const Head: FC = (props) => {
   ]);
 
   if (ssrHeadCollection) {
-    els.forEach(({ type, props }, key) => {
+    els.forEach(({ type, props }) => {
       const { children, ...rest } = props;
       if (type === "title") {
         if (util.isFilledString(children)) {
@@ -76,8 +76,8 @@ export const Head: FC = (props) => {
 
 function parse(
   node: ReactNode,
-): [{ type: string; props: Record<string, any> }[], ReactNode[]] {
-  const els: { type: string; props: Record<string, any> }[] = [];
+): [{ type: string; props: Record<string, unknown> }[], ReactNode[]] {
+  const els: { type: string; props: Record<string, unknown> }[] = [];
   const forwardNodes: ReactNode[] = [];
   const parseFn = (node: ReactNode) => {
     Children.forEach(node, (child) => {
@@ -85,7 +85,7 @@ function parse(
         return;
       }
 
-      let { type, props } = child;
+      const { type, props } = child;
       switch (type) {
         case Fragment:
           parseFn(props.children);
@@ -104,7 +104,7 @@ function parse(
         case "style":
           // remove the children prop of base/meta/link
           if (["base", "meta", "link"].includes(type) && "children" in props) {
-            const { children, ...rest } = props;
+            const { children: _, ...rest } = props;
             els.push({ type, props: rest });
           } else {
             els.push({ type, props });

@@ -5,8 +5,8 @@ const styleCacheMap = new Map<string, { css?: string; href?: string }>();
 
 export function applyCSS(url: string, { css, href }: { css?: string; href?: string }) {
   if (!inDeno) {
-    const { document } = window as any;
-    const ssrEl = Array.from<any>(document.head.children).find((el: any) =>
+    const { document } = window;
+    const ssrEl = Array.from<Element>(document.head.children).find((el: Element) =>
       el.getAttribute("data-module-id") === url &&
       el.hasAttribute("ssr")
     );
@@ -14,7 +14,7 @@ export function applyCSS(url: string, { css, href }: { css?: string; href?: stri
       // apply the css at next time
       ssrEl.removeAttribute("ssr");
     } else {
-      const prevEls = Array.from(document.head.children).filter((el: any) => {
+      const prevEls = Array.from(document.head.children).filter((el: Element) => {
         return el.getAttribute("data-module-id") === url;
       });
       const cleanup = () =>
@@ -23,16 +23,15 @@ export function applyCSS(url: string, { css, href }: { css?: string; href?: stri
             prevEls.forEach((el) => document.head.removeChild(el));
           }
         }, 0);
-      let el: any;
+      let el: HTMLStyleElement | HTMLLinkElement;
       if (util.isFilledString(css)) {
         el = document.createElement("style");
-        el.type = "text/css";
         el.appendChild(document.createTextNode(css));
         cleanup();
       } else if (util.isFilledString(href)) {
         el = document.createElement("link");
-        el.rel = "stylesheet";
-        el.href = href;
+        (el as HTMLLinkElement).rel = "stylesheet";
+        (el as HTMLLinkElement).href = href;
         el.onload = cleanup;
       } else {
         throw new Error("applyCSS: missing css");

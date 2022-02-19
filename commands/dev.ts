@@ -134,7 +134,7 @@ if (import.meta.main) {
     if (pathname === "/-/HMR") {
       const { socket, response } = Deno.upgradeWebSocket(req, {});
       const listener = createFSWatchListener();
-      const send = (message: object) => {
+      const send = (message: Record<string, unknown>) => {
         try {
           socket.send(JSON.stringify(message));
         } catch (err) {
@@ -155,7 +155,9 @@ if (import.meta.main) {
             if (type === "hotAccept" && util.isFilledString(specifier)) {
               listener.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
             }
-          } catch (e) {}
+          } catch (_e) {
+            log.error("invlid socket message:", e.data);
+          }
         }
       });
       socket.addEventListener("close", () => {
@@ -164,6 +166,7 @@ if (import.meta.main) {
       return response;
     }
 
+    // deno-lint-ignore ban-ts-comment
     // @ts-ignore
     return globalThis.__ALEPH_SERVER_HANDLER(req);
   };

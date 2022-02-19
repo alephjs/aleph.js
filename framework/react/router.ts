@@ -9,25 +9,33 @@ export type RouterProps = {
   readonly ssr?: SSRContext;
 };
 
+type PegeProps = {
+  url: URL;
+};
+
 export const Router: FC<RouterProps> = ({ ssr }) => {
-  const [url, setUrl] = useState<URL & { _component?: FC<any> }>(() =>
+  const [url, setUrl] = useState<URL & { _component?: FC<PegeProps> }>(() =>
     ssr?.url || new URL(globalThis.location?.href || "http://localhost/")
   );
-  const dataCache = useMemo<any>(() => {
+  const dataCache = useMemo(() => {
     const cache = new Map();
     const [data, expires] = ssr ? [ssr.data, ssr.dataExpires] : loadSSRDataFromTag();
     cache.set(url.pathname + url.search, { data, expires });
     return cache;
   }, []);
-  const Component = useMemo<FC<any>>(
-    () => ssr?.moduleDefaultExport || (globalThis as any).__ssrModuleDefaultExport || url._component || E404Page,
+  const Component = useMemo<FC<PegeProps>>(
+    () =>
+      ssr?.moduleDefaultExport as FC ||
+      (globalThis as Record<string, unknown>).__ssrModuleDefaultExport ||
+      url._component ||
+      E404Page,
     [url],
   );
 
   useEffect(() => {
     // remove ssr head elements
     const { head } = globalThis.document;
-    Array.from(head.children).forEach((el: any) => {
+    Array.from(head.children).forEach((el: Element) => {
       if (el.hasAttribute("ssr")) {
         head.removeChild(el);
       }
@@ -38,7 +46,7 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
       // todo: load comonent
       setUrl(url);
       if (e.resetScroll) {
-        (window as any).scrollTo(0, 0);
+        window.scrollTo(0, 0);
       }
     });
   }, []);
@@ -62,14 +70,14 @@ export const useRouter = (): { url: URL } => {
   return { url };
 };
 
-function loadSSRDataFromTag(): [any, number | undefined] {
+function loadSSRDataFromTag(): [unknown, number | undefined] {
   const ssrDataEl = self.document?.getElementById("aleph-ssr-data");
   if (ssrDataEl) {
     try {
       const ssrData = JSON.parse(ssrDataEl.innerText);
       const expires = ssrDataEl.getAttribute("data-expires");
       return [ssrData, parseInt(expires || "") || undefined];
-    } catch (e) {
+    } catch (_e) {
       console.error("ssr-data: invalid JSON");
     }
   }

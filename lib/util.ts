@@ -1,11 +1,11 @@
 export default {
-  isFilledString(a: any): a is string {
+  isFilledString(a: unknown): a is string {
     return typeof a === "string" && a.length > 0;
   },
-  isFilledArray(a: any): a is Array<any> {
+  isFilledArray(a: unknown): a is Array<unknown> {
     return Array.isArray(a) && a.length > 0;
   },
-  isPlainObject<T = Record<string, any>>(a: any): a is T {
+  isPlainObject<T = Record<string, unknown>>(a: unknown): a is T {
     return typeof a === "object" && a !== null && !Array.isArray(a) && Object.getPrototypeOf(a) === Object.prototype;
   },
   isLikelyHttpURL(s: string): boolean {
@@ -72,16 +72,24 @@ export default {
   cleanPath(path: string): string {
     return "/" + this.splitPath(path).join("/");
   },
-  debounce<T extends Function>(callback: T, delay: number): T {
-    let timer: number | null = null;
-    return ((...args: any[]) => {
+  debounce<Args extends unknown[], F extends (...args: Args) => void>(
+    fn: F,
+    delay: number,
+  ): DebouncedFunction<Args, F> {
+    let timer: number | null;
+    function debounced(this: ThisParameterType<F>, ...args: Parameters<F>): void {
       if (timer !== null) {
         clearTimeout(timer);
       }
       timer = setTimeout(() => {
         timer = null;
-        callback(...args);
+        fn(...args);
       }, delay);
-    }) as any;
+    }
+    return debounced;
   },
 };
+
+export interface DebouncedFunction<Args extends unknown[], F extends (...args: Args) => void> {
+  (this: ThisParameterType<F>, ...args: Parameters<F>): void;
+}

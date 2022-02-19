@@ -94,7 +94,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
       }
     }
 
-    const ctx: Record<string | symbol, any> = {};
+    const ctx: Record<string, unknown> = {};
 
     // use middlewares
     if (Array.isArray(middlewares)) {
@@ -179,6 +179,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
         return new Response("Not found", { status: 404 });
     }
 
+    // deno-lint-ignore no-explicit-any
     let indexHtml: string | null | undefined = (globalThis as any).__ALEPH_INDEX_HTML;
     if (indexHtml === undefined) {
       try {
@@ -200,7 +201,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
 
     // cache indexHtml to global(memory) in production env
     if (!isDev) {
-      (globalThis as any).__ALEPH_INDEX_HTML = indexHtml;
+      Object.assign(globalThis, { __ALEPH_INDEX_HTML: indexHtml });
     }
 
     if (indexHtml === null) {
@@ -212,7 +213,9 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
 
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {
     // support deno deploy
-    self.addEventListener("fetch", (e: any) => {
+    self.addEventListener("fetch", (e) => {
+      // deno-lint-ignore ban-ts-comment
+      // @ts-ignore
       e.respondWith(handler(e.request));
     });
   } else {

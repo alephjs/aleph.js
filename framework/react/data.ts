@@ -11,14 +11,14 @@ export type UpdateStrategy<T> = "none" | "replace" | {
   onFailure?: (error: FetchError) => void;
 };
 
-export const useData = <T = any>(path?: string): DataState<T> & { mutation: typeof mutation } => {
+export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: typeof mutation } => {
   const { dataCache, url: routeUrl } = useContext(MainContext);
   const dataUrl = useMemo(() => path || (routeUrl.pathname + routeUrl.search), [path, routeUrl]);
   const [dataStore, setDataStore] = useState<DataState<T>>(() => {
     if (dataCache.has(dataUrl)) {
       const { data, expires } = dataCache.get(dataUrl)!;
       if (!expires || Date.now() < expires) {
-        return { data };
+        return { data: data as T };
       }
     }
     return {};
@@ -47,7 +47,6 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
       const message = await res.text();
       const error: FetchError = { method, status: res.status, message };
       if (optimistic) {
-        // @ts-ignore
         setDataStore({ data: rollback.data });
         update.onFailure?.(error);
       } else {
@@ -62,7 +61,6 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
         location.href = redirectUrl;
       }
       if (optimistic) {
-        // @ts-ignore
         setDataStore({ data: rollback.data });
       } else {
         setDataStore(({ data }) => ({ data }));
@@ -77,7 +75,6 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
       } catch (err) {
         const error: FetchError = { method, status: 0, message: "Invalid JSON data: " + err.message };
         if (optimistic) {
-          // @ts-ignore
           setDataStore({ data: rollback.data });
           update.onFailure?.(error);
         } else {
@@ -92,16 +89,16 @@ export const useData = <T = any>(path?: string): DataState<T> & { mutation: type
   }, []);
   const mutation = useMemo(() => {
     return {
-      post: async (data?: unknown, update?: UpdateStrategy<T>) => {
+      post: (data?: unknown, update?: UpdateStrategy<T>) => {
         return action("post", jsonFetch("post", data, path), update ?? "none");
       },
-      put: async (data?: unknown, update?: UpdateStrategy<T>) => {
+      put: (data?: unknown, update?: UpdateStrategy<T>) => {
         return action("put", jsonFetch("put", data, path), update ?? "none");
       },
-      patch: async (data?: unknown, update?: UpdateStrategy<T>) => {
+      patch: (data?: unknown, update?: UpdateStrategy<T>) => {
         return action("patch", jsonFetch("patch", data, path), update ?? "none");
       },
-      delete: async (params?: Record<string, string>, update?: UpdateStrategy<T>) => {
+      delete: (params?: Record<string, string>, update?: UpdateStrategy<T>) => {
         let url = routeUrl;
         if (path) {
           url = new URL(self.location?.href);
@@ -165,6 +162,6 @@ function jsonFetch(method: string, data: unknown, href?: string) {
 }
 
 function clone<T>(obj: T): T {
-  // @ts-ignore
-  return typeof structuredClone === "function" ? structuredClone(obj) : JSON.parse(json.stringify(obj));
+  const win = globalThis as Record<string, unknown>;
+  return typeof win.structuredClone === "function" ? win.structuredClone(obj) : JSON.parse(JSON.stringify(obj));
 }

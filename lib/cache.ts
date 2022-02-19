@@ -39,7 +39,7 @@ export default async function cache(
     try {
       const { headers = {} } = JSON.parse(meta);
       return new Response(content, { headers });
-    } catch (e) {
+    } catch (_e) {
       return new Response(content);
     }
   }

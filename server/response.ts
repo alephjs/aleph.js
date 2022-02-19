@@ -21,28 +21,26 @@ export function content(
   contentType: string,
   cacheContorl?: CacheControl | "immutable" | "no-cache",
 ): Response {
-  let cc: any;
+  const headers = new Headers({ "Content-Type": contentType });
   if (cacheContorl) {
     if (cacheContorl === "no-cache") {
-      cc = "no-chche";
+      headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
     } else if (cacheContorl === "immutable") {
-      cc = "public, max-age=31536000, immutable";
+      headers.set("Cache-Control", "public, max-age=31536000, immutable");
     } else {
       const { maxAge, sMaxAge, immutable, mustRevalidate } = cacheContorl;
-      cc = [
-        cacheContorl.public && "public",
-        cacheContorl.private && "private",
-        maxAge && `max-age=${maxAge}`,
-        sMaxAge && `s-maxage=${sMaxAge}`,
-        immutable && "immutable",
-        mustRevalidate && "must-revalidate",
-      ].filter(Boolean).join(", ");
+      headers.set(
+        "Cache-Control",
+        [
+          cacheContorl.public && "public",
+          cacheContorl.private && "private",
+          maxAge && `max-age=${maxAge}`,
+          sMaxAge && `s-maxage=${sMaxAge}`,
+          immutable && "immutable",
+          mustRevalidate && "must-revalidate",
+        ].filter(Boolean).join(", "),
+      );
     }
   }
-  return new Response(content, {
-    headers: {
-      "content-type": contentType,
-      "cache-control": cc,
-    },
-  });
+  return new Response(content, { headers });
 }

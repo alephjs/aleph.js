@@ -13,8 +13,8 @@ events.once("routerstate", (state) => {
   Object.assign(routerState, state);
 });
 
-export async function redirect(url: string, replace?: boolean) {
-  const { location, history } = window as any;
+export function redirect(url: string, replace?: boolean) {
+  const { location, history } = window;
 
   if (!util.isFilledString(url)) {
     return;

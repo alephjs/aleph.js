@@ -5,9 +5,9 @@ import events from "./events.ts";
 
 class Module {
   private _specifier: string;
-  private _isAccepted: boolean = false;
-  private _isDeclined: boolean = false;
-  private _isLocked: boolean = false;
+  private _isAccepted = false;
+  private _isDeclined = false;
+  private _isLocked = false;
   private _acceptCallbacks: CallableFunction[] = [];
 
   constructor(specifier: string) {
@@ -45,7 +45,7 @@ class Module {
       const url = this._specifier.slice(1) + (this._specifier.endsWith(".css") ? "?module&" : "?") + "t=" + Date.now();
       const module = await import(url);
       this._acceptCallbacks.forEach((cb) => cb({ module }));
-    } catch (e) {
+    } catch (_e) {
       location.reload();
     }
   }
@@ -62,11 +62,11 @@ export default function createHotContext(specifier: string) {
   return mod;
 }
 
-let modules: Map<string, Module> = new Map();
-let messageQueue: string[] = [];
+const modules: Map<string, Module> = new Map();
+const messageQueue: string[] = [];
 let conn: WebSocket | null = null;
 
-function sendMessage(msg: any) {
+function sendMessage(msg: Record<string, unknown>) {
   const json = JSON.stringify(msg);
   if (!conn || conn.readyState !== WebSocket.OPEN) {
     messageQueue.push(json);
@@ -76,7 +76,7 @@ function sendMessage(msg: any) {
 }
 
 function connect() {
-  const { location } = window as any;
+  const { location } = window;
   const { protocol, host } = location;
   const wsUrl = (protocol === "https:" ? "wss" : "ws") + "://" + host + "/-/HMR";
   const ws = new WebSocket(wsUrl);
@@ -119,23 +119,27 @@ function connect() {
           return;
         }
         switch (type) {
-          case "add":
+          case "add": {
             if (routePattern) {
               events.emit("add-route", { pattern: routePattern, specifier });
             }
             break;
-          case "modify":
+          }
+          case "modify": {
             const mod = modules.get(specifier);
             if (mod) {
               mod.applyUpdate();
             }
             break;
+          }
           case "remove":
-            if (modules.has(specifier)) {
-              modules.delete(specifier);
-            }
-            if (routePattern) {
-              events.emit("remove-route", specifier);
+            {
+              if (modules.has(specifier)) {
+                modules.delete(specifier);
+              }
+              if (routePattern) {
+                events.emit("remove-route", specifier);
+              }
             }
             break;
         }

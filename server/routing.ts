@@ -3,14 +3,14 @@ import log, { dim } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { RouteConfig } from "../types.d.ts";
 
-const routeModules: Map<string, any> = new Map();
+const routeModules: Map<string, unknown> = new Map();
 
-export async function register(filename: string, module: any) {
+export function register(filename: string, module: unknown) {
   routeModules.set(filename, module);
 }
 
 export function isRouteFile(filename: string): boolean {
-  const { __ALEPH_ROUTES: routes } = globalThis as any;
+  const { __ALEPH_ROUTES: routes } = globalThis as Record<string, unknown>;
   if (Array.isArray(routes)) {
     return routes.findIndex((r) => r[2].filename === filename) !== -1;
   }
@@ -18,15 +18,15 @@ export function isRouteFile(filename: string): boolean {
 }
 
 export async function getRoutes(glob: string): Promise<RouteConfig[]> {
-  const global = globalThis as any;
+  const global = globalThis as Record<string, unknown>;
   if (global.__ALEPH_ROUTES) {
-    return global.__ALEPH_ROUTES;
+    return global.__ALEPH_ROUTES as RouteConfig[];
   }
 
   const reg = globToRegExp(glob);
   const cwd = Deno.cwd();
   const files = await getFiles(cwd, (filename) => reg.test(filename));
-  const routes = await Promise.all(files.map(async (filename): Promise<RouteConfig> => {
+  const routes = files.map((filename) => {
     const [prefix] = glob.split("*");
     const p = "/" + util.splitPath(util.trimPrefix(filename, util.trimSuffix(prefix, "/"))).map((part) => {
       part = part.toLowerCase();
@@ -39,11 +39,12 @@ export async function getRoutes(glob: string): Promise<RouteConfig[]> {
     }).join("/");
     const pathname = util.trimSuffix(util.trimSuffix(p, extname(p)), "/index") || "/";
     log.debug(dim("[route]"), pathname);
-    return [
+    return <RouteConfig> [
+      // deno-lint-ignore ban-ts-comment
       // @ts-ignore
       new URLPattern({ pathname }),
       async () => {
-        let mod: any;
+        let mod: unknown;
         if (routeModules.has(filename)) {
           mod = routeModules.get(filename);
         } else {
@@ -56,7 +57,7 @@ export async function getRoutes(glob: string): Promise<RouteConfig[]> {
       },
       { pattern: { pathname }, filename },
     ];
-  }));
+  });
   global.__ALEPH_ROUTES = routes;
   return routes;
 }

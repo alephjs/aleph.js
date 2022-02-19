@@ -24,12 +24,12 @@ export interface IURLPattern {
 
 export type RouteConfig = [
   IURLPattern,
-  () => Promise<{ default?: unknown; data?: Record<string, any> }>,
+  () => Promise<{ default?: unknown; data?: Record<string, unknown> }>,
   { filename: string; pattern: { host?: string; pathname: string } },
 ];
 
 export type Fetcher = {
-  (request: Request, context: any): Promise<Response | void> | Response | void;
+  (request: Request, context: Record<string, unknown>): Promise<Response | void> | Response | void;
 };
 
 export type Middleware = Fetcher | { fetch: Fetcher };
@@ -37,7 +37,7 @@ export type Middleware = Fetcher | { fetch: Fetcher };
 export type SSRContext = {
   readonly url: URL;
   readonly headCollection: string[];
-  readonly moduleDefaultExport?: any;
-  readonly data?: any;
+  readonly moduleDefaultExport?: unknown;
+  readonly data?: unknown;
   readonly dataExpires?: number;
 };

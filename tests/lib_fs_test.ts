@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertNotEquals } from "std/testing/asserts.ts";
+import { assert, assertEquals } from "std/testing/asserts.ts";
 import { SEP } from "std/path/separator.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
 

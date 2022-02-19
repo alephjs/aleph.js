@@ -4,13 +4,7 @@ import init, {
   transformCSS as parcelCSS,
 } from "./dist/compiler.js";
 import getWasmData from "./dist/wasm.js";
-import {
-  InlineStyleExpr,
-  TransformCSSOptions,
-  TransformCSSResult,
-  TransformOptions,
-  TransformResult,
-} from "./types.d.ts";
+import { TransformCSSOptions, TransformCSSResult, TransformOptions, TransformResult } from "./types.d.ts";
 
 let wasmReady: Promise<void> | boolean = false;
 
