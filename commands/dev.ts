@@ -7,7 +7,7 @@ import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { serve } from "../server/mod.ts";
-import { parseRoutes, toRoutingRegExp } from "../server/routing.ts";
+import { initRoutes, toRoutingRegExp } from "../server/routing.ts";
 import { clientDependencyGraph, serveAppModules, serverDependencyGraph } from "../server/transformer.ts";
 import { AlephConfig } from "../types.d.ts";
 
@@ -127,7 +127,7 @@ if (import.meta.main) {
     if (config && config.routeFiles) {
       const reg = toRoutingRegExp(config.routeFiles);
       if (reg.test(specifier)) {
-        parseRoutes(reg);
+        initRoutes(reg);
       }
     }
   };

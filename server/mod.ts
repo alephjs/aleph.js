@@ -6,7 +6,7 @@ import util from "../lib/util.ts";
 import type { ServerOptions } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
-import { parseRoutes } from "./routing.ts";
+import { initRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
 import { clientModuleTransformer } from "./transformer.ts";
@@ -23,7 +23,7 @@ export const serve = (options: ServerOptions = {}) => {
       return util.toHex(await crypto.subtle.digest("sha-1", (new TextEncoder()).encode(buildArgs)));
     },
   );
-  const routesPromise = config?.routeFiles ? parseRoutes(config.routeFiles) : Promise.resolve([]);
+  const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
   const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const { pathname } = url;

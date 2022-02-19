@@ -24,7 +24,7 @@ export function isRouteFile(filename: string): boolean {
   return false;
 }
 
-export async function parseRoutes(config: string | RoutesConfig | RoutingRegExp): Promise<Route[]> {
+export async function initRoutes(config: string | RoutesConfig | RoutingRegExp): Promise<Route[]> {
   const reg = isRoutingRegExp(config) ? config : toRoutingRegExp(config);
   const files = await getFiles(join(Deno.cwd(), reg.prefix));
   const routes: Route[] = [];
