@@ -113,15 +113,11 @@ function connect() {
   ws.addEventListener("message", ({ data }: { data?: string }) => {
     if (data) {
       try {
-        const { type, specifier, routePattern, refreshPage } = JSON.parse(data);
-        if (refreshPage === true) {
-          location.reload();
-          return;
-        }
+        const { type, specifier, routePattern } = JSON.parse(data);
         switch (type) {
-          case "add": {
+          case "create": {
             if (routePattern) {
-              events.emit("add-route", { pattern: routePattern, specifier });
+              events.emit("create-route", { pattern: routePattern, specifier });
             }
             break;
           }

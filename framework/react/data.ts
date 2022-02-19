@@ -162,6 +162,7 @@ function jsonFetch(method: string, data: unknown, href?: string) {
 }
 
 function clone<T>(obj: T): T {
-  const win = globalThis as Record<string, unknown>;
-  return typeof win.structuredClone === "function" ? win.structuredClone(obj) : JSON.parse(JSON.stringify(obj));
+  // deno-lint-ignore ban-ts-comment
+  // @ts-ignore
+  return typeof structuredClone === "function" ? structuredClone(obj) : JSON.parse(JSON.stringify(obj));
 }

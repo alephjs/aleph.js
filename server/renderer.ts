@@ -5,14 +5,14 @@ import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import log from "../lib/log.ts";
 import { toLocalPath } from "../lib/path.ts";
 import util from "../lib/util.ts";
-import type { RouteConfig, SSRContext } from "../types.d.ts";
+import type { Route, SSRContext } from "../types.d.ts";
 import { getAlephPkgUri } from "./config.ts";
 
 let lolHtmlReady = false;
 
 export type RenderOptions = {
   indexHtml: string;
-  routes: RouteConfig[];
+  routes: Route[];
   isDev: boolean;
   ssrHandler?: (ctx: SSRContext) => string | null | undefined;
 };
@@ -174,7 +174,7 @@ export default {
   },
 };
 
-async function matchRoute(req: Request, ctx: Record<string, unknown>, routes: RouteConfig[]): Promise<
+async function matchRoute(req: Request, ctx: Record<string, unknown>, routes: Route[]): Promise<
   Response | { url: URL; moduleDefaultExport?: unknown; filename?: string; data?: unknown; dataExpires?: number }
 > {
   const url = new URL(req.url);
@@ -185,36 +185,35 @@ async function matchRoute(req: Request, ctx: Record<string, unknown>, routes: Ro
       const ret = pattern.exec({ pathname });
       if (ret) {
         const mod = await load();
+        const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
         Object.assign(route, {
           url: util.appendUrlParams(url, ret.pathname.groups),
           moduleDefaultExport: mod.default,
-          dataExpires: mod.data?.cacheTtl,
+          dataExpires: dataConfig?.cacheTtl,
           filename: meta.filename,
         });
-        const request = new Request(route.url.toString(), req);
-        if (mod.data) {
-          const fetcher = mod.data.get;
-          if (typeof fetcher === "function") {
-            const allFetcher = mod.data.all;
-            if (typeof allFetcher === "function") {
-              let res = allFetcher(request);
-              if (res instanceof Promise) {
-                res = await res;
-              }
-              if (res instanceof Response) {
-                return res;
-              }
-            }
-            let res = fetcher(request, ctx);
+        const fetcher = dataConfig.get;
+        if (typeof fetcher === "function") {
+          const request = new Request(route.url.toString(), req);
+          const allFetcher = dataConfig.all;
+          if (typeof allFetcher === "function") {
+            let res = allFetcher(request);
             if (res instanceof Promise) {
               res = await res;
             }
             if (res instanceof Response) {
-              if (res.status !== 200) {
-                return res;
-              }
-              route.data = await res.json();
+              return res;
             }
+          }
+          let res = fetcher(request, ctx);
+          if (res instanceof Promise) {
+            res = await res;
+          }
+          if (res instanceof Response) {
+            if (res.status !== 200) {
+              return res;
+            }
+            route.data = await res.json();
           }
         }
       }

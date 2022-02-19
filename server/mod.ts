@@ -3,39 +3,16 @@ import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import type { AlephConfig, Fetcher, Middleware, SSRContext } from "../types.d.ts";
+import type { ServerOptions } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
-import { getRoutes } from "./routing.ts";
+import { parseRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
 import { clientModuleTransformer } from "./transformer.ts";
 
-export type ServerOptions = {
-  config?: AlephConfig;
-  middlewares?: Middleware[];
-  fetch?: Fetcher;
-  ssr?: (ctx: SSRContext) => string | null | undefined;
-};
-
-export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) => {
-  // inject browser navigator polyfill
-  Object.assign(globalThis.navigator, {
-    connection: {
-      downlink: 10,
-      effectiveType: "4g",
-      onchange: null,
-      rtt: 50,
-      saveData: false,
-    },
-    cookieEnabled: false,
-    language: "en",
-    languages: ["en"],
-    onLine: true,
-    userAgent: `Deno/${Deno.version?.deno || "deploy"}`,
-    vendor: "Deno Land Inc.",
-  });
-
+export const serve = (options: ServerOptions = {}) => {
+  const { config, middlewares, fetch, ssr } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const jsxConfigPromise = loadJSXConfig();
   const importMapPromise = loadImportMap();
@@ -46,6 +23,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
       return util.toHex(await crypto.subtle.digest("sha-1", (new TextEncoder()).encode(buildArgs)));
     },
   );
+  const routesPromise = config?.routeFiles ? parseRoutes(config.routeFiles) : Promise.resolve([]);
   const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const { pathname } = url;
@@ -55,13 +33,18 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
       builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
       pathname.endsWith(".css")
     ) {
+      const [buildArgsHash, jsxConfig, importMap] = await Promise.all([
+        buildArgsHashPromise,
+        jsxConfigPromise,
+        importMapPromise,
+      ]);
       return clientModuleTransformer.fetch(req, {
         isDev,
-        atomicCSS: config?.atomicCSS,
         buildTarget,
-        buildArgsHash: await buildArgsHashPromise,
-        importMap: await importMapPromise,
-        jsxConfig: await jsxConfigPromise,
+        buildArgsHash,
+        importMap,
+        jsxConfig,
+        atomicCSS: config?.atomicCSS,
       });
     }
 
@@ -99,12 +82,9 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
     // use middlewares
     if (Array.isArray(middlewares)) {
       for (const mw of middlewares) {
-        let fetcher = mw;
-        if (util.isPlainObject<{ fetch: Fetcher }>(mw)) {
-          fetcher = mw.fetch;
-        }
-        if (typeof fetcher === "function") {
-          let res = fetcher(req, ctx);
+        const handler = mw.fetch;
+        if (typeof handler === "function") {
+          let res = handler(req, ctx);
           if (res instanceof Promise) {
             res = await res;
           }
@@ -127,21 +107,19 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
     }
 
     // request page data
-    const routes = config?.routeFiles ? await getRoutes(config.routeFiles) : [];
+    const routes = await routesPromise;
     if (routes.length > 0) {
       for (const [pattern, load] of routes) {
         const ret = pattern.exec({ pathname });
         if (ret) {
           try {
             const mod = await load();
-            if (
-              mod.data &&
-              (req.method !== "GET" || mod.default === undefined || req.headers.has("X-Fetch-Data"))
-            ) {
-              const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
-              const fetcher = mod.data[req.method.toLowerCase()];
+            const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
+            if (req.method !== "GET" || mod.default === undefined || req.headers.has("X-Fetch-Data")) {
+              const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
-                const allFetcher = mod.data.all;
+                const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
+                const allFetcher = dataConfig.all;
                 if (typeof allFetcher === "function") {
                   let res = allFetcher(request);
                   if (res instanceof Promise) {
@@ -179,8 +157,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
         return new Response("Not found", { status: 404 });
     }
 
-    // deno-lint-ignore no-explicit-any
-    let indexHtml: string | null | undefined = (globalThis as any).__ALEPH_INDEX_HTML;
+    let indexHtml: string | null | undefined = Reflect.get(globalThis, "__ALEPH_INDEX_HTML");
     if (indexHtml === undefined) {
       try {
         indexHtml = await Deno.readTextFile("./index.html");
@@ -201,7 +178,7 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
 
     // cache indexHtml to global(memory) in production env
     if (!isDev) {
-      Object.assign(globalThis, { __ALEPH_INDEX_HTML: indexHtml });
+      Reflect.set(globalThis, "__ALEPH_INDEX_HTML", indexHtml);
     }
 
     if (indexHtml === null) {
@@ -211,16 +188,35 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
     return renderer.fetch(req, ctx, { indexHtml, routes, ssrHandler: ssr, isDev });
   };
 
+  // inject browser navigator polyfill
+  Object.assign(globalThis.navigator, {
+    connection: {
+      downlink: 10,
+      effectiveType: "4g",
+      onchange: null,
+      rtt: 50,
+      saveData: false,
+    },
+    cookieEnabled: false,
+    language: "en",
+    languages: ["en"],
+    onLine: true,
+    userAgent: `Deno/${Deno.version?.deno || "deploy"}`,
+    vendor: "Deno Land Inc.",
+  });
+
+  // support deno deploy
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {
-    // support deno deploy
     self.addEventListener("fetch", (e) => {
       // deno-lint-ignore ban-ts-comment
       // @ts-ignore
       e.respondWith(handler(e.request));
     });
-  } else {
-    Object.assign(globalThis, { __ALEPH_SERVER_HANDLER: handler });
+    return;
   }
+
+  Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
+  Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
 };
 
 export { content, json };

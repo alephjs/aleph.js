@@ -1,13 +1,19 @@
 import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.24.4";
 
-export { AtomicCSSConfig };
-
 export type AlephConfig = {
-  routeFiles?: string;
+  routeFiles?: string | RoutesConfig;
+  build?: BuildOptions;
   atomicCSS?: AtomicCSSConfig;
-  build?: {
-    target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
-  };
+};
+
+export type RoutesConfig = {
+  dir: string;
+  exts: string[];
+  host?: boolean;
+};
+
+export type BuildOptions = {
+  target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
 };
 
 export type JSXConfig = {
@@ -15,24 +21,13 @@ export type JSXConfig = {
   jsxImportSource?: string;
 };
 
-export interface IURLPattern {
-  exec(input: { host?: string; pathname: string }): {
-    host: { groups: Record<string, string> };
-    pathname: { groups: Record<string, string> };
-  };
-}
-
-export type RouteConfig = [
-  IURLPattern,
-  () => Promise<{ default?: unknown; data?: Record<string, unknown> }>,
-  { filename: string; pattern: { host?: string; pathname: string } },
-];
-
-export type Fetcher = {
+export type FetchHandler = {
   (request: Request, context: Record<string, unknown>): Promise<Response | void> | Response | void;
 };
 
-export type Middleware = Fetcher | { fetch: Fetcher };
+export interface Middleware {
+  fetch: FetchHandler;
+}
 
 export type SSRContext = {
   readonly url: URL;
@@ -41,3 +36,38 @@ export type SSRContext = {
   readonly data?: unknown;
   readonly dataExpires?: number;
 };
+
+export type ServerOptions = {
+  config?: AlephConfig;
+  middlewares?: Middleware[];
+  fetch?: FetchHandler;
+  ssr?: (ctx: SSRContext) => string | null | undefined;
+};
+
+export type RoutePattern = {
+  host?: string;
+  pathname: string;
+};
+
+export type RoutingRegExp = {
+  prefix: string;
+  test(filename: string): boolean;
+  exec(filename: string): RoutePattern | null;
+};
+
+export interface IURLPattern {
+  exec(input: { host?: string; pathname: string }): {
+    [key in "host" | "pathname"]: { groups: Record<string, string> };
+  };
+}
+
+export type Route = [
+  // pattern
+  IURLPattern,
+  // loader
+  () => Promise<Record<string, unknown>>,
+  // meta
+  { filename: string; pattern: RoutePattern },
+];
+
+export { AtomicCSSConfig };

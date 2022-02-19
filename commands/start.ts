@@ -53,17 +53,15 @@ if (import.meta.main) {
     await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?v=${version}`);
   }
 
-  const global = globalThis as Record<string, unknown>;
-  if (global.__ALEPH_SERVER_HANDLER === undefined) {
-    serve(); // make default handler
+  // make the default handler
+  if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
+    serve();
   }
 
   const handler = (req: Request) => {
-    const serverHandler = global.__ALEPH_SERVER_HANDLER;
-    if (typeof serverHandler === "function") {
-      return serverHandler(req);
-    }
+    return Reflect.get(globalThis, "__ALEPH_SERVER_HANDLER")?.(req);
   };
+
   log.info(`Server ready on http://localhost:${port}`);
   if (certFile && keyFile) {
     await serveTls(handler, { port, hostname, certFile, keyFile });

@@ -7,7 +7,9 @@ import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { serve } from "../server/mod.ts";
+import { parseRoutes, toRoutingRegExp } from "../server/routing.ts";
 import { clientDependencyGraph, serveAppModules, serverDependencyGraph } from "../server/transformer.ts";
+import { AlephConfig } from "../types.d.ts";
 
 export const helpMessage = `
 Usage:
@@ -25,6 +27,20 @@ Options:
     -r, --reload                 Reload source code cache
     -h, --help                   Prints help message
 `;
+
+const fsWatchListeners: EventEmitter[] = [];
+const createFSWatchListener = (): EventEmitter => {
+  const e = new EventEmitter();
+  fsWatchListeners.push(e);
+  return e;
+};
+const removeFSWatchListener = (e: EventEmitter) => {
+  e.removeAllListeners();
+  const index = fsWatchListeners.indexOf(e);
+  if (index > -1) {
+    fsWatchListeners.splice(index, 1);
+  }
+};
 
 if (import.meta.main) {
   const { args, options } = parse();
@@ -51,21 +67,8 @@ if (import.meta.main) {
   serveAppModules(6060);
   log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
 
-  /** create a fs watcher.  */
-  const fsWatchListeners: EventEmitter[] = [];
-  const createFSWatchListener = (): EventEmitter => {
-    const e = new EventEmitter();
-    fsWatchListeners.push(e);
-    return e;
-  };
-  const removeFSWatchListener = (e: EventEmitter) => {
-    e.removeAllListeners();
-    const index = fsWatchListeners.indexOf(e);
-    if (index > -1) {
-      fsWatchListeners.splice(index, 1);
-    }
-  };
-  watchFs(workingDir, (path, kind) => {
+  log.info(`Watching files for changes...`);
+  watchFs(workingDir, (kind, path) => {
     const specifier = "./" + relative(workingDir, path);
     if (kind === "remove") {
       clientDependencyGraph.unmark(specifier);
@@ -91,7 +94,6 @@ if (import.meta.main) {
       });
     }
   });
-  log.info(`Watching files for changes...`);
 
   const fswListener = createFSWatchListener();
   const watchFile = async (filename: string) => {
@@ -101,7 +103,7 @@ if (import.meta.main) {
     fswListener.on(evtName, importServer);
     return stat.mtime?.getTime().toString(16) + "-" + stat.size.toString(16);
   };
-  const importServer = async (): Promise<void> => {
+  const importServer = async (forceUpdate = false): Promise<void> => {
     const cwd = Deno.cwd();
     const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
       findFile(cwd, ["deno.jsonc", "deno.json", "tsconfig.json"]),
@@ -116,59 +118,40 @@ if (import.meta.main) {
       if (importMapFile) {
         hash += "-" + await watchFile(importMapFile);
       }
+      if (forceUpdate) {
+        hash += "-" + Date.now().toString(16);
+      }
       await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?hash=${hash}`);
-      log.debug(`Import server handler from ${basename(serverEntry)}(${hash})`);
+      log.info(`Server handler imported from ${basename(serverEntry)}`);
     }
   };
+  const updateRoutes = (specifier: string) => {
+    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+    if (config && config.routeFiles) {
+      const reg = toRoutingRegExp(config.routeFiles);
+      if (reg.test(specifier)) {
+        parseRoutes(reg);
+      }
+    }
+  };
+  fswListener.on("create", updateRoutes);
+  fswListener.on("remove", updateRoutes);
   importServer();
 
   // make the default handler
-  if (!("__ALEPH_SERVER_HANDLER" in globalThis)) {
+  if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
     serve();
   }
 
   const handler = (req: Request) => {
     const { pathname } = new URL(req.url);
 
-    // handle HMR socket
+    // handle HMR sockets
     if (pathname === "/-/HMR") {
-      const { socket, response } = Deno.upgradeWebSocket(req, {});
-      const listener = createFSWatchListener();
-      const send = (message: Record<string, unknown>) => {
-        try {
-          socket.send(JSON.stringify(message));
-        } catch (err) {
-          log.warn("socket.send:", err.message);
-        }
-      };
-      socket.addEventListener("open", () => {
-        listener.on("add", (specifier: string) => send({ type: "add", specifier }));
-        listener.on("remove", (specifier: string) => {
-          listener.removeAllListeners(`hotUpdate:${specifier}`);
-          send({ type: "remove", specifier });
-        });
-      });
-      socket.addEventListener("message", (e) => {
-        if (util.isFilledString(e.data)) {
-          try {
-            const { type, specifier } = JSON.parse(e.data);
-            if (type === "hotAccept" && util.isFilledString(specifier)) {
-              listener.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
-            }
-          } catch (_e) {
-            log.error("invlid socket message:", e.data);
-          }
-        }
-      });
-      socket.addEventListener("close", () => {
-        removeFSWatchListener(listener);
-      });
-      return response;
+      return hmrWS(req);
     }
 
-    // deno-lint-ignore ban-ts-comment
-    // @ts-ignore
-    return globalThis.__ALEPH_SERVER_HANDLER(req);
+    return Reflect.get(globalThis, "__ALEPH_SERVER_HANDLER")?.(req);
   };
 
   log.info(`Server ready on http://localhost:${port}`);
@@ -177,4 +160,50 @@ if (import.meta.main) {
   } else {
     await stdServe(handler, { port, hostname });
   }
+}
+
+function hmrWS(req: Request): Response {
+  const { socket, response } = Deno.upgradeWebSocket(req, {});
+  const listener = createFSWatchListener();
+  const send = (message: Record<string, unknown>) => {
+    try {
+      socket.send(JSON.stringify(message));
+    } catch (err) {
+      log.warn("socket.send:", err.message);
+    }
+  };
+  socket.addEventListener("open", () => {
+    listener.on("create", (specifier: string) => {
+      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+      if (config && config.routeFiles) {
+        const reg = toRoutingRegExp(config.routeFiles);
+        const pattern = reg.exec(specifier);
+        if (pattern) {
+          send({ type: "create", specifier, routePattern: pattern });
+          return;
+        }
+      }
+      send({ type: "create", specifier });
+    });
+    listener.on("remove", (specifier: string) => {
+      listener.removeAllListeners(`hotUpdate:${specifier}`);
+      send({ type: "remove", specifier });
+    });
+  });
+  socket.addEventListener("message", (e) => {
+    if (util.isFilledString(e.data)) {
+      try {
+        const { type, specifier } = JSON.parse(e.data);
+        if (type === "hotAccept" && util.isFilledString(specifier)) {
+          listener.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
+        }
+      } catch (_e) {
+        log.error("invlid socket message:", e.data);
+      }
+    }
+  });
+  socket.addEventListener("close", () => {
+    removeFSWatchListener(listener);
+  });
+  return response;
 }

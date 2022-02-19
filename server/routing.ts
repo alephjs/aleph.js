@@ -1,78 +1,101 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.125.0/path/mod.ts";
-import log, { dim } from "../lib/log.ts";
+import { getFiles } from "../lib/fs.ts";
+import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { RouteConfig } from "../types.d.ts";
+import { AlephConfig, Route, RoutePattern, RoutesConfig, RoutingRegExp } from "../types.d.ts";
 
-const routeModules: Map<string, unknown> = new Map();
+const currentRoutes: Route[] = [];
+const routeModules: Map<string, Record<string, unknown>> = new Map();
 
-export function register(filename: string, module: unknown) {
+export function register(filename: string, module: Record<string, unknown>) {
   routeModules.set(filename, module);
 }
 
 export function isRouteFile(filename: string): boolean {
-  const { __ALEPH_ROUTES: routes } = globalThis as Record<string, unknown>;
-  if (Array.isArray(routes)) {
-    return routes.findIndex((r) => r[2].filename === filename) !== -1;
+  const index = currentRoutes.findIndex((r) => r[2].filename === filename);
+  if (index !== -1) {
+    return true;
+  }
+  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+  if (config && config.routeFiles) {
+    const reg = toRoutingRegExp(config.routeFiles);
+    return reg.test(filename);
   }
   return false;
 }
 
-export async function getRoutes(glob: string): Promise<RouteConfig[]> {
-  const global = globalThis as Record<string, unknown>;
-  if (global.__ALEPH_ROUTES) {
-    return global.__ALEPH_ROUTES as RouteConfig[];
-  }
-
-  const reg = globToRegExp(glob);
-  const cwd = Deno.cwd();
-  const files = await getFiles(cwd, (filename) => reg.test(filename));
-  const routes = files.map((filename) => {
-    const [prefix] = glob.split("*");
-    const p = "/" + util.splitPath(util.trimPrefix(filename, util.trimSuffix(prefix, "/"))).map((part) => {
-      part = part.toLowerCase();
-      if (part.startsWith("[") && part.startsWith("]")) {
-        return ":" + part.slice(1, -1);
-      } else if (part.startsWith("$")) {
-        return ":" + part.slice(1);
-      }
-      return part;
-    }).join("/");
-    const pathname = util.trimSuffix(util.trimSuffix(p, extname(p)), "/index") || "/";
-    log.debug(dim("[route]"), pathname);
-    return <RouteConfig> [
-      // deno-lint-ignore ban-ts-comment
-      // @ts-ignore
-      new URLPattern({ pathname }),
-      async () => {
-        let mod: unknown;
-        if (routeModules.has(filename)) {
-          mod = routeModules.get(filename);
-        } else {
-          const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
-          const importUrl = `http://localhost:${port}${join(cwd, filename)}`;
-          const mtime = (await Deno.lstat(filename)).mtime?.getTime().toString(16);
-          mod = await import(`${importUrl}?v=${mtime}`);
-        }
-        return mod;
-      },
-      { pattern: { pathname }, filename },
-    ];
+export async function parseRoutes(config: string | RoutesConfig | RoutingRegExp): Promise<Route[]> {
+  const reg = isRoutingRegExp(config) ? config : toRoutingRegExp(config);
+  const files = await getFiles(join(Deno.cwd(), reg.prefix));
+  const routes: Route[] = [];
+  files.forEach((file) => {
+    const filename = reg.prefix + file.slice(1);
+    const pattern = reg.exec(filename);
+    if (pattern) {
+      routes.push([
+        // deno-lint-ignore ban-ts-comment
+        // @ts-ignore
+        new URLPattern(pattern),
+        async () => {
+          let mod: Record<string, unknown>;
+          if (routeModules.has(filename)) {
+            mod = routeModules.get(filename)!;
+          } else {
+            const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
+            const importUrl = `http://localhost:${port}${join(Deno.cwd(), filename)}`;
+            const mtime = (await Deno.lstat(filename)).mtime?.getTime().toString(16);
+            mod = await import(`${importUrl}?v=${mtime}`);
+          }
+          return mod;
+        },
+        { pattern, filename },
+      ]);
+    }
   });
-  global.__ALEPH_ROUTES = routes;
+  log.info(`${routes.length || "No"} route${routes.length !== 1 ? "s" : ""} found from ${reg.prefix}`);
+  currentRoutes.splice(0, currentRoutes.length, ...routes);
   return routes;
 }
 
-async function getFiles(dir: string, filter?: (filename: string) => boolean, path: string[] = []): Promise<string[]> {
-  const list: string[] = [];
-  for await (const dirEntry of Deno.readDir(dir)) {
-    if (dirEntry.isDirectory) {
-      list.push(...await getFiles(join(dir, dirEntry.name), filter, [...path, dirEntry.name]));
-    } else {
-      const filename = [".", ...path, dirEntry.name].join("/");
-      if (!filter || filter(filename)) {
-        list.push(filename);
-      }
+export function toRoutingRegExp(config: string | RoutesConfig): RoutingRegExp {
+  const isObject = util.isPlainObject(config);
+  const prefix = "." + util.cleanPath(isObject ? config.dir : config.split("*")[0]);
+  const reg = isObject
+    ? {
+      test(s: string) {
+        return s.startsWith(prefix) &&
+          !!config.exts.find((ext) => ext.startsWith(".") ? s.endsWith(ext) : s.endsWith(`.${ext}`));
+      },
     }
-  }
-  return list;
+    : globToRegExp("./" + util.trimPrefix(util.trimPrefix(config, "/"), "./"));
+  return {
+    prefix,
+    test: (s: string) => reg.test(s),
+    exec: (filename: string): RoutePattern | null => {
+      if (reg.test(filename)) {
+        const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
+          part = part.toLowerCase();
+          if (part.startsWith("[") && part.startsWith("]")) {
+            return ":" + part.slice(1, -1);
+          } else if (part.startsWith("$")) {
+            return ":" + part.slice(1);
+          }
+          return part;
+        });
+        let host: string | undefined = undefined;
+        if (isObject && config.host && parts.length > 1 && parts[0].startsWith("@")) {
+          host = parts.shift()!.slice(1);
+        }
+        const basename = parts.pop()!;
+        const pathname =
+          util.trimSuffix("/" + [...parts, util.trimSuffix(basename, extname(basename))].join("/"), "/index") || "/";
+        return { host, pathname };
+      }
+      return null;
+    },
+  };
+}
+
+function isRoutingRegExp(v: unknown): v is RoutingRegExp {
+  return util.isPlainObject(v) && typeof v.test === "function" && typeof v.exec === "function";
 }
