@@ -101,13 +101,16 @@ export default {
       const alephPkgUri = toLocalPath(getAlephPkgUri());
       const linkHandler = {
         element(el: Element) {
-          const href = el.getAttribute("href");
-          if (href?.startsWith("./")) {
-            el.setAttribute("href", href.slice(1));
-            if (href.endsWith(".css") && isDev) {
+          let href = el.getAttribute("href");
+          if (href) {
+            if (href.startsWith("./")) {
+              href = href.slice(1);
+            }
+            el.setAttribute("href", href);
+            if (href.endsWith(".css") && href.startsWith("/") && isDev) {
               el.after(
                 `<script type="module">import hot from "${alephPkgUri}framework/core/hmr.ts";hot(${
-                  JSON.stringify(href)
+                  JSON.stringify(`.${href}`)
                 }).accept();</script>`,
                 { html: true },
               );

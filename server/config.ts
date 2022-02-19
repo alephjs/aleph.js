@@ -2,6 +2,7 @@ import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import type { ImportMap } from "../compiler/types.d.ts";
 import { findFile } from "../lib/fs.ts";
+import { toLocalPath } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { JSXConfig } from "../types.d.ts";
@@ -22,8 +23,8 @@ export function getAlephPkgUri() {
 }
 
 export async function loadJSXConfig(): Promise<JSXConfig> {
-  const global = globalThis as any;
-  const config: JSXConfig = {};
+  const isDev = Deno.env.get("ALEPH_ENV") === "development";
+  const jsxConfig: JSXConfig = {};
 
   if (Deno.env.get("ALEPH_DEV")) {
     const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
@@ -36,51 +37,48 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
       (jsx === "react-jsx" || jsx === "react-jsxdev") &&
       util.isFilledString(jsxImportSource)
     ) {
-      config.jsxImportSource = jsxImportSource;
-      config.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
+      jsxConfig.jsxImportSource = jsxImportSource;
+      jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
     } else if (jsx === "react") {
-      config.jsxRuntime = compilerOptions.jsxFactory === "h" ? "preact" : "react";
+      jsxConfig.jsxRuntime = compilerOptions.jsxFactory === "h" ? "preact" : "react";
     }
   }
 
-  if (util.isPlainObject(global.__DENO_JSX_CONFIG)) {
-    Object.assign(config, global.__DENO_JSX_CONFIG);
-  } else if (global.__DENO_JSX_CONFIG === undefined) {
-    const jsxConfig: JSXConfig = {};
-    const denoConfigFile = await findFile(Deno.cwd(), ["deno.jsonc", "deno.json", "tsconfig.json"]);
-    if (denoConfigFile) {
-      try {
-        const { compilerOptions } = await parseJSONFile(denoConfigFile);
-        const { jsx, jsxImportSource } = compilerOptions || {};
-        if (
-          (jsx === "react-jsx" || jsx === "react-jsxdev") &&
-          util.isFilledString(jsxImportSource)
-        ) {
-          jsxConfig.jsxImportSource = jsxImportSource;
-          jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
-        } else if (jsx === "react") {
-          jsxConfig.jsxRuntime = compilerOptions.jsxFactory === "h" ? "preact" : "react";
-        }
-      } catch (error) {
-        log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
+  const appJsxConfig: JSXConfig = {};
+  const denoConfigFile = await findFile(Deno.cwd(), ["deno.jsonc", "deno.json", "tsconfig.json"]);
+  if (denoConfigFile) {
+    try {
+      const { compilerOptions } = await parseJSONFile(denoConfigFile);
+      const { jsx, jsxImportSource } = compilerOptions || {};
+      if (
+        (jsx === "react-jsx" || jsx === "react-jsxdev") &&
+        util.isFilledString(jsxImportSource)
+      ) {
+        appJsxConfig.jsxImportSource = jsxImportSource;
+        appJsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
+      } else if (jsx === "react") {
+        appJsxConfig.jsxRuntime = compilerOptions.jsxFactory === "h" ? "preact" : "react";
       }
+    } catch (error) {
+      log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
     }
-    global.__DENO_JSX_CONFIG = jsxConfig;
-    Object.assign(config, jsxConfig);
   }
 
-  return config;
+  Object.assign(jsxConfig, appJsxConfig);
+  if (isDev && jsxConfig.jsxImportSource && util.isLikelyHttpURL(jsxConfig.jsxImportSource)) {
+    jsxConfig.jsxImportSource = toLocalPath(jsxConfig.jsxImportSource);
+  }
+  return jsxConfig;
 }
 
 export async function loadImportMap(): Promise<ImportMap> {
+  const importMap: ImportMap = { imports: {}, scopes: {} };
+
   if (Deno.env.get("ALEPH_DEV")) {
     const alephPkgUri = `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
     const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "import_map.json");
-    const stat = await Deno.stat(jsonFile);
-    const { default: { imports, scopes } } = await import(`${jsonFile}#mtime-${stat.mtime?.getTime()}`, {
-      assert: { type: "json" },
-    });
-    return {
+    const { imports, scopes } = await readImportMap(jsonFile);
+    Object.assign(importMap, {
       imports: {
         ...imports,
         "aleph/": `${alephPkgUri}/`,
@@ -88,30 +86,24 @@ export async function loadImportMap(): Promise<ImportMap> {
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
       },
       scopes,
-    };
-  } else {
-    const global = globalThis as any;
-    if (util.isPlainObject(global.__IMPORT_MAP)) {
-      return { ...global.__IMPORT_MAP };
-    } else if (global.__IMPORT_MAP === undefined) {
-      try {
-        const importMapFile = await findFile(
-          Deno.cwd(),
-          ["import_map", "import-map", "importmap", "importMap"].map((name) => `${name}.json`),
-        );
-        if (importMapFile) {
-          const m = await readImportMap(importMapFile);
-          global.__IMPORT_MAP = m;
-          return m;
-        } else {
-          global.__IMPORT_MAP = null;
-        }
-      } catch (e) {
-        log.error("read import map:", e.message);
-      }
+    });
+  }
+
+  const importMapFile = await findFile(
+    Deno.cwd(),
+    ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`),
+  );
+  if (importMapFile) {
+    try {
+      const { imports, scopes } = await readImportMap(importMapFile);
+      Object.assign(importMap.imports, imports);
+      Object.assign(importMap.scopes, scopes);
+    } catch (e) {
+      log.error("Read import map:", e.message);
     }
   }
-  return { imports: {}, scopes: {} };
+
+  return importMap;
 }
 
 export async function parseJSONFile(jsonFile: string): Promise<any> {

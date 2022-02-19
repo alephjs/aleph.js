@@ -3,11 +3,13 @@ import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
+import type { AlephConfig, Fetcher, Middleware, SSRContext } from "../types.d.ts";
+import { VERSION } from "../version.ts";
+import { loadImportMap, loadJSXConfig } from "./config.ts";
 import { getRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
 import { clientModuleTransformer } from "./transformer.ts";
-import type { AlephConfig, Fetcher, Middleware, SSRContext } from "../types.d.ts";
 
 export type ServerOptions = {
   config?: AlephConfig;
@@ -35,6 +37,15 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
   });
 
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
+  const jsxConfigPromise = loadJSXConfig();
+  const importMapPromise = loadImportMap();
+  const buildTarget = config?.build?.target ?? (isDev ? "es2022" : "es2015");
+  const buildArgsHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(
+    async ([jsxConfig, importMap]) => {
+      const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
+      return util.toHex(await crypto.subtle.digest("sha-1", (new TextEncoder()).encode(buildArgs)));
+    },
+  );
   const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const { pathname } = url;
@@ -44,7 +55,14 @@ export const serve = ({ config, middlewares, fetch, ssr }: ServerOptions = {}) =
       builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
       pathname.endsWith(".css")
     ) {
-      return clientModuleTransformer.fetch(req, { isDev, atomicCSS: config?.atomicCSS });
+      return clientModuleTransformer.fetch(req, {
+        isDev,
+        atomicCSS: config?.atomicCSS,
+        buildTarget,
+        buildArgsHash: await buildArgsHashPromise,
+        importMap: await importMapPromise,
+        jsxConfig: await jsxConfigPromise,
+      });
     }
 
     try {

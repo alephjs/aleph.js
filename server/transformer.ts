@@ -1,12 +1,12 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.24.4";
 import { transform, transformCSS } from "../compiler/mod.ts";
+import type { ImportMap, TransformOptions } from "../compiler/types.d.ts";
 import cache from "../lib/cache.ts";
 import { restoreUrl, toLocalPath } from "../lib/path.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import type { AtomicCSSConfig, JSXConfig } from "../types.d.ts";
-import { VERSION } from "../version.ts";
-import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "./config.ts";
+import { getAlephPkgUri } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
 
@@ -47,22 +47,26 @@ export async function serveAppModules(port: number) {
 
 type TransformeOptions = {
   isDev: boolean;
+  buildTarget: TransformOptions["target"];
+  buildArgsHash: string;
+  jsxConfig: JSXConfig;
+  importMap: ImportMap;
   atomicCSS?: AtomicCSSConfig;
 };
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformeOptions): Promise<Response> => {
-    const { isDev, atomicCSS } = options;
+    const { isDev, buildArgsHash } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
     const isCSS = pathname.endsWith(".css");
-    const jsxConfig: JSXConfig = isJSX ? await loadJSXConfig() : {};
     const [rawCode, mtime] = await readCode(specifier);
-    const buildArgs = VERSION + JSON.stringify(jsxConfig) + JSON.stringify(atomicCSS) + isDev;
     const etag = mtime
-      ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${(await computeHash(buildArgs)).slice(0, 8)}`
-      : await computeHash(rawCode + buildArgs);
+      ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${
+        rawCode.charCodeAt(Math.floor(rawCode.length / 2)).toString(16)
+      }${buildArgsHash.slice(0, 8)}`
+      : util.toHex(await crypto.subtle.digest("sha-1", enc.encode(rawCode + buildArgsHash)));
     if (req.headers.get("If-None-Match") === etag) {
       return new Response(null, { status: 304 });
     }
@@ -89,7 +93,7 @@ export const clientModuleTransformer = {
         deps: deps?.map((specifier) => ({ specifier })),
       });
     } else {
-      const importMap = await loadImportMap();
+      const { atomicCSS, jsxConfig, importMap, buildTarget } = options;
       const graphVersions = clientDependencyGraph.modules.filter((mod) =>
         !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
       ).reduce((acc, { specifier, version }) => {
@@ -99,12 +103,10 @@ export const clientModuleTransformer = {
       const useAtomicCSS = Boolean(atomicCSS?.presets?.length) && isJSX;
       const alephPkgUri = getAlephPkgUri();
       const { code, jsxStaticClasses, deps } = await transform(specifier, rawCode, {
-        jsxRuntime: jsxConfig.jsxRuntime,
-        jsxImportSource: jsxConfig.jsxImportSource && isDev
-          ? toLocalPath(jsxConfig.jsxImportSource)
-          : jsxConfig.jsxImportSource,
+        ...jsxConfig,
         stripDataExport: isRouteFile(specifier),
         parseJsxStaticClasses: useAtomicCSS,
+        target: buildTarget,
         alephPkgUri,
         graphVersions,
         importMap,
@@ -212,7 +214,7 @@ async function readCode(filename: string): Promise<[string, number | undefined]>
   if (util.isLikelyHttpURL(filename)) {
     const url = new URL(filename);
     if (url.hostname === "esm.sh") {
-      url.searchParams.set("target", "es2021");
+      url.searchParams.set("target", "esnext");
     }
     const res = await cache(url.toString());
     if (res.status >= 400) {
@@ -224,8 +226,4 @@ async function readCode(filename: string): Promise<[string, number | undefined]>
   }
   const stat = await Deno.stat(filename);
   return [await Deno.readTextFile(filename), stat.mtime?.getTime()];
-}
-
-async function computeHash(content: string): Promise<string> {
-  return util.toHex(await crypto.subtle.digest("sha-1", enc.encode(content)));
 }

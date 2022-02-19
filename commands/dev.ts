@@ -1,8 +1,9 @@
-import { relative, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { basename, relative, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { EventEmitter } from "../framework/core/events.ts";
-import { existsDir, findFile, watchFs } from "../lib/fs.ts";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
+import { existsDir, findFile, watchFs } from "../lib/fs.ts";
+import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { serve } from "../server/mod.ts";
@@ -73,8 +74,13 @@ if (import.meta.main) {
       clientDependencyGraph.update(specifier);
       serverDependencyGraph.update(specifier);
     }
+    fsWatchListeners.forEach((e) => {
+      e.emit(kind, specifier);
+    });
     if (kind === "modify") {
       fsWatchListeners.forEach((e) => {
+        e.emit(`modify:${specifier}`);
+        // emit HMR event
         if (!e.emit(`hotUpdate:${specifier}`)) {
           clientDependencyGraph.lookup(specifier, (specifier) => {
             if (e.emit(`hotUpdate:${specifier}`)) {
@@ -83,24 +89,42 @@ if (import.meta.main) {
           });
         }
       });
-    } else {
-      fsWatchListeners.forEach((e) => {
-        e.emit(kind, specifier);
-      });
     }
   });
   log.info(`Watching files for changes...`);
 
-  const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"]);
-  if (serverEntry) {
-    const stat = await Deno.lstat(serverEntry);
-    const version = stat.mtime?.getTime().toString(16) + stat.size.toString(16);
-    await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?v=${version}`);
-  }
+  const fswListener = createFSWatchListener();
+  const watchFile = async (filename: string) => {
+    const stat = await Deno.lstat(filename);
+    const evtName = `modify:./${basename(filename)}`;
+    fswListener.removeAllListeners(evtName);
+    fswListener.on(evtName, importServer);
+    return stat.mtime?.getTime().toString(16) + "-" + stat.size.toString(16);
+  };
+  const importServer = async (): Promise<void> => {
+    const cwd = Deno.cwd();
+    const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
+      findFile(cwd, ["deno.jsonc", "deno.json", "tsconfig.json"]),
+      findFile(cwd, ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
+      findFile(cwd, builtinModuleExts.map((ext) => `server.${ext}`)),
+    ]);
+    if (serverEntry) {
+      let hash = await watchFile(serverEntry);
+      if (denoConfigFile) {
+        hash += "-" + await watchFile(denoConfigFile);
+      }
+      if (importMapFile) {
+        hash += "-" + await watchFile(importMapFile);
+      }
+      await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?hash=${hash}`);
+      log.debug(`Import server handler from ${basename(serverEntry)}(${hash})`);
+    }
+  };
+  importServer();
 
-  const global = globalThis as any;
-  if (global.__ALEPH_SERVER_HANDLER === undefined) {
-    serve(); // make default handler
+  // make the default handler
+  if (!("__ALEPH_SERVER_HANDLER" in globalThis)) {
+    serve();
   }
 
   const handler = (req: Request) => {
@@ -140,7 +164,8 @@ if (import.meta.main) {
       return response;
     }
 
-    return global.__ALEPH_SERVER_HANDLER(req);
+    // @ts-ignore
+    return globalThis.__ALEPH_SERVER_HANDLER(req);
   };
 
   log.info(`Server ready on http://localhost:${port}`);
