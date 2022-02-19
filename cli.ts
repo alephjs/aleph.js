@@ -90,7 +90,7 @@ async function main() {
   // invoke `init` command
   if (command === "init") {
     const { default: init } = await import(`./commands/init.ts`);
-    await init(options?.template, args[0]);
+    await init(args[0], options?.template);
     return;
   }
 

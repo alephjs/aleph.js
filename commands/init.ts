@@ -22,7 +22,7 @@ Options:
     -h, --help                                Prints help message
 `;
 
-export default async function (template = "react", nameArg?: string) {
+export default async function (nameArg: string | undefined, template = "react") {
   const cwd = Deno.cwd();
   const rev = "master";
 
