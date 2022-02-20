@@ -6,7 +6,7 @@ export default {
     return Array.isArray(a) && a.length > 0;
   },
   isPlainObject<T = Record<string, unknown>>(a: unknown): a is T {
-    return typeof a === "object" && a !== null && !Array.isArray(a) && Object.getPrototypeOf(a) === Object.prototype;
+    return typeof a === "object" && a !== null && Object.getPrototypeOf(a) === Object.prototype;
   },
   isLikelyHttpURL(s: string): boolean {
     const p = s.slice(0, 8).toLowerCase();
@@ -37,14 +37,6 @@ export default {
       newUrl.searchParams.set(key, value);
     }
     return newUrl;
-  },
-  parseCookie(req: Request): Map<string, string> {
-    const cookie: Map<string, string> = new Map();
-    req.headers.get("cookie")?.split(";").forEach((part) => {
-      const [key, value] = this.splitBy(part.trim(), "=");
-      cookie.set(key, value);
-    });
-    return cookie;
   },
   toHex(buffer: ArrayBuffer) {
     const bytes = new Uint8Array(buffer);

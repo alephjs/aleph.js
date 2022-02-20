@@ -1,4 +1,4 @@
-import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.24.4";
+import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.25.0";
 
 export type AlephConfig = {
   routeFiles?: string | RoutesConfig;
@@ -41,7 +41,7 @@ export type ServerOptions = {
   config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
-  ssr?: (ctx: SSRContext) => string | null | undefined;
+  ssr?: (ctx: SSRContext) => string | undefined | Promise<string | undefined>;
 };
 
 export type RoutePattern = {
@@ -61,13 +61,10 @@ export interface IURLPattern {
   };
 }
 
-export type Route = [
-  // pattern
-  IURLPattern,
-  // loader
-  () => Promise<Record<string, unknown>>,
-  // meta
-  { filename: string; pattern: RoutePattern },
+export type Route = readonly [
+  pattern: IURLPattern,
+  loader: () => Promise<Record<string, unknown>>,
+  meta: { filename: string; pattern: RoutePattern },
 ];
 
 export { AtomicCSSConfig };

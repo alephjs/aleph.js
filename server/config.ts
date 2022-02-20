@@ -28,11 +28,8 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
 
   if (Deno.env.get("ALEPH_DEV")) {
     const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
-    const stat = await Deno.stat(jsonFile);
-    const { default: { compilerOptions } } = await import(`${jsonFile}#mtime-${stat.mtime?.getTime()}`, {
-      assert: { type: "json" },
-    });
-    const { jsx, jsxImportSource } = compilerOptions || {};
+    const { compilerOptions } = await parseJSONFile(jsonFile);
+    const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
     if (
       (jsx === "react-jsx" || jsx === "react-jsxdev") &&
       util.isFilledString(jsxImportSource)
@@ -40,7 +37,7 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
       jsxConfig.jsxImportSource = jsxImportSource;
       jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
     } else if (jsx === "react") {
-      jsxConfig.jsxRuntime = compilerOptions.jsxFactory === "h" ? "preact" : "react";
+      jsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
     }
   }
 
