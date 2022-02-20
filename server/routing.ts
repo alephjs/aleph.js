@@ -3,6 +3,7 @@ import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { AlephConfig, Route, RoutePattern, RoutesConfig, RoutingRegExp } from "../types.d.ts";
+import { type DependencyGraph } from "./graph.ts";
 
 const currentRoutes: Route[] = [];
 const routeModules: Map<string, Record<string, unknown>> = new Map();
@@ -41,10 +42,11 @@ export async function initRoutes(config: string | RoutesConfig | RoutingRegExp):
           if (routeModules.has(filename)) {
             mod = routeModules.get(filename)!;
           } else {
+            const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_serverDependencyGraph");
+            const gm = graph?.get(filename) || graph?.mark(filename, {});
             const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
-            const importUrl = `http://localhost:${port}${join(Deno.cwd(), filename)}`;
-            const mtime = (await Deno.lstat(filename)).mtime?.getTime().toString(16);
-            mod = await import(`${importUrl}?v=${mtime}`);
+            const version = (gm?.version || Date.now()).toString(16);
+            mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version}`);
           }
           return mod;
         },

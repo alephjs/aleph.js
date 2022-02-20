@@ -1,3 +1,4 @@
+import { createGenerator } from "https://esm.sh/@unocss/core@0.25.0";
 import { concat } from "https://deno.land/std@0.125.0/bytes/mod.ts";
 import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
@@ -5,8 +6,10 @@ import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import log from "../lib/log.ts";
 import { toLocalPath } from "../lib/path.ts";
 import util from "../lib/util.ts";
-import type { Route, SSRContext } from "../types.d.ts";
+import type { AlephConfig, Route, SSRContext } from "../types.d.ts";
 import { getAlephPkgUri } from "./config.ts";
+import type { DependencyGraph, Module } from "./graph.ts";
+import { bundleCSS } from "./bundle.ts";
 
 let lolHtmlReady = false;
 
@@ -14,7 +17,7 @@ export type RenderOptions = {
   indexHtml: string;
   routes: Route[];
   isDev: boolean;
-  ssrHandler?: (ctx: SSRContext) => string | null | undefined;
+  ssrHandler?: (ctx: SSRContext) => string | undefined | Promise<string | undefined>;
 };
 
 export default {
@@ -35,34 +38,66 @@ export default {
       let withSSR = false;
 
       if (ssrHandler) {
-        // get route
-        const route = await matchRoute(req, ctx, routes);
-        if (route instanceof Response) {
-          return route;
+        const res = await loadPageData(req, ctx, routes);
+        if (res instanceof Response) {
+          return res;
         }
 
         // ssr
         const headCollection: string[] = [];
-        const ssrOutput = ssrHandler({ ...route, headCollection });
+        const ssrOutput = await ssrHandler({ ...res, headCollection });
         if (typeof ssrOutput === "string") {
+          if (res.filename) {
+            const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(
+              globalThis,
+              "__ALEPH_serverDependencyGraph",
+            );
+            const imports: Module[] = [];
+            serverDependencyGraph?.walk(res.filename, (mod) => {
+              if (mod.inlineCSS || mod.specifier.endsWith(".css")) {
+                imports.push(mod);
+              }
+            });
+            const styles = await Promise.all(imports.map(async (mod) => {
+              if (mod.specifier.endsWith(".css")) {
+                const rawCSS = await Deno.readTextFile(mod.specifier);
+                const { code } = await bundleCSS(mod.specifier, rawCSS, { minify: !isDev });
+                return `<style data-module-id="${mod.specifier}">${code}</style>`;
+              }
+              if (mod.jsxStaticClasses) {
+                const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+                const atomicStyle = new Set(
+                  mod.jsxStaticClasses?.map((name) => name.split(" ").map((name) => name.trim())).flat(),
+                );
+                const uno = createGenerator(config?.atomicCSS);
+                const { css } = await uno.generate(atomicStyle, { id: mod.specifier, minify: !isDev });
+                if (css) {
+                  return `<style data-module-id="${mod.specifier}">${css}</style>`;
+                }
+              }
+              // vue/svelte
+              return `<style data-module-id="${mod.specifier}">/* todo */</style>`;
+            }));
+            headCollection.push(...styles);
+          }
           rewriter.on("ssr-head", {
             element(el: Element) {
               headCollection.forEach((tag) => el.before(tag, { html: true }));
-              if (route.data) {
-                const expiresAttr = route.dataExpires ? ` data-expires="route.dataExpires"` : "";
+              if (res.data) {
+                const expiresAttr = res.dataExpires ? ` data-expires="${res.dataExpires}"` : "";
                 el.before(
                   `<script id="aleph-ssr-data" type="application/json"${expiresAttr}>${
-                    JSON.stringify(route.data)
+                    JSON.stringify(res.data)
                   }</script>`,
                   {
                     html: true,
                   },
                 );
               }
-              if (route.filename) {
+              if (res.filename) {
                 el.before(
                   `<script type="module">import e from ${
-                    JSON.stringify(route.filename)
+                    JSON.stringify(res.filename)
                   };window.__ssrModuleDefaultExport=e;</script>`,
                   {
                     html: true,
@@ -77,8 +112,8 @@ export default {
               el.replace(ssrOutput, { html: true });
             },
           });
-          if (typeof route.dataExpires === "number") {
-            headers.append("Cache-Control", `public, max-age=${route.dataExpires}`);
+          if (typeof res.dataExpires === "number") {
+            headers.append("Cache-Control", `public, max-age=${res.dataExpires}`);
           } else {
             headers.append("Cache-Control", "public, max-age=0, must-revalidate");
           }
@@ -174,7 +209,7 @@ export default {
   },
 };
 
-async function matchRoute(req: Request, ctx: Record<string, unknown>, routes: Route[]): Promise<
+async function loadPageData(req: Request, ctx: Record<string, unknown>, routes: Route[]): Promise<
   Response | { url: URL; moduleDefaultExport?: unknown; filename?: string; data?: unknown; dataExpires?: number }
 > {
   const url = new URL(req.url);

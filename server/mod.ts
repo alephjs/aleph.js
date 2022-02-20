@@ -6,6 +6,7 @@ import util from "../lib/util.ts";
 import type { ServerOptions } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
+import { DependencyGraph } from "./graph.ts";
 import { initRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
@@ -215,6 +216,8 @@ export const serve = (options: ServerOptions = {}) => {
     return;
   }
 
+  Reflect.set(globalThis, "__ALEPH_clientDependencyGraph", new DependencyGraph());
+  Reflect.set(globalThis, "__ALEPH_serverDependencyGraph", new DependencyGraph());
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
   Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
 };

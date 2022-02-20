@@ -6,9 +6,11 @@ import { existsDir, findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
+import { loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRoutingRegExp } from "../server/routing.ts";
-import { clientDependencyGraph, serveAppModules, serverDependencyGraph } from "../server/transformer.ts";
+import { type DependencyGraph } from "../server/graph.ts";
+import { serveAppModules } from "../server/transformer.ts";
 import { AlephConfig } from "../types.d.ts";
 
 export const helpMessage = `
@@ -52,6 +54,7 @@ if (import.meta.main) {
     log.fatal("No such directory:", workingDir);
   }
   Deno.chdir(workingDir);
+  Deno.env.set("ALEPH_ENV", "development");
 
   const port = parsePortNumber(getFlag(options, ["p", "port"], "8080"));
   const hostname = getFlag(options, ["hostname"]);
@@ -63,20 +66,20 @@ if (import.meta.main) {
     log.fatal("missing `--tls-key` option");
   }
 
-  Deno.env.set("ALEPH_ENV", "development");
-
-  serveAppModules(6060);
+  serveAppModules(6060, await loadImportMap());
   log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
 
   log.info(`Watching files for changes...`);
   watchFs(workingDir, (kind, path) => {
     const specifier = "./" + relative(workingDir, path);
+    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_clientDependencyGraph");
+    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_serverDependencyGraph");
     if (kind === "remove") {
-      clientDependencyGraph.unmark(specifier);
-      serverDependencyGraph.unmark(specifier);
+      clientDependencyGraph?.unmark(specifier);
+      serverDependencyGraph?.unmark(specifier);
     } else {
-      clientDependencyGraph.update(specifier);
-      serverDependencyGraph.update(specifier);
+      clientDependencyGraph?.update(specifier);
+      serverDependencyGraph?.update(specifier);
     }
     if (kind === "modify") {
       fswListeners.forEach((e) => {
@@ -85,7 +88,7 @@ if (import.meta.main) {
         if (e.all.has(`hotUpdate:${specifier}`)) {
           e.emit(`hotUpdate:${specifier}`, { specifier });
         } else {
-          clientDependencyGraph.lookup(specifier, (specifier) => {
+          clientDependencyGraph?.lookup(specifier, (specifier) => {
             if (e.all.has(`hotUpdate:${specifier}`)) {
               e.emit(`hotUpdate:${specifier}`, { specifier });
               return false;
@@ -101,11 +104,9 @@ if (import.meta.main) {
   });
 
   const fswListener = createFSWListener();
-  const peekFile = async (filename: string) => {
-    const stat = await Deno.lstat(filename);
+  const watchServerHandler = (filename: string) => {
     fswListener.off(`modify:./${basename(filename)}`);
     fswListener.on(`modify:./${basename(filename)}`, importServerHandler);
-    return stat.mtime?.getTime().toString(16) + "-" + stat.size.toString(16);
   };
   const importServerHandler = async (): Promise<void> => {
     const cwd = Deno.cwd();
@@ -115,17 +116,24 @@ if (import.meta.main) {
       findFile(cwd, builtinModuleExts.map((ext) => `server.${ext}`)),
     ]);
     if (serverEntry) {
-      let hash = await peekFile(serverEntry);
+      watchServerHandler(serverEntry);
       if (denoConfigFile) {
-        hash += "-" + await peekFile(denoConfigFile);
+        watchServerHandler(denoConfigFile);
       }
       if (importMapFile) {
-        hash += "-" + await peekFile(importMapFile);
+        watchServerHandler(importMapFile);
       }
-      await import(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}${serverEntry}?hash=${hash}`);
+      await import(
+        `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/${basename(serverEntry)}?t=${
+          Date.now().toString(16)
+        }`
+      );
       log.info(`Server handler imported from ${basename(serverEntry)}`);
     }
   };
+  await importServerHandler();
+
+  // init routes when fs change
   const updateRoutes = ({ specifier }: { specifier: string }) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     if (config && config.routeFiles) {
@@ -137,13 +145,13 @@ if (import.meta.main) {
   };
   fswListener.on("create", updateRoutes);
   fswListener.on("remove", updateRoutes);
-  importServerHandler();
 
   // make the default handler
   if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
     serve();
   }
 
+  // final server handler
   const handler = (req: Request) => {
     const { pathname } = new URL(req.url);
 

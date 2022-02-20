@@ -1,10 +1,11 @@
 import type { DependencyDescriptor } from "../compiler/types.d.ts";
 
 export type Module = {
-  specifier: string;
-  version: number;
-  deps?: DependencyDescriptor[];
-  inlineCSS?: boolean;
+  readonly specifier: string;
+  readonly version: number;
+  readonly deps?: readonly DependencyDescriptor[];
+  readonly inlineCSS?: boolean;
+  readonly jsxStaticClasses?: readonly string[];
 };
 
 export class DependencyGraph {
@@ -22,14 +23,23 @@ export class DependencyGraph {
     return this.#modules.get(specifier);
   }
 
-  mark(module: Module) {
-    const prev = this.#modules.get(module.specifier);
+  mark(
+    specifier: string,
+    props: { deps?: DependencyDescriptor[]; inlineCSS?: boolean; jsxStaticClasses?: readonly string[] },
+  ): Module {
+    const prev = this.#modules.get(specifier);
     if (prev) {
-      prev.deps = module.deps;
-      prev.inlineCSS = module.inlineCSS;
-    } else {
-      this.#modules.set(module.specifier, module);
+      Object.assign(prev, props);
+      return prev;
     }
+
+    const mod = {
+      ...props,
+      specifier,
+      version: Date.now(),
+    };
+    this.#modules.set(specifier, mod);
+    return mod;
   }
 
   unmark(specifier: string) {
@@ -42,8 +52,10 @@ export class DependencyGraph {
   }
 
   #update(specifier: string, __tracing = new Set<string>()) {
-    const module = this.get(specifier);
+    const module = this.#modules.get(specifier);
     if (module) {
+      // deno-lint-ignore ban-ts-comment
+      // @ts-ignore
       module.version++;
       __tracing.add(specifier);
       this.#modules.forEach((module) => {
@@ -68,6 +80,23 @@ export class DependencyGraph {
           this.#lookup(module.specifier, callback, __tracing);
         }
       }
+    }
+  }
+
+  walk(specifier: string, callback: (mod: Module) => void) {
+    this.#walk(specifier, callback);
+  }
+
+  #walk(specifier: string, callback: (mod: Module) => void, __tracing = new Set<string>()) {
+    if (this.#modules.has(specifier)) {
+      const mod = this.#modules.get(specifier)!;
+      callback({ ...mod, deps: mod.deps?.map((dep) => ({ ...dep })) });
+      __tracing.add(specifier);
+      mod.deps?.forEach((dep) => {
+        if (!__tracing.has(dep.specifier)) {
+          this.#walk(dep.specifier, callback, __tracing);
+        }
+      });
     }
   }
 }

@@ -6,16 +6,17 @@ export type ServerOptions = {
   port: number;
   cwd?: string;
   loaders?: Loader[];
+  loaderOptions?: unknown;
 };
 
-export type Loader = {
+export type Loader<Options = unknown> = {
   test: (url: URL) => boolean;
-  load(url: URL, code: Uint8Array): Promise<Content> | Content;
+  load(url: URL, code: Uint8Array, options?: Options): Promise<Content> | Content;
 };
 
 export type Content = {
   content: Uint8Array;
-  contentType: string;
+  contentType?: string;
 };
 
 export async function serveDir(options: ServerOptions) {
@@ -24,10 +25,10 @@ export async function serveDir(options: ServerOptions) {
   const serve = async (conn: Deno.Conn) => {
     const httpConn = Deno.serveHttp(conn);
     for await (const { request, respondWith } of httpConn) {
-      await handle(request, respondWith);
+      respondWith(handler(request));
     }
   };
-  const handle = async (request: Request, respondWith: (r: Response | Promise<Response>) => Promise<void>) => {
+  const handler = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     const filepath = join(cwd, url.pathname);
     try {
@@ -44,49 +45,43 @@ export async function serveDir(options: ServerOptions) {
             );
           }
         }
-        respondWith(
-          new Response(
-            `<!DOCTYPE html><title>${title}</title><h2>&nbsp;${title}</h2><ul>${Array.from(items).join("")}</ul>`,
-            {
-              headers: new Headers({ "Content-Type": "text/html; charset=utf-8" }),
+        return new Response(
+          `<!DOCTYPE html><title>${title}</title><h2>&nbsp;${title}</h2><ul>${Array.from(items).join("")}</ul>`,
+          {
+            headers: {
+              "Content-Type": "text/html; charset=utf-8",
+              "Cache-Control": "no-cache, no-store, must-revalidate",
             },
-          ),
+          },
         );
-        return;
       }
 
       const loader = options.loaders?.find((loader) => loader.test(url));
       if (loader) {
-        let ret = loader.load(url, await Deno.readFile(filepath));
+        let ret = loader.load(url, await Deno.readFile(filepath), options.loaderOptions);
         if (ret instanceof Promise) {
           ret = await ret;
         }
-        respondWith(
-          new Response(ret.content, {
-            headers: {
-              "Content-Type": ret.contentType,
-              "Last-Modified": stat.mtime?.toUTCString() || "",
-            },
-          }),
-        );
-        return;
+        return new Response(ret.content, {
+          headers: {
+            "Content-Type": ret.contentType || getContentType(filepath),
+            "Last-Modified": stat.mtime?.toUTCString() || "",
+          },
+        });
       }
 
       const file = await Deno.open(filepath, { read: true });
-      respondWith(
-        new Response(readableStreamFromReader(file), {
-          headers: {
-            "Content-Type": getContentType(filepath),
-            "Last-Modified": stat.mtime?.toUTCString() || "",
-          },
-        }),
-      );
+      return new Response(readableStreamFromReader(file), {
+        headers: {
+          "Content-Type": getContentType(filepath),
+          "Last-Modified": stat.mtime?.toUTCString() || "",
+        },
+      });
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) {
-        respondWith(new Response("Not found", { status: 404 }));
-        return;
+        return new Response("Not found", { status: 404 });
       }
-      respondWith(new Response(err.message, { status: 500 }));
+      return new Response(err.message, { status: 500 });
     }
   };
 
