@@ -42,7 +42,7 @@ export async function initRoutes(config: string | RoutesConfig | RoutingRegExp):
           if (routeModules.has(filename)) {
             mod = routeModules.get(filename)!;
           } else {
-            const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_serverDependencyGraph");
+            const graph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
             const gm = graph?.get(filename) || graph?.mark(filename, {});
             const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
             const version = (gm?.version || Date.now()).toString(16);

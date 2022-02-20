@@ -47,7 +47,7 @@ const esModuleLoader: Loader<{ importMap: ImportMap; initialGraphVersion: string
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     const specifier = "." + pathname;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
-    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_serverDependencyGraph");
+    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
     if (serverDependencyGraph) {
       const graphVersions = serverDependencyGraph.modules.filter((mod) =>
         !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
@@ -106,7 +106,7 @@ export type TransformerOptions = {
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_clientDependencyGraph");
+    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
     if (!clientDependencyGraph) {
       return new Response("Server is not ready", { status: 500 });
     }
@@ -172,9 +172,9 @@ export const clientModuleTransformer = {
       }
       if (inlineCSS) {
         resBody = code +
-          `\nimport { applyCSS as __ALEPH_applyCSS } from "${
-            toLocalPath(alephPkgUri)
-          }framework/core/style.ts";__ALEPH_applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`;
+          `\nimport { applyCSS as __applyCSS } from "${toLocalPath(alephPkgUri)}framework/core/style.ts";__applyCSS(${
+            JSON.stringify(specifier)
+          }, ${JSON.stringify(inlineCSS)});`;
         clientDependencyGraph.mark(specifier, { deps, inlineCSS: true });
       } else {
         resBody = code;

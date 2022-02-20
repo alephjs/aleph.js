@@ -206,6 +206,11 @@ export const serve = (options: ServerOptions = {}) => {
     vendor: "Deno Land Inc.",
   });
 
+  Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
+  Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+  Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
+  Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
+
   // support deno deploy
   if (Deno.env.get("DENO_DEPLOYMENT_ID")) {
     self.addEventListener("fetch", (e) => {
@@ -213,13 +218,7 @@ export const serve = (options: ServerOptions = {}) => {
       // @ts-ignore
       e.respondWith(handler(e.request));
     });
-    return;
   }
-
-  Reflect.set(globalThis, "__ALEPH_clientDependencyGraph", new DependencyGraph());
-  Reflect.set(globalThis, "__ALEPH_serverDependencyGraph", new DependencyGraph());
-  Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
-  Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
 };
 
 export { content, json };

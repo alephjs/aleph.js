@@ -72,8 +72,8 @@ if (import.meta.main) {
   log.info(`Watching files for changes...`);
   watchFs(workingDir, (kind, path) => {
     const specifier = "./" + relative(workingDir, path);
-    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_clientDependencyGraph");
-    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_serverDependencyGraph");
+    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
+    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
     if (kind === "remove") {
       clientDependencyGraph?.unmark(specifier);
       serverDependencyGraph?.unmark(specifier);

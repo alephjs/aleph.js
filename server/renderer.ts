@@ -50,7 +50,7 @@ export default {
           if (res.filename) {
             const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(
               globalThis,
-              "__ALEPH_serverDependencyGraph",
+              "serverDependencyGraph",
             );
             const imports: Module[] = [];
             serverDependencyGraph?.walk(res.filename, (mod) => {
