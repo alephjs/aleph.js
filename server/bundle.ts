@@ -26,7 +26,7 @@ export async function bundleCSS(
       customMedia: true,
     },
   });
-  const deps = dependencies?.filter((dep) => dep.type === "import").map((dep) => {
+  const deps = dependencies?.filter((dep) => dep.type === "import" && !dep.media).map((dep) => {
     let url = dep.url;
     if (util.isLikelyHttpURL(specifier)) {
       if (!util.isLikelyHttpURL(url)) {
