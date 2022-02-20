@@ -1,10 +1,12 @@
-import init, {
-  parseJsxStaticClasses as getStaticClasses,
-  transform as swc,
-  transformCSS as parcelCSS,
-} from "./dist/compiler.js";
+import init, { fastTransform as fastSWC, transform as swc, transformCSS as parcelCSS } from "./dist/compiler.js";
 import getWasmData from "./dist/wasm.js";
-import { TransformCSSOptions, TransformCSSResult, TransformOptions, TransformResult } from "./types.d.ts";
+import {
+  FastTransformOptions,
+  TransformCSSOptions,
+  TransformCSSResult,
+  TransformOptions,
+  TransformResult,
+} from "./types.d.ts";
 
 let wasmReady: Promise<void> | boolean = false;
 
@@ -23,9 +25,14 @@ async function initWasm() {
   await init(wasmData);
 }
 
-export async function parseJsxStaticClasses(specifier: string, code: string): Promise<string[]> {
+/** fast transform */
+export async function fastTransform(
+  specifier: string,
+  code: string,
+  options: FastTransformOptions = {},
+): Promise<TransformResult> {
   await checkWasmReady();
-  return getStaticClasses(specifier, code);
+  return fastSWC(specifier, code, options);
 }
 
 /**
