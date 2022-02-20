@@ -192,6 +192,10 @@ async function runCli(command: string, version: string, denoConfigFile?: string,
     "--quiet",
     "--location=http://localhost",
   ];
+  const devPort = Deno.env.get("ALEPH_DEV_PORT");
+  if (devPort) {
+    cmd.push(`--reload=http://localhost:${devPort}/`);
+  }
   if (denoConfigFile) {
     cmd.push("--config", denoConfigFile);
   }
