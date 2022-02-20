@@ -37,12 +37,14 @@ pub struct Resolver {
   pub jsx_runtime: String,
   /// jsx static class names
   pub jsx_static_classes: IndexSet<String>,
+  /// development mode
+  pub is_dev: bool,
   // internal
   jsx_runtime_version: Option<String>,
   jsx_runtime_cdn_version: Option<String>,
   import_map: ImportMap,
   graph_versions: HashMap<String, String>,
-  is_dev: bool,
+  initial_graph_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -62,6 +64,7 @@ impl Resolver {
     jsx_runtime_cdn_version: Option<String>,
     import_map: ImportHashMap,
     graph_versions: HashMap<String, String>,
+    initial_graph_version: Option<String>,
     is_dev: bool,
   ) -> Self {
     Resolver {
@@ -75,34 +78,18 @@ impl Resolver {
       jsx_static_classes: IndexSet::new(),
       import_map: ImportMap::from_hashmap(import_map),
       graph_versions,
+      initial_graph_version,
       is_dev,
     }
   }
 
-  /// fix remote url.
-  //  - `https://esm.sh/react` -> `https://esm.sh/react`
-  //  - `https://esm.sh/react` -> `/-/esm.sh/react` (dev)
+  /// fix remote url for dev mode.
+  //  - `https://esm.sh/react` -> `/-/esm.sh/react`
   //  - `https://deno.land/std/path/mod.ts` -> `/-/deno.land/std/path/mod.ts`
   //  - `http://localhost:8080/mod.ts` -> `/-/http_localhost_8080/mod.ts`
-  pub fn fix_remote_url(&self, url: &str) -> String {
+  pub fn to_local_path(&self, url: &str) -> String {
     let url = Url::from_str(url).unwrap();
     let pathname = Path::new(url.path());
-    let mut nonjs = false;
-    if let Some(os_str) = pathname.extension() {
-      if let Some(s) = os_str.to_str() {
-        match s {
-          "ts" | "jsx" | "mts" | "tsx" => {
-            nonjs = true;
-          }
-          _ => {}
-        }
-      }
-    };
-
-    if !nonjs && !self.is_dev {
-      return url.into();
-    }
-
     let mut local_path = "/-/".to_owned();
     let scheme = url.scheme();
     if scheme == "http" {
@@ -231,16 +218,26 @@ impl Resolver {
       import_url = import_url + "?module"
     }
 
-    if is_remote {
-      return self.fix_remote_url(&import_url);
+    // fix remote url to local path for development mode
+    if is_remote && self.is_dev {
+      return self.to_local_path(&import_url);
     }
 
-    if self.graph_versions.contains_key(&fixed_url) {
-      let version = self.graph_versions.get(&fixed_url).unwrap();
-      if import_url.contains("?") {
-        import_url = format!("{}&v={}", import_url, version);
-      } else {
-        import_url = format!("{}?v={}", import_url, version);
+    // apply graph version if has
+    if !is_remote {
+      if self.graph_versions.contains_key(&fixed_url) {
+        let version = self.graph_versions.get(&fixed_url).unwrap();
+        if import_url.contains("?") {
+          import_url = format!("{}&v={}", import_url, version);
+        } else {
+          import_url = format!("{}?v={}", import_url, version);
+        }
+      } else if let Some(init_version) = &self.initial_graph_version {
+        if import_url.contains("?") {
+          import_url = format!("{}&v={}", import_url, init_version);
+        } else {
+          import_url = format!("{}?v={}", import_url, init_version);
+        }
       }
     }
 

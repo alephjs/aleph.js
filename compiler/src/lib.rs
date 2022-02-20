@@ -39,6 +39,9 @@ pub struct Options {
   #[serde(default)]
   pub graph_versions: HashMap<String, String>,
 
+  #[serde(default)]
+  pub initial_graph_version: Option<String>,
+
   #[serde(default = "default_target")]
   pub target: String,
 
@@ -84,24 +87,49 @@ pub struct TransformOutput {
   pub map: Option<String>,
 }
 
-#[wasm_bindgen(js_name = "parseJsxStaticClasses")]
-pub fn parse_jsx_static_classes(specifier: &str, code: &str) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = "fastTransform")]
+pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
+  console_error_panic_hook::set_once();
+
+  let options: Options = options
+    .into_serde()
+    .map_err(|err| format!("failed to parse options: {}", err))
+    .unwrap();
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifier,
     "",
     "",
     None,
     None,
-    ImportHashMap::default(),
-    HashMap::new(),
+    options.import_map,
+    options.graph_versions,
+    options.initial_graph_version,
     false,
   )));
   let module = SWC::parse(specifier, code, EsVersion::Es2022).expect("could not parse the module");
-  let jsx_static_class_names = module
-    .parse_jsx_static_classes(resolver.clone())
-    .expect("could not parse");
+  let (code, map) = module
+    .fast_transform(
+      resolver.clone(),
+      &EmitOptions {
+        parse_jsx_static_classes: options.parse_jsx_static_classes,
+        strip_data_export: false,
+        jsx_import_source: None,
+        minify: false,
+        source_map: true,
+      },
+    )
+    .expect("could not transform the module");
+  let r = resolver.borrow();
 
-  Ok(JsValue::from_serde(&jsx_static_class_names).unwrap())
+  Ok(
+    JsValue::from_serde(&TransformOutput {
+      code,
+      deps: r.deps.clone(),
+      jsx_static_classes: r.jsx_static_classes.clone().into_iter().collect(),
+      map,
+    })
+    .unwrap(),
+  )
 }
 
 #[wasm_bindgen(js_name = "transform")]
@@ -120,6 +148,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     options.jsx_runtime_cdn_version,
     options.import_map,
     options.graph_versions,
+    options.initial_graph_version,
     options.is_dev,
   )));
   let target = match options.target.as_str() {
@@ -142,7 +171,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
         strip_data_export: options.strip_data_export,
         jsx_import_source: options.jsx_import_source,
         minify: !options.is_dev,
-        is_dev: options.is_dev,
+        source_map: options.is_dev,
       },
     )
     .expect("could not transform the module");

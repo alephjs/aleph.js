@@ -1,7 +1,7 @@
 use super::*;
 use std::collections::HashMap;
 
-fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
+fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
   let mut imports: HashMap<String, String> = HashMap::new();
   let mut graph_versions: HashMap<String, String> = HashMap::new();
   imports.insert("~/".into(), "./".into());
@@ -20,7 +20,8 @@ fn transform(specifer: &str, source: &str, options: &EmitOptions) -> (String, Rc
     Some("v64".into()),
     import_map,
     graph_versions,
-    options.is_dev,
+    None,
+    is_dev,
   )));
   let (code, _) = module.transform(resolver.clone(), options).unwrap();
   println!("{}", code);
@@ -58,7 +59,7 @@ fn typescript() {
         bar() {}
       }
     "#;
-  let (code, _) = transform("mod.ts", source, &EmitOptions::default());
+  let (code, _) = transform("mod.ts", source, false, &EmitOptions::default());
   assert!(code.contains("var D;\n(function(D) {\n"));
   assert!(code.contains("_applyDecoratedDescriptor("));
 }
@@ -73,7 +74,7 @@ fn import_resolving() {
       foo();
       <div/>
     "#;
-  let (code, _) = transform("./App.tsx", source, &EmitOptions::default());
+  let (code, _) = transform("./App.tsx", source, false, &EmitOptions::default());
   assert!(code.contains("\"https://esm.sh/react@17.0.2\""));
   assert!(code.contains("\"./foo.ts?v=100\""));
   assert!(code.contains("\"../style/index.css?module\""));
@@ -93,6 +94,7 @@ fn jsx_automtic() {
   let (code, _) = transform(
     "./app.tsx",
     source,
+    false,
     &EmitOptions {
       jsx_import_source: Some("https://esm.sh/react@17.0.2".to_owned()),
       ..Default::default()
@@ -117,14 +119,7 @@ fn react_dev() {
         )
       }
     "#;
-  let (code, _) = transform(
-    "./app.tsx",
-    source,
-    &EmitOptions {
-      is_dev: true,
-      ..Default::default()
-    },
-  );
+  let (code, _) = transform("./app.tsx", source, true, &EmitOptions::default());
   assert!(code.contains(
     "import { __REACT_REFRESH_RUNTIME__, __REACT_REFRESH__ } from \"/-/deno.land/x/aleph/framework/react/refresh.ts\""
   ));
@@ -161,6 +156,7 @@ fn jsx_class_names() {
   let (_, resolver) = transform(
     "./app.tsx",
     source,
+    false,
     &EmitOptions {
       parse_jsx_static_classes: true,
       ..Default::default()
@@ -187,6 +183,7 @@ fn strip_data_export() {
   let (code, _) = transform(
     "./app.tsx",
     source,
+    false,
     &EmitOptions {
       strip_data_export: true,
       ..Default::default()
