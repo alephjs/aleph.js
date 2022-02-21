@@ -45,6 +45,7 @@ pub struct Resolver {
   import_map: ImportMap,
   graph_versions: HashMap<String, String>,
   initial_graph_version: Option<String>,
+  browser: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -66,6 +67,7 @@ impl Resolver {
     graph_versions: HashMap<String, String>,
     initial_graph_version: Option<String>,
     is_dev: bool,
+    browser: bool,
   ) -> Self {
     Resolver {
       aleph_pkg_uri: aleph_pkg_uri.into(),
@@ -80,6 +82,7 @@ impl Resolver {
       graph_versions,
       initial_graph_version,
       is_dev,
+      browser,
     }
   }
 
@@ -227,7 +230,7 @@ impl Resolver {
     }
 
     // fix remote url to local path for development mode
-    if is_remote && (self.is_dev || nonjs) {
+    if is_remote && (self.is_dev || (nonjs && self.browser)) {
       return self.to_local_path(&import_url);
     }
 

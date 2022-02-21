@@ -22,6 +22,7 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
     graph_versions,
     None,
     is_dev,
+    true,
   )));
   let (code, _) = module.transform(resolver.clone(), options).unwrap();
   println!("{}", code);

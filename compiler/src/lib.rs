@@ -105,6 +105,7 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
     options.graph_versions,
     options.initial_graph_version,
     false,
+    false,
   )));
   let module = SWC::parse(specifier, code, EsVersion::Es2022).expect("could not parse the module");
   let (code, map) = module
@@ -150,6 +151,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     options.graph_versions,
     options.initial_graph_version,
     options.is_dev,
+    true,
   )));
   let target = match options.target.as_str() {
     "es2015" => EsVersion::Es2015,
