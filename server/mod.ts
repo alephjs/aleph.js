@@ -206,8 +206,10 @@ export const serve = (options: ServerOptions = {}) => {
     vendor: "Deno Land Inc.",
   });
 
-  Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
-  Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+  if (!Reflect.has(globalThis, "clientDependencyGraph")) {
+    Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
+    Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+  }
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
   Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
 

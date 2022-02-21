@@ -6,9 +6,9 @@ export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 export type FetchError = { method: HttpMethod; status: number; message: string };
 export type DataState<T> = { data?: T; error?: FetchError; isLoading?: boolean; isMutating?: HttpMethod };
 export type UpdateStrategy<T> = "none" | "replace" | {
-  replace?: boolean;
   optimisticUpdate?: (data: T) => T;
   onFailure?: (error: FetchError) => void;
+  replace?: boolean;
 };
 
 export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: typeof mutation } => {
@@ -117,17 +117,20 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
   }, [path, routeUrl]);
 
   useEffect(() => {
+    const now = Date.now();
     if (
       dataUrl &&
-      (!dataCache.has(dataUrl) || (dataCache.get(dataUrl)!.expires || Date.now() + 1000) < Date.now())
+      (!dataCache.has(dataUrl) || (dataCache.get(dataUrl)!.expires || now + 1000) < now)
     ) {
-      setDataStore({ isLoading: true });
+      if (!dataCache.has(dataUrl)) {
+        setDataStore({ isLoading: true });
+      }
       fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } })
         .then(async (res) => {
           if (res.ok) {
             const data = await res.json();
-            const cc = res.headers.get("cache-control");
-            const expires = cc && cc.includes("max-age") ? Date.now() + parseInt(cc.split("=")[1]) * 1000 : undefined;
+            const cc = res.headers.get("Cache-Control");
+            const expires = cc && cc.includes("max-age") ? now + parseInt(cc.split("=")[1]) * 1000 : undefined;
             dataCache.set(dataUrl, { data, expires });
             setDataStore({ data });
           } else {
@@ -136,13 +139,7 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
           }
         })
         .catch((err) => {
-          setDataStore({
-            error: {
-              method: "get",
-              status: 0,
-              message: err.message,
-            },
-          });
+          setDataStore({ error: { method: "get", status: 0, message: err.message } });
         });
     }
   }, [dataCache, dataUrl]);
@@ -155,9 +152,7 @@ function jsonFetch(method: string, data: unknown, href?: string) {
     method,
     body: typeof data === "object" ? JSON.stringify(data) : "null",
     redirect: "manual",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
