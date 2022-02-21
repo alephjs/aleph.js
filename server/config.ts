@@ -64,7 +64,6 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
     jsxConfig.jsxImportSource = toLocalPath(jsxConfig.jsxImportSource);
   }
 
-  console.log(jsxConfig);
   return jsxConfig;
 }
 
