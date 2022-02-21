@@ -56,20 +56,24 @@ export const serve = (options: ServerOptions = {}) => {
         filePath = `${util.trimSuffix(filePath, "/")}/index.html`;
         stat = await Deno.lstat(filePath);
       }
-      if (stat.isFile && stat.mtime) {
-        const etag = stat.mtime.getTime().toString(16) + "-" + stat.size.toString(16);
-        if (req.headers.get("If-None-Match") === etag) {
+      if (stat.isFile) {
+        const { mtime } = stat;
+        const etag = mtime ? mtime.getTime().toString(16) + "-" + stat.size.toString(16) : null;
+        if (etag && req.headers.get("If-None-Match") === etag) {
           return new Response(null, { status: 304 });
         }
         const file = await Deno.open(`.${pathname}`, { read: true });
-        return new Response(readableStreamFromReader(file), {
-          headers: {
-            "Content-Type": getContentType(pathname),
-            "Etag": etag,
-            "Last-Modified": stat.mtime.toUTCString(),
-            "Cache-Control": "public, max-age=0, must-revalidate",
-          },
+        const headers = new Headers({
+          "Content-Type": getContentType(pathname),
+          "Cache-Control": "public, max-age=0, must-revalidate",
         });
+        if (etag) {
+          headers.set("Etag", etag);
+        }
+        if (mtime) {
+          headers.set("Last-Modified", mtime.toUTCString());
+        }
+        return new Response(readableStreamFromReader(file), { headers });
       }
     } catch (err) {
       if (!(err instanceof Deno.errors.NotFound)) {
