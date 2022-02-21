@@ -23,10 +23,26 @@ export function getAlephPkgUri() {
 }
 
 export async function loadJSXConfig(): Promise<JSXConfig> {
-  const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const jsxConfig: JSXConfig = {};
+  const denoConfigFile = await findFile(Deno.cwd(), ["deno.jsonc", "deno.json", "tsconfig.json"]);
 
-  if (Deno.env.get("ALEPH_DEV")) {
+  if (denoConfigFile) {
+    try {
+      const { compilerOptions } = await parseJSONFile(denoConfigFile);
+      const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
+      if (
+        (jsx === "react-jsx" || jsx === "react-jsxdev") &&
+        util.isFilledString(jsxImportSource)
+      ) {
+        jsxConfig.jsxImportSource = jsxImportSource;
+        jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
+      } else if (jsx === "react") {
+        jsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
+      }
+    } catch (error) {
+      log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
+    }
+  } else if (Deno.env.get("ALEPH_DEV")) {
     const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
     const { compilerOptions } = await parseJSONFile(jsonFile);
     const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
@@ -41,30 +57,14 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
     }
   }
 
-  const appJsxConfig: JSXConfig = {};
-  const denoConfigFile = await findFile(Deno.cwd(), ["deno.jsonc", "deno.json", "tsconfig.json"]);
-  if (denoConfigFile) {
-    try {
-      const { compilerOptions } = await parseJSONFile(denoConfigFile);
-      const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
-      if (
-        (jsx === "react-jsx" || jsx === "react-jsxdev") &&
-        util.isFilledString(jsxImportSource)
-      ) {
-        appJsxConfig.jsxImportSource = jsxImportSource;
-        appJsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
-      } else if (jsx === "react") {
-        appJsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
-      }
-    } catch (error) {
-      log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
-    }
-  }
-
-  Object.assign(jsxConfig, appJsxConfig);
-  if (isDev && jsxConfig.jsxImportSource && util.isLikelyHttpURL(jsxConfig.jsxImportSource)) {
+  if (
+    Deno.env.get("ALEPH_ENV") === "development" && jsxConfig.jsxImportSource &&
+    util.isLikelyHttpURL(jsxConfig.jsxImportSource)
+  ) {
     jsxConfig.jsxImportSource = toLocalPath(jsxConfig.jsxImportSource);
   }
+
+  console.log(jsxConfig);
   return jsxConfig;
 }
 

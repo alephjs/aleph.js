@@ -15,7 +15,7 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
     "https://deno.land/x/aleph",
-    "react",
+    Some("react".into()),
     Some("17.0.2".into()),
     Some("v64".into()),
     import_map,

@@ -34,7 +34,7 @@ pub struct Resolver {
   /// a ordered dependencies of the module
   pub deps: Vec<DependencyDescriptor>,
   /// jsx runtime: react | preact
-  pub jsx_runtime: String,
+  pub jsx_runtime: Option<String>,
   /// jsx static class names
   pub jsx_static_classes: IndexSet<String>,
   /// development mode
@@ -60,7 +60,7 @@ impl Resolver {
   pub fn new(
     specifier: &str,
     aleph_pkg_uri: &str,
-    jsx_runtime: &str,
+    jsx_runtime: Option<String>,
     jsx_runtime_version: Option<String>,
     jsx_runtime_cdn_version: Option<String>,
     import_map: ImportHashMap,
@@ -74,9 +74,9 @@ impl Resolver {
       specifier: specifier.into(),
       specifier_is_remote: is_remote_url(specifier),
       deps: Vec::new(),
-      jsx_runtime: jsx_runtime.into(),
-      jsx_runtime_version: jsx_runtime_version,
-      jsx_runtime_cdn_version: jsx_runtime_cdn_version,
+      jsx_runtime,
+      jsx_runtime_version,
+      jsx_runtime_cdn_version,
       jsx_static_classes: IndexSet::new(),
       import_map: ImportMap::from_hashmap(import_map),
       graph_versions,

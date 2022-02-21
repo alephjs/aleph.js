@@ -45,8 +45,7 @@ pub struct Options {
   #[serde(default = "default_target")]
   pub target: String,
 
-  #[serde(default = "default_jsx_runtime")]
-  pub jsx_runtime: String,
+  pub jsx_runtime: Option<String>,
 
   #[serde(default)]
   pub jsx_runtime_version: Option<String>,
@@ -66,10 +65,6 @@ pub struct Options {
 
 fn default_target() -> String {
   return "es2022".into();
-}
-
-fn default_jsx_runtime() -> String {
-  return "react".into();
 }
 
 #[derive(Serialize)]
@@ -98,7 +93,7 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifier,
     "",
-    "",
+    None,
     None,
     None,
     options.import_map,
@@ -144,7 +139,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifier,
     &options.aleph_pkg_uri,
-    &options.jsx_runtime,
+    options.jsx_runtime,
     options.jsx_runtime_version,
     options.jsx_runtime_cdn_version,
     options.import_map,

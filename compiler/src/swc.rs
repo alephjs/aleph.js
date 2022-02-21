@@ -134,14 +134,23 @@ impl SWC {
           ..Default::default()
         }
       } else {
-        match jsx_runtime.as_str() {
-          "preact" => react::Options {
-            pragma: "h".into(),
-            pragma_frag: "Fragment".into(),
-            ..Default::default()
-          },
-          _ => react::Options { ..Default::default() },
+        if let Some(jsx_runtime) = &jsx_runtime {
+          match jsx_runtime.as_str() {
+            "preact" => react::Options {
+              pragma: "h".into(),
+              pragma_frag: "Fragment".into(),
+              ..Default::default()
+            },
+            _ => react::Options { ..Default::default() },
+          }
+        } else {
+          react::Options { ..Default::default() }
         }
+      };
+      let is_react = if let Some(jsx_runtime) = &jsx_runtime {
+        jsx_runtime.eq("react")
+      } else {
+        false
       };
       let passes = chain!(
         resolver_with_mark(top_level_mark),
@@ -180,7 +189,7 @@ impl SWC {
             self.source_map.clone(),
             Some(&self.comments),
           ),
-          !specifier_is_remote && jsx_runtime.eq("react")
+          !specifier_is_remote && is_react
         ),
         Optional::new(
           react::jsx(
