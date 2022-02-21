@@ -1,4 +1,4 @@
-import presetUno from "https://esm.sh/@unocss/preset-uno@0.25.0";
+import presetUno from "https://esm.sh/@unocss/preset-uno@0.26.0";
 import { renderToString } from "react-dom/server";
 import { Router } from "aleph/react";
 import { serve } from "aleph/server";

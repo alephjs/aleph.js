@@ -1,4 +1,4 @@
-import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.25.0";
+import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.26.0";
 
 export type AlephConfig = {
   routeFiles?: string | RoutesConfig;
