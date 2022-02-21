@@ -146,7 +146,7 @@ async function main() {
           ) {
             const [prefix, rest] = util.splitBy(url, "@");
             const [ver, suffix] = util.splitBy(rest, "/");
-            if (command === "dev" && ver !== "v" + VERSION && update === null) {
+            if (command === "dev" && ver !== VERSION && update === null) {
               update = confirm(
                 `You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${
                   basename(importMapFile)
@@ -158,7 +158,7 @@ async function main() {
               }
             }
             if (update) {
-              importMap.imports[key] = `${prefix}@v${VERSION}/${suffix}`;
+              importMap.imports[key] = `${prefix}@${VERSION}/${suffix}`;
             }
           }
         }
@@ -205,7 +205,7 @@ async function runCli(command: string, version: string, denoConfigFile?: string,
   if (Deno.env.get("ALEPH_DEV")) {
     cmd.push(`./commands/${command}.ts`);
   } else {
-    cmd.push(`https://deno.land/x/aleph@v${version}/commands/${command}.ts`);
+    cmd.push(`https://deno.land/x/aleph@${version}/commands/${command}.ts`);
   }
   cmd.push(...Deno.args.slice(1));
   const p = Deno.run({ cmd, stdout: "inherit", stderr: "inherit" });

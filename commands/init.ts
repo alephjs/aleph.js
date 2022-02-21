@@ -85,9 +85,9 @@ export default async function (nameArg: string | undefined, template = "react") 
     imports: {
       "~/": "./",
       "std/": "https://deno.land/std@0.125.0/",
-      "aleph/": `https://deno.land/x/aleph@v${VERSION}/`,
-      "aleph/server": `https://deno.land/x/aleph@v${VERSION}/server/mod.ts`,
-      "aleph/react": `https://deno.land/x/aleph@v${VERSION}/framework/react/mod.ts`,
+      "aleph/": `https://deno.land/x/aleph@${VERSION}/`,
+      "aleph/server": `https://deno.land/x/aleph@${VERSION}/server/mod.ts`,
+      "aleph/react": `https://deno.land/x/aleph@${VERSION}/framework/react/mod.ts`,
       "react": `https://esm.sh/react@${defaultReactVersion}`,
       "react-dom": `https://esm.sh/react-dom@${defaultReactVersion}`,
       "react-dom/server": `https://esm.sh/react-dom@${defaultReactVersion}/server`,

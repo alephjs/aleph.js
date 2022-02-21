@@ -13,7 +13,7 @@ export function getAlephPkgUri() {
   if (util.isFilledString(global.__ALEPH_PKG_URI)) {
     return global.__ALEPH_PKG_URI;
   }
-  let uri = `https://deno.land/x/aleph@v${VERSION}`;
+  let uri = `https://deno.land/x/aleph@${VERSION}`;
   const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
   if (DEV_PORT) {
     uri = `http://localhost:${DEV_PORT}`;
