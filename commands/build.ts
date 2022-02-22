@@ -25,5 +25,5 @@ if (import.meta.main) {
   }
   Deno.chdir(workingDir);
 
-  // todo: implement
+  console.log("build: not implemented yet");
 }
