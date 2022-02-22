@@ -3,7 +3,7 @@ import { Buffer } from "https://deno.land/std@0.125.0/io/buffer.ts";
 import { copy, readAll } from "https://deno.land/std@0.125.0/streams/conversion.ts";
 import { blue, cyan, dim, green, red } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { ensureDir } from "https://deno.land/std@0.125.0/fs/ensure_dir.ts";
-import { join } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import { existsDir } from "../lib/fs.ts";
 import log from "../lib/log.ts";
@@ -45,19 +45,17 @@ export default async function (nameArg: string | undefined, template = "react") 
     }
   }
 
-  const workingDir = join(Deno.cwd(), name);
-  const rev = "master";
-
   // download template
   console.log("Downloading template, this might take a moment...");
   const repo = isCanary ? "ije/aleph-canary" : "alephjs/aleph.js";
-  const resp = await fetch(`https://codeload.github.com/${repo}/tar.gz/${rev}`);
+  const resp = await fetch(`https://codeload.github.com/${repo}/tar.gz/refs/tags/${VERSION}`);
   const gzData = await readAll(new Buffer(await resp.arrayBuffer()));
   const tarData = gunzip(gzData);
   const entryList = new Untar(new Buffer(tarData));
+  const workingDir = join(Deno.cwd(), name);
 
   for await (const entry of entryList) {
-    const prefix = `aleph.js-${rev}/examples/hello-${template}/`;
+    const prefix = `${basename(repo)}-${VERSION}/examples/hello-${template}/`;
     if (entry.fileName.startsWith(prefix)) {
       const fp = join(workingDir, util.trimPrefix(entry.fileName, prefix));
       if (entry.type === "directory") {
