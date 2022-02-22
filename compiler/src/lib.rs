@@ -6,7 +6,6 @@ mod error;
 mod expr_utils;
 mod hmr;
 mod import_map;
-mod jsx_attr;
 mod resolve_fold;
 mod resolver;
 mod source_type;
@@ -57,9 +56,6 @@ pub struct Options {
   pub jsx_import_source: Option<String>,
 
   #[serde(default)]
-  pub parse_jsx_static_classes: bool,
-
-  #[serde(default)]
   pub strip_data_export: bool,
 }
 
@@ -74,9 +70,6 @@ pub struct TransformOutput {
 
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub deps: Vec<DependencyDescriptor>,
-
-  #[serde(skip_serializing_if = "Vec::is_empty")]
-  pub jsx_static_classes: Vec<String>,
 
   #[serde(skip_serializing_if = "Option::is_none")]
   pub map: Option<String>,
@@ -104,16 +97,7 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
   )));
   let module = SWC::parse(specifier, code, EsVersion::Es2022).expect("could not parse the module");
   let (code, map) = module
-    .fast_transform(
-      resolver.clone(),
-      &EmitOptions {
-        parse_jsx_static_classes: options.parse_jsx_static_classes,
-        strip_data_export: false,
-        jsx_import_source: None,
-        minify: false,
-        source_map: true,
-      },
-    )
+    .fast_transform(resolver.clone())
     .expect("could not transform the module");
   let r = resolver.borrow();
 
@@ -121,7 +105,6 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
     JsValue::from_serde(&TransformOutput {
       code,
       deps: r.deps.clone(),
-      jsx_static_classes: r.jsx_static_classes.clone().into_iter().collect(),
       map,
     })
     .unwrap(),
@@ -164,7 +147,6 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     .transform(
       resolver.clone(),
       &EmitOptions {
-        parse_jsx_static_classes: options.parse_jsx_static_classes,
         strip_data_export: options.strip_data_export,
         jsx_import_source: options.jsx_import_source,
         minify: !options.is_dev,
@@ -178,7 +160,6 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     JsValue::from_serde(&TransformOutput {
       code,
       deps: r.deps.clone(),
-      jsx_static_classes: r.jsx_static_classes.clone().into_iter().collect(),
       map,
     })
     .unwrap(),

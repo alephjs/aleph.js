@@ -13,7 +13,6 @@ export type TransformOptions = {
   jsxRuntimeVersion?: string;
   jsxRuntimeCdnVersion?: string;
   jsxImportSource?: string;
-  parseJsxStaticClasses?: boolean;
   stripDataExport?: boolean;
   isDev?: boolean;
 };
@@ -23,14 +22,12 @@ export type FastTransformOptions = Pick<
   | "importMap"
   | "graphVersions"
   | "initialGraphVersion"
-  | "parseJsxStaticClasses"
 >;
 
 export type TransformResult = {
   readonly code: string;
   readonly map?: string;
   readonly deps?: DependencyDescriptor[];
-  readonly jsxStaticClasses?: ReadonlyArray<string>;
 };
 
 export type DependencyDescriptor = {

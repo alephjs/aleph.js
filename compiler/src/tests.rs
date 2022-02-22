@@ -140,34 +140,6 @@ fn react_dev() {
 }
 
 #[test]
-fn jsx_class_names() {
-  let source = r#"
-      export default function Index() {
-        const [color, setColor] = useState('white');
-
-        return (
-          <div className="mt-4 flex">
-            <div className={"p-4" + " " + (bold ? "bold" : "font-sm")}>
-              <div class={`font-lg ${"fw-600"}`} />
-            </div>
-          </div>
-        )
-      }
-    "#;
-  let (_, resolver) = transform(
-    "./app.tsx",
-    source,
-    false,
-    &EmitOptions {
-      parse_jsx_static_classes: true,
-      ..Default::default()
-    },
-  );
-  let r = resolver.borrow();
-  assert_eq!(r.jsx_static_classes.len(), 7);
-}
-
-#[test]
 fn strip_data_export() {
   let source = r#"
       import { json } from "./helper.ts"

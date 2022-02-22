@@ -5,7 +5,6 @@ export type Module = {
   readonly version: number;
   readonly deps?: readonly DependencyDescriptor[];
   readonly inlineCSS?: boolean;
-  readonly jsxStaticClasses?: readonly string[];
 };
 
 export class DependencyGraph {
@@ -25,7 +24,7 @@ export class DependencyGraph {
 
   mark(
     specifier: string,
-    props: { deps?: DependencyDescriptor[]; inlineCSS?: boolean; jsxStaticClasses?: readonly string[] },
+    props: { deps?: readonly DependencyDescriptor[]; inlineCSS?: boolean },
   ): Module {
     const prev = this.#modules.get(specifier);
     if (prev) {

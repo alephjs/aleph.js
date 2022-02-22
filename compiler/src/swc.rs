@@ -1,6 +1,5 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::hmr::hmr;
-use crate::jsx_attr::jsx_attr_fold;
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::Resolver;
 use crate::source_type::SourceType;
@@ -21,7 +20,6 @@ use swc_ecmascript::visit::{Fold, FoldWith};
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
   pub jsx_import_source: Option<String>,
-  pub parse_jsx_static_classes: bool,
   pub strip_data_export: bool,
   pub minify: bool,
   pub source_map: bool,
@@ -31,7 +29,6 @@ impl Default for EmitOptions {
   fn default() -> Self {
     EmitOptions {
       jsx_import_source: None,
-      parse_jsx_static_classes: false,
       strip_data_export: false,
       minify: false,
       source_map: false,
@@ -88,26 +85,13 @@ impl SWC {
   }
 
   /// fast transform
-  pub fn fast_transform(
-    self,
-    resolver: Rc<RefCell<Resolver>>,
-    options: &EmitOptions,
-  ) -> Result<(String, Option<String>), anyhow::Error> {
+  pub fn fast_transform(self, resolver: Rc<RefCell<Resolver>>) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
-      let is_jsx = match self.source_type {
-        SourceType::JSX => true,
-        SourceType::TSX => true,
-        _ => false,
-      };
-      let passes = chain!(
-        Optional::new(
-          jsx_attr_fold(resolver.clone()),
-          is_jsx && options.parse_jsx_static_classes
-        ),
-        resolve_fold(resolver.clone(), false),
-      );
-
-      Ok(self.apply_fold(passes, true, false).unwrap())
+      Ok(
+        self
+          .apply_fold(resolve_fold(resolver.clone(), false), true, false)
+          .unwrap(),
+      )
     })
   }
 
@@ -155,10 +139,6 @@ impl SWC {
       let passes = chain!(
         resolver_with_mark(top_level_mark),
         Optional::new(react::jsx_src(is_dev, self.source_map.clone()), is_jsx),
-        Optional::new(
-          jsx_attr_fold(resolver.clone()),
-          is_jsx && options.parse_jsx_static_classes
-        ),
         resolve_fold(resolver.clone(), options.strip_data_export),
         decorators::decorators(decorators::Config {
           legacy: true,

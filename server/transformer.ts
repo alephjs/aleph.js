@@ -55,17 +55,14 @@ const esModuleLoader: Loader<{ importMap: ImportMap; initialGraphVersion: string
         acc[specifier] = version.toString(16);
         return acc;
       }, {} as Record<string, string>);
-      const useAtomicCSS = Boolean(config?.atomicCSS?.presets?.length) && isJSX;
-      const { code, deps, jsxStaticClasses } = await fastTransform(specifier, dec.decode(rawContent), {
-        parseJsxStaticClasses: useAtomicCSS,
+      const { code, deps } = await fastTransform(specifier, dec.decode(rawContent), {
         importMap: options?.importMap,
         initialGraphVersion: options?.initialGraphVersion,
         graphVersions,
       });
       serverDependencyGraph.mark(specifier, {
         deps,
-        inlineCSS: useAtomicCSS && Boolean(jsxStaticClasses?.length),
-        jsxStaticClasses,
+        inlineCSS: Boolean(config?.atomicCSS?.presets?.length) && isJSX,
       });
       return {
         content: enc.encode(code),
@@ -153,26 +150,24 @@ export const clientModuleTransformer = {
       }, {} as Record<string, string>);
       const useAtomicCSS = Boolean(atomicCSS?.presets?.length) && isJSX;
       const alephPkgUri = getAlephPkgUri();
-      const { code, jsxStaticClasses, deps } = await transform(specifier, rawCode, {
+      const { code, deps } = await transform(specifier, rawCode, {
         ...jsxConfig,
         stripDataExport: isRouteFile(specifier),
-        parseJsxStaticClasses: useAtomicCSS,
         target: buildTarget,
         alephPkgUri,
         graphVersions,
         importMap,
         isDev,
       });
-      const atomicStyle = new Set(jsxStaticClasses?.map((name) => name.split(" ").map((name) => name.trim())).flat());
       let inlineCSS: string | null = null;
-      if (useAtomicCSS && atomicStyle.size > 0) {
+      if (useAtomicCSS) {
         const uno = createGenerator(atomicCSS);
-        const { css } = await uno.generate(atomicStyle, { id: specifier, minify: !isDev });
+        const { css } = await uno.generate(rawCode, { id: specifier, minify: !isDev });
         inlineCSS = css;
       }
       if (inlineCSS) {
         resBody = code +
-          `\nimport { applyCSS as __applyCSS } from "${toLocalPath(alephPkgUri)}framework/core/style.ts";__applyCSS(${
+          `\nimport { applyCSS as __apply_CSS } from "${toLocalPath(alephPkgUri)}framework/core/style.ts";__apply_CSS(${
             JSON.stringify(specifier)
           }, ${JSON.stringify(inlineCSS)});`;
         clientDependencyGraph.mark(specifier, { deps, inlineCSS: true });

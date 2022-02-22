@@ -59,18 +59,15 @@ export default {
               }
             });
             const styles = await Promise.all(imports.map(async (mod) => {
+              const rawCode = await Deno.readTextFile(mod.specifier);
               if (mod.specifier.endsWith(".css")) {
-                const rawCSS = await Deno.readTextFile(mod.specifier);
-                const { code } = await bundleCSS(mod.specifier, rawCSS, { minify: !isDev });
+                const { code } = await bundleCSS(mod.specifier, rawCode, { minify: !isDev });
                 return `<style data-module-id="${mod.specifier}">${code}</style>`;
               }
-              if (mod.jsxStaticClasses) {
+              if (mod.inlineCSS) {
                 const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-                const atomicStyle = new Set(
-                  mod.jsxStaticClasses?.map((name) => name.split(" ").map((name) => name.trim())).flat(),
-                );
                 const uno = createGenerator(config?.atomicCSS);
-                const { css } = await uno.generate(atomicStyle, { id: mod.specifier, minify: !isDev });
+                const { css } = await uno.generate(rawCode, { id: mod.specifier, minify: !isDev });
                 if (css) {
                   return `<style data-module-id="${mod.specifier}">${css}</style>`;
                 }
