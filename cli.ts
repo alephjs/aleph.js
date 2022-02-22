@@ -12,7 +12,7 @@ const commands = {
   "init": "Create a new app",
   "dev": "Start the app in `development` mode",
   "start": "Start the app in `production` mode",
-  "compile": "Compile the app into a worker",
+  "build": "Build the app into a worker",
   "upgrade": "Upgrade Aleph.js CLI",
 };
 
@@ -103,7 +103,7 @@ async function main() {
 
   let importMapFile: string | undefined;
   let denoConfigFile: string | undefined;
-  let cliVerison = VERSION;
+  let version: string | undefined;
 
   // get denoDir
   const p = Deno.run({
@@ -153,7 +153,7 @@ async function main() {
                 }'?`,
               );
               if (!update) {
-                cliVerison = ver.slice(1);
+                version = ver;
                 break;
               }
             }
@@ -177,10 +177,10 @@ async function main() {
     }
   }
 
-  await runCli(command, cliVerison, denoConfigFile, importMapFile);
+  await run(command, version, denoConfigFile, importMapFile);
 }
 
-async function runCli(command: string, version: string, denoConfigFile?: string, importMapFile?: string) {
+async function run(command: string, version?: string, denoConfigFile?: string, importMapFile?: string) {
   const cmd: string[] = [
     Deno.execPath(),
     "run",
@@ -188,9 +188,9 @@ async function runCli(command: string, version: string, denoConfigFile?: string,
     "--allow-net",
     "--allow-read",
     "--allow-write",
+    "--location=http://localhost",
     "--no-check",
     "--quiet",
-    "--location=http://localhost",
   ];
   const devPort = Deno.env.get("ALEPH_DEV_PORT");
   if (devPort) {
@@ -202,10 +202,10 @@ async function runCli(command: string, version: string, denoConfigFile?: string,
   if (importMapFile) {
     cmd.push("--import-map", importMapFile);
   }
-  if (Deno.env.get("ALEPH_DEV")) {
-    cmd.push(`./commands/${command}.ts`);
-  } else {
+  if (version) {
     cmd.push(`https://deno.land/x/aleph@${version}/commands/${command}.ts`);
+  } else {
+    cmd.push(`./commands/${command}.ts`);
   }
   cmd.push(...Deno.args.slice(1));
   const p = Deno.run({ cmd, stdout: "inherit", stderr: "inherit" });

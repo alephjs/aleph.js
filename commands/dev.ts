@@ -26,7 +26,6 @@ Options:
         --tls-cert  <cert-file>  The server certificate file
         --tls-key   <key-file>   The server public key file
     -L, --log-level <log-level>  Set log level [possible values: debug, info]
-    -r, --reload                 Reload source code cache
     -h, --help                   Prints help message
 `;
 

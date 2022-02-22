@@ -12,7 +12,6 @@ if the <dir> is empty, the current directory will be used.
 
 Options:
     -L, --log-level <log-level>  Set log level [possible values: debug, info]
-    -r, --reload                 Reload source code cache
     -h, --help                   Prints help message
 `;
 
