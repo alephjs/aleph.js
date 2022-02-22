@@ -14,7 +14,7 @@ export function getAlephPkgUri() {
     return global.__ALEPH_PKG_URI;
   }
   const pkgName = isCanary ? "aleph_canary" : "aleph";
-  let uri = `https://deno.land/x/${pkgName}}@${VERSION}`;
+  let uri = `https://deno.land/x/${pkgName}@${VERSION}`;
   const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
   if (DEV_PORT) {
     uri = `http://localhost:${DEV_PORT}`;
