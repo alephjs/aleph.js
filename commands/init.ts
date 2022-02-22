@@ -68,8 +68,8 @@ export default async function (nameArg: string | undefined, template = "react") 
     }
   }
 
-  const gitignore = [".DS_Store", "Thumbs.db", "dist/"];
-  const alephPkgUri = `https://deno.land/x/aleph${isCanary ? "_canary" : ""}@${VERSION}`;
+  const pkgName = isCanary ? "aleph_canary" : "aleph";
+  const alephPkgUri = `https://deno.land/x/${pkgName}@${VERSION}`;
   const importMap = {
     imports: {
       "~/": "./",
@@ -89,6 +89,11 @@ export default async function (nameArg: string | undefined, template = "react") 
     "format": {},
     "lint": {},
   };
+  const gitignore = [
+    ".DS_Store",
+    "Thumbs.db",
+    "dist/",
+  ];
   switch (template) {
     case "react": {
       Object.assign(importMap.imports, {

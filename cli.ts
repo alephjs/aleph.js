@@ -104,6 +104,7 @@ async function main() {
   let importMapFile: string | undefined;
   let denoConfigFile: string | undefined;
   let version: string | undefined;
+  let isCanary: boolean | undefined;
 
   // get denoDir
   const p = Deno.run({
@@ -142,7 +143,7 @@ async function main() {
         for (const key in importMap.imports) {
           const url = importMap.imports[key];
           if (
-            /\/\/deno\.land\/x\/aleph@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)
+            /\/\/deno\.land\/x\/aleph(_canary)?@v?\d+\.\d+\.\d+(-[a-z0-9\.]+)?\//.test(url)
           ) {
             const [prefix, rest] = util.splitBy(url, "@");
             const [ver, suffix] = util.splitBy(rest, "/");
@@ -154,6 +155,7 @@ async function main() {
               );
               if (!update) {
                 version = ver;
+                isCanary = prefix.endsWith("_canary");
                 break;
               }
             }
@@ -177,10 +179,18 @@ async function main() {
     }
   }
 
-  await run(command, version, denoConfigFile, importMapFile);
+  await run(command, { version, isCanary, denoConfigFile, importMapFile });
 }
 
-async function run(command: string, version?: string, denoConfigFile?: string, importMapFile?: string) {
+type RunOptions = {
+  version?: string;
+  isCanary?: boolean;
+  denoConfigFile?: string;
+  importMapFile?: string;
+};
+
+async function run(command: string, options: RunOptions) {
+  const { version, isCanary, denoConfigFile, importMapFile } = options;
   const cmd: string[] = [
     Deno.execPath(),
     "run",
@@ -203,7 +213,8 @@ async function run(command: string, version?: string, denoConfigFile?: string, i
     cmd.push("--import-map", importMapFile);
   }
   if (version) {
-    cmd.push(`https://deno.land/x/aleph@${version}/commands/${command}.ts`);
+    const pkgName = isCanary ? "aleph_canary" : "aleph";
+    cmd.push(`https://deno.land/x/${pkgName}@${version}/commands/${command}.ts`);
   } else {
     cmd.push(`./commands/${command}.ts`);
   }
