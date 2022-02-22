@@ -6,7 +6,7 @@ import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import log from "../lib/log.ts";
 import { toLocalPath } from "../lib/path.ts";
 import util from "../lib/util.ts";
-import type { AlephConfig, Route, SSRContext } from "../types.d.ts";
+import type { AlephConfig, FetchContext, HTMLRewriterHandlers, Route, SSRContext } from "../types.d.ts";
 import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { bundleCSS } from "./bundle.ts";
@@ -17,17 +17,18 @@ export type RenderOptions = {
   indexHtml: string;
   routes: Route[];
   isDev: boolean;
+  customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   ssrHandler?: (ssr: SSRContext) => string | undefined | Promise<string | undefined>;
 };
 
 export default {
-  async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
+  async fetch(req: Request, ctx: FetchContext, options: RenderOptions): Promise<Response> {
     if (!lolHtmlReady) {
       await initWasm(decodeWasm());
       lolHtmlReady = true;
     }
 
-    const { indexHtml, routes, isDev, ssrHandler } = options;
+    const { indexHtml, routes, isDev, customHTMLRewriter, ssrHandler } = options;
     const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
     const chunks: Uint8Array[] = [];
     const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
@@ -188,6 +189,7 @@ export default {
         },
       };
 
+      customHTMLRewriter.forEach((handlers, selector) => rewriter.on(selector, handlers));
       rewriter.on("link", linkHandler);
       rewriter.on("script", scriptHandler);
       rewriter.on("head", commonHandler);
@@ -208,7 +210,7 @@ export default {
   },
 };
 
-async function loadPageData(req: Request, ctx: Record<string, unknown>, routes: Route[]): Promise<
+async function loadPageData(req: Request, ctx: FetchContext, routes: Route[]): Promise<
   Response | { url: URL; moduleDefaultExport?: unknown; filename?: string; data?: unknown; dataExpires?: number }
 > {
   const url = new URL(req.url);

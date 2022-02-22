@@ -4,7 +4,7 @@ import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import type { ServerOptions } from "../types.d.ts";
+import type { FetchContext, HTMLRewriterHandlers, ServerOptions } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
 import { DependencyGraph } from "./graph.ts";
@@ -80,7 +80,14 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    const ctx: Record<string, unknown> = {};
+    const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
+    const ctx: FetchContext = {
+      HTMLRewriter: {
+        on: (selector: string, handlers: HTMLRewriterHandlers) => {
+          customHTMLRewriter.set(selector, handlers);
+        },
+      },
+    };
 
     // use middlewares
     if (Array.isArray(middlewares)) {
@@ -188,7 +195,7 @@ export const serve = (options: ServerOptions = {}) => {
       return new Response("Not Found", { status: 404 });
     }
 
-    return renderer.fetch(req, ctx, { indexHtml, routes, ssrHandler: ssr, isDev });
+    return renderer.fetch(req, ctx, { indexHtml, routes, ssrHandler: ssr, customHTMLRewriter, isDev });
   };
 
   // inject browser navigator polyfill
