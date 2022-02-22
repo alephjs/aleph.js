@@ -1,7 +1,8 @@
 // MIME Types for Web
 const mimeTypes: Record<string, string[]> = {
   // application
-  "application/javascript": ["js", "mjs", "cjs"],
+  "application/javascript": ["js", "mjs"],
+  "application/node": ["cjs"],
   "application/wasm": ["wasm"],
   "application/json": ["json", "jsonc", "map"],
   "application/json5": ["json5"],
@@ -21,7 +22,8 @@ const mimeTypes: Record<string, string[]> = {
   "text/sass": ["sass", "scss"],
   "text/stylus": ["stylus", "styl"],
   "text/csv": ["csv"],
-  "text/plain": ["txt", "text", "conf", "ini", "log", "yaml"],
+  "text/yaml": ["yaml"],
+  "text/plain": ["txt", "text", "conf", "ini", "log", "glsl"],
   // font
   "font/ttf": ["ttf"],
   "font/otf": ["otf"],
@@ -47,6 +49,10 @@ const mimeTypes: Record<string, string[]> = {
   "video/mp4": ["mp4", "m4v"],
   "video/ogg": ["ogv"],
   "video/webm": ["webm"],
+  "video/x-matroska": ["mkv"],
+  // shader
+  "x-shader/x-fragment": ["frag"],
+  "x-shader/x-vertex": ["vert"],
 };
 
 // map types

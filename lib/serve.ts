@@ -1,13 +1,7 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
 import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { serve as stdServe } from "https://deno.land/std@0.125.0/http/server.ts";
 import { getContentType } from "./mime.ts";
-
-export type ServerOptions = {
-  port: number;
-  cwd?: string;
-  loaders?: Loader[];
-  loaderOptions?: unknown;
-};
 
 export type Loader<Options = unknown> = {
   test: (url: URL) => boolean;
@@ -19,15 +13,15 @@ export type Content = {
   contentType?: string;
 };
 
-export async function serveDir(options: ServerOptions) {
+export type ServeDirOptions = {
+  port: number;
+  cwd?: string;
+  loaders?: Loader[];
+  loaderOptions?: unknown;
+};
+
+export async function serveDir(options: ServeDirOptions) {
   const cwd = options.cwd || Deno.cwd();
-  const s = Deno.listen({ port: options.port });
-  const serve = async (conn: Deno.Conn) => {
-    const httpConn = Deno.serveHttp(conn);
-    for await (const { request, respondWith } of httpConn) {
-      respondWith(handler(request));
-    }
-  };
   const handler = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     const filepath = join(cwd, url.pathname);
@@ -84,8 +78,5 @@ export async function serveDir(options: ServerOptions) {
       return new Response(err.message, { status: 500 });
     }
   };
-
-  for await (const conn of s) {
-    serve(conn);
-  }
+  await stdServe(handler, { port: options.port });
 }

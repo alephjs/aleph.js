@@ -1,3 +1,4 @@
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
 import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
@@ -63,10 +64,7 @@ export const serve = (options: ServerOptions = {}) => {
           return new Response(null, { status: 304 });
         }
         const file = await Deno.open(`.${pathname}`, { read: true });
-        const headers = new Headers({
-          "Content-Type": getContentType(pathname),
-          "Cache-Control": "public, max-age=0, must-revalidate",
-        });
+        const headers = new Headers({ "Content-Type": getContentType(pathname) });
         if (etag) {
           headers.set("Etag", etag);
         }
@@ -224,6 +222,14 @@ export const serve = (options: ServerOptions = {}) => {
       // @ts-ignore
       e.respondWith(handler(e.request));
     });
+  } else if (!Deno.env.get("ALEPH_CLI")) {
+    const { port = 8080, certFile, keyFile } = options;
+    if (certFile && keyFile) {
+      serveTls(handler, { port, certFile, keyFile });
+    } else {
+      stdServe(handler, { port });
+    }
+    log.info(`Server ready on http://localhost:${port}`);
   }
 };
 

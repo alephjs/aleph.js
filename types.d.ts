@@ -1,4 +1,4 @@
-import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.26.0";
+import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.26.2";
 
 export type AlephConfig = {
   build?: BuildOptions;
@@ -43,6 +43,9 @@ export type SSRContext = {
 };
 
 export type ServerOptions = {
+  port?: number;
+  certFile?: string;
+  keyFile?: string;
   config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
