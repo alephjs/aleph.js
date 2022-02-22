@@ -1,4 +1,4 @@
-import { createGenerator } from "https://esm.sh/@unocss/core@0.26.0";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.26.2";
 import { fastTransform, transform, transformCSS } from "../compiler/mod.ts";
 import type { ImportMap, TransformOptions } from "../compiler/types.d.ts";
 import { readCode } from "../lib/fs.ts";
@@ -179,7 +179,6 @@ export const clientModuleTransformer = {
     return new Response(resBody, {
       headers: {
         "Content-Type": `${resType}; charset=utf-8`,
-        "Cache-Control": "public, max-age=0, must-revalidate",
         "Etag": etag,
       },
     });
