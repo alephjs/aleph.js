@@ -216,7 +216,7 @@ async function run(command: string, options: RunOptions) {
     const pkgName = isCanary ? "aleph_canary" : "aleph";
     cmd.push(`https://deno.land/x/${pkgName}@${version}/commands/${command}.ts`);
   } else {
-    cmd.push(`./commands/${command}.ts`);
+    cmd.push(new URL(`./commands/${command}.ts`, import.meta.url).href);
   }
   cmd.push(...Deno.args.slice(1));
   const p = Deno.run({ cmd, stdout: "inherit", stderr: "inherit" });
