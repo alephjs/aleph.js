@@ -49,8 +49,9 @@ export default async function (nameArg: string | undefined, template = "react") 
   const rev = "master";
 
   // download template
-  console.log("Downloading template. This might take a moment...");
-  const resp = await fetch("https://codeload.github.com/alephjs/aleph.js/tar.gz/" + rev);
+  console.log("Downloading template, this might take a moment...");
+  const repo = isCanary ? "ije/aleph-canary" : "alephjs/aleph.js";
+  const resp = await fetch(`https://codeload.github.com/${repo}/tar.gz/${rev}`);
   const gzData = await readAll(new Buffer(await resp.arrayBuffer()));
   const tarData = gunzip(gzData);
   const entryList = new Untar(new Buffer(tarData));
