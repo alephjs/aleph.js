@@ -6,9 +6,11 @@ import { ensureDir } from "https://deno.land/std@0.125.0/fs/ensure_dir.ts";
 import { join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import { existsDir } from "../lib/fs.ts";
+import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { VERSION } from "../version.ts";
+import { isCanary, VERSION } from "../version.ts";
 
+const templates = ["react", "vue", "svelte", "vanilla", "api"];
 const defaultReactVersion = "17.0.2";
 
 export const helpMessage = `
@@ -18,13 +20,14 @@ Usage:
 <name> represents the name of new app.
 
 Options:
-    -t, --template [react,vue,svelte,vanilla,api] Specify a template for the created project
-    -h, --help                                Prints help message
+    -t, --template [${templates.join(",")}] Specify a template for the created project
+    -h, --help      ${" ".repeat(templates.length)}  Prints help message
 `;
 
 export default async function (nameArg: string | undefined, template = "react") {
-  const cwd = Deno.cwd();
-  const rev = "master";
+  if (!templates.includes(template)) {
+    log.fatal(`Invalid template ${red(template)}, must be one of ${templates.join(",")}`);
+  }
 
   const name = nameArg || (prompt("Project Name:") || "").trim();
   if (name === "") {
@@ -32,40 +35,30 @@ export default async function (nameArg: string | undefined, template = "react") 
   }
 
   if (!/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) {
-    console.error(`Invalid project name: ${red(name)}`);
-    return;
+    log.fatal(`Invalid project name: ${red(name)}`);
   }
 
   // check dir is clean
-  if (!await isFolderEmpty(cwd, name)) {
+  if (!await isFolderEmpty(Deno.cwd(), name)) {
     if (!confirm("Continue?")) {
       Deno.exit(1);
     }
   }
 
+  const workingDir = join(Deno.cwd(), name);
+  const rev = "master";
+
   // download template
   console.log("Downloading template. This might take a moment...");
-  const resp = await fetch(
-    "https://codeload.github.com/alephjs/aleph.js/tar.gz/" + rev,
-  );
+  const resp = await fetch("https://codeload.github.com/alephjs/aleph.js/tar.gz/" + rev);
   const gzData = await readAll(new Buffer(await resp.arrayBuffer()));
-
-  console.log("Apply template...");
   const tarData = gunzip(gzData);
   const entryList = new Untar(new Buffer(tarData));
 
   for await (const entry of entryList) {
-    if (
-      entry.fileName.startsWith(`aleph.js-${rev}/examples/hello-${template}/`)
-    ) {
-      const fp = join(
-        cwd,
-        name,
-        util.trimPrefix(
-          entry.fileName,
-          `aleph.js-${rev}/examples/hello-${template}/`,
-        ),
-      );
+    const prefix = `aleph.js-${rev}/examples/hello-${template}/`;
+    if (entry.fileName.startsWith(prefix)) {
+      const fp = join(workingDir, util.trimPrefix(entry.fileName, prefix));
       if (entry.type === "directory") {
         await ensureDir(fp);
         continue;
@@ -75,22 +68,13 @@ export default async function (nameArg: string | undefined, template = "react") 
     }
   }
 
-  const gitignore = [
-    ".DS_Store",
-    "Thumbs.db",
-    ".aleph/",
-    "dist/",
-  ];
+  const gitignore = [".DS_Store", "Thumbs.db", "dist/"];
+  const alephPkgUri = `https://deno.land/x/aleph${isCanary ? "_canary" : ""}@${VERSION}`;
   const importMap = {
     imports: {
       "~/": "./",
-      "std/": "https://deno.land/std@0.125.0/",
-      "aleph/": `https://deno.land/x/aleph@${VERSION}/`,
-      "aleph/server": `https://deno.land/x/aleph@${VERSION}/server/mod.ts`,
-      "aleph/react": `https://deno.land/x/aleph@${VERSION}/framework/react/mod.ts`,
-      "react": `https://esm.sh/react@${defaultReactVersion}`,
-      "react-dom": `https://esm.sh/react-dom@${defaultReactVersion}`,
-      "react-dom/server": `https://esm.sh/react-dom@${defaultReactVersion}/server`,
+      "aleph/": `${alephPkgUri}/`,
+      "aleph/server": `${alephPkgUri}/server/mod.ts`,
     },
   };
   const denoConfig = {
@@ -101,20 +85,32 @@ export default async function (nameArg: string | undefined, template = "react") 
         "dom.asynciterable",
         "deno.ns",
       ],
-      "jsx": "react-jsx",
-      "jsxImportSource": `https://esm.sh/react@${defaultReactVersion}`,
     },
     "format": {},
     "lint": {},
   };
+  switch (template) {
+    case "react": {
+      Object.assign(importMap.imports, {
+        "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
+        "react": `https://esm.sh/react@${defaultReactVersion}`,
+        "react-dom": `https://esm.sh/react-dom@${defaultReactVersion}`,
+        "react-dom/server": `https://esm.sh/react-dom@${defaultReactVersion}/server`,
+      });
+      Object.assign(denoConfig.compilerOptions, {
+        "jsx": "react-jsx",
+        "jsxImportSource": `https://esm.sh/react@${defaultReactVersion}`,
+      });
+    }
+  }
   await Promise.all([
-    Deno.writeTextFile(join(cwd, name, ".gitignore"), gitignore.join("\n")),
+    Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")),
     Deno.writeTextFile(
-      join(cwd, name, "import_map.json"),
+      join(workingDir, "import_map.json"),
       JSON.stringify(importMap, undefined, 2),
     ),
     Deno.writeTextFile(
-      join(cwd, name, "deno.json"),
+      join(workingDir, "deno.json"),
       JSON.stringify(denoConfig, undefined, 2),
     ),
   ]);
@@ -130,6 +126,10 @@ export default async function (nameArg: string | undefined, template = "react") 
       "deno.unstable": true,
       "deno.config": "./deno.json",
       "deno.importMap": "./import_map.json",
+      "deno.suggest.imports.hosts": {
+        "https://deno.land": true,
+        "https://esm.sh": false,
+      },
     };
     await ensureDir(join(name, ".vscode"));
     await Promise.all([
@@ -149,7 +149,7 @@ ${green("Aleph.js is ready to go!")}
 ${dim("▲")} cd ${name}
 ${dim("▲")} aleph dev    ${dim("# start the app in `development` mode")}
 ${dim("▲")} aleph start  ${dim("# start the app in `production` mode")}
-${dim("▲")} aleph build  ${dim("# build the app to a static site (SSG)")}
+${dim("▲")} aleph build  ${dim("# build the app to a worker")}
 
 Docs: ${cyan("https://alephjs.org/docs")}
 Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}
@@ -165,30 +165,34 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
     ".gitattributes",
     ".gitignore",
     ".gitlab-ci.yml",
+    ".github",
     ".hg",
     ".hgcheck",
     ".hgignore",
     ".idea",
     ".travis.yml",
-    "LICENSE",
-    "Thumbs.db",
+    "assets",
     "docs",
-    "public",
-    "api",
     "pages",
+    "public",
+    "routes",
     "src",
     "app.tsx",
-    "aleph.config.ts",
+    "deno.json",
+    "deno.jsonc",
     "import_map.json",
-    "mkdocs.yml",
+    "import-map.json",
+    "LICENSE",
+    "README.md",
+    "server.ts",
+    "server.tsx",
+    "Thumbs.db",
   ];
 
   const conflicts = [];
 
   if (await existsDir(join(root, name))) {
-    for await (
-      const { name: file, isDirectory } of Deno.readDir(join(root, name))
-    ) {
+    for await (const { name: file, isDirectory } of Deno.readDir(join(root, name))) {
       // Support IntelliJ IDEA-based editors
       if (validFiles.includes(file) || /\.iml$/.test(file)) {
         if (isDirectory) {
@@ -201,15 +205,13 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
   }
 
   if (conflicts.length > 0) {
-    console.log(
-      [
-        `The directory ${green(name)} contains files that could conflict:`,
-        "",
-        ...conflicts.filter((name) => name.endsWith("/")).sort().map((name) => dim("- ") + name),
-        ...conflicts.filter((name) => !name.endsWith("/")).sort().map((name) => dim("- ") + name),
-        "",
-      ].join("\n"),
-    );
+    console.log([
+      `The directory ${green(name)} contains files that could conflict:`,
+      "",
+      ...conflicts.filter((name) => name.endsWith("/")).sort().map((name) => dim("- ") + name),
+      ...conflicts.filter((name) => !name.endsWith("/")).sort().map((name) => dim("- ") + name),
+      "",
+    ].join("\n"));
     return false;
   }
 

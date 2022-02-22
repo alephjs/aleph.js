@@ -6,14 +6,14 @@ import { toLocalPath } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { JSXConfig } from "../types.d.ts";
-import { VERSION } from "../version.ts";
+import { isCanary, VERSION } from "../version.ts";
 
 export function getAlephPkgUri() {
   const global = globalThis as Record<string, unknown>;
   if (util.isFilledString(global.__ALEPH_PKG_URI)) {
     return global.__ALEPH_PKG_URI;
   }
-  let uri = `https://deno.land/x/aleph@${VERSION}`;
+  let uri = `https://deno.land/x/aleph${isCanary ? "_canary" : ""}@${VERSION}`;
   const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
   if (DEV_PORT) {
     uri = `http://localhost:${DEV_PORT}`;
