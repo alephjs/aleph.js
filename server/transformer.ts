@@ -167,9 +167,9 @@ export const clientModuleTransformer = {
       }
       if (inlineCSS) {
         resBody = code +
-          `\nimport { applyCSS as __apply_CSS } from "${toLocalPath(alephPkgUri)}framework/core/style.ts";__apply_CSS(${
-            JSON.stringify(specifier)
-          }, ${JSON.stringify(inlineCSS)});`;
+          `\nimport { applyCSS as __apply_CSS } from "${
+            toLocalPath(alephPkgUri)
+          }/framework/core/style.ts";__apply_CSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`;
         clientDependencyGraph.mark(specifier, { deps, inlineCSS: true });
       } else {
         resBody = code;

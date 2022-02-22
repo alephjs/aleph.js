@@ -18,7 +18,7 @@ export function toLocalPath(url: string): string {
       isHttp && "http_",
       hostname,
       port && "_" + port,
-      pathname,
+      util.trimSuffix(pathname, "/"),
       search,
     ].filter(Boolean).join("");
   }

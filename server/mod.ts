@@ -11,7 +11,7 @@ import { DependencyGraph } from "./graph.ts";
 import { initRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
-import { clientModuleTransformer } from "./transformer.ts";
+import { clientModuleTransformer, serveAppModules } from "./transformer.ts";
 
 export const serve = (options: ServerOptions = {}) => {
   const { config, middlewares, fetch, ssr } = options;
@@ -223,6 +223,12 @@ export const serve = (options: ServerOptions = {}) => {
       e.respondWith(handler(e.request));
     });
   } else if (!Deno.env.get("ALEPH_CLI")) {
+    if (options.ssr && options.config?.routeFiles) {
+      importMapPromise.then((importMap) => {
+        serveAppModules(6060, importMap);
+        log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
+      });
+    }
     const { port = 8080, certFile, keyFile } = options;
     if (certFile && keyFile) {
       serveTls(handler, { port, certFile, keyFile });

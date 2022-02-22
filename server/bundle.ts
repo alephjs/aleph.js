@@ -63,10 +63,10 @@ export async function bundleCSS(
     }
     return {
       code: [
-        options.hmr && `import createHotContext from "${toLocalPath(alephPkgUri)}framework/core/hmr.ts";`,
+        options.hmr && `import createHotContext from "${toLocalPath(alephPkgUri)}/framework/core/hmr.ts";`,
         options.hmr && `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
         `import { applyCSS } from "${
-          options.resolveAlephPkgUri ? toLocalPath(alephPkgUri).slice(0, -1) : alephPkgUri
+          options.resolveAlephPkgUri ? toLocalPath(alephPkgUri) : alephPkgUri
         }/framework/core/style.ts";`,
         `export const css = ${JSON.stringify(css)};`,
         `export default ${JSON.stringify(cssModulesExports)};`,

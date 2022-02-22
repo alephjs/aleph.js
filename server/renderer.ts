@@ -17,11 +17,11 @@ export type RenderOptions = {
   indexHtml: string;
   routes: Route[];
   isDev: boolean;
-  ssrHandler?: (ctx: SSRContext) => string | undefined | Promise<string | undefined>;
+  ssrHandler?: (ssr: SSRContext) => string | undefined | Promise<string | undefined>;
 };
 
 export default {
-  async fetch(req: Request, ctx: Record<string | symbol, unknown>, options: RenderOptions): Promise<Response> {
+  async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
     if (!lolHtmlReady) {
       await initWasm(decodeWasm());
       lolHtmlReady = true;
@@ -130,7 +130,7 @@ export default {
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
       }
 
-      const alephPkgUri = toLocalPath(getAlephPkgUri());
+      const alephPkgUri = getAlephPkgUri();
       const linkHandler = {
         element(el: Element) {
           let href = el.getAttribute("href");
@@ -141,7 +141,7 @@ export default {
             el.setAttribute("href", href);
             if (href.endsWith(".css") && href.startsWith("/") && isDev) {
               el.after(
-                `<script type="module">import hot from "${alephPkgUri}framework/core/hmr.ts";hot(${
+                `<script type="module">import hot from "${toLocalPath(alephPkgUri)}/framework/core/hmr.ts";hot(${
                   JSON.stringify(`.${href}`)
                 }).accept();</script>`,
                 { html: true },
@@ -156,7 +156,7 @@ export default {
           const src = el.getAttribute("src");
           const type = el.getAttribute("type");
           if (type === "module" && !scriptHandler.nomoduleInserted) {
-            el.after(`<script nomodule src="${alephPkgUri}lib/nomodule.js"></script>`, { html: true });
+            el.after(`<script nomodule src="${alephPkgUri}/lib/nomodule.js"></script>`, { html: true });
             scriptHandler.nomoduleInserted = true;
           }
           if (src?.startsWith("./")) {
@@ -179,7 +179,9 @@ export default {
           }
           if (isDev) {
             el.append(
-              `<script type="module">import hot from "${alephPkgUri}framework/core/hmr.ts";hot("./index.html").decline();</script>`,
+              `<script type="module">import hot from "${
+                toLocalPath(alephPkgUri)
+              }/framework/core/hmr.ts";hot("./index.html").decline();</script>`,
               { html: true },
             );
           }
