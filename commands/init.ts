@@ -76,6 +76,7 @@ export default async function (nameArg: string | undefined, template = "react") 
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
     },
+    scope: {},
   };
   const denoConfig = {
     "compilerOptions": {
@@ -108,16 +109,11 @@ export default async function (nameArg: string | undefined, template = "react") 
       });
     }
   }
+  await ensureDir(workingDir);
   await Promise.all([
     Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")),
-    Deno.writeTextFile(
-      join(workingDir, "import_map.json"),
-      JSON.stringify(importMap, undefined, 2),
-    ),
-    Deno.writeTextFile(
-      join(workingDir, "deno.json"),
-      JSON.stringify(denoConfig, undefined, 2),
-    ),
+    Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
+    Deno.writeTextFile(join(workingDir, "deno.json"), JSON.stringify(denoConfig, undefined, 2)),
   ]);
 
   if (confirm("Using VS Code?")) {
@@ -136,14 +132,14 @@ export default async function (nameArg: string | undefined, template = "react") 
         "https://esm.sh": false,
       },
     };
-    await ensureDir(join(name, ".vscode"));
+    await ensureDir(join(workingDir, ".vscode"));
     await Promise.all([
       Deno.writeTextFile(
-        join(name, ".vscode", "extensions.json"),
+        join(workingDir, ".vscode", "extensions.json"),
         JSON.stringify(extensions, undefined, 2),
       ),
       Deno.writeTextFile(
-        join(name, ".vscode", "settings.json"),
+        join(workingDir, ".vscode", "settings.json"),
         JSON.stringify(settigns, undefined, 2),
       ),
     ]);

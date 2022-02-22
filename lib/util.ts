@@ -32,7 +32,7 @@ export default {
     return [s, ""];
   },
   appendUrlParams(url: URL, params: Record<string, string>): URL {
-    const newUrl = new URL(url);
+    const newUrl = new URL(url.href);
     for (const [key, value] of Object.entries(params)) {
       newUrl.searchParams.set(key, value);
     }
