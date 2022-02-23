@@ -4,7 +4,7 @@ import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import type { FetchContext, HTMLRewriterHandlers, ServerOptions } from "../types.d.ts";
+import type { FetchContext, HTMLRewriterHandlers, Route, ServerOptions } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
 import { DependencyGraph } from "./graph.ts";
@@ -117,7 +117,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request page data
-    const routes = await routesPromise;
+    const routes = (Reflect.get(globalThis, "__ALEPH_ROUTES") as Route[] | undefined) || await routesPromise;
     if (routes.length > 0) {
       for (const [pattern, load] of routes) {
         const ret = pattern.exec({ pathname });

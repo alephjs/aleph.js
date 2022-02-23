@@ -5,7 +5,6 @@ import util from "../lib/util.ts";
 import { AlephConfig, Route, RoutePattern, RoutesConfig, RoutingRegExp } from "../types.d.ts";
 import { type DependencyGraph } from "./graph.ts";
 
-const currentRoutes: Route[] = [];
 const routeModules: Map<string, Record<string, unknown>> = new Map();
 
 export function register(filename: string, module: Record<string, unknown>) {
@@ -13,8 +12,9 @@ export function register(filename: string, module: Record<string, unknown>) {
 }
 
 export function isRouteFile(filename: string): boolean {
-  const index = currentRoutes.findIndex((r) => r[2].filename === filename);
-  if (index !== -1) {
+  const currentRoutes: Route[] | undefined = Reflect.get(globalThis, "__ALEPH_ROUTES");
+  const index = currentRoutes?.findIndex((r) => r[2].filename === filename);
+  if (index !== undefined && index !== -1) {
     return true;
   }
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
@@ -55,7 +55,7 @@ export async function initRoutes(config: string | RoutesConfig | RoutingRegExp):
     }
   });
   log.info(`${routes.length || "No"} route${routes.length !== 1 ? "s" : ""} found from ${reg.prefix}`);
-  currentRoutes.splice(0, currentRoutes.length, ...routes);
+  Reflect.set(globalThis, "__ALEPH_ROUTES", routes);
   return routes;
 }
 

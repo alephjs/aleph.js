@@ -1,31 +1,32 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
-import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import { createElement, Fragment, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
 import type { SSRContext } from "../../types.d.ts";
 import events from "../core/events.ts";
 import MainContext from "./context.ts";
 import { E404Page } from "./error.ts";
 
 export type RouterProps = {
-  readonly ssr?: SSRContext;
+  readonly layout?: FC<PegeProps>;
+  readonly ssrContext?: SSRContext;
 };
 
-type PegeProps = {
+export type PegeProps = {
   url: URL;
 };
 
-export const Router: FC<RouterProps> = ({ ssr }) => {
+export const Router: FC<RouterProps> = ({ layout = Fragment, ssrContext }) => {
   const [url, setUrl] = useState<URL & { _component?: FC<PegeProps> }>(() =>
-    ssr?.url || new URL(globalThis.location?.href || "http://localhost/")
+    ssrContext?.url || new URL(globalThis.location?.href || "http://localhost/")
   );
   const dataCache = useMemo(() => {
     const cache = new Map();
-    const [data, expires] = ssr ? [ssr.data, ssr.dataExpires] : loadSSRDataFromTag();
+    const [data, expires] = ssrContext ? [ssrContext.data, ssrContext.dataExpires] : loadSSRDataFromTag();
     cache.set(url.pathname + url.search, { data, expires });
     return cache;
   }, []);
   const Component = useMemo<FC<PegeProps>>(
     () =>
-      ssr?.moduleDefaultExport as FC ||
+      ssrContext?.moduleDefaultExport as FC ||
       (window as { __ssrModuleDefaultExport?: FC }).__ssrModuleDefaultExport ||
       url._component ||
       E404Page,
@@ -71,10 +72,14 @@ export const Router: FC<RouterProps> = ({ ssr }) => {
         url,
         setUrl,
         dataCache,
-        ssrHeadCollection: ssr?.headCollection,
+        ssrHeadCollection: ssrContext?.headCollection,
       },
     },
-    createElement(Component, { url }),
+    createElement(
+      layout,
+      null,
+      createElement(Component),
+    ),
   );
 };
 
