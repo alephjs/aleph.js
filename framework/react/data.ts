@@ -16,8 +16,8 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
   const dataUrl = useMemo(() => path || (routeUrl.pathname + routeUrl.search), [path, routeUrl]);
   const [dataStore, setDataStore] = useState<DataState<T>>(() => {
     if (dataCache.has(dataUrl)) {
-      const { data, expires } = dataCache.get(dataUrl)!;
-      if (!expires || Date.now() < expires) {
+      const { data, dataCacheTtl } = dataCache.get(dataUrl)!;
+      if (!dataCacheTtl || Date.now() < dataCacheTtl) {
         return { data: data as T };
       }
     }
@@ -120,7 +120,7 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
     const now = Date.now();
     if (
       dataUrl &&
-      (!dataCache.has(dataUrl) || (dataCache.get(dataUrl)!.expires || now + 1000) < now)
+      (!dataCache.has(dataUrl) || (dataCache.get(dataUrl)!.dataCacheTtl || now + 1000) < now)
     ) {
       if (!dataCache.has(dataUrl)) {
         setDataStore({ isLoading: true });
@@ -130,8 +130,8 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
           if (res.ok) {
             const data = await res.json();
             const cc = res.headers.get("Cache-Control");
-            const expires = cc && cc.includes("max-age") ? now + parseInt(cc.split("=")[1]) * 1000 : undefined;
-            dataCache.set(dataUrl, { data, expires });
+            const dataCacheTtl = cc && cc.includes("max-age") ? now + parseInt(cc.split("=")[1]) * 1000 : undefined;
+            dataCache.set(dataUrl, { data, dataCacheTtl });
             setDataStore({ data });
           } else {
             const message = await res.text();

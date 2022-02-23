@@ -9,7 +9,7 @@ import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { bundleCSS } from "./bundle.ts";
-import type { AlephConfig, FetchContext, HTMLRewriterHandlers, Route, SSRContext } from "./types.ts";
+import type { AlephConfig, FetchContext, HTMLRewriterHandlers, Route, SSRContext, SSRModule } from "./types.ts";
 
 let lolHtmlReady = false;
 
@@ -49,18 +49,20 @@ export default {
         const headCollection: string[] = [];
         const ssrOutput = await ssrHandler({ ...res, headCollection });
         if (typeof ssrOutput === "string") {
-          if (res.filename) {
+          if (res.imports.length > 0) {
             const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(
               globalThis,
               "serverDependencyGraph",
             );
-            const imports: Module[] = [];
-            serverDependencyGraph?.walk(res.filename, (mod) => {
-              if (mod.inlineCSS || mod.specifier.endsWith(".css")) {
-                imports.push(mod);
-              }
-            });
-            const styles = await Promise.all(imports.map(async (mod) => {
+            const styleModules: Module[] = [];
+            for (const { filename } of res.imports) {
+              serverDependencyGraph?.walk(filename, (mod) => {
+                if (mod.inlineCSS || mod.specifier.endsWith(".css")) {
+                  styleModules.push(mod);
+                }
+              });
+            }
+            const styles = await Promise.all(styleModules.map(async (mod) => {
               const rawCode = await Deno.readTextFile(mod.specifier);
               if (mod.specifier.endsWith(".css")) {
                 const { code } = await bundleCSS(mod.specifier, rawCode, { minify: !isDev });
@@ -82,22 +84,29 @@ export default {
           rewriter.on("ssr-head", {
             element(el: Element) {
               headCollection.forEach((tag) => el.before(tag, { html: true }));
-              if (res.data) {
-                const expiresAttr = res.dataExpires ? ` data-expires="${res.dataExpires}"` : "";
+              const imports = res.imports
+                .filter(({ defaultExport }) => defaultExport !== undefined)
+                .map(({ url, filename }, idx) =>
+                  `import mod_${idx} from ${JSON.stringify(filename)};__ssrModules[${
+                    JSON.stringify(url.pathname + url.search)
+                  }]={default:mod_${idx}};`
+                );
+              if (imports.length > 0) {
                 el.before(
-                  `<script id="aleph-ssr-data" type="application/json"${expiresAttr}>${
-                    JSON.stringify(res.data)
-                  }</script>`,
+                  `<script type="module">window.__ssrModules={};${imports.join("")}</script>`,
                   {
                     html: true,
                   },
                 );
               }
-              if (res.filename) {
+              const data = res.imports.map(({ url, data, dataCacheTtl }) => ({
+                url: url.pathname + url.search,
+                data,
+                dataCacheTtl,
+              }));
+              if (data.length > 0) {
                 el.before(
-                  `<script type="module">import e from ${
-                    JSON.stringify(res.filename)
-                  };window.__ssrModuleDefaultExport=e;</script>`,
+                  `<script id="aleph-ssr-data" type="application/json">${JSON.stringify(data)}</script>`,
                   {
                     html: true,
                   },
@@ -111,8 +120,13 @@ export default {
               el.replace(ssrOutput, { html: true });
             },
           });
-          if (typeof res.dataExpires === "number") {
-            headers.append("Cache-Control", `public, max-age=${res.dataExpires}`);
+          const ttls = res.imports.filter(({ dataCacheTtl }) =>
+            typeof dataCacheTtl === "number" && !Number.isNaN(dataCacheTtl) && dataCacheTtl > 0
+          ).map(({ dataCacheTtl }) => Number(dataCacheTtl));
+          if (ttls.length > 1) {
+            headers.append("Cache-Control", `public, max-age=${Math.min(...ttls)}`);
+          } else if (ttls.length == 1) {
+            headers.append("Cache-Control", `public, max-age=${ttls[0]}`);
           } else {
             headers.append("Cache-Control", "public, max-age=0, must-revalidate");
           }
@@ -208,51 +222,60 @@ export default {
   },
 };
 
-async function loadPageData(req: Request, ctx: FetchContext, routes: Route[]): Promise<
-  Response | { url: URL; moduleDefaultExport?: unknown; filename?: string; data?: unknown; dataExpires?: number }
-> {
+async function loadPageData(
+  req: Request,
+  ctx: FetchContext,
+  routes: Route[],
+): Promise<Response | { url: URL; imports: SSRModule[] }> {
   const url = new URL(req.url);
+  const loads: (() => Promise<SSRModule>)[] = [];
   if (routes.length > 0) {
-    const pathname = util.cleanPath(url.pathname);
-    for (const [pattern, load, meta] of routes) {
-      const route: { url: URL; data?: unknown } = { url };
-      const ret = pattern.exec({ pathname });
+    routes.forEach(([pattern, load, meta]) => {
+      let ret = pattern.exec({ pathname: url.pathname });
+      if (!ret) {
+        ret = pattern.exec({ pathname: "/_app" });
+      }
       if (ret) {
-        const mod = await load();
-        const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
-        Object.assign(route, {
-          url: util.appendUrlParams(url, ret.pathname.groups),
-          moduleDefaultExport: mod.default,
-          dataExpires: dataConfig?.cacheTtl,
-          filename: meta.filename,
-        });
-        const fetcher = dataConfig.get;
-        if (typeof fetcher === "function") {
-          const request = new Request(route.url.toString(), req);
-          const allFetcher = dataConfig.all;
-          if (typeof allFetcher === "function") {
-            let res = allFetcher(request);
+        loads.push(async () => {
+          const mod = await load();
+          const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
+          const ssrModule: SSRModule = {
+            url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
+            filename: meta.filename,
+            defaultExport: mod.default,
+            dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
+          };
+          const fetcher = dataConfig.get;
+          if (typeof fetcher === "function") {
+            const request = new Request(ssrModule.url.toString(), req);
+            const allFetcher = dataConfig.all;
+            if (typeof allFetcher === "function") {
+              let res = allFetcher(request);
+              if (res instanceof Promise) {
+                res = await res;
+              }
+              if (res instanceof Response) {
+                Reflect.set(ssrModule, "respond", res);
+                return ssrModule;
+              }
+            }
+            let res = fetcher(request, ctx);
             if (res instanceof Promise) {
               res = await res;
             }
             if (res instanceof Response) {
-              return res;
+              if (res.status !== 200) {
+                Reflect.set(ssrModule, "respond", res);
+                return ssrModule;
+              }
+              Reflect.set(ssrModule, "data", await res.json());
             }
           }
-          let res = fetcher(request, ctx);
-          if (res instanceof Promise) {
-            res = await res;
-          }
-          if (res instanceof Response) {
-            if (res.status !== 200) {
-              return res;
-            }
-            route.data = await res.json();
-          }
-        }
+          return ssrModule;
+        });
       }
-      return route;
-    }
+    });
+    return { url, imports: await Promise.all(loads.map((load) => load())) };
   }
-  return { url };
+  return { url, imports: [] };
 }

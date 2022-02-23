@@ -1,35 +1,50 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
-import { createElement, Fragment, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
 import type { SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import MainContext from "./context.ts";
 import { E404Page } from "./error.ts";
 
 export type RouterProps = {
-  readonly layout?: FC<PegeProps>;
   readonly ssrContext?: SSRContext;
 };
 
-export type PegeProps = {
-  url: URL;
-};
-
-export const Router: FC<RouterProps> = ({ layout = Fragment, ssrContext }) => {
-  const [url, setUrl] = useState<URL & { _component?: FC<PegeProps> }>(() =>
+export const Router: FC<RouterProps> = ({ ssrContext }) => {
+  const [url, setUrl] = useState<URL & { _component?: FC }>(() =>
     ssrContext?.url || new URL(globalThis.location?.href || "http://localhost/")
   );
   const dataCache = useMemo(() => {
     const cache = new Map();
-    const [data, expires] = ssrContext ? [ssrContext.data, ssrContext.dataExpires] : loadSSRDataFromTag();
-    cache.set(url.pathname + url.search, { data, expires });
+    const data = ssrContext
+      ? ssrContext.imports.map(({ url, data, dataCacheTtl }) => ({
+        url: url.pathname + url.search,
+        data,
+        dataCacheTtl,
+      }))
+      : loadSSRDataFromTag();
+    data?.forEach(({ url, data, dataCacheTtl }) => {
+      cache.set(url, { data, dataCacheTtl });
+    });
     return cache;
   }, []);
-  const Component = useMemo<FC<PegeProps>>(
-    () =>
-      ssrContext?.moduleDefaultExport as FC ||
-      (window as { __ssrModuleDefaultExport?: FC }).__ssrModuleDefaultExport ||
-      url._component ||
-      E404Page,
+  const [app, _setApp] = useState(() => {
+    if (ssrContext) {
+      return {
+        Component: ssrContext?.imports.find(({ url }) => url.pathname === "/_app")?.defaultExport as FC | undefined,
+      };
+    }
+    return {
+      Component: ((window as { __ssrModules?: Record<string, { default?: FC }> }).__ssrModules || {})["/_app"]?.default,
+    };
+  });
+  const routeComponent = useMemo<FC>(
+    () => {
+      const href = url.pathname + url.search;
+      return ssrContext?.imports.find((i) => i.url.pathname + i.url.search === href)?.defaultExport as FC ||
+        ((window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {})[href]?.default ||
+        url._component ||
+        E404Page;
+    },
     [url],
   );
 
@@ -65,7 +80,7 @@ export const Router: FC<RouterProps> = ({ layout = Fragment, ssrContext }) => {
     };
   }, []);
 
-  return createElement(
+  const routeEl = createElement(
     MainContext.Provider,
     {
       value: {
@@ -75,12 +90,25 @@ export const Router: FC<RouterProps> = ({ layout = Fragment, ssrContext }) => {
         ssrHeadCollection: ssrContext?.headCollection,
       },
     },
-    createElement(
-      layout,
-      null,
-      createElement(Component),
-    ),
+    createElement(routeComponent),
   );
+
+  if (app.Component) {
+    return createElement(
+      MainContext.Provider,
+      {
+        value: {
+          url: new URL("/_app", url.href),
+          setUrl: () => {},
+          dataCache,
+          ssrHeadCollection: ssrContext?.headCollection,
+        },
+      },
+      createElement(app.Component, null, routeEl),
+    );
+  }
+
+  return routeEl;
 };
 
 export const useRouter = (): { url: URL } => {
@@ -88,16 +116,15 @@ export const useRouter = (): { url: URL } => {
   return { url };
 };
 
-function loadSSRDataFromTag(): [unknown, number | undefined] {
+function loadSSRDataFromTag(): { url: string; data?: unknown; dataCacheTtl?: number }[] | undefined {
   const ssrDataEl = self.document?.getElementById("aleph-ssr-data");
   if (ssrDataEl) {
     try {
       const ssrData = JSON.parse(ssrDataEl.innerText);
-      const expires = ssrDataEl.getAttribute("data-expires");
-      return [ssrData, parseInt(expires || "") || undefined];
+      return ssrData;
     } catch (_e) {
       console.error("ssr-data: invalid JSON");
     }
   }
-  return [undefined, undefined];
+  return undefined;
 }

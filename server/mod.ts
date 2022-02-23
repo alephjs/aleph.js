@@ -202,7 +202,7 @@ export const serve = (options: ServerOptions = {}) => {
       ssrHandler: ssr,
       customHTMLRewriter,
       isDev,
-      hmrWebSocketUrl: config?.hmrWebSocketUrl,
+      hmrWebSocketUrl: options.hmrWebSocketUrl,
     });
   };
 

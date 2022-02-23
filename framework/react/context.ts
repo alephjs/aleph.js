@@ -4,7 +4,7 @@ import { createContext } from "https://esm.sh/react@17.0.2";
 export type ContextProps = {
   url: URL;
   setUrl: Dispatch<SetStateAction<URL>>;
-  dataCache: Map<string, { data?: unknown; expires?: number }>;
+  dataCache: Map<string, { data?: unknown; dataCacheTtl?: number }>;
   ssrHeadCollection?: string[];
 };
 

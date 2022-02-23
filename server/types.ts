@@ -5,7 +5,6 @@ export type AlephConfig = {
   build?: BuildOptions;
   atomicCSS?: AtomicCSSConfig;
   routeFiles?: string | RoutesConfig;
-  hmrWebSocketUrl?: string;
 };
 
 export type RoutesConfig = {
@@ -51,18 +50,26 @@ export interface Middleware {
   fetch: FetchHandler;
 }
 
+export type SSRModule = {
+  readonly url: URL;
+  readonly filename: string;
+  readonly respond?: Response;
+  readonly defaultExport?: unknown;
+  readonly data?: unknown;
+  readonly dataCacheTtl?: number;
+};
+
 export type SSRContext = {
   readonly url: URL;
+  readonly imports: SSRModule[];
   readonly headCollection: string[];
-  readonly moduleDefaultExport?: unknown;
-  readonly data?: unknown;
-  readonly dataExpires?: number;
 };
 
 export type ServerOptions = {
   port?: number;
   certFile?: string;
   keyFile?: string;
+  hmrWebSocketUrl?: string;
   config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
@@ -82,7 +89,7 @@ export type RoutingRegExp = {
 
 export interface IURLPattern {
   exec(input: { host?: string; pathname: string }): {
-    [key in "host" | "pathname"]: { groups: Record<string, string> };
+    [key in "host" | "pathname"]: { input: string; groups: Record<string, string> };
   };
 }
 
