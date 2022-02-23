@@ -85,6 +85,9 @@ export default async function (nameArg: string | undefined, template = "react") 
         "dom.asynciterable",
         "deno.ns",
       ],
+      "types": [
+        `${alephPkgUri}/types.d.ts`,
+      ],
     },
     "format": {},
     "lint": {},

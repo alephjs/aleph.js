@@ -1,6 +1,6 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
 import { createElement, Fragment, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
-import type { SSRContext } from "../../types.d.ts";
+import type { SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import MainContext from "./context.ts";
 import { E404Page } from "./error.ts";

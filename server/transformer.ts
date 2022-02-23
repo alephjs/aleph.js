@@ -1,15 +1,15 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.26.2";
 import { fastTransform, transform, transformCSS } from "../compiler/mod.ts";
-import type { ImportMap, TransformOptions } from "../compiler/types.d.ts";
+import type { ImportMap, TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import { builtinModuleExts, restoreUrl, toLocalPath } from "../lib/path.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
-import type { AlephConfig, AtomicCSSConfig, JSXConfig } from "../types.d.ts";
 import { bundleCSS } from "./bundle.ts";
 import { getAlephPkgUri } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
 import type { DependencyGraph } from "./graph.ts";
+import type { AlephConfig, AtomicCSSConfig, JSXConfig } from "./types.ts";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();

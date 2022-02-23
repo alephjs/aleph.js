@@ -9,9 +9,9 @@ import util from "../lib/util.ts";
 import { loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRoutingRegExp } from "../server/routing.ts";
-import { type DependencyGraph } from "../server/graph.ts";
+import type { DependencyGraph } from "../server/graph.ts";
 import { serveAppModules } from "../server/transformer.ts";
-import { AlephConfig } from "../types.d.ts";
+import type { AlephConfig } from "../server/types.ts";
 
 export const helpMessage = `
 Usage:

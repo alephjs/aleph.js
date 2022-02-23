@@ -4,7 +4,6 @@ import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import type { FetchContext, HTMLRewriterHandlers, Route, ServerOptions } from "../types.d.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
 import { DependencyGraph } from "./graph.ts";
@@ -12,6 +11,7 @@ import { initRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
 import { clientModuleTransformer, serveAppModules } from "./transformer.ts";
+import type { FetchContext, HTMLRewriterHandlers, Route, ServerOptions } from "./types.ts";
 
 export const serve = (options: ServerOptions = {}) => {
   const { config, middlewares, fetch, ssr } = options;

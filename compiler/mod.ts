@@ -6,7 +6,7 @@ import {
   TransformCSSResult,
   TransformOptions,
   TransformResult,
-} from "./types.d.ts";
+} from "./types.ts";
 
 let wasmReady: Promise<void> | boolean = false;
 

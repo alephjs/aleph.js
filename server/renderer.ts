@@ -6,10 +6,10 @@ import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import log from "../lib/log.ts";
 import { toLocalPath } from "../lib/path.ts";
 import util from "../lib/util.ts";
-import type { AlephConfig, FetchContext, HTMLRewriterHandlers, Route, SSRContext } from "../types.d.ts";
 import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { bundleCSS } from "./bundle.ts";
+import type { AlephConfig, FetchContext, HTMLRewriterHandlers, Route, SSRContext } from "./types.ts";
 
 let lolHtmlReady = false;
 

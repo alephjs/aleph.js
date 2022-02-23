@@ -1,12 +1,12 @@
 import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
-import type { ImportMap } from "../compiler/types.d.ts";
+import type { ImportMap } from "../compiler/types.ts";
 import { findFile } from "../lib/fs.ts";
 import { toLocalPath } from "../lib/path.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import type { JSXConfig } from "../types.d.ts";
 import { isCanary, VERSION } from "../version.ts";
+import type { JSXConfig } from "./types.ts";
 
 export function getAlephPkgUri() {
   const global = globalThis as Record<string, unknown>;

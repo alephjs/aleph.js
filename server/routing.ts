@@ -2,8 +2,8 @@ import { extname, globToRegExp, join } from "https://deno.land/std@0.125.0/path/
 import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { AlephConfig, Route, RoutePattern, RoutesConfig, RoutingRegExp } from "../types.d.ts";
-import { type DependencyGraph } from "./graph.ts";
+import type { DependencyGraph } from "./graph.ts";
+import type { AlephConfig, Route, RoutePattern, RoutesConfig, RoutingRegExp } from "./types.ts";
 
 const routeModules: Map<string, Record<string, unknown>> = new Map();
 
