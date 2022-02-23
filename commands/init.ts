@@ -55,7 +55,7 @@ export default async function (nameArg: string | undefined, template = "react") 
   const workingDir = join(Deno.cwd(), name);
 
   for await (const entry of entryList) {
-    const prefix = `${basename(repo)}-${VERSION}/examples/hello-${template}/`;
+    const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app/`;
     if (entry.fileName.startsWith(prefix)) {
       const fp = join(workingDir, util.trimPrefix(entry.fileName, prefix));
       if (entry.type === "directory") {
