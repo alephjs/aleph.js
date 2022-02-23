@@ -201,12 +201,9 @@ export default {
       return new Response(concat(...chunks), { headers });
     } catch (err) {
       log.error(err.stack);
-      return new Response(
-        isDev ? err.message.split("\n")[0] : "Internal Server Error",
-        {
-          status: 500,
-        },
-      );
+      return new Response(isDev ? err.message : "Internal Server Error", {
+        status: 500,
+      });
     }
   },
 };

@@ -12,5 +12,5 @@ serve({
       ],
     },
   },
-  ssr: (ctx) => renderToString(<Router ssr={ctx} />),
+  ssr: (ctx) => renderToString(<Router ssrContext={ctx} />),
 });

@@ -6,5 +6,5 @@ serve({
   config: {
     routeFiles: "./routes/**/*.tsx",
   },
-  ssr: (ctx) => renderToString(<Router ssr={ctx} />),
+  ssr: (ctx) => renderToString(<Router ssrContext={ctx} />),
 });
