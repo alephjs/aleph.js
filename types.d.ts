@@ -5,6 +5,7 @@ export type AlephConfig = {
   build?: BuildOptions;
   atomicCSS?: AtomicCSSConfig;
   routeFiles?: string | RoutesConfig;
+  hmrWebSocketUrl?: string;
 };
 
 export type RoutesConfig = {

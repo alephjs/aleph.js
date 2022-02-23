@@ -19,6 +19,7 @@ export type RenderOptions = {
   isDev: boolean;
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   ssrHandler?: (ssr: SSRContext) => string | undefined | Promise<string | undefined>;
+  hmrWebSocketUrl?: string;
 };
 
 export default {
@@ -28,7 +29,7 @@ export default {
       lolHtmlReady = true;
     }
 
-    const { indexHtml, routes, isDev, customHTMLRewriter, ssrHandler } = options;
+    const { indexHtml, routes, isDev, customHTMLRewriter, ssrHandler, hmrWebSocketUrl } = options;
     const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
     const chunks: Uint8Array[] = [];
     const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
@@ -171,7 +172,6 @@ export default {
           if (commonHandler.handled) {
             return;
           }
-          commonHandler.handled = true;
           if (routes.length > 0) {
             const config = routes.map((r) => r[2]);
             el.append(`<script id="aleph-routes" type="application/json">${JSON.stringify(config)}</script>`, {
@@ -180,11 +180,12 @@ export default {
           }
           if (isDev) {
             el.append(
-              `<script type="module">import hot from "${
+              `<script type="module">window.__hmrWebSocketUrl=${JSON.stringify(hmrWebSocketUrl)};import hot from "${
                 toLocalPath(alephPkgUri)
               }/framework/core/hmr.ts";hot("./index.html").decline();</script>`,
               { html: true },
             );
+            commonHandler.handled = true;
           }
         },
       };

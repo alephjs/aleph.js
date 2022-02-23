@@ -195,7 +195,15 @@ export const serve = (options: ServerOptions = {}) => {
       return new Response("Not Found", { status: 404 });
     }
 
-    return renderer.fetch(req, ctx, { indexHtml, routes, ssrHandler: ssr, customHTMLRewriter, isDev });
+    // render html
+    return renderer.fetch(req, ctx, {
+      indexHtml,
+      routes,
+      ssrHandler: ssr,
+      customHTMLRewriter,
+      isDev,
+      hmrWebSocketUrl: config?.hmrWebSocketUrl,
+    });
   };
 
   // inject browser navigator polyfill

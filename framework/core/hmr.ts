@@ -76,9 +76,9 @@ function sendMessage(msg: Record<string, unknown>) {
 }
 
 function connect() {
-  const { location } = window;
+  const { location, __hmrWebSocketUrl } = window as { location: Location; __hmrWebSocketUrl?: string };
   const { protocol, host } = location;
-  const wsUrl = (protocol === "https:" ? "wss" : "ws") + "://" + host + "/-/HMR";
+  const wsUrl = __hmrWebSocketUrl || `${protocol === "https:" ? "wss" : "ws"}://${host}/-/HMR`;
   const ws = new WebSocket(wsUrl);
   const ping = (callback: () => void) => {
     setTimeout(() => {
