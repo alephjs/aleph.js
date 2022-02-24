@@ -116,7 +116,7 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    // request page data
+    // request route data
     const routes = (Reflect.get(globalThis, "__ALEPH_ROUTES") as Route[] | undefined) || await routesPromise;
     if (routes.length > 0) {
       for (const [pattern, load] of routes) {
@@ -129,16 +129,6 @@ export const serve = (options: ServerOptions = {}) => {
               const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
                 const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
-                const allFetcher = dataConfig.all;
-                if (typeof allFetcher === "function") {
-                  let res = allFetcher(request);
-                  if (res instanceof Promise) {
-                    res = await res;
-                  }
-                  if (res instanceof Response) {
-                    return res;
-                  }
-                }
                 return fetcher(request, ctx);
               }
               return new Response("Method not allowed", { status: 405 });
@@ -149,7 +139,7 @@ export const serve = (options: ServerOptions = {}) => {
             }
             return new Response(
               isDev || (typeof err.status === "number" && err.status < 500)
-                ? err.message || "Server Error"
+                ? err.message || "Internal Server Error"
                 : "Internal Server Error",
               {
                 status: err.status || 500,
@@ -225,7 +215,6 @@ export const serve = (options: ServerOptions = {}) => {
 
   if (!Reflect.has(globalThis, "clientDependencyGraph")) {
     Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
-    Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
   }
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
   Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
@@ -237,7 +226,7 @@ export const serve = (options: ServerOptions = {}) => {
       // @ts-ignore
       e.respondWith(handler(e.request));
     });
-  } else if (!Deno.env.get("ALEPH_CLI")) {
+  } else if (!Deno.env.get("ALEPH_APP_MODULES_PORT")) {
     if (options.ssr && options.config?.routeFiles) {
       importMapPromise.then((importMap) => {
         serveAppModules(6060, importMap);

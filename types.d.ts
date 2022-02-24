@@ -6,10 +6,7 @@ declare type HTMLRewriterHandlers = {
   end?: (end: import("https://deno.land/x/lol_html@0.0.2/types.d.ts").DocumentEnd) => void;
 };
 
-// deno-lint-ignore no-empty-interface
-declare interface FetchContext extends Record<string, unknown> {}
-
-declare interface FetchContext {
+declare interface FetchContext extends Record<string, unknown> {
   HTMLRewriter: {
     on: (selector: string, handlers: HTMLRewriterHandlers) => void;
   };

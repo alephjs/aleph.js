@@ -16,7 +16,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
   const dataCache = useMemo(() => {
     const cache = new Map();
     const data = ssrContext
-      ? ssrContext.imports.map(({ url, data, dataCacheTtl }) => ({
+      ? ssrContext.modules.map(({ url, data, dataCacheTtl }) => ({
         url: url.pathname + url.search,
         data,
         dataCacheTtl,
@@ -27,36 +27,47 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     });
     return cache;
   }, []);
+  const routes = useMemo(() => {
+    const routesDataEl = self.document?.getElementById("aleph-routes");
+    if (routesDataEl) {
+      try {
+        const routes: { pattern: { pathname: string }; filename: string }[] = JSON.parse(routesDataEl.innerText);
+        // deno-lint-ignore ban-ts-comment
+        // @ts-ignore
+        return routes.map((r) => [new URLPattern(r.pattern), r.filename]);
+      } catch (_e) {
+        console.error("routes: invalid JSON");
+      }
+    }
+    return [];
+  }, []);
   const [app, _setApp] = useState(() => {
     if (ssrContext) {
       return {
-        Component: ssrContext?.imports.find(({ url }) => url.pathname === "/_app")?.defaultExport as FC | undefined,
+        Component: ssrContext?.modules.find(({ url }) => url.pathname === "/_app")?.defaultExport as FC | undefined,
       };
     }
-    return {
-      Component: ((window as { __ssrModules?: Record<string, { default?: FC }> }).__ssrModules || {})["/_app"]?.default,
-    };
+    const route = routes.find(([pattern]) => pattern.test({ pathname: "/_app" }));
+    if (route) {
+      const ssrModules = ((window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {});
+      const mod = ssrModules[route[1]];
+      if (mod) {
+        return { Component: mod.default };
+      }
+    }
+    return {};
   });
   const routeComponent = useMemo<FC>(
     () => {
       if (ssrContext) {
-        return ssrContext.imports.find((i) => i.url.pathname === url.pathname)?.defaultExport as FC || E404Page;
+        return ssrContext.modules.find((i) => i.url.pathname === url.pathname)?.defaultExport as FC || E404Page;
       }
-
-      const routesDataEl = self.document?.getElementById("aleph-routes");
-      if (routesDataEl) {
-        try {
-          const routes: { pattern: { pathname: string }; filename: string }[] = JSON.parse(routesDataEl.innerText);
-          const route = routes.find((r) => new URLPattern(r.pattern).test({ pathname: url.pathname }));
-          if (route) {
-            const ssrModules = ((window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {});
-            const mod = ssrModules[route.filename];
-            if (mod) {
-              return mod.default;
-            }
-          }
-        } catch (_e) {
-          console.error("routes: invalid JSON");
+      const route = routes.find(([pattern]) => pattern.test({ pathname: url.pathname }));
+      if (route) {
+        const ssrModules = ((window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {});
+        const mod = ssrModules[route[1]];
+        if (mod) {
+          return mod.default;
         }
       }
 

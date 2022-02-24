@@ -53,7 +53,6 @@ if (import.meta.main) {
     log.fatal("No such directory:", workingDir);
   }
   Deno.chdir(workingDir);
-  Deno.env.set("ALEPH_CLI", "true");
   Deno.env.set("ALEPH_ENV", "development");
 
   const port = parsePortNumber(getFlag(options, ["p", "port"], "8080"));

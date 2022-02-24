@@ -15,7 +15,7 @@ export type RoutesConfig = {
 
 export type BuildOptions = {
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
-  ssg?: () => SSGOptions;
+  ssg?: SSGOptions;
 };
 
 export type SSGOptions = {
@@ -36,7 +36,6 @@ export type HTMLRewriterHandlers = {
 };
 
 export interface FetchContext extends Record<string, unknown> {
-  [key: string]: unknown;
   HTMLRewriter: {
     on: (selector: string, handlers: HTMLRewriterHandlers) => void;
   };
@@ -51,17 +50,18 @@ export interface Middleware {
 }
 
 export type SSRModule = {
-  readonly url: URL;
-  readonly filename: string;
-  readonly respond?: Response;
-  readonly defaultExport?: unknown;
-  readonly data?: unknown;
-  readonly dataCacheTtl?: number;
+  url: URL;
+  filename: string;
+  error?: { message: string; status: number };
+  redirect?: { headers: Headers; status: number };
+  defaultExport?: unknown;
+  data?: unknown;
+  dataCacheTtl?: number;
 };
 
 export type SSRContext = {
   readonly url: URL;
-  readonly imports: SSRModule[];
+  readonly modules: SSRModule[];
   readonly headCollection: string[];
 };
 

@@ -8,7 +8,7 @@ import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle.ts";
 import { getAlephPkgUri } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
-import type { DependencyGraph } from "./graph.ts";
+import { DependencyGraph } from "./graph.ts";
 import type { AlephConfig, AtomicCSSConfig, JSXConfig } from "./types.ts";
 
 const enc = new TextEncoder();
@@ -77,6 +77,9 @@ const esModuleLoader: Loader<{ importMap: ImportMap; initialGraphVersion: string
 /** serve app modules to support module loader that allows you import NON-JS modules like `.css/.vue/.svelet`... */
 export async function serveAppModules(port: number, importMap: ImportMap) {
   try {
+    if (!Reflect.has(globalThis, "serverDependencyGraph")) {
+      Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+    }
     Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
     await serveDir({
       port,
