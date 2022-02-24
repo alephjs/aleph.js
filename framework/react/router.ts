@@ -39,11 +39,28 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
   });
   const routeComponent = useMemo<FC>(
     () => {
-      const href = url.pathname + url.search;
-      return ssrContext?.imports.find((i) => i.url.pathname + i.url.search === href)?.defaultExport as FC ||
-        ((window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {})[href]?.default ||
-        url._component ||
-        E404Page;
+      if (ssrContext) {
+        return ssrContext.imports.find((i) => i.url.pathname === url.pathname)?.defaultExport as FC || E404Page;
+      }
+
+      const routesDataEl = self.document?.getElementById("aleph-routes");
+      if (routesDataEl) {
+        try {
+          const routes: { pattern: { pathname: string }; filename: string }[] = JSON.parse(routesDataEl.innerText);
+          const route = routes.find((r) => new URLPattern(r.pattern).test({ pathname: url.pathname }));
+          if (route) {
+            const ssrModules = ((window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {});
+            const mod = ssrModules[route.filename];
+            if (mod) {
+              return mod.default;
+            }
+          }
+        } catch (_e) {
+          console.error("routes: invalid JSON");
+        }
+      }
+
+      return url._component || E404Page;
     },
     [url],
   );

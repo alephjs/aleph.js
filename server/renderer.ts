@@ -86,9 +86,9 @@ export default {
               headCollection.forEach((tag) => el.before(tag, { html: true }));
               const imports = res.imports
                 .filter(({ defaultExport }) => defaultExport !== undefined)
-                .map(({ url, filename }, idx) =>
-                  `import mod_${idx} from ${JSON.stringify(filename)};__ssrModules[${
-                    JSON.stringify(url.pathname + url.search)
+                .map(({ filename }, idx) =>
+                  `import mod_${idx} from ${JSON.stringify(filename.slice(1))};__ssrModules[${
+                    JSON.stringify(filename)
                   }]={default:mod_${idx}};`
                 );
               if (imports.length > 0) {
