@@ -44,7 +44,10 @@ impl Fold for HmrFold {
       expr: Box::new(Expr::Assign(AssignExpr {
         span: DUMMY_SP,
         op: AssignOp::Assign,
-        left: PatOrExpr::Expr(Box::new(new_member_expr(simple_member_expr("import", "meta"), "hot"))),
+        left: PatOrExpr::Expr(Box::new(Expr::Member(new_member_expr(
+          simple_member_expr("import", "meta"),
+          "hot",
+        )))),
         right: Box::new(Expr::Call(CallExpr {
           span: DUMMY_SP,
           callee: Callee::Expr(Box::new(Expr::Ident(quote_ident!("__CREATE_HOT_CONTEXT__")))),
@@ -152,8 +155,8 @@ impl Fold for HmrFold {
           callee: Callee::Expr(Box::new(Expr::OptChain(OptChainExpr {
             span: DUMMY_SP,
             question_dot_token: DUMMY_SP,
-            expr: Box::new(new_member_expr(
-              new_member_expr(simple_member_expr("import", "meta"), "hot"),
+            base: OptChainBase::Member(new_member_expr(
+              Expr::Member(new_member_expr(simple_member_expr("import", "meta"), "hot")),
               "accept",
             )),
           }))),

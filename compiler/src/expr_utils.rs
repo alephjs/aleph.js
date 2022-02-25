@@ -44,12 +44,12 @@ pub fn import_name(name: &str) -> ImportSpecifier {
   })
 }
 
-pub fn new_member_expr(obj: Expr, key: &str) -> Expr {
-  Expr::Member(MemberExpr {
+pub fn new_member_expr(obj: Expr, key: &str) -> MemberExpr {
+  MemberExpr {
     span: DUMMY_SP,
     obj: Box::new(obj),
     prop: MemberProp::Ident(quote_ident!(key)),
-  })
+  }
 }
 
 pub fn simple_member_expr(obj: &str, key: &str) -> Expr {
