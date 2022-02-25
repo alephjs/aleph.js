@@ -1,9 +1,90 @@
 import type { FC } from "https://esm.sh/react@17.0.2";
 import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import util from "../../lib/util.ts";
 import type { SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
-import MainContext from "./context.ts";
+import RouterContext from "./context.ts";
 import { E404Page } from "./error.ts";
+
+class URLPatternCompat {
+  pattern: Record<string, unknown>;
+
+  static execPathname(
+    patternPathname: string,
+    pathname: string,
+  ): null | { pathname: { input: string; groups: Record<string, string> } } {
+    const patternSegments = util.splitPath(patternPathname);
+    const segments = util.splitPath(pathname);
+    const depth = Math.max(patternSegments.length, segments.length);
+    const groups: Record<string, string> = {};
+
+    for (let i = 0; i < depth; i++) {
+      const patternSegment = patternSegments[i];
+      const segment = segments[i];
+
+      if (segment === undefined || patternSegment === undefined) {
+        return null;
+      }
+
+      if (patternSegment.startsWith(":") && patternSegment.length > 1) {
+        if (patternSegment.endsWith("+") && patternSegment.length > 2 && i === patternSegments.length - 1) {
+          groups[patternSegment.slice(1, -1)] = segments.slice(i).map(decodeURIComponent).join("/");
+          break;
+        }
+        groups[patternSegment.slice(1)] = decodeURIComponent(segment);
+      } else if (patternSegment !== segment) {
+        return null;
+      }
+    }
+
+    return {
+      pathname: {
+        input: pathname,
+        groups,
+      },
+    };
+  }
+
+  constructor(pattern: { host?: string; pathname: string }) {
+    if ("URLPattern" in window) {
+      // deno-lint-ignore ban-ts-comment
+      // @ts-ignore
+      this.pattern = new URLPattern(pattern);
+    } else {
+      this.pattern = pattern;
+    }
+  }
+
+  test(input: { host: string; pathname: string }): boolean {
+    const { pattern } = this;
+    if (typeof pattern.test === "function") {
+      return pattern.test(input);
+    }
+    if (util.isFilledString(pattern.host) && pattern.host !== input.host) {
+      return false;
+    }
+    if (util.isFilledString(pattern.pathname)) {
+      return URLPatternCompat.execPathname(pattern.pathname, input.pathname) !== null;
+    }
+    return false;
+  }
+
+  exec(
+    input: { host: string; pathname: string },
+  ): null | { pathname: { input: string; groups: Record<string, string> } } {
+    const { pattern } = this;
+    if (typeof pattern.exec === "function") {
+      return pattern.exec(input);
+    }
+    if (util.isFilledString(pattern.host) && pattern.host !== input.host) {
+      return null;
+    }
+    if (util.isFilledString(pattern.pathname)) {
+      return URLPatternCompat.execPathname(pattern.pathname, input.pathname);
+    }
+    return null;
+  }
+}
 
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
@@ -27,29 +108,29 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     });
     return cache;
   }, []);
-  const routes = useMemo(() => {
+  const [routes, _setRoutes] = useState<[pattern: URLPatternCompat, filename: string][]>(() => {
     const routesDataEl = self.document?.getElementById("aleph-routes");
     if (routesDataEl) {
       try {
-        const routes: { pattern: { pathname: string }; filename: string }[] = JSON.parse(routesDataEl.innerText);
-        // deno-lint-ignore ban-ts-comment
-        // @ts-ignore
-        return routes.map((r) => [new URLPattern(r.pattern), r.filename]);
+        const routes = JSON.parse(routesDataEl.innerText);
+        if (Array.isArray(routes)) {
+          return routes.map((r) => [new URLPatternCompat(r.pattern), r.filename]);
+        }
       } catch (_e) {
-        console.error("routes: invalid JSON");
+        console.error("init routes: invalid JSON");
       }
     }
     return [];
-  }, []);
+  });
   const [app, _setApp] = useState(() => {
     if (ssrContext) {
       return {
-        Component: ssrContext?.modules.find(({ url }) => url.pathname === "/_app")?.defaultExport as FC | undefined,
+        Component: ssrContext.modules.find(({ url }) => url.pathname === "/_app")?.defaultExport as FC | undefined,
       };
     }
-    const route = routes.find(([pattern]) => pattern.test({ pathname: "/_app" }));
+    const route = routes.find(([pattern]) => pattern.test({ host: window.location.host, pathname: "/_app" }));
     if (route) {
-      const ssrModules = ((window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {});
+      const ssrModules = (window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {};
       const mod = ssrModules[route[1]];
       if (mod) {
         return { Component: mod.default };
@@ -62,9 +143,9 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       if (ssrContext) {
         return ssrContext.modules.find((i) => i.url.pathname === url.pathname)?.defaultExport as FC || E404Page;
       }
-      const route = routes.find(([pattern]) => pattern.test({ pathname: url.pathname }));
+      const route = routes.find(([pattern]) => pattern.test({ host: window.location.host, pathname: url.pathname }));
       if (route) {
-        const ssrModules = ((window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {});
+        const ssrModules = (window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {};
         const mod = ssrModules[route[1]];
         if (mod) {
           return mod.default;
@@ -73,7 +154,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 
       return url._component || E404Page;
     },
-    [url],
+    [url, routes],
   );
 
   useEffect(() => {
@@ -84,6 +165,8 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         head.removeChild(el);
       }
     });
+
+    // todo: update routes
 
     const onpopstate = (e: Record<string, unknown>) => {
       const url = new URL(location.href);
@@ -109,7 +192,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
   }, []);
 
   const routeEl = createElement(
-    MainContext.Provider,
+    RouterContext.Provider,
     {
       value: {
         url,
@@ -123,7 +206,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 
   if (app.Component) {
     return createElement(
-      MainContext.Provider,
+      RouterContext.Provider,
       {
         value: {
           url: new URL("/_app", url.href),
@@ -140,7 +223,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 };
 
 export const useRouter = (): { url: URL } => {
-  const { url } = useContext(MainContext);
+  const { url } = useContext(RouterContext);
   return { url };
 };
 
