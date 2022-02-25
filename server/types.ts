@@ -30,7 +30,7 @@ export type JSXConfig = {
 export type HTMLRewriterHandlers = {
   element?: (element: Element) => void;
   text?: (text: TextChunk) => void;
-  doctype?: (doctype: Doctype) => string;
+  doctype?: (doctype: Doctype) => void;
   comments?: (comment: Comment) => void;
   end?: (end: DocumentEnd) => void;
 };
