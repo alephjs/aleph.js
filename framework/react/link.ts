@@ -87,7 +87,7 @@ export function Link(props: LinkProps) {
       href && !util.isLikelyHttpURL(href) && !isCurrent &&
       !prefetchedPages.has(href)
     ) {
-      events.emit("fetch-page-module", { href });
+      events.emit("prefetch-page", { href });
       prefetchedPages.add(href);
     }
   }, [isCurrent]);

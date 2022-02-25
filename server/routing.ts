@@ -3,7 +3,7 @@ import { getFiles } from "../lib/fs.ts";
 import log, { dim } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
-import type { AlephConfig, Route, RoutePattern, RoutesConfig, RoutingRegExp } from "./types.ts";
+import type { AlephConfig, RawURLPattern, Route, RoutesConfig, RoutingRegExp } from "./types.ts";
 
 const routeModules: Map<string, Record<string, unknown>> = new Map();
 
@@ -54,6 +54,7 @@ export async function initRoutes(config: string | RoutesConfig | RoutingRegExp):
       ]);
     }
   });
+  routes.sort((a, b) => routeOrder(a) - routeOrder(b));
   log.debug(`${routes.length || "No"} route${routes.length !== 1 ? "s" : ""} found from ${dim(reg.prefix)}`);
   Reflect.set(globalThis, "__ALEPH_ROUTES", routes);
   return routes;
@@ -64,22 +65,26 @@ export function toRoutingRegExp(config: string | RoutesConfig): RoutingRegExp {
   const prefix = "." + util.cleanPath(isObject ? config.dir : config.split("*")[0]);
   const reg = isObject
     ? {
-      test(s: string) {
-        return s.startsWith(prefix) &&
-          !!config.exts.find((ext) => ext.startsWith(".") ? s.endsWith(ext) : s.endsWith(`.${ext}`));
-      },
+      test: (s: string) =>
+        s.startsWith(prefix) &&
+        config.exts.findIndex((ext) => ext.startsWith(".") ? s.endsWith(ext) : s.endsWith(`.${ext}`)) !== -1,
     }
     : globToRegExp("./" + util.trimPrefix(util.trimPrefix(config, "/"), "./"));
+
   return {
     prefix,
     test: (s: string) => reg.test(s),
-    exec: (filename: string): RoutePattern | null => {
+    exec: (filename: string): RawURLPattern | null => {
       if (reg.test(filename)) {
         const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
-          part = part.toLowerCase();
-          if (part.startsWith("[") && part.startsWith("]")) {
+          part = toSlug(part);
+          if (part.startsWith("[...") && part.startsWith("]") && part.length > 5) {
+            return ":" + part.slice(4, -1) + "+";
+          }
+          if (part.startsWith("[") && part.startsWith("]") && part.length > 2) {
             return ":" + part.slice(1, -1);
-          } else if (part.startsWith("$")) {
+          }
+          if (part.startsWith("$") && part.length > 1) {
             return ":" + part.slice(1);
           }
           return part;
@@ -100,4 +105,19 @@ export function toRoutingRegExp(config: string | RoutesConfig): RoutingRegExp {
 
 function isRoutingRegExp(v: unknown): v is RoutingRegExp {
   return util.isPlainObject(v) && typeof v.test === "function" && typeof v.exec === "function";
+}
+
+function toSlug(s: string): string {
+  return s.replace(/\s+/g, "-").replace(/[^a-z0-9\-\[\]\/\$+_.@]/gi, "").toLowerCase();
+}
+
+function routeOrder(route: Route): number {
+  const { pattern, filename } = route[2];
+  switch (pattern.pathname) {
+    case "/_app":
+    case "/_a404":
+      return 0;
+    default:
+      return filename.split("/").length;
+  }
 }

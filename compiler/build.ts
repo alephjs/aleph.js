@@ -28,12 +28,9 @@ if (import.meta.main) {
     await ensureDir("./dist");
     await Deno.writeTextFile(
       "./dist/wasm.js",
-      [
-        `import { decode } from "https://deno.land/std@0.125.0/encoding/base64.ts";`,
-        `import { decompress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";`,
-        `const dataRaw = "${encode(compress(wasmData))}";`,
-        `export default () => decompress(decode(dataRaw));`,
-      ].join("\n"),
+      `import { decompress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";\nexport default () => decompress(Uint8Array.from(atob("${
+        encode(compress(wasmData))
+      }"), c => c.charCodeAt(0)));`,
     );
     await Deno.writeTextFile(
       "./dist/compiler.js",

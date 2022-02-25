@@ -1,8 +1,9 @@
-import type { FC } from "https://esm.sh/react@17.0.2";
-import { createElement, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import type { FC, ReactElement, ReactNode } from "https://esm.sh/react@17.0.2";
+import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
 import util from "../../lib/util.ts";
 import type { SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
+import { redirect } from "../core/redirect.ts";
 import RouterContext from "./context.ts";
 import { E404Page } from "./error.ts";
 
@@ -91,9 +92,9 @@ export type RouterProps = {
 };
 
 export const Router: FC<RouterProps> = ({ ssrContext }) => {
-  const [url, setUrl] = useState<URL & { _component?: FC }>(() =>
-    ssrContext?.url || new URL(globalThis.location?.href || "http://localhost/")
-  );
+  // deno-lint-ignore ban-ts-comment
+  // @ts-ignore
+  const ssrModules = window.__SSR_MODULES || (window.__SSR_MODULES = {});
   const dataCache = useMemo(() => {
     const cache = new Map();
     const data = ssrContext
@@ -108,13 +109,30 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     });
     return cache;
   }, []);
-  const [routes, _setRoutes] = useState<[pattern: URLPatternCompat, filename: string][]>(() => {
-    const routesDataEl = self.document?.getElementById("aleph-routes");
+  const createContextElement = useCallback((url: URL, component: FC, child?: ReactNode) => {
+    return createElement(
+      RouterContext.Provider,
+      {
+        value: { url, dataCache, ssrHeadCollection: ssrContext?.headCollection },
+      },
+      createElement(component, null, child),
+    );
+  }, []);
+  const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location.href));
+  const [routes, _setRoutes] = useState<[pattern: URLPatternCompat, filename: string, isNest: boolean][]>(() => {
+    const routesDataEl = window.document?.getElementById("aleph-routes");
     if (routesDataEl) {
       try {
         const routes = JSON.parse(routesDataEl.innerText);
         if (Array.isArray(routes)) {
-          return routes.map((r) => [new URLPatternCompat(r.pattern), r.filename]);
+          return routes.map(({ pattern, filename }) => {
+            const isNest = !util.splitBy(filename, ".", true)[0].endsWith("/index") &&
+              routes.findIndex((rr) =>
+                  rr.pattern.host === pattern.host && rr.pattern.pathname !== pattern.pathname &&
+                  rr.pattern.pathname.startsWith(pattern.pathname)
+                ) !== -1;
+            return [new URLPatternCompat(pattern), filename, isNest];
+          });
         }
       } catch (_e) {
         console.error("init routes: invalid JSON");
@@ -122,40 +140,6 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     }
     return [];
   });
-  const [app, _setApp] = useState(() => {
-    if (ssrContext) {
-      return {
-        Component: ssrContext.modules.find(({ url }) => url.pathname === "/_app")?.defaultExport as FC | undefined,
-      };
-    }
-    const route = routes.find(([pattern]) => pattern.test({ host: window.location.host, pathname: "/_app" }));
-    if (route) {
-      const ssrModules = (window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {};
-      const mod = ssrModules[route[1]];
-      if (mod) {
-        return { Component: mod.default };
-      }
-    }
-    return {};
-  });
-  const routeComponent = useMemo<FC>(
-    () => {
-      if (ssrContext) {
-        return ssrContext.modules.find((i) => i.url.pathname === url.pathname)?.defaultExport as FC || E404Page;
-      }
-      const route = routes.find(([pattern]) => pattern.test({ host: window.location.host, pathname: url.pathname }));
-      if (route) {
-        const ssrModules = (window as { __ssrModules?: Record<string, Record<string, FC>> }).__ssrModules || {};
-        const mod = ssrModules[route[1]];
-        if (mod) {
-          return mod.default;
-        }
-      }
-
-      return url._component || E404Page;
-    },
-    [url, routes],
-  );
 
   useEffect(() => {
     // remove ssr head elements
@@ -168,63 +152,78 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 
     // todo: update routes
 
-    const onpopstate = (e: Record<string, unknown>) => {
-      const url = new URL(location.href);
-      // todo: cacha data
-      // todo: load comonent
-      setUrl(url);
+    const onpopstate = async (e: Record<string, unknown>) => {
+      const modules: [dataUrl: string, filename: string][] = [];
+      for (const [pattern, filename] of routes) {
+        let ret = pattern.exec({ host: location.host, pathname: "/_app" });
+        if (!ret) {
+          ret = pattern.exec({ host: location.host, pathname: location.pathname });
+        }
+        if (ret) {
+          const url = util.appendUrlParams(new URL(location.href), ret.pathname.groups);
+          modules.push([url.pathname + url.search, filename]);
+        }
+      }
+      if (modules.length > 0) {
+        await Promise.all(modules.map(async ([dataUrl, filename]) => {
+          if (filename in ssrModules) {
+            return;
+          }
+          const mod = await import(filename.slice(1)); // todo: add version
+          if (typeof mod.default === "function") {
+            ssrModules[filename] = mod.default;
+            if (mod.data === true) {
+              const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
+              const data = await res.json();
+              const cc = res.headers.get("Cache-Control");
+              const dataCacheTtl = cc && cc.includes("max-age")
+                ? Date.now() + parseInt(cc.split("=")[1]) * 1000
+                : undefined;
+              dataCache.set(dataUrl, { data, dataCacheTtl });
+            }
+          }
+        }));
+      }
+      setUrl(new URL(location.href));
       if (e.resetScroll) {
         window.scrollTo(0, 0);
       }
     };
-    // deno-lint-ignore ban-ts-comment
-    // @ts-ignore
-    addEventListener("popstate", onpopstate);
+    addEventListener("popstate", onpopstate as unknown as EventListener);
     events.on("popstate", onpopstate);
     events.emit("routerready", { type: "routerready" });
 
     return () => {
-      // deno-lint-ignore ban-ts-comment
-      // @ts-ignore
-      removeEventListener("popstate", onpopstate);
+      removeEventListener("popstate", onpopstate as unknown as EventListener);
       events.off("popstate", onpopstate);
     };
-  }, []);
+  }, [routes]);
 
-  const routeEl = createElement(
-    RouterContext.Provider,
-    {
-      value: {
-        url,
-        setUrl,
-        dataCache,
-        ssrHeadCollection: ssrContext?.headCollection,
-      },
+  return useMemo<ReactElement>(
+    () => {
+      if (ssrContext) {
+        const component = ssrContext.modules.find((i) => i.url.pathname === url.pathname)?.defaultExport as FC;
+        if (component) {
+          return createContextElement(ssrContext.url, component);
+        }
+        return createContextElement(ssrContext.url, E404Page);
+      }
+      const route = routes.find(([pattern]) => pattern.test(location));
+      if (route) {
+        const mod = ssrModules[route[1]];
+        if (mod) {
+          return mod.default;
+        }
+      }
+      return createContextElement(new URL(location.href), E404Page);
     },
-    createElement(routeComponent),
+    [routes, url],
   );
-
-  if (app.Component) {
-    return createElement(
-      RouterContext.Provider,
-      {
-        value: {
-          url: new URL("/_app", url.href),
-          setUrl: () => {},
-          dataCache,
-          ssrHeadCollection: ssrContext?.headCollection,
-        },
-      },
-      createElement(app.Component, null, routeEl),
-    );
-  }
-
-  return routeEl;
 };
 
-export const useRouter = (): { url: URL } => {
+export const useRouter = (): { url: URL; redirect: typeof redirect } => {
   const { url } = useContext(RouterContext);
-  return { url };
+  return { url, redirect };
 };
 
 function loadSSRDataFromTag(): { url: string; data?: unknown; dataCacheTtl?: number }[] | undefined {

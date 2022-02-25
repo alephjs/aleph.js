@@ -1,4 +1,4 @@
-import type { DependencyDescriptor } from "../compiler/types.d.ts";
+import type { DependencyDescriptor } from "../compiler/types.ts";
 
 export type Module = {
   readonly specifier: string;

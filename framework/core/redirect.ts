@@ -1,17 +1,15 @@
 import util from "../../lib/util.ts";
 import events from "./events.ts";
 
-const routerState = {
-  ready: false,
-  hasPreRedirect: false,
-};
+let routerReady = false;
+let hasPreRedirect = false;
 
 const onrouterready = (_: Record<string, unknown>) => {
   events.off("routerready", onrouterready);
-  if (routerState.hasPreRedirect) {
+  if (hasPreRedirect) {
     events.emit("popstate", { type: "popstate", resetScroll: true });
   }
-  routerState.ready = true;
+  routerReady = true;
 };
 events.on("routerready", onrouterready);
 
@@ -22,24 +20,20 @@ export function redirect(url: string, replace?: boolean) {
     return;
   }
 
-  if (
-    util.isLikelyHttpURL(url) || url.startsWith("file://") ||
-    url.startsWith("mailto:")
-  ) {
+  if (util.isLikelyHttpURL(url) || url.startsWith("file://") || url.startsWith("mailto:")) {
     location.href = url;
     return;
   }
 
-  url = util.cleanPath(url);
   if (replace) {
-    history.replaceState(null, "", url);
+    history.replaceState(null, "", new URL(url, location.href));
   } else {
-    history.pushState(null, "", url);
+    history.pushState(null, "", new URL(url, location.href));
   }
 
-  if (routerState.ready) {
+  if (routerReady) {
     events.emit("popstate", { type: "popstate", resetScroll: true });
-  } else if (!routerState.hasPreRedirect) {
-    routerState.hasPreRedirect = true;
+  } else if (!hasPreRedirect) {
+    hasPreRedirect = true;
   }
 }

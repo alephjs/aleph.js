@@ -8,7 +8,15 @@ import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { bundleCSS } from "./bundle.ts";
-import type { AlephConfig, FetchContext, HTMLRewriterHandlers, Route, SSRContext, SSRModule } from "./types.ts";
+import type {
+  AlephConfig,
+  FetchContext,
+  HTMLRewriterHandlers,
+  Route,
+  SSRContext,
+  SSRModule,
+  URLPatternResult,
+} from "./types.ts";
 
 let lolHtmlReady = false;
 
@@ -37,7 +45,7 @@ export default {
 
     let ssrHandled = false;
     if (ssrHandler) {
-      const { url, modules } = await loadSSRModules(req, ctx, routes);
+      const { url, modules } = await importSSRModules(req, ctx, routes);
       for (const { redirect } of modules) {
         if (redirect) {
           return new Response(null, redirect);
@@ -83,15 +91,14 @@ export default {
             element(el: Element) {
               headCollection.forEach((h) => util.isFilledString(h) && el.before(h, { html: true }));
               const importStmts = modules
-                .filter(({ defaultExport }) => defaultExport !== undefined)
                 .map(({ filename }, idx) =>
-                  `import mod_${idx} from ${JSON.stringify(filename.slice(1))};__ssrModules[${
+                  `import mod_${idx} from ${JSON.stringify(filename.slice(1))};__SSR_MODULES[${
                     JSON.stringify(filename)
                   }]={default:mod_${idx}};`
                 );
               if (importStmts.length > 0) {
                 el.before(
-                  `<script type="module">window.__ssrModules={};${importStmts.join("")}</script>`,
+                  `<script type="module">window.__SSR_MODULES={};${importStmts.join("")}</script>`,
                   {
                     html: true,
                   },
@@ -201,10 +208,12 @@ export default {
           return;
         }
         if (routes.length > 0) {
-          const config = routes.map((r) => r[2]);
-          el.append(`<script id="aleph-routes" type="application/json">${JSON.stringify(config)}</script>`, {
-            html: true,
-          });
+          el.append(
+            `<script id="aleph-routes" type="application/json">${JSON.stringify(routes.map((r) => r[2]))}</script>`,
+            {
+              html: true,
+            },
+          );
         }
         if (isDev) {
           if (hmrWebSocketUrl) {
@@ -236,61 +245,78 @@ export default {
   },
 };
 
-async function loadSSRModules(
+// import routing modules and fetch data for SSR
+async function importSSRModules(
   req: Request,
   ctx: FetchContext,
   routes: Route[],
 ): Promise<{ url: URL; modules: SSRModule[] }> {
   const url = new URL(req.url);
-  const imports: (() => Promise<SSRModule>)[] = [];
+  const matches: [ret: URLPatternResult, route: Route][] = [];
   if (routes.length > 0) {
-    routes.forEach(([pattern, load, meta]) => {
-      let ret = pattern.exec({ pathname: url.pathname });
-      if (!ret) {
-        ret = pattern.exec({ pathname: "/_app" }); // always match '/_app'
-      }
+    routes.forEach((route) => {
+      const ret = route[0].exec({ host: url.host, pathname: url.pathname });
       if (ret) {
-        imports.push(async () => {
-          const mod = await load();
-          const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
-          const ssrModule: SSRModule = {
-            url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
-            filename: meta.filename,
-            defaultExport: mod.default,
-            dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
-          };
-          const fetcher = dataConfig.get;
-          if (typeof fetcher === "function") {
-            const request = new Request(ssrModule.url.toString(), req);
-            let res = fetcher(request, ctx);
-            if (res instanceof Promise) {
-              res = await res;
-            }
-            if (res instanceof Response) {
-              if (res.status >= 400) {
-                ssrModule.error = { message: await res.text(), status: res.status };
-                return ssrModule;
-              }
-              if (res.status >= 300) {
-                if (res.headers.has("Location")) {
-                  ssrModule.redirect = { headers: res.headers, status: res.status };
-                } else {
-                  ssrModule.error = { message: "Missing the `Location` header", status: 400 };
-                }
-                return ssrModule;
-              }
-              try {
-                ssrModule.data = await res.json();
-              } catch (_e) {
-                ssrModule.error = { message: "Data must be valid JSON", status: 400 };
-              }
-            }
-          }
-          return ssrModule;
-        });
+        matches.push([ret, route]);
       }
     });
-    return { url, modules: await Promise.all(imports.map((load) => load())) };
+    if (matches.length === 0) {
+      for (const route of routes) {
+        const ret = route[0].exec({ host: url.host, pathname: "/404" });
+        if (ret) {
+          matches.push([ret, route]);
+          break;
+        }
+      }
+    }
+    if (matches.length > 0) {
+      for (const route of routes) {
+        const ret = route[0].exec({ host: url.host, pathname: "/_app" });
+        if (ret) {
+          matches.unshift([ret, route]);
+          break;
+        }
+      }
+      const modules = await Promise.all(matches.map(async ([ret, [_, imp, meta]]) => {
+        const mod = await imp();
+        const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
+        const ssrModule: SSRModule = {
+          url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
+          filename: meta.filename,
+          defaultExport: mod.default,
+          dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
+        };
+        const fetcher = dataConfig.get;
+        if (typeof fetcher === "function") {
+          const request = new Request(ssrModule.url.toString(), req);
+          let res = fetcher(request, ctx);
+          if (res instanceof Promise) {
+            res = await res;
+          }
+          if (res instanceof Response) {
+            if (res.status >= 400) {
+              ssrModule.error = { message: await res.text(), status: res.status };
+              return ssrModule;
+            }
+            if (res.status >= 300) {
+              if (res.headers.has("Location")) {
+                ssrModule.redirect = { headers: res.headers, status: res.status };
+              } else {
+                ssrModule.error = { message: "Missing the `Location` header", status: 400 };
+              }
+              return ssrModule;
+            }
+            try {
+              ssrModule.data = await res.json();
+            } catch (_e) {
+              ssrModule.error = { message: "Data must be valid JSON", status: 400 };
+            }
+          }
+        }
+        return ssrModule;
+      }));
+      return { url, modules: modules.filter(({ defaultExport }) => defaultExport !== undefined) };
+    }
   }
   return { url, modules: [] };
 }

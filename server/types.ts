@@ -76,7 +76,7 @@ export type ServerOptions = {
   ssr?: (ctx: SSRContext) => string | undefined | Promise<string | undefined>;
 };
 
-export type RoutePattern = {
+export type RawURLPattern = {
   host?: string;
   pathname: string;
 };
@@ -84,19 +84,21 @@ export type RoutePattern = {
 export type RoutingRegExp = {
   prefix: string;
   test(filename: string): boolean;
-  exec(filename: string): RoutePattern | null;
+  exec(filename: string): RawURLPattern | null;
+};
+
+export type URLPatternResult = {
+  [key in "host" | "pathname"]: { input: string; groups: Record<string, string> };
 };
 
 export interface IURLPattern {
-  exec(input: { host?: string; pathname: string }): {
-    [key in "host" | "pathname"]: { input: string; groups: Record<string, string> };
-  };
+  exec(input: { host?: string; pathname: string }): URLPatternResult;
 }
 
 export type Route = readonly [
   pattern: IURLPattern,
   loader: () => Promise<Record<string, unknown>>,
-  meta: { filename: string; pattern: RoutePattern },
+  meta: { filename: string; pattern: RawURLPattern },
 ];
 
 export { AtomicCSSConfig };

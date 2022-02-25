@@ -32,6 +32,7 @@ class Module {
     this.accept();
   }
 
+  // don't accept updates if the module is locked
   lock(): void {
     this._isLocked = true;
   }
@@ -64,8 +65,8 @@ export default function createHotContext(specifier: string) {
 
 const modules: Map<string, Module> = new Map();
 const messageQueue: string[] = [];
-let conn: WebSocket | null = null;
 
+let conn: WebSocket | null = null;
 function sendMessage(msg: Record<string, unknown>) {
   const json = JSON.stringify(msg);
   if (!conn || conn.readyState !== WebSocket.OPEN) {
@@ -116,9 +117,7 @@ function connect() {
         const { type, specifier, routePattern } = JSON.parse(data);
         switch (type) {
           case "create": {
-            if (routePattern) {
-              events.emit("create-route", { pattern: routePattern, specifier });
-            }
+            events.emit("create-file", { routePattern, specifier });
             break;
           }
           case "modify": {
@@ -133,7 +132,7 @@ function connect() {
               if (modules.has(specifier)) {
                 modules.delete(specifier);
               }
-              events.emit("remove-route", { specifier });
+              events.emit("remove-file", { specifier });
             }
             break;
         }

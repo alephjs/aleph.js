@@ -75,6 +75,7 @@ export async function serveDir(options: ServeDirOptions) {
       if (err instanceof Deno.errors.NotFound) {
         return new Response("Not found", { status: 404 });
       }
+      console.error(err.stack);
       return new Response(err.message, { status: 500 });
     }
   };

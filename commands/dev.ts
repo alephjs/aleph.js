@@ -189,9 +189,9 @@ function handleHMRSocket(req: Request): Response {
       const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
       if (config && config.routeFiles) {
         const reg = toRoutingRegExp(config.routeFiles);
-        const pattern = reg.exec(specifier);
-        if (pattern) {
-          send({ type: "create", specifier, routePattern: pattern });
+        const routePattern = reg.exec(specifier);
+        if (routePattern) {
+          send({ type: "create", specifier, routePattern });
           return;
         }
       }
