@@ -102,5 +102,8 @@ export class Logger {
   }
 }
 
-export default new Logger();
+// deno-lint-ignore ban-ts-comment
+// @ts-ignore
+const defaultLogger = window.__LOGGER || (window.__LOGGER = new Logger());
+export default defaultLogger;
 export { blue, dim, green, red, yellow };

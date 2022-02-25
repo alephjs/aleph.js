@@ -4,7 +4,7 @@ import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/path.ts";
-import log from "../lib/log.ts";
+import log, { dim } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
@@ -131,7 +131,7 @@ if (import.meta.main) {
           Date.now().toString(16)
         }`
       );
-      log.info(`Server handler imported from ${basename(serverEntry)}`);
+      log.info(`Server handler imported from ${dim(basename(serverEntry))}`);
     }
   };
   await importServerHandler();

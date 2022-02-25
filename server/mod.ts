@@ -1,12 +1,11 @@
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
+import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import { builtinModuleExts } from "../lib/path.ts";
-import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
-import { DependencyGraph } from "./graph.ts";
 import { initRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
@@ -213,9 +212,6 @@ export const serve = (options: ServerOptions = {}) => {
     vendor: "Deno Land Inc.",
   });
 
-  if (!Reflect.has(globalThis, "clientDependencyGraph")) {
-    Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
-  }
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
   Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
 

@@ -163,14 +163,17 @@ export default {
       element(el: Element) {
         let href = el.getAttribute("href");
         if (href) {
-          if (href.startsWith("./")) {
-            href = href.slice(1);
+          const isUrl = util.isLikelyHttpURL(href);
+          if (!isUrl) {
+            href = util.cleanPath(href);
+            el.setAttribute("href", href);
           }
-          el.setAttribute("href", href);
-          if (href.endsWith(".css") && href.startsWith("/") && isDev) {
+          if (href.endsWith(".css") && !isUrl && isDev) {
+            const specifier = `.${href}`;
+            el.setAttribute("data-module-id", specifier);
             el.after(
               `<script type="module">import hot from "${toLocalPath(alephPkgUri)}/framework/core/hmr.ts";hot(${
-                JSON.stringify(`.${href}`)
+                JSON.stringify(specifier)
               }).accept();</script>`,
               { html: true },
             );
@@ -182,13 +185,12 @@ export default {
       nomoduleInserted: false,
       element(el: Element) {
         const src = el.getAttribute("src");
-        const type = el.getAttribute("type");
-        if (type === "module" && !scriptHandler.nomoduleInserted) {
+        if (src && !util.isLikelyHttpURL(src)) {
+          el.setAttribute("src", util.cleanPath(src));
+        }
+        if (el.getAttribute("type") === "module" && !scriptHandler.nomoduleInserted) {
           el.after(`<script nomodule src="${alephPkgUri}/lib/nomodule.js"></script>`, { html: true });
           scriptHandler.nomoduleInserted = true;
-        }
-        if (src?.startsWith("./")) {
-          el.setAttribute("src", src.slice(1));
         }
       },
     };
@@ -205,8 +207,14 @@ export default {
           });
         }
         if (isDev) {
+          if (hmrWebSocketUrl) {
+            el.append(
+              `<script>window.__hmrWebSocketUrl=${JSON.stringify(hmrWebSocketUrl)};</script>`,
+              { html: true },
+            );
+          }
           el.append(
-            `<script type="module">window.__hmrWebSocketUrl=${JSON.stringify(hmrWebSocketUrl)};import hot from "${
+            `<script type="module">import hot from "${
               toLocalPath(alephPkgUri)
             }/framework/core/hmr.ts";hot("./index.html").decline();</script>`,
             { html: true },

@@ -106,9 +106,10 @@ export type TransformerOptions = {
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
+    let clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
     if (!clientDependencyGraph) {
-      return new Response("Server is not ready", { status: 500 });
+      clientDependencyGraph = new DependencyGraph();
+      Reflect.set(globalThis, "clientDependencyGraph", clientDependencyGraph);
     }
 
     const { isDev, buildArgsHash } = options;
