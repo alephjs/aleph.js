@@ -2,7 +2,7 @@ import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
-import { builtinModuleExts } from "../lib/path.ts";
+import { builtinModuleExts } from "../lib/helpers.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";

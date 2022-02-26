@@ -3,7 +3,7 @@ import { concat } from "https://deno.land/std@0.125.0/bytes/mod.ts";
 import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
 import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
-import { toLocalPath } from "../lib/path.ts";
+import { matchRoute, toLocalPath } from "../lib/helpers.ts";
 import { createStaticURLPatternResult, type URLPatternResult } from "../lib/url.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
@@ -228,91 +228,45 @@ export default {
 /** import route modules and fetch data for SSR */
 async function initSSR(req: Request, ctx: FetchContext, routes: Route[]): Promise<{ url: URL; modules: SSRModule[] }> {
   const url = new URL(req.url);
-  const matches: [ret: URLPatternResult, route: Route][] = [];
-  if (routes.length > 0) {
-    routes.forEach((route) => {
-      const [pattern, _, meta] = route;
-      const ret = pattern.exec({ host: url.host, pathname: url.pathname });
-      if (ret) {
-        matches.push([ret, route]);
-        if (meta.nesting && meta.pattern.pathname !== "/_app") {
-          for (const route of routes) {
-            const ret = route[0].exec({ host: url.host, pathname: url.pathname + "/index" });
-            if (ret) {
-              matches.push([ret, route]);
-              break;
-            }
-          }
-        }
-      } else if (meta.nesting) {
-        const parts = util.splitPath(url.pathname);
-        for (let i = parts.length - 1; i > 0; i--) {
-          const pathname = "/" + parts.slice(0, i).join("/");
-          const ret = pattern.exec({ host: url.host, pathname });
-          if (ret) {
-            matches.push([ret, route]);
-            break;
-          }
-        }
+  const matches = matchRoute(url, routes);
+  const modules = await Promise.all(matches.map(async ([ret, [_, imp, meta]]) => {
+    const mod = await imp();
+    const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
+    const ssrModule: SSRModule = {
+      url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
+      filename: meta.filename,
+      defaultExport: mod.default,
+      dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
+    };
+    const fetcher = dataConfig.get;
+    if (typeof fetcher === "function") {
+      const request = new Request(ssrModule.url.toString(), req);
+      let res = fetcher(request, ctx);
+      if (res instanceof Promise) {
+        res = await res;
       }
-    });
-    if (matches.filter(([_, route]) => !route[2].nesting).length === 0) {
-      for (const route of routes) {
-        if (route[2].pattern.pathname === "/_404") {
-          matches.push([createStaticURLPatternResult(url.host, "/_404"), route]);
-          break;
+      if (res instanceof Response) {
+        if (res.status >= 400) {
+          ssrModule.error = { message: await res.text(), status: res.status };
+          return ssrModule;
+        }
+        if (res.status >= 300) {
+          if (res.headers.has("Location")) {
+            ssrModule.redirect = { headers: res.headers, status: res.status };
+          } else {
+            ssrModule.error = { message: "Missing the `Location` header", status: 400 };
+          }
+          return ssrModule;
+        }
+        try {
+          ssrModule.data = await res.json();
+        } catch (_e) {
+          ssrModule.error = { message: "Data must be valid JSON", status: 400 };
         }
       }
     }
-    if (matches.length > 0) {
-      if (matches[0][0].pathname.input !== "/_app") {
-        for (const route of routes) {
-          if (route[2].pattern.pathname === "/_app") {
-            matches.unshift([createStaticURLPatternResult(url.host, "/_app"), route]);
-            break;
-          }
-        }
-      }
-      const modules = await Promise.all(matches.map(async ([ret, [_, imp, meta]]) => {
-        const mod = await imp();
-        const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
-        const ssrModule: SSRModule = {
-          url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
-          filename: meta.filename,
-          defaultExport: mod.default,
-          dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
-        };
-        const fetcher = dataConfig.get;
-        if (typeof fetcher === "function") {
-          const request = new Request(ssrModule.url.toString(), req);
-          let res = fetcher(request, ctx);
-          if (res instanceof Promise) {
-            res = await res;
-          }
-          if (res instanceof Response) {
-            if (res.status >= 400) {
-              ssrModule.error = { message: await res.text(), status: res.status };
-              return ssrModule;
-            }
-            if (res.status >= 300) {
-              if (res.headers.has("Location")) {
-                ssrModule.redirect = { headers: res.headers, status: res.status };
-              } else {
-                ssrModule.error = { message: "Missing the `Location` header", status: 400 };
-              }
-              return ssrModule;
-            }
-            try {
-              ssrModule.data = await res.json();
-            } catch (_e) {
-              ssrModule.error = { message: "Data must be valid JSON", status: 400 };
-            }
-          }
-        }
-        return ssrModule;
-      }));
-      return { url, modules: modules.filter(({ defaultExport }) => defaultExport !== undefined) };
-    }
-  }
-  return { url, modules: [] };
+    return ssrModule;
+  }));
+
+  return { url, modules: modules.filter(({ defaultExport }) => defaultExport !== undefined) };
 }

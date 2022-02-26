@@ -2,7 +2,7 @@ import { createGenerator } from "https://esm.sh/@unocss/core@0.26.2";
 import { fastTransform, transform, transformCSS } from "../compiler/mod.ts";
 import type { ImportMap, TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
-import { builtinModuleExts, restoreUrl, toLocalPath } from "../lib/path.ts";
+import { builtinModuleExts, restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle.ts";

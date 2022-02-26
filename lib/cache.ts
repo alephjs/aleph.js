@@ -5,7 +5,7 @@ import util from "./util.ts";
 
 const enc = new TextEncoder();
 
-/** download and cache remote contents */
+/** fetch and cache remote contents */
 export default async function cache(
   url: string,
   options?: { forceRefresh?: boolean; retryTimes?: number; userAgent?: string },
