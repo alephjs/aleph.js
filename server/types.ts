@@ -1,5 +1,6 @@
 import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.26.2";
 import type { Comment, Doctype, DocumentEnd, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
+import type { URLPatternCompat, URLPatternInput } from "../lib/url.ts";
 
 export type AlephConfig = {
   build?: BuildOptions;
@@ -76,29 +77,10 @@ export type ServerOptions = {
   ssr?: (ctx: SSRContext) => string | undefined | Promise<string | undefined>;
 };
 
-export type RawURLPattern = {
-  host?: string;
-  pathname: string;
-};
-
-export type RoutingRegExp = {
-  prefix: string;
-  test(filename: string): boolean;
-  exec(filename: string): RawURLPattern | null;
-};
-
-export type URLPatternResult = {
-  [key in "host" | "pathname"]: { input: string; groups: Record<string, string> };
-};
-
-export interface IURLPattern {
-  exec(input: { host?: string; pathname: string }): URLPatternResult;
-}
-
 export type Route = readonly [
-  pattern: IURLPattern,
+  pattern: URLPatternCompat,
   loader: () => Promise<Record<string, unknown>>,
-  meta: { filename: string; pattern: RawURLPattern },
+  meta: { filename: string; pattern: URLPatternInput; nesting?: boolean },
 ];
 
 export { AtomicCSSConfig };

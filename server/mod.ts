@@ -9,7 +9,7 @@ import { loadImportMap, loadJSXConfig } from "./config.ts";
 import { initRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
-import { clientModuleTransformer, serveAppModules } from "./transformer.ts";
+import { clientModuleTransformer } from "./transformer.ts";
 import type { FetchContext, HTMLRewriterHandlers, Route, ServerOptions } from "./types.ts";
 
 export const serve = (options: ServerOptions = {}) => {
@@ -27,8 +27,9 @@ export const serve = (options: ServerOptions = {}) => {
   const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
   const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
-    const { pathname } = url;
+    const { host, pathname } = url;
 
+    // transform client modules
     if (
       pathname.startsWith("/-/") ||
       builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
@@ -49,6 +50,7 @@ export const serve = (options: ServerOptions = {}) => {
       });
     }
 
+    // serve static files
     try {
       let filePath = `.${pathname}`;
       let stat = await Deno.lstat(filePath);
@@ -115,11 +117,11 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    // request route data
+    // request data
     const routes = (Reflect.get(globalThis, "__ALEPH_ROUTES") as Route[] | undefined) || await routesPromise;
     if (routes.length > 0) {
       for (const [pattern, load] of routes) {
-        const ret = pattern.exec({ pathname });
+        const ret = pattern.exec({ host, pathname });
         if (ret) {
           try {
             const mod = await load();
@@ -149,7 +151,7 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    // don't render this special asset files
+    // don't render those special asset files
     switch (pathname) {
       case "/favicon.ico":
       case "/robots.txt":
@@ -180,6 +182,7 @@ export const serve = (options: ServerOptions = {}) => {
       Reflect.set(globalThis, "__ALEPH_INDEX_HTML", indexHtml);
     }
 
+    // no root `index.html` found
     if (indexHtml === null) {
       return new Response("Not Found", { status: 404 });
     }
@@ -223,12 +226,6 @@ export const serve = (options: ServerOptions = {}) => {
       e.respondWith(handler(e.request));
     });
   } else if (!Deno.env.get("ALEPH_APP_MODULES_PORT")) {
-    if (options.ssr && options.config?.routeFiles) {
-      importMapPromise.then((importMap) => {
-        serveAppModules(6060, importMap);
-        log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
-      });
-    }
     const { port = 8080, certFile, keyFile } = options;
     if (certFile && keyFile) {
       serveTls(handler, { port, certFile, keyFile });

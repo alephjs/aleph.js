@@ -4,19 +4,12 @@ import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
 import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import { toLocalPath } from "../lib/path.ts";
+import { createStaticURLPatternResult, type URLPatternResult } from "../lib/url.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { bundleCSS } from "./bundle.ts";
-import type {
-  AlephConfig,
-  FetchContext,
-  HTMLRewriterHandlers,
-  Route,
-  SSRContext,
-  SSRModule,
-  URLPatternResult,
-} from "./types.ts";
+import type { AlephConfig, FetchContext, HTMLRewriterHandlers, Route, SSRContext, SSRModule } from "./types.ts";
 
 let lolHtmlReady = false;
 
@@ -43,9 +36,9 @@ export default {
       chunks.push(chunk);
     });
 
-    let ssrHandled = false;
+    let ssr = false;
     if (ssrHandler) {
-      const { url, modules } = await importSSRModules(req, ctx, routes);
+      const { url, modules } = await initSSR(req, ctx, routes);
       for (const { redirect } of modules) {
         if (redirect) {
           return new Response(null, redirect);
@@ -90,32 +83,24 @@ export default {
           rewriter.on("ssr-head", {
             element(el: Element) {
               headCollection.forEach((h) => util.isFilledString(h) && el.before(h, { html: true }));
-              const importStmts = modules
-                .map(({ filename }, idx) =>
-                  `import mod_${idx} from ${JSON.stringify(filename.slice(1))};__SSR_MODULES[${
-                    JSON.stringify(filename)
-                  }]={default:mod_${idx}};`
-                );
-              if (importStmts.length > 0) {
-                el.before(
-                  `<script type="module">window.__SSR_MODULES={};${importStmts.join("")}</script>`,
-                  {
-                    html: true,
-                  },
-                );
-              }
-              const data = modules.map(({ url, data, dataCacheTtl }) => ({
-                url: url.pathname + url.search,
-                data,
-                dataCacheTtl,
-              }));
-              if (data.length > 0) {
-                el.before(
-                  `<script id="aleph-ssr-data" type="application/json">${JSON.stringify(data)}</script>`,
-                  {
-                    html: true,
-                  },
-                );
+              if (modules.length > 0) {
+                const importStmts = modules.map(({ filename }, idx) =>
+                  `import mod_${idx} from ${JSON.stringify(filename.slice(1))};`
+                ).join("");
+                const kvs = modules.map(({ filename }, idx) => `${JSON.stringify(filename)}:mod_${idx}`).join(",");
+                const data = modules.map(({ url, filename, error, data, dataCacheTtl }) => ({
+                  url: url.pathname + url.search,
+                  module: filename,
+                  error,
+                  data,
+                  dataCacheTtl,
+                }));
+                el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(data)}</script>`, {
+                  html: true,
+                });
+                el.before(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
+                  html: true,
+                });
               }
               el.remove();
             },
@@ -135,7 +120,7 @@ export default {
           } else {
             headers.append("Cache-Control", "public, max-age=0, must-revalidate");
           }
-          ssrHandled = true;
+          ssr = true;
         }
       } catch (error) {
         rewriter.on("ssr-head", {
@@ -149,11 +134,11 @@ export default {
           },
         });
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
-        ssrHandled = true;
+        ssr = true;
       }
     }
 
-    if (!ssrHandled) {
+    if (!ssr) {
       const stat = await Deno.lstat("./index.html");
       if (stat.mtime) {
         const mtimeUTC = stat.mtime.toUTCString();
@@ -208,19 +193,14 @@ export default {
           return;
         }
         if (routes.length > 0) {
-          el.append(
-            `<script id="aleph-routes" type="application/json">${JSON.stringify(routes.map((r) => r[2]))}</script>`,
-            {
-              html: true,
-            },
-          );
+          const json = JSON.stringify({ routes: routes.map((r) => r[2]) });
+          el.append(`<script id="route-manifest" type="application/json">${json}</script>`, {
+            html: true,
+          });
         }
         if (isDev) {
           if (hmrWebSocketUrl) {
-            el.append(
-              `<script>window.__hmrWebSocketUrl=${JSON.stringify(hmrWebSocketUrl)};</script>`,
-              { html: true },
-            );
+            el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(hmrWebSocketUrl)};</script>`, { html: true });
           }
           el.append(
             `<script type="module">import hot from "${
@@ -245,36 +225,52 @@ export default {
   },
 };
 
-// import routing modules and fetch data for SSR
-async function importSSRModules(
-  req: Request,
-  ctx: FetchContext,
-  routes: Route[],
-): Promise<{ url: URL; modules: SSRModule[] }> {
+/** import route modules and fetch data for SSR */
+async function initSSR(req: Request, ctx: FetchContext, routes: Route[]): Promise<{ url: URL; modules: SSRModule[] }> {
   const url = new URL(req.url);
   const matches: [ret: URLPatternResult, route: Route][] = [];
   if (routes.length > 0) {
     routes.forEach((route) => {
-      const ret = route[0].exec({ host: url.host, pathname: url.pathname });
+      const [pattern, _, meta] = route;
+      const ret = pattern.exec({ host: url.host, pathname: url.pathname });
       if (ret) {
         matches.push([ret, route]);
+        if (meta.nesting && meta.pattern.pathname !== "/_app") {
+          for (const route of routes) {
+            const ret = route[0].exec({ host: url.host, pathname: url.pathname + "/index" });
+            if (ret) {
+              matches.push([ret, route]);
+              break;
+            }
+          }
+        }
+      } else if (meta.nesting) {
+        const parts = util.splitPath(url.pathname);
+        for (let i = parts.length - 1; i > 0; i--) {
+          const pathname = "/" + parts.slice(0, i).join("/");
+          const ret = pattern.exec({ host: url.host, pathname });
+          if (ret) {
+            matches.push([ret, route]);
+            break;
+          }
+        }
       }
     });
-    if (matches.length === 0) {
+    if (matches.filter(([_, route]) => !route[2].nesting).length === 0) {
       for (const route of routes) {
-        const ret = route[0].exec({ host: url.host, pathname: "/404" });
-        if (ret) {
-          matches.push([ret, route]);
+        if (route[2].pattern.pathname === "/_404") {
+          matches.push([createStaticURLPatternResult(url.host, "/_404"), route]);
           break;
         }
       }
     }
     if (matches.length > 0) {
-      for (const route of routes) {
-        const ret = route[0].exec({ host: url.host, pathname: "/_app" });
-        if (ret) {
-          matches.unshift([ret, route]);
-          break;
+      if (matches[0][0].pathname.input !== "/_app") {
+        for (const route of routes) {
+          if (route[2].pattern.pathname === "/_app") {
+            matches.unshift([createStaticURLPatternResult(url.host, "/_app"), route]);
+            break;
+          }
         }
       }
       const modules = await Promise.all(matches.map(async ([ret, [_, imp, meta]]) => {

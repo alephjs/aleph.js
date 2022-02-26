@@ -1,5 +1,4 @@
 const inDeno = typeof Deno !== "undefined" && typeof Deno.env === "object";
-const trashBin = new Map<string, string>();
 
 export function applyCSS(url: string, css: string) {
   if (!inDeno) {
@@ -27,23 +26,5 @@ export function applyCSS(url: string, css: string) {
       el.setAttribute("data-module-id", url);
       document.head.appendChild(el);
     }
-  }
-}
-
-export function removeCSS(url: string, recoverable?: boolean) {
-  const { document } = window;
-  Array.from(document.head.children).forEach((el) => {
-    if (el.getAttribute("data-module-id") === url) {
-      if (recoverable) {
-        trashBin.set(url, el.innerHTML);
-      }
-      document.head.removeChild(el);
-    }
-  });
-}
-
-export function recoverCSS(url: string) {
-  if (trashBin.has(url)) {
-    applyCSS(url, trashBin.get(url)!);
   }
 }

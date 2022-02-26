@@ -1,91 +1,12 @@
 import type { FC, ReactElement, ReactNode } from "https://esm.sh/react@17.0.2";
 import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import { URLPatternCompat } from "../../lib/url.ts";
 import util from "../../lib/util.ts";
 import type { SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import RouterContext from "./context.ts";
 import { E404Page } from "./error.ts";
-
-class URLPatternCompat {
-  pattern: Record<string, unknown>;
-
-  static execPathname(
-    patternPathname: string,
-    pathname: string,
-  ): null | { pathname: { input: string; groups: Record<string, string> } } {
-    const patternSegments = util.splitPath(patternPathname);
-    const segments = util.splitPath(pathname);
-    const depth = Math.max(patternSegments.length, segments.length);
-    const groups: Record<string, string> = {};
-
-    for (let i = 0; i < depth; i++) {
-      const patternSegment = patternSegments[i];
-      const segment = segments[i];
-
-      if (segment === undefined || patternSegment === undefined) {
-        return null;
-      }
-
-      if (patternSegment.startsWith(":") && patternSegment.length > 1) {
-        if (patternSegment.endsWith("+") && patternSegment.length > 2 && i === patternSegments.length - 1) {
-          groups[patternSegment.slice(1, -1)] = segments.slice(i).map(decodeURIComponent).join("/");
-          break;
-        }
-        groups[patternSegment.slice(1)] = decodeURIComponent(segment);
-      } else if (patternSegment !== segment) {
-        return null;
-      }
-    }
-
-    return {
-      pathname: {
-        input: pathname,
-        groups,
-      },
-    };
-  }
-
-  constructor(pattern: { host?: string; pathname: string }) {
-    if ("URLPattern" in window) {
-      // deno-lint-ignore ban-ts-comment
-      // @ts-ignore
-      this.pattern = new URLPattern(pattern);
-    } else {
-      this.pattern = pattern;
-    }
-  }
-
-  test(input: { host: string; pathname: string }): boolean {
-    const { pattern } = this;
-    if (typeof pattern.test === "function") {
-      return pattern.test(input);
-    }
-    if (util.isFilledString(pattern.host) && pattern.host !== input.host) {
-      return false;
-    }
-    if (util.isFilledString(pattern.pathname)) {
-      return URLPatternCompat.execPathname(pattern.pathname, input.pathname) !== null;
-    }
-    return false;
-  }
-
-  exec(
-    input: { host: string; pathname: string },
-  ): null | { pathname: { input: string; groups: Record<string, string> } } {
-    const { pattern } = this;
-    if (typeof pattern.exec === "function") {
-      return pattern.exec(input);
-    }
-    if (util.isFilledString(pattern.host) && pattern.host !== input.host) {
-      return null;
-    }
-    if (util.isFilledString(pattern.pathname)) {
-      return URLPatternCompat.execPathname(pattern.pathname, input.pathname);
-    }
-    return null;
-  }
-}
 
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
@@ -94,7 +15,7 @@ export type RouterProps = {
 export const Router: FC<RouterProps> = ({ ssrContext }) => {
   // deno-lint-ignore ban-ts-comment
   // @ts-ignore
-  const ssrModules = window.__SSR_MODULES || (window.__SSR_MODULES = {});
+  const routeModules = window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
   const dataCache = useMemo(() => {
     const cache = new Map();
     const data = ssrContext
@@ -120,7 +41,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
   }, []);
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location.href));
   const [routes, _setRoutes] = useState<[pattern: URLPatternCompat, filename: string, isNest: boolean][]>(() => {
-    const routesDataEl = window.document?.getElementById("aleph-routes");
+    const routesDataEl = window.document?.getElementById("route-files");
     if (routesDataEl) {
       try {
         const routes = JSON.parse(routesDataEl.innerText);
@@ -166,12 +87,12 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       }
       if (modules.length > 0) {
         await Promise.all(modules.map(async ([dataUrl, filename]) => {
-          if (filename in ssrModules) {
+          if (filename in routeModules) {
             return;
           }
           const mod = await import(filename.slice(1)); // todo: add version
           if (typeof mod.default === "function") {
-            ssrModules[filename] = mod.default;
+            routeModules[filename] = mod.default;
             if (mod.data === true) {
               const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
               const data = await res.json();
@@ -210,7 +131,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       }
       const route = routes.find(([pattern]) => pattern.test(location));
       if (route) {
-        const mod = ssrModules[route[1]];
+        const mod = routeModules[route[1]];
         if (mod) {
           return mod.default;
         }
@@ -227,7 +148,7 @@ export const useRouter = (): { url: URL; redirect: typeof redirect } => {
 };
 
 function loadSSRDataFromTag(): { url: string; data?: unknown; dataCacheTtl?: number }[] | undefined {
-  const ssrDataEl = self.document?.getElementById("aleph-ssr-data");
+  const ssrDataEl = self.document?.getElementById("ssr-data");
   if (ssrDataEl) {
     try {
       const ssrData = JSON.parse(ssrDataEl.innerText);

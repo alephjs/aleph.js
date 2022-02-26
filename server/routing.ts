@@ -1,16 +1,25 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { getFiles } from "../lib/fs.ts";
 import log, { dim } from "../lib/log.ts";
+import { URLPatternCompat, type URLPatternInput } from "../lib/url.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
-import type { AlephConfig, RawURLPattern, Route, RoutesConfig, RoutingRegExp } from "./types.ts";
+import type { AlephConfig, Route, RoutesConfig } from "./types.ts";
+
+type RouteRegExp = {
+  prefix: string;
+  test(filename: string): boolean;
+  exec(filename: string): URLPatternInput | null;
+};
 
 const routeModules: Map<string, Record<string, unknown>> = new Map();
 
+/** register route module */
 export function register(filename: string, module: Record<string, unknown>) {
   routeModules.set(filename, module);
 }
 
+/* check if the filename is a route */
 export function isRouteFile(filename: string): boolean {
   const currentRoutes: Route[] | undefined = Reflect.get(globalThis, "__ALEPH_ROUTES");
   const index = currentRoutes?.findIndex((r) => r[2].filename === filename);
@@ -19,14 +28,15 @@ export function isRouteFile(filename: string): boolean {
   }
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   if (config && config.routeFiles) {
-    const reg = toRoutingRegExp(config.routeFiles);
+    const reg = toRouteRegExp(config.routeFiles);
     return reg.test(filename);
   }
   return false;
 }
 
-export async function initRoutes(config: string | RoutesConfig | RoutingRegExp): Promise<Route[]> {
-  const reg = isRoutingRegExp(config) ? config : toRoutingRegExp(config);
+/** initialize routes from routes config */
+export async function initRoutes(config: string | RoutesConfig | RouteRegExp): Promise<Route[]> {
+  const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
   const files = await getFiles(join(Deno.cwd(), reg.prefix));
   const routes: Route[] = [];
   files.forEach((file) => {
@@ -34,9 +44,7 @@ export async function initRoutes(config: string | RoutesConfig | RoutingRegExp):
     const pattern = reg.exec(filename);
     if (pattern) {
       routes.push([
-        // deno-lint-ignore ban-ts-comment
-        // @ts-ignore
-        new URLPattern(pattern),
+        new URLPatternCompat(pattern),
         async () => {
           let mod: Record<string, unknown>;
           if (routeModules.has(filename)) {
@@ -54,13 +62,27 @@ export async function initRoutes(config: string | RoutesConfig | RoutingRegExp):
       ]);
     }
   });
-  routes.sort((a, b) => routeOrder(a) - routeOrder(b));
+  if (routes.length > 0) {
+    // roder routes by length of pathname
+    routes.sort((a, b) => getRouteOrder(a) - getRouteOrder(b));
+    // check if nesting routes
+    routes.forEach(([_, __, meta]) => {
+      const { pattern: { pathname }, filename } = meta;
+      const nesting = pathname === "/_app" || (pathname !== "/" && !isIndexRoute(filename) &&
+        routes.findIndex(([_, __, { pattern: { pathname: p } }]) => p !== pathname && p.startsWith(pathname + "/")) !==
+          -1);
+      if (nesting) {
+        meta.nesting = true;
+      }
+    });
+  }
   log.debug(`${routes.length || "No"} route${routes.length !== 1 ? "s" : ""} found from ${dim(reg.prefix)}`);
   Reflect.set(globalThis, "__ALEPH_ROUTES", routes);
   return routes;
 }
 
-export function toRoutingRegExp(config: string | RoutesConfig): RoutingRegExp {
+/** convert route config to `RouteRegExp` */
+export function toRouteRegExp(config: string | RoutesConfig): RouteRegExp {
   const isObject = util.isPlainObject(config);
   const prefix = "." + util.cleanPath(isObject ? config.dir : config.split("*")[0]);
   const reg = isObject
@@ -74,7 +96,7 @@ export function toRoutingRegExp(config: string | RoutesConfig): RoutingRegExp {
   return {
     prefix,
     test: (s: string) => reg.test(s),
-    exec: (filename: string): RawURLPattern | null => {
+    exec: (filename: string): URLPatternInput | null => {
       if (reg.test(filename)) {
         const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
           part = toSlug(part);
@@ -94,28 +116,35 @@ export function toRoutingRegExp(config: string | RoutesConfig): RoutingRegExp {
           host = parts.shift()!.slice(1);
         }
         const basename = parts.pop()!;
-        const pathname =
-          util.trimSuffix("/" + [...parts, util.trimSuffix(basename, extname(basename))].join("/"), "/index") || "/";
-        return { host, pathname };
+        const pathname = "/" + [...parts, util.trimSuffix(basename, extname(basename))].join("/");
+        return { host, pathname: pathname === "/index" ? "/" : pathname };
       }
       return null;
     },
   };
 }
 
-function isRoutingRegExp(v: unknown): v is RoutingRegExp {
+// check if route is index route
+function isRouteRegExp(v: unknown): v is RouteRegExp {
   return util.isPlainObject(v) && typeof v.test === "function" && typeof v.exec === "function";
 }
 
+/** check if the file is index route */
+function isIndexRoute(filename: string): boolean {
+  return util.splitBy(filename, ".", true)[0].endsWith("/index");
+}
+
+/** slugify a string */
 function toSlug(s: string): string {
   return s.replace(/\s+/g, "-").replace(/[^a-z0-9\-\[\]\/\$+_.@]/gi, "").toLowerCase();
 }
 
-function routeOrder(route: Route): number {
+/** get route order by pathname length */
+function getRouteOrder(route: Route): number {
   const { pattern, filename } = route[2];
   switch (pattern.pathname) {
+    case "/_404":
     case "/_app":
-    case "/_a404":
       return 0;
     default:
       return filename.split("/").length;
