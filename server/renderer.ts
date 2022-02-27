@@ -3,7 +3,7 @@ import { concat } from "https://deno.land/std@0.125.0/bytes/mod.ts";
 import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
 import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
-import { matchRoute, toLocalPath } from "../lib/helpers.ts";
+import { matchRoutes, toLocalPath } from "../lib/helpers.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
@@ -232,7 +232,7 @@ async function initSSR(
   routes: Route[],
 ): Promise<{ url: URL; modules: RenderModule[] }> {
   const url = new URL(req.url);
-  const matches = matchRoute(url, routes);
+  const matches = matchRoutes(url, routes);
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
     const mod = await importRouteModule(filename);
     const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};

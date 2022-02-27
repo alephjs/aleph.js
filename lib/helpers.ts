@@ -4,7 +4,8 @@ import util from "./util.ts";
 
 export const builtinModuleExts = ["tsx", "jsx", "ts", "mts", "js", "mjs"];
 
-export function matchRoute(url: URL, routes: Route[]): [ret: URLPatternResult, route: RouteMeta][] {
+/** match routes against the given url */
+export function matchRoutes(url: URL, routes: Route[]): [ret: URLPatternResult, route: RouteMeta][] {
   let { pathname } = url;
   if (pathname !== "/") {
     pathname = util.trimSuffix(url.pathname, "/").toLowerCase();
@@ -86,10 +87,10 @@ export function toLocalPath(url: string): string {
 }
 
 /**
- * store local path to remote url
+ * restore the remote url from local path
  * e.g.: /-/esm.sh/react@17.0.2?target=es2018 -> https://esm.sh/react@17.0.2?target=es2018
  */
-export function restoreUrl(pathname: string) {
+export function restoreUrl(pathname: string): string {
   let [h, ...rest] = pathname.substring(3).split("/");
   let protocol = "https";
   if (h.startsWith("http_")) {
