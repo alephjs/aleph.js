@@ -59,7 +59,6 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       const ROUTE_MODULES: Record<string, unknown> = window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
       const url = new URL(window.location.href);
       const matches = matchRoute(url, routes);
-      console.log(matches);
       const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
         const rmod: RenderModule = {
           url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
