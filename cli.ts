@@ -215,6 +215,8 @@ async function run(command: string, options: RunOptions) {
   if (version) {
     const pkgName = isCanary ? "aleph_canary" : "aleph";
     cmd.push(`https://deno.land/x/${pkgName}@${version}/commands/${command}.ts`);
+  } else if (devPort) {
+    cmd.push(`http://localhost:${devPort}/commands/${command}.ts`);
   } else {
     cmd.push(new URL(`./commands/${command}.ts`, import.meta.url).href);
   }

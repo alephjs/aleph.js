@@ -6,7 +6,7 @@ import { builtinModuleExts } from "../lib/helpers.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
-import { initRoutes } from "./routing.ts";
+import { importRouteModule, initRoutes } from "./routing.ts";
 import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
 import { clientModuleTransformer } from "./transformer.ts";
@@ -21,7 +21,7 @@ export const serve = (options: ServerOptions = {}) => {
   const buildArgsHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(
     async ([jsxConfig, importMap]) => {
       const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
-      return util.toHex(await crypto.subtle.digest("sha-1", (new TextEncoder()).encode(buildArgs)));
+      return await util.computeHash("sha-1", buildArgs);
     },
   );
   const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
@@ -120,11 +120,11 @@ export const serve = (options: ServerOptions = {}) => {
     // request data
     const routes = (Reflect.get(globalThis, "__ALEPH_ROUTES") as Route[] | undefined) || await routesPromise;
     if (routes.length > 0) {
-      for (const [pattern, load] of routes) {
+      for (const [pattern, meta] of routes) {
         const ret = pattern.exec({ host, pathname });
         if (ret) {
           try {
-            const mod = await load();
+            const mod = await importRouteModule(meta.filename);
             const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
             if (req.method !== "GET" || mod.default === undefined || req.headers.has("X-Fetch-Data")) {
               const fetcher = dataConfig[req.method.toLowerCase()];

@@ -3,8 +3,6 @@ import { existsDir, existsFile } from "./fs.ts";
 import log from "./log.ts";
 import util from "./util.ts";
 
-const enc = new TextEncoder();
-
 /** fetch and cache remote contents */
 export default async function cache(
   url: string,
@@ -21,9 +19,7 @@ export default async function cache(
   let contentFilepath = "";
   if (cacheable) {
     cacheDir = join(denoDir, "deps", util.trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
-    hashname = util.toHex(
-      await crypto.subtle.digest("sha-256", enc.encode(pathname + search + (options?.userAgent || ""))),
-    );
+    hashname = await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
     metaFilepath = join(cacheDir, hashname + ".metadata.json");
     contentFilepath = join(cacheDir, hashname);
   }

@@ -4,12 +4,12 @@ import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
 import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import { matchRoute, toLocalPath } from "../lib/helpers.ts";
-import { createStaticURLPatternResult, type URLPatternResult } from "../lib/url.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { bundleCSS } from "./bundle.ts";
-import type { AlephConfig, FetchContext, HTMLRewriterHandlers, Route, SSRContext, SSRModule } from "./types.ts";
+import { importRouteModule } from "./routing.ts";
+import type { AlephConfig, FetchContext, HTMLRewriterHandlers, RenderModule, Route, SSRContext } from "./types.ts";
 
 let lolHtmlReady = false;
 
@@ -88,14 +88,14 @@ export default {
                   `import mod_${idx} from ${JSON.stringify(filename.slice(1))};`
                 ).join("");
                 const kvs = modules.map(({ filename }, idx) => `${JSON.stringify(filename)}:mod_${idx}`).join(",");
-                const data = modules.map(({ url, filename, error, data, dataCacheTtl }) => ({
+                const ssrModules = modules.map(({ url, filename, error, data, dataCacheTtl }) => ({
                   url: url.pathname + url.search,
                   module: filename,
                   error,
                   data,
                   dataCacheTtl,
                 }));
-                el.before(`<script id="ssr-data" type="application/json">${JSON.stringify(data)}</script>`, {
+                el.before(`<script id="ssr-modules" type="application/json">${JSON.stringify(ssrModules)}</script>`, {
                   html: true,
                 });
                 el.before(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
@@ -193,7 +193,7 @@ export default {
           return;
         }
         if (routes.length > 0) {
-          const json = JSON.stringify({ routes: routes.map((r) => r[2]) });
+          const json = JSON.stringify({ routes: routes.map(([_, meta]) => meta) });
           el.append(`<script id="route-manifest" type="application/json">${json}</script>`, {
             html: true,
           });
@@ -226,46 +226,50 @@ export default {
 };
 
 /** import route modules and fetch data for SSR */
-async function initSSR(req: Request, ctx: FetchContext, routes: Route[]): Promise<{ url: URL; modules: SSRModule[] }> {
+async function initSSR(
+  req: Request,
+  ctx: FetchContext,
+  routes: Route[],
+): Promise<{ url: URL; modules: RenderModule[] }> {
   const url = new URL(req.url);
   const matches = matchRoute(url, routes);
-  const modules = await Promise.all(matches.map(async ([ret, [_, imp, meta]]) => {
-    const mod = await imp();
+  const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
+    const mod = await importRouteModule(filename);
     const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
-    const ssrModule: SSRModule = {
+    const rmod: RenderModule = {
       url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
-      filename: meta.filename,
+      filename: filename,
       defaultExport: mod.default,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
     };
     const fetcher = dataConfig.get;
     if (typeof fetcher === "function") {
-      const request = new Request(ssrModule.url.toString(), req);
+      const request = new Request(rmod.url.toString(), req);
       let res = fetcher(request, ctx);
       if (res instanceof Promise) {
         res = await res;
       }
       if (res instanceof Response) {
         if (res.status >= 400) {
-          ssrModule.error = { message: await res.text(), status: res.status };
-          return ssrModule;
+          rmod.error = { message: await res.text(), status: res.status };
+          return rmod;
         }
         if (res.status >= 300) {
           if (res.headers.has("Location")) {
-            ssrModule.redirect = { headers: res.headers, status: res.status };
+            rmod.redirect = { headers: res.headers, status: res.status };
           } else {
-            ssrModule.error = { message: "Missing the `Location` header", status: 400 };
+            rmod.error = { message: "Missing the `Location` header", status: 400 };
           }
-          return ssrModule;
+          return rmod;
         }
         try {
-          ssrModule.data = await res.json();
+          rmod.data = await res.json();
         } catch (_e) {
-          ssrModule.error = { message: "Data must be valid JSON", status: 400 };
+          rmod.error = { message: "Data must be valid JSON", status: 400 };
         }
       }
     }
-    return ssrModule;
+    return rmod;
   }));
 
   return { url, modules: modules.filter(({ defaultExport }) => defaultExport !== undefined) };

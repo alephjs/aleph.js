@@ -1,4 +1,6 @@
 export default {
+  utf8TextEncoder: new TextEncoder(),
+  utf8TextDecoder: new TextDecoder(),
   isFilledString(a: unknown): a is string {
     return typeof a === "string" && a.length > 0;
   },
@@ -42,6 +44,11 @@ export default {
     const bytes = new Uint8Array(buffer);
     return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
   },
+  computeHash(algorithm: AlgorithmIdentifier, data: string | Uint8Array): Promise<string> {
+    return crypto.subtle.digest(algorithm, typeof data === "string" ? this.utf8TextEncoder.encode(data) : data).then((
+      sum,
+    ) => this.toHex(sum));
+  },
   prettyBytes(bytes: number) {
     const units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
     const exp = Math.floor(Math.log(bytes) / Math.log(1024));
@@ -67,7 +74,7 @@ export default {
   debounce<Args extends unknown[], F extends (...args: Args) => void>(
     fn: F,
     delay: number,
-  ): DebouncedFunction<Args, F> {
+  ): (this: ThisParameterType<F>, ...args: Parameters<F>) => void {
     let timer: number | null;
     function debounced(this: ThisParameterType<F>, ...args: Parameters<F>): void {
       if (timer !== null) {
@@ -81,7 +88,3 @@ export default {
     return debounced;
   },
 };
-
-export interface DebouncedFunction<Args extends unknown[], F extends (...args: Args) => void> {
-  (this: ThisParameterType<F>, ...args: Parameters<F>): void;
-}

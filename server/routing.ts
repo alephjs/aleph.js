@@ -19,10 +19,24 @@ export function register(filename: string, module: Record<string, unknown>) {
   routeModules.set(filename, module);
 }
 
+export async function importRouteModule(filename: string) {
+  let mod: Record<string, unknown>;
+  if (routeModules.has(filename)) {
+    mod = routeModules.get(filename)!;
+  } else {
+    const graph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+    const gm = graph?.get(filename) || graph?.mark(filename, {});
+    const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
+    const version = (gm?.version || Date.now()).toString(16);
+    mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version}`);
+  }
+  return mod;
+}
+
 /* check if the filename is a route */
 export function isRouteFile(filename: string): boolean {
   const currentRoutes: Route[] | undefined = Reflect.get(globalThis, "__ALEPH_ROUTES");
-  const index = currentRoutes?.findIndex((r) => r[2].filename === filename);
+  const index = currentRoutes?.findIndex(([_, meta]) => meta.filename === filename);
   if (index !== undefined && index !== -1) {
     return true;
   }
@@ -45,19 +59,6 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp): P
     if (pattern) {
       routes.push([
         new URLPatternCompat(pattern),
-        async () => {
-          let mod: Record<string, unknown>;
-          if (routeModules.has(filename)) {
-            mod = routeModules.get(filename)!;
-          } else {
-            const graph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
-            const gm = graph?.get(filename) || graph?.mark(filename, {});
-            const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
-            const version = (gm?.version || Date.now()).toString(16);
-            mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version}`);
-          }
-          return mod;
-        },
         { pattern, filename },
       ]);
     }
@@ -65,11 +66,11 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp): P
   if (routes.length > 0) {
     // roder routes by length of pathname
     routes.sort((a, b) => getRouteOrder(a) - getRouteOrder(b));
-    // check if nesting routes
-    routes.forEach(([_, __, meta]) => {
-      const { pattern: { pathname }, filename } = meta;
-      const nesting = pathname === "/_app" || (pathname !== "/" && !isIndexRoute(filename) &&
-        routes.findIndex(([_, __, { pattern: { pathname: p } }]) => p !== pathname && p.startsWith(pathname + "/")) !==
+    // check nesting routes
+    routes.forEach(([_, meta]) => {
+      const { pattern: { pathname } } = meta;
+      const nesting = pathname === "/_app" || (pathname !== "/" && !pathname.endsWith("/index") &&
+        routes.findIndex(([_, { pattern: { pathname: p } }]) => p !== pathname && p.startsWith(pathname + "/")) !==
           -1);
       if (nesting) {
         meta.nesting = true;
@@ -99,7 +100,7 @@ export function toRouteRegExp(config: string | RoutesConfig): RouteRegExp {
     exec: (filename: string): URLPatternInput | null => {
       if (reg.test(filename)) {
         const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
-          part = toSlug(part);
+          part = part.toLowerCase();
           if (part.startsWith("[...") && part.startsWith("]") && part.length > 5) {
             return ":" + part.slice(4, -1) + "+";
           }
@@ -129,19 +130,9 @@ function isRouteRegExp(v: unknown): v is RouteRegExp {
   return util.isPlainObject(v) && typeof v.test === "function" && typeof v.exec === "function";
 }
 
-/** check if the file is index route */
-function isIndexRoute(filename: string): boolean {
-  return util.splitBy(filename, ".", true)[0].endsWith("/index");
-}
-
-/** slugify a string */
-function toSlug(s: string): string {
-  return s.replace(/\s+/g, "-").replace(/[^a-z0-9\-\[\]\/\$+_.@]/gi, "").toLowerCase();
-}
-
 /** get route order by pathname length */
-function getRouteOrder(route: Route): number {
-  const { pattern, filename } = route[2];
+function getRouteOrder([_, meta]: Route): number {
+  const { pattern, filename } = meta;
   switch (pattern.pathname) {
     case "/_404":
     case "/_app":

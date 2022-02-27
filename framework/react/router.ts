@@ -1,8 +1,9 @@
-import type { FC, ReactElement, ReactNode } from "https://esm.sh/react@17.0.2";
+import type { FC, ReactElement } from "https://esm.sh/react@17.0.2";
 import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import { matchRoute } from "../../lib/helpers.ts";
 import { URLPatternCompat } from "../../lib/url.ts";
 import util from "../../lib/util.ts";
-import type { SSRContext } from "../../server/types.ts";
+import type { RenderModule, Route, RouteMeta, SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import RouterContext from "./context.ts";
@@ -13,54 +14,34 @@ export type RouterProps = {
 };
 
 export const Router: FC<RouterProps> = ({ ssrContext }) => {
-  // deno-lint-ignore ban-ts-comment
-  // @ts-ignore
-  const routeModules = window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
+  const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location.href));
+  const [modules, setModules] = useState(() => ssrContext?.modules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
-    const cache = new Map();
-    const data = ssrContext
-      ? ssrContext.modules.map(({ url, data, dataCacheTtl }) => ({
-        url: url.pathname + url.search,
-        data,
-        dataCacheTtl,
-      }))
-      : loadSSRDataFromTag();
-    data?.forEach(({ url, data, dataCacheTtl }) => {
-      cache.set(url, { data, dataCacheTtl });
+    const cache = new Map<string, { data?: unknown; dataCacheTtl?: number }>();
+    modules.forEach(({ url, data, dataCacheTtl }) => {
+      cache.set(url.pathname + url.search, { data, dataCacheTtl });
     });
     return cache;
   }, []);
-  const createContextElement = useCallback((url: URL, component: FC, child?: ReactNode) => {
+  const createContextElement = useCallback((url: URL, modules: RenderModule[]): ReactElement => {
+    const currentModule = modules[0] as RenderModule | undefined;
+    const dataUrl = currentModule?.url || url;
+    const ctxValue = {
+      url,
+      dataUrl: dataUrl.pathname + dataUrl.search,
+      dataCache,
+      ssrHeadCollection: ssrContext?.headCollection,
+    };
     return createElement(
       RouterContext.Provider,
-      {
-        value: { url, dataCache, ssrHeadCollection: ssrContext?.headCollection },
-      },
-      createElement(component, null, child),
+      { value: ctxValue },
+      createElement(
+        (currentModule?.defaultExport || E404Page) as FC,
+        null,
+        modules.length > 1 ? createContextElement(url, modules.slice(1)) : undefined,
+      ),
     );
   }, []);
-  const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location.href));
-  const [routes, _setRoutes] = useState<[pattern: URLPatternCompat, filename: string, isNest: boolean][]>(() => {
-    const routesDataEl = window.document?.getElementById("route-files");
-    if (routesDataEl) {
-      try {
-        const routes = JSON.parse(routesDataEl.innerText);
-        if (Array.isArray(routes)) {
-          return routes.map(({ pattern, filename }) => {
-            const isNest = !util.splitBy(filename, ".", true)[0].endsWith("/index") &&
-              routes.findIndex((rr) =>
-                  rr.pattern.host === pattern.host && rr.pattern.pathname !== pattern.pathname &&
-                  rr.pattern.pathname.startsWith(pattern.pathname)
-                ) !== -1;
-            return [new URLPatternCompat(pattern), filename, isNest];
-          });
-        }
-      } catch (_e) {
-        console.error("init routes: invalid JSON");
-      }
-    }
-    return [];
-  });
 
   useEffect(() => {
     // remove ssr head elements
@@ -71,75 +52,60 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       }
     });
 
-    // todo: update routes
-
+    const { routes } = loadRouteManifestFromTag();
     const onpopstate = async (e: Record<string, unknown>) => {
-      const modules: [dataUrl: string, filename: string][] = [];
-      for (const [pattern, filename] of routes) {
-        let ret = pattern.exec({ host: location.host, pathname: "/_app" });
-        if (!ret) {
-          ret = pattern.exec({ host: location.host, pathname: location.pathname });
-        }
-        if (ret) {
-          const url = util.appendUrlParams(new URL(location.href), ret.pathname.groups);
-          modules.push([url.pathname + url.search, filename]);
-        }
-      }
-      if (modules.length > 0) {
-        await Promise.all(modules.map(async ([dataUrl, filename]) => {
-          if (filename in routeModules) {
-            return;
-          }
-          const mod = await import(filename.slice(1)); // todo: add version
-          if (typeof mod.default === "function") {
-            routeModules[filename] = mod.default;
-            if (mod.data === true) {
+      // deno-lint-ignore ban-ts-comment
+      // @ts-ignore
+      const ROUTE_MODULES: Record<string, unknown> = window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
+      const url = new URL(window.location.href);
+      const matches = matchRoute(url, routes);
+      console.log(matches);
+      const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
+        const rmod: RenderModule = {
+          url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
+          filename: filename,
+        };
+        const dataUrl = rmod.url.pathname + rmod.url.search;
+        if (filename in ROUTE_MODULES) {
+          rmod.defaultExport = ROUTE_MODULES[filename];
+          Object.assign(rmod, dataCache.get(dataUrl));
+        } else {
+          const { default: defaultExport, data: withData } = await import(filename.slice(1)); // todo: add version
+          if (defaultExport) {
+            ROUTE_MODULES[filename] = defaultExport;
+            rmod.defaultExport = defaultExport;
+            if (withData === true) {
               const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
               const data = await res.json();
               const cc = res.headers.get("Cache-Control");
-              const dataCacheTtl = cc && cc.includes("max-age")
-                ? Date.now() + parseInt(cc.split("=")[1]) * 1000
-                : undefined;
+              const dataCacheTtl = cc?.includes("max-age") ? Date.now() + parseInt(cc.split("=")[1]) * 1000 : undefined;
               dataCache.set(dataUrl, { data, dataCacheTtl });
+              Object.assign(rmod, { data, dataCacheTtl });
             }
           }
-        }));
-      }
-      setUrl(new URL(location.href));
+        }
+        return rmod;
+      }));
+      setModules(modules);
+      setUrl(url);
       if (e.resetScroll) {
         window.scrollTo(0, 0);
       }
     };
+
     addEventListener("popstate", onpopstate as unknown as EventListener);
     events.on("popstate", onpopstate);
     events.emit("routerready", { type: "routerready" });
+
+    // todo: update routes by hmr
 
     return () => {
       removeEventListener("popstate", onpopstate as unknown as EventListener);
       events.off("popstate", onpopstate);
     };
-  }, [routes]);
+  }, []);
 
-  return useMemo<ReactElement>(
-    () => {
-      if (ssrContext) {
-        const component = ssrContext.modules.find((i) => i.url.pathname === url.pathname)?.defaultExport as FC;
-        if (component) {
-          return createContextElement(ssrContext.url, component);
-        }
-        return createContextElement(ssrContext.url, E404Page);
-      }
-      const route = routes.find(([pattern]) => pattern.test(location));
-      if (route) {
-        const mod = routeModules[route[1]];
-        if (mod) {
-          return mod.default;
-        }
-      }
-      return createContextElement(new URL(location.href), E404Page);
-    },
-    [routes, url],
-  );
+  return useMemo<ReactElement>(() => createContextElement(url, modules), [url, modules]);
 };
 
 export const useRouter = (): { url: URL; redirect: typeof redirect } => {
@@ -147,15 +113,44 @@ export const useRouter = (): { url: URL; redirect: typeof redirect } => {
   return { url, redirect };
 };
 
-function loadSSRDataFromTag(): { url: string; data?: unknown; dataCacheTtl?: number }[] | undefined {
-  const ssrDataEl = self.document?.getElementById("ssr-data");
-  if (ssrDataEl) {
+function loadRouteManifestFromTag(): { routes: Route[] } {
+  const el = window.document?.getElementById("route-manifest");
+  if (el) {
     try {
-      const ssrData = JSON.parse(ssrDataEl.innerText);
-      return ssrData;
+      const manifest = JSON.parse(el.innerText);
+      if (Array.isArray(manifest.routes)) {
+        return {
+          routes: manifest.routes.map((meta: RouteMeta) => [new URLPatternCompat(meta.pattern), meta]),
+        };
+      }
     } catch (_e) {
-      console.error("ssr-data: invalid JSON");
+      console.error("loadRouteManifestFromTag: invalid JSON");
     }
   }
-  return undefined;
+  return { routes: [] };
+}
+
+function loadSSRModulesFromTag(): RenderModule[] {
+  // deno-lint-ignore ban-ts-comment
+  // @ts-ignore
+  const ROUTE_MODULES: Record<string, unknown> = window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
+  const el = window.document?.getElementById("ssr-modules");
+  if (el) {
+    try {
+      const ssrData = JSON.parse(el.innerText);
+      if (Array.isArray(ssrData)) {
+        return ssrData.map(({ url, module: filename, ...rest }) => {
+          return {
+            url: new URL(url, location.href),
+            filename,
+            defaultExport: ROUTE_MODULES[filename],
+            ...rest,
+          };
+        });
+      }
+    } catch (_e) {
+      console.error("loadSSRModulesFromTag: invalid JSON");
+    }
+  }
+  return [];
 }

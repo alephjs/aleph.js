@@ -1,51 +1,54 @@
-import type { Route } from "../server/types.ts";
+import type { Route, RouteMeta } from "../server/types.ts";
 import { createStaticURLPatternResult, type URLPatternResult } from "./url.ts";
 import util from "./util.ts";
 
 export const builtinModuleExts = ["tsx", "jsx", "ts", "mts", "js", "mjs"];
 
-export function matchRoute(url: URL, routes: Route[]): [ret: URLPatternResult, route: Route][] {
-  const matches: [ret: URLPatternResult, route: Route][] = [];
+export function matchRoute(url: URL, routes: Route[]): [ret: URLPatternResult, route: RouteMeta][] {
+  let { pathname } = url;
+  if (pathname !== "/") {
+    pathname = util.trimSuffix(url.pathname, "/").toLowerCase();
+  }
+  const matches: [ret: URLPatternResult, route: RouteMeta][] = [];
   if (routes.length > 0) {
-    routes.forEach((route) => {
-      const [pattern, _, meta] = route;
-      const ret = pattern.exec({ host: url.host, pathname: url.pathname });
+    routes.forEach(([pattern, meta]) => {
+      const ret = pattern.exec({ host: url.host, pathname });
       if (ret) {
-        matches.push([ret, route]);
+        matches.push([ret, meta]);
         if (meta.nesting && meta.pattern.pathname !== "/_app") {
-          for (const route of routes) {
-            const ret = route[0].exec({ host: url.host, pathname: url.pathname + "/index" });
+          for (const [p, m] of routes) {
+            const ret = p.exec({ host: url.host, pathname: pathname + "/index" });
             if (ret) {
-              matches.push([ret, route]);
+              matches.push([ret, m]);
               break;
             }
           }
         }
       } else if (meta.nesting) {
-        const parts = util.splitPath(url.pathname);
+        const parts = util.splitPath(pathname);
         for (let i = parts.length - 1; i > 0; i--) {
           const pathname = "/" + parts.slice(0, i).join("/");
           const ret = pattern.exec({ host: url.host, pathname });
           if (ret) {
-            matches.push([ret, route]);
+            matches.push([ret, meta]);
             break;
           }
         }
       }
     });
-    if (matches.filter(([_, route]) => !route[2].nesting).length === 0) {
-      for (const route of routes) {
-        if (route[2].pattern.pathname === "/_404") {
-          matches.push([createStaticURLPatternResult(url.host, "/_404"), route]);
+    if (matches.filter(([_, meta]) => !meta.nesting).length === 0) {
+      for (const [_, meta] of routes) {
+        if (meta.pattern.pathname === "/_404") {
+          matches.push([createStaticURLPatternResult(url.host, "/_404"), meta]);
           break;
         }
       }
     }
     if (matches.length > 0) {
       if (matches[0][0].pathname.input !== "/_app") {
-        for (const route of routes) {
-          if (route[2].pattern.pathname === "/_app") {
-            matches.unshift([createStaticURLPatternResult(url.host, "/_app"), route]);
+        for (const [_, meta] of routes) {
+          if (meta.pattern.pathname === "/_app") {
+            matches.unshift([createStaticURLPatternResult(url.host, "/_app"), meta]);
             break;
           }
         }

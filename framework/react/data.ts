@@ -1,5 +1,4 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import util from "../../lib/util.ts";
 import MainContext from "./context.ts";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
@@ -12,8 +11,8 @@ export type UpdateStrategy<T> = "none" | "replace" | {
 };
 
 export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: typeof mutation } => {
-  const { dataCache, url: routeUrl } = useContext(MainContext);
-  const dataUrl = useMemo(() => path || (routeUrl.pathname + routeUrl.search), [path, routeUrl]);
+  const { dataUrl: dataUrlCtx, dataCache } = useContext(MainContext);
+  const dataUrl = useMemo(() => path || dataUrlCtx, [path, dataUrlCtx]);
   const [dataStore, setDataStore] = useState<DataState<T>>(() => {
     if (dataCache.has(dataUrl)) {
       const { data, dataCacheTtl } = dataCache.get(dataUrl)!;
@@ -90,22 +89,16 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
   const mutation = useMemo(() => {
     return {
       post: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("post", jsonFetch("post", data, path), update ?? "none");
+        return action("post", jsonFetch("post", dataUrl, data), update ?? "none");
       },
       put: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("put", jsonFetch("put", data, path), update ?? "none");
+        return action("put", jsonFetch("put", dataUrl, data), update ?? "none");
       },
       patch: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("patch", jsonFetch("patch", data, path), update ?? "none");
+        return action("patch", jsonFetch("patch", dataUrl, data), update ?? "none");
       },
       delete: (params?: Record<string, string>, update?: UpdateStrategy<T>) => {
-        let url = routeUrl;
-        if (path) {
-          url = new URL(self.location?.href);
-          const [pathname, search] = util.splitBy(path, "?");
-          url.pathname = util.cleanPath(pathname);
-          url.search = search ? "?" + search : "";
-        }
+        const url = new URL(dataUrl, globalThis.location?.href);
         if (params) {
           for (const [key, value] of Object.entries(params)) {
             url.searchParams.set(key, value);
@@ -114,7 +107,7 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
         return action("delete", fetch(url.toString(), { method: "delete" }), update ?? "none");
       },
     };
-  }, [path, routeUrl]);
+  }, [path, dataUrl]);
 
   useEffect(() => {
     const now = Date.now();
@@ -147,8 +140,8 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
   return { ...dataStore, mutation };
 };
 
-function jsonFetch(method: string, data: unknown, href?: string) {
-  return fetch(href || self.location?.href, {
+function jsonFetch(method: string, href: string, data: unknown) {
+  return fetch(href, {
     method,
     body: typeof data === "object" ? JSON.stringify(data) : "null",
     redirect: "manual",

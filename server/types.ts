@@ -50,7 +50,7 @@ export interface Middleware {
   fetch: FetchHandler;
 }
 
-export type SSRModule = {
+export type RenderModule = {
   url: URL;
   filename: string;
   error?: { message: string; status: number };
@@ -62,7 +62,7 @@ export type SSRModule = {
 
 export type SSRContext = {
   readonly url: URL;
-  readonly modules: SSRModule[];
+  readonly modules: RenderModule[];
   readonly headCollection: string[];
 };
 
@@ -77,10 +77,15 @@ export type ServerOptions = {
   ssr?: (ctx: SSRContext) => string | undefined | Promise<string | undefined>;
 };
 
+export type RouteMeta = {
+  filename: string;
+  pattern: URLPatternInput;
+  nesting?: boolean;
+};
+
 export type Route = readonly [
   pattern: URLPatternCompat,
-  loader: () => Promise<Record<string, unknown>>,
-  meta: { filename: string; pattern: URLPatternInput; nesting?: boolean },
+  meta: RouteMeta,
 ];
 
 export { AtomicCSSConfig };
