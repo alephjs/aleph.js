@@ -15,12 +15,16 @@ export function matchRoute(url: URL, routes: Route[]): [ret: URLPatternResult, r
       const ret = pattern.exec({ host: url.host, pathname });
       if (ret) {
         matches.push([ret, meta]);
+        // find the nesting index of the route
         if (meta.nesting && meta.pattern.pathname !== "/_app") {
           for (const [p, m] of routes) {
-            const ret = p.exec({ host: url.host, pathname: pathname + "/index" });
-            if (ret) {
-              matches.push([ret, m]);
-              break;
+            const [_, name] = util.splitBy(m.pattern.pathname, "/", true);
+            if (!name.startsWith(":")) {
+              const ret = p.exec({ host: url.host, pathname: pathname + "/index" });
+              if (ret) {
+                matches.push([ret, m]);
+                break;
+              }
             }
           }
         }

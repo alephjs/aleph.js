@@ -49,9 +49,9 @@ export function isRouteFile(filename: string): boolean {
 }
 
 /** initialize routes from routes config */
-export async function initRoutes(config: string | RoutesConfig | RouteRegExp): Promise<Route[]> {
+export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cwd = Deno.cwd()): Promise<Route[]> {
   const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
-  const files = await getFiles(join(Deno.cwd(), reg.prefix));
+  const files = await getFiles(join(cwd, reg.prefix));
   const routes: Route[] = [];
   files.forEach((file) => {
     const filename = reg.prefix + file.slice(1);
