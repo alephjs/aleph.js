@@ -10,6 +10,16 @@
 }
 
 body {
-  font-family: Inter,"Helvetica Neue",Helvetica,Arial,sans-serif;
   font-size: 16px;
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system, /* Firefox supports this but not yet `system-ui` */
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji';
 }
