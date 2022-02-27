@@ -2,7 +2,7 @@ import type { Route, RouteMeta } from "../server/types.ts";
 import { createStaticURLPatternResult, type URLPatternResult } from "./url.ts";
 import util from "./util.ts";
 
-export const builtinModuleExts = ["tsx", "jsx", "ts", "mts", "js", "mjs"];
+export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
 /** match routes against the given url */
 export function matchRoutes(url: URL, routes: Route[]): [ret: URLPatternResult, route: RouteMeta][] {
@@ -64,8 +64,8 @@ export function matchRoutes(url: URL, routes: Route[]): [ret: URLPatternResult, 
 }
 
 /**
- * fix remote url to local path
- * e.g.: https://esm.sh/react@17.0.2?target=es2018 -> /-/esm.sh/react@17.0.2?target=es2018
+ * fix remote url to local path.
+ * e.g. `https://esm.sh/react@17.0.2` -> `/-/esm.sh/react@17.0.2`
  */
 export function toLocalPath(url: string): string {
   if (util.isLikelyHttpURL(url)) {
@@ -87,8 +87,8 @@ export function toLocalPath(url: string): string {
 }
 
 /**
- * restore the remote url from local path
- * e.g.: /-/esm.sh/react@17.0.2?target=es2018 -> https://esm.sh/react@17.0.2?target=es2018
+ * restore the remote url from local path.
+ * e.g. `/-/esm.sh/react@17.0.2` -> `https://esm.sh/react@17.0.2`
  */
 export function restoreUrl(pathname: string): string {
   let [h, ...rest] = pathname.substring(3).split("/");
