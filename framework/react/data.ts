@@ -26,13 +26,13 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
     const updateIsObject = update && typeof update === "object" && update !== null;
     const optimistic = updateIsObject && typeof update.optimisticUpdate === "function";
     const replace = update === "replace" || (updateIsObject && !!update.replace);
-    const rollback: { data?: T } = {};
 
+    let rollbackData: T | undefined = undefined;
     if (optimistic) {
       const optimisticUpdate = update.optimisticUpdate!;
       setDataStore((store) => {
-        if (store.data) {
-          rollback.data = store.data;
+        if (store.data !== undefined) {
+          rollbackData = store.data;
           return { data: optimisticUpdate(clone(store.data)) };
         }
         return store;
@@ -46,7 +46,7 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
       const message = await res.text();
       const error: FetchError = { method, status: res.status, message };
       if (optimistic) {
-        setDataStore({ data: rollback.data });
+        setDataStore({ data: rollbackData });
         update.onFailure?.(error);
       } else {
         setDataStore(({ data }) => ({ data, error }));
@@ -58,23 +58,27 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
       const redirectUrl = res.headers.get("Location");
       if (redirectUrl) {
         location.href = redirectUrl;
-      }
-      if (optimistic) {
-        setDataStore({ data: rollback.data });
       } else {
-        setDataStore(({ data }) => ({ data }));
+        if (optimistic) {
+          setDataStore({ data: rollbackData });
+        } else {
+          setDataStore(({ data }) => ({ data }));
+        }
+        return res;
       }
-      return res;
     }
 
     if (replace && res.ok) {
       try {
         const data = await res.json();
+        const cc = res.headers.get("Cache-Control");
+        const dataCacheTtl = cc && cc.includes("max-age") ? Date.now() + parseInt(cc.split("=")[1]) * 1000 : undefined;
         setDataStore({ data });
+        dataCache.set(dataUrl, { data, dataCacheTtl });
       } catch (err) {
         const error: FetchError = { method, status: 0, message: "Invalid JSON data: " + err.message };
         if (optimistic) {
-          setDataStore({ data: rollback.data });
+          setDataStore({ data: rollbackData });
           update.onFailure?.(error);
         } else {
           setDataStore(({ data }) => ({ data, error }));
@@ -104,7 +108,7 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
             url.searchParams.set(key, value);
           }
         }
-        return action("delete", fetch(url.toString(), { method: "delete" }), update ?? "none");
+        return action("delete", fetch(url.toString(), { method: "delete", redirect: "manual" }), update ?? "none");
       },
     };
   }, [path, dataUrl]);
@@ -124,8 +128,8 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
             const data = await res.json();
             const cc = res.headers.get("Cache-Control");
             const dataCacheTtl = cc && cc.includes("max-age") ? now + parseInt(cc.split("=")[1]) * 1000 : undefined;
-            dataCache.set(dataUrl, { data, dataCacheTtl });
             setDataStore({ data });
+            dataCache.set(dataUrl, { data, dataCacheTtl });
           } else {
             const message = await res.text();
             setDataStore({ error: { method: "get", status: res.status, message } });
