@@ -1,4 +1,4 @@
-import { Head, Link, useData } from "aleph/react";
+import { Head, useData } from "aleph/react";
 
 type TodoItem = {
   id: number;
@@ -57,7 +57,9 @@ export default function Todos() {
       </Head>
       <h1>
         <span>Todos</span>
-        {!!(data?.todos.length) && <em>{data?.todos.filter((todo) => todo.completed).length}/{data?.todos.length}</em>}
+        {data && data.todos.length > 0 && (
+          <em>{data.todos.filter((todo) => todo.completed).length}/{data.todos.length}</em>
+        )}
       </h1>
       <ul>
         {data?.todos.map((todo) => (
@@ -75,7 +77,8 @@ export default function Todos() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const fd = new FormData(e.currentTarget);
+          const form = e.currentTarget;
+          const fd = new FormData(form);
           const message = fd.get("message")?.toString().trim();
           if (message) {
             mutation.put({ message }, {
@@ -88,7 +91,7 @@ export default function Todos() {
               // replace the data with the new data from the server
               replace: true,
             });
-            e.currentTarget.reset();
+            form.reset();
           }
         }}
       >

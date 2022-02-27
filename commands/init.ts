@@ -152,7 +152,7 @@ ${green("Aleph.js is ready to go!")}
 ${dim("▲")} cd ${name}
 ${dim("▲")} aleph dev    ${dim("# start the app in `development` mode")}
 ${dim("▲")} aleph start  ${dim("# start the app in `production` mode")}
-${dim("▲")} aleph build  ${dim("# build the app to a worker")}
+${dim("▲")} aleph build  ${dim("# build the app into a worker")}
 
 Docs: ${cyan("https://alephjs.org/docs")}
 Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}
@@ -163,7 +163,6 @@ Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}
 
 async function isFolderEmpty(root: string, name: string): Promise<boolean> {
   const validFiles = [
-    ".DS_Store",
     ".git",
     ".gitattributes",
     ".gitignore",
@@ -175,44 +174,54 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
     ".idea",
     ".travis.yml",
     "assets",
+    "components",
     "docs",
+    "lib",
     "pages",
     "public",
     "routes",
     "src",
+    "style",
     "app.tsx",
     "deno.json",
     "deno.jsonc",
     "import_map.json",
     "import-map.json",
     "LICENSE",
+    "main.js",
+    "main.jsx",
+    "main.ts",
+    "main.tsx",
     "README.md",
+    "server.js",
+    "server.jsx",
     "server.ts",
     "server.tsx",
-    "Thumbs.db",
+    "tsconfig.json",
   ];
 
-  const conflicts = [];
+  const conflictDirs = [];
+  const conflictFiles = [];
 
   if (await existsDir(join(root, name))) {
     for await (const { name: file, isDirectory } of Deno.readDir(join(root, name))) {
       // Support IntelliJ IDEA-based editors
       if (validFiles.includes(file) || /\.iml$/.test(file)) {
         if (isDirectory) {
-          conflicts.push(blue(file) + "/");
+          conflictDirs.push(blue(file) + "/");
         } else {
-          conflicts.push(file);
+          conflictFiles.push(file);
         }
       }
     }
   }
 
-  if (conflicts.length > 0) {
+  if (conflictFiles.length > 0 || conflictDirs.length > 0) {
     console.log([
       `The directory ${green(name)} contains files that could conflict:`,
       "",
-      ...conflicts.filter((name) => name.endsWith("/")).sort().map((name) => dim("- ") + name),
-      ...conflicts.filter((name) => !name.endsWith("/")).sort().map((name) => dim("- ") + name),
+      ...conflictFiles.filter((name) => name.endsWith("/")).sort().map((name) => dim("- ") + name),
+      ...conflictFiles.sort().map((name) => dim("- ") + name),
       "",
     ].join("\n"));
     return false;
