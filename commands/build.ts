@@ -6,7 +6,7 @@ import { parse } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { getAlephPkgUri, loadImportMap } from "../server/config.ts";
+import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "../server/config.ts";
 import { serveAppModules } from "../server/transformer.ts";
 import { initRoutes } from "../server/routing.ts";
 import type { AlephConfig } from "../server/types.ts";
@@ -48,7 +48,9 @@ if (import.meta.main) {
     throw new Error("No server entry found");
   }
 
+  const tmpDir = await Deno.makeTempDir();
   const alephPkgUri = getAlephPkgUri();
+  const jsxCofig = await loadJSXConfig();
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
   const outputDir = config?.build?.outputDir ?? "dist";
 
@@ -84,6 +86,24 @@ if (import.meta.main) {
     `import "http://localhost:${port}/${basename(serverEntry)}";`,
   ].filter(Boolean).join("\n");
 
+  // since esbuild doesn't support jsx automic mode, we need to manually import jsx runtime
+  let jsxShimFile: string | null = null;
+  if (jsxCofig.jsxImportSource) {
+    jsxShimFile = join(tmpDir, "jsx-shim.js");
+    await Deno.writeTextFile(
+      jsxShimFile,
+      (jsxCofig.jsxRuntime === "preact"
+        ? [
+          `import { h, Fragment } from ${JSON.stringify(jsxCofig.jsxImportSource)};`,
+          `export { h, Fragment }`,
+        ]
+        : [
+          `import React from ${JSON.stringify(jsxCofig.jsxImportSource)};`,
+          `export { React }`,
+        ]).join("\n"),
+    );
+  }
+
   log.info("Building...");
   await ensureDir(join(workingDir, outputDir));
   await build({
@@ -99,6 +119,9 @@ if (import.meta.main) {
     minify: true,
     treeShaking: true,
     sourcemap: true,
+    jsxFactory: jsxCofig.jsxRuntime === "preact" ? "h" : "React.createElement",
+    jsxFragment: jsxCofig.jsxRuntime === "preact" ? "Fragment" : "React.Fragment",
+    inject: [jsxShimFile as string].filter(Boolean),
     plugins: [{
       name: "http-importer",
       setup(build) {
@@ -136,6 +159,9 @@ if (import.meta.main) {
   });
 
   log.info(`Done in ${(performance.now() - start)}ms`);
+
+  // clean up then exit
   stop();
+  await Deno.remove(tmpDir, { recursive: true });
   Deno.exit(0);
 }
