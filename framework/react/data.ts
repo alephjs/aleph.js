@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
-import MainContext from "./context.ts";
+import { DataContext } from "./context.ts";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 export type FetchError = { method: HttpMethod; status: number; message: string };
@@ -11,14 +11,12 @@ export type UpdateStrategy<T> = "none" | "replace" | {
 };
 
 export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: typeof mutation } => {
-  const { dataUrl: dataUrlCtx, dataCache } = useContext(MainContext);
+  const { dataUrl: dataUrlCtx, dataCache } = useContext(DataContext);
   const dataUrl = useMemo(() => path || dataUrlCtx, [path, dataUrlCtx]);
   const [dataStore, setDataStore] = useState<DataState<T>>(() => {
     if (dataCache.has(dataUrl)) {
-      const { data, dataCacheTtl } = dataCache.get(dataUrl)!;
-      if (!dataCacheTtl || Date.now() < dataCacheTtl) {
-        return { data: data as T };
-      }
+      const { data } = dataCache.get(dataUrl)!;
+      return { data: data as T };
     }
     return {};
   });
@@ -71,10 +69,9 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
     if (replace && res.ok) {
       try {
         const data = await res.json();
-        const cc = res.headers.get("Cache-Control");
-        const dataCacheTtl = cc && cc.includes("max-age") ? Date.now() + parseInt(cc.split("=")[1]) * 1000 : undefined;
         setDataStore({ data });
-        dataCache.set(dataUrl, { data, dataCacheTtl });
+        const dataCacheTtl = dataCache.get(dataUrl)?.dataCacheTtl;
+        dataCache.set(dataUrl, { data, dataCacheTtl, dataExpires: Date.now() + (dataCacheTtl || 1) * 1000 });
       } catch (err) {
         const error: FetchError = { method, status: 0, message: "Invalid JSON data: " + err.message };
         if (optimistic) {
@@ -111,25 +108,26 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
         return action("delete", fetch(url.toString(), { method: "delete", redirect: "manual" }), update ?? "none");
       },
     };
-  }, [path, dataUrl]);
+  }, [dataUrl]);
 
   useEffect(() => {
     const now = Date.now();
-    if (
-      dataUrl &&
-      (!dataCache.has(dataUrl) || (dataCache.get(dataUrl)!.dataCacheTtl || now + 1000) < now)
-    ) {
-      if (!dataCache.has(dataUrl)) {
+    const cache = dataCache.get(dataUrl);
+    let ac: AbortController | null = null;
+    if (!cache || cache.dataExpires === undefined || cache.dataExpires < now) {
+      if (!cache) {
         setDataStore({ isLoading: true });
       }
-      fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } })
+      ac = new AbortController();
+      fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, signal: ac.signal })
         .then(async (res) => {
           if (res.ok) {
             const data = await res.json();
             const cc = res.headers.get("Cache-Control");
-            const dataCacheTtl = cc && cc.includes("max-age") ? now + parseInt(cc.split("=")[1]) * 1000 : undefined;
+            const dataCacheTtl = cc && cc.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+            const dataExpires = Date.now() + (dataCacheTtl || 1) * 1000;
             setDataStore({ data });
-            dataCache.set(dataUrl, { data, dataCacheTtl });
+            dataCache.set(dataUrl, { data, dataExpires });
           } else {
             const message = await res.text();
             setDataStore({ error: { method: "get", status: res.status, message } });
@@ -137,9 +135,15 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
         })
         .catch((err) => {
           setDataStore({ error: { method: "get", status: 0, message: err.message } });
+        }).finally(() => {
+          ac = null;
         });
     }
-  }, [dataCache, dataUrl]);
+
+    return () => {
+      ac?.abort();
+    };
+  }, [dataUrl]);
 
   return { ...dataStore, mutation };
 };

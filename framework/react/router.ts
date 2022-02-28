@@ -6,7 +6,7 @@ import util from "../../lib/util.ts";
 import type { RenderModule, Route, RouteMeta, SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
-import RouterContext from "./context.ts";
+import { DataContext, RouterContext } from "./context.ts";
 import { E404Page } from "./error.ts";
 
 export type RouterProps = {
@@ -17,31 +17,38 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location.href));
   const [modules, setModules] = useState(() => ssrContext?.modules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
-    const cache = new Map<string, { data?: unknown; dataCacheTtl?: number }>();
+    const cache = new Map<string, { data?: unknown; dataCacheTtl?: number; dataExpires?: number }>();
     modules.forEach(({ url, data, dataCacheTtl }) => {
-      cache.set(url.pathname + url.search, { data, dataCacheTtl });
+      cache.set(url.pathname + url.search, {
+        data,
+        dataCacheTtl,
+        dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+      });
     });
     return cache;
   }, []);
-  const createContextElement = useCallback((url: URL, modules: RenderModule[]): ReactElement => {
-    const currentModule = modules[0] as RenderModule | undefined;
-    const dataUrl = currentModule?.url || url;
-    const ctxValue = {
-      url,
-      dataUrl: dataUrl.pathname + dataUrl.search,
-      dataCache,
-      ssrHeadCollection: ssrContext?.headCollection,
-    };
+  const createDataDriver = useCallback((modules: RenderModule[]): ReactElement => {
+    const currentModule = modules[0];
+    const dataUrl = currentModule.url.pathname + currentModule.url.search;
     return createElement(
-      RouterContext.Provider,
-      { value: ctxValue },
+      DataContext.Provider,
+      {
+        value: {
+          dataUrl,
+          dataCache,
+          ssrHeadCollection: ssrContext?.headCollection,
+        },
+      },
       createElement(
         (currentModule?.defaultExport || E404Page) as FC,
         null,
-        modules.length > 1 ? createContextElement(url, modules.slice(1)) : undefined,
+        modules.length > 1 ? createDataDriver(modules.slice(1)) : undefined,
       ),
     );
   }, []);
+  const dataDirver = useMemo<ReactElement | null>(() => modules.length > 0 ? createDataDriver(modules) : null, [
+    modules,
+  ]);
 
   useEffect(() => {
     // remove ssr head elements
@@ -77,8 +84,12 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
               const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
               const data = await res.json();
               const cc = res.headers.get("Cache-Control");
-              const dataCacheTtl = cc?.includes("max-age") ? Date.now() + parseInt(cc.split("=")[1]) * 1000 : undefined;
-              dataCache.set(dataUrl, { data, dataCacheTtl });
+              const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+              dataCache.set(dataUrl, {
+                data,
+                dataCacheTtl,
+                dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+              });
               Object.assign(rmod, { data, dataCacheTtl });
             }
           }
@@ -104,7 +115,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     };
   }, []);
 
-  return useMemo<ReactElement>(() => createContextElement(url, modules), [url, modules]);
+  return createElement(RouterContext.Provider, { value: { url } }, dataDirver);
 };
 
 export const useRouter = (): { url: URL; redirect: typeof redirect } => {

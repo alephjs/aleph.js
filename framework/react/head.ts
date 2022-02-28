@@ -9,10 +9,10 @@ import {
   useMemo,
 } from "https://esm.sh/react@17.0.2";
 import util from "../../lib/util.ts";
-import MainContext from "./context.ts";
+import { DataContext } from "./context.ts";
 
 export const Head: FC = (props) => {
-  const { ssrHeadCollection } = useContext(MainContext);
+  const { ssrHeadCollection } = useContext(DataContext);
   const [els, forwardNodes] = useMemo(() => parse(props.children), [
     props.children,
   ]);
