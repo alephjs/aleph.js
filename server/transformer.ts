@@ -41,7 +41,7 @@ const cssModuleLoader: Loader = {
 const esModuleLoader: Loader<{ importMap: ImportMap; initialGraphVersion: string }> = {
   test: (url) => builtinModuleExts.findIndex((ext) => url.pathname.endsWith(`.${ext}`)) !== -1,
   load: async ({ pathname }, rawContent, options) => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
     const specifier = "." + pathname;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
@@ -74,10 +74,10 @@ const esModuleLoader: Loader<{ importMap: ImportMap; initialGraphVersion: string
 /** serve app modules to support module loader that allows you import NON-JS modules like `.css/.vue/.svelet`... */
 export async function serveAppModules(port: number, importMap: ImportMap) {
   try {
+    Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
     if (!Reflect.has(globalThis, "serverDependencyGraph")) {
       Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
     }
-    Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
     await serveDir({
       port,
       loaders: [esModuleLoader, cssModuleLoader],

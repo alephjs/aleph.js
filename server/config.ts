@@ -2,25 +2,20 @@ import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import type { ImportMap } from "../compiler/types.ts";
 import { findFile } from "../lib/fs.ts";
-import { toLocalPath } from "../lib/helpers.ts";
+import { globalIt, toLocalPath } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import type { JSXConfig } from "./types.ts";
 
 export function getAlephPkgUri() {
-  const global = globalThis as Record<string, unknown>;
-  if (util.isFilledString(global.__ALEPH_PKG_URI)) {
-    return global.__ALEPH_PKG_URI;
-  }
-  const pkgName = isCanary ? "aleph_canary" : "aleph";
-  let uri = `https://deno.land/x/${pkgName}@${VERSION}`;
-  const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
-  if (DEV_PORT) {
-    uri = `http://localhost:${DEV_PORT}`;
-  }
-  global.__ALEPH_PKG_URI = uri;
-  return uri;
+  return globalIt("__ALEPH_PKG_URI", () => {
+    const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
+    if (DEV_PORT) {
+      return `http://localhost:${DEV_PORT}`;
+    }
+    return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${VERSION}`;
+  });
 }
 
 export async function loadJSXConfig(): Promise<JSXConfig> {
@@ -96,7 +91,7 @@ export async function loadImportMap(): Promise<ImportMap> {
       Object.assign(importMap.imports, imports);
       Object.assign(importMap.scopes, scopes);
     } catch (e) {
-      log.error("Read import map:", e.message);
+      log.error("loadImportMap:", e.message);
     }
   }
 

@@ -1,22 +1,23 @@
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
+import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
-import { builtinModuleExts } from "../lib/helpers.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { loadImportMap, loadJSXConfig } from "./config.ts";
-import { importRouteModule, initRoutes } from "./routing.ts";
-import { content, json } from "./response.ts";
 import renderer from "./renderer.ts";
+import { content, json } from "./response.ts";
+import { importRouteModule, initRoutes } from "./routing.ts";
 import { clientModuleTransformer } from "./transformer.ts";
 import type { FetchContext, HTMLRewriterHandlers, Route, ServerOptions } from "./types.ts";
 
-export const serve = (options: ServerOptions = {}) => {
+export const serve = (options: ServerOptions) => {
   const { config, middlewares, fetch, ssr } = options;
-  const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const jsxConfigPromise = loadJSXConfig();
   const importMapPromise = loadImportMap();
+  const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
+  const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const buildTarget = config?.build?.target ?? (isDev ? "es2022" : "es2015");
   const buildArgsHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(
     async ([jsxConfig, importMap]) => {
@@ -24,10 +25,17 @@ export const serve = (options: ServerOptions = {}) => {
       return await util.computeHash("sha-1", buildArgs);
     },
   );
-  const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
   const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const { host, pathname } = url;
+
+    if (pathname === "/-/hmr") {
+      const { socket, response } = Deno.upgradeWebSocket(req, {});
+      socket.addEventListener("open", () => {
+        socket.send(JSON.stringify({ type: "reload" }));
+      });
+      return response;
+    }
 
     // transform client modules
     if (
@@ -64,12 +72,10 @@ export const serve = (options: ServerOptions = {}) => {
         if (etag && req.headers.get("If-None-Match") === etag) {
           return new Response(null, { status: 304 });
         }
-        const file = await Deno.open(`.${pathname}`, { read: true });
+        const file = await Deno.open(filePath, { read: true });
         const headers = new Headers({ "Content-Type": getContentType(pathname) });
-        if (etag) {
-          headers.set("Etag", etag);
-        }
         if (mtime) {
+          headers.set("Etag", etag!);
           headers.set("Last-Modified", mtime.toUTCString());
         }
         return new Response(readableStreamFromReader(file), { headers });
@@ -89,6 +95,16 @@ export const serve = (options: ServerOptions = {}) => {
         },
       },
     };
+
+    if (options.hmrWebSocketUrl) {
+      customHTMLRewriter.set("head", {
+        element(el) {
+          el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(options.hmrWebSocketUrl)};</script>`, {
+            html: true,
+          });
+        },
+      });
+    }
 
     // use middlewares
     if (Array.isArray(middlewares)) {
@@ -120,11 +136,11 @@ export const serve = (options: ServerOptions = {}) => {
     // request data
     const routes = (Reflect.get(globalThis, "__ALEPH_ROUTES") as Route[] | undefined) || await routesPromise;
     if (routes.length > 0) {
-      for (const [pattern, meta] of routes) {
+      for (const [pattern, { filename }] of routes) {
         const ret = pattern.exec({ host, pathname });
         if (ret) {
           try {
-            const mod = await importRouteModule(meta.filename);
+            const mod = await importRouteModule(filename);
             const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
             if (req.method !== "GET" || mod.default === undefined || req.headers.has("X-Fetch-Data")) {
               const fetcher = dataConfig[req.method.toLowerCase()];
@@ -158,6 +174,7 @@ export const serve = (options: ServerOptions = {}) => {
         return new Response("Not found", { status: 404 });
     }
 
+    // load the `index.html`
     let indexHtml: string | null | undefined = Reflect.get(globalThis, "__ALEPH_INDEX_HTML");
     if (indexHtml === undefined) {
       try {
@@ -176,8 +193,7 @@ export const serve = (options: ServerOptions = {}) => {
         }
       }
     }
-
-    // cache indexHtml to global(memory) in production env
+    // cache indexHtml to global(memory) in production mode
     if (!isDev) {
       Reflect.set(globalThis, "__ALEPH_INDEX_HTML", indexHtml);
     }
@@ -191,10 +207,9 @@ export const serve = (options: ServerOptions = {}) => {
     return renderer.fetch(req, ctx, {
       indexHtml,
       routes,
-      ssrHandler: ssr,
       customHTMLRewriter,
       isDev,
-      hmrWebSocketUrl: options.hmrWebSocketUrl,
+      ssr,
     });
   };
 
@@ -215,7 +230,7 @@ export const serve = (options: ServerOptions = {}) => {
     vendor: "Deno Land Inc.",
   });
 
-  Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
+  Reflect.set(globalThis, "__ALEPH_SERVER_CONFIG", Object.assign({}, config));
   Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
 
   // support deno deploy

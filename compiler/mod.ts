@@ -1,5 +1,5 @@
 import init, { fastTransform as fastSWC, transform as swc, transformCSS as parcelCSS } from "./dist/compiler.js";
-import getWasmData from "./dist/wasm.js";
+import decodeWasmData from "./dist/wasm.js";
 import {
   FastTransformOptions,
   TransformCSSOptions,
@@ -21,7 +21,7 @@ async function checkWasmReady() {
 }
 
 async function initWasm() {
-  const wasmData = getWasmData();
+  const wasmData = decodeWasmData();
   await init(wasmData);
 }
 

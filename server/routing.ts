@@ -25,9 +25,8 @@ export async function importRouteModule(filename: string) {
     mod = routeModules.get(filename)!;
   } else {
     const graph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
-    const gm = graph?.get(filename) || graph?.mark(filename, {});
+    const version = graph?.get(filename)?.version || graph?.mark(filename, {}).version || Date.now().toString(16);
     const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
-    const version = (gm?.version || Date.now()).toString(16);
     mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version}`);
   }
   return mod;
@@ -40,7 +39,7 @@ export function isRouteFile(filename: string): boolean {
   if (index !== undefined && index !== -1) {
     return true;
   }
-  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
   if (config && config.routeFiles) {
     const reg = toRouteRegExp(config.routeFiles);
     return reg.test(filename);
@@ -101,12 +100,15 @@ export function toRouteRegExp(config: string | RoutesConfig): RouteRegExp {
       if (reg.test(filename)) {
         const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
           part = part.toLowerCase();
+          // replace `/p/[...path]` to `/p/:path+`
           if (part.startsWith("[...") && part.startsWith("]") && part.length > 5) {
             return ":" + part.slice(4, -1) + "+";
           }
+          // replace `/blog/[id]` to `/blog/:id`
           if (part.startsWith("[") && part.startsWith("]") && part.length > 2) {
             return ":" + part.slice(1, -1);
           }
+          // replace `/blog/$id` to `/blog/:id`
           if (part.startsWith("$") && part.length > 1) {
             return ":" + part.slice(1);
           }
@@ -136,6 +138,7 @@ function getRouteOrder([_, meta]: Route): number {
   switch (pattern.pathname) {
     case "/_404":
     case "/_app":
+    case "/_error":
       return 0;
     default:
       return filename.split("/").length;

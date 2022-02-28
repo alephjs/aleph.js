@@ -74,7 +74,7 @@ export type ServerOptions = {
   config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
-  ssr?: (ctx: SSRContext) => string | undefined | Promise<string | undefined>;
+  ssr?: (ctx: SSRContext) => string | Promise<string>;
 };
 
 export type RouteMeta = {

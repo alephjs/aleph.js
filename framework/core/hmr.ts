@@ -79,7 +79,7 @@ function sendMessage(msg: Record<string, unknown>) {
 function connect() {
   const { location, __hmrWebSocketUrl } = window as { location: Location; __hmrWebSocketUrl?: string };
   const { protocol, host } = location;
-  const wsUrl = __hmrWebSocketUrl || `${protocol === "https:" ? "wss" : "ws"}://${host}/-/HMR`;
+  const wsUrl = __hmrWebSocketUrl || `${protocol === "https:" ? "wss" : "ws"}://${host}/-/hmr`;
   const ws = new WebSocket(wsUrl);
   const ping = (callback: () => void) => {
     setTimeout(() => {
@@ -127,14 +127,16 @@ function connect() {
             }
             break;
           }
-          case "remove":
-            {
-              if (modules.has(specifier)) {
-                modules.delete(specifier);
-              }
-              events.emit("remove-file", { specifier });
+          case "remove": {
+            if (modules.has(specifier)) {
+              modules.delete(specifier);
             }
+            events.emit("remove-file", { specifier });
             break;
+          }
+          case "reload": {
+            location.reload();
+          }
         }
         console.log(`[HMR] ${type} ${JSON.stringify(specifier)}`);
       } catch (err) {

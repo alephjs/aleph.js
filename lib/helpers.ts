@@ -100,3 +100,13 @@ export function restoreUrl(pathname: string): string {
   const [host, port] = h.split("_");
   return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
 }
+
+export function globalIt<T>(name: string, fn: () => T): T {
+  const cache: T | undefined = Reflect.get(globalThis, name);
+  if (cache !== undefined) {
+    return cache;
+  }
+  const ret = fn();
+  Reflect.set(globalThis, name, ret);
+  return ret;
+}

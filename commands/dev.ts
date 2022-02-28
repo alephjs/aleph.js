@@ -138,7 +138,7 @@ if (import.meta.main) {
 
   // init routes when fs change
   const updateRoutes = ({ specifier }: { specifier: string }) => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
     if (config && config.routeFiles) {
       const reg = toRouteRegExp(config.routeFiles);
       if (reg.test(specifier)) {
@@ -151,7 +151,7 @@ if (import.meta.main) {
 
   // make the default handler
   if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
-    serve();
+    serve({});
   }
 
   // final server handler
@@ -159,7 +159,7 @@ if (import.meta.main) {
     const { pathname } = new URL(req.url);
 
     // handle HMR sockets
-    if (pathname === "/-/HMR") {
+    if (pathname === "/-/hmr") {
       return handleHMRSocket(req);
     }
 
@@ -186,7 +186,7 @@ function handleHMRSocket(req: Request): Response {
   };
   socket.addEventListener("open", () => {
     listener.on("create", ({ specifier }) => {
-      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
       if (config && config.routeFiles) {
         const reg = toRouteRegExp(config.routeFiles);
         const routePattern = reg.exec(specifier);
