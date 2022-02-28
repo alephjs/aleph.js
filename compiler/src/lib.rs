@@ -3,6 +3,7 @@ extern crate lazy_static;
 
 mod css;
 mod error;
+mod export_names;
 mod expr_utils;
 mod hmr;
 mod import_map;
@@ -109,6 +110,16 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
     })
     .unwrap(),
   )
+}
+
+#[wasm_bindgen(js_name = "parseExportNames")]
+pub fn parse_export_names(specifier: &str, code: &str) -> Result<JsValue, JsValue> {
+  console_error_panic_hook::set_once();
+
+  let module = SWC::parse(specifier, code, EsVersion::Es2022).expect("could not parse the module");
+  let names = module.parse_export_names().expect("could not parse the module");
+
+  Ok(JsValue::from_serde(&names).unwrap())
 }
 
 #[wasm_bindgen(js_name = "transform")]

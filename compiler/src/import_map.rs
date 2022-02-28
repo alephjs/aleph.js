@@ -47,6 +47,10 @@ impl ImportMap {
   }
 
   pub fn resolve(&self, specifier: &str, url: &str) -> String {
+    if self.imports.len() == 0 && self.scopes.len() == 0 {
+      return url.into();
+    }
+
     for (prefix, scope_imports) in self.scopes.iter() {
       if prefix.ends_with("/") && specifier.starts_with(prefix) {
         match scope_imports.get(url) {

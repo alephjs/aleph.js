@@ -1,4 +1,9 @@
-import init, { fastTransform as fastSWC, transform as swc, transformCSS as parcelCSS } from "./dist/compiler.js";
+import init, {
+  fastTransform as fastSWC,
+  parseExportNames as parseExportNamesSWC,
+  transform as swc,
+  transformCSS as parcelCSS,
+} from "./dist/compiler.js";
 import decodeWasmData from "./dist/wasm.js";
 import {
   FastTransformOptions,
@@ -25,7 +30,16 @@ async function initWasm() {
   await init(wasmData);
 }
 
-/** fast transform */
+/** parse export names */
+export async function parseExportNames(
+  specifier: string,
+  code: string,
+): Promise<string[]> {
+  await checkWasmReady();
+  return parseExportNamesSWC(specifier, code);
+}
+
+/** fast transform without transpile code raw syntax */
 export async function fastTransform(
   specifier: string,
   code: string,

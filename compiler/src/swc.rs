@@ -1,4 +1,5 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
+use crate::export_names::ExportParser;
 use crate::hmr::hmr;
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::Resolver;
@@ -82,6 +83,14 @@ impl SWC {
       source_map: Rc::new(source_map),
       comments,
     })
+  }
+
+  /// parse export names in the module.
+  pub fn parse_export_names(&self) -> Result<Vec<String>, anyhow::Error> {
+    let program = Program::Module(self.module.clone());
+    let mut parser = ExportParser { names: vec![] };
+    program.fold_with(&mut parser);
+    Ok(parser.names)
   }
 
   /// fast transform
