@@ -44,7 +44,7 @@ const removeFSWListener = (e: Emitter<FsEvents>) => {
   fswListeners.delete(e);
 };
 
-if (import.meta.main) {
+const main = async () => {
   const { args, options } = parse();
 
   // check working dir
@@ -107,25 +107,13 @@ if (import.meta.main) {
   });
 
   const fswListener = createFSWListener();
-  const watchServerHandler = (filename: string) => {
-    fswListener.off(`modify:./${basename(filename)}`);
-    fswListener.on(`modify:./${basename(filename)}`, importServerHandler);
-  };
+  const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
+    findFile(workingDir, ["deno.jsonc", "deno.json", "tsconfig.json"]),
+    findFile(workingDir, ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
+    findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`)),
+  ]);
   const importServerHandler = async (): Promise<void> => {
-    const cwd = Deno.cwd();
-    const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
-      findFile(cwd, ["deno.jsonc", "deno.json", "tsconfig.json"]),
-      findFile(cwd, ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
-      findFile(cwd, builtinModuleExts.map((ext) => `server.${ext}`)),
-    ]);
     if (serverEntry) {
-      watchServerHandler(serverEntry);
-      if (denoConfigFile) {
-        watchServerHandler(denoConfigFile);
-      }
-      if (importMapFile) {
-        watchServerHandler(importMapFile);
-      }
       await import(
         `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/${basename(serverEntry)}?t=${
           Date.now().toString(16)
@@ -134,7 +122,16 @@ if (import.meta.main) {
       log.info(`Server handler imported from ${blue(basename(serverEntry))}`);
     }
   };
-  await importServerHandler();
+  if (serverEntry) {
+    fswListener.on(`modify:./${basename(serverEntry)}`, importServerHandler);
+    if (denoConfigFile) {
+      fswListener.on(`modify:./${basename(denoConfigFile)}`, importServerHandler);
+    }
+    if (importMapFile) {
+      fswListener.on(`modify:./${basename(importMapFile)}`, importServerHandler);
+    }
+    await importServerHandler();
+  }
 
   // init routes when fs change
   const updateRoutes = ({ specifier }: { specifier: string }) => {
@@ -172,7 +169,7 @@ if (import.meta.main) {
   } else {
     await stdServe(handler, { port, hostname });
   }
-}
+};
 
 function handleHMRSocket(req: Request): Response {
   const { socket, response } = Deno.upgradeWebSocket(req, {});
@@ -218,4 +215,8 @@ function handleHMRSocket(req: Request): Response {
     removeFSWListener(listener);
   });
   return response;
+}
+
+if (import.meta.main) {
+  await main();
 }

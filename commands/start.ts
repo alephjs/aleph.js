@@ -59,7 +59,7 @@ if (import.meta.main) {
 
   // make the default handler
   if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
-    serve();
+    serve({});
   }
 
   const handler = (req: Request) => {

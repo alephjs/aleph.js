@@ -198,6 +198,7 @@ async function run(command: string, options: RunOptions) {
     "--allow-net",
     "--allow-read",
     "--allow-write",
+    "--allow-run",
     "--location=http://localhost",
     "--no-check",
     "--quiet",
