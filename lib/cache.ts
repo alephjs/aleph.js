@@ -3,6 +3,8 @@ import { existsDir, existsFile } from "./fs.ts";
 import log from "./log.ts";
 import util from "./util.ts";
 
+const memoryCache = new Map<string, [Uint8Array, { headers: Record<string, string> }]>();
+
 /** fetch and cache remote contents */
 export default async function cache(
   url: string,
@@ -11,32 +13,34 @@ export default async function cache(
   const { protocol, hostname, port, pathname, search } = new URL(url);
   const isLocalhost = ["localhost", "0.0.0.0", "127.0.0.1"].includes(hostname);
   const denoDir = Deno.env.get("DENO_DIR");
-  const cacheable = !isLocalhost && denoDir;
+  const hashname = await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
 
   let cacheDir = "";
-  let hashname = "";
   let metaFilepath = "";
   let contentFilepath = "";
-  if (cacheable) {
+  if (denoDir) {
     cacheDir = join(denoDir, "deps", util.trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
-    hashname = await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
     metaFilepath = join(cacheDir, hashname + ".metadata.json");
     contentFilepath = join(cacheDir, hashname);
   }
 
-  if (
-    cacheable && !options?.forceRefresh && await existsFile(contentFilepath) &&
-    await existsFile(metaFilepath)
-  ) {
-    const [content, meta] = await Promise.all([
-      Deno.readFile(contentFilepath),
-      Deno.readTextFile(metaFilepath),
-    ]);
-    try {
-      const { headers = {} } = JSON.parse(meta);
-      return new Response(content, { headers });
-    } catch (_e) {
-      return new Response(content);
+  if (options?.forceRefresh && !isLocalhost) {
+    if (denoDir) {
+      if (await existsFile(contentFilepath) && await existsFile(metaFilepath)) {
+        const [content, meta] = await Promise.all([
+          Deno.readFile(contentFilepath),
+          Deno.readTextFile(metaFilepath),
+        ]);
+        try {
+          const { headers = {} } = JSON.parse(meta);
+          return new Response(content, { headers: { ...headers, "cache-hit": "true" } });
+        } catch (_e) {
+          return new Response(content);
+        }
+      }
+    } else if (memoryCache.has(hashname)) {
+      const [content, { headers }] = memoryCache.get(hashname)!;
+      return new Response(content, { headers: { ...headers, "cache-hit": "true" } });
     }
   }
 
@@ -57,27 +61,31 @@ export default async function cache(
       continue;
     }
 
-    if (cacheable && res.ok) {
+    if (res.ok && !isLocalhost) {
       const buffer = await res.arrayBuffer();
       const content = new Uint8Array(buffer);
       const headers: Record<string, string> = {};
       res.headers.forEach((val, key) => {
         headers[key] = val;
       });
-      if (!(await existsDir(cacheDir))) {
-        await Deno.mkdir(cacheDir, { recursive: true });
-      }
-      await Promise.all([
-        Deno.writeFile(contentFilepath, content),
-        Deno.writeTextFile(
-          metaFilepath,
-          JSON.stringify(
-            { headers, url, now: { secs_since_epoch: Math.round(Date.now() / 1000), nanos_since_epoch: 0 } },
-            undefined,
-            2,
+      if (denoDir) {
+        if (!(await existsDir(cacheDir))) {
+          await Deno.mkdir(cacheDir, { recursive: true });
+        }
+        await Promise.all([
+          Deno.writeFile(contentFilepath, content),
+          Deno.writeTextFile(
+            metaFilepath,
+            JSON.stringify(
+              { headers, url, now: { secs_since_epoch: Math.round(Date.now() / 1000), nanos_since_epoch: 0 } },
+              undefined,
+              2,
+            ),
           ),
-        ),
-      ]);
+        ]);
+      } else {
+        memoryCache.set(hashname, [content, { headers }]);
+      }
       return new Response(content, { headers: res.headers });
     }
 
