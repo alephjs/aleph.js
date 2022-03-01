@@ -151,7 +151,7 @@ if (import.meta.main) {
           const contents = await fetch(args.path).then((res) => res.text());
           return {
             contents,
-            loader: extname(args.path).slice(1) as unknown as "js",
+            loader: util.splitBy(extname(args.path).slice(1), "?")[0] as unknown as "js",
           };
         });
       },
