@@ -216,6 +216,7 @@ async function run(command: string, options: RunOptions) {
   if (version) {
     const pkgName = isCanary ? "aleph_canary" : "aleph";
     cmd.push(`https://deno.land/x/${pkgName}@${version}/commands/${command}.ts`);
+    Deno.env.set("ALEPH_VERSION", version);
   } else if (devPort) {
     cmd.push(`http://localhost:${devPort}/commands/${command}.ts`);
   } else {

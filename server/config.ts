@@ -14,7 +14,8 @@ export function getAlephPkgUri() {
     if (DEV_PORT) {
       return `http://localhost:${DEV_PORT}`;
     }
-    return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${VERSION}`;
+    const version = Deno.env.get("ALEPH_VERSION") || VERSION;
+    return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${version}`;
   });
 }
 
