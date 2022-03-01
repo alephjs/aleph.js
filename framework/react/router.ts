@@ -61,9 +61,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 
     const { routes } = loadRouteManifestFromTag();
     const onpopstate = async (e: Record<string, unknown>) => {
-      // deno-lint-ignore ban-ts-comment
-      // @ts-ignore
-      const ROUTE_MODULES: Record<string, unknown> = window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
+      const ROUTE_MODULES = getRouteModules();
       const url = new URL(window.location.href);
       const matches = matchRoutes(url, routes);
       const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
@@ -73,25 +71,26 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;
         if (filename in ROUTE_MODULES) {
-          rmod.defaultExport = ROUTE_MODULES[filename];
-          Object.assign(rmod, dataCache.get(dataUrl));
+          rmod.defaultExport = ROUTE_MODULES[filename].defaultExport;
         } else {
           const { default: defaultExport, data: withData } = await import(filename.slice(1)); // todo: add version
-          if (defaultExport) {
-            ROUTE_MODULES[filename] = defaultExport;
-            rmod.defaultExport = defaultExport;
-            if (withData === true) {
-              const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
-              const data = await res.json();
-              const cc = res.headers.get("Cache-Control");
-              const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-              dataCache.set(dataUrl, {
-                data,
-                dataCacheTtl,
-                dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
-              });
-              Object.assign(rmod, { data, dataCacheTtl });
-            }
+          ROUTE_MODULES[filename] = { defaultExport, withData };
+          rmod.defaultExport = defaultExport;
+        }
+        if (dataCache.has(dataUrl)) {
+          Object.assign(rmod, dataCache.get(dataUrl));
+        } else {
+          if (ROUTE_MODULES[filename].withData === true) {
+            const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
+            const data = await res.json();
+            const cc = res.headers.get("Cache-Control");
+            const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+            dataCache.set(dataUrl, {
+              data,
+              dataCacheTtl,
+              dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+            });
+            Object.assign(rmod, { data, dataCacheTtl });
           }
         }
         return rmod;
@@ -141,9 +140,7 @@ function loadRouteManifestFromTag(): { routes: Route[] } {
 }
 
 function loadSSRModulesFromTag(): RenderModule[] {
-  // deno-lint-ignore ban-ts-comment
-  // @ts-ignore
-  const ROUTE_MODULES: Record<string, unknown> = window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
+  const ROUTE_MODULES = getRouteModules();
   const el = window.document?.getElementById("ssr-modules");
   if (el) {
     try {
@@ -153,7 +150,7 @@ function loadSSRModulesFromTag(): RenderModule[] {
           return {
             url: new URL(url, location.href),
             filename,
-            defaultExport: ROUTE_MODULES[filename],
+            defaultExport: ROUTE_MODULES[filename].defaultExport,
             ...rest,
           };
         });
@@ -163,4 +160,10 @@ function loadSSRModulesFromTag(): RenderModule[] {
     }
   }
   return [];
+}
+
+function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
+  // deno-lint-ignore ban-ts-comment
+  // @ts-ignore
+  return window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
 }

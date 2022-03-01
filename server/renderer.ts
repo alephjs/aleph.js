@@ -90,7 +90,9 @@ export default {
               const importStmts = modules.map(({ filename }, idx) =>
                 `import mod_${idx} from ${JSON.stringify(filename.slice(1))};`
               ).join("");
-              const kvs = modules.map(({ filename }, idx) => `${JSON.stringify(filename)}:mod_${idx}`).join(",");
+              const kvs = modules.map(({ filename, data }, idx) =>
+                `${JSON.stringify(filename)}:{defaultExport:mod_${idx}${data !== undefined ? ",withData:true" : ""}}`
+              ).join(",");
               const ssrModules = modules.map(({ url, filename, error, data, dataCacheTtl }) => ({
                 url: url.pathname + url.search,
                 module: filename,
