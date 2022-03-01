@@ -14,17 +14,13 @@ export function applyCSS(url: string, css: string) {
       const prevEls = Array.from(document.head.children).filter((el: Element) => {
         return el.getAttribute("data-module-id") === url;
       });
-      const cleanup = () =>
-        setTimeout(() => {
-          if (prevEls.length > 0) {
-            prevEls.forEach((el) => document.head.removeChild(el));
-          }
-        }, 0);
       const el = document.createElement("style");
-      el.appendChild(document.createTextNode(css));
-      cleanup();
       el.setAttribute("data-module-id", url);
+      el.appendChild(document.createTextNode(css));
       document.head.appendChild(el);
+      if (prevEls.length > 0) {
+        prevEls.forEach((el) => document.head.removeChild(el));
+      }
     }
   }
 }
