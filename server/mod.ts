@@ -10,7 +10,7 @@ import renderer from "./renderer.ts";
 import { content, json } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
 import { clientModuleTransformer } from "./transformer.ts";
-import type { FetchContext, HTMLRewriterHandlers, Route, ServerOptions } from "./types.ts";
+import type { Route, ServerOptions } from "./types.ts";
 
 export const serve = (options: ServerOptions) => {
   const { config, middlewares, fetch, ssr } = options;
@@ -89,6 +89,7 @@ export const serve = (options: ServerOptions) => {
 
     const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
     const ctx: FetchContext = {
+      params: {},
       HTMLRewriter: {
         on: (selector: string, handlers: HTMLRewriterHandlers) => {
           customHTMLRewriter.set(selector, handlers);
@@ -145,8 +146,8 @@ export const serve = (options: ServerOptions) => {
             if (req.method !== "GET" || mod.default === undefined || req.headers.has("X-Fetch-Data")) {
               const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
-                const request = new Request(util.appendUrlParams(url, ret.pathname.groups).toString(), req);
-                return fetcher(request, ctx);
+                Reflect.set(ctx, "params", ret.pathname.groups);
+                return fetcher(ret, ctx);
               }
               return new Response("Method not allowed", { status: 405 });
             }

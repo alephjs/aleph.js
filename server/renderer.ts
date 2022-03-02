@@ -8,7 +8,7 @@ import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { bundleCSS } from "./bundle.ts";
 import { importRouteModule } from "./routing.ts";
-import type { AlephConfig, FetchContext, HTMLRewriterHandlers, RenderModule, Route, SSRContext } from "./types.ts";
+import type { AlephConfig, RenderModule, Route, SSRContext } from "./types.ts";
 
 let lolHtmlReady: Promise<unknown> | boolean = false;
 
@@ -244,15 +244,14 @@ async function initSSR(
     const mod = await importRouteModule(filename);
     const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
     const rmod: RenderModule = {
-      url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
+      url: new URL(ret.pathname.input, url.href),
       filename: filename,
       defaultExport: mod.default,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
     };
     const fetcher = dataConfig.get;
     if (typeof fetcher === "function") {
-      const request = new Request(rmod.url.toString(), req);
-      let res = fetcher(request, ctx);
+      let res = fetcher(req, { ...ctx, params: ret.pathname.groups });
       if (res instanceof Promise) {
         res = await res;
       }

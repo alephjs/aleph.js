@@ -1,10 +1,10 @@
 import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.26.2";
-import type { Comment, Doctype, DocumentEnd, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import type { URLPatternCompat, URLPatternInput } from "../lib/url.ts";
 
 export type AlephConfig = {
-  build?: BuildOptions;
   atomicCSS?: AtomicCSSConfig;
+  basePath?: string;
+  build?: BuildOptions;
   routeFiles?: string | RoutesConfig;
 };
 
@@ -29,20 +29,6 @@ export type JSXConfig = {
   jsxRuntime?: "react" | "preact";
   jsxImportSource?: string;
 };
-
-export type HTMLRewriterHandlers = {
-  element?: (element: Element) => void;
-  text?: (text: TextChunk) => void;
-  doctype?: (doctype: Doctype) => void;
-  comments?: (comment: Comment) => void;
-  end?: (end: DocumentEnd) => void;
-};
-
-export interface FetchContext extends Record<string, unknown> {
-  HTMLRewriter: {
-    on: (selector: string, handlers: HTMLRewriterHandlers) => void;
-  };
-}
 
 export type FetchHandler = {
   (request: Request, context: FetchContext): Promise<Response | void> | Response | void;

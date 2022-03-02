@@ -20,11 +20,11 @@ export default async function cache(
   let contentFilepath = "";
   if (denoDir) {
     cacheDir = join(denoDir, "deps", util.trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
-    metaFilepath = join(cacheDir, hashname + ".metadata.json");
     contentFilepath = join(cacheDir, hashname);
+    metaFilepath = join(cacheDir, hashname + ".metadata.json");
   }
 
-  if (options?.forceRefresh && !isLocalhost) {
+  if (!options?.forceRefresh && !isLocalhost) {
     if (denoDir) {
       if (await existsFile(contentFilepath) && await existsFile(metaFilepath)) {
         const [content, meta] = await Promise.all([

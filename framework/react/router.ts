@@ -2,7 +2,6 @@ import type { FC, ReactElement } from "https://esm.sh/react@17.0.2";
 import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
 import { matchRoutes } from "../../lib/helpers.ts";
 import { URLPatternCompat } from "../../lib/url.ts";
-import util from "../../lib/util.ts";
 import type { RenderModule, Route, RouteMeta, SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
@@ -66,7 +65,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       const matches = matchRoutes(url, routes);
       const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
         const rmod: RenderModule = {
-          url: util.appendUrlParams(new URL(ret.pathname.input, url.href), ret.pathname.groups),
+          url: new URL(ret.pathname.input, url.href),
           filename: filename,
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;

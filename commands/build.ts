@@ -4,6 +4,7 @@ import { build, stop } from "https://deno.land/x/esbuild@v0.14.23/mod.js";
 import { parseExportNames } from "../compiler/mod.ts";
 import { parse } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
+import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "../server/config.ts";
@@ -38,7 +39,7 @@ if (import.meta.main) {
   log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
 
   const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
-  const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"]);
+  const serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {
     await import(
       `http://localhost:${port}/${basename(serverEntry)}?t=${Date.now().toString(16)}`

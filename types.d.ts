@@ -7,7 +7,8 @@ declare type HTMLRewriterHandlers = {
 };
 
 declare interface FetchContext extends Record<string, unknown> {
-  HTMLRewriter: {
+  readonly params: Record<string, string>;
+  readonly HTMLRewriter: {
     on: (selector: string, handlers: HTMLRewriterHandlers) => void;
   };
 }

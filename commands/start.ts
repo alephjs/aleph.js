@@ -2,6 +2,7 @@ import { basename, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/server.ts";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
+import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import { loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
@@ -50,7 +51,7 @@ if (import.meta.main) {
   serveAppModules(6060, await loadImportMap());
   log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
 
-  const serverEntry = await findFile(Deno.cwd(), ["server.tsx", "server.jsx", "server.ts", "server.js"]);
+  const serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {
     await import(
       `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/${basename(serverEntry)}?t=${Date.now().toString(16)}`
