@@ -53,7 +53,7 @@ const esModuleLoader: Loader<{ importMap: ImportMap; initialGraphVersion: string
         return acc;
       }, {} as Record<string, string>);
       const { code, deps } = await fastTransform(specifier, util.utf8TextDecoder.decode(rawContent), {
-        importMap: options?.importMap,
+        importMap: JSON.stringify(options?.importMap),
         initialGraphVersion: options?.initialGraphVersion,
         graphVersions,
       });
@@ -164,7 +164,7 @@ export const clientModuleTransformer = {
         target: buildTarget,
         alephPkgUri,
         graphVersions,
-        importMap,
+        importMap: JSON.stringify(importMap),
         isDev,
       });
       let inlineCSS: string | null = null;
