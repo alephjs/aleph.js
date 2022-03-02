@@ -1,8 +1,8 @@
-use crate::expr_utils::{
+use crate::resolver::Resolver;
+use crate::swc_helpers::{
   import_name, is_call_expr_by_name, new_member_expr, new_str, pat_id, rename_var_decl, simple_member_expr,
   window_assign,
 };
-use crate::resolver::Resolver;
 use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;
 use swc_ecma_ast::*;

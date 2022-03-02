@@ -2,15 +2,19 @@ use super::*;
 use std::collections::HashMap;
 
 fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
-  let mut imports: HashMap<String, String> = HashMap::new();
+  let importmap = import_map::parse_from_json(
+    &Url::from_file_path("/").unwrap(),
+    r#"{
+    "imports": {
+      "~/": "./",
+      "react": "https://esm.sh/react"
+    }
+  }"#,
+  )
+  .expect("could not pause the import map")
+  .import_map;
   let mut graph_versions: HashMap<String, String> = HashMap::new();
-  imports.insert("~/".into(), "./".into());
-  imports.insert("react".into(), "https://esm.sh/react".into());
   graph_versions.insert("./foo.ts".into(), "100".into());
-  let import_map = ImportHashMap {
-    imports,
-    scopes: HashMap::new(),
-  };
   let module = SWC::parse(specifer, source, swc_ecma_ast::EsVersion::Es2022).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
@@ -18,7 +22,7 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
     Some("react".into()),
     Some("17.0.2".into()),
     Some("v64".into()),
-    import_map,
+    importmap,
     graph_versions,
     None,
     is_dev,
@@ -69,16 +73,16 @@ fn typescript() {
 fn import_resolving() {
   let source = r#"
       import React from "react"
-      import { foo } from "./foo.ts"
-      import "../style/index.css"
+      import { foo } from "~/foo.ts"
+      import "../../style/app.css"
 
-      foo();
-      <div/>
+      foo()
+      export default () => <div />
     "#;
-  let (code, _) = transform("./App.tsx", source, false, &EmitOptions::default());
+  let (code, _) = transform("./pages/blog/$id.tsx", source, false, &EmitOptions::default());
   assert!(code.contains("\"https://esm.sh/react@17.0.2\""));
-  assert!(code.contains("\"./foo.ts?v=100\""));
-  assert!(code.contains("\"../style/index.css?module\""));
+  assert!(code.contains("\"../../foo.ts?v=100\""));
+  assert!(code.contains("\"../../style/app.css?module\""));
 }
 
 #[test]

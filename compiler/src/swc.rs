@@ -3,7 +3,6 @@ use crate::export_names::ExportParser;
 use crate::hmr::hmr;
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::Resolver;
-use crate::source_type::SourceType;
 
 use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::comments::SingleThreadedComments;
@@ -41,7 +40,6 @@ impl Default for EmitOptions {
 pub struct SWC {
   pub specifier: String,
   pub module: Module,
-  pub source_type: SourceType,
   pub source_map: Rc<SourceMap>,
   pub comments: SingleThreadedComments,
 }
@@ -53,8 +51,7 @@ impl SWC {
     let source_file = source_map.new_source_file(FileName::Real(Path::new(specifier).to_path_buf()), source.into());
     let sm = &source_map;
     let error_buffer = ErrorBuffer::new(specifier);
-    let source_type = SourceType::from(Path::new(specifier));
-    let syntax = get_syntax(&source_type);
+    let syntax = get_syntax(specifier);
     let input = StringInput::from(&*source_file);
     let comments = SingleThreadedComments::default();
     let lexer = Lexer::new(syntax, target, input, Some(&comments));
@@ -79,7 +76,6 @@ impl SWC {
     Ok(SWC {
       specifier: specifier.into(),
       module,
-      source_type,
       source_map: Rc::new(source_map),
       comments,
     })
@@ -114,12 +110,8 @@ impl SWC {
       let top_level_mark = Mark::fresh(Mark::root());
       let jsx_runtime = resolver.borrow().jsx_runtime.clone();
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
+      let is_jsx = self.specifier.ends_with(".tsx") || self.specifier.ends_with(".jsx");
       let is_dev = resolver.borrow().is_dev;
-      let is_jsx = match self.source_type {
-        SourceType::JSX => true,
-        SourceType::TSX => true,
-        _ => false,
-      };
       let react_options = if let Some(jsx_import_source) = &options.jsx_import_source {
         react::Options {
           runtime: Some(react::Runtime::Automatic),
@@ -262,13 +254,21 @@ fn get_ts_config(tsx: bool) -> TsConfig {
   }
 }
 
-fn get_syntax(source_type: &SourceType) -> Syntax {
-  match source_type {
-    SourceType::JS => Syntax::Es(get_es_config(false)),
-    SourceType::JSX => Syntax::Es(get_es_config(true)),
-    SourceType::TS => Syntax::Typescript(get_ts_config(false)),
-    SourceType::TSX => Syntax::Typescript(get_ts_config(true)),
-    _ => Syntax::Typescript(get_ts_config(true)),
+fn get_syntax(specifier: &str) -> Syntax {
+  let ext = specifier
+    .split(|c| c == '?' || c == '#')
+    .next()
+    .unwrap()
+    .split('.')
+    .last()
+    .unwrap_or("js")
+    .to_lowercase();
+  match ext.as_str() {
+    "js" | "mjs" => Syntax::Es(get_es_config(false)),
+    "jsx" => Syntax::Es(get_es_config(true)),
+    "ts" | "mts" => Syntax::Typescript(get_ts_config(false)),
+    "tsx" => Syntax::Typescript(get_ts_config(true)),
+    _ => Syntax::Es(get_es_config(false)),
   }
 }
 

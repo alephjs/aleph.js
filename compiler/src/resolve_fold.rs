@@ -1,5 +1,5 @@
-use crate::expr_utils::new_str;
 use crate::resolver::Resolver;
+use crate::swc_helpers::new_str;
 use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;
 use swc_ecma_ast::*;
@@ -75,7 +75,7 @@ impl Fold for ResolveFold {
             // match: export * from "https://esm.sh/react"
             ModuleDecl::ExportAll(ExportAll { src, span, asserts }) => {
               let mut resolver = self.resolver.borrow_mut();
-              let resolved_url = resolver.resolve(src.value.as_ref(), true);
+              let resolved_url = resolver.resolve(src.value.as_ref(), false);
               ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
                 span,
                 src: new_str(&resolved_url),
@@ -87,39 +87,13 @@ impl Fold for ResolveFold {
               span,
             }) => {
               let mut data_export_idx = -1;
-              let mut has_get_method = false;
               if self.strip_data_export && var.decls.len() > 0 {
                 let mut i = 0;
                 for decl in &var.decls {
                   if let Pat::Ident(bi) = &decl.name {
-                    if let Some(init) = &decl.init {
-                      if bi.id.sym.eq("data") {
-                        data_export_idx = i;
-                        if let Expr::Object(ObjectLit { props, .. }) = init.as_ref() {
-                          for prop in props {
-                            if let PropOrSpread::Prop(prop) = prop {
-                              has_get_method = match prop.as_ref() {
-                                Prop::Shorthand(id) => id.sym.eq("get"),
-                                Prop::KeyValue(kv) => match &kv.key {
-                                  PropName::Str(s) => s.value.eq("get"),
-                                  PropName::Ident(id) => id.sym.eq("get"),
-                                  _ => false,
-                                },
-                                Prop::Method(m) => match &m.key {
-                                  PropName::Str(s) => s.value.eq("get"),
-                                  PropName::Ident(id) => id.sym.eq("get"),
-                                  _ => false,
-                                },
-                                _ => false,
-                              };
-                              if has_get_method {
-                                break;
-                              }
-                            }
-                          }
-                        }
-                        break;
-                      }
+                    if bi.id.sym.eq("data") && decl.init.is_some() {
+                      data_export_idx = i;
+                      break;
                     }
                   }
                   i += 1;
@@ -140,7 +114,7 @@ impl Fold for ResolveFold {
                             span: DUMMY_SP,
                             init: Some(Box::new(Expr::Lit(Lit::Bool(Bool {
                               span: DUMMY_SP,
-                              value: has_get_method,
+                              value: true,
                             })))),
                             ..decl
                           }

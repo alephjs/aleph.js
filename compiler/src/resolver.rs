@@ -1,8 +1,8 @@
-use crate::import_map::{ImportHashMap, ImportMap};
+use import_map::ImportMap;
 use indexmap::IndexSet;
 use path_slash::PathBufExt;
+use pathdiff::diff_paths;
 use regex::Regex;
-use relative_path::RelativePath;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -20,7 +20,7 @@ lazy_static! {
 pub struct DependencyDescriptor {
   pub specifier: String,
   #[serde(skip_serializing_if = "is_false")]
-  pub is_star_export: bool,
+  pub dynamic: bool,
 }
 
 /// A Resolver to resolve esm import/export URL.
@@ -45,7 +45,7 @@ pub struct Resolver {
   import_map: ImportMap,
   graph_versions: HashMap<String, String>,
   initial_graph_version: Option<String>,
-  browser: bool,
+  resolve_remote_deps: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -63,26 +63,26 @@ impl Resolver {
     jsx_runtime: Option<String>,
     jsx_runtime_version: Option<String>,
     jsx_runtime_cdn_version: Option<String>,
-    import_map: ImportHashMap,
+    import_map: ImportMap,
     graph_versions: HashMap<String, String>,
     initial_graph_version: Option<String>,
     is_dev: bool,
-    browser: bool,
+    resolve_remote_deps: bool,
   ) -> Self {
     Resolver {
       aleph_pkg_uri: aleph_pkg_uri.into(),
       specifier: specifier.into(),
-      specifier_is_remote: is_remote_url(specifier),
+      specifier_is_remote: is_http_url(specifier),
       deps: Vec::new(),
       jsx_runtime,
       jsx_runtime_version,
       jsx_runtime_cdn_version,
       jsx_static_classes: IndexSet::new(),
-      import_map: ImportMap::from_hashmap(import_map),
+      import_map,
       graph_versions,
       initial_graph_version,
       is_dev,
-      browser,
+      resolve_remote_deps,
     }
   }
 
@@ -124,43 +124,31 @@ impl Resolver {
   }
 
   /// Resolve import/export URLs.
-  pub fn resolve(&mut self, url: &str, is_star_export: bool) -> String {
-    // apply import maps
-    let url = self.import_map.resolve(self.specifier.as_str(), url);
-    let url = url.as_str();
-    let mut is_remote = is_remote_url(url);
-    let mut fixed_url: String = if is_remote {
-      url.into()
+  pub fn resolve(&mut self, url: &str, dynamic: bool) -> String {
+    let referrer = if self.specifier_is_remote {
+      Url::from_str(self.specifier.as_str()).unwrap()
     } else {
-      if self.specifier_is_remote {
-        let mut new_url = Url::from_str(self.specifier.as_str()).unwrap();
-        if url.starts_with("/") {
-          new_url.set_path(url);
-        } else {
-          let mut buf = PathBuf::from(new_url.path());
-          buf.pop();
-          buf.push(url);
-          let path = "/".to_owned() + RelativePath::new(buf.to_slash().unwrap().as_str()).normalize().as_str();
-          new_url.set_path(path.as_str());
-        }
-        is_remote = true;
-        new_url.as_str().into()
-      } else {
-        if url.starts_with("/") {
-          url.into()
-        } else {
-          let mut buf = PathBuf::from(self.specifier.as_str());
-          buf.pop();
-          buf.push(url);
-          let rel_path = RelativePath::new(buf.to_slash().unwrap().as_str()).normalize();
-          if self.specifier.starts_with("/") {
-            "/".to_owned() + rel_path.as_str()
-          } else {
-            "./".to_owned() + rel_path.as_str()
-          }
-        }
-      }
+      Url::from_str(&("file://".to_owned() + self.specifier.trim_start_matches('.'))).unwrap()
     };
+    let resolved_url = self.import_map.resolve(url, &referrer).unwrap().to_string();
+    let mut import_url = if resolved_url.starts_with("file://") {
+      let path = resolved_url.strip_prefix("file://").unwrap();
+      if !self.specifier_is_remote {
+        let mut buf = PathBuf::from(self.specifier.trim_start_matches('.'));
+        buf.pop();
+        diff_paths(&path, buf).unwrap().to_slash().unwrap().to_string()
+      } else {
+        ".".to_owned() + path
+      }
+    } else {
+      resolved_url.clone()
+    };
+    let mut fixed_url: String = if resolved_url.starts_with("file://") {
+      ".".to_owned() + resolved_url.strip_prefix("file://").unwrap()
+    } else {
+      resolved_url.into()
+    };
+    let is_remote = is_http_url(&fixed_url);
 
     // fix react/react-dom url
     if is_remote && RE_REACT_URL.is_match(fixed_url.as_str()) {
@@ -194,6 +182,7 @@ impl Resolver {
           } else {
             fixed_url = format!("https://{}/react{}@{}{}", host, dom, jsx_runtime_version, path);
           }
+          import_url = fixed_url.clone();
         }
       }
     }
@@ -204,19 +193,15 @@ impl Resolver {
       } else {
         fixed_url = fixed_url + "?dev"
       }
+      import_url = fixed_url.clone();
     }
 
-    // push into dep graph
+    // update dep graph
     self.deps.push(DependencyDescriptor {
       specifier: fixed_url.clone(),
-      is_star_export,
+      dynamic,
     });
 
-    let mut import_url = if is_remote {
-      fixed_url.to_owned()
-    } else {
-      url.to_owned()
-    };
     if import_url.ends_with(".css") {
       import_url = import_url + "?module"
     }
@@ -230,7 +215,7 @@ impl Resolver {
     }
 
     // fix remote url to local path for development mode
-    if is_remote && (self.is_dev || (nonjs && self.browser)) {
+    if is_remote && (nonjs && self.resolve_remote_deps) {
       return self.to_local_path(&import_url);
     }
 
@@ -260,7 +245,7 @@ pub fn is_esm_sh_url(url: &str) -> bool {
   return url.starts_with("https://esm.sh") || url.starts_with("http://esm.sh");
 }
 
-pub fn is_remote_url(url: &str) -> bool {
+pub fn is_http_url(url: &str) -> bool {
   return url.starts_with("https://") || url.starts_with("http://");
 }
 

@@ -5,7 +5,7 @@ export type ImportMap = {
 
 export type TransformOptions = {
   alephPkgUri?: string;
-  importMap?: ImportMap;
+  importMap?: string;
   graphVersions?: Record<string, string>;
   initialGraphVersion?: string;
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
@@ -32,7 +32,7 @@ export type TransformResult = {
 
 export type DependencyDescriptor = {
   readonly specifier: string;
-  readonly isStarExport?: boolean;
+  readonly dynamic?: boolean;
 };
 
 export interface Targets {

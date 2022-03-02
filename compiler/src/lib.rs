@@ -4,24 +4,23 @@ extern crate lazy_static;
 mod css;
 mod error;
 mod export_names;
-mod expr_utils;
 mod hmr;
-mod import_map;
 mod resolve_fold;
 mod resolver;
-mod source_type;
 mod swc;
+mod swc_helpers;
 
 #[cfg(test)]
 mod tests;
 
-use import_map::ImportHashMap;
 use resolver::{DependencyDescriptor, Resolver};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, SWC};
 use swc_ecma_ast::EsVersion;
+use url::Url;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
 #[derive(Deserialize)]
@@ -34,7 +33,7 @@ pub struct Options {
   pub is_dev: bool,
 
   #[serde(default)]
-  pub import_map: ImportHashMap,
+  pub import_map: Option<String>,
 
   #[serde(default)]
   pub graph_versions: HashMap<String, String>,
@@ -84,13 +83,19 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
     .into_serde()
     .map_err(|err| format!("failed to parse options: {}", err))
     .unwrap();
+  let importmap = import_map::parse_from_json(
+    &Url::from_str("file:///").unwrap(),
+    options.import_map.unwrap_or("{}".into()).as_str(),
+  )
+  .expect("could not pause the import map")
+  .import_map;
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifier,
     "",
     None,
     None,
     None,
-    options.import_map,
+    importmap,
     options.graph_versions,
     options.initial_graph_version,
     false,
@@ -130,13 +135,19 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     .into_serde()
     .map_err(|err| format!("failed to parse options: {}", err))
     .unwrap();
+  let importmap = import_map::parse_from_json(
+    &Url::from_str("file:///").unwrap(),
+    options.import_map.unwrap_or("{}".into()).as_str(),
+  )
+  .expect("could not pause the import map")
+  .import_map;
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifier,
     &options.aleph_pkg_uri,
     options.jsx_runtime,
     options.jsx_runtime_version,
     options.jsx_runtime_cdn_version,
-    options.import_map,
+    importmap,
     options.graph_versions,
     options.initial_graph_version,
     options.is_dev,
