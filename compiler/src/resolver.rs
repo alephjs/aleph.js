@@ -206,16 +206,8 @@ impl Resolver {
       import_url = import_url + "?module"
     }
 
-    let mut nonjs = false;
-    for ext in vec![".css", ".jsx", ".ts", ".mts", ".tsx"] {
-      if import_url.ends_with(ext) {
-        nonjs = true;
-        break;
-      }
-    }
-
     // fix remote url to local path for development mode
-    if is_remote && (nonjs && self.resolve_remote_deps) {
+    if is_remote && self.resolve_remote_deps {
       return self.to_local_path(&import_url);
     }
 
