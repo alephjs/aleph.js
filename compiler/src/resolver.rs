@@ -159,17 +159,17 @@ impl Resolver {
         let dom = caps.get(3).map_or("", |m| m.as_str());
         let ver = caps.get(4).map_or("", |m| m.as_str());
         let path = caps.get(5).map_or("", |m| m.as_str());
-        let (target_build_version, should_replace_build_version) =
-          if let Some(jsx_runtime_cdn_version) = &self.jsx_runtime_cdn_version {
-            (
-              jsx_runtime_cdn_version.clone(),
-              build_version != "" && !build_version.eq(jsx_runtime_cdn_version),
-            )
+        let target_build_version = if let Some(jsx_runtime_cdn_version) = &self.jsx_runtime_cdn_version {
+          if build_version != "" && !build_version.eq(jsx_runtime_cdn_version) {
+            Some(jsx_runtime_cdn_version.clone())
           } else {
-            ("".to_owned(), false)
-          };
-        if ver != jsx_runtime_version || should_replace_build_version {
-          if should_replace_build_version {
+            None
+          }
+        } else {
+          None
+        };
+        if ver != jsx_runtime_version || target_build_version.is_some() {
+          if let Some(target_build_version) = target_build_version {
             fixed_url = format!(
               "https://{}/v{}/react{}@{}{}",
               host, target_build_version, dom, jsx_runtime_version, path
@@ -213,18 +213,16 @@ impl Resolver {
 
     // apply graph version if has
     if !is_remote {
-      if self.graph_versions.contains_key(&fixed_url) {
-        let version = self.graph_versions.get(&fixed_url).unwrap();
+      let v = if self.graph_versions.contains_key(&fixed_url) {
+        self.graph_versions.get(&fixed_url)
+      } else {
+        self.initial_graph_version.as_ref()
+      };
+      if let Some(version) = v {
         if import_url.contains("?") {
           import_url = format!("{}&v={}", import_url, version);
         } else {
           import_url = format!("{}?v={}", import_url, version);
-        }
-      } else if let Some(init_version) = &self.initial_graph_version {
-        if import_url.contains("?") {
-          import_url = format!("{}&v={}", import_url, init_version);
-        } else {
-          import_url = format!("{}?v={}", import_url, init_version);
         }
       }
     }

@@ -56,7 +56,7 @@ if (import.meta.main) {
     const changed = ((wasmSize - prevWasmSize) / prevWasmSize) * 100;
     if (changed) {
       console.log(
-        `${dim("[INFO]")}: wasm.js ${changed.toFixed(2)}% (${
+        `${dim("[INFO]")}: wasm.js ${changed < 0 ? "-" : "+"}${Math.abs(changed).toFixed(2)}% (${
           [prevWasmSize, wasmSize].filter(Boolean).map((n) => (n / (1024 * 1024)).toFixed(2) + "MB")
             .join(" -> ")
         })`,

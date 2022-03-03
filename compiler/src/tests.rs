@@ -21,7 +21,7 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
     "https://deno.land/x/aleph",
     Some("react".into()),
     Some("17.0.2".into()),
-    Some("v64".into()),
+    Some("64".into()),
     importmap,
     graph_versions,
     None,
@@ -73,6 +73,7 @@ fn typescript() {
 fn import_resolving() {
   let source = r#"
       import React from "react"
+      import React from "https://cdn.esm.sh/v66/react-dom@16.0.4"
       import { foo } from "~/foo.ts"
       import "../../style/app.css"
 
@@ -80,7 +81,8 @@ fn import_resolving() {
       export default () => <div />
     "#;
   let (code, _) = transform("./pages/blog/$id.tsx", source, false, &EmitOptions::default());
-  assert!(code.contains("\"https://esm.sh/react@17.0.2\""));
+  assert!(code.contains("\"/-/esm.sh/react@17.0.2\""));
+  assert!(code.contains("\"/-/cdn.esm.sh/v64/react-dom@17.0.2\""));
   assert!(code.contains("\"../../foo.ts?v=100\""));
   assert!(code.contains("\"../../style/app.css?module\""));
 }
