@@ -75,15 +75,17 @@ fn import_resolving() {
       import React from "react"
       import React from "https://cdn.esm.sh/v66/react-dom@16.0.4"
       import { foo } from "~/foo.ts"
+      import Layout from "./Layout.tsx"
       import "../../style/app.css"
 
       foo()
-      export default () => <div />
+      export default () => <Layout />
     "#;
   let (code, _) = transform("./pages/blog/$id.tsx", source, false, &EmitOptions::default());
   assert!(code.contains("\"/-/esm.sh/react@17.0.2\""));
   assert!(code.contains("\"/-/cdn.esm.sh/v64/react-dom@17.0.2\""));
   assert!(code.contains("\"../../foo.ts?v=100\""));
+  assert!(code.contains("\"./Layout.tsx\""));
   assert!(code.contains("\"../../style/app.css?module\""));
 }
 
