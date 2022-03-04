@@ -1,5 +1,5 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.26.2";
-import { fastTransform, transform, transformCSS } from "../compiler/mod.ts";
+import { fastTransform, transform } from "../compiler/mod.ts";
 import type { ImportMap, TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import { builtinModuleExts, restoreUrl, toLocalPath } from "../lib/helpers.ts";
@@ -14,36 +14,43 @@ import type { AlephConfig, AtomicCSSConfig, JSXConfig } from "./types.ts";
 const cssModuleLoader: Loader = {
   test: (url) => url.pathname.endsWith(".css"),
   load: async ({ pathname }, rawContent) => {
-    const cssExports: Record<string, string> = {};
-    if (pathname.endsWith(".module.css")) {
-      const specifier = "." + pathname;
-      const { exports } = await transformCSS(specifier, util.utf8TextDecoder.decode(rawContent), {
-        analyzeDependencies: false,
-        cssModules: true,
-        drafts: {
-          nesting: true,
-          customMedia: true,
+    const specifier = "." + pathname;
+    const isDev = Deno.env.get("ALEPH_ENV") === "development";
+    const { code, cssModulesExports, deps } = await bundleCSS(
+      specifier,
+      util.utf8TextDecoder.decode(rawContent),
+      {
+        targets: {
+          android: 95,
+          chrome: 95,
+          edge: 95,
+          firefox: 90,
+          safari: 14,
         },
-      });
-      if (exports) {
-        for (const [key, value] of Object.entries(exports)) {
-          cssExports[key] = value.name;
-        }
-      }
+        minify: !isDev,
+        cssModules: pathname.endsWith(".module.css"),
+        resolveAlephPkgUri: false,
+        toJS: true,
+      },
+    );
+    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+    if (serverDependencyGraph) {
+      serverDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })), inlineCSS: code });
     }
     return {
-      content: util.utf8TextEncoder.encode(`export default ${JSON.stringify(cssExports)};`),
+      content: util.utf8TextEncoder.encode(`export default ${JSON.stringify(cssModulesExports)};`),
       contentType: "application/javascript; charset=utf-8",
     };
   },
 };
 
-const esModuleLoader: Loader<{ importMap: ImportMap; initialGraphVersion: string }> = {
+const esModuleLoader: Loader<{ importMap: ImportMap }> = {
   test: (url) => builtinModuleExts.findIndex((ext) => url.pathname.endsWith(`.${ext}`)) !== -1,
   load: async ({ pathname }, rawContent, options) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
     const specifier = "." + pathname;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
+    const isDev = Deno.env.get("ALEPH_ENV") === "development";
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
     if (serverDependencyGraph) {
       const graphVersions = serverDependencyGraph.modules.filter((mod) =>
@@ -54,13 +61,21 @@ const esModuleLoader: Loader<{ importMap: ImportMap; initialGraphVersion: string
       }, {} as Record<string, string>);
       const { code, deps } = await fastTransform(specifier, util.utf8TextDecoder.decode(rawContent), {
         importMap: JSON.stringify(options?.importMap),
-        initialGraphVersion: options?.initialGraphVersion,
+        initialGraphVersion: serverDependencyGraph.initialVersion.toString(16),
         graphVersions,
       });
-      serverDependencyGraph.mark(specifier, {
-        deps,
-        inlineCSS: Boolean(config?.atomicCSS?.presets?.length) && isJSX,
-      });
+      let inlineCSS: string | undefined = undefined;
+      if (Boolean(config?.atomicCSS?.presets?.length) && isJSX) {
+        const uno = createGenerator(config?.atomicCSS);
+        const { css } = await uno.generate(util.utf8TextDecoder.decode(rawContent), {
+          id: specifier,
+          minify: !isDev,
+        });
+        if (css) {
+          inlineCSS = css;
+        }
+      }
+      serverDependencyGraph.mark(specifier, { deps, inlineCSS });
       return {
         content: util.utf8TextEncoder.encode(code),
       };
@@ -81,7 +96,7 @@ export async function serveAppModules(port: number, importMap: ImportMap) {
     await serveDir({
       port,
       loaders: [esModuleLoader, cssModuleLoader],
-      loaderOptions: { importMap, initialGraphVersion: Date.now().toString(16) },
+      loaderOptions: { importMap },
     });
   } catch (error) {
     if (error instanceof Deno.errors.AddrInUse) {
@@ -156,7 +171,6 @@ export const clientModuleTransformer = {
         acc[specifier] = version.toString(16);
         return acc;
       }, {} as Record<string, string>);
-      const useAtomicCSS = Boolean(atomicCSS?.presets?.length) && isJSX;
       const alephPkgUri = getAlephPkgUri();
       const { code, deps } = await transform(specifier, rawCode, {
         ...jsxConfig,
@@ -164,21 +178,22 @@ export const clientModuleTransformer = {
         target: buildTarget,
         alephPkgUri,
         graphVersions,
+        initialGraphVersion: clientDependencyGraph.initialVersion.toString(16),
         importMap: JSON.stringify(importMap),
         isDev,
       });
       let inlineCSS: string | null = null;
-      if (useAtomicCSS) {
+      if (Boolean(atomicCSS?.presets?.length) && isJSX) {
         const uno = createGenerator(atomicCSS);
         const { css } = await uno.generate(rawCode, { id: specifier, minify: !isDev });
         inlineCSS = css;
       }
       if (inlineCSS) {
         resBody = code +
-          `\nimport { applyCSS as __apply_CSS } from "${
+          `\nimport { applyCSS as __applyCSS } from "${
             toLocalPath(alephPkgUri)
-          }/framework/core/style.ts";__apply_CSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`;
-        clientDependencyGraph.mark(specifier, { deps, inlineCSS: true });
+          }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`;
+        clientDependencyGraph.mark(specifier, { deps });
       } else {
         resBody = code;
         clientDependencyGraph.mark(specifier, { deps });

@@ -4,17 +4,33 @@ export type Module = {
   readonly specifier: string;
   readonly version: number;
   readonly deps?: readonly DependencyDescriptor[];
-  readonly inlineCSS?: boolean;
+  readonly inlineCSS?: string;
 };
 
 export class DependencyGraph {
   #modules = new Map<string, Module>();
+  #initialVersion = Date.now();
+
+  constructor(modules?: Module[], initialVersion?: number) {
+    if (modules) {
+      modules.forEach((item) => {
+        if (typeof item.specifier === "string" && typeof item.version === "number") {
+          this.#modules.set(item.specifier, item);
+        }
+      });
+    }
+    if (initialVersion) {
+      this.#initialVersion = initialVersion;
+    }
+  }
+
+  get initialVersion(): number {
+    return this.#initialVersion;
+  }
 
   get modules(): Module[] {
     const modules: Module[] = [];
-    this.#modules.forEach((module) => {
-      modules.push({ ...module, deps: module.deps?.map((dep) => ({ ...dep })) });
-    });
+    this.#modules.forEach((module) => modules.push(module));
     return modules;
   }
 
@@ -22,10 +38,7 @@ export class DependencyGraph {
     return this.#modules.get(specifier);
   }
 
-  mark(
-    specifier: string,
-    props: { deps?: readonly DependencyDescriptor[]; inlineCSS?: boolean },
-  ): Module {
+  mark(specifier: string, props: Partial<Module>): Module {
     const prev = this.#modules.get(specifier);
     if (prev) {
       Object.assign(prev, props);
@@ -33,9 +46,9 @@ export class DependencyGraph {
     }
 
     const mod = {
-      ...props,
       specifier,
-      version: Date.now(),
+      version: this.#initialVersion,
+      ...props,
     };
     this.#modules.set(specifier, mod);
     return mod;

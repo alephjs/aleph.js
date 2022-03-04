@@ -1,6 +1,6 @@
 import { basename, extname, join, resolve } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.125.0/fs/ensure_dir.ts";
-import { build, stop } from "https://deno.land/x/esbuild@v0.14.23/mod.js";
+import { build, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.23/mod.js";
 import { parseExportNames } from "../compiler/mod.ts";
 import { parse } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
@@ -8,6 +8,7 @@ import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "../server/config.ts";
+import { DependencyGraph } from "../server/graph.ts";
 import { serveAppModules } from "../server/transformer.ts";
 import { initRoutes } from "../server/routing.ts";
 import type { AlephConfig } from "../server/types.ts";
@@ -69,21 +70,25 @@ if (import.meta.main) {
     }));
   }
   const entryCode = [
-    routeFiles.length && `import { register } from "${alephPkgUri}/server/routing.ts";`,
+    `import { DependencyGraph } from "${alephPkgUri}/server/graph.ts";`,
+    `import { modules } from "./server_dependency_graph.js";`,
+    `globalThis.serverDependencyGraph = new DependencyGraph(modules);`,
+    routeFiles.length > 0 && `import { register } from "${alephPkgUri}/server/routing.ts";`,
     ...routeFiles.map(([filename, exportNames], idx) => {
       const hasDefaultExport = exportNames.includes("default");
       const hasDataExport = exportNames.includes("data");
       if (!hasDefaultExport && !hasDataExport) {
         return [];
       }
+      const url = `http://localhost:${port}${filename.slice(1)}`;
       return [
-        hasDefaultExport && `import default_${idx} from "http://localhost:${port}${filename.slice(1)}";`,
-        !hasDefaultExport && `const default_${idx} = undefined;`,
-        hasDataExport && `import { data as data_${idx} } from "http://localhost:${port}${filename.slice(1)}";`,
-        !hasDataExport && `const data_${idx} = undefined;`,
-        `register(${JSON.stringify(filename)}, { default: default_${idx}, data: data_${idx} });`,
+        hasDefaultExport && `import _${idx} from ${JSON.stringify(url)};`,
+        !hasDefaultExport && `const _${idx} = undefined;`,
+        hasDataExport && `import { data as $${idx} } from ${JSON.stringify(url)};`,
+        !hasDataExport && `const $${idx} = undefined;`,
+        `register(${JSON.stringify(filename)}, { default: _${idx}, data: $${idx} });`,
       ];
-    }).filter(Boolean).flat(),
+    }).flat().filter(Boolean),
     `import "http://localhost:${port}/${basename(serverEntry)}";`,
   ].filter(Boolean).join("\n");
 
@@ -124,14 +129,14 @@ if (import.meta.main) {
     jsxFragment: jsxCofig.jsxRuntime === "preact" ? "Fragment" : "React.Fragment",
     inject: [jsxShimFile as string].filter(Boolean),
     plugins: [{
-      name: "http-importer",
+      name: "aleph-build",
       setup(build) {
         build.onResolve({ filter: /.*/ }, (args) => {
           const isRemote = util.isLikelyHttpURL(args.path);
           const isLocalUrl = args.path.startsWith(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/`);
           const [path] = util.splitBy(isRemote ? args.path : util.trimPrefix(args.path, "file://"), "#");
 
-          if (isRemote && !isLocalUrl) {
+          if ((isRemote && !isLocalUrl) || args.path === "./server_dependency_graph.js") {
             return { path, external: true };
           }
 
@@ -149,15 +154,24 @@ if (import.meta.main) {
           return { path };
         });
         build.onLoad({ filter: /.*/, namespace: "http" }, async (args) => {
-          const contents = await fetch(args.path).then((res) => res.text());
+          const { pathname } = new URL(args.path);
+          const contents = await (await fetch(args.path)).text();
           return {
             contents,
-            loader: util.splitBy(extname(args.path).slice(1), "?")[0] as unknown as "js",
+            loader: extname(pathname).slice(1) as unknown as Loader,
           };
         });
       },
     }],
   });
+
+  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+  if (serverDependencyGraph) {
+    await Deno.writeTextFile(
+      join(workingDir, outputDir, "server_dependency_graph.js"),
+      "export default " + JSON.stringify({ modules: serverDependencyGraph.modules }),
+    );
+  }
 
   log.info(`Done in ${(performance.now() - start)}ms`);
 

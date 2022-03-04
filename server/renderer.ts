@@ -1,14 +1,12 @@
-import { createGenerator } from "https://esm.sh/@unocss/core@0.26.2";
 import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
 import initWasm, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
 import decodeWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
 import { matchRoutes, toLocalPath } from "../lib/helpers.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
-import type { DependencyGraph, Module } from "./graph.ts";
-import { bundleCSS } from "./bundle.ts";
+import type { DependencyGraph } from "./graph.ts";
 import { importRouteModule } from "./routing.ts";
-import type { AlephConfig, RenderModule, Route, SSRContext } from "./types.ts";
+import type { RenderModule, Route, SSRContext } from "./types.ts";
 
 let lolHtmlReady: Promise<unknown> | boolean = false;
 
@@ -53,34 +51,15 @@ export default {
         const headCollection: string[] = [];
         const ssrOutput = await ssr({ url, modules, headCollection });
         if (modules.length > 0) {
-          const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(
-            globalThis,
-            "serverDependencyGraph",
-          );
-          const styleModules: Module[] = [];
+          const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+          const styles: string[] = [];
           for (const { filename } of modules) {
             serverDependencyGraph?.walk(filename, (mod) => {
-              if (mod.inlineCSS || mod.specifier.endsWith(".css")) {
-                styleModules.push(mod);
+              if (mod.inlineCSS) {
+                styles.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
               }
             });
           }
-          const styles = await Promise.all(styleModules.map(async (mod) => {
-            const rawCode = await Deno.readTextFile(mod.specifier);
-            if (mod.specifier.endsWith(".css")) {
-              const { code } = await bundleCSS(mod.specifier, rawCode, { minify: !isDev });
-              return `<style data-module-id="${mod.specifier}">${code}</style>`;
-            }
-            if (mod.inlineCSS) {
-              const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
-              const uno = createGenerator(config?.atomicCSS);
-              const { css } = await uno.generate(rawCode, { id: mod.specifier, minify: !isDev });
-              if (css) {
-                return `<style data-module-id="${mod.specifier}">${css}</style>`;
-              }
-            }
-            return "";
-          }));
           headCollection.push(...styles);
         }
         ssrHTMLRewriter.set("ssr-head", {

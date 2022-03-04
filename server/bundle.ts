@@ -14,12 +14,18 @@ export type BundleCSSOptions = {
   toJS?: boolean;
 };
 
+export type BundleCSSResult = {
+  code: string;
+  cssModulesExports?: Record<string, string>;
+  deps?: string[];
+};
+
 export async function bundleCSS(
   specifier: string,
   rawCode: string,
   options: BundleCSSOptions,
   tracing = new Set<string>(),
-): Promise<{ code: string; deps?: string[] }> {
+): Promise<BundleCSSResult> {
   let { code: css, dependencies, exports } = await transformCSS(specifier, rawCode, {
     ...options,
     analyzeDependencies: true,
@@ -55,14 +61,14 @@ export async function bundleCSS(
     }));
     css = imports.join(eof) + eof + css;
   }
+  const cssModulesExports: Record<string, string> = {};
+  if (exports) {
+    for (const [key, value] of Object.entries(exports)) {
+      cssModulesExports[key] = value.name;
+    }
+  }
   if (options.toJS) {
     const alephPkgUri = getAlephPkgUri();
-    const cssModulesExports: Record<string, string> = {};
-    if (exports) {
-      for (const [key, value] of Object.entries(exports)) {
-        cssModulesExports[key] = value.name;
-      }
-    }
     return {
       code: [
         options.hmr && `import createHotContext from "${toLocalPath(alephPkgUri)}/framework/core/hmr.ts";`,
@@ -76,7 +82,8 @@ export async function bundleCSS(
         options.hmr && `import.meta.hot.accept();`,
       ].filter(Boolean).join(eof),
       deps,
+      cssModulesExports,
     };
   }
-  return { code: css, deps };
+  return { code: css, cssModulesExports, deps };
 }

@@ -147,7 +147,7 @@ export const serve = (options: ServerOptions) => {
               const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
                 Reflect.set(ctx, "params", ret.pathname.groups);
-                return fetcher(ret, ctx);
+                return fetcher(req, ctx);
               }
               return new Response("Method not allowed", { status: 405 });
             }
