@@ -89,7 +89,7 @@ export default async function (nameArg: string | undefined, template = "react") 
         `${alephPkgUri}/types.d.ts`,
       ],
     },
-    "format": {},
+    "fmt": {},
     "lint": {},
   };
   const gitignore = [
@@ -114,8 +114,8 @@ export default async function (nameArg: string | undefined, template = "react") 
   await ensureDir(workingDir);
   await Promise.all([
     Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")),
-    Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
     Deno.writeTextFile(join(workingDir, "deno.json"), JSON.stringify(denoConfig, undefined, 2)),
+    Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
 
   if (confirm("Using VS Code?")) {

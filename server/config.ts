@@ -54,13 +54,6 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
     }
   }
 
-  if (
-    Deno.env.get("ALEPH_ENV") === "development" && jsxConfig.jsxImportSource &&
-    util.isLikelyHttpURL(jsxConfig.jsxImportSource)
-  ) {
-    jsxConfig.jsxImportSource = toLocalPath(jsxConfig.jsxImportSource);
-  }
-
   return jsxConfig;
 }
 

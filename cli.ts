@@ -205,7 +205,7 @@ async function run(command: string, options: RunOptions) {
   ];
   const devPort = Deno.env.get("ALEPH_DEV_PORT");
   if (devPort) {
-    cmd.push(`--reload=http://localhost:${devPort}/`);
+    cmd.push(`--reload=http://localhost:${devPort}`);
   }
   if (denoConfigFile) {
     cmd.push("--config", denoConfigFile);

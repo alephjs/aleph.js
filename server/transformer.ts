@@ -3,6 +3,7 @@ import { fastTransform, transform } from "../compiler/mod.ts";
 import type { ImportMap, TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import { builtinModuleExts, restoreUrl, toLocalPath } from "../lib/helpers.ts";
+import log from "../lib/log.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle.ts";
@@ -87,6 +88,7 @@ const esModuleLoader: Loader<{ importMap: ImportMap }> = {
 /** serve app modules to support module loader that allows you import NON-JS modules like `.css/.vue/.svelet`... */
 export async function serveAppModules(port: number, importMap: ImportMap) {
   try {
+    log.debug(`Serve app modules on http://localhost:${port}`);
     Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
     if (!Reflect.has(globalThis, "serverDependencyGraph")) {
       Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
@@ -98,7 +100,7 @@ export async function serveAppModules(port: number, importMap: ImportMap) {
     });
   } catch (error) {
     if (error instanceof Deno.errors.AddrInUse) {
-      await serveAppModules(port + 1, importMap);
+      serveAppModules(port + 1, importMap);
     } else {
       throw error;
     }
@@ -116,12 +118,6 @@ export type TransformerOptions = {
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    let clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
-    if (!clientDependencyGraph) {
-      clientDependencyGraph = new DependencyGraph();
-      Reflect.set(globalThis, "clientDependencyGraph", clientDependencyGraph);
-    }
-
     const { isDev, buildHash } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
@@ -135,6 +131,12 @@ export const clientModuleTransformer = {
       : await util.computeHash("sha-1", rawCode + buildHash);
     if (req.headers.get("If-None-Match") === etag) {
       return new Response(null, { status: 304 });
+    }
+
+    let clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
+    if (!clientDependencyGraph) {
+      clientDependencyGraph = new DependencyGraph();
+      Reflect.set(globalThis, "clientDependencyGraph", clientDependencyGraph);
     }
 
     let resBody = "";

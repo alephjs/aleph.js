@@ -49,7 +49,6 @@ if (import.meta.main) {
   }
 
   serveAppModules(6060, await loadImportMap());
-  log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
 
   const serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {

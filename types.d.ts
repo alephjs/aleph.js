@@ -14,7 +14,7 @@ declare interface FetchContext extends Record<string, unknown> {
 }
 
 declare interface ImportMeta {
-  hot?: {
+  readonly hot?: {
     accept: (callback?: (module: unknown) => void) => void;
     decline: () => void;
   };

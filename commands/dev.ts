@@ -70,7 +70,6 @@ const main = async () => {
   }
 
   serveAppModules(6060, await loadImportMap());
-  log.debug(`Serve app modules on http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}`);
 
   log.info(`Watching files for changes...`);
   watchFs(workingDir, (kind, path) => {

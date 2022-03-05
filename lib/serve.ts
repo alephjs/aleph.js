@@ -1,11 +1,11 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
 import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
-import { serve as stdServe } from "https://deno.land/std@0.125.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.125.0/http/server.ts";
 import { getContentType } from "./mime.ts";
 
 export type Loader<Options = unknown> = {
   test: (url: URL) => boolean;
-  load(url: URL, code: Uint8Array, options?: Options): Promise<Content> | Content;
+  load(url: URL, content: Uint8Array, options?: Options): Promise<Content> | Content;
 };
 
 export type Content = {
@@ -79,5 +79,5 @@ export async function serveDir(options: ServeDirOptions) {
       return new Response(err.message, { status: 500 });
     }
   };
-  await stdServe(handler, { port: options.port });
+  await serve(handler, { port: options.port });
 }

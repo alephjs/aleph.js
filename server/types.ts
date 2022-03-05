@@ -31,11 +31,15 @@ export type JSXConfig = {
 };
 
 export type FetchHandler = {
+  (request: Request, context: FetchContext): Promise<Response> | Response;
+};
+
+export type MiddlewareHandler = {
   (request: Request, context: FetchContext): Promise<Response | void> | Response | void;
 };
 
 export interface Middleware {
-  fetch: FetchHandler;
+  fetch: MiddlewareHandler;
 }
 
 export type RenderModule = {
