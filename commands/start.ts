@@ -65,7 +65,7 @@ if (import.meta.main) {
   }
 
   log.info("Building...");
-  const { clientModules } = await build(workingDir, serverEntry);
+  const { clientModules } = await build(workingDir, "deno-deploy", serverEntry);
   log.info(`${clientModules.size} client modules built`);
 
   await import(

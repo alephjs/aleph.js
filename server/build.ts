@@ -12,7 +12,11 @@ import { DependencyGraph } from "../server/graph.ts";
 import { initRoutes } from "../server/routing.ts";
 import type { AlephConfig, FetchHandler } from "../server/types.ts";
 
-export async function build(workingDir: string, serverEntry?: string): Promise<{ clientModules: Set<string> }> {
+export async function build(
+  workingDir: string,
+  _platform: "deno-deploy" | "cf-worker" | "vercel",
+  serverEntry?: string,
+): Promise<{ clientModules: Set<string> }> {
   const tmpDir = await Deno.makeTempDir();
   const alephPkgUri = getAlephPkgUri();
   const jsxCofig = await loadJSXConfig();
