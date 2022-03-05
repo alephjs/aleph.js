@@ -113,9 +113,17 @@ impl SWC {
       let is_jsx = self.specifier.ends_with(".tsx") || self.specifier.ends_with(".jsx");
       let is_dev = resolver.borrow().is_dev;
       let react_options = if let Some(jsx_import_source) = &options.jsx_import_source {
+        let mut resolver = resolver.borrow_mut();
+        let jsx_import_source = jsx_import_source.clone();
+        let runtime = if is_dev { "/jsx-dev-runtime" } else { "/jsx-runtime" };
+        let import_source = resolver
+          .resolve(&(jsx_import_source + runtime), false)
+          .strip_suffix(runtime)
+          .unwrap()
+          .into();
         react::Options {
           runtime: Some(react::Runtime::Automatic),
-          import_source: jsx_import_source.clone(),
+          import_source,
           ..Default::default()
         }
       } else {

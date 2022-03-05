@@ -100,7 +100,7 @@ fn jsx_automtic() {
         )
       }
     "#;
-  let (code, _) = transform(
+  let (code, resolver) = transform(
     "./app.tsx",
     source,
     false,
@@ -109,12 +109,14 @@ fn jsx_automtic() {
       ..Default::default()
     },
   );
-  assert!(
-    code.contains("import { jsx as _jsx, Fragment as _Fragment } from \"https://esm.sh/react@17.0.2/jsx-runtime\"")
-  );
+  assert!(code.contains("import { jsx as _jsx, Fragment as _Fragment } from \"/-/esm.sh/react@17.0.2/jsx-runtime\""));
   assert!(code.contains("_jsx(_Fragment, {"));
   assert!(code.contains("_jsx(\"h1\", {"));
   assert!(code.contains("children: \"Hello world!\""));
+  assert_eq!(
+    resolver.borrow().deps.get(0).unwrap().specifier,
+    "https://esm.sh/react@17.0.2/jsx-runtime"
+  );
 }
 
 #[test]
