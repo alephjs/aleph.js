@@ -192,6 +192,7 @@ export const clientModuleTransformer = {
           `\nimport { applyCSS as __applyCSS } from "${
             toLocalPath(alephPkgUri)
           }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`;
+        deps?.push({ specifier: alephPkgUri + "/framework/core/style.ts" });
         clientDependencyGraph.mark(specifier, { deps });
       } else {
         resBody = code;

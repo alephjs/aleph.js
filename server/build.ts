@@ -190,9 +190,15 @@ export async function build(
         ]);
         await res.body?.pipeTo(file.writable);
         clientModules.add(specifier);
-        if (!specifier.endsWith(".css")) {
+        if (!url.pathname.endsWith(".css")) {
           const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
-          clientDependencyGraph?.get(specifier)?.deps?.forEach(({ specifier }) => deps.add(specifier));
+          clientDependencyGraph?.get(specifier)?.deps?.forEach(({ specifier }) => {
+            if (specifier.endsWith(".css")) {
+              deps.add(specifier + "?module");
+            } else {
+              deps.add(specifier);
+            }
+          });
         }
       }));
       tasks = Array.from(deps).filter((specifier) => !clientModules.has(specifier));
