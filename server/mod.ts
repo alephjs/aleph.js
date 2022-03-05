@@ -14,17 +14,14 @@ import type { Route, ServerOptions } from "./types.ts";
 
 export const serve = (options: ServerOptions) => {
   const { config, middlewares, fetch, ssr } = options;
+  const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const jsxConfigPromise = loadJSXConfig();
   const importMapPromise = loadImportMap();
   const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
-  const isDev = Deno.env.get("ALEPH_ENV") === "development";
-  const buildTarget = config?.build?.target ?? (isDev ? "es2022" : "es2015");
-  const buildArgsHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(
-    async ([jsxConfig, importMap]) => {
-      const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
-      return await util.computeHash("sha-1", buildArgs);
-    },
-  );
+  const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {
+    const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
+    return util.computeHash("sha-1", buildArgs);
+  });
   const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const { host, pathname } = url;
@@ -43,17 +40,17 @@ export const serve = (options: ServerOptions) => {
       builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
       pathname.endsWith(".css")
     ) {
-      const [buildArgsHash, jsxConfig, importMap] = await Promise.all([
-        buildArgsHashPromise,
+      const [buildHash, jsxConfig, importMap] = await Promise.all([
+        buildHashPromise,
         jsxConfigPromise,
         importMapPromise,
       ]);
       return clientModuleTransformer.fetch(req, {
         isDev,
-        buildTarget,
-        buildArgsHash,
         importMap,
         jsxConfig,
+        buildHash,
+        buildTarget: config?.build?.target,
         atomicCSS: config?.atomicCSS,
       });
     }
@@ -156,9 +153,7 @@ export const serve = (options: ServerOptions) => {
               log.error(err.stack);
             }
             return new Response(
-              isDev || (typeof err.status === "number" && err.status < 500)
-                ? err.message || "Internal Server Error"
-                : "Internal Server Error",
+              isDev || (util.isInt(err.status) && err.status < 500) ? err.message : "Internal Server Error",
               {
                 status: err.status || 500,
               },
@@ -189,11 +184,12 @@ export const serve = (options: ServerOptions) => {
         if (err instanceof Deno.errors.NotFound) {
           indexHtml = null;
         } else {
-          log.error(err);
-          return new Response(isDev ? err.message.split("\n")[0] : "Internal Server Error", { status: 500 });
+          log.error("read index.html:", err.message);
+          return new Response("Internal Server Error", { status: 500 });
         }
       }
     }
+
     // cache indexHtml to global(memory) in production mode
     if (!isDev) {
       Reflect.set(globalThis, "__ALEPH_INDEX_HTML", indexHtml);

@@ -40,12 +40,12 @@ pub struct Resolver {
   /// development mode
   pub is_dev: bool,
   // internal
+  import_map: ImportMap,
+  resolve_remote_deps: bool,
   jsx_runtime_version: Option<String>,
   jsx_runtime_cdn_version: Option<String>,
-  import_map: ImportMap,
   graph_versions: HashMap<String, String>,
   initial_graph_version: Option<String>,
-  resolve_remote_deps: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

@@ -9,7 +9,6 @@ export type BundleCSSOptions = {
   targets?: Targets;
   cssModules?: boolean;
   minify?: boolean;
-  resolveAlephPkgUri?: boolean;
   hmr?: boolean;
   toJS?: boolean;
 };
@@ -68,14 +67,12 @@ export async function bundleCSS(
     }
   }
   if (options.toJS) {
-    const alephPkgUri = getAlephPkgUri();
+    const alephPkgPath = toLocalPath(getAlephPkgUri());
     return {
       code: [
-        options.hmr && `import createHotContext from "${toLocalPath(alephPkgUri)}/framework/core/hmr.ts";`,
+        options.hmr && `import createHotContext from "${alephPkgPath}/framework/core/hmr.ts";`,
         options.hmr && `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
-        `import { applyCSS } from "${
-          options.resolveAlephPkgUri ? toLocalPath(alephPkgUri) : alephPkgUri
-        }/framework/core/style.ts";`,
+        `import { applyCSS } from "${alephPkgPath}/framework/core/style.ts";`,
         `export const css = ${JSON.stringify(css)};`,
         `export default ${JSON.stringify(cssModulesExports)};`,
         `applyCSS(${JSON.stringify(specifier)}, css);`,

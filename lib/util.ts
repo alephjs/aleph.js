@@ -1,6 +1,12 @@
 export default {
   utf8TextEncoder: new TextEncoder(),
   utf8TextDecoder: new TextDecoder(),
+  isInt(a: unknown): a is number {
+    return typeof a === "number" && !Number.isNaN(a) && Number.isInteger(a);
+  },
+  isUint(a: unknown): a is number {
+    return this.isInt(a) && a >= 0;
+  },
   isFilledString(a: unknown): a is string {
     return typeof a === "string" && a.length > 0;
   },

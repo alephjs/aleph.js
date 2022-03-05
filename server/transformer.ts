@@ -29,8 +29,6 @@ const cssModuleLoader: Loader = {
         },
         minify: !isDev,
         cssModules: pathname.endsWith(".module.css"),
-        resolveAlephPkgUri: false,
-        toJS: true,
       },
     );
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
@@ -108,12 +106,12 @@ export async function serveAppModules(port: number, importMap: ImportMap) {
 }
 
 export type TransformerOptions = {
-  isDev: boolean;
-  buildTarget: TransformOptions["target"];
-  buildArgsHash: string;
-  jsxConfig: JSXConfig;
-  importMap: ImportMap;
   atomicCSS?: AtomicCSSConfig;
+  buildHash: string;
+  buildTarget?: TransformOptions["target"];
+  importMap: ImportMap;
+  isDev: boolean;
+  jsxConfig: JSXConfig;
 };
 
 export const clientModuleTransformer = {
@@ -124,7 +122,7 @@ export const clientModuleTransformer = {
       Reflect.set(globalThis, "clientDependencyGraph", clientDependencyGraph);
     }
 
-    const { isDev, buildArgsHash } = options;
+    const { isDev, buildHash } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
@@ -133,8 +131,8 @@ export const clientModuleTransformer = {
     const etag = mtime
       ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${
         rawCode.charCodeAt(Math.floor(rawCode.length / 2)).toString(16)
-      }${buildArgsHash.slice(0, 8)}`
-      : await util.computeHash("sha-1", rawCode + buildArgsHash);
+      }${buildHash.slice(0, 8)}`
+      : await util.computeHash("sha-1", rawCode + buildHash);
     if (req.headers.get("If-None-Match") === etag) {
       return new Response(null, { status: 304 });
     }
@@ -154,7 +152,6 @@ export const clientModuleTransformer = {
         },
         minify: !isDev,
         cssModules: toJS && pathname.endsWith(".module.css"),
-        resolveAlephPkgUri: true,
         hmr: isDev,
         toJS,
       });
@@ -175,7 +172,7 @@ export const clientModuleTransformer = {
       const { code, deps } = await transform(specifier, rawCode, {
         ...jsxConfig,
         stripDataExport: isRouteFile(specifier),
-        target: buildTarget,
+        target: buildTarget ?? (isDev ? "es2022" : "es2015"),
         alephPkgUri,
         graphVersions,
         initialGraphVersion: clientDependencyGraph.initialVersion.toString(16),
