@@ -56,6 +56,10 @@ if (import.meta.main) {
     }
   }
 
+  if (platform === "cf-worker" || platform === "vercel") {
+    log.fatal(`Deploy to ${supportedPlatforms.find(([id]) => id === platform)![1]} is not supported yet`);
+  }
+
   const start = performance.now();
 
   // check working dir
