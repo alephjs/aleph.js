@@ -3,8 +3,9 @@ import { serve as stdServe, serveTls } from "https://deno.land/std@0.125.0/http/
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
-import log from "../lib/log.ts";
+import log, { blue } from "../lib/log.ts";
 import { loadImportMap } from "../server/config.ts";
+import { build } from "../server/build.ts";
 import { serve } from "../server/mod.ts";
 import { serveAppModules } from "../server/transformer.ts";
 
@@ -50,7 +51,7 @@ if (import.meta.main) {
 
   serveAppModules(6060, await loadImportMap());
 
-  const serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));
+  let serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {
     await import(
       `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/${basename(serverEntry)}?t=${Date.now().toString(16)}`
@@ -59,8 +60,18 @@ if (import.meta.main) {
 
   // make the default handler
   if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
-    serve({});
+    serverEntry = undefined;
+    serve();
   }
+
+  log.info("Building...");
+  const { clientModules } = await build(workingDir, serverEntry);
+  log.info(`${clientModules.size} client modules built`);
+
+  await import(
+    `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/dist/server.js?t=${Date.now().toString(16)}`
+  );
+  log.info(`Server handler imported from ${blue("dist/server.js")}`);
 
   const handler = (req: Request) => {
     return Reflect.get(globalThis, "__ALEPH_SERVER_HANDLER")?.(req);

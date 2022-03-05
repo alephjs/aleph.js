@@ -55,10 +55,10 @@ export default {
             headCollection.forEach((h) => util.isFilledString(h) && el.before(h, { html: true }));
             if (modules.length > 0) {
               const importStmts = modules.map(({ filename }, idx) =>
-                `import mod_${idx} from ${JSON.stringify(filename.slice(1))};`
+                `import $${idx} from ${JSON.stringify(filename.slice(1))};`
               ).join("");
               const kvs = modules.map(({ filename, data }, idx) =>
-                `${JSON.stringify(filename)}:{defaultExport:mod_${idx}${data !== undefined ? ",withData:true" : ""}}`
+                `${JSON.stringify(filename)}:{defaultExport:$${idx}${data !== undefined ? ",withData:true" : ""}}`
               ).join(",");
               const ssrModules = modules.map(({ url, filename, error, data, dataCacheTtl }) => ({
                 url: url.pathname + url.search,

@@ -1,6 +1,5 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { getFiles } from "../lib/fs.ts";
-import log, { dim } from "../lib/log.ts";
 import { URLPatternCompat, type URLPatternInput } from "../lib/url.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
@@ -76,7 +75,6 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cw
       }
     });
   }
-  log.debug(`${routes.length || "No"} route${routes.length !== 1 ? "s" : ""} found from ${dim(reg.prefix)}`);
   Reflect.set(globalThis, "__ALEPH_ROUTES", routes);
   return routes;
 }

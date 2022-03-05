@@ -20,6 +20,14 @@ export default {
     const p = s.slice(0, 8).toLowerCase();
     return p === "https://" || p.slice(0, 7) === "http://";
   },
+  endsWithAny(str: string, ...suffixes: string[]) {
+    for (const suffix of suffixes) {
+      if (str.endsWith(suffix)) {
+        return true;
+      }
+    }
+    return false;
+  },
   trimPrefix(s: string, prefix: string): string {
     if (prefix !== "" && s.startsWith(prefix)) {
       return s.slice(prefix.length);

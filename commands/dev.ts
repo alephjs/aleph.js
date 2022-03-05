@@ -147,7 +147,7 @@ const main = async () => {
 
   // make the default handler
   if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
-    serve({});
+    serve();
   }
 
   // final server handler

@@ -12,7 +12,7 @@ import { importRouteModule, initRoutes } from "./routing.ts";
 import { clientModuleTransformer } from "./transformer.ts";
 import type { Route, ServerOptions } from "./types.ts";
 
-export const serve = (options: ServerOptions) => {
+export const serve = (options: ServerOptions = {}) => {
   const { config, middlewares, fetch, ssr } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const jsxConfigPromise = loadJSXConfig();

@@ -13,7 +13,7 @@ export default async function cache(
   const { protocol, hostname, port, pathname, search } = new URL(url);
   const isLocalhost = ["localhost", "0.0.0.0", "127.0.0.1"].includes(hostname);
   const denoDir = Deno.env.get("DENO_DIR");
-  const hashname = await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
+  const hashname = isLocalhost ? "" : await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
 
   let cacheDir = "";
   let metaFilepath = "";
