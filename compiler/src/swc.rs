@@ -114,10 +114,11 @@ impl SWC {
       let is_dev = resolver.borrow().is_dev;
       let react_options = if let Some(jsx_import_source) = &options.jsx_import_source {
         let mut resolver = resolver.borrow_mut();
-        let jsx_import_source = jsx_import_source.clone();
         let runtime = if is_dev { "/jsx-dev-runtime" } else { "/jsx-runtime" };
-        let import_source = resolver
-          .resolve(&(jsx_import_source + runtime), false)
+        let import_source = resolver.resolve(&(jsx_import_source.to_owned() + runtime), false);
+        let import_source = import_source
+          .strip_suffix("?dev")
+          .unwrap_or(&import_source)
           .strip_suffix(runtime)
           .unwrap()
           .into();
