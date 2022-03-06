@@ -94,16 +94,6 @@ export const serve = (options: ServerOptions = {}) => {
       },
     };
 
-    if (options.hmrWebSocketUrl) {
-      customHTMLRewriter.set("head", {
-        element(el) {
-          el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(options.hmrWebSocketUrl)};</script>`, {
-            html: true,
-          });
-        },
-      });
-    }
-
     // use middlewares
     if (Array.isArray(middlewares)) {
       for (const mw of middlewares) {
@@ -198,6 +188,16 @@ export const serve = (options: ServerOptions = {}) => {
     // no root `index.html` found
     if (indexHtml === null) {
       return new Response("Not Found", { status: 404 });
+    }
+
+    if (options.hmrWebSocketUrl) {
+      customHTMLRewriter.set("head", {
+        element(el) {
+          el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(options.hmrWebSocketUrl)};</script>`, {
+            html: true,
+          });
+        },
+      });
     }
 
     // render html
