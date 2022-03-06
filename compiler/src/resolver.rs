@@ -130,7 +130,11 @@ impl Resolver {
     } else {
       Url::from_str(&("file://".to_owned() + self.specifier.trim_start_matches('.'))).unwrap()
     };
-    let resolved_url = self.import_map.resolve(url, &referrer).unwrap().to_string();
+    let resolved_url = if let Ok(ret) = self.import_map.resolve(url, &referrer) {
+      ret.to_string()
+    } else {
+      url.into()
+    };
     let mut import_url = if resolved_url.starts_with("file://") {
       let path = resolved_url.strip_prefix("file://").unwrap();
       if !self.specifier_is_remote {
