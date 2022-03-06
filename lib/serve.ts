@@ -15,6 +15,7 @@ export type Content = {
 
 export type ServeDirOptions = {
   port: number;
+  signal?: AbortSignal;
   cwd?: string;
   loaders?: Loader[];
   loaderOptions?: unknown;
@@ -79,5 +80,5 @@ export async function serveDir(options: ServeDirOptions) {
       return new Response(err.message, { status: 500 });
     }
   };
-  await serve(handler, { port: options.port });
+  await serve(handler, { port: options.port, signal: options.signal });
 }

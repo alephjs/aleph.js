@@ -7,7 +7,7 @@ import log from "../lib/log.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle.ts";
-import { getAlephPkgUri } from "./config.ts";
+import { getAlephPkgUri, loadImportMap } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
 import type { AlephConfig, AtomicCSSConfig, JSXConfig } from "./types.ts";
@@ -86,25 +86,32 @@ const esModuleLoader: Loader<{ importMap: ImportMap }> = {
 };
 
 /** serve app modules to support module loader that allows you import NON-JS modules like `.css/.vue/.svelet`... */
-export async function serveAppModules(port: number, importMap: ImportMap) {
-  try {
-    log.debug(`Serve app modules on http://localhost:${port}`);
-    Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
+export function serveAppModules(port: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
     if (!Reflect.has(globalThis, "serverDependencyGraph")) {
       Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
     }
-    await serveDir({
-      port,
-      loaders: [esModuleLoader, cssModuleLoader],
-      loaderOptions: { importMap },
-    });
-  } catch (error) {
-    if (error instanceof Deno.errors.AddrInUse) {
-      serveAppModules(port + 1, importMap);
-    } else {
-      throw error;
-    }
-  }
+    loadImportMap().then(async (importMap) => {
+      try {
+        const s = serveDir({
+          port,
+          loaders: [esModuleLoader, cssModuleLoader],
+          loaderOptions: { importMap },
+          signal,
+        });
+        Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
+        log.debug(`Serve app modules on http://localhost:${port}`);
+        resolve();
+        await s;
+      } catch (error) {
+        if (error instanceof Deno.errors.AddrInUse) {
+          serveAppModules(port + 1, signal);
+        } else {
+          reject(error);
+        }
+      }
+    }).catch(reject);
+  });
 }
 
 export type TransformerOptions = {
@@ -171,6 +178,7 @@ export const clientModuleTransformer = {
         return acc;
       }, {} as Record<string, string>);
       const alephPkgUri = getAlephPkgUri();
+      console.log(jsxConfig);
       const { code, deps } = await transform(specifier, rawCode, {
         ...jsxConfig,
         stripDataExport: isRouteFile(specifier),

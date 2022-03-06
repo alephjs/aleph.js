@@ -6,7 +6,6 @@ import { existsDir, findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
 import type { DependencyGraph } from "../server/graph.ts";
@@ -69,7 +68,7 @@ const main = async () => {
     keyFile = await findFile(workingDir, ["key.pem", "tls.key"]);
   }
 
-  serveAppModules(6060, await loadImportMap());
+  await serveAppModules(6060);
 
   log.info(`Watching files for changes...`);
   watchFs(workingDir, (kind, path) => {

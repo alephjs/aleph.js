@@ -4,7 +4,6 @@ import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
-import { loadImportMap } from "../server/config.ts";
 import { build } from "../server/build.ts";
 import { serve } from "../server/mod.ts";
 import { serveAppModules } from "../server/transformer.ts";
@@ -49,7 +48,8 @@ if (import.meta.main) {
     keyFile = await findFile(workingDir, ["key.pem", "tls.key"]);
   }
 
-  serveAppModules(6060, await loadImportMap());
+  const ac = new AbortController();
+  await serveAppModules(6060, ac.signal);
 
   let serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {
@@ -68,9 +68,10 @@ if (import.meta.main) {
   const { clientModules } = await build(workingDir, "deno-deploy", serverEntry);
   log.info(`${clientModules.size} client modules built`);
 
-  await import(
-    `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/dist/server.js?t=${Date.now().toString(16)}`
-  );
+  // close the app modules server
+  ac.abort();
+
+  await import(`file://${workingDir}/dist/server.js`);
   log.info(`Server handler imported from ${blue("dist/server.js")}`);
 
   const handler = (req: Request) => {

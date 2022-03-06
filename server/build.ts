@@ -67,7 +67,7 @@ export async function build(
     !serverEntry && `serve();`,
   ].filter(Boolean).join("\n");
 
-  // since esbuild doesn't support jsx automic mode, we need to manually import jsx runtime
+  // since esbuild doesn't support jsx automic transform, we need to manually import jsx runtime
   let jsxShimFile: string | null = null;
   if (serverEntry && util.endsWithAny(serverEntry, ".jsx", ".tsx") && jsxCofig.jsxImportSource) {
     jsxShimFile = join(tmpDir, "jsx-shim.js");
