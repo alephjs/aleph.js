@@ -36,11 +36,11 @@ export type JSXConfig = {
 };
 
 export type FetchHandler = {
-  (request: Request, context: FetchContext): Promise<Response> | Response;
+  (request: Request, context: Record<string, unknown>): Promise<Response> | Response;
 };
 
 export type MiddlewareHandler = {
-  (request: Request, context: FetchContext): Promise<Response | void> | Response | void;
+  (request: Request, context: Record<string, unknown>): Promise<Response | void> | Response | void;
 };
 
 export interface Middleware {
