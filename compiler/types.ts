@@ -1,8 +1,3 @@
-export type ImportMap = {
-  readonly imports: Record<string, string>;
-  readonly scopes: Record<string, Record<string, string>>;
-};
-
 export type TransformOptions = {
   alephPkgUri?: string;
   importMap?: string;

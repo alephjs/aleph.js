@@ -6,11 +6,12 @@ import { existsDir, findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
+import { loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
 import type { DependencyGraph } from "../server/graph.ts";
 import { serveAppModules } from "../server/transformer.ts";
-import type { AlephConfig } from "../server/types.ts";
+import type { AlephConfig, ImportMap } from "../server/types.ts";
 
 export const helpMessage = `
 Usage:
@@ -68,7 +69,8 @@ const main = async () => {
     keyFile = await findFile(workingDir, ["key.pem", "tls.key"]);
   }
 
-  await serveAppModules(6060);
+  const importMap = await loadImportMap();
+  serveAppModules(6060, { importMap });
 
   log.info(`Watching files for changes...`);
   watchFs(workingDir, (kind, path) => {
@@ -126,7 +128,10 @@ const main = async () => {
       fswListener.on(`modify:./${basename(denoConfigFile)}`, importServerHandler);
     }
     if (importMapFile) {
-      fswListener.on(`modify:./${basename(importMapFile)}`, importServerHandler);
+      fswListener.on(`modify:./${basename(importMapFile)}`, async () => {
+        Object.assign(importMap, await loadImportMap());
+        importServerHandler();
+      });
     }
     await importServerHandler();
   }

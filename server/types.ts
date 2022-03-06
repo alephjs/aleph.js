@@ -8,6 +8,11 @@ export type AlephConfig = {
   routeFiles?: string | RoutesConfig;
 };
 
+export type ImportMap = {
+  readonly imports: Record<string, string>;
+  readonly scopes: Record<string, Record<string, string>>;
+};
+
 export type RoutesConfig = {
   dir: string;
   exts: string[];

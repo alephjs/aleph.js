@@ -1,16 +1,16 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.26.2";
 import { fastTransform, transform } from "../compiler/mod.ts";
-import type { ImportMap, TransformOptions } from "../compiler/types.ts";
+import type { TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import { builtinModuleExts, restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import { Loader, serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle.ts";
-import { getAlephPkgUri, loadImportMap } from "./config.ts";
+import { getAlephPkgUri } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { AlephConfig, AtomicCSSConfig, JSXConfig } from "./types.ts";
+import type { AlephConfig, AtomicCSSConfig, ImportMap, JSXConfig } from "./types.ts";
 
 const cssModuleLoader: Loader = {
   test: (url) => url.pathname.endsWith(".css"),
@@ -86,32 +86,26 @@ const esModuleLoader: Loader<{ importMap: ImportMap }> = {
 };
 
 /** serve app modules to support module loader that allows you import NON-JS modules like `.css/.vue/.svelet`... */
-export function serveAppModules(port: number, signal?: AbortSignal) {
-  return new Promise<void>((resolve, reject) => {
-    if (!Reflect.has(globalThis, "serverDependencyGraph")) {
-      Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+export async function serveAppModules(port: number, options: { importMap: ImportMap; signal?: AbortSignal }) {
+  if (!Reflect.has(globalThis, "serverDependencyGraph")) {
+    Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+  }
+  Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
+  log.debug(`Serve app modules on http://localhost:${port}`);
+  try {
+    await serveDir({
+      port,
+      loaders: [esModuleLoader, cssModuleLoader],
+      loaderOptions: { importMap: options.importMap },
+      signal: options.signal,
+    });
+  } catch (error) {
+    if (error instanceof Deno.errors.AddrInUse) {
+      serveAppModules(port + 1, options);
+    } else {
+      throw error;
     }
-    loadImportMap().then(async (importMap) => {
-      try {
-        const s = serveDir({
-          port,
-          loaders: [esModuleLoader, cssModuleLoader],
-          loaderOptions: { importMap },
-          signal,
-        });
-        Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
-        log.debug(`Serve app modules on http://localhost:${port}`);
-        resolve();
-        await s;
-      } catch (error) {
-        if (error instanceof Deno.errors.AddrInUse) {
-          serveAppModules(port + 1, signal);
-        } else {
-          reject(error);
-        }
-      }
-    }).catch(reject);
-  });
+  }
 }
 
 export type TransformerOptions = {
