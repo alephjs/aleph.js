@@ -178,7 +178,6 @@ export const clientModuleTransformer = {
         return acc;
       }, {} as Record<string, string>);
       const alephPkgUri = getAlephPkgUri();
-      console.log(jsxConfig);
       const { code, deps } = await transform(specifier, rawCode, {
         ...jsxConfig,
         stripDataExport: isRouteFile(specifier),
