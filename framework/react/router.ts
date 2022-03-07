@@ -65,26 +65,32 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       ROUTE_MODULES[filename] = { defaultExport, withData };
       return { defaultExport, withData };
     };
-    const prefetchData = async (dataUrl: string, { filename }: RouteMeta) => {
-      if (ROUTE_MODULES[filename].withData === true) {
-        const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
-        const data = await res.json();
-        const cc = res.headers.get("Cache-Control");
-        const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-        dataCache.set(dataUrl, {
-          data,
-          dataCacheTtl,
-          dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
-        });
-        return { data, dataCacheTtl };
-      }
+    const prefetchData = async (dataUrl: string) => {
+      const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
+      const data = await res.json();
+      const cc = res.headers.get("Cache-Control");
+      const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+      dataCache.set(dataUrl, {
+        data,
+        dataCacheTtl,
+        dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+      });
+      return { data, dataCacheTtl };
     };
-    const onprefetch = async (e: Record<string, unknown>) => {
+    const onprefetchpage = async (e: Record<string, unknown>) => {
       const pageUrl = new URL(e.href as string, location.href);
       const matches = matchRoutes(pageUrl, routes);
       await Promise.all(matches.map(async ([ret, meta]) => {
-        await importModule(meta);
-        await prefetchData(ret.pathname.input + pageUrl.search, meta);
+        const { filename } = meta;
+        if (!(filename in ROUTE_MODULES)) {
+          await importModule(meta);
+        }
+        if (ROUTE_MODULES[filename]?.withData === true) {
+          const dataUrl = ret.pathname.input + pageUrl.search;
+          if (!dataCache.has(dataUrl)) {
+            await prefetchData(dataUrl);
+          }
+        }
       }));
     };
     const onpopstate = async (e: Record<string, unknown>) => {
@@ -105,11 +111,9 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         }
         if (dataCache.has(dataUrl)) {
           Object.assign(rmod, dataCache.get(dataUrl));
-        } else {
-          const ret = await prefetchData(dataUrl, meta);
-          if (ret) {
-            Object.assign(rmod, ret);
-          }
+        } else if (ROUTE_MODULES[filename]?.withData === true) {
+          const ret = await prefetchData(dataUrl);
+          Object.assign(rmod, ret);
         }
         return rmod;
       }));
@@ -122,7 +126,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 
     addEventListener("popstate", onpopstate as unknown as EventListener);
     events.on("popstate", onpopstate);
-    events.on("prefetch-page", onprefetch);
+    events.on("prefetchpage", onprefetchpage);
     events.emit("routerready", { type: "routerready" });
 
     // todo: update routes by hmr
@@ -130,7 +134,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     return () => {
       removeEventListener("popstate", onpopstate as unknown as EventListener);
       events.off("popstate", onpopstate);
-      events.off("prefetch-page", onprefetch);
+      events.off("prefetchpage", onprefetchpage);
     };
   }, []);
 
