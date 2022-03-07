@@ -33,19 +33,19 @@ type FsEvents = {
   [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: { specifier: string };
 };
 
-const fswListeners = new Set<Emitter<FsEvents>>();
-const createFSWListener = () => {
+const emitters = new Set<Emitter<FsEvents>>();
+const createEmitter = () => {
   const e = mitt<FsEvents>();
-  fswListeners.add(e);
+  emitters.add(e);
   return e;
 };
-const removeFSWListener = (e: Emitter<FsEvents>) => {
+const removeEmitter = (e: Emitter<FsEvents>) => {
   e.all.clear();
-  fswListeners.delete(e);
+  emitters.delete(e);
 };
 const handleHMRSocket = (req: Request): Response => {
   const { socket, response } = Deno.upgradeWebSocket(req, {});
-  const listener = createFSWListener();
+  const emitter = createEmitter();
   const send = (message: Record<string, unknown>) => {
     try {
       socket.send(JSON.stringify(message));
@@ -54,7 +54,7 @@ const handleHMRSocket = (req: Request): Response => {
     }
   };
   socket.addEventListener("open", () => {
-    listener.on("create", ({ specifier }) => {
+    emitter.on("create", ({ specifier }) => {
       const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
       if (config && config.routeFiles) {
         const reg = toRouteRegExp(config.routeFiles);
@@ -66,8 +66,8 @@ const handleHMRSocket = (req: Request): Response => {
       }
       send({ type: "create", specifier });
     });
-    listener.on("remove", ({ specifier }) => {
-      listener.off(`hotUpdate:${specifier}`);
+    emitter.on("remove", ({ specifier }) => {
+      emitter.off(`hotUpdate:${specifier}`);
       send({ type: "remove", specifier });
     });
   });
@@ -76,7 +76,7 @@ const handleHMRSocket = (req: Request): Response => {
       try {
         const { type, specifier } = JSON.parse(e.data);
         if (type === "hotAccept" && util.isFilledString(specifier)) {
-          listener.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
+          emitter.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
         }
       } catch (_e) {
         log.error("invlid socket message:", e.data);
@@ -84,7 +84,7 @@ const handleHMRSocket = (req: Request): Response => {
     }
   });
   socket.addEventListener("close", () => {
-    removeFSWListener(listener);
+    removeEmitter(emitter);
   });
   return response;
 };
@@ -127,7 +127,7 @@ if (import.meta.main) {
       serverDependencyGraph?.update(specifier);
     }
     if (kind === "modify") {
-      fswListeners.forEach((e) => {
+      emitters.forEach((e) => {
         e.emit(`modify:${specifier}`, { specifier });
         // emit HMR event
         if (e.all.has(`hotUpdate:${specifier}`)) {
@@ -142,13 +142,13 @@ if (import.meta.main) {
         }
       });
     } else {
-      fswListeners.forEach((e) => {
+      emitters.forEach((e) => {
         e.emit(kind, { specifier });
       });
     }
   });
 
-  const fswListener = createFSWListener();
+  const emitter = createEmitter();
   const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
     findFile(workingDir, ["deno.jsonc", "deno.json", "tsconfig.json"]),
     findFile(workingDir, ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
@@ -165,12 +165,12 @@ if (import.meta.main) {
     }
   };
   if (serverEntry) {
-    fswListener.on(`modify:./${basename(serverEntry)}`, importServerHandler);
+    emitter.on(`modify:./${basename(serverEntry)}`, importServerHandler);
     if (denoConfigFile) {
-      fswListener.on(`modify:./${basename(denoConfigFile)}`, importServerHandler);
+      emitter.on(`modify:./${basename(denoConfigFile)}`, importServerHandler);
     }
     if (importMapFile) {
-      fswListener.on(`modify:./${basename(importMapFile)}`, async () => {
+      emitter.on(`modify:./${basename(importMapFile)}`, async () => {
         Object.assign(importMap, await loadImportMap());
         importServerHandler();
       });
@@ -183,7 +183,7 @@ if (import.meta.main) {
     serve();
   }
 
-  // init routes when fs change
+  // update routes when fs change
   const updateRoutes = ({ specifier }: { specifier: string }) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
     if (config && config.routeFiles) {
@@ -193,8 +193,8 @@ if (import.meta.main) {
       }
     }
   };
-  fswListener.on("create", updateRoutes);
-  fswListener.on("remove", updateRoutes);
+  emitter.on("create", updateRoutes);
+  emitter.on("remove", updateRoutes);
 
   // final server handler
   const handler = (req: Request) => {
