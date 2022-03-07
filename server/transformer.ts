@@ -1,4 +1,4 @@
-import { createGenerator } from "https://esm.sh/@unocss/core@0.26.2";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.27.2";
 import { fastTransform, transform } from "../compiler/mod.ts";
 import type { TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
