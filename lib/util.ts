@@ -58,10 +58,12 @@ export default {
     const bytes = new Uint8Array(buffer);
     return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
   },
-  computeHash(algorithm: AlgorithmIdentifier, data: string | Uint8Array): Promise<string> {
-    return crypto.subtle.digest(algorithm, typeof data === "string" ? this.utf8TextEncoder.encode(data) : data).then((
-      sum,
-    ) => this.toHex(sum));
+  async computeHash(algorithm: AlgorithmIdentifier, data: string | Uint8Array): Promise<string> {
+    const sum = await crypto.subtle.digest(
+      algorithm,
+      typeof data === "string" ? this.utf8TextEncoder.encode(data) : data,
+    );
+    return this.toHex(sum);
   },
   prettyBytes(bytes: number) {
     const units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];

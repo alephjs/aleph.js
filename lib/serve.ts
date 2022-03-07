@@ -5,10 +5,10 @@ import { getContentType } from "./mime.ts";
 
 export type Loader<Options = unknown> = {
   test: (url: URL) => boolean;
-  load(url: URL, content: Uint8Array, options?: Options): Promise<Content> | Content;
+  load(url: URL, content: Uint8Array, options?: Options): Promise<LoaderContent> | LoaderContent;
 };
 
-export type Content = {
+export type LoaderContent = {
   content: Uint8Array;
   contentType?: string;
 };
