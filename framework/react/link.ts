@@ -1,19 +1,11 @@
-import {
-  AnchorHTMLAttributes,
-  createElement,
-  CSSProperties,
-  MouseEvent,
-  PropsWithChildren,
-  useCallback,
-  useEffect,
-  useMemo,
-} from "https://esm.sh/react@17.0.2";
+import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren } from "https://esm.sh/react@17.0.2";
+import { createElement, useCallback, useEffect, useMemo } from "https://esm.sh/react@17.0.2";
 import util from "../../lib/util.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import { useRouter } from "./router.ts";
 
-const prefetchedPages = new Set<string>();
+const prefetched = new Set<string>();
 
 export type LinkProps = PropsWithChildren<
   {
@@ -55,7 +47,7 @@ export function Link(props: LinkProps) {
     }
     return [p, q].filter(Boolean).join("?");
   }, [pathname, propHref]);
-  const isCurrent = useMemo(() => {
+  const isActived = useMemo(() => {
     if (!util.isFilledString(propHref)) {
       return false;
     }
@@ -84,13 +76,13 @@ export function Link(props: LinkProps) {
   }, [href, propAriaCurrent]);
   const prefetch = useCallback(() => {
     if (
-      href && !util.isLikelyHttpURL(href) && !isCurrent &&
-      !prefetchedPages.has(href)
+      href && !util.isLikelyHttpURL(href) && !isActived &&
+      !prefetched.has(href)
     ) {
       events.emit("prefetch-page", { href });
-      prefetchedPages.add(href);
+      prefetched.add(href);
     }
-  }, [isCurrent]);
+  }, [isActived]);
   const onMouseEnter = useCallback((e: MouseEvent) => {
     if (typeof propOnMouseEnter === "function") {
       propOnMouseEnter(e);
@@ -108,10 +100,10 @@ export function Link(props: LinkProps) {
       return;
     }
     e.preventDefault();
-    if (!isCurrent) {
+    if (!isActived) {
       redirect(href, replace);
     }
-  }, [isCurrent, href, replace]);
+  }, [isActived, href, replace]);
 
   useEffect(() => {
     if (propPrefetch) {
@@ -146,7 +138,7 @@ export function NavLink(props: LinkProps & { activeClassName?: string; activeSty
     activeClassName,
   } = props;
   const { url: { pathname, searchParams } } = useRouter();
-  const isCurrent = useMemo(() => {
+  const isActived = useMemo(() => {
     if (!util.isFilledString(propHref)) {
       return false;
     }
@@ -165,19 +157,19 @@ export function NavLink(props: LinkProps & { activeClassName?: string; activeSty
     return true;
   }, [pathname, searchParams, propHref]);
   const className = useMemo(() => {
-    if (!isCurrent) {
+    if (!isActived) {
       return propClassName;
     }
     return [propClassName, activeClassName].filter(util.isFilledString).map(
       (n) => n.trim(),
     ).filter(Boolean).join(" ");
-  }, [propClassName, activeClassName, isCurrent]);
+  }, [propClassName, activeClassName, isActived]);
   const style = useMemo(() => {
-    if (!isCurrent) {
+    if (!isActived) {
       return propStyle;
     }
     return Object.assign({}, propStyle, activeStyle);
-  }, [propStyle, activeStyle, isCurrent]);
+  }, [propStyle, activeStyle, isActived]);
 
   return createElement(
     Link,

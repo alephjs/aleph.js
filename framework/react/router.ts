@@ -58,38 +58,57 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       }
     });
 
-    const { routes } = loadRouteManifestFromTag();
+    const ROUTE_MODULES = getRouteModules();
+    const routes = loadRoutesFromTag();
+    const importModule = async ({ filename }: RouteMeta) => {
+      const { default: defaultExport, data: withData } = await import(filename.slice(1)); // todo: add version
+      ROUTE_MODULES[filename] = { defaultExport, withData };
+      return { defaultExport, withData };
+    };
+    const prefetchData = async (dataUrl: string, { filename }: RouteMeta) => {
+      if (ROUTE_MODULES[filename].withData === true) {
+        const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
+        const data = await res.json();
+        const cc = res.headers.get("Cache-Control");
+        const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+        dataCache.set(dataUrl, {
+          data,
+          dataCacheTtl,
+          dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+        });
+        return { data, dataCacheTtl };
+      }
+    };
+    const onprefetch = async (e: Record<string, unknown>) => {
+      const pageUrl = new URL(e.href as string, location.href);
+      const matches = matchRoutes(pageUrl, routes);
+      await Promise.all(matches.map(async ([ret, meta]) => {
+        await importModule(meta);
+        await prefetchData(ret.pathname.input + pageUrl.search, meta);
+      }));
+    };
     const onpopstate = async (e: Record<string, unknown>) => {
-      const ROUTE_MODULES = getRouteModules();
       const url = new URL(window.location.href);
       const matches = matchRoutes(url, routes);
-      const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
+      const modules = await Promise.all(matches.map(async ([ret, meta]) => {
+        const { filename } = meta;
         const rmod: RenderModule = {
           url: new URL(ret.pathname.input, url.href),
-          filename: filename,
+          filename,
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;
         if (filename in ROUTE_MODULES) {
           rmod.defaultExport = ROUTE_MODULES[filename].defaultExport;
         } else {
-          const { default: defaultExport, data: withData } = await import(filename.slice(1)); // todo: add version
-          ROUTE_MODULES[filename] = { defaultExport, withData };
+          const { defaultExport } = await importModule(meta);
           rmod.defaultExport = defaultExport;
         }
         if (dataCache.has(dataUrl)) {
           Object.assign(rmod, dataCache.get(dataUrl));
         } else {
-          if (ROUTE_MODULES[filename].withData === true) {
-            const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
-            const data = await res.json();
-            const cc = res.headers.get("Cache-Control");
-            const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-            dataCache.set(dataUrl, {
-              data,
-              dataCacheTtl,
-              dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
-            });
-            Object.assign(rmod, { data, dataCacheTtl });
+          const ret = await prefetchData(dataUrl, meta);
+          if (ret) {
+            Object.assign(rmod, ret);
           }
         }
         return rmod;
@@ -103,6 +122,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 
     addEventListener("popstate", onpopstate as unknown as EventListener);
     events.on("popstate", onpopstate);
+    events.on("prefetch-page", onprefetch);
     events.emit("routerready", { type: "routerready" });
 
     // todo: update routes by hmr
@@ -110,6 +130,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     return () => {
       removeEventListener("popstate", onpopstate as unknown as EventListener);
       events.off("popstate", onpopstate);
+      events.off("prefetch-page", onprefetch);
     };
   }, []);
 
@@ -121,21 +142,19 @@ export const useRouter = (): { url: URL; redirect: typeof redirect } => {
   return { url, redirect };
 };
 
-function loadRouteManifestFromTag(): { routes: Route[] } {
+function loadRoutesFromTag(): Route[] {
   const el = window.document?.getElementById("route-manifest");
   if (el) {
     try {
       const manifest = JSON.parse(el.innerText);
       if (Array.isArray(manifest.routes)) {
-        return {
-          routes: manifest.routes.map((meta: RouteMeta) => [new URLPatternCompat(meta.pattern), meta]),
-        };
+        return manifest.routes.map((meta: RouteMeta) => [new URLPatternCompat(meta.pattern), meta]);
       }
     } catch (_e) {
-      console.error("loadRouteManifestFromTag: invalid JSON");
+      console.error("loadRoutesFromTag: invalid JSON");
     }
   }
-  return { routes: [] };
+  return [];
 }
 
 function loadSSRModulesFromTag(): RenderModule[] {
