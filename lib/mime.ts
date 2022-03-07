@@ -17,6 +17,8 @@ const mimeTypes: Record<string, string[]> = {
   "text/typescript": ["ts", "mts", "cts"],
   "text/tsx": ["tsx"],
   "text/css": ["css"],
+  "text/vue": ["vue"],
+  "text/svelte": ["svelte"],
   "text/postcss": ["pcss", "postcss"],
   "text/less": ["less"],
   "text/sass": ["sass", "scss"],

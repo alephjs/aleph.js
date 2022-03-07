@@ -214,8 +214,8 @@ impl Resolver {
       import_url = import_url + "?module"
     }
 
-    // fix remote url to local path for development mode
-    if is_remote && self.resolve_remote_deps {
+    // fix remote url to local path
+    if is_http_url(&import_url) && self.resolve_remote_deps {
       return self.to_local_path(&import_url);
     }
 

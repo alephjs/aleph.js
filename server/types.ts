@@ -8,6 +8,21 @@ export type AlephConfig = {
   routeFiles?: string | RoutesConfig;
 };
 
+export type Loader = {
+  test(req: Request): boolean;
+  load(
+    req: Request,
+    env: { isDev?: boolean; ssr?: boolean; importMap?: ImportMap },
+  ): Promise<LoaderContent> | LoaderContent;
+};
+
+export type LoaderContent = {
+  content: Uint8Array;
+  contentType?: string;
+  inlineCSS?: string;
+  modtime?: number;
+};
+
 export type BuildOptions = {
   /** The output directory. default is "dist" */
   outputDir?: string;
@@ -61,6 +76,7 @@ export type Route = readonly [
 ];
 
 export type ImportMap = {
+  readonly __filename: string;
   readonly imports: Record<string, string>;
   readonly scopes: Record<string, Record<string, string>>;
 };

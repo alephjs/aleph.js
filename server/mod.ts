@@ -5,7 +5,7 @@ import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
-import { loadImportMap, loadJSXConfig } from "./config.ts";
+import { importLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
 import renderer from "./renderer.ts";
 import { content, json } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
@@ -28,6 +28,7 @@ export const serve = (options: ServerOptions = {}) => {
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const jsxConfigPromise = loadJSXConfig();
   const importMapPromise = loadImportMap();
+  const loadersPromise = importMapPromise.then((importMap) => importLoaders(importMap));
   const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
   const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {
     const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
@@ -60,6 +61,24 @@ export const serve = (options: ServerOptions = {}) => {
         isDev,
         importMap,
         jsxConfig,
+        buildHash,
+        buildTarget: config?.build?.target,
+        atomicCSS: config?.atomicCSS,
+      });
+    }
+
+    // use loader to load modules
+    const loaders = await loadersPromise;
+    const loader = loaders.find((loader) => loader.test(req));
+    if (loader) {
+      const [buildHash, importMap] = await Promise.all([
+        buildHashPromise,
+        importMapPromise,
+      ]);
+      return clientModuleTransformer.fetch(req, {
+        isDev,
+        importMap,
+        loader,
         buildHash,
         buildTarget: config?.build?.target,
         atomicCSS: config?.atomicCSS,

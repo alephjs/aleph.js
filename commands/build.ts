@@ -4,7 +4,7 @@ import { existsDir, findFile } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { loadImportMap } from "../server/config.ts";
+import { importLoaders, loadImportMap } from "../server/config.ts";
 import { build, type BuildPlatform, supportedPlatforms } from "../server/build.ts";
 import { serve } from "../server/mod.ts";
 import { serveAppModules } from "../server/transformer.ts";
@@ -60,7 +60,9 @@ if (import.meta.main) {
   }
   Deno.chdir(workingDir);
 
-  serveAppModules(6060, { importMap: await loadImportMap() });
+  const importMap = await loadImportMap();
+  const loaders = await importLoaders(importMap);
+  serveAppModules(6060, { importMap, loaders });
 
   let serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {

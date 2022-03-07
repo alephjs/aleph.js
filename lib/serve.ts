@@ -1,30 +1,21 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
 import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { serve } from "https://deno.land/std@0.125.0/http/server.ts";
+import type { ImportMap, Loader } from "../server/types.ts";
 import { getContentType } from "./mime.ts";
-
-export type Loader<Options = unknown> = {
-  test: (url: URL) => boolean;
-  load(url: URL, content: Uint8Array, options?: Options): Promise<LoaderContent> | LoaderContent;
-};
-
-export type LoaderContent = {
-  content: Uint8Array;
-  contentType?: string;
-};
 
 export type ServeDirOptions = {
   port: number;
-  signal?: AbortSignal;
   cwd?: string;
+  signal?: AbortSignal;
+  importMap?: ImportMap;
   loaders?: Loader[];
-  loaderOptions?: unknown;
 };
 
 export async function serveDir(options: ServeDirOptions) {
   const cwd = options.cwd || Deno.cwd();
-  const handler = async (request: Request): Promise<Response> => {
-    const url = new URL(request.url);
+  const handler = async (req: Request): Promise<Response> => {
+    const url = new URL(req.url);
     const filepath = join(cwd, url.pathname);
     try {
       const stat = await Deno.lstat(filepath);
@@ -51,9 +42,9 @@ export async function serveDir(options: ServeDirOptions) {
         );
       }
 
-      const loader = options.loaders?.find((loader) => loader.test(url));
+      const loader = options.loaders?.find((loader) => loader.test(req));
       if (loader) {
-        let ret = loader.load(url, await Deno.readFile(filepath), options.loaderOptions);
+        let ret = loader.load(req, { importMap: options.importMap, ssr: true });
         if (ret instanceof Promise) {
           ret = await ret;
         }

@@ -1,11 +1,11 @@
-import { basename, join } from "https://deno.land/std@0.125.0/path/mod.ts";
+import { basename, dirname, join } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { findFile } from "../lib/fs.ts";
 import { globalIt } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
-import type { ImportMap, JSXConfig } from "./types.ts";
+import type { ImportMap, JSXConfig, Loader } from "./types.ts";
 
 export function getAlephPkgUri() {
   return globalIt("__ALEPH_PKG_URI", () => {
@@ -57,13 +57,14 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
 }
 
 export async function loadImportMap(): Promise<ImportMap> {
-  const importMap: ImportMap = { imports: {}, scopes: {} };
+  const importMap: ImportMap = { __filename: "", imports: {}, scopes: {} };
 
   if (Deno.env.get("ALEPH_DEV")) {
     const alephPkgUri = `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
-    const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "import_map.json");
-    const { imports, scopes } = await readImportMap(jsonFile);
+    const importMapFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "import_map.json");
+    const { __filename, imports, scopes } = await readImportMap(importMapFile);
     Object.assign(importMap, {
+      __filename,
       imports: {
         ...imports,
         "aleph/": `${alephPkgUri}/`,
@@ -72,6 +73,7 @@ export async function loadImportMap(): Promise<ImportMap> {
       },
       scopes,
     });
+    return importMap;
   }
 
   const importMapFile = await findFile(
@@ -80,15 +82,40 @@ export async function loadImportMap(): Promise<ImportMap> {
   );
   if (importMapFile) {
     try {
-      const { imports, scopes } = await readImportMap(importMapFile);
-      Object.assign(importMap.imports, imports);
-      Object.assign(importMap.scopes, scopes);
+      const im = await readImportMap(importMapFile);
+      Object.assign(importMap, im);
     } catch (e) {
       log.error("loadImportMap:", e.message);
     }
   }
 
   return importMap;
+}
+
+export async function importLoaders(importMap: ImportMap): Promise<Loader[]> {
+  const loaders: Loader[] = [];
+
+  for (const key in importMap.imports) {
+    if (key.startsWith("*.")) {
+      let src = importMap.imports[key];
+      if (src.endsWith("!loader")) {
+        src = util.trimSuffix(src, "!loader");
+        if (src.startsWith("./") || src.startsWith("../")) {
+          src = "file://" + join(dirname(importMap.__filename), src);
+        }
+        const { default: Loader } = await import(src);
+        if (typeof Loader === "function") {
+          loaders.push(new Loader());
+        } else if (
+          typeof Loader === "object" && Loader !== null && Loader.test && typeof Loader.load === "function"
+        ) {
+          loaders.push(Loader);
+        }
+      }
+    }
+  }
+
+  return loaders;
 }
 
 export async function parseJSONFile(jsonFile: string): Promise<Record<string, unknown>> {
@@ -100,7 +127,7 @@ export async function parseJSONFile(jsonFile: string): Promise<Record<string, un
 }
 
 export async function readImportMap(importMapFile: string): Promise<ImportMap> {
-  const importMap: ImportMap = { imports: {}, scopes: {} };
+  const importMap: ImportMap = { __filename: importMapFile, imports: {}, scopes: {} };
   const data = await parseJSONFile(importMapFile);
   const imports: Record<string, string> = toStringMap(data.imports);
   const scopes: Record<string, Record<string, string>> = {};

@@ -4,22 +4,23 @@ import type { TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import { builtinModuleExts, restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
-import { Loader, serveDir } from "../lib/serve.ts";
+import { serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle.ts";
 import { getAlephPkgUri } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { AlephConfig, AtomicCSSConfig, ImportMap, JSXConfig } from "./types.ts";
+import type { AlephConfig, AtomicCSSConfig, ImportMap, JSXConfig, Loader } from "./types.ts";
 
 const cssModuleLoader: Loader = {
-  test: (url) => url.pathname.endsWith(".css"),
-  load: async ({ pathname }, rawContent) => {
+  test: (req) => new URL(req.url).pathname.endsWith(".css"),
+  load: async (req) => {
+    const { pathname } = new URL(req.url);
     const specifier = "." + pathname;
     const isDev = Deno.env.get("ALEPH_ENV") === "development";
     const { code, cssModulesExports, deps } = await bundleCSS(
       specifier,
-      util.utf8TextDecoder.decode(rawContent),
+      await Deno.readTextFile(specifier),
       {
         targets: {
           android: 95,
@@ -43,11 +44,16 @@ const cssModuleLoader: Loader = {
   },
 };
 
-const esModuleLoader: Loader<{ importMap: ImportMap }> = {
-  test: (url) => builtinModuleExts.findIndex((ext) => url.pathname.endsWith(`.${ext}`)) !== -1,
-  load: async ({ pathname }, rawContent, options) => {
+const esModuleLoader: Loader = {
+  test: (req) => {
+    const { pathname } = new URL(req.url);
+    return builtinModuleExts.findIndex((ext) => pathname.endsWith(`.${ext}`)) !== -1;
+  },
+  load: async (req, env) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
+    const { pathname } = new URL(req.url);
     const specifier = "." + pathname;
+    const rawCode = await Deno.readTextFile(specifier);
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
     const isDev = Deno.env.get("ALEPH_ENV") === "development";
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
@@ -58,15 +64,15 @@ const esModuleLoader: Loader<{ importMap: ImportMap }> = {
         acc[specifier] = version.toString(16);
         return acc;
       }, {} as Record<string, string>);
-      const { code, deps } = await fastTransform(specifier, util.utf8TextDecoder.decode(rawContent), {
-        importMap: JSON.stringify(options?.importMap),
+      const { code, deps } = await fastTransform(specifier, rawCode, {
+        importMap: JSON.stringify(env.importMap),
         initialGraphVersion: serverDependencyGraph.initialVersion.toString(16),
         graphVersions,
       });
       let inlineCSS: string | undefined = undefined;
       if (Boolean(config?.atomicCSS?.presets?.length) && isJSX) {
         const uno = createGenerator(config?.atomicCSS);
-        const { css } = await uno.generate(util.utf8TextDecoder.decode(rawContent), {
+        const { css } = await uno.generate(rawCode, {
           id: specifier,
           minify: !isDev,
         });
@@ -80,13 +86,16 @@ const esModuleLoader: Loader<{ importMap: ImportMap }> = {
       };
     }
     return {
-      content: rawContent,
+      content: util.utf8TextEncoder.encode(rawCode),
     };
   },
 };
 
 /** serve app modules to support module loader that allows you import NON-JS modules like `.css/.vue/.svelet`... */
-export async function serveAppModules(port: number, options: { importMap: ImportMap; signal?: AbortSignal }) {
+export async function serveAppModules(
+  port: number,
+  options: { importMap: ImportMap; loaders: Loader[]; signal?: AbortSignal },
+) {
   if (!Reflect.has(globalThis, "serverDependencyGraph")) {
     Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
   }
@@ -95,9 +104,8 @@ export async function serveAppModules(port: number, options: { importMap: Import
   try {
     await serveDir({
       port,
-      loaders: [esModuleLoader, cssModuleLoader],
-      loaderOptions: { importMap: options.importMap },
-      signal: options.signal,
+      ...options,
+      loaders: [esModuleLoader, cssModuleLoader, ...options.loaders],
     });
   } catch (error) {
     if (error instanceof Deno.errors.AddrInUse) {
@@ -114,12 +122,13 @@ export type TransformerOptions = {
   buildTarget?: TransformOptions["target"];
   importMap: ImportMap;
   isDev: boolean;
-  jsxConfig: JSXConfig;
+  jsxConfig?: JSXConfig;
+  loader?: Loader;
 };
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { isDev, buildHash } = options;
+    const { isDev, buildHash, loader } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
@@ -143,7 +152,13 @@ export const clientModuleTransformer = {
     let resBody = "";
     let resType = "application/javascript";
 
-    if (isCSS) {
+    if (loader) {
+      const { content, contentType } = await loader.load(req, { importMap: options.importMap, isDev });
+      resBody = util.utf8TextDecoder.decode(content);
+      if (contentType) {
+        resType = util.trimSuffix(contentType, "; charset=utf-8");
+      }
+    } else if (isCSS) {
       const toJS = searchParams.has("module");
       const { code, deps } = await bundleCSS(specifier, rawCode, {
         targets: {
