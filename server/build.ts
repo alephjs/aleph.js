@@ -6,17 +6,30 @@ import cache from "../lib/cache.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
 import { builtinModuleExts, toLocalPath } from "../lib/helpers.ts";
 import { parseHtmlLinks } from "../lib/html.ts";
+import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri, loadJSXConfig } from "../server/config.ts";
 import { DependencyGraph } from "../server/graph.ts";
 import { initRoutes } from "../server/routing.ts";
 import type { AlephConfig, FetchHandler } from "../server/types.ts";
 
+export type BuildPlatform = "deno-deploy" | "cf-worker" | "vercel";
+
+export const supportedPlatforms: Record<BuildPlatform, string> = {
+  "deno-deploy": "Deno Deploy",
+  "cf-worker": "Cloudflare Worker",
+  "vercel": "Vercel",
+};
+
 export async function build(
   workingDir: string,
-  _platform: "deno-deploy" | "cf-worker" | "vercel",
+  platform: BuildPlatform,
   serverEntry?: string,
 ): Promise<{ clientModules: Set<string> }> {
+  if (platform === "cf-worker" || platform === "vercel") {
+    log.fatal(`Deploy to ${supportedPlatforms[platform]} is not supported yet`);
+  }
+
   const tmpDir = await Deno.makeTempDir();
   const alephPkgUri = getAlephPkgUri();
   const jsxCofig = await loadJSXConfig();
@@ -209,8 +222,6 @@ export async function build(
       tasks = Array.from(deps).filter((specifier) => !clientModules.has(specifier));
     }
   }
-
-  // todo: ssg
 
   // clean up then exit
   await Deno.remove(tmpDir, { recursive: true });

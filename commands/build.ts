@@ -5,7 +5,7 @@ import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { loadImportMap } from "../server/config.ts";
-import { build } from "../server/build.ts";
+import { build, type BuildPlatform, supportedPlatforms } from "../server/build.ts";
 import { serve } from "../server/mod.ts";
 import { serveAppModules } from "../server/transformer.ts";
 
@@ -22,26 +22,21 @@ Options:
     -h, --help                   Prints help message
 `;
 
-const supportedPlatforms = [
-  ["deno-deploy", "Deno Deploy"],
-  ["cf-worker", "Cloudflare Worker"],
-  ["vercel", "Vercel"],
-];
-
 if (import.meta.main) {
   const { args, options } = parse();
 
-  let platform = getFlag(options, ["P", "platform"])?.toLowerCase();
+  let platform = getFlag(options, ["P", "platform"])?.toLowerCase() as BuildPlatform | undefined;
   if (platform) {
-    if (!supportedPlatforms.some(([id]) => id === platform)) {
+    if (!(platform in supportedPlatforms)) {
       log.fatal(`Unsupported platform: ${platform}`);
     }
   } else {
+    const platforms: BuildPlatform[] = ["deno-deploy", "cf-worker", "vercel"];
     Deno.stdout.write(
       util.utf8TextEncoder.encode([
         "Deploy to:",
         "",
-        ...supportedPlatforms.map(([_, name], index) => `  ${index + 1}. ${name}`),
+        ...platforms.map((id, index) => `  ${index + 1}. ${supportedPlatforms[id]}`),
         "",
         "",
       ].join("\n")),
@@ -49,15 +44,11 @@ if (import.meta.main) {
     while (true) {
       const p = prompt("Select a platform:");
       const n = parseInt(p || "");
-      if (util.isInt(n) && n > 0 && n <= supportedPlatforms.length) {
-        platform = supportedPlatforms[n - 1][0];
+      if (util.isInt(n) && n > 0 && n <= platforms.length) {
+        platform = platforms[n - 1];
         break;
       }
     }
-  }
-
-  if (platform === "cf-worker" || platform === "vercel") {
-    log.fatal(`Deploy to ${supportedPlatforms.find(([id]) => id === platform)![1]} is not supported yet`);
   }
 
   const start = performance.now();
@@ -85,7 +76,7 @@ if (import.meta.main) {
     serve();
   }
 
-  log.info(`Building for ${supportedPlatforms.find(([id]) => id === platform)![1]}...`);
+  log.info(`Building for ${supportedPlatforms[platform]}...`);
   const { clientModules } = await build(workingDir, platform as unknown as "deno-deploy", serverEntry);
   log.info(`${clientModules.size} client modules built`);
 

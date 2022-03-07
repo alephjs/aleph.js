@@ -10,7 +10,18 @@ import renderer from "./renderer.ts";
 import { content, json } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
 import { clientModuleTransformer } from "./transformer.ts";
-import type { Route, ServerOptions } from "./types.ts";
+import type { AlephConfig, FetchHandler, Middleware, Route, SSRContext } from "./types.ts";
+
+export type ServerOptions = {
+  port?: number;
+  certFile?: string;
+  keyFile?: string;
+  hmrWebSocketUrl?: string;
+  config?: AlephConfig;
+  middlewares?: Middleware[];
+  fetch?: FetchHandler;
+  ssr?: (ctx: SSRContext) => string | Promise<string>;
+};
 
 export const serve = (options: ServerOptions = {}) => {
   const { config, middlewares, fetch, ssr } = options;

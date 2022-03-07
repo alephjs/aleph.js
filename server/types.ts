@@ -8,31 +8,17 @@ export type AlephConfig = {
   routeFiles?: string | RoutesConfig;
 };
 
-export type ImportMap = {
-  readonly imports: Record<string, string>;
-  readonly scopes: Record<string, Record<string, string>>;
+export type BuildOptions = {
+  /** The output directory. default is "dist" */
+  outputDir?: string;
+  /** build target */
+  target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
 };
 
 export type RoutesConfig = {
   dir: string;
   exts: string[];
   host?: boolean;
-};
-
-export type BuildOptions = {
-  /** The output directory. default: "dist" */
-  outputDir?: string;
-  target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
-  ssg?: SSGOptions;
-};
-
-export type SSGOptions = {
-  paths: () => Promise<string[]>;
-};
-
-export type JSXConfig = {
-  jsxRuntime?: "react" | "preact";
-  jsxImportSource?: string;
 };
 
 export type FetchHandler = {
@@ -63,17 +49,6 @@ export type SSRContext = {
   readonly headCollection: string[];
 };
 
-export type ServerOptions = {
-  port?: number;
-  certFile?: string;
-  keyFile?: string;
-  hmrWebSocketUrl?: string;
-  config?: AlephConfig;
-  middlewares?: Middleware[];
-  fetch?: FetchHandler;
-  ssr?: (ctx: SSRContext) => string | Promise<string>;
-};
-
 export type RouteMeta = {
   filename: string;
   pattern: URLPatternInput;
@@ -84,5 +59,15 @@ export type Route = readonly [
   pattern: URLPatternCompat,
   meta: RouteMeta,
 ];
+
+export type ImportMap = {
+  readonly imports: Record<string, string>;
+  readonly scopes: Record<string, Record<string, string>>;
+};
+
+export type JSXConfig = {
+  jsxRuntime?: "react" | "preact";
+  jsxImportSource?: string;
+};
 
 export { AtomicCSSConfig };
