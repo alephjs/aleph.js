@@ -43,8 +43,53 @@ const removeFSWListener = (e: Emitter<FsEvents>) => {
   e.all.clear();
   fswListeners.delete(e);
 };
+const handleHMRSocket = (req: Request): Response => {
+  const { socket, response } = Deno.upgradeWebSocket(req, {});
+  const listener = createFSWListener();
+  const send = (message: Record<string, unknown>) => {
+    try {
+      socket.send(JSON.stringify(message));
+    } catch (err) {
+      log.warn("socket.send:", err.message);
+    }
+  };
+  socket.addEventListener("open", () => {
+    listener.on("create", ({ specifier }) => {
+      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
+      if (config && config.routeFiles) {
+        const reg = toRouteRegExp(config.routeFiles);
+        const routePattern = reg.exec(specifier);
+        if (routePattern) {
+          send({ type: "create", specifier, routePattern });
+          return;
+        }
+      }
+      send({ type: "create", specifier });
+    });
+    listener.on("remove", ({ specifier }) => {
+      listener.off(`hotUpdate:${specifier}`);
+      send({ type: "remove", specifier });
+    });
+  });
+  socket.addEventListener("message", (e) => {
+    if (util.isFilledString(e.data)) {
+      try {
+        const { type, specifier } = JSON.parse(e.data);
+        if (type === "hotAccept" && util.isFilledString(specifier)) {
+          listener.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
+        }
+      } catch (_e) {
+        log.error("invlid socket message:", e.data);
+      }
+    }
+  });
+  socket.addEventListener("close", () => {
+    removeFSWListener(listener);
+  });
+  return response;
+};
 
-const main = async () => {
+if (import.meta.main) {
   const { args, options } = parse();
 
   // check working dir
@@ -169,54 +214,4 @@ const main = async () => {
   } else {
     await stdServe(handler, { port, hostname });
   }
-};
-
-function handleHMRSocket(req: Request): Response {
-  const { socket, response } = Deno.upgradeWebSocket(req, {});
-  const listener = createFSWListener();
-  const send = (message: Record<string, unknown>) => {
-    try {
-      socket.send(JSON.stringify(message));
-    } catch (err) {
-      log.warn("socket.send:", err.message);
-    }
-  };
-  socket.addEventListener("open", () => {
-    listener.on("create", ({ specifier }) => {
-      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
-      if (config && config.routeFiles) {
-        const reg = toRouteRegExp(config.routeFiles);
-        const routePattern = reg.exec(specifier);
-        if (routePattern) {
-          send({ type: "create", specifier, routePattern });
-          return;
-        }
-      }
-      send({ type: "create", specifier });
-    });
-    listener.on("remove", ({ specifier }) => {
-      listener.off(`hotUpdate:${specifier}`);
-      send({ type: "remove", specifier });
-    });
-  });
-  socket.addEventListener("message", (e) => {
-    if (util.isFilledString(e.data)) {
-      try {
-        const { type, specifier } = JSON.parse(e.data);
-        if (type === "hotAccept" && util.isFilledString(specifier)) {
-          listener.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
-        }
-      } catch (_e) {
-        log.error("invlid socket message:", e.data);
-      }
-    }
-  });
-  socket.addEventListener("close", () => {
-    removeFSWListener(listener);
-  });
-  return response;
-}
-
-if (import.meta.main) {
-  await main();
 }

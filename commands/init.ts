@@ -147,17 +147,18 @@ export default async function (nameArg: string | undefined, template = "react") 
     ]);
   }
 
-  const msg = `
-${green("Aleph.js is ready to go!")}
-${dim("▲")} cd ${name}
-${dim("▲")} aleph dev    ${dim("# start the app in `development` mode")}
-${dim("▲")} aleph start  ${dim("# start the app in `production` mode")}
-${dim("▲")} aleph build  ${dim("# build the app into a worker")}
-
-Docs: ${cyan("https://alephjs.org/docs")}
-Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}
-`;
-  console.log(msg);
+  console.log([
+    "",
+    green("Aleph.js is ready to go!"),
+    `${dim("▲")} cd ${name}`,
+    `${dim("▲")} aleph dev    ${dim("# start the app in `development` mode")}`,
+    `${dim("▲")} aleph start  ${dim("# start the app in `production` mode")}`,
+    `${dim("▲")} aleph build  ${dim("# build the app into a worker for serverless platforms like Deno Deploy")}`,
+    "",
+    `Docs: ${cyan("https://alephjs.org/docs")}`,
+    `Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}`,
+    "",
+  ].join("\n"));
   Deno.exit(0);
 }
 
