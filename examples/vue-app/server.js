@@ -4,5 +4,5 @@ import { renderToString } from "@vue/server-renderer";
 import app from "./app.vue";
 
 serve({
-  ssr: async (ctx) => await renderToString(createSSRApp(app)),
+  ssr: async (_ctx) => await renderToString(createSSRApp(app)),
 });

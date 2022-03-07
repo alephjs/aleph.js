@@ -1,7 +1,7 @@
 <script setup>
-import { ref } from "vue"
+  import { ref } from "vue"
 
-const msg = ref("Hello World!")
+  const msg = ref("Hello World!")
 </script>
 
 <template>
