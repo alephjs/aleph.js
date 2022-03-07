@@ -181,7 +181,7 @@ export async function build(
         const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
         const isCSS = url.pathname.endsWith(".css");
         const req = new Request(url.toString());
-        const ctx = {} as unknown as FetchContext;
+        const ctx: Record<string, unknown> = {};
         let savePath = join(outputDir, url.pathname);
         if (specifier.startsWith("https://esm.sh/")) {
           savePath += ".js";

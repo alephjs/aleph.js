@@ -85,7 +85,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
-    const ctx: FetchContext = {
+    const ctx = {
       params: {},
       HTMLRewriter: {
         on: (selector: string, handlers: HTMLRewriterHandlers) => {
@@ -133,8 +133,7 @@ export const serve = (options: ServerOptions = {}) => {
             if (req.method !== "GET" || mod.default === undefined || req.headers.has("X-Fetch-Data")) {
               const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
-                Reflect.set(ctx, "params", ret.pathname.groups);
-                return fetcher(req, ctx);
+                return fetcher(req, { ...ctx, params: ret.pathname.groups });
               }
               return new Response("Method not allowed", { status: 405 });
             }

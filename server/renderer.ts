@@ -15,17 +15,8 @@ export type RenderOptions = {
 };
 
 export default {
-  async fetch(
-    req: Request,
-    ctx: FetchContext,
-    {
-      indexHtml,
-      routes,
-      isDev,
-      customHTMLRewriter,
-      ssr,
-    }: RenderOptions,
-  ): Promise<Response> {
+  async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
+    const { indexHtml, routes, isDev, customHTMLRewriter, ssr } = options;
     const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
     const ssrHTMLRewriter: Map<string, HTMLRewriterHandlers> = new Map();
     if (ssr) {
@@ -202,7 +193,7 @@ export default {
 /** import route modules and fetch data for SSR */
 async function initSSR(
   req: Request,
-  ctx: FetchContext,
+  ctx: Record<string, unknown>,
   routes: Route[],
 ): Promise<{ url: URL; modules: RenderModule[] }> {
   const url = new URL(req.url);
