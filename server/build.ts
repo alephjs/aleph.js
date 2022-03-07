@@ -134,7 +134,7 @@ export async function build(
         build.onLoad({ filter: /.*/, namespace: "http" }, async (args) => {
           const url = new URL(args.path);
           if (url.href === `${alephPkgUri}/server/transformer.ts`) {
-            url.pathname = util.trimSuffix(url.pathname, ".ts") + "_dist.ts";
+            url.pathname = util.trimSuffix(url.pathname, "transformer.ts") + "serve_dist.ts";
           }
           const contents = await (await cache(url.href)).text();
           return {
@@ -179,10 +179,15 @@ export async function build(
       const deps = new Set<string>();
       await Promise.all(tasks.map(async (specifier) => {
         const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
-        const savePath = join(outputDir, url.pathname) +
-          (specifier.startsWith("https://esm.sh/") ? ".js" : "");
+        const isCSS = url.pathname.endsWith(".css");
         const req = new Request(url.toString());
         const ctx = {} as unknown as FetchContext;
+        let savePath = join(outputDir, url.pathname);
+        if (specifier.startsWith("https://esm.sh/")) {
+          savePath += ".js";
+        } else if (isCSS && url.searchParams.has("module")) {
+          savePath += ".js";
+        }
         await ensureDir(dirname(savePath));
         const [res, file] = await Promise.all([
           serverHandler(req, ctx),
@@ -190,7 +195,7 @@ export async function build(
         ]);
         await res.body?.pipeTo(file.writable);
         clientModules.add(specifier);
-        if (!url.pathname.endsWith(".css")) {
+        if (!isCSS) {
           const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
           clientDependencyGraph?.get(specifier)?.deps?.forEach(({ specifier }) => {
             if (specifier.endsWith(".css")) {

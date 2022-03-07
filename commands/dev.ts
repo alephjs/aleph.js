@@ -11,7 +11,7 @@ import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
 import type { DependencyGraph } from "../server/graph.ts";
 import { serveAppModules } from "../server/transformer.ts";
-import type { AlephConfig, ImportMap } from "../server/types.ts";
+import type { AlephConfig } from "../server/types.ts";
 
 export const helpMessage = `
 Usage:
@@ -57,16 +57,13 @@ const main = async () => {
 
   const port = parsePortNumber(getFlag(options, ["p", "port"], "8080"));
   const hostname = getFlag(options, ["hostname"]);
+  const certFile = getFlag(options, ["tls-cert"]);
+  const keyFile = getFlag(options, ["tls-key"]);
 
-  let certFile = getFlag(options, ["tls-cert"]);
-  let keyFile = getFlag(options, ["tls-key"]);
   if (keyFile !== undefined && certFile === undefined) {
     log.fatal("missing `--tls-cert` option");
   } else if (certFile !== undefined && keyFile === undefined) {
     log.fatal("missing `--tls-key` option");
-  } else {
-    certFile = await findFile(workingDir, ["cert.pem", "tls.cert", "tls.crt"]);
-    keyFile = await findFile(workingDir, ["key.pem", "tls.key"]);
   }
 
   const importMap = await loadImportMap();
@@ -136,6 +133,11 @@ const main = async () => {
     await importServerHandler();
   }
 
+  // make the default handler
+  if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
+    serve();
+  }
+
   // init routes when fs change
   const updateRoutes = ({ specifier }: { specifier: string }) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
@@ -148,11 +150,6 @@ const main = async () => {
   };
   fswListener.on("create", updateRoutes);
   fswListener.on("remove", updateRoutes);
-
-  // make the default handler
-  if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
-    serve();
-  }
 
   // final server handler
   const handler = (req: Request) => {

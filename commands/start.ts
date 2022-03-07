@@ -37,16 +37,13 @@ if (import.meta.main) {
 
   const port = parsePortNumber(getFlag(options, ["p", "port"], "8080"));
   const hostname = getFlag(options, ["hostname"]);
+  const certFile = getFlag(options, ["tls-cert"]);
+  const keyFile = getFlag(options, ["tls-key"]);
 
-  let certFile = getFlag(options, ["tls-cert"]);
-  let keyFile = getFlag(options, ["tls-key"]);
   if (keyFile !== undefined && certFile === undefined) {
     log.fatal("missing `--tls-cert` option");
   } else if (certFile !== undefined && keyFile === undefined) {
     log.fatal("missing `--tls-key` option");
-  } else {
-    certFile = await findFile(workingDir, ["cert.pem", "tls.cert", "tls.crt"]);
-    keyFile = await findFile(workingDir, ["key.pem", "tls.key"]);
   }
 
   const ac = new AbortController();
