@@ -15,6 +15,7 @@
   "fmt": {
     "files": {
       "exclude": [
+        "compiler/target/",
         "compiler/pkg/"
       ]
     },
@@ -25,9 +26,9 @@
   "lint": {
     "files": {
       "exclude": [
+        "lib/nomodule.js",
         "compiler/dist/",
-        "compiler/pkg/",
-        "lib/nomodule.js"
+        "compiler/pkg/"
       ]
     }
   }

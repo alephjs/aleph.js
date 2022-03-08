@@ -20,11 +20,11 @@ You will need [Deno](https://deno.land/) 1.18.2+.
 7. Merge to master branch by our maintainers.
 
 ```bash
-# ssr/development with HMR
-ALEPH_DEV=true deno run -A cli.ts dev ./examples/hello-react -L debug
+# run example app in development mode
+make dev app=react-app
 
-# ssr/production
-ALEPH_DEV=true deno run -A cli.ts start ./examples/hello-react -L debug
+# run example app in production mode
+make dev app=react-app
 ```
 
 ## Testing
@@ -32,27 +32,20 @@ ALEPH_DEV=true deno run -A cli.ts start ./examples/hello-react -L debug
 You can run all tests with the following command:
 
 ```bash
-$ deno test -A --location=http://localhost --import-map=import_map.json
-```
-
-After running `integration_test.ts`, a zombie subprocesse may remain alive. (See [denoland/deno#7087](https://github.com/denoland/deno/issues/7087) for details) You can get rid of it with the following command:
-
-```shell
-# On Unix
-$ kill $(lsof -i:8080 -t)
+make test
 ```
 
 ## Project Structure
 
-- **/bundler** bundler for production mode
-- **/commands** commands to start
-- **/compiler** a JS/TS/JSX compiler written in rust powered by swc
+- **/commands** commands of Aleph.js CLI
+- **/compiler** the compiler of Aleph.js written in Rust, powered by swc and parcel-css
+- **/examples** examples to learn
 - **/framework**
   - **core** framework core
   - **react** framework in React
 - **/lib** shared lib
-- **/examples** examples to learn
-- **/server** server to run apps
+- **/loaders** builtin loaders
+- **/server** server of Aleph.js
 
 ## Code Style We Followed
 

@@ -5,19 +5,6 @@
   <a href="https://twitter.com/intent/follow?screen_name=alephjs"><img src="https://img.shields.io/twitter/follow/alephjs?style=social" alt="Twitter"></a>
 </p>
 
-## Features
-
-- Modern tooling in Deno
-- Deno Deploy first
-- Use standard Web API
-- Filesystem routing
-- Static file server
-- Web framework for React/Vue/Svelet
-- Server side rendering
-- Better data fecthing
-- Bulitin atomic CSS
-- Middlewares
-
 ## Getting Started
 
 Visit [https://alephjs.org/docs/get-started](https://alephjs.org/docs/get-started) to get started with Aleph.js.
@@ -31,7 +18,3 @@ To chat with other community members you can join the Aleph.js [Discord](https:/
 ## Contributing
 
 Please see our [contributing.md](https://github.com/alephjs/aleph.js/blob/master/CONTRIBUTING.md).
-
-## License
-
-[MIT licensed.](https://github.com/alephjs/aleph.js/blob/master/LICENSE)
