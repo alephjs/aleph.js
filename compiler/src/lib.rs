@@ -33,6 +33,9 @@ pub struct Options {
   pub is_dev: bool,
 
   #[serde(default)]
+  pub lang: Option<String>,
+
+  #[serde(default)]
   pub import_map: Option<String>,
 
   #[serde(default)]
@@ -101,7 +104,7 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
     false,
     false,
   )));
-  let module = SWC::parse(specifier, code, EsVersion::Es2022).expect("could not parse the module");
+  let module = SWC::parse(specifier, code, EsVersion::Es2022, None).expect("could not parse the module");
   let (code, map) = module
     .fast_transform(resolver.clone())
     .expect("could not transform the module");
@@ -121,7 +124,7 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
 pub fn parse_export_names(specifier: &str, code: &str) -> Result<JsValue, JsValue> {
   console_error_panic_hook::set_once();
 
-  let module = SWC::parse(specifier, code, EsVersion::Es2022).expect("could not parse the module");
+  let module = SWC::parse(specifier, code, EsVersion::Es2022, None).expect("could not parse the module");
   let names = module.parse_export_names().expect("could not parse the module");
 
   Ok(JsValue::from_serde(&names).unwrap())
@@ -164,7 +167,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     "es2022" => EsVersion::Es2022,
     _ => EsVersion::Es2015, // minium version
   };
-  let module = SWC::parse(specifier, code, target).expect("could not parse the module");
+  let module = SWC::parse(specifier, code, target, options.lang).expect("could not parse the module");
   let (code, map) = module
     .transform(
       resolver.clone(),

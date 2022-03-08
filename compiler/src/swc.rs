@@ -46,12 +46,12 @@ pub struct SWC {
 
 impl SWC {
   /// parse source code.
-  pub fn parse(specifier: &str, source: &str, target: EsVersion) -> Result<Self, anyhow::Error> {
+  pub fn parse(specifier: &str, source: &str, target: EsVersion, lang: Option<String>) -> Result<Self, anyhow::Error> {
     let source_map = SourceMap::default();
     let source_file = source_map.new_source_file(FileName::Real(Path::new(specifier).to_path_buf()), source.into());
     let sm = &source_map;
     let error_buffer = ErrorBuffer::new(specifier);
-    let syntax = get_syntax(specifier);
+    let syntax = get_syntax(specifier, lang);
     let input = StringInput::from(&*source_file);
     let comments = SingleThreadedComments::default();
     let lexer = Lexer::new(syntax, target, input, Some(&comments));
@@ -263,16 +263,20 @@ fn get_ts_config(tsx: bool) -> TsConfig {
   }
 }
 
-fn get_syntax(specifier: &str) -> Syntax {
-  let ext = specifier
-    .split(|c| c == '?' || c == '#')
-    .next()
-    .unwrap()
-    .split('.')
-    .last()
-    .unwrap_or("js")
-    .to_lowercase();
-  match ext.as_str() {
+fn get_syntax(specifier: &str, lang: Option<String>) -> Syntax {
+  let lang = if let Some(lang) = lang {
+    lang
+  } else {
+    specifier
+      .split(|c| c == '?' || c == '#')
+      .next()
+      .unwrap()
+      .split('.')
+      .last()
+      .unwrap_or("js")
+      .to_lowercase()
+  };
+  match lang.as_str() {
     "js" | "mjs" => Syntax::Es(get_es_config(false)),
     "jsx" => Syntax::Es(get_es_config(true)),
     "ts" | "mts" => Syntax::Typescript(get_ts_config(false)),

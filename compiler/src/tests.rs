@@ -15,7 +15,7 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
   .import_map;
   let mut graph_versions: HashMap<String, String> = HashMap::new();
   graph_versions.insert("./foo.ts".into(), "100".into());
-  let module = SWC::parse(specifer, source, swc_ecma_ast::EsVersion::Es2022).expect("could not parse module");
+  let module = SWC::parse(specifer, source, swc_ecma_ast::EsVersion::Es2022, None).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
     "https://deno.land/x/aleph",
@@ -194,7 +194,7 @@ fn parse_export_names() {
     export * as DenoStdServer from "https://deno.land/std/http/sever.ts"
     export * from "https://deno.land/std/http/sever.ts"
   "#;
-  let module = SWC::parse("/app.ts", source, EsVersion::Es2022).expect("could not parse module");
+  let module = SWC::parse("/app.ts", source, EsVersion::Es2022, None).expect("could not parse module");
   assert_eq!(
     module.parse_export_names().unwrap(),
     vec![
