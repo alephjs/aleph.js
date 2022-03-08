@@ -27,13 +27,13 @@ Deno.test("loaders/vue.ts: VueLoader", async () => {
   `,
   );
   const loader = new VueLoader();
-  const ret = await loader.load(new Request("http://localhost/test.vue"));
+  const ret = await loader.load(new Request("http://localhost/test.vue"), { isDev: true });
   const js = (new TextDecoder().decode(ret.content));
   assertEquals(loader.test(new Request("http://localhost/app.vue")), true);
   assertEquals(loader.test(new Request("http://localhost/app.jsx")), false);
   assertEquals(ret.contentType, "application/javascript; charset=utf-8");
-  assertEquals(js.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue@3"`), true);
-  assertEquals(js.includes(`setup(__props)`), true);
+  assertEquals(js.includes(`createElementBlock as _createElementBlock } from "/-/esm.sh/vue?dev"`), true);
+  assertEquals(js.includes(`setup (__props)`), true);
   assertEquals(js.includes(`const msg = ref("Hello World!")`), true);
   assertEquals(js.includes(`_createElementBlock(_Fragment`), true);
   assertEquals(js.includes(`_createElementVNode("h1"`), true);
@@ -72,7 +72,7 @@ Deno.test("loaders/vue.ts: VueLoader.ssr", async () => {
   const ret = await loader.load(new Request("http://localhost/test.vue"), { ssr: true });
   const js = (new TextDecoder().decode(ret.content));
   assertEquals(ret.contentType, "application/javascript; charset=utf-8");
-  assertEquals(js.includes(`ssrInterpolate as _ssrInterpolate } from "https://esm.sh/@vue/server-renderer@3"`), true);
+  assertEquals(js.includes(`ssrInterpolate as _ssrInterpolate } from "https://esm.sh/@vue/server-renderer"`), true);
   assertEquals(js.includes(`__ssrInlineRender: true,`), true);
   assertEquals(js.includes(`setup(__props)`), true);
   assertEquals(js.includes(`const msg = ref("Hello World!")`), true);
