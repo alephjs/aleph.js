@@ -113,7 +113,7 @@ if (import.meta.main) {
 
   const importMap = await loadImportMap();
   const loaders = await importLoaders(importMap);
-  await serveAppModules(6060, { importMap, loaders });
+  serveAppModules(6060, { importMap, loaders });
 
   log.info(`Watching files for changes...`);
   watchFs(workingDir, (kind, path) => {
