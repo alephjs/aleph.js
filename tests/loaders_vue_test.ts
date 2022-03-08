@@ -71,6 +71,7 @@ Deno.test("loaders/vue.ts: VueLoader.hmr", async () => {
   const loader = new VueLoader();
   const ret = await loader.load(new Request("http://localhost/test.vue"), { isDev: true });
   const js = (new TextDecoder().decode(ret.content));
+  assertEquals(js.includes(`createElementBlock as _createElementBlock } from "/-/esm.sh/vue?dev"`), true);
   assertEquals(js.includes(`__sfc__.__hmrId = "`), true);
   assertEquals(js.includes(`__sfc__.__scriptHash = "`), true);
   assertEquals(js.includes(`__sfc__.render = function render(`), true);

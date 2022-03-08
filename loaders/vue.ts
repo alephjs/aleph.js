@@ -51,6 +51,9 @@ export default class VueSFCLoader implements Loader {
     if (scriptLang && !isTS) {
       throw new Error(`VueSFCLoader: Only lang="ts" is supported for <script> blocks.`);
     }
+    if (descriptor.styles.some((style) => style.module)) {
+      console.warn(`VueSFCLoader: <style module> is not supported yet.`);
+    }
     const expressionPlugins: CompilerOptions["expressionPlugins"] = isTS ? ["typescript"] : undefined;
     const templateOptions: Omit<SFCTemplateCompileOptions, "source"> = {
       ...this.#options?.template,
@@ -135,13 +138,7 @@ export default class VueSFCLoader implements Loader {
       importMap: env.importMap ? JSON.stringify(env.importMap) : undefined,
       isDev: env.isDev,
     });
-
-    let css = "";
-    for (const style of descriptor.styles) {
-      if (style.module) {
-        throw new Error(`VueSFCLoader: <style module> is not supported yet.`);
-      }
-
+    const css = (await Promise.all(descriptor.styles.map(async (style) => {
       const styleResult = await compileStyleAsync({
         ...this.#options.style,
         source: style.content,
@@ -158,10 +155,11 @@ export default class VueSFCLoader implements Loader {
           log.warn(`VueSFCLoader: ${msg}`);
         }
         // proceed even if css compile errors
+        return "";
       } else {
-        css += styleResult.code + "\n";
+        return styleResult.code;
       }
-    }
+    }))).join("\n");
 
     return {
       content: new TextEncoder().encode(code),
