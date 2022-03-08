@@ -1,6 +1,7 @@
 import { dim } from "https://deno.land/std@0.125.0/fmt/colors.ts";
 import { encode } from "https://deno.land/std@0.125.0/encoding/base64.ts";
 import { ensureDir } from "https://deno.land/std@0.125.0/fs/ensure_dir.ts";
+import { dirname } from "https://deno.land/std@0.125.0/path/mod.ts";
 import { compress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";
 
 async function run(cmd: string[]) {
@@ -13,6 +14,8 @@ async function run(cmd: string[]) {
   p.close();
   return status.success;
 }
+
+Deno.chdir(dirname(new URL(import.meta.url).pathname));
 
 if (import.meta.main) {
   const ok = await run(["wasm-pack", "build", "--target", "web"]);
