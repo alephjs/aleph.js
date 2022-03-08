@@ -1,4 +1,4 @@
-import { parse as parseArgs } from "https://deno.land/std@0.125.0/flags/mod.ts";
+import { parse as parseArgs } from "https://deno.land/std@0.128.0/flags/mod.ts";
 import log, { type LevelName } from "./log.ts";
 import util from "./util.ts";
 

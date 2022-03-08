@@ -1,4 +1,4 @@
-import { red } from "https://deno.land/std@0.125.0/fmt/colors.ts";
+import { red } from "https://deno.land/std@0.128.0/fmt/colors.ts";
 
 let wasm;
 

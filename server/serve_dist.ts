@@ -1,4 +1,4 @@
-import { readableStreamFromReader } from "https://deno.land/std@0.125.0/streams/conversion.ts";
+import { readableStreamFromReader } from "https://deno.land/std@0.128.0/streams/conversion.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
