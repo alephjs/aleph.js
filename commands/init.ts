@@ -10,8 +10,11 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 
-const templates = ["react", "vue", "svelte", "vanilla", "api"];
-const defaultReactVersion = "17.0.2";
+const templates = ["react", "preact", "vue", "svelte", "lit", "vanilla", "api"];
+const versions = {
+  react: "17.0.2",
+  vue: "3.2.31",
+};
 
 export const helpMessage = `
 Usage:
@@ -101,14 +104,24 @@ export default async function (nameArg: string | undefined, template = "react") 
     case "react": {
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
-        "react": `https://esm.sh/react@${defaultReactVersion}`,
-        "react-dom": `https://esm.sh/react-dom@${defaultReactVersion}`,
-        "react-dom/server": `https://esm.sh/react-dom@${defaultReactVersion}/server`,
+        "react": `https://esm.sh/react@${versions.react}`,
+        "react-dom": `https://esm.sh/react-dom@${versions.react}`,
+        "react-dom/server": `https://esm.sh/react-dom@${versions.react}/server`,
       });
       Object.assign(denoConfig.compilerOptions, {
         "jsx": "react-jsx",
-        "jsxImportSource": `https://esm.sh/react@${defaultReactVersion}`,
+        "jsxImportSource": `https://esm.sh/react@${versions.react}`,
       });
+      break;
+    }
+    case "vue": {
+      Object.assign(importMap.imports, {
+        "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
+        "vue": `https://esm.sh/vue@${versions.vue}`,
+        "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
+        "*.vue": `${alephPkgUri}/loaders/vue.ts!loader`,
+      });
+      break;
     }
   }
   await ensureDir(workingDir);
