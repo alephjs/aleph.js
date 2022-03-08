@@ -4,7 +4,13 @@ import type {
   SFCScriptCompileOptions,
   SFCTemplateCompileOptions,
 } from "https://esm.sh/@vue/compiler-sfc@3.2.31";
-import { compileScript, compileStyleAsync, parse, rewriteDefault } from "https://esm.sh/@vue/compiler-sfc@3.2.31";
+import {
+  compileScript,
+  compileStyleAsync,
+  compileTemplate,
+  parse,
+  rewriteDefault,
+} from "https://esm.sh/@vue/compiler-sfc@3.2.31";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { transform } from "../compiler/mod.ts";
@@ -45,12 +51,27 @@ export default class VueSFCLoader implements Loader {
     if (scriptLang && !isTS) {
       throw new Error(`VueSFCLoader: Only lang="ts" is supported for <script> blocks.`);
     }
-    if (!descriptor.scriptSetup) {
-      throw new Error("VueSFCLoader: currentlly only support vue files with script `setup`");
-    }
     const expressionPlugins: CompilerOptions["expressionPlugins"] = isTS ? ["typescript"] : undefined;
+    const templateOptions: Omit<SFCTemplateCompileOptions, "source"> = {
+      ...this.#options?.template,
+      id,
+      filename: descriptor.filename,
+      scoped: descriptor.styles.some((s) => s.scoped),
+      slotted: descriptor.slotted,
+      isProd: !env.isDev,
+      ssr: env.ssr,
+      ssrCssVars: descriptor.cssVars,
+      compilerOptions: {
+        ...this.#options?.template?.compilerOptions,
+        runtimeModuleName: this.#options.runtimeModuleName ?? env.importMap?.imports["vue"] ?? "https://esm.sh/vue",
+        ssrRuntimeModuleName: this.#options.ssrRuntimeModuleName ?? env.importMap?.imports["vue/server-renderer"] ??
+          env.importMap?.imports["@vue/server-renderer"] ??
+          "https://esm.sh/@vue/server-renderer",
+        expressionPlugins,
+      },
+    };
     const compiledScript = compileScript(descriptor, {
-      inlineTemplate: true,
+      inlineTemplate: !env.isDev || env.ssr,
       ...this.#options?.script,
       id,
       templateOptions: {
@@ -61,26 +82,58 @@ export default class VueSFCLoader implements Loader {
         compilerOptions: {
           ...this.#options?.template?.compilerOptions,
           runtimeModuleName: this.#options.runtimeModuleName ?? env.importMap?.imports["vue"] ?? "https://esm.sh/vue",
-          ssrRuntimeModuleName: this.#options.ssrRuntimeModuleName ?? env.importMap?.imports["@vue/server-renderer"] ??
+          ssrRuntimeModuleName: this.#options.ssrRuntimeModuleName ?? env.importMap?.imports["vue/server-renderer"] ??
+            env.importMap?.imports["@vue/server-renderer"] ??
             "https://esm.sh/@vue/server-renderer",
           expressionPlugins,
         },
       },
     });
 
-    let js = "";
-    js += rewriteDefault(compiledScript.content, "__sfc__", expressionPlugins) + "\n";
-    js += `__sfc__.__file = ${JSON.stringify(filename)}\n`;
-    if (descriptor.styles.some((s) => s.scoped)) {
-      js += `__sfc__.__scopeId = ${JSON.stringify(`data-v-${id}`)}\n`;
+    const mainScript = rewriteDefault(compiledScript.content, "__sfc__", expressionPlugins);
+    const jsLines = [mainScript];
+    if (env.isDev && !env.ssr && descriptor.template) {
+      const templateResult = compileTemplate({
+        ...templateOptions,
+        source: descriptor.template.content,
+      });
+      if (templateResult.errors.length > 0) {
+        jsLines.push(`/* SSR compile error: ${templateResult.errors[0]} */`);
+      } else {
+        jsLines.push(templateResult.code.replace("export function render(", "__sfc__.render = function render("));
+      }
     }
-    js += `export default __sfc__\n`;
+    jsLines.push(`__sfc__.__file = ${JSON.stringify(filename)}`);
+    if (descriptor.styles.some((s) => s.scoped)) {
+      jsLines.push(`__sfc__.__scopeId = ${JSON.stringify(`data-v-${id}`)}`);
+    }
+    if (!env.ssr && env.isDev) {
+      const mainScriptHash = (await util.computeHash("SHA-256", mainScript)).slice(0, 8);
+      jsLines.push(`__sfc__.__scriptHash = ${JSON.stringify(mainScriptHash)}`);
+      jsLines.push(`__sfc__.__hmrId = ${JSON.stringify(id)}`);
+      jsLines.push(`window.__VUE_HMR_RUNTIME__?.createRecord(__sfc__.__hmrId, __sfc__)`);
+      jsLines.push(`let __currentScriptHash = ${JSON.stringify(mainScriptHash)}`);
+      jsLines.push(
+        `import.meta.hot.accept(({ default: sfc }) => {`,
+        `  const rerenderOnly = __currentScriptHash === sfc.__scriptHash`,
+        `  if (rerenderOnly) {`,
+        `    __currentScriptHash = sfc.__scriptHash; // update '__currentScriptHash'`,
+        `    __VUE_HMR_RUNTIME__.rerender(sfc.__hmrId, sfc.render)`,
+        `  } else {`,
+        `    __VUE_HMR_RUNTIME__.reload(sfc.__hmrId, sfc)`,
+        `  }`,
+        `})`,
+      );
+    }
+    jsLines.push(`export default __sfc__`);
 
     // post-process
-    const { code } = env.ssr ? { code: js } : await transform(filename + (isTS ? ".ts" : ".js"), js, {
+    const js = jsLines.join("\n");
+    const { code } = env.ssr ? { code: js } : await transform(filename, js, {
       alephPkgUri: getAlephPkgUri(),
-      isDev: env.isDev,
+      lang: isTS ? "ts" : "js",
       importMap: env.importMap ? JSON.stringify(env.importMap) : undefined,
+      isDev: env.isDev,
     });
 
     let css = "";

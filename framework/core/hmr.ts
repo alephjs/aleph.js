@@ -45,9 +45,10 @@ class Module {
     try {
       const url = this._specifier.slice(1) + (this._specifier.endsWith(".css") ? "?module&" : "?") + "t=" + Date.now();
       const module = await import(url);
-      this._acceptCallbacks.forEach((cb) => cb({ module }));
-    } catch (_e) {
-      location.reload();
+      this._acceptCallbacks.forEach((cb) => cb(module));
+    } catch (err) {
+      console.error(err);
+      // todo: ui feedback
     }
   }
 }
