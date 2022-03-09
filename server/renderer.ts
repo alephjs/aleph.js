@@ -180,9 +180,13 @@ export default {
         rewriter.on("script", scriptHandler);
         rewriter.on("head", commonHandler);
         rewriter.on("body", commonHandler);
-        rewriter.write(util.utf8TextEncoder.encode(indexHtml));
-        rewriter.end();
-        controller.close();
+        try {
+          rewriter.write(util.utf8TextEncoder.encode(indexHtml));
+          rewriter.end();
+        } finally {
+          controller.close();
+          rewriter.free();
+        }
       },
     });
 

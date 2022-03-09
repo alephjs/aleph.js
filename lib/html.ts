@@ -29,8 +29,12 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
       };
       rewriter.on("link", linkHandler);
       rewriter.on("script", scriptHandler);
-      rewriter.write(typeof html === "string" ? util.utf8TextEncoder.encode(html) : html);
-      rewriter.end();
+      try {
+        rewriter.write(typeof html === "string" ? util.utf8TextEncoder.encode(html) : html);
+        rewriter.end();
+      } finally {
+        rewriter.free();
+      }
       resolve(links);
     } catch (error) {
       reject(error);
