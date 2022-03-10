@@ -159,7 +159,7 @@ export const clientModuleTransformer = {
         resType = util.trimSuffix(contentType, "; charset=utf-8");
       }
     } else if (isCSS) {
-      const toJS = searchParams.has("module");
+      const jsModule = searchParams.has("module");
       const { code, deps } = await bundleCSS(specifier, rawCode, {
         targets: {
           android: 95,
@@ -169,12 +169,12 @@ export const clientModuleTransformer = {
           safari: 14,
         },
         minify: !isDev,
-        cssModules: toJS && pathname.endsWith(".module.css"),
+        cssModules: jsModule && pathname.endsWith(".module.css"),
+        jsModule,
         hmr: isDev,
-        toJS,
       });
       resBody = code;
-      if (!toJS) {
+      if (!jsModule) {
         resType = "text/css";
       }
       clientDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });

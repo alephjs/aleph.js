@@ -7,10 +7,10 @@ import { getAlephPkgUri } from "./config.ts";
 
 export type BundleCSSOptions = {
   targets?: Targets;
-  cssModules?: boolean;
   minify?: boolean;
+  cssModules?: boolean;
+  jsModule?: boolean;
   hmr?: boolean;
-  toJS?: boolean;
 };
 
 export type BundleCSSResult = {
@@ -52,7 +52,12 @@ export async function bundleCSS(
       }
       tracing.add(url);
       const [css] = await readCode(url);
-      const { code, deps: subDeps } = await bundleCSS(url, css, { minify: options.minify }, tracing);
+      const { code, deps: subDeps } = await bundleCSS(
+        url,
+        css,
+        { targets: options.targets, minify: options.minify },
+        tracing,
+      );
       if (subDeps) {
         deps.push(...subDeps);
       }
@@ -66,7 +71,7 @@ export async function bundleCSS(
       cssModulesExports[key] = value.name;
     }
   }
-  if (options.toJS) {
+  if (options.jsModule) {
     const alephPkgPath = toLocalPath(getAlephPkgUri());
     return {
       code: [
