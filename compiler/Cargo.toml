@@ -32,7 +32,7 @@ parcel_sourcemap = "2.0.2"
 # docs: https://swc.rs
 # crate: https://crates.io/search?q=swc
 swc_atoms = "0.2.9"
-swc_common = { version = "0.17.11", features = ["sourcemap"] }
+swc_common = { version = "0.17.13", features = ["sourcemap"] }
 swc_ecma_transforms = { version = "0.127.0", features = ["proposal", "typescript", "react" ] }
 swc_ecmascript = { version = "0.127.0", features = ["codegen", "parser", "utils", "visit"] }
 

@@ -1,23 +1,25 @@
 export type TransformOptions = {
   alephPkgUri?: string;
-  importMap?: string;
   graphVersions?: Record<string, string>;
+  importMap?: string;
   initialGraphVersion?: string;
-  target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
-  lang?: "ts" | "tsx" | "js" | "jsx";
-  jsxRuntime?: "react" | "preact";
-  jsxRuntimeVersion?: string;
-  jsxRuntimeCdnVersion?: string;
-  jsxImportSource?: string;
-  stripDataExport?: boolean;
   isDev?: boolean;
+  jsxImportSource?: string;
+  jsxRuntime?: "react" | "preact";
+  jsxRuntimeCdnVersion?: string;
+  jsxRuntimeVersion?: string;
+  lang?: "ts" | "tsx" | "js" | "jsx";
+  stripDataExport?: boolean;
+  target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
 };
 
 export type FastTransformOptions = Pick<
   TransformOptions,
-  | "importMap"
   | "graphVersions"
+  | "importMap"
   | "initialGraphVersion"
+  | "isDev"
+  | "lang"
 >;
 
 export type TransformResult = {
