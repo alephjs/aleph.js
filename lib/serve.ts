@@ -1,15 +1,15 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.128.0/streams/conversion.ts";
 import { basename, join } from "https://deno.land/std@0.128.0/path/mod.ts";
 import { serve } from "https://deno.land/std@0.128.0/http/server.ts";
-import type { ImportMap, Loader } from "../server/types.ts";
+import type { Loader, LoaderEnv } from "../server/types.ts";
 import { getContentType } from "./mime.ts";
 
 export type ServeDirOptions = {
   port: number;
   cwd?: string;
   signal?: AbortSignal;
-  importMap?: ImportMap;
   loaders?: Loader[];
+  env?: LoaderEnv;
 };
 
 export async function serveDir(options: ServeDirOptions) {
@@ -44,7 +44,7 @@ export async function serveDir(options: ServeDirOptions) {
 
       const loader = options.loaders?.find((loader) => loader.test(req));
       if (loader) {
-        let ret = loader.load(req, { importMap: options.importMap, ssr: true });
+        let ret = loader.load(req, options.env || {});
         if (ret instanceof Promise) {
           ret = await ret;
         }

@@ -14,10 +14,9 @@ import type { AlephConfig, AtomicCSSConfig, ImportMap, JSXConfig, Loader } from 
 
 const cssModuleLoader: Loader = {
   test: (req) => new URL(req.url).pathname.endsWith(".css"),
-  load: async (req) => {
+  load: async (req, env) => {
     const { pathname } = new URL(req.url);
     const specifier = "." + pathname;
-    const isDev = Deno.env.get("ALEPH_ENV") === "development";
     const { code, cssModulesExports, deps } = await bundleCSS(
       specifier,
       await Deno.readTextFile(specifier),
@@ -29,7 +28,7 @@ const cssModuleLoader: Loader = {
           firefox: 90,
           safari: 14,
         },
-        minify: !isDev,
+        minify: !env.isDev,
         cssModules: pathname.endsWith(".module.css"),
       },
     );
@@ -55,7 +54,6 @@ const esModuleLoader: Loader = {
     const specifier = "." + pathname;
     const rawCode = await Deno.readTextFile(specifier);
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
-    const isDev = Deno.env.get("ALEPH_ENV") === "development";
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
     if (serverDependencyGraph) {
       const graphVersions = serverDependencyGraph.modules.filter((mod) =>
@@ -74,7 +72,7 @@ const esModuleLoader: Loader = {
         const uno = createGenerator(config?.atomicCSS);
         const { css } = await uno.generate(rawCode, {
           id: specifier,
-          minify: !isDev,
+          minify: !env.isDev,
         });
         if (css) {
           inlineCSS = css;
@@ -104,8 +102,13 @@ export async function serveAppModules(
   try {
     await serveDir({
       port,
-      ...options,
+      signal: options.signal,
       loaders: [esModuleLoader, cssModuleLoader, ...options.loaders],
+      env: {
+        importMap: options.importMap,
+        isDev: Deno.env.get("ALEPH_ENV") === "development",
+        ssr: true,
+      },
     });
   } catch (error) {
     if (error instanceof Deno.errors.AddrInUse) {
@@ -128,7 +131,7 @@ export type TransformerOptions = {
 
 export const clientModuleTransformer = {
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { isDev, buildHash, loader } = options;
+    const { isDev, buildHash, loader, importMap } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
@@ -153,11 +156,12 @@ export const clientModuleTransformer = {
     let resType = "application/javascript";
 
     if (loader) {
-      const { content, contentType } = await loader.load(req, { importMap: options.importMap, isDev });
+      const { content, contentType, deps } = await loader.load(req, { importMap, isDev });
       resBody = util.utf8TextDecoder.decode(content);
       if (contentType) {
         resType = util.trimSuffix(contentType, "; charset=utf-8");
       }
+      clientDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
     } else if (isCSS) {
       const jsModule = searchParams.has("module");
       const { code, deps } = await bundleCSS(specifier, rawCode, {
