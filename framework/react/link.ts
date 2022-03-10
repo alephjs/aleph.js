@@ -151,15 +151,13 @@ export function NavLink(props: LinkProps & { activeClassName?: string; activeSty
     return true;
   }, [pathname, searchParams, to]);
   const className = useMemo(() => {
-    if (!isActivated) {
+    if (!isActivated || !activeClassName) {
       return propClassName;
     }
-    return [propClassName, activeClassName].filter(util.isFilledString).map(
-      (n) => n.trim(),
-    ).filter(Boolean).join(" ");
+    return [propClassName, activeClassName].filter(util.isFilledString).map((n) => n.trim()).filter(Boolean).join(" ");
   }, [propClassName, activeClassName, isActivated]);
   const style = useMemo(() => {
-    if (!isActivated) {
+    if (!isActivated || !activeStyle) {
       return propStyle;
     }
     return Object.assign({}, propStyle, activeStyle);
