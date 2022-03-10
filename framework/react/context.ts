@@ -18,3 +18,11 @@ export const DataContext = createContext<DataContextProps>({
   dataUrl: "/",
   dataCache: new Map(),
 });
+
+export type ForwardPropsContextProps = {
+  props: Record<string, unknown>;
+};
+
+export const ForwardPropsContext = createContext<ForwardPropsContextProps>({
+  props: {},
+});

@@ -1,11 +1,11 @@
-import type { FC, ReactElement } from "https://esm.sh/react@17.0.2";
+import type { FC, ReactElement, ReactNode } from "https://esm.sh/react@17.0.2";
 import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
 import { matchRoutes } from "../../lib/helpers.ts";
 import { URLPatternCompat } from "../../lib/url.ts";
 import type { RenderModule, Route, RouteMeta, SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
-import { DataContext, RouterContext } from "./context.ts";
+import { DataContext, ForwardPropsContext, RouterContext } from "./context.ts";
 import { E404Page } from "./error.ts";
 
 export type RouterProps = {
@@ -144,6 +144,21 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 export const useRouter = (): { url: URL; redirect: typeof redirect } => {
   const { url } = useContext(RouterContext);
   return { url, redirect };
+};
+
+export const useForwardProps = <T = Record<string, unknown>>(): T => {
+  const { props } = useContext(ForwardPropsContext);
+  return props as T;
+};
+
+export const forwardProps = (children?: ReactNode, props: Record<string, unknown> = {}) => {
+  if (
+    children === null || children === undefined || typeof children === "string" || typeof children === "number" ||
+    typeof children === "boolean"
+  ) {
+    return children;
+  }
+  return createElement(ForwardPropsContext.Provider, { value: { props } }, children);
 };
 
 function loadRoutesFromTag(): Route[] {
