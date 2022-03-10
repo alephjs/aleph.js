@@ -40,8 +40,9 @@ Deno.test("loaders/vue.ts: VueLoader", async () => {
   assertEquals(js.includes(`_withDirectives(_createElementVNode("input"`), true);
   assertEquals(js.includes(`__sfc__.__file="./test.vue"`), true);
   assertEquals(js.includes(`__sfc__.__scopeId="data-v-`), true);
-  assertEquals(ret.inlineCSS?.includes("h1[data-v-"), true);
-  assertEquals(ret.inlineCSS?.includes("font-size: 30px;"), true);
+  assertEquals(ret.deps?.length, 3);
+  assertEquals(ret.deps?.at(2)!.includes("h1[data-v-"), true);
+  assertEquals(ret.deps?.at(2)!.includes("font-size: 30px;"), true);
 });
 
 Deno.test("loaders/vue.ts: VueLoader.hmr", async () => {
@@ -107,13 +108,14 @@ Deno.test("loaders/vue.ts: VueLoader.ssr", async () => {
   assertEquals(ret.contentType, "application/javascript; charset=utf-8");
   assertEquals(js.includes(`ssrInterpolate as _ssrInterpolate } from "https://esm.sh/@vue/server-renderer"`), true);
   assertEquals(js.includes(`__ssrInlineRender: true,`), true);
-  assertEquals(js.includes(`setup(__props)`), true);
+  assertEquals(js.includes(`setup (__props)`), true);
   assertEquals(js.includes(`const msg = ref("Hello World!")`), true);
   assertEquals(js.includes(`<h1`), true);
   assertEquals(js.includes(`<input`), true);
   assertEquals(js.includes(` data-v-`), true);
   assertEquals(js.includes(`__file = "./test.vue"`), true);
   assertEquals(js.includes(`__scopeId = "data-v-`), true);
-  assertEquals(ret.inlineCSS?.includes("h1[data-v-"), true);
-  assertEquals(ret.inlineCSS?.includes("font-size: 30px;"), true);
+  assertEquals(ret.deps?.length, 3);
+  assertEquals(ret.deps?.at(2)!.includes("h1[data-v-"), true);
+  assertEquals(ret.deps?.at(2)!.includes("font-size: 30px;"), true);
 });

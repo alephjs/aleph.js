@@ -13,7 +13,7 @@ import {
 } from "https://esm.sh/@vue/compiler-sfc@3.2.31";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { transform } from "../compiler/mod.ts";
+import { fastTransform, transform } from "../compiler/mod.ts";
 import { getAlephPkgUri } from "../server/config.ts";
 import type { ImportMap, Loader, LoaderContent } from "../server/types.ts";
 
@@ -132,12 +132,19 @@ export default class VueSFCLoader implements Loader {
 
     // post-process
     const js = jsLines.join("\n");
-    const { code } = env.ssr ? { code: js } : await transform(filename, js, {
-      alephPkgUri: getAlephPkgUri(),
-      lang: isTS ? "ts" : "js",
-      importMap: env.importMap ? JSON.stringify(env.importMap) : undefined,
-      isDev: env.isDev,
-    });
+    const { code, deps: scriptDeps = [] } = env.ssr
+      ? await fastTransform(filename, js, {
+        importMap: env.importMap ? JSON.stringify(env.importMap) : undefined,
+        lang: isTS ? "ts" : "js",
+        isDev: env.isDev,
+      })
+      : await transform(filename, js, {
+        alephPkgUri: getAlephPkgUri(),
+        importMap: env.importMap ? JSON.stringify(env.importMap) : undefined,
+        lang: isTS ? "ts" : "js",
+        isDev: env.isDev,
+      });
+    const deps = scriptDeps.map(({ specifier }) => specifier);
     const css = (await Promise.all(descriptor.styles.map(async (style) => {
       const styleResult = await compileStyleAsync({
         ...this.#options.style,
@@ -160,11 +167,14 @@ export default class VueSFCLoader implements Loader {
         return styleResult.code;
       }
     }))).join("\n");
+    if (css) {
+      deps.push(`inline-css:${css}`);
+    }
 
     return {
       content: new TextEncoder().encode(code),
       contentType: "application/javascript; charset=utf-8",
-      inlineCSS: css || undefined,
+      deps,
     };
   }
 }
