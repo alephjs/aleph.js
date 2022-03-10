@@ -15,7 +15,8 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
   .import_map;
   let mut graph_versions: HashMap<String, String> = HashMap::new();
   graph_versions.insert("./foo.ts".into(), "100".into());
-  let module = SWC::parse(specifer, source, swc_ecma_ast::EsVersion::Es2022, None).expect("could not parse module");
+  let module =
+    SWC::parse(specifer, source, swc_ecmascript::ast::EsVersion::Es2022, None).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
     specifer,
     "https://deno.land/x/aleph",

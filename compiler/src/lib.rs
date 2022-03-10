@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, SWC};
-use swc_ecma_ast::EsVersion;
+use swc_ecmascript::ast::EsVersion;
 use url::Url;
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 

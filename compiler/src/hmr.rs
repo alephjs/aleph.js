@@ -5,9 +5,9 @@ use crate::swc_helpers::{
 };
 use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;
-use swc_ecma_ast::*;
-use swc_ecma_utils::quote_ident;
-use swc_ecma_visit::{noop_fold_type, Fold};
+use swc_ecmascript::ast::*;
+use swc_ecmascript::utils::quote_ident;
+use swc_ecmascript::visit::{noop_fold_type, Fold};
 
 pub fn hmr(resolver: Rc<RefCell<Resolver>>) -> impl Fold {
   HmrFold { resolver }

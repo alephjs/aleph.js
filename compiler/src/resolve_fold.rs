@@ -2,8 +2,8 @@ use crate::resolver::Resolver;
 use crate::swc_helpers::new_str;
 use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;
-use swc_ecma_ast::*;
-use swc_ecma_visit::{noop_fold_type, Fold};
+use swc_ecmascript::ast::*;
+use swc_ecmascript::visit::{noop_fold_type, Fold};
 
 pub fn resolve_fold(resolver: Rc<RefCell<Resolver>>, strip_data_export: bool) -> impl Fold {
   ResolveFold {

@@ -1,5 +1,5 @@
-use swc_ecma_ast::*;
-use swc_ecma_visit::{noop_fold_type, Fold};
+use swc_ecmascript::ast::*;
+use swc_ecmascript::visit::{noop_fold_type, Fold};
 
 pub struct ExportParser {
   pub names: Vec<String>,

@@ -8,12 +8,13 @@ use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::{Handler, HandlerFlags};
 use swc_common::{chain, FileName, Globals, Mark, SourceMap};
-use swc_ecma_transforms_proposal::decorators;
-use swc_ecma_transforms_typescript::strip;
+use swc_ecma_transforms::proposals::decorators;
+use swc_ecma_transforms::react;
+use swc_ecma_transforms::typescript::strip;
+use swc_ecma_transforms::{fixer, helpers, hygiene, pass::Optional, resolver_with_mark};
 use swc_ecmascript::ast::{EsVersion, Module, Program};
 use swc_ecmascript::codegen::{text_writer::JsWriter, Node};
 use swc_ecmascript::parser::{lexer::Lexer, EsConfig, StringInput, Syntax, TsConfig};
-use swc_ecmascript::transforms::{fixer, helpers, hygiene, pass::Optional, react, resolver_with_mark};
 use swc_ecmascript::visit::{Fold, FoldWith};
 
 /// Options for transpiling a module.
