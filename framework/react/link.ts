@@ -20,7 +20,7 @@ export type LinkProps = PropsWithChildren<
  */
 export function Link(props: LinkProps) {
   const {
-    to: propHref,
+    to,
     prefetch: propPrefetch,
     replace,
     className,
@@ -33,26 +33,26 @@ export function Link(props: LinkProps) {
   } = props;
   const { url: { pathname, searchParams } } = useRouter();
   const href = useMemo(() => {
-    if (!util.isFilledString(propHref)) {
+    if (!util.isFilledString(to)) {
       return "";
     }
-    if (util.isLikelyHttpURL(propHref)) {
-      return propHref;
+    if (util.isLikelyHttpURL(to)) {
+      return to;
     }
-    let [p, q] = util.splitBy(propHref, "?");
+    let [p, q] = util.splitBy(to, "?");
     if (p.startsWith("/")) {
       p = util.cleanPath(p);
     } else {
       p = util.cleanPath(pathname + "/" + p);
     }
     return [p, q].filter(Boolean).join("?");
-  }, [pathname, propHref]);
-  const isActived = useMemo(() => {
-    if (!util.isFilledString(propHref)) {
+  }, [pathname, to]);
+  const isActivated = useMemo(() => {
+    if (!util.isFilledString(to)) {
       return false;
     }
 
-    const [p, q] = util.splitBy(propHref, "?");
+    const [p, q] = util.splitBy(to, "?");
     if (util.trimSuffix(p, "/") !== pathname) {
       return false;
     }
@@ -64,7 +64,7 @@ export function Link(props: LinkProps) {
     }
 
     return true;
-  }, [pathname, searchParams, propHref]);
+  }, [pathname, searchParams, to]);
   const ariaCurrent = useMemo(() => {
     if (util.isFilledString(propAriaCurrent)) {
       return propAriaCurrent;
@@ -76,13 +76,13 @@ export function Link(props: LinkProps) {
   }, [href, propAriaCurrent]);
   const prefetch = useCallback(() => {
     if (
-      href && !util.isLikelyHttpURL(href) && !isActived &&
+      href && !util.isLikelyHttpURL(href) && !isActivated &&
       !prefetched.has(href)
     ) {
       events.emit("prefetchpage", { href });
       prefetched.add(href);
     }
-  }, [isActived]);
+  }, [isActivated]);
   const onMouseEnter = useCallback((e: MouseEvent) => {
     if (typeof propOnMouseEnter === "function") {
       propOnMouseEnter(e);
@@ -100,10 +100,10 @@ export function Link(props: LinkProps) {
       return;
     }
     e.preventDefault();
-    if (!isActived) {
+    if (!isActivated) {
       redirect(href, replace);
     }
-  }, [isActived, href, replace]);
+  }, [isActivated, href, replace]);
 
   useEffect(() => {
     if (propPrefetch) {
@@ -130,20 +130,14 @@ export function Link(props: LinkProps) {
  * Link Component to link between pages.
  */
 export function NavLink(props: LinkProps & { activeClassName?: string; activeStyle?: CSSProperties }) {
-  const {
-    to: propHref,
-    className: propClassName,
-    style: propStyle,
-    activeStyle,
-    activeClassName,
-  } = props;
+  const { to, className: propClassName, style: propStyle, activeStyle, activeClassName, ...rest } = props;
   const { url: { pathname, searchParams } } = useRouter();
-  const isActived = useMemo(() => {
-    if (!util.isFilledString(propHref)) {
+  const isActivated = useMemo(() => {
+    if (!util.isFilledString(to)) {
       return false;
     }
 
-    const [p, q] = util.splitBy(propHref, "?");
+    const [p, q] = util.splitBy(to, "?");
     if (util.trimSuffix(p, "/") !== pathname) {
       return false;
     }
@@ -155,30 +149,26 @@ export function NavLink(props: LinkProps & { activeClassName?: string; activeSty
     }
 
     return true;
-  }, [pathname, searchParams, propHref]);
+  }, [pathname, searchParams, to]);
   const className = useMemo(() => {
-    if (!isActived) {
+    if (!isActivated) {
       return propClassName;
     }
     return [propClassName, activeClassName].filter(util.isFilledString).map(
       (n) => n.trim(),
     ).filter(Boolean).join(" ");
-  }, [propClassName, activeClassName, isActived]);
+  }, [propClassName, activeClassName, isActivated]);
   const style = useMemo(() => {
-    if (!isActived) {
+    if (!isActivated) {
       return propStyle;
     }
     return Object.assign({}, propStyle, activeStyle);
-  }, [propStyle, activeStyle, isActived]);
-
-  return createElement(
-    Link,
-    {
-      ...props,
-      className,
-      style,
-    },
-  );
+  }, [propStyle, activeStyle, isActivated]);
+  const linkProps: LinkProps = { ...rest, to, className, style };
+  if (isActivated) {
+    Object.assign(linkProps, { "data-active": "true" });
+  }
+  return createElement(Link, linkProps);
 }
 
 function isModifiedEvent(event: MouseEvent): boolean {
