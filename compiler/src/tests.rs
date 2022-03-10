@@ -3,13 +3,13 @@ use std::collections::HashMap;
 
 fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
   let importmap = import_map::parse_from_json(
-    &Url::from_file_path("/").unwrap(),
+    &Url::from_str("file:///").unwrap(),
     r#"{
-    "imports": {
-      "~/": "./",
-      "react": "https://esm.sh/react"
-    }
-  }"#,
+      "imports": {
+        "~/": "./",
+        "react": "https://esm.sh/react"
+      }
+    }"#,
   )
   .expect("could not pause the import map")
   .import_map;
