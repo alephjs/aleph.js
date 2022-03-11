@@ -1,15 +1,15 @@
 # Contributing to Aleph.js
 
-Welcome, and thank you for taking time in contributing to Aleph.js! You can improve Aleph.js in different ways:
+Welcome, and thank you for taking time in contributing to Aleph.js! You can contribute to Aleph.js in different ways:
 
-- ∆ submit new features
-- ✘ find bugs
-- ✔︎ review code
-- 𝔸 improve our [documentation](https://github.com/alephjs/alephjs.org)
+- Submit new features
+- Report and fix bugs
+- Review code
+- Improve our [documentation](https://github.com/alephjs/alephjs.org)
 
 ## Development Setup
 
-You will need [Deno](https://deno.land/) 1.18.2+.
+You will need [Deno](https://deno.land/) 1.19+.
 
 1. Fork this repository to your own GitHub account.
 2. Clone the repository to your local device.
@@ -20,11 +20,14 @@ You will need [Deno](https://deno.land/) 1.18.2+.
 7. Merge to master branch by our maintainers.
 
 ```bash
-# run example app in development mode
-make dev app=react-app
+# run the example app in development mode
+make dev example=react-app
 
-# run example app in production mode
-make dev app=react-app
+# run the example app in production mode
+make start example=react-app
+
+# build the example app into a worker for serverless platform
+make build example=react-app
 ```
 
 ## Testing
