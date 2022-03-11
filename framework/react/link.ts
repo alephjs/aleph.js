@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren } from "https://esm.sh/react@17.0.2";
-import { createElement, useCallback, useEffect, useMemo } from "https://esm.sh/react@17.0.2";
+import { createElement, useCallback, useEffect, useMemo, useRef } from "https://esm.sh/react@17.0.2";
 import util from "../../lib/util.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
@@ -27,6 +27,7 @@ export function Link(props: LinkProps) {
     style,
     onClick: propOnClick,
     onMouseEnter: propOnMouseEnter,
+    onMouseLeave: propOnMouseLeave,
     ["aria-current"]: propAriaCurrent,
     children,
     ...rest
@@ -34,7 +35,7 @@ export function Link(props: LinkProps) {
   const { url: { pathname, searchParams } } = useRouter();
   const href = useMemo(() => {
     if (!util.isFilledString(to)) {
-      return "";
+      throw new Error("<Link>: prop `to` is required.");
     }
     if (util.isLikelyHttpURL(to)) {
       return to;
@@ -74,15 +75,13 @@ export function Link(props: LinkProps) {
     }
     return undefined;
   }, [href, propAriaCurrent]);
+  const timerRef = useRef<number | null>(null);
   const prefetch = useCallback(() => {
-    if (
-      href && !util.isLikelyHttpURL(href) && !isActivated &&
-      !prefetched.has(href)
-    ) {
+    if (!util.isLikelyHttpURL(href) && !isActivated && !prefetched.has(href)) {
       events.emit("prefetchpage", { href });
       prefetched.add(href);
     }
-  }, [isActivated]);
+  }, [href, isActivated]);
   const onMouseEnter = useCallback((e: MouseEvent) => {
     if (typeof propOnMouseEnter === "function") {
       propOnMouseEnter(e);
@@ -90,8 +89,25 @@ export function Link(props: LinkProps) {
     if (e.defaultPrevented) {
       return;
     }
-    prefetch();
-  }, [prefetch]);
+    if (!timerRef.current && !prefetched.has(href)) {
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        prefetch();
+      }, 300);
+    }
+  }, [prefetch, href, propOnMouseEnter]);
+  const onMouseLeave = useCallback((e: MouseEvent) => {
+    if (typeof propOnMouseLeave === "function") {
+      propOnMouseLeave(e);
+    }
+    if (e.defaultPrevented) {
+      return;
+    }
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [propOnMouseLeave]);
   const onClick = useCallback((e: MouseEvent) => {
     if (typeof propOnClick === "function") {
       propOnClick(e);
@@ -109,6 +125,12 @@ export function Link(props: LinkProps) {
     if (propPrefetch) {
       prefetch();
     }
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [propPrefetch, prefetch]);
 
   return createElement(
@@ -120,6 +142,7 @@ export function Link(props: LinkProps) {
       href,
       onClick,
       onMouseEnter,
+      onMouseLeave,
       "aria-current": ariaCurrent,
     },
     children,
