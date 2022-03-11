@@ -6,7 +6,6 @@ import type { RenderModule, Route, RouteMeta, SSRContext } from "../../server/ty
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import { DataContext, ForwardPropsContext, RouterContext } from "./context.ts";
-import { E404Page } from "./error.ts";
 
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
@@ -39,7 +38,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         },
       },
       createElement(
-        (currentModule?.defaultExport || E404Page) as FC,
+        (currentModule?.defaultExport || E404) as FC,
         null,
         modules.length > 1 ? createDataDriver(modules.slice(1)) : undefined,
       ),
@@ -66,7 +65,18 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       return { defaultExport, withData };
     };
     const prefetchData = async (dataUrl: string) => {
-      const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" } });
+      const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, redirect: "manual" });
+      if (res.status >= 400) {
+        const message = await res.text();
+        throw new Error(`prefetchData: <${res.status}> ${message}`);
+      }
+      if (res.status >= 300) {
+        const redirectUrl = res.headers.get("Location");
+        if (redirectUrl) {
+          location.href = redirectUrl;
+        }
+        return;
+      }
       const data = await res.json();
       const cc = res.headers.get("Cache-Control");
       const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
@@ -140,6 +150,16 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 
   return createElement(RouterContext.Provider, { value: { url } }, dataDirver);
 };
+
+function E404() {
+  return createElement(
+    "div",
+    { style: { padding: 10, color: "#999" } },
+    createElement("strong", null, "404"),
+    createElement("small", null, " - "),
+    "page not found",
+  );
+}
 
 export const useRouter = (): { url: URL; redirect: typeof redirect } => {
   const { url } = useContext(RouterContext);

@@ -119,8 +119,22 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
         setDataStore({ isLoading: true });
       }
       ac = new AbortController();
-      fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, signal: ac.signal })
+      fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, signal: ac.signal, redirect: "manual" })
         .then(async (res) => {
+          if (res.status >= 400) {
+            const message = await res.text();
+            const error: FetchError = { method: "get", status: res.status, message };
+            setDataStore(({ data }) => ({ data, error }));
+            return;
+          }
+          if (res.status >= 300) {
+            const redirectUrl = res.headers.get("Location");
+            if (redirectUrl) {
+              location.href = redirectUrl;
+            }
+            setDataStore(({ data }) => ({ data }));
+            return;
+          }
           if (res.ok) {
             const data = await res.json();
             const cc = res.headers.get("Cache-Control");
