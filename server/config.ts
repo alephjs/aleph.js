@@ -27,12 +27,12 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
       const { compilerOptions } = await parseJSONFile(denoConfigFile);
       const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
       if (
-        (jsx === "react-jsx" || jsx === "react-jsxdev") &&
+        (jsx === undefined || jsx === "react-jsx" || jsx === "react-jsxdev") &&
         util.isFilledString(jsxImportSource)
       ) {
         jsxConfig.jsxImportSource = jsxImportSource;
         jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
-      } else if (jsx === "react") {
+      } else if (jsx === undefined || jsx === "react") {
         jsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
       }
     } catch (error) {
@@ -43,12 +43,12 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
     const { compilerOptions } = await parseJSONFile(jsonFile);
     const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
     if (
-      (jsx === "react-jsx" || jsx === "react-jsxdev") &&
+      (jsx === undefined || jsx === "react-jsx" || jsx === "react-jsxdev") &&
       util.isFilledString(jsxImportSource)
     ) {
       jsxConfig.jsxImportSource = jsxImportSource;
       jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
-    } else if (jsx === "react") {
+    } else if (jsx === undefined || jsx === "react") {
       jsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
     }
   }
@@ -70,6 +70,7 @@ export async function loadImportMap(): Promise<ImportMap> {
         "aleph/": `${alephPkgUri}/`,
         "aleph/server": `${alephPkgUri}/server/mod.ts`,
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
+        "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
       },
       scopes,
     });
@@ -103,13 +104,15 @@ export async function importLoaders(importMap: ImportMap): Promise<Loader[]> {
         if (src.startsWith("./") || src.startsWith("../")) {
           src = "file://" + join(dirname(importMap.__filename), src);
         }
-        const { default: Loader } = await import(src);
-        if (typeof Loader === "function") {
-          loaders.push(new Loader());
-        } else if (
-          typeof Loader === "object" && Loader !== null && Loader.test && typeof Loader.load === "function"
+        let { default: loader } = await import(src);
+        if (typeof loader === "function") {
+          loader = new loader();
+        }
+        if (
+          typeof loader === "object" && loader !== null &&
+          typeof loader.test === "function" && typeof loader.load === "function"
         ) {
-          loaders.push(Loader);
+          loaders.push(loader);
         }
       }
     }

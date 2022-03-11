@@ -18,10 +18,6 @@ import { getAlephPkgUri } from "../server/config.ts";
 import type { ImportMap, Loader, LoaderContent } from "../server/types.ts";
 
 type Options = {
-  /** vue import source, default is `https://esm.sh/vue` */
-  runtimeModuleName?: string;
-  /** vue SSR import source, default is `https://esm.sh/@vue/server-renderer` */
-  ssrRuntimeModuleName?: string;
   script?: Omit<SFCScriptCompileOptions, "id">;
   template?: Partial<SFCTemplateCompileOptions>;
   style?: Partial<SFCAsyncStyleCompileOptions>;
@@ -66,8 +62,10 @@ export default class VueSFCLoader implements Loader {
       ssrCssVars: descriptor.cssVars,
       compilerOptions: {
         ...this.#options?.template?.compilerOptions,
-        runtimeModuleName: this.#options.runtimeModuleName ?? env.importMap?.imports["vue"] ?? "https://esm.sh/vue",
-        ssrRuntimeModuleName: this.#options.ssrRuntimeModuleName ?? env.importMap?.imports["vue/server-renderer"] ??
+        runtimeModuleName: this.#options?.template?.compilerOptions?.runtimeModuleName ??
+          env.importMap?.imports["vue"] ?? "https://esm.sh/vue",
+        ssrRuntimeModuleName: this.#options?.template?.compilerOptions?.ssrRuntimeModuleName ??
+          env.importMap?.imports["vue/server-renderer"] ??
           env.importMap?.imports["@vue/server-renderer"] ??
           "https://esm.sh/@vue/server-renderer",
         expressionPlugins,
@@ -77,20 +75,7 @@ export default class VueSFCLoader implements Loader {
       inlineTemplate: !env.isDev || env.ssr,
       ...this.#options?.script,
       id,
-      templateOptions: {
-        ...this.#options?.template,
-        isProd: !env.isDev,
-        ssr: env.ssr,
-        ssrCssVars: descriptor.cssVars,
-        compilerOptions: {
-          ...this.#options?.template?.compilerOptions,
-          runtimeModuleName: this.#options.runtimeModuleName ?? env.importMap?.imports["vue"] ?? "https://esm.sh/vue",
-          ssrRuntimeModuleName: this.#options.ssrRuntimeModuleName ?? env.importMap?.imports["vue/server-renderer"] ??
-            env.importMap?.imports["@vue/server-renderer"] ??
-            "https://esm.sh/@vue/server-renderer",
-          expressionPlugins,
-        },
-      },
+      templateOptions,
     });
 
     const mainScript = rewriteDefault(compiledScript.content, "__sfc__", expressionPlugins);
