@@ -18,7 +18,6 @@ export type FastTransformOptions = Pick<
   | "graphVersions"
   | "importMap"
   | "initialGraphVersion"
-  | "isDev"
   | "lang"
 >;
 

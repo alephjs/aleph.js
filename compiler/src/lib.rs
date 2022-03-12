@@ -101,7 +101,7 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
     importmap,
     options.graph_versions,
     options.initial_graph_version,
-    options.is_dev,
+    false,
     false,
   )));
   let module = SWC::parse(specifier, code, EsVersion::Es2022, options.lang).expect("could not parse the module");

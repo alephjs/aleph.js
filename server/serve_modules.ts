@@ -51,7 +51,6 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
       return acc;
     }, {} as Record<string, string>);
     const { code, deps } = await fastTransform(specifier, rawCode, {
-      isDev: env.isDev,
       importMap: JSON.stringify(env.importMap),
       initialGraphVersion: serverDependencyGraph.initialVersion.toString(16),
       graphVersions,
