@@ -1,9 +1,11 @@
 import { bold } from "https://deno.land/std@0.128.0/fmt/colors.ts";
+import { writeAll } from "https://deno.land/std@0.128.0/streams/conversion.ts";
+import { readLines } from "https://deno.land/std@0.128.0/io/mod.ts";
 import { basename, resolve } from "https://deno.land/std@0.128.0/path/mod.ts";
 import { readImportMap } from "./server/config.ts";
 import { parse } from "./lib/flags.ts";
 import { existsDir, findFile } from "./lib/fs.ts";
-import log from "./lib/log.ts";
+import log, { stripColor } from "./lib/log.ts";
 import { serveDir } from "./lib/serve.ts";
 import util from "./lib/util.ts";
 import { minDenoVersion, VERSION } from "./version.ts";
@@ -201,7 +203,6 @@ async function run(command: string, options: RunOptions) {
     "--allow-run",
     "--location=http://localhost",
     "--no-check",
-    "--quiet",
   ];
   const devPort = Deno.env.get("ALEPH_DEV_PORT");
   if (devPort) {
@@ -223,9 +224,28 @@ async function run(command: string, options: RunOptions) {
     cmd.push(new URL(`./commands/${command}.ts`, import.meta.url).href);
   }
   cmd.push(...Deno.args.slice(1));
-  const p = Deno.run({ cmd, stdout: "inherit", stderr: "inherit" });
+  const p = Deno.run({ cmd, stdout: "piped", stderr: "piped" });
+  pipe(p.stdout, Deno.stdout);
+  pipe(p.stderr, Deno.stderr);
   const { code } = await p.status();
   Deno.exit(code);
+}
+
+async function pipe(reader: Deno.Reader, writer: Deno.Writer) {
+  for await (const line of readLines(reader)) {
+    const newLine = fixLine(line);
+    if (newLine !== null) {
+      await writeAll(writer, util.utf8TextEncoder.encode(newLine + "\n"));
+    }
+  }
+}
+
+function fixLine(line: string): string | null {
+  const l = stripColor(line);
+  if (l.startsWith(`Download http://localhost:`)) {
+    return null;
+  }
+  return line;
 }
 
 if (import.meta.main) {
