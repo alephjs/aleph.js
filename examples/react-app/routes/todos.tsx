@@ -1,4 +1,5 @@
 import { Head, useData } from "aleph/react";
+import { json } from "aleph/server";
 
 type TodoItem = {
   id: number;
@@ -10,7 +11,7 @@ let todos: TodoItem[] = JSON.parse(window.localStorage?.getItem("todos") || "[]"
 
 export const data = {
   get: (req: Request) => {
-    return new Response(JSON.stringify({ todos }));
+    return json({ todos });
   },
   put: async (req: Request) => {
     const { message } = await req.json();
@@ -18,7 +19,7 @@ export const data = {
       todos.push({ id: Date.now(), message, completed: false });
       window.localStorage?.setItem("todos", JSON.stringify(todos));
     }
-    return new Response(JSON.stringify({ todos }));
+    return json({ todos });
   },
   patch: async (req: Request) => {
     const { id, message, completed } = await req.json();
@@ -32,7 +33,7 @@ export const data = {
       }
       window.localStorage?.setItem("todos", JSON.stringify(todos));
     }
-    return new Response(JSON.stringify({ todos }));
+    return json({ todos });
   },
   delete: (req: Request) => {
     const { searchParams } = new URL(req.url);
@@ -43,7 +44,7 @@ export const data = {
         window.localStorage?.setItem("todos", JSON.stringify(todos));
       }
     }
-    return new Response(JSON.stringify({ todos }));
+    return json({ todos });
   },
 };
 
