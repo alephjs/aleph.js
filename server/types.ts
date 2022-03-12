@@ -1,4 +1,4 @@
-import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.27.2";
+import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.28.0";
 import type { URLPatternCompat, URLPatternInput } from "../lib/url.ts";
 
 export type AlephConfig = {
