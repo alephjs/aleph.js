@@ -164,7 +164,7 @@ fn strip_data_export() {
          }
       }
     "#;
-  let (code, _) = transform(
+  let (code, r) = transform(
     "./app.tsx",
     source,
     false,
@@ -175,6 +175,7 @@ fn strip_data_export() {
   );
   assert!(code.contains("export const data = true"));
   assert!(!code.contains("import { json } from \"./helper.ts\""));
+  assert_eq!(r.borrow().deps.len(), 0);
 }
 
 #[test]

@@ -19,6 +19,8 @@ lazy_static! {
 #[serde(rename_all = "camelCase")]
 pub struct DependencyDescriptor {
   pub specifier: String,
+  #[serde(skip)]
+  pub import_url: String,
   #[serde(skip_serializing_if = "is_false")]
   pub dynamic: bool,
 }
@@ -204,23 +206,17 @@ impl Resolver {
       import_url = fixed_url.clone();
     }
 
-    // update dep graph
-    self.deps.push(DependencyDescriptor {
-      specifier: fixed_url.clone(),
-      dynamic,
-    });
-
     if import_url.ends_with(".css") {
       import_url = import_url + "?module"
     }
 
-    // fix remote url to local path
-    if is_http_url(&import_url) && self.resolve_remote_deps {
-      return self.to_local_path(&import_url);
-    }
-
-    // apply graph version if has
-    if !is_remote {
+    if is_remote {
+      // fix remote url to local path if allowed
+      if self.resolve_remote_deps {
+        import_url = self.to_local_path(&import_url);
+      }
+    } else {
+      // apply graph version if exists
       let v = if self.graph_versions.contains_key(&fixed_url) {
         self.graph_versions.get(&fixed_url)
       } else {
@@ -234,6 +230,13 @@ impl Resolver {
         }
       }
     }
+
+    // update dep graph
+    self.deps.push(DependencyDescriptor {
+      specifier: fixed_url.clone(),
+      import_url: import_url.clone(),
+      dynamic,
+    });
 
     import_url
   }

@@ -2,7 +2,7 @@ use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::export_names::ExportParser;
 use crate::hmr::hmr;
 use crate::resolve_fold::resolve_fold;
-use crate::resolver::Resolver;
+use crate::resolver::{DependencyDescriptor, Resolver};
 
 use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::comments::SingleThreadedComments;
@@ -200,7 +200,22 @@ impl SWC {
         hygiene()
       );
 
-      Ok(self.apply_fold(passes, options.source_map, options.minify).unwrap())
+      let (code, map) = self.apply_fold(passes, options.source_map, options.minify).unwrap();
+
+      // remove dead deps by tree-shaking
+      if options.strip_data_export {
+        let mut resolver = resolver.borrow_mut();
+        let mut deps: Vec<DependencyDescriptor> = Vec::new();
+        let a = code.split("\"").collect::<Vec<&str>>();
+        for dep in resolver.deps.clone() {
+          if a.contains(&dep.import_url.as_str()) {
+            deps.push(dep);
+          }
+        }
+        resolver.deps = deps;
+      }
+
+      Ok((code, map))
     })
   }
 
