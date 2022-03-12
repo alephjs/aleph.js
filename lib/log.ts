@@ -1,4 +1,4 @@
-import { blue, dim, green, red, yellow } from "https://deno.land/std@0.128.0/fmt/colors.ts";
+import { blue, dim, green, red, stripColor, yellow } from "https://deno.land/std@0.128.0/fmt/colors.ts";
 
 export type LevelName = "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -103,4 +103,4 @@ export class Logger {
 }
 
 export default new Logger();
-export { blue, dim, green, red, yellow };
+export { blue, dim, green, red, stripColor, yellow };
