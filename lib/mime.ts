@@ -2,6 +2,7 @@
 const mimeTypes: Record<string, string[]> = {
   // application
   "application/javascript": ["js", "mjs"],
+  "application/typescript": ["ts", "mts", "cts"],
   "application/node": ["cjs"],
   "application/wasm": ["wasm"],
   "application/json": ["json", "jsonc", "map"],
@@ -14,11 +15,10 @@ const mimeTypes: Record<string, string[]> = {
   "text/markdown": ["md", "markdown"],
   "text/mdx": ["mdx"],
   "text/jsx": ["jsx"],
-  "text/typescript": ["ts", "mts", "cts"],
   "text/tsx": ["tsx"],
-  "text/css": ["css"],
   "text/vue": ["vue"],
   "text/svelte": ["svelte"],
+  "text/css": ["css"],
   "text/postcss": ["pcss", "postcss"],
   "text/less": ["less"],
   "text/sass": ["sass", "scss"],
@@ -58,13 +58,17 @@ const mimeTypes: Record<string, string[]> = {
 };
 
 // map types
-const typesMap = Object.keys(mimeTypes).reduce((map, contentType) => {
-  mimeTypes[contentType].forEach((ext) => map.set(ext, contentType));
+const typesMap = Object.entries(mimeTypes).reduce((map, [contentType, exts]) => {
+  exts.forEach((ext) => map.set(ext, contentType));
   return map;
 }, new Map<string, string>());
 
 /** get content type by file name */
-export function getContentType(filename: string): string {
+export function getContentType(filename: string, charset?: string): string {
   const ext = filename.split(".").pop()!.toLowerCase();
-  return typesMap.get(ext) ?? "application/octet-stream";
+  let ctype = typesMap.get(ext);
+  if (charset) {
+    ctype = `${ctype}; charset=${charset}`;
+  }
+  return ctype ?? "application/octet-stream";
 }

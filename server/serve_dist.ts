@@ -4,7 +4,7 @@ import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import type { AlephConfig } from "./types.ts";
 
-export const clientModuleTransformer = {
+export default {
   fetch: async (req: Request): Promise<Response> => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
     const outputDir = config?.build?.outputDir ?? "dist";

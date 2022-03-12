@@ -1,11 +1,11 @@
-import { basename, dirname, join } from "https://deno.land/std@0.128.0/path/mod.ts";
+import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.128.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { findFile } from "../lib/fs.ts";
 import { globalIt } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
-import type { ImportMap, JSXConfig, Loader } from "./types.ts";
+import type { ImportMap, JSXConfig, ModuleLoader } from "./types.ts";
 
 export function getAlephPkgUri() {
   return globalIt("__ALEPH_PKG_URI", () => {
@@ -93,11 +93,10 @@ export async function loadImportMap(): Promise<ImportMap> {
   return importMap;
 }
 
-export async function importLoaders(importMap: ImportMap): Promise<Loader[]> {
-  const loaders: Loader[] = [];
-
+export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoader[]> {
+  const loaders: ModuleLoader[] = [];
   for (const key in importMap.imports) {
-    if (key.startsWith("*.")) {
+    if (/^\*\.[a-z0-9]+$/i.test(key)) {
       let src = importMap.imports[key];
       if (src.endsWith("!loader")) {
         src = util.trimSuffix(src, "!loader");
@@ -112,12 +111,17 @@ export async function importLoaders(importMap: ImportMap): Promise<Loader[]> {
           typeof loader === "object" && loader !== null &&
           typeof loader.test === "function" && typeof loader.load === "function"
         ) {
-          loaders.push(loader);
+          const reg = globToRegExp("/**/" + key);
+          loaders.push({
+            test: (pathname: string) => {
+              return reg.test(pathname) && loader.test(pathname);
+            },
+            load: (pathname: string, env: Record<string, unknown>) => loader.load(pathname, env),
+          });
         }
       }
     }
   }
-
   return loaders;
 }
 

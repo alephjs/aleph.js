@@ -1,4 +1,4 @@
-import { matchRoutes, toLocalPath } from "../lib/helpers.ts";
+import { builtinModuleExts, matchRoutes, toLocalPath } from "../lib/helpers.ts";
 import { type Element, HTMLRewriter } from "../lib/html.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
@@ -29,15 +29,25 @@ export default {
       try {
         const headCollection: string[] = [];
         const ssrOutput = await ssr({ url, modules, headCollection });
-        if (modules.length > 0) {
-          const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+        const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+        if (serverDependencyGraph) {
           const styles: string[] = [];
           for (const { filename } of modules) {
-            serverDependencyGraph?.walk(filename, (mod) => {
+            serverDependencyGraph.walk(filename, (mod) => {
               if (mod.inlineCSS) {
                 styles.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
               }
             });
+          }
+          for (const serverEntry of builtinModuleExts.map((ext) => `./server.${ext}`)) {
+            if (serverDependencyGraph.get(serverEntry)) {
+              serverDependencyGraph.walk(serverEntry, (mod) => {
+                if (mod.inlineCSS) {
+                  styles.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
+                }
+              });
+              break;
+            }
           }
           headCollection.push(...styles);
         }

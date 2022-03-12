@@ -4,10 +4,10 @@ import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { existsDir, findFile } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
-import { importLoaders, loadImportMap } from "../server/config.ts";
+import { initLoaders, loadImportMap } from "../server/config.ts";
 import { build } from "../server/build.ts";
 import { serve } from "../server/mod.ts";
-import { serveAppModules } from "../server/transformer.ts";
+import { serveAppModules } from "../server/serve_app_modules.ts";
 
 export const helpMessage = `
 Usage:
@@ -48,7 +48,7 @@ if (import.meta.main) {
 
   const ac = new AbortController();
   const importMap = await loadImportMap();
-  const loaders = await importLoaders(importMap);
+  const loaders = await initLoaders(importMap);
   serveAppModules(6060, { importMap, loaders, signal: ac.signal });
 
   let serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));

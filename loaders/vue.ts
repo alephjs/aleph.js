@@ -13,9 +13,7 @@ import {
 } from "https://esm.sh/@vue/compiler-sfc@3.2.31";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { fastTransform, transform } from "../compiler/mod.ts";
-import { getAlephPkgUri } from "../server/config.ts";
-import type { ImportMap, Loader, LoaderContent } from "../server/types.ts";
+import type { ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "../server/types.ts";
 
 type Options = {
   script?: Omit<SFCScriptCompileOptions, "id">;
@@ -23,24 +21,23 @@ type Options = {
   style?: Partial<SFCAsyncStyleCompileOptions>;
 };
 
-export default class VueSFCLoader implements Loader {
+export default class VueSFCLoader implements ModuleLoader {
   #options: Options;
 
   constructor(options?: Options) {
     this.#options = { ...options };
   }
 
-  test(req: Request): boolean {
-    const url = new URL(req.url);
-    return url.pathname.endsWith(".vue");
+  test(pathname: string): boolean {
+    return pathname.endsWith(".vue");
   }
 
-  async load(req: Request, env: { importMap?: ImportMap; isDev?: boolean; ssr?: boolean }): Promise<LoaderContent> {
-    const url = new URL(req.url);
-    const content = await Deno.readTextFile(`.${url.pathname}`);
-    const filename = "." + url.pathname;
+  async load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderContent> {
+    const stat = await Deno.lstat(`.${pathname}`);
+    const content = await Deno.readTextFile(`.${pathname}`);
+    const filename = "." + pathname;
     const id = (await util.computeHash("SHA-256", filename)).slice(0, 8);
-    const { descriptor } = parse(content, { filename: "." + url.pathname });
+    const { descriptor } = parse(content, { filename });
     const scriptLang = (descriptor.script && descriptor.script.lang) ||
       (descriptor.scriptSetup && descriptor.scriptSetup.lang);
     const isTS = scriptLang === "ts";
@@ -79,29 +76,29 @@ export default class VueSFCLoader implements Loader {
     });
 
     const mainScript = rewriteDefault(compiledScript.content, "__sfc__", expressionPlugins);
-    const jsLines = [mainScript];
+    const output = [mainScript];
     if (env.isDev && !env.ssr && descriptor.template) {
       const templateResult = compileTemplate({
         ...templateOptions,
         source: descriptor.template.content,
       });
       if (templateResult.errors.length > 0) {
-        jsLines.push(`/* SSR compile error: ${templateResult.errors[0]} */`);
+        output.push(`/* SSR compile error: ${templateResult.errors[0]} */`);
       } else {
-        jsLines.push(templateResult.code.replace("export function render(", "__sfc__.render = function render("));
+        output.push(templateResult.code.replace("export function render(", "__sfc__.render = function render("));
       }
     }
-    jsLines.push(`__sfc__.__file = ${JSON.stringify(filename)}`);
+    output.push(`__sfc__.__file = ${JSON.stringify(filename)}`);
     if (descriptor.styles.some((s) => s.scoped)) {
-      jsLines.push(`__sfc__.__scopeId = ${JSON.stringify(`data-v-${id}`)}`);
+      output.push(`__sfc__.__scopeId = ${JSON.stringify(`data-v-${id}`)}`);
     }
     if (!env.ssr && env.isDev) {
       const mainScriptHash = (await util.computeHash("SHA-256", mainScript)).slice(0, 8);
-      jsLines.push(`__sfc__.__scriptHash = ${JSON.stringify(mainScriptHash)}`);
-      jsLines.push(`__sfc__.__hmrId = ${JSON.stringify(id)}`);
-      jsLines.push(`window.__VUE_HMR_RUNTIME__?.createRecord(__sfc__.__hmrId, __sfc__)`);
-      jsLines.push(`let __currentScriptHash = ${JSON.stringify(mainScriptHash)}`);
-      jsLines.push(
+      output.push(`__sfc__.__scriptHash = ${JSON.stringify(mainScriptHash)}`);
+      output.push(`__sfc__.__hmrId = ${JSON.stringify(id)}`);
+      output.push(`window.__VUE_HMR_RUNTIME__?.createRecord(__sfc__.__hmrId, __sfc__)`);
+      output.push(`let __currentScriptHash = ${JSON.stringify(mainScriptHash)}`);
+      output.push(
         `import.meta.hot.accept(({ default: sfc }) => {`,
         `  const rerenderOnly = __currentScriptHash === sfc.__scriptHash`,
         `  if (rerenderOnly) {`,
@@ -113,23 +110,8 @@ export default class VueSFCLoader implements Loader {
         `})`,
       );
     }
-    jsLines.push(`export default __sfc__`);
+    output.push(`export default __sfc__`);
 
-    // post-process
-    const js = jsLines.join("\n");
-    const { code, deps: scriptDeps = [] } = env.ssr
-      ? await fastTransform(filename, js, {
-        importMap: env.importMap ? JSON.stringify(env.importMap) : undefined,
-        lang: isTS ? "ts" : "js",
-        isDev: env.isDev,
-      })
-      : await transform(filename, js, {
-        alephPkgUri: getAlephPkgUri(),
-        importMap: env.importMap ? JSON.stringify(env.importMap) : undefined,
-        lang: isTS ? "ts" : "js",
-        isDev: env.isDev,
-      });
-    const deps = scriptDeps.map(({ specifier }) => specifier);
     const css = (await Promise.all(descriptor.styles.map(async (style) => {
       const styleResult = await compileStyleAsync({
         ...this.#options.style,
@@ -152,14 +134,12 @@ export default class VueSFCLoader implements Loader {
         return styleResult.code;
       }
     }))).join("\n");
-    if (css) {
-      deps.push(`inline-css:${css}`);
-    }
 
     return {
-      content: new TextEncoder().encode(code),
-      contentType: "application/javascript; charset=utf-8",
-      deps,
+      code: output.join("\n"),
+      modtime: stat?.mtime?.getTime(),
+      lang: isTS ? "ts" : "js",
+      inlineCSS: css || undefined,
     };
   }
 }

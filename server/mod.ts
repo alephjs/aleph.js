@@ -5,11 +5,11 @@ import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
-import { importLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
+import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
 import renderer from "./renderer.ts";
 import { content, json } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
-import { clientModuleTransformer } from "./transformer.ts";
+import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware, Route, SSRContext } from "./types.ts";
 
 export type ServerOptions = {
@@ -28,7 +28,7 @@ export const serve = (options: ServerOptions = {}) => {
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const jsxConfigPromise = loadJSXConfig();
   const importMapPromise = loadImportMap();
-  const loadersPromise = importMapPromise.then((importMap) => importLoaders(importMap));
+  const moduleLoadersPromise = importMapPromise.then((importMap) => initModuleLoaders(importMap));
   const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
   const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {
     const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
@@ -68,21 +68,26 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // use loader to load modules
-    const loaders = await loadersPromise;
-    const loader = loaders.find((loader) => loader.test(req));
+    const moduleLoaders = await moduleLoadersPromise;
+    const loader = moduleLoaders.find((loader) => loader.test(pathname));
     if (loader) {
-      const [buildHash, importMap] = await Promise.all([
-        buildHashPromise,
-        importMapPromise,
-      ]);
-      return clientModuleTransformer.fetch(req, {
-        isDev,
-        importMap,
-        loader,
-        buildHash,
-        buildTarget: config?.build?.target,
-        atomicCSS: config?.atomicCSS,
-      });
+      const [buildHash, importMap] = await Promise.all([buildHashPromise, importMapPromise]);
+      try {
+        const loaded = await loader.load(pathname, { isDev, importMap });
+        return clientModuleTransformer.fetch(req, {
+          isDev,
+          importMap,
+          loaded,
+          buildHash,
+          buildTarget: config?.build?.target,
+          atomicCSS: config?.atomicCSS,
+        });
+      } catch (err) {
+        if (!(err instanceof Deno.errors.NotFound)) {
+          log.error(err);
+          return new Response("Internal Server Error", { status: 500 });
+        }
+      }
     }
 
     // serve static files

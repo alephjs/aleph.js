@@ -1,15 +1,13 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.128.0/streams/conversion.ts";
 import { basename, join } from "https://deno.land/std@0.128.0/path/mod.ts";
 import { serve } from "https://deno.land/std@0.128.0/http/server.ts";
-import type { Loader, LoaderEnv } from "../server/types.ts";
 import { getContentType } from "./mime.ts";
 
 export type ServeDirOptions = {
   port: number;
   cwd?: string;
   signal?: AbortSignal;
-  loaders?: Loader[];
-  env?: LoaderEnv;
+  loader?: (req: Request) => Promise<{ content: string | Uint8Array; contentType?: string } | null | undefined>;
 };
 
 export async function serveDir(options: ServeDirOptions) {
@@ -42,18 +40,16 @@ export async function serveDir(options: ServeDirOptions) {
         );
       }
 
-      const loader = options.loaders?.find((loader) => loader.test(req));
-      if (loader) {
-        let ret = loader.load(req, options.env || {});
-        if (ret instanceof Promise) {
-          ret = await ret;
+      if (options.loader) {
+        const ret = await options.loader(req);
+        if (ret) {
+          return new Response(ret.content, {
+            headers: {
+              "Content-Type": ret.contentType || getContentType(filepath),
+              "Last-Modified": stat.mtime?.toUTCString() || "",
+            },
+          });
         }
-        return new Response(ret.content, {
-          headers: {
-            "Content-Type": ret.contentType || getContentType(filepath),
-            "Last-Modified": stat.mtime?.toUTCString() || "",
-          },
-        });
       }
 
       const file = await Deno.open(filepath, { read: true });

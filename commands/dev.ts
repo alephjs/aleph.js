@@ -6,11 +6,11 @@ import { existsDir, findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { importLoaders, loadImportMap } from "../server/config.ts";
+import { initModuleLoaders, loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
 import type { DependencyGraph } from "../server/graph.ts";
-import { serveAppModules } from "../server/transformer.ts";
+import { serveAppModules } from "../server/serve_modules.ts";
 import type { AlephConfig } from "../server/types.ts";
 
 export const helpMessage = `
@@ -112,8 +112,8 @@ if (import.meta.main) {
   }
 
   const importMap = await loadImportMap();
-  const loaders = await importLoaders(importMap);
-  serveAppModules(6060, { importMap, loaders });
+  const moduleLoaders = await initModuleLoaders(importMap);
+  serveAppModules(6060, { importMap, moduleLoaders });
 
   log.info(`Watching files for changes...`);
   watchFs(workingDir, (kind, path) => {

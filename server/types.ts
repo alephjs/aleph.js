@@ -8,21 +8,22 @@ export type AlephConfig = {
   routeFiles?: string | RoutesConfig;
 };
 
-export type LoaderEnv = {
+export type ModuleLoader = {
+  test(pathname: string): boolean;
+  load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderContent> | ModuleLoaderContent;
+};
+
+export type ModuleLoaderEnv = {
   importMap?: ImportMap;
   isDev?: boolean;
   ssr?: boolean;
 };
 
-export type Loader = {
-  test(req: Request): boolean;
-  load(req: Request, env: LoaderEnv): Promise<LoaderContent> | LoaderContent;
-};
-
-export type LoaderContent = {
-  content: Uint8Array;
-  contentType?: string;
-  deps?: string[];
+export type ModuleLoaderContent = {
+  code: string;
+  inlineCSS?: string;
+  lang?: "js" | "jsx" | "ts" | "tsx" | "css";
+  map?: string;
   modtime?: number;
 };
 
