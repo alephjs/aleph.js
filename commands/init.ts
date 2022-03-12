@@ -78,7 +78,7 @@ export default async function (nameArg: string | undefined, template = "react") 
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
     },
-    scope: {},
+    scopes: {},
   };
   const denoConfig = {
     "compilerOptions": {
