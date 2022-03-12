@@ -1,3 +1,7 @@
+import { ensureDir } from "https://deno.land/std@0.128.0/fs/ensure_dir.ts";
+import { dirname, join } from "https://deno.land/std@0.128.0/path/mod.ts";
+import { existsFile } from "../lib/fs.ts";
+import { isCanary, VERSION } from "../version.ts";
 import init, {
   fastTransform as fastSWC,
   parseExportNames as parseExportNamesSWC,
@@ -26,8 +30,24 @@ async function checkWasmReady() {
 }
 
 async function initWasm() {
-  const wasmData = decodeWasmData();
-  await init(wasmData);
+  const denoDir = Deno.env.get("DENO_DIR");
+  if (denoDir) {
+    const pkgName = isCanary ? "aleph_canary" : "aleph";
+    const cacheDir = join(denoDir, `deps/https/deno.land/x/${pkgName}`);
+    const cachePath = `${cacheDir}/compiler.${VERSION}.wasm`;
+    if (await existsFile(cachePath)) {
+      const wasmData = await Deno.readFile(cachePath);
+      await init(wasmData);
+    } else {
+      const wasmData = decodeWasmData();
+      await init(wasmData);
+      await ensureDir(dirname(cachePath));
+      await Deno.writeFile(cachePath, wasmData);
+    }
+  } else {
+    const wasmData = decodeWasmData();
+    await init(wasmData);
+  }
 }
 
 /** parse export names */
