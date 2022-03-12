@@ -31,7 +31,7 @@ async function checkWasmReady() {
 
 async function initWasm() {
   const denoDir = Deno.env.get("DENO_DIR");
-  if (denoDir) {
+  if (denoDir && !Deno.env.get("ALEPH_DEV")) {
     const pkgName = isCanary ? "aleph_canary" : "aleph";
     const cacheDir = join(denoDir, `deps/https/deno.land/x/${pkgName}`);
     const cachePath = `${cacheDir}/compiler.${VERSION}.wasm`;
