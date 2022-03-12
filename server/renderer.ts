@@ -97,17 +97,23 @@ export default {
           headers.append("Cache-Control", "public, max-age=0, must-revalidate");
         }
       } catch (error) {
-        ssrHTMLRewriter.set("ssr-head", {
-          element(el: Element) {
-            el.remove();
-          },
-        });
-        ssrHTMLRewriter.set("ssr-body", {
-          element(el: Element) {
-            el.replace(`<code><pre>${error.stack}</pre></code>`, { html: true });
-          },
-        });
+        // todo: better UI & reload
+        const errorHtml = `
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <title>SSR Error</title>
+            </head>
+            <body>
+              <div>
+                <pre><code>${error.stack}</code></pre>
+              </div>
+            </body>
+          </html>
+        `;
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
+        return new Response(errorHtml, { headers });
       }
     } else {
       const { mtime, size } = await Deno.lstat("./index.html");
