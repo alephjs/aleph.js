@@ -69,10 +69,10 @@ export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
         jsxConfig.jsxRuntime = m[1] as "react" | "preact";
       }
       if (m[2]) {
-        if (jsxConfig.jsxImportSource) {
-          jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${jsxConfig.jsxRuntimeVersion}`;
-        }
         jsxConfig.jsxRuntimeVersion = m[2];
+        if (jsxConfig.jsxImportSource) {
+          jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${m[2]}`;
+        }
       } else {
         fuzzReactUrl = url;
       }
@@ -89,7 +89,7 @@ export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
       jsxConfig.jsxRuntimeCdnVersion = m[1].slice(1);
       jsxConfig.jsxRuntimeVersion = m[2];
       if (jsxConfig.jsxImportSource) {
-        jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${jsxConfig.jsxRuntimeVersion}`;
+        jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${m[2]}`;
       }
       log.info(`${jsxConfig.jsxRuntime}@${jsxConfig.jsxRuntimeVersion} is used`);
     }

@@ -169,7 +169,7 @@ async function main() {
         if (update) {
           await Deno.writeTextFile(
             importMapFile,
-            JSON.stringify(importMap, undefined, 2),
+            JSON.stringify({ imports: importMap.imports, scopes: importMap.scopes }, undefined, 2),
           );
         }
       } catch (e) {
