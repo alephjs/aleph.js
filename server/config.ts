@@ -18,7 +18,7 @@ export function getAlephPkgUri() {
   });
 }
 
-export async function loadJSXConfig(): Promise<JSXConfig> {
+export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
   const jsxConfig: JSXConfig = {};
   const denoConfigFile = await findFile(Deno.cwd(), ["deno.jsonc", "deno.json", "tsconfig.json"]);
 
@@ -53,6 +53,48 @@ export async function loadJSXConfig(): Promise<JSXConfig> {
     }
   }
 
+  let fuzzReactUrl: string | null = null;
+
+  for (const url of Object.values(importMap.imports)) {
+    let m = url.match(/^https?:\/\/esm\.sh\/(p?react)@(\d+\.\d+\.\d+(-[a-z\d.]+)*)(\?|$)/);
+    if (!m) {
+      m = url.match(/^https?:\/\/esm\.sh\/(p?react)@.+/);
+    }
+    if (m) {
+      const { searchParams } = new URL(url);
+      if (searchParams.has("pin")) {
+        jsxConfig.jsxRuntimeCdnVersion = util.trimPrefix(searchParams.get("pin")!, "v");
+      }
+      if (!jsxConfig.jsxRuntime) {
+        jsxConfig.jsxRuntime = m[1] as "react" | "preact";
+      }
+      if (m[2]) {
+        if (jsxConfig.jsxImportSource) {
+          jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${jsxConfig.jsxRuntimeVersion}`;
+        }
+        jsxConfig.jsxRuntimeVersion = m[2];
+      } else {
+        fuzzReactUrl = url;
+      }
+      break;
+    }
+  }
+
+  // get acctual react version from esm.sh
+  if (fuzzReactUrl) {
+    log.info(`Checking ${jsxConfig.jsxRuntime} version...`);
+    const text = await fetch(fuzzReactUrl).then((resp) => resp.text());
+    const m = text.match(/https?:\/\/cdn\.esm\.sh\/(v\d+)\/p?react@(\d+\.\d+\.\d+(-[a-z\d.]+)*)\//);
+    if (m) {
+      jsxConfig.jsxRuntimeCdnVersion = m[1].slice(1);
+      jsxConfig.jsxRuntimeVersion = m[2];
+      if (jsxConfig.jsxImportSource) {
+        jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${jsxConfig.jsxRuntimeVersion}`;
+      }
+      log.info(`${jsxConfig.jsxRuntime}@${jsxConfig.jsxRuntimeVersion} is used`);
+    }
+  }
+
   return jsxConfig;
 }
 
@@ -74,7 +116,6 @@ export async function loadImportMap(): Promise<ImportMap> {
       },
       scopes,
     });
-    return importMap;
   }
 
   const importMapFile = await findFile(
@@ -83,8 +124,10 @@ export async function loadImportMap(): Promise<ImportMap> {
   );
   if (importMapFile) {
     try {
-      const im = await readImportMap(importMapFile);
-      Object.assign(importMap, im);
+      const { __filename, imports, scopes } = await readImportMap(importMapFile);
+      Object.assign(importMap, { __filename });
+      Object.assign(importMap.imports, imports);
+      Object.assign(importMap.scopes, scopes);
     } catch (e) {
       log.error("loadImportMap:", e.message);
     }

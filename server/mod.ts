@@ -26,8 +26,8 @@ export type ServerOptions = {
 export const serve = (options: ServerOptions = {}) => {
   const { config, middlewares, fetch, ssr } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
-  const jsxConfigPromise = loadJSXConfig();
   const importMapPromise = loadImportMap();
+  const jsxConfigPromise = importMapPromise.then((importMap) => loadJSXConfig(importMap));
   const moduleLoadersPromise = importMapPromise.then((importMap) => initModuleLoaders(importMap));
   const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
   const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {

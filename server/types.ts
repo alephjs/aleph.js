@@ -88,6 +88,8 @@ export type ImportMap = {
 export type JSXConfig = {
   jsxRuntime?: "react" | "preact";
   jsxImportSource?: string;
+  jsxRuntimeVersion?: string;
+  jsxRuntimeCdnVersion?: string;
 };
 
 export { AtomicCSSConfig };
