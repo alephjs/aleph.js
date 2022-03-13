@@ -8,7 +8,7 @@ import { builtinModuleExts, toLocalPath } from "../lib/helpers.ts";
 import { parseHtmlLinks } from "../lib/html.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { getAlephPkgUri, loadJSXConfig } from "../server/config.ts";
+import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "../server/config.ts";
 import { DependencyGraph } from "../server/graph.ts";
 import { initRoutes } from "../server/routing.ts";
 import type { AlephConfig, FetchHandler } from "../server/types.ts";
@@ -32,7 +32,8 @@ export async function build(
 
   const tmpDir = await Deno.makeTempDir();
   const alephPkgUri = getAlephPkgUri();
-  const jsxCofig = await loadJSXConfig();
+  const importMap = await loadImportMap();
+  const jsxCofig = await loadJSXConfig(importMap);
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
   const outputDir = join(workingDir, config?.build?.outputDir ?? "dist");
 
@@ -124,9 +125,7 @@ export async function build(
             args.path.startsWith(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/`);
           const [path] = util.splitBy(isRemote ? args.path : util.trimPrefix(args.path, "file://"), "#");
 
-          if (
-            (isRemote && !forceBundle) || args.path === "./server_dependency_graph.js"
-          ) {
+          if ((isRemote && !forceBundle) || args.path === "./server_dependency_graph.js") {
             return { path, external: true };
           }
 
@@ -149,10 +148,28 @@ export async function build(
           if (url.href === `${alephPkgUri}/server/transformer.ts`) {
             url.pathname = util.trimSuffix(url.pathname, "transformer.ts") + "serve_dist.ts";
           }
-          const contents = await (await cache(url.href)).text();
+          const res = await cache(url.href);
+          const contents = await res.text();
+          let ext = extname(url.pathname).slice(1);
+          if (ext === "mjs") {
+            ext = "js";
+          } else if (ext === "mts") {
+            ext = "ts";
+          } else if (!builtinModuleExts.includes(ext)) {
+            const ctype = res.headers.get("Content-Type");
+            if (ctype?.startsWith("application/javascript")) {
+              ext = "js";
+            } else if (ctype?.startsWith("application/typescript")) {
+              ext = "ts";
+            } else if (ctype?.startsWith("text/jsx")) {
+              ext = "jsx";
+            } else if (ctype?.startsWith("text/tsx")) {
+              ext = "tsx";
+            }
+          }
           return {
             contents,
-            loader: extname(url.pathname).slice(1) as unknown as Loader,
+            loader: ext as unknown as Loader,
           };
         });
       },

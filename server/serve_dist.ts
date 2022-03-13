@@ -1,7 +1,5 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.128.0/streams/conversion.ts";
-import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
-import { getContentType } from "../lib/mime.ts";
 import type { AlephConfig } from "./types.ts";
 
 export default {
@@ -11,12 +9,12 @@ export default {
     const { pathname, searchParams } = new URL(req.url);
     try {
       let filePath = `./${outputDir}${pathname}`;
-      let ctype = getContentType(pathname);
+      let ctype = "application/javascript; charset=utf-8";
       if (searchParams.has("module") || pathname.startsWith("/-/esm.sh/")) {
         filePath += `.js`;
       }
-      if (builtinModuleExts.find((ext) => filePath.endsWith(`.${ext}`))) {
-        ctype = "application/javascript; charset=utf-8";
+      if (pathname.endsWith(".css") && !searchParams.has("module")) {
+        ctype = "text/css; charset=utf-8";
       }
       const stat = await Deno.lstat(filePath);
       if (stat.isFile) {
