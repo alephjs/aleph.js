@@ -1,4 +1,4 @@
-import { createContext } from "https://esm.sh/react@17.0.2";
+import { createContext } from "react";
 
 export type RouterContextProps = {
   url: URL;

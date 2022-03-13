@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { DataContext } from "./context.ts";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";

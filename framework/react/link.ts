@@ -1,5 +1,5 @@
-import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren } from "https://esm.sh/react@17.0.2";
-import { createElement, useCallback, useEffect, useMemo, useRef } from "https://esm.sh/react@17.0.2";
+import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef } from "react";
 import util from "../../lib/util.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";

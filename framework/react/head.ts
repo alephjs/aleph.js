@@ -1,13 +1,5 @@
-import type { FC, ReactNode } from "https://esm.sh/react@17.0.2";
-import {
-  Children,
-  createElement,
-  Fragment,
-  isValidElement,
-  useContext,
-  useEffect,
-  useMemo,
-} from "https://esm.sh/react@17.0.2";
+import type { FC, ReactNode } from "react";
+import { Children, createElement, Fragment, isValidElement, useContext, useEffect, useMemo } from "react";
 import util from "../../lib/util.ts";
 import { DataContext } from "./context.ts";
 

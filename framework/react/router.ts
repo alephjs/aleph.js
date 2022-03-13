@@ -1,5 +1,5 @@
-import type { FC, ReactElement, ReactNode } from "https://esm.sh/react@17.0.2";
-import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "https://esm.sh/react@17.0.2";
+import type { FC, ReactElement, ReactNode } from "react";
+import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { matchRoutes } from "../../lib/helpers.ts";
 import { URLPatternCompat } from "../../lib/url.ts";
 import type { RenderModule, Route, RouteMeta, SSRContext } from "../../server/types.ts";
