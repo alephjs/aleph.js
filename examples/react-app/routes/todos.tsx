@@ -35,14 +35,11 @@ export const data = {
     }
     return json({ todos });
   },
-  delete: (req: Request) => {
-    const { searchParams } = new URL(req.url);
-    if (searchParams.has("id")) {
-      const id = parseInt(searchParams.get("id")!);
-      if (!Number.isNaN(id)) {
-        todos = todos.filter((todo) => todo.id !== id);
-        window.localStorage?.setItem("todos", JSON.stringify(todos));
-      }
+  delete: async (req: Request) => {
+    const { id } = await req.json();
+    if (id) {
+      todos = todos.filter((todo) => todo.id !== id);
+      window.localStorage?.setItem("todos", JSON.stringify(todos));
     }
     return json({ todos });
   },
@@ -71,7 +68,7 @@ export default function Todos() {
               onChange={() => mutation.patch({ id: todo.id, completed: !todo.completed }, "replace")}
             />
             <label className={todo.completed ? "completed" : ""}>{todo.message}</label>
-            {todo.id > 0 && <button onClick={() => mutation.delete({ id: todo.id.toString() }, "replace")}></button>}
+            {todo.id > 0 && <button onClick={() => mutation.delete({ id: todo.id }, "replace")}></button>}
           </li>
         ))}
       </ul>
@@ -101,6 +98,7 @@ export default function Todos() {
           name="message"
           placeholder="What needs to be done?"
           autoFocus
+          autoComplete="off"
           disabled={!!isMutating}
         />
       </form>

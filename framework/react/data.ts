@@ -90,22 +90,16 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
   const mutation = useMemo(() => {
     return {
       post: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("post", jsonFetch("post", dataUrl, data), update ?? "none");
+        return action("post", send("POST", dataUrl, data), update ?? "none");
       },
       put: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("put", jsonFetch("put", dataUrl, data), update ?? "none");
+        return action("put", send("PUT", dataUrl, data), update ?? "none");
       },
       patch: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("patch", jsonFetch("patch", dataUrl, data), update ?? "none");
+        return action("patch", send("PATCH", dataUrl, data), update ?? "none");
       },
-      delete: (params?: Record<string, string>, update?: UpdateStrategy<T>) => {
-        const url = new URL(dataUrl, globalThis.location?.href);
-        if (params) {
-          for (const [key, value] of Object.entries(params)) {
-            url.searchParams.set(key, value);
-          }
-        }
-        return action("delete", fetch(url.toString(), { method: "delete", redirect: "manual" }), update ?? "none");
+      delete: (data?: unknown, update?: UpdateStrategy<T>) => {
+        return action("patch", send("DELETE", dataUrl, data), update ?? "none");
       },
     };
   }, [dataUrl]);
@@ -162,13 +156,31 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
   return { ...dataStore, mutation };
 };
 
-function jsonFetch(method: string, href: string, data: unknown) {
-  return fetch(href, {
-    method,
-    body: typeof data === "object" ? JSON.stringify(data) : "null",
-    redirect: "manual",
-    headers: { "Content-Type": "application/json" },
-  });
+function send(method: string, href: string, data: unknown) {
+  let body: BodyInit | undefined;
+  const headers = new Headers();
+  if (typeof data === "string") {
+    body = data;
+  } else if (typeof data === "number") {
+    body = data.toString();
+  } else if (typeof data === "object") {
+    if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
+      body = data;
+    } else if (data instanceof FormData) {
+      body = data;
+      headers.append("Content-Type", "multipart/form-data");
+    } else if (data instanceof URLSearchParams) {
+      body = data;
+      headers.append("Content-Type", "application/x-www-form-urlencoded");
+    } else if (data instanceof Blob) {
+      body = data;
+      headers.append("Content-Type", data.type);
+    } else {
+      body = JSON.stringify(data);
+      headers.append("Content-Type", "application/json; charset=utf-8");
+    }
+  }
+  return fetch(href, { method, body, headers, redirect: "manual" });
 }
 
 function clone<T>(obj: T): T {
