@@ -78,7 +78,7 @@ export function Link(props: LinkProps) {
   const timerRef = useRef<number | null>(null);
   const prefetch = useCallback(() => {
     if (!util.isLikelyHttpURL(href) && !isActivated && !prefetched.has(href)) {
-      events.emit("prefetchpage", { href });
+      events.emit("moduleprefetch", { href });
       prefetched.add(href);
     }
   }, [href, isActivated]);

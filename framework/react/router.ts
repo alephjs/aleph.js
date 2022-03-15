@@ -66,16 +66,21 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     };
     const prefetchData = async (dataUrl: string) => {
       const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, redirect: "manual" });
+      if (res.status === 404 || res.status === 405) {
+        dataCache.set(dataUrl, {});
+        return {};
+      }
       if (res.status >= 400) {
         const message = await res.text();
-        throw new Error(`prefetchData: <${res.status}> ${message}`);
+        console.warn(`prefetchData: ${res.status} ${message}`);
+        return {};
       }
       if (res.status >= 300) {
         const redirectUrl = res.headers.get("Location");
         if (redirectUrl) {
           location.href = redirectUrl;
         }
-        return;
+        return {};
       }
       const data = await res.json();
       const cc = res.headers.get("Cache-Control");
@@ -87,21 +92,18 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       });
       return { data, dataCacheTtl };
     };
-    const onprefetchpage = async (e: Record<string, unknown>) => {
+    const onmoduleprefetch = (e: Record<string, unknown>) => {
       const pageUrl = new URL(e.href as string, location.href);
       const matches = matchRoutes(pageUrl, routes);
-      await Promise.all(matches.map(async ([ret, meta]) => {
+      matches.map(([_, meta]) => {
         const { filename } = meta;
         if (!(filename in ROUTE_MODULES)) {
-          await importModule(meta);
+          const link = document.createElement("link");
+          link.setAttribute("rel", "modulepreload");
+          link.setAttribute("href", meta.filename.slice(1));
+          document.head.appendChild(link);
         }
-        if (ROUTE_MODULES[filename]?.withData === true) {
-          const dataUrl = ret.pathname.input + pageUrl.search;
-          if (!dataCache.has(dataUrl)) {
-            await prefetchData(dataUrl);
-          }
-        }
-      }));
+      });
     };
     const onpopstate = async (e: Record<string, unknown>) => {
       const url = new URL(window.location.href);
@@ -136,7 +138,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
 
     addEventListener("popstate", onpopstate as unknown as EventListener);
     events.on("popstate", onpopstate);
-    events.on("prefetchpage", onprefetchpage);
+    events.on("moduleprefetch", onmoduleprefetch);
     events.emit("routerready", { type: "routerready" });
 
     // todo: update routes by hmr
@@ -144,7 +146,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     return () => {
       removeEventListener("popstate", onpopstate as unknown as EventListener);
       events.off("popstate", onpopstate);
-      events.off("prefetchpage", onprefetchpage);
+      events.off("moduleprefetch", onmoduleprefetch);
     };
   }, []);
 
