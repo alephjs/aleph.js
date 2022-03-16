@@ -2,24 +2,27 @@ import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { DataContext } from "./context.ts";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
-export type FetchError = { method: HttpMethod; status: number; message: string };
-export type DataState<T> = { data?: T; error?: FetchError; isLoading?: boolean; isMutating?: HttpMethod };
 export type UpdateStrategy<T> = "none" | "replace" | {
   optimisticUpdate?: (data: T) => T;
   onFailure?: (error: FetchError) => void;
   replace?: boolean;
 };
 
-export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: typeof mutation } => {
-  const { dataUrl: dataUrlCtx, dataCache } = useContext(DataContext);
-  const dataUrl = useMemo(() => path || dataUrlCtx, [path, dataUrlCtx]);
-  const [dataStore, setDataStore] = useState<DataState<T>>(() => {
-    if (dataCache.has(dataUrl)) {
-      const { data } = dataCache.get(dataUrl)!;
-      return { data: data as T };
-    }
-    return {};
-  });
+class FetchError extends Error {
+  constructor(public method: HttpMethod, public status: number, public message: string) {
+    super(message);
+  }
+}
+
+export const useData = <T = unknown>(): {
+  data: T;
+  isMutating?: HttpMethod;
+  mutation: typeof mutation;
+  reload: (signal?: AbortSignal) => Promise<void>;
+} => {
+  const { dataUrl, dataCache } = useContext(DataContext);
+  const [data, setData] = useState(() => dataCache.get(dataUrl)?.data as T);
+  const [isMutating, setIsMutating] = useState<HttpMethod>();
   const action = useCallback(async (method: HttpMethod, fetcher: Promise<Response>, update: UpdateStrategy<T>) => {
     const updateIsObject = update && typeof update === "object" && update !== null;
     const optimistic = updateIsObject && typeof update.optimisticUpdate === "function";
@@ -28,26 +31,27 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
     let rollbackData: T | undefined = undefined;
     if (optimistic) {
       const optimisticUpdate = update.optimisticUpdate!;
-      setDataStore((store) => {
-        if (store.data !== undefined) {
-          rollbackData = store.data;
-          return { data: optimisticUpdate(clone(store.data)) };
+      setData((prev) => {
+        if (prev !== undefined) {
+          rollbackData = prev;
+          return optimisticUpdate(clone(prev));
         }
-        return store;
+        return prev;
       });
     } else {
-      setDataStore(({ data }) => ({ data, isMutating: method }));
+      setIsMutating(method);
     }
 
     const res = await fetcher;
     if (res.status >= 400) {
-      const message = await res.text();
-      const error: FetchError = { method, status: res.status, message };
-      if (optimistic) {
-        setDataStore({ data: rollbackData });
-        update.onFailure?.(error);
+      if (optimistic && rollbackData !== undefined) {
+        setData(rollbackData);
+        if (update.onFailure) {
+          const error = new FetchError(method, res.status, res.statusText);
+          update.onFailure(error);
+        }
       } else {
-        setDataStore(({ data }) => ({ data, error }));
+        setIsMutating(undefined);
       }
       return res;
     }
@@ -55,12 +59,12 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
     if (res.status >= 300) {
       const redirectUrl = res.headers.get("Location");
       if (redirectUrl) {
-        location.href = redirectUrl;
+        location.href = new URL(redirectUrl, location.href).href;
       } else {
-        if (optimistic) {
-          setDataStore({ data: rollbackData });
+        if (optimistic && rollbackData !== undefined) {
+          setData(rollbackData);
         } else {
-          setDataStore(({ data }) => ({ data }));
+          setIsMutating(undefined);
         }
         return res;
       }
@@ -69,37 +73,66 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
     if (replace && res.ok) {
       try {
         const data = await res.json();
-        setDataStore({ data });
         const dataCacheTtl = dataCache.get(dataUrl)?.dataCacheTtl;
         dataCache.set(dataUrl, { data, dataCacheTtl, dataExpires: Date.now() + (dataCacheTtl || 1) * 1000 });
+        setData(data);
       } catch (err) {
-        const error: FetchError = { method, status: 0, message: "Invalid JSON data: " + err.message };
-        if (optimistic) {
-          setDataStore({ data: rollbackData });
-          update.onFailure?.(error);
+        if (optimistic && rollbackData !== undefined) {
+          setData(rollbackData);
+          if (update.onFailure) {
+            const error = new FetchError(method, res.status, err.message);
+            update.onFailure(error);
+          }
         } else {
-          setDataStore(({ data }) => ({ data, error }));
+          setIsMutating(undefined);
         }
       }
       return res;
     }
 
-    setDataStore(({ data }) => ({ data }));
+    setIsMutating(undefined);
     return res;
-  }, []);
+  }, [dataUrl]);
+  const reload = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, signal, redirect: "manual" });
+      if (res.status >= 400) {
+        throw new FetchError("get", res.status, await res.text());
+      }
+      if (res.status >= 300) {
+        const redirectUrl = res.headers.get("Location");
+        if (redirectUrl) {
+          location.href = redirectUrl;
+        }
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        const cc = res.headers.get("Cache-Control");
+        const dataCacheTtl = cc && cc.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+        const dataExpires = Date.now() + (dataCacheTtl || 1) * 1000;
+        dataCache.set(dataUrl, { data, dataExpires });
+        setData(data);
+      } else {
+        throw new FetchError("get", res.status, await res.text());
+      }
+    } catch (err) {
+      throw new FetchError("get", 0, err.message);
+    }
+  }, [dataUrl]);
   const mutation = useMemo(() => {
     return {
       post: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("post", send("POST", dataUrl, data), update ?? "none");
+        return action("post", send("post", dataUrl, data), update ?? "none");
       },
       put: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("put", send("PUT", dataUrl, data), update ?? "none");
+        return action("put", send("put", dataUrl, data), update ?? "none");
       },
       patch: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("patch", send("PATCH", dataUrl, data), update ?? "none");
+        return action("patch", send("patch", dataUrl, data), update ?? "none");
       },
       delete: (data?: unknown, update?: UpdateStrategy<T>) => {
-        return action("patch", send("DELETE", dataUrl, data), update ?? "none");
+        return action("delete", send("delete", dataUrl, data), update ?? "none");
       },
     };
   }, [dataUrl]);
@@ -108,55 +141,20 @@ export const useData = <T = unknown>(path?: string): DataState<T> & { mutation: 
     const now = Date.now();
     const cache = dataCache.get(dataUrl);
     let ac: AbortController | null = null;
-    if (!cache || cache.dataExpires === undefined || cache.dataExpires < now) {
-      if (!cache) {
-        setDataStore({ isLoading: true });
-      }
+    if (cache === undefined || cache.dataExpires === undefined || cache.dataExpires < now) {
       ac = new AbortController();
-      fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, signal: ac.signal, redirect: "manual" })
-        .then(async (res) => {
-          if (res.status >= 400) {
-            const message = await res.text();
-            const error: FetchError = { method: "get", status: res.status, message };
-            setDataStore(({ data }) => ({ data, error }));
-            return;
-          }
-          if (res.status >= 300) {
-            const redirectUrl = res.headers.get("Location");
-            if (redirectUrl) {
-              location.href = redirectUrl;
-            }
-            setDataStore(({ data }) => ({ data }));
-            return;
-          }
-          if (res.ok) {
-            const data = await res.json();
-            const cc = res.headers.get("Cache-Control");
-            const dataCacheTtl = cc && cc.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-            const dataExpires = Date.now() + (dataCacheTtl || 1) * 1000;
-            setDataStore({ data });
-            dataCache.set(dataUrl, { data, dataExpires });
-          } else {
-            const message = await res.text();
-            setDataStore({ error: { method: "get", status: res.status, message } });
-          }
-        })
-        .catch((err) => {
-          setDataStore({ error: { method: "get", status: 0, message: err.message } });
-        }).finally(() => {
-          ac = null;
-        });
+      reload(ac.signal).finally(() => {
+        ac = null;
+      });
     }
 
-    return () => {
-      ac?.abort();
-    };
+    return () => ac?.abort();
   }, [dataUrl]);
 
-  return { ...dataStore, mutation };
+  return { data, isMutating, mutation, reload };
 };
 
-function send(method: string, href: string, data: unknown) {
+function send(method: HttpMethod, href: string, data: unknown) {
   let body: BodyInit | undefined;
   const headers = new Headers();
   if (typeof data === "string") {
