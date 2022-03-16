@@ -5,5 +5,4 @@
 Thumbs.db
 compiler/target/
 compiler/pkg/
-compiler/Cargo.lock
 examples/**/dist/
