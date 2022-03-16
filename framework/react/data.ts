@@ -166,10 +166,8 @@ function send(method: HttpMethod, href: string, data: unknown) {
       body = data;
     } else if (data instanceof FormData) {
       body = data;
-      headers.append("Content-Type", "multipart/form-data");
     } else if (data instanceof URLSearchParams) {
       body = data;
-      headers.append("Content-Type", "application/x-www-form-urlencoded");
     } else if (data instanceof Blob) {
       body = data;
       headers.append("Content-Type", data.type);
