@@ -47,13 +47,6 @@ export default {
     }
     return [s, ""];
   },
-  appendUrlParams(url: URL, params: Record<string, string>): URL {
-    const newUrl = new URL(url.href);
-    for (const [key, value] of Object.entries(params)) {
-      newUrl.searchParams.set(key, value);
-    }
-    return newUrl;
-  },
   toHex(buffer: ArrayBuffer) {
     const bytes = new Uint8Array(buffer);
     return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");

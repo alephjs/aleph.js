@@ -1,5 +1,5 @@
 import type { Route, RouteMeta } from "../server/types.ts";
-import { createStaticURLPatternResult, type URLPatternResult } from "./url.ts";
+import { createStaticURLPatternResult, type URLPatternResult } from "./urlpattern.ts";
 import util from "./util.ts";
 
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];

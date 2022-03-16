@@ -1,7 +1,7 @@
 import type { FC, ReactElement, ReactNode } from "react";
 import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { matchRoutes } from "../../lib/helpers.ts";
-import { URLPatternCompat } from "../../lib/url.ts";
+import { URLPatternCompat } from "../../lib/urlpattern.ts";
 import type { RenderModule, Route, RouteMeta, SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
