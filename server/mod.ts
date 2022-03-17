@@ -224,7 +224,7 @@ export const serve = (options: ServerOptions = {}) => {
       return new Response("Not Found", { status: 404 });
     }
 
-    if (options.hmrWebSocketUrl) {
+    if (isDev && options.hmrWebSocketUrl) {
       customHTMLRewriter.set("head", {
         element(el) {
           el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(options.hmrWebSocketUrl)};</script>`, {
