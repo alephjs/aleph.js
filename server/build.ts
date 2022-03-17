@@ -99,6 +99,13 @@ export async function build(
     );
   }
 
+  const forceBundle = (importUrl: string) => {
+    return importUrl === alephPkgUri + "/server/mod.ts" ||
+      // since deno deploy doesn't support importMap, we need to resolve the 'react' import
+      importUrl.startsWith(alephPkgUri + "/framework/react/") ||
+      importUrl.startsWith(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/`);
+  };
+
   // build server entry
   await esbuild({
     stdin: {
@@ -120,25 +127,28 @@ export async function build(
       name: "aleph-server-build-plugin",
       setup(build) {
         build.onResolve({ filter: /.*/ }, (args) => {
-          const isRemote = util.isLikelyHttpURL(args.path);
-          const forceBundle = args.path === alephPkgUri + "/server/mod.ts" ||
-            args.path.startsWith(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/`);
-          const [path] = util.splitBy(isRemote ? args.path : util.trimPrefix(args.path, "file://"), "#");
-
-          if ((isRemote && !forceBundle) || args.path === "./server_dependency_graph.js") {
-            return { path, external: true };
+          let importUrl = args.path;
+          if (importUrl in importMap.imports) {
+            importUrl = importMap.imports[importUrl];
           }
 
-          if (forceBundle) {
-            return { path, namespace: "http" };
-          }
+          const isRemote = util.isLikelyHttpURL(importUrl);
+          const [path] = util.splitBy(isRemote ? importUrl : util.trimPrefix(importUrl, "file://"), "#");
 
           if (args.namespace === "http") {
             const { href } = new URL(path, args.importer);
-            if (href.startsWith(alephPkgUri) && href !== `${alephPkgUri}/server/transformer.ts`) {
+            if (!forceBundle(href)) {
               return { path: href, external: true };
             }
             return { path: href, namespace: "http" };
+          }
+
+          if (isRemote && forceBundle(path)) {
+            return { path, namespace: "http" };
+          }
+
+          if (isRemote || path === "./server_dependency_graph.js") {
+            return { path, external: true };
           }
 
           return { path };
