@@ -70,7 +70,8 @@ export default {
               }));
               el.before(
                 `<script id="ssr-modules" type="application/json">${
-                  JSON.stringify(ssrModules).replaceAll("/", "\/")
+                  // replace "/" to "\/" to prevent xss
+                  JSON.stringify(ssrModules).replaceAll("/", "\\/")
                 }</script>`,
                 {
                   html: true,
