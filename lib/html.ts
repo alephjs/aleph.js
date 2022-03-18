@@ -1,6 +1,6 @@
-import type { Element } from "https://deno.land/x/lol_html@0.0.2/types.d.ts";
-import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.2/mod.js";
-import decodeLolHtmlWasm from "https://deno.land/x/lol_html@0.0.2/wasm.js";
+import type { Element } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
+import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
+import decodeLolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
 import util from "./util.ts";
 
 await initLolHtml(decodeLolHtmlWasm());
