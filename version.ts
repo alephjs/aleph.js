@@ -4,9 +4,6 @@ export const VERSION = "1.0.0";
 /** whether is canary version */
 export const isCanary = false;
 
-/** minimum supported deno version */
-export const minDenoVersion = "1.18.2";
-
 /** `prepublish` will be invoked before publish */
 export async function prepublish(): Promise<boolean> {
   const p = Deno.run({

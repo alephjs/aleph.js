@@ -8,7 +8,7 @@ import { existsDir, findFile } from "./lib/fs.ts";
 import log, { stripColor } from "./lib/log.ts";
 import { serveDir } from "./lib/serve.ts";
 import util from "./lib/util.ts";
-import { minDenoVersion, VERSION } from "./version.ts";
+import { VERSION } from "./version.ts";
 
 const commands = {
   "init": "Create a new app",
@@ -40,18 +40,6 @@ Options:
 
 async function main() {
   const { args, options } = parse();
-
-  // check deno version
-  const [major, minor, patch] = minDenoVersion.split(".").map((p) => parseInt(p));
-  const [currentMajor, currentMinor, currentPatch] = Deno.version.deno.split(
-    ".",
-  ).map((p) => parseInt(p));
-  if (
-    currentMajor < major || (currentMajor === major && currentMinor < minor) ||
-    (currentMajor === major && currentMinor === minor && currentPatch < patch)
-  ) {
-    log.fatal(`Aleph.js requires Deno v${minDenoVersion} or higher.`);
-  }
 
   // prints aleph.js version
   if (options.v) {
