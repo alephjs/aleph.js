@@ -1,3 +1,4 @@
+import { extname } from "https://deno.land/std@0.128.0/path/mod.ts";
 import { createGenerator } from "https://esm.sh/@unocss/core@0.28.0";
 import { transform } from "../compiler/mod.ts";
 import type { TransformOptions } from "../compiler/types.ts";
@@ -25,20 +26,21 @@ export default {
     const { isDev, buildHash, loaded } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
-    let isJSX: boolean;
-    let isCSS: boolean;
     let rawCode: string;
     let mtime: number | undefined;
     let lang: string | undefined;
+    let isCSS: boolean;
+    let enableAtomicCSS: boolean;
     if (loaded) {
-      lang = loaded.lang;
-      isJSX = lang === "tsx" || lang === "jsx";
-      isCSS = lang === "css";
       rawCode = loaded.code;
       mtime = loaded.modtime;
+      lang = loaded.lang;
+      isCSS = lang === "css";
+      enableAtomicCSS = lang === "tsx" || lang === "jsx";
     } else {
-      isJSX = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
-      isCSS = pathname.endsWith(".css") || pathname.endsWith(".pcss") || pathname.endsWith(".postcss");
+      const ext = extname(pathname);
+      isCSS = ext === ".css" || ext === ".pcss" || ext === ".postcss";
+      enableAtomicCSS = ext === ".jsx" || ext === ".tsx";
       [rawCode, mtime] = await readCode(specifier);
     }
     const etag = mtime
@@ -70,7 +72,7 @@ export default {
           safari: 14,
         },
         minify: !isDev,
-        cssModules: jsModule && pathname.endsWith(".module.css"),
+        cssModules: jsModule && ["css", "pcss", "postcss"].findIndex((ext) => pathname.endsWith(`.module.${ext}`)) > -1,
         jsModule,
         hmr: isDev,
       });
@@ -100,7 +102,7 @@ export default {
         isDev,
       });
       let inlineCSS = loaded?.inlineCSS;
-      if (Boolean(atomicCSS?.presets?.length) && isJSX) {
+      if (Boolean(atomicCSS?.presets?.length) && enableAtomicCSS) {
         const uno = createGenerator(atomicCSS);
         const { css } = await uno.generate(rawCode, { id: specifier, minify: !isDev });
         if (inlineCSS) {

@@ -22,6 +22,7 @@ export type ModuleLoaderEnv = {
 export type ModuleLoaderContent = {
   code: string;
   inlineCSS?: string;
+  atomicCSS?: boolean;
   lang?: "js" | "jsx" | "ts" | "tsx" | "css";
   map?: string;
   modtime?: number;

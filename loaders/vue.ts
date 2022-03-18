@@ -140,6 +140,7 @@ export default class VueSFCLoader implements ModuleLoader {
       modtime: stat?.mtime?.getTime(),
       lang: isTS ? "ts" : "js",
       inlineCSS: css || undefined,
+      atomicCSS: true,
     };
   }
 }

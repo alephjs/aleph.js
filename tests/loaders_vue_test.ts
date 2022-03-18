@@ -27,7 +27,7 @@ Deno.test("loaders/vue.ts: VueLoader", async () => {
   `,
   );
   const loader = new VueLoader();
-  const { lang, code, inlineCSS } = await loader.load("/test.vue", { isDev: false });
+  const { lang, code, inlineCSS, atomicCSS } = await loader.load("/test.vue", { isDev: false });
   assertEquals(loader.test("/app.vue"), true);
   assertEquals(loader.test("/app.jsx"), false);
   assertEquals(lang, "js");
@@ -41,6 +41,7 @@ Deno.test("loaders/vue.ts: VueLoader", async () => {
   assertEquals(code.includes(`__sfc__.__scopeId = "data-v-`), true);
   assertEquals(inlineCSS?.includes("h1[data-v-"), true);
   assertEquals(inlineCSS?.includes("font-size: 30px;"), true);
+  assertEquals(atomicCSS, true);
 });
 
 Deno.test("loaders/vue.ts: VueLoader.hmr", async () => {
