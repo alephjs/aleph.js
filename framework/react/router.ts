@@ -65,7 +65,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       return { defaultExport, withData };
     };
     const prefetchData = async (dataUrl: string) => {
-      const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, redirect: "manual" });
+      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
       if (res.status === 404 || res.status === 405) {
         dataCache.set(dataUrl, {});
         return {};

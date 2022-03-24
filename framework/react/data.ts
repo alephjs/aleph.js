@@ -95,7 +95,7 @@ export const useData = <T = unknown>(): {
   }, [dataUrl]);
   const reload = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch(dataUrl, { headers: { "X-Fetch-Data": "true" }, signal, redirect: "manual" });
+      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
       if (res.status >= 400) {
         throw new FetchError("get", res.status, await res.text());
       }

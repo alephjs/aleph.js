@@ -165,7 +165,10 @@ export const serve = (options: ServerOptions = {}) => {
           try {
             const mod = await importRouteModule(filename);
             const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
-            if (req.method !== "GET" || mod.default === undefined || req.headers.has("X-Fetch-Data")) {
+            if (
+              req.method !== "GET" || mod.default === undefined || req.headers.get("Accept") === "application/json" ||
+              !req.headers.get("Accept")?.includes("html")
+            ) {
               const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
                 return fetcher(req, { ...ctx, params: ret.pathname.groups });
