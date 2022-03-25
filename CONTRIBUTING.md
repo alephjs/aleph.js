@@ -9,7 +9,7 @@ Welcome, and thank you for taking time in contributing to Aleph.js! You can cont
 
 ## Development Setup
 
-You will need [Deno](https://deno.land/) 1.19+.
+You will need [Deno](https://deno.land/) 1.20+.
 
 1. Fork this repository to your own GitHub account.
 2. Clone the repository to your local device.
