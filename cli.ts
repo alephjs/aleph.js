@@ -1,6 +1,6 @@
 import { bold } from "https://deno.land/std@0.128.0/fmt/colors.ts";
-import { writeAll } from "https://deno.land/std@0.128.0/streams/conversion.ts";
 import { readLines } from "https://deno.land/std@0.128.0/io/mod.ts";
+import { writeAll } from "https://deno.land/std@0.128.0/streams/conversion.ts";
 import { basename, resolve } from "https://deno.land/std@0.128.0/path/mod.ts";
 import { readImportMap } from "./server/config.ts";
 import { parse } from "./lib/flags.ts";
@@ -91,11 +91,6 @@ async function main() {
     return;
   }
 
-  let importMapFile: string | undefined;
-  let denoConfigFile: string | undefined;
-  let version: string | undefined;
-  let isCanary: boolean | undefined;
-
   // get denoDir
   const p = Deno.run({
     cmd: [Deno.execPath(), "info", "--json"],
@@ -109,9 +104,11 @@ async function main() {
   }
   p.close();
 
+  const runOptions: RunOptions = {};
+
   if (Deno.env.get("ALEPH_DEV")) {
-    denoConfigFile = resolve("./deno.json");
-    importMapFile = resolve("./import_map.json");
+    runOptions.denoConfigFile = resolve("./deno.json");
+    runOptions.importMapFile = resolve("./import_map.json");
     Deno.env.set("ALEPH_DEV_ROOT", Deno.cwd());
     Deno.env.set("ALEPH_DEV_PORT", "2020");
     serveDir({ cwd: Deno.cwd(), port: 2020 });
@@ -121,15 +118,15 @@ async function main() {
     if (!(await existsDir(workingDir))) {
       log.fatal("No such directory:", workingDir);
     }
-    denoConfigFile = await findFile(workingDir, ["deno.jsonc", "deno.json", "tsconfig.json"]);
-    importMapFile = await findFile(
+    runOptions.denoConfigFile = await findFile(workingDir, ["deno.jsonc", "deno.json", "tsconfig.json"]);
+    runOptions.importMapFile = await findFile(
       workingDir,
       ["import_map", "import-map", "importmap", "importMap"].map((name) => `${name}.json`),
     );
-    if (importMapFile) {
+    if (runOptions.importMapFile) {
       try {
         let update: boolean | null = null;
-        const importMap = await readImportMap(importMapFile);
+        const importMap = await readImportMap(runOptions.importMapFile);
         for (const key in importMap.imports) {
           const url = importMap.imports[key];
           if (
@@ -140,12 +137,12 @@ async function main() {
             if (command === "dev" && ver !== VERSION && update === null) {
               update = confirm(
                 `You are using a different version of Aleph.js, expect ${ver} -> v${bold(VERSION)}, update '${
-                  basename(importMapFile)
+                  basename(runOptions.importMapFile)
                 }'?`,
               );
               if (!update) {
-                version = ver;
-                isCanary = prefix.endsWith("_canary");
+                runOptions.version = ver;
+                runOptions.isCanary = prefix.endsWith("_canary");
                 break;
               }
             }
@@ -156,12 +153,12 @@ async function main() {
         }
         if (update) {
           await Deno.writeTextFile(
-            importMapFile,
+            runOptions.importMapFile,
             JSON.stringify({ imports: importMap.imports, scopes: importMap.scopes }, undefined, 2),
           );
         }
       } catch (e) {
-        log.error(`invalid '${basename(importMapFile)}':`, e.message);
+        log.error(`invalid '${basename(runOptions.importMapFile)}':`, e.message);
         if (!confirm("Continue?")) {
           Deno.exit(1);
         }
@@ -169,7 +166,7 @@ async function main() {
     }
   }
 
-  await run(command, { version, isCanary, denoConfigFile, importMapFile });
+  await run(command, runOptions);
 }
 
 type RunOptions = {
