@@ -92,6 +92,11 @@ export default async function (nameArg: string | undefined, template = "react") 
         `${alephPkgUri}/types.d.ts`,
       ],
     },
+    "tasks": {
+      "dev": `deno run -A ${alephPkgUri}/cli.ts dev`,
+      "start": `deno run -A ${alephPkgUri}/cli.ts start`,
+      "build": `deno run -A ${alephPkgUri}/cli.ts build`,
+    },
     "fmt": {},
     "lint": {},
   };
