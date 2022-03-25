@@ -25,16 +25,16 @@ url = "2.2.2"
 
 # parcel css
 cssparser = "0.29.2"
-parcel_css = "1.0.0-alpha.19"
+parcel_css = "1.0.0-alpha.20"
 parcel_sourcemap = "2.0.2"
 
 # swc
 # docs: https://swc.rs
-# crate: https://crates.io/search?q=swc
-swc_atoms = "0.2.9"
-swc_common = { version = "0.17.17", features = ["sourcemap"] }
-swc_ecma_transforms = { version = "0.135.0", features = ["proposal", "typescript", "react" ] }
-swc_ecmascript = { version = "0.136.0", features = ["codegen", "parser", "utils", "visit"] }
+# crate: https://crates.io/search?q=swc_ecmascript
+swc_atoms = "0.2.10"
+swc_common = { version = "0.17.18", features = ["sourcemap"] }
+swc_ecma_transforms = { version = "0.138.0", features = ["proposal", "typescript", "react" ] }
+swc_ecmascript = { version = "0.139.0", features = ["codegen", "parser", "utils", "visit"] }
 
 # wasm-bindgen
 # docs: https://rustwasm.github.io/docs/wasm-bindgen

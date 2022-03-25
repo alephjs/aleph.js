@@ -77,7 +77,6 @@ pub fn new_str(s: &str) -> Str {
   Str {
     span: DUMMY_SP,
     value: s.into(),
-    has_escape: false,
-    kind: Default::default(),
+    raw: None,
   }
 }
