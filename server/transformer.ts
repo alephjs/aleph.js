@@ -1,5 +1,5 @@
 import { extname } from "https://deno.land/std@0.128.0/path/mod.ts";
-import { createGenerator } from "https://esm.sh/@unocss/core@0.30.2";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.30.3";
 import { transform } from "../compiler/mod.ts";
 import type { TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";

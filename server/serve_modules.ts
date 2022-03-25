@@ -1,4 +1,4 @@
-import { createGenerator } from "https://esm.sh/@unocss/core@0.30.2";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.30.3";
 import { fastTransform } from "../compiler/mod.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
