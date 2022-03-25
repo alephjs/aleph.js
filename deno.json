@@ -14,9 +14,9 @@
   },
   "tasks": {
     "test": "deno test -A --location=http://localhost --import-map=import_map.json",
-    "dev": "ALEPH_DEV=true deno run -A cli.ts dev -L debug·",
-    "start": "ALEPH_DEV=true deno run -A cli.ts start -L debug·",
-    "build": "ALEPH_DEV=true deno run -A cli.ts build -L debug·",
+    "dev": "ALEPH_DEV=true deno run -A cli.ts dev --log-level=debug",
+    "start": "ALEPH_DEV=true deno run -A cli.ts start --log-level=debug",
+    "build": "ALEPH_DEV=true deno run -A cli.ts build --log-level=debug",
     "build_wasm": "deno run -A compiler/build.ts"
   },
   "fmt": {
