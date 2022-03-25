@@ -11,6 +11,7 @@ export default function Index() {
           </div>
           <div className="m2 flex justify-center text-2xl op30 hover:op80">
             <a
+              // className="i-carbon-logo-github text-inherit"
               className="text-inherit"
               href="https://github.com/antfu/unocss"
               target="_blank"
