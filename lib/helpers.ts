@@ -50,12 +50,10 @@ export function matchRoutes(url: URL, routes: Route[]): [ret: URLPatternResult, 
       }
     }
     if (matches.length > 0) {
-      if (matches[0][0].pathname.input !== "/_app") {
-        for (const [_, meta] of routes) {
-          if (meta.pattern.pathname === "/_app") {
-            matches.unshift([createStaticURLPatternResult(url.host, "/_app"), meta]);
-            break;
-          }
+      for (const [_, meta] of routes) {
+        if (meta.pattern.pathname === "/_app") {
+          matches.unshift([createStaticURLPatternResult(url.host, "/_app"), meta]);
+          break;
         }
       }
     }

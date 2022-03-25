@@ -37,16 +37,27 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
           ssrHeadCollection: ssrContext?.headCollection,
         },
       },
-      createElement(
-        (currentModule?.defaultExport || E404) as FC,
-        null,
-        modules.length > 1 ? createDataDriver(modules.slice(1)) : undefined,
-      ),
+      typeof currentModule.defaultExport === "function"
+        ? createElement(
+          currentModule.defaultExport as FC,
+          null,
+          modules.length > 1 ? createDataDriver(modules.slice(1)) : undefined,
+        )
+        : createElement(Err, {
+          status: 400,
+          statusText: "missing default export as a valid React component",
+        }),
     );
   }, []);
-  const dataDirver = useMemo<ReactElement | null>(() => modules.length > 0 ? createDataDriver(modules) : null, [
-    modules,
-  ]);
+  const dataDirver = useMemo<ReactElement | null>(
+    () =>
+      modules.length > 0
+        ? createDataDriver(modules)
+        : createElement(Err, { status: 404, statusText: "page not found" }),
+    [
+      modules,
+    ],
+  );
 
   useEffect(() => {
     // remove ssr head elements
@@ -153,13 +164,22 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
   return createElement(RouterContext.Provider, { value: { url } }, dataDirver);
 };
 
-function E404() {
+function Err({ status, statusText }: { status: number; statusText: string }) {
   return createElement(
     "div",
-    { style: { padding: 10, color: "#999" } },
-    createElement("strong", null, "404"),
-    createElement("small", null, " - "),
-    "page not found",
+    {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100vw",
+        height: "100vh",
+        fontSize: 16,
+      },
+    },
+    createElement("strong", { style: { fontWeight: "500" } }, status),
+    createElement("small", { style: { color: "#999", padding: "0 6px" } }, "-"),
+    statusText,
   );
 }
 
