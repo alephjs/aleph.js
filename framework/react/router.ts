@@ -125,7 +125,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
           url: new URL(ret.pathname.input, url.href),
           filename,
         };
-        const dataUrl = rmod.url.pathname + rmod.url.search;
+        const dataUrl = rmod.url.pathname + url.search;
         if (filename in ROUTE_MODULES) {
           rmod.defaultExport = ROUTE_MODULES[filename].defaultExport;
         } else {
