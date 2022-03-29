@@ -225,7 +225,7 @@ async function initSSR(
     const mod = await importRouteModule(filename);
     const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
     const rmod: RenderModule = {
-      url: new URL(ret.pathname.input, url.href),
+      url: new URL(ret.pathname.input + url.search, url.href),
       filename: filename,
       defaultExport: mod.default,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),

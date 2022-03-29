@@ -146,6 +146,8 @@ export const useData = <T = unknown>(): {
       reload(ac.signal).finally(() => {
         ac = null;
       });
+    } else if (cache.data !== undefined) {
+      setData(cache.data as never);
     }
 
     return () => ac?.abort();

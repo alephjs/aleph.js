@@ -122,10 +122,10 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       const modules = await Promise.all(matches.map(async ([ret, meta]) => {
         const { filename } = meta;
         const rmod: RenderModule = {
-          url: new URL(ret.pathname.input, url.href),
+          url: new URL(ret.pathname.input + url.search, url.href),
           filename,
         };
-        const dataUrl = rmod.url.pathname + url.search;
+        const dataUrl = rmod.url.pathname + rmod.url.search;
         if (filename in ROUTE_MODULES) {
           rmod.defaultExport = ROUTE_MODULES[filename].defaultExport;
         } else {
