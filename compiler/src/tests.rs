@@ -82,6 +82,11 @@ fn import_resolving() {
 
       foo()
       export default () => <Layout />
+
+      setTimeout(() => {
+        import("https://esm.sh/asksomeonelse")
+        new Worker("https://esm.sh/asksomeonelse")
+      }, 1000)
     "#;
   let (code, _) = transform("./pages/blog/$id.tsx", source, false, &EmitOptions::default());
   assert!(code.contains("\"/-/esm.sh/react@17.0.2\""));
@@ -90,6 +95,8 @@ fn import_resolving() {
   assert!(code.contains("\"./Layout.tsx\""));
   assert!(code.contains("\"/-/esm.sh/@fullcalendar/daygrid?css&module\""));
   assert!(code.contains("\"../../style/app.css?module\""));
+  assert!(code.contains("import(\"/-/esm.sh/asksomeonelse\")"));
+  assert!(code.contains("new Worker(\"/-/esm.sh/asksomeonelse\")"));
 }
 
 #[test]
