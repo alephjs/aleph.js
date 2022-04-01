@@ -1,5 +1,6 @@
 import { join } from "https://deno.land/std@0.128.0/path/mod.ts";
 import cache from "./cache.ts";
+import { getContentType } from "./mime.ts";
 import util from "./util.ts";
 
 /* check whether or not the given path exists as a directory. */
@@ -62,10 +63,12 @@ export async function getFiles(
 }
 
 /* read source code from fs/cdn/cache */
-export async function readCode(specifier: string): Promise<[string, number | undefined]> {
+export async function readCode(
+  specifier: string,
+): Promise<[code: string, mtime: number | undefined, contentType: string]> {
   if (util.isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
-    if (url.hostname === "esm.sh") {
+    if (url.hostname === "esm.sh" && !url.searchParams.has("target")) {
       url.searchParams.set("target", "esnext");
     }
     const res = await cache(url.toString());
@@ -74,10 +77,10 @@ export async function readCode(specifier: string): Promise<[string, number | und
     }
     const val = res.headers.get("Last-Modified");
     const mtime = val ? new Date(val).getTime() : undefined;
-    return [await res.text(), mtime];
+    return [await res.text(), mtime, res.headers.get("Content-Type") || getContentType(url.pathname)];
   }
   const stat = await Deno.stat(specifier);
-  return [await Deno.readTextFile(specifier), stat.mtime?.getTime()];
+  return [await Deno.readTextFile(specifier), stat.mtime?.getTime(), getContentType(specifier)];
 }
 
 /* watch the given directory and its subdirectories */

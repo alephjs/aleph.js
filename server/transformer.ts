@@ -1,4 +1,3 @@
-import { extname } from "https://deno.land/std@0.128.0/path/mod.ts";
 import { createGenerator } from "https://esm.sh/@unocss/core@0.30.3";
 import { transform } from "../compiler/mod.ts";
 import type { TransformOptions } from "../compiler/types.ts";
@@ -35,13 +34,13 @@ export default {
       rawCode = loaded.code;
       mtime = loaded.modtime;
       lang = loaded.lang;
-      isCSS = lang === "css";
-      enableAtomicCSS = lang === "tsx" || lang === "jsx";
+      isCSS = loaded.lang === "css";
+      enableAtomicCSS = !!loaded.atomicCSS;
     } else {
-      const ext = extname(pathname);
-      isCSS = ext === ".css" || ext === ".pcss" || ext === ".postcss";
-      enableAtomicCSS = ext === ".jsx" || ext === ".tsx";
-      [rawCode, mtime] = await readCode(specifier);
+      let ctype: string;
+      [rawCode, mtime, ctype] = await readCode(specifier);
+      enableAtomicCSS = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
+      isCSS = ctype.startsWith("text/css") || ctype.startsWith("text/postcss");
     }
     const etag = mtime
       ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${
@@ -62,7 +61,7 @@ export default {
     let resType = "application/javascript";
 
     if (isCSS) {
-      const jsModule = searchParams.has("module");
+      const asJsModule = searchParams.has("module");
       const { code, deps } = await bundleCSS(specifier, rawCode, {
         targets: {
           android: 95,
@@ -72,12 +71,12 @@ export default {
           safari: 14,
         },
         minify: !isDev,
-        cssModules: jsModule && ["css", "pcss", "postcss"].findIndex((ext) => pathname.endsWith(`.module.${ext}`)) > -1,
-        jsModule,
+        cssModules: asJsModule && /\.module\.(p|post)?css$/.test(pathname),
+        asJsModule,
         hmr: isDev,
       });
       resBody = code;
-      if (!jsModule) {
+      if (!asJsModule) {
         resType = "text/css";
       }
       clientDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
@@ -102,7 +101,7 @@ export default {
         isDev,
       });
       let inlineCSS = loaded?.inlineCSS;
-      if (Boolean(atomicCSS?.presets?.length) && enableAtomicCSS) {
+      if (enableAtomicCSS && Boolean(atomicCSS?.presets?.length)) {
         const uno = createGenerator(atomicCSS);
         const { css } = await uno.generate(rawCode, { id: specifier, minify: !isDev });
         if (inlineCSS) {

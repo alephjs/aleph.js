@@ -9,7 +9,7 @@ export type BundleCSSOptions = {
   targets?: Targets;
   minify?: boolean;
   cssModules?: boolean;
-  jsModule?: boolean;
+  asJsModule?: boolean;
   hmr?: boolean;
 };
 
@@ -71,7 +71,7 @@ export async function bundleCSS(
       cssModulesExports[key] = value.name;
     }
   }
-  if (options.jsModule) {
+  if (options.asJsModule) {
     const alephPkgPath = toLocalPath(getAlephPkgUri());
     return {
       code: [
