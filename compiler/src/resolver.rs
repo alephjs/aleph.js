@@ -247,7 +247,7 @@ impl Resolver {
 }
 
 pub fn is_esm_sh_url(url: &str) -> bool {
-  return url.starts_with("https://esm.sh") || url.starts_with("http://esm.sh");
+  return url.starts_with("https://esm.sh/") || url.starts_with("http://esm.sh/");
 }
 
 pub fn is_http_url(url: &str) -> bool {
@@ -256,7 +256,13 @@ pub fn is_http_url(url: &str) -> bool {
 
 pub fn is_css_url(url: &str) -> bool {
   if is_esm_sh_url(url) {
-    return url.ends_with("?css");
+    let url = Url::from_str(url).unwrap();
+    for (key, _value) in url.query_pairs() {
+      if key.eq("css") {
+        return true;
+      }
+    }
+    return false;
   }
   return url.ends_with(".css") || url.starts_with(".pcss") || url.starts_with(".postcss");
 }
