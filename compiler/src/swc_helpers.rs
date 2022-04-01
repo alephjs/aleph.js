@@ -63,7 +63,7 @@ pub fn simple_member_expr(obj: &str, key: &str) -> Expr {
 pub fn is_call_expr_by_name(call: &CallExpr, name: &str) -> bool {
   let callee = match &call.callee {
     Callee::Super(_) => return false,
-    Callee::Import(_) => return false,
+    Callee::Import(_) => return name.eq("import"),
     Callee::Expr(callee) => callee.as_ref(),
   };
 

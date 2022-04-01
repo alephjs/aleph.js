@@ -1,9 +1,9 @@
 use crate::resolver::Resolver;
-use crate::swc_helpers::new_str;
+use crate::swc_helpers::{is_call_expr_by_name, new_str};
 use std::{cell::RefCell, rc::Rc};
 use swc_common::DUMMY_SP;
 use swc_ecmascript::ast::*;
-use swc_ecmascript::visit::{noop_fold_type, Fold};
+use swc_ecmascript::visit::{noop_fold_type, Fold, FoldWith};
 
 pub fn resolve_fold(resolver: Rc<RefCell<Resolver>>, strip_data_export: bool) -> impl Fold {
   ResolveFold {
@@ -20,7 +20,7 @@ pub struct ResolveFold {
 impl Fold for ResolveFold {
   noop_fold_type!();
 
-  // resolve import/export url
+  // fold&resolve import/export url
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
 
@@ -135,14 +135,74 @@ impl Fold for ResolveFold {
             }
             _ => ModuleItem::ModuleDecl(decl),
           };
-          items.push(item);
+          items.push(item.fold_children_with(self));
         }
         _ => {
-          items.push(item);
+          items.push(item.fold_children_with(self));
         }
       };
     }
 
     items
+  }
+
+  // fold&resolve worker import url
+  fn fold_new_expr(&mut self, mut new_expr: NewExpr) -> NewExpr {
+    let ok = match new_expr.callee.as_ref() {
+      Expr::Ident(id) => id.sym.as_ref().eq("Worker"),
+      _ => false,
+    };
+    if ok {
+      if let Some(args) = &mut new_expr.args {
+        let url = match args.first() {
+          Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
+            Expr::Lit(lit) => match lit {
+              Lit::Str(s) => Some(s.value.as_ref()),
+              _ => None,
+            },
+            _ => None,
+          },
+          _ => None,
+        };
+        if let Some(url) = url {
+          let mut resolver = self.resolver.borrow_mut();
+          let new_url = resolver.resolve(url, true);
+
+          args[0] = ExprOrSpread {
+            spread: None,
+            expr: Box::new(Expr::Lit(Lit::Str(new_str(&new_url)))),
+          }
+        }
+      }
+    };
+
+    new_expr.fold_children_with(self)
+  }
+
+  // fold&resolve dynamic import url
+  fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
+    if is_call_expr_by_name(&call, "import") {
+      let url = match call.args.first() {
+        Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
+          Expr::Lit(lit) => match lit {
+            Lit::Str(s) => Some(s.value.as_ref()),
+            _ => None,
+          },
+          _ => None,
+        },
+        _ => None,
+      };
+      if let Some(url) = url {
+        let mut resolver = self.resolver.borrow_mut();
+        let new_url = resolver.resolve(url, true);
+
+        call.args[0] = ExprOrSpread {
+          spread: None,
+          expr: Box::new(Expr::Lit(Lit::Str(new_str(&new_url)))),
+        }
+      }
+    }
+
+    call.fold_children_with(self)
   }
 }
