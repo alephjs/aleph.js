@@ -110,7 +110,7 @@ impl Resolver {
       }
     }
     local_path.push_str(pathname.to_owned().to_slash().unwrap().as_str());
-    if url.path().ends_with(".css") {
+    if is_css_url(url.path()) {
       if let Some(query) = url.query() {
         local_path.push('?');
         local_path.push_str(query);
@@ -206,8 +206,12 @@ impl Resolver {
       import_url = fixed_url.clone();
     }
 
-    if import_url.ends_with(".css") {
-      import_url = import_url + "?module"
+    if is_css_url(&import_url) {
+      if import_url.contains("?") {
+        import_url = import_url + "&module"
+      } else {
+        import_url = import_url + "?module"
+      }
     }
 
     if is_remote {
@@ -248,6 +252,13 @@ pub fn is_esm_sh_url(url: &str) -> bool {
 
 pub fn is_http_url(url: &str) -> bool {
   return url.starts_with("https://") || url.starts_with("http://");
+}
+
+pub fn is_css_url(url: &str) -> bool {
+  if is_esm_sh_url(url) {
+    return url.ends_with("?css");
+  }
+  return url.ends_with(".css") || url.starts_with(".pcss") || url.starts_with(".postcss");
 }
 
 fn is_false(value: &bool) -> bool {
