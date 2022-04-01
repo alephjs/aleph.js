@@ -49,7 +49,7 @@ export const serve = (options: ServerOptions = {}) => {
     // transform client modules
     if (
       pathname.startsWith("/-/") ||
-      builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) ||
+      (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) && !pathname.endsWith(".d.ts")) ||
       pathname.endsWith(".css")
     ) {
       const [buildHash, jsxConfig, importMap] = await Promise.all([
