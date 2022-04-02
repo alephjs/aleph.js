@@ -44,6 +44,12 @@ export async function bundleCSS(
     }
     return url;
   });
+  dependencies?.forEach((dep) => {
+    if (dep.type === "url") {
+      // todo: use magic-string
+      css = css.replace(`url("${dep.placeholder}")`, `url("${dep.url}")`);
+    }
+  });
   const eof = options.minify ? "" : "\n";
   if (deps) {
     const imports = await Promise.all(deps.map(async (url) => {
