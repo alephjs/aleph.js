@@ -103,7 +103,8 @@ export async function build(
     return importUrl === alephPkgUri + "/server/mod.ts" ||
       // since deno deploy doesn't support importMap, we need to resolve the 'react' import
       importUrl.startsWith(alephPkgUri + "/framework/react/") ||
-      importUrl.startsWith(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/`);
+      importUrl.startsWith(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/`) ||
+      importUrl.endsWith(".css");
   };
 
   // build server entry
@@ -135,6 +136,10 @@ export async function build(
           const isRemote = util.isLikelyHttpURL(importUrl);
           const [path] = util.splitBy(isRemote ? importUrl : util.trimPrefix(importUrl, "file://"), "#");
 
+          if (args.kind === "dynamic-import") {
+            return { path, external: true };
+          }
+
           if (args.namespace === "http") {
             const { href } = new URL(path, args.importer);
             if (!forceBundle(href)) {
@@ -160,26 +165,30 @@ export async function build(
           }
           const res = await cache(url.href);
           const contents = await res.text();
-          let ext = extname(url.pathname).slice(1);
+          const ext = extname(url.pathname).slice(1);
+          let loader = ext;
           if (ext === "mjs") {
-            ext = "js";
+            loader = "js";
           } else if (ext === "mts") {
-            ext = "ts";
-          } else if (!builtinModuleExts.includes(ext)) {
-            const ctype = res.headers.get("Content-Type");
-            if (ctype?.startsWith("application/javascript")) {
-              ext = "js";
-            } else if (ctype?.startsWith("application/typescript")) {
-              ext = "ts";
-            } else if (ctype?.startsWith("text/jsx")) {
-              ext = "jsx";
-            } else if (ctype?.startsWith("text/tsx")) {
-              ext = "tsx";
-            }
+            loader = "ts";
+          } else if (ext === "pcss" || ext === "postcss") {
+            loader = "css";
+          }
+          const ctype = res.headers.get("Content-Type");
+          if (ctype?.startsWith("application/javascript")) {
+            loader = "js";
+          } else if (ctype?.startsWith("application/typescript")) {
+            loader = "ts";
+          } else if (ctype?.startsWith("text/jsx")) {
+            loader = "jsx";
+          } else if (ctype?.startsWith("text/tsx")) {
+            loader = "tsx";
+          } else if (ctype?.startsWith("text/css")) {
+            loader = "css";
           }
           return {
             contents,
-            loader: ext as unknown as Loader,
+            loader: loader as unknown as Loader,
           };
         });
       },
