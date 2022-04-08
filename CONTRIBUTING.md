@@ -21,13 +21,13 @@ You will need [Deno](https://deno.land/) 1.20+.
 
 ```bash
 # run the example app in development mode
-make dev example=react-app
+deno task dev examples/react-app
 
 # run the example app in production mode
-make start example=react-app
+deno task start examples/react-app
 
 # build the example app into a worker for serverless platform
-make build example=react-app
+deno task build examples/react-app
 ```
 
 ## Testing
@@ -35,7 +35,7 @@ make build example=react-app
 You can run all tests with the following command:
 
 ```bash
-make test
+deno task test
 ```
 
 ## Project Structure
