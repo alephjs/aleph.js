@@ -6,11 +6,23 @@ declare type HTMLRewriterHandlers = {
   end?: (end: import("https://deno.land/x/lol_html@0.0.3/types.d.ts").DocumentEnd) => void;
 };
 
-declare interface FetchContext extends Record<string, unknown> {
+declare interface Context extends Record<string, unknown> {
   readonly params: Record<string, string>;
   readonly HTMLRewriter: {
     on: (selector: string, handlers: HTMLRewriterHandlers) => void;
   };
+}
+
+declare interface Data {
+  get?(request: Request, context: Context): Promise<Response> | Response;
+  post?(request: Request, context: Context): Promise<Response> | Response;
+  put?(request: Request, context: Context): Promise<Response> | Response;
+  patch?(request: Request, context: Context): Promise<Response> | Response;
+  delete?(request: Request, context: Context): Promise<Response> | Response;
+}
+
+declare interface Middleware {
+  fetch(request: Request, context: Context): Promise<Response | void> | Response | void;
 }
 
 declare interface ImportMeta {

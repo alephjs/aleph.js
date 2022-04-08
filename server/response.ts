@@ -18,10 +18,19 @@ export type CacheControl = {
 
 export function content(
   content: BodyInit,
-  contentType: string,
-  cacheContorl?: CacheControl | "immutable" | "no-cache",
+  init?: ResponseInit & {
+    contentType?: string;
+    cacheContorl?: CacheControl | "immutable" | "no-cache";
+  },
 ): Response {
-  const headers = new Headers({ "Content-Type": contentType });
+  const headers = new Headers(init?.headers);
+
+  const contentType = init?.contentType;
+  if (contentType) {
+    headers.set("Content-Type", contentType);
+  }
+
+  const cacheContorl = init?.cacheContorl;
   if (cacheContorl) {
     if (cacheContorl === "no-cache") {
       headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -42,5 +51,6 @@ export function content(
       );
     }
   }
-  return new Response(content, { headers });
+
+  return new Response(content, { ...init, headers });
 }

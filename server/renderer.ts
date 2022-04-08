@@ -6,6 +6,10 @@ import type { DependencyGraph } from "./graph.ts";
 import { importRouteModule } from "./routing.ts";
 import type { RenderModule, Route, SSRContext } from "./types.ts";
 
+export type HTMLRewriterHandlers = {
+  element?: (element: Element) => void;
+};
+
 export type RenderOptions = {
   indexHtml: string;
   routes: Route[];

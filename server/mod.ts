@@ -6,7 +6,7 @@ import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
-import renderer from "./renderer.ts";
+import renderer, { type HTMLRewriterHandlers } from "./renderer.ts";
 import { content, json } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
