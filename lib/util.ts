@@ -66,7 +66,6 @@ export default {
   splitPath(path: string): string[] {
     return path
       .split(/[\/\\]+/g)
-      .map((p) => p.trim())
       .filter((p) => p !== "" && p !== ".")
       .reduce((slice, p) => {
         if (p === "..") {

@@ -8,7 +8,7 @@ export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 export function matchRoutes(url: URL, routes: Route[]): [ret: URLPatternResult, route: RouteMeta][] {
   let { pathname } = url;
   if (pathname !== "/") {
-    pathname = util.trimSuffix(url.pathname, "/").toLowerCase();
+    pathname = util.trimSuffix(url.pathname, "/");
   }
   const matches: [ret: URLPatternResult, route: RouteMeta][] = [];
   if (routes.length > 0) {

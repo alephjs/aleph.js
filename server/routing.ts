@@ -97,7 +97,6 @@ export function toRouteRegExp(config: string | RoutesConfig): RouteRegExp {
     exec: (filename: string): URLPatternInput | null => {
       if (reg.test(filename)) {
         const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
-          part = part.toLowerCase();
           // replace `/p/[...path]` to `/p/:path+`
           if (part.startsWith("[...") && part.startsWith("]") && part.length > 5) {
             return ":" + part.slice(4, -1) + "+";
