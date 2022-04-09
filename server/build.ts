@@ -1,6 +1,6 @@
 import { basename, dirname, extname, join } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.134.0/fs/ensure_dir.ts";
-import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.23/mod.js";
+import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.34/mod.js";
 import { parseExportNames } from "../compiler/mod.ts";
 import cache from "../lib/cache.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
