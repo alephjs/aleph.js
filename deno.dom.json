@@ -9,7 +9,6 @@
     "jsx": "react-jsx",
     "jsxImportSource": "https://esm.sh/react@17.0.2"
   },
-  "importMap": "import_map.json",
   "fmt": {
     "files": {
       "exclude": [
