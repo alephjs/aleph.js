@@ -92,6 +92,7 @@ export default async function (nameArg: string | undefined, template = "react") 
         `${alephPkgUri}/types.d.ts`,
       ],
     },
+    "importMap": "import_map.json",
     "tasks": {
       "dev": `deno run -A ${alephPkgUri}/cli.ts dev`,
       "start": `deno run -A ${alephPkgUri}/cli.ts start`,
@@ -144,9 +145,8 @@ export default async function (nameArg: string | undefined, template = "react") 
     };
     const settigns = {
       "deno.enable": true,
-      "deno.unstable": true,
+      "deno.lint": true,
       "deno.config": "./deno.json",
-      "deno.importMap": "./import_map.json",
       "deno.suggest.imports.hosts": {
         "https://deno.land": true,
         "https://esm.sh": false,

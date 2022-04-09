@@ -14,7 +14,6 @@
     "editor.formatOnSave": true,
   },
   "deno.enable": true,
-  "deno.unstable": false,
   "deno.lint": true,
   "deno.config": "./deno.dom.json",
   "deno.suggest.imports.hosts": {

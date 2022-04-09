@@ -3,7 +3,7 @@
     "jsx": "react-jsx",
     "jsxImportSource": "https://esm.sh/react@17.0.2"
   },
-  "importMap": "./import_map.json",
+  "importMap": "import_map.json",
   "tasks": {
     "test": "deno test -A --unstable --location=http://localhost",
     "dev": "ALEPH_DEV=true deno run -A cli.ts dev --log-level=debug",
