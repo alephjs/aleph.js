@@ -5,7 +5,7 @@ import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import { serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
-import { bundleCSS } from "./bundle.ts";
+import { bundleCSS } from "./bundle_css.ts";
 import { DependencyGraph } from "./graph.ts";
 import type { AlephConfig, ImportMap, ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "./types.ts";
 

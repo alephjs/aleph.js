@@ -4,7 +4,7 @@ import type { TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import { restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import util from "../lib/util.ts";
-import { bundleCSS } from "./bundle.ts";
+import { bundleCSS } from "./bundle_css.ts";
 import { getAlephPkgUri } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
