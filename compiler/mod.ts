@@ -1,5 +1,5 @@
-import { ensureDir } from "https://deno.land/std@0.128.0/fs/ensure_dir.ts";
-import { dirname, join } from "https://deno.land/std@0.128.0/path/mod.ts";
+import { ensureDir } from "https://deno.land/std@0.134.0/fs/ensure_dir.ts";
+import { dirname, join } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { existsFile } from "../lib/fs.ts";
 import { isCanary, VERSION } from "../version.ts";
 import init, {

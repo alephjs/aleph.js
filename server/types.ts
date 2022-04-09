@@ -45,12 +45,8 @@ export type FetchHandler = {
   (request: Request, context: Record<string, unknown>): Promise<Response> | Response;
 };
 
-export type MiddlewareHandler = {
-  (request: Request, context: Record<string, unknown>): Promise<Response | void> | Response | void;
-};
-
 export interface Middleware {
-  fetch: MiddlewareHandler;
+  fetch(request: Request, context: Record<string, unknown>): Promise<Response | void> | Response | void;
 }
 
 export type RenderModule = {

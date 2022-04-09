@@ -1,7 +1,7 @@
-import { bold } from "https://deno.land/std@0.128.0/fmt/colors.ts";
-import { readLines } from "https://deno.land/std@0.128.0/io/mod.ts";
-import { writeAll } from "https://deno.land/std@0.128.0/streams/conversion.ts";
-import { basename, resolve } from "https://deno.land/std@0.128.0/path/mod.ts";
+import { bold } from "https://deno.land/std@0.134.0/fmt/colors.ts";
+import { readLines } from "https://deno.land/std@0.134.0/io/mod.ts";
+import { writeAll } from "https://deno.land/std@0.134.0/streams/conversion.ts";
+import { basename, resolve } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { readImportMap } from "./server/config.ts";
 import { parse } from "./lib/flags.ts";
 import { existsDir, findFile } from "./lib/fs.ts";

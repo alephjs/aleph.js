@@ -1,4 +1,4 @@
-import { red } from "https://deno.land/std@0.128.0/fmt/colors.ts";
+import { red } from "https://deno.land/std@0.134.0/fmt/colors.ts";
 let wasm;
 
 const heap = new Array(32).fill(undefined);
@@ -9,23 +9,7 @@ function getObject(idx) {
   return heap[idx];
 }
 
-let heap_next = heap.length;
-
-function dropObject(idx) {
-  if (idx < 36) return;
-  heap[idx] = heap_next;
-  heap_next = idx;
-}
-
-function takeObject(idx) {
-  const ret = getObject(idx);
-  dropObject(idx);
-  return ret;
-}
-
-let cachedTextDecoder = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
-
-cachedTextDecoder.decode();
+let WASM_VECTOR_LEN = 0;
 
 let cachegetUint8Memory0 = null;
 function getUint8Memory0() {
@@ -35,22 +19,7 @@ function getUint8Memory0() {
   return cachegetUint8Memory0;
 }
 
-function getStringFromWasm0(ptr, len) {
-  return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
-}
-
-function addHeapObject(obj) {
-  if (heap_next === heap.length) heap.push(heap.length + 1);
-  const idx = heap_next;
-  heap_next = heap[idx];
-
-  heap[idx] = obj;
-  return idx;
-}
-
-let WASM_VECTOR_LEN = 0;
-
-let cachedTextEncoder = new TextEncoder("utf-8");
+const cachedTextEncoder = new TextEncoder("utf-8");
 
 const encodeString = (typeof cachedTextEncoder.encodeInto === "function"
   ? function (arg, view) {
@@ -109,6 +78,37 @@ function getInt32Memory0() {
   }
   return cachegetInt32Memory0;
 }
+
+let heap_next = heap.length;
+
+function dropObject(idx) {
+  if (idx < 36) return;
+  heap[idx] = heap_next;
+  heap_next = idx;
+}
+
+function takeObject(idx) {
+  const ret = getObject(idx);
+  dropObject(idx);
+  return ret;
+}
+
+const cachedTextDecoder = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
+
+cachedTextDecoder.decode();
+
+function getStringFromWasm0(ptr, len) {
+  return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
+}
+
+function addHeapObject(obj) {
+  if (heap_next === heap.length) heap.push(heap.length + 1);
+  const idx = heap_next;
+  heap_next = heap[idx];
+
+  heap[idx] = obj;
+  return idx;
+}
 /**
  * @param {string} specifier
  * @param {string} code
@@ -118,10 +118,10 @@ function getInt32Memory0() {
 export function fastTransform(specifier, code, options) {
   try {
     const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-    var ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len0 = WASM_VECTOR_LEN;
-    var ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len1 = WASM_VECTOR_LEN;
+    const ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
     wasm.fastTransform(retptr, ptr0, len0, ptr1, len1, addHeapObject(options));
     var r0 = getInt32Memory0()[retptr / 4 + 0];
     var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -143,10 +143,10 @@ export function fastTransform(specifier, code, options) {
 export function parseExportNames(specifier, code) {
   try {
     const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-    var ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len0 = WASM_VECTOR_LEN;
-    var ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len1 = WASM_VECTOR_LEN;
+    const ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
     wasm.parseExportNames(retptr, ptr0, len0, ptr1, len1);
     var r0 = getInt32Memory0()[retptr / 4 + 0];
     var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -169,10 +169,10 @@ export function parseExportNames(specifier, code) {
 export function transform(specifier, code, options) {
   try {
     const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-    var ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len0 = WASM_VECTOR_LEN;
-    var ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len1 = WASM_VECTOR_LEN;
+    const ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
     wasm.transform(retptr, ptr0, len0, ptr1, len1, addHeapObject(options));
     var r0 = getInt32Memory0()[retptr / 4 + 0];
     var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -195,10 +195,10 @@ export function transform(specifier, code, options) {
 export function transformCSS(filename, code, config_val) {
   try {
     const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-    var ptr0 = passStringToWasm0(filename, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len0 = WASM_VECTOR_LEN;
-    var ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len1 = WASM_VECTOR_LEN;
+    const ptr0 = passStringToWasm0(filename, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
     wasm.transformCSS(retptr, ptr0, len0, ptr1, len1, addHeapObject(config_val));
     var r0 = getInt32Memory0()[retptr / 4 + 0];
     var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -248,29 +248,29 @@ async function init(input) {
   }
   const imports = {};
   imports.wbg = {};
+  imports.wbg.__wbindgen_json_serialize = function (arg0, arg1) {
+    const obj = getObject(arg1);
+    const ret = JSON.stringify(obj === undefined ? null : obj);
+    const ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    getInt32Memory0()[arg0 / 4 + 1] = len0;
+    getInt32Memory0()[arg0 / 4 + 0] = ptr0;
+  };
   imports.wbg.__wbindgen_object_drop_ref = function (arg0) {
     takeObject(arg0);
   };
   imports.wbg.__wbindgen_json_parse = function (arg0, arg1) {
-    var ret = JSON.parse(getStringFromWasm0(arg0, arg1));
+    const ret = JSON.parse(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
   };
-  imports.wbg.__wbindgen_json_serialize = function (arg0, arg1) {
-    const obj = getObject(arg1);
-    var ret = JSON.stringify(obj === undefined ? null : obj);
-    var ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len0 = WASM_VECTOR_LEN;
-    getInt32Memory0()[arg0 / 4 + 1] = len0;
-    getInt32Memory0()[arg0 / 4 + 0] = ptr0;
-  };
   imports.wbg.__wbg_new_693216e109162396 = function () {
-    var ret = new Error();
+    const ret = new Error();
     return addHeapObject(ret);
   };
   imports.wbg.__wbg_stack_0ddaca5d1abfb52f = function (arg0, arg1) {
-    var ret = getObject(arg1).stack;
-    var ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len0 = WASM_VECTOR_LEN;
+    const ret = getObject(arg1).stack;
+    const ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
     getInt32Memory0()[arg0 / 4 + 1] = len0;
     getInt32Memory0()[arg0 / 4 + 0] = ptr0;
   };
@@ -287,8 +287,8 @@ async function init(input) {
       wasm.__wbindgen_free(arg0, arg1);
     }
   };
-  imports.wbg.__wbg_new_55259b13834a484c = function (arg0, arg1) {
-    var ret = new Error(getStringFromWasm0(arg0, arg1));
+  imports.wbg.__wbg_new_3047bf4b4f02b802 = function (arg0, arg1) {
+    const ret = new Error(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
   };
   imports.wbg.__wbindgen_throw = function (arg0, arg1) {

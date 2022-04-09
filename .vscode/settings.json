@@ -14,10 +14,9 @@
     "editor.formatOnSave": true,
   },
   "deno.enable": true,
-  "deno.unstable": true,
+  "deno.unstable": false,
   "deno.lint": true,
-  "deno.config": "./deno.json",
-  "deno.importMap": "./import_map.json",
+  "deno.config": "./deno.dom.json",
   "deno.suggest.imports.hosts": {
     "https://deno.land": true,
     "https://esm.sh": false

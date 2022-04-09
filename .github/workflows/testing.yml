@@ -29,7 +29,7 @@ jobs:
           rust-version: stable
 
       - name: Deno test
-        run: deno test -A --location=http://localhost --import-map=import_map.json
+        run: deno test -A --unstable --location=http://localhost
 
       - name: Deno lint
         run: deno lint

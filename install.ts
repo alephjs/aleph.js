@@ -1,6 +1,6 @@
-import { red } from "https://deno.land/std@0.128.0/fmt/colors.ts";
-import { parse } from "https://deno.land/std@0.128.0/flags/mod.ts";
-import { dirname, join } from "https://deno.land/std@0.128.0/path/mod.ts";
+import { red } from "https://deno.land/std@0.134.0/fmt/colors.ts";
+import { parse } from "https://deno.land/std@0.134.0/flags/mod.ts";
+import { dirname, join } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { isCanary } from "./version.ts";
 
 const pkgName = isCanary ? "aleph_canary" : "aleph";

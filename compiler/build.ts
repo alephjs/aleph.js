@@ -1,8 +1,8 @@
-import { dim } from "https://deno.land/std@0.128.0/fmt/colors.ts";
-import { encode } from "https://deno.land/std@0.128.0/encoding/base64.ts";
-import { ensureDir } from "https://deno.land/std@0.128.0/fs/ensure_dir.ts";
-import { dirname } from "https://deno.land/std@0.128.0/path/mod.ts";
-import { compress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";
+import { dim } from "https://deno.land/std@0.134.0/fmt/colors.ts";
+import { encode } from "https://deno.land/std@0.134.0/encoding/base64.ts";
+import { ensureDir } from "https://deno.land/std@0.134.0/fs/ensure_dir.ts";
+import { dirname } from "https://deno.land/std@0.134.0/path/mod.ts";
+import { compress } from "https://deno.land/x/lz4@v0.1.2/mod.ts";
 
 async function run(cmd: string[]) {
   const p = Deno.run({
@@ -31,13 +31,13 @@ if (import.meta.main) {
     await ensureDir("./dist");
     await Deno.writeTextFile(
       "./dist/wasm.js",
-      `import { decompress } from "https://deno.land/x/brotli@v0.1.4/mod.ts";\nexport default () => decompress(Uint8Array.from(atob("${
+      `import { decompress } from "https://deno.land/x/lz4@v0.1.2/mod.ts";\nexport default () => decompress(Uint8Array.from(atob("${
         encode(compress(wasmData))
       }"), c => c.charCodeAt(0)));`,
     );
     await Deno.writeTextFile(
       "./dist/compiler.js",
-      "import { red } from 'https://deno.land/std@0.128.0/fmt/colors.ts';" +
+      "import { red } from 'https://deno.land/std@0.134.0/fmt/colors.ts';" +
         jsCode
           .replace(`import * as __wbg_star0 from 'env';`, "")
           .replace(`imports['env'] = __wbg_star0;`, `imports['env'] = { now: () => Date.now() };`)
