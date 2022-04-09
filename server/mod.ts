@@ -13,6 +13,7 @@ import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware, Route, SSRContext } from "./types.ts";
 
 export type ServerOptions = {
+  hostname?: string;
   port?: number;
   certFile?: string;
   keyFile?: string;
@@ -275,11 +276,11 @@ export const serve = (options: ServerOptions = {}) => {
       e.respondWith(handler(e.request));
     });
   } else if (!Deno.env.get("ALEPH_APP_MODULES_PORT")) {
-    const { port = 8080, certFile, keyFile } = options;
+    const { hostname, port = 8080, certFile, keyFile } = options;
     if (certFile && keyFile) {
-      serveTls(handler, { port, certFile, keyFile });
+      serveTls(handler, { hostname, port, certFile, keyFile });
     } else {
-      stdServe(handler, { port });
+      stdServe(handler, { hostname, port });
     }
     log.info(`Server ready on http://localhost:${port}`);
   }

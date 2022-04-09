@@ -24,7 +24,7 @@ Usage:
 
 Options:
     -t, --template [${templates.join(",")}] Specify a template for the created project
-    -h, --help      ${" ".repeat(templates.length)}  Prints help message
+    -h, --help      ${" ".repeat(templates.join(",").length)}  Prints help message
 `;
 
 export default async function (nameArg: string | undefined, template = "react") {
