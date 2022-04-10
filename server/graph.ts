@@ -1,10 +1,13 @@
-import type { DependencyDescriptor } from "../compiler/types.ts";
-
 export type Module = {
   readonly specifier: string;
   readonly version: number;
-  readonly deps?: readonly DependencyDescriptor[];
+  readonly deps?: ReadonlyArray<DependencyDescriptor>;
   readonly inlineCSS?: string;
+};
+
+export type DependencyDescriptor = {
+  readonly specifier: string;
+  readonly dynamic?: boolean;
 };
 
 export class DependencyGraph {
