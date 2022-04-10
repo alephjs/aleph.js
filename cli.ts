@@ -217,10 +217,17 @@ async function pipe(reader: Deno.Reader, writer: Deno.Writer) {
   }
 }
 
+const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
+
 function fixLine(line: string): string | null {
   const l = stripColor(line);
   if (l.startsWith(`Download http://localhost:`)) {
     return null;
+  }
+  const ret = l.match(regStackLoc);
+  if (ret) {
+    const url = new URL(ret[1]);
+    return l.replace(ret[0], `.${url.pathname}${ret[2]}`);
   }
   return line;
 }
