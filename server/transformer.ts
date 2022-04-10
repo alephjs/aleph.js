@@ -1,4 +1,5 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.30.12";
+import MagicString from "https://esm.sh/magic-string@0.26.1";
 import { transform } from "../compiler/mod.ts";
 import type { TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
@@ -51,8 +52,10 @@ export default {
       return new Response(null, { status: 304 });
     }
 
-    let clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
-    if (!clientDependencyGraph) {
+    let clientDependencyGraph: DependencyGraph;
+    if (Reflect.has(globalThis, "clientDependencyGraph")) {
+      clientDependencyGraph = Reflect.get(globalThis, "clientDependencyGraph");
+    } else {
       clientDependencyGraph = new DependencyGraph();
       Reflect.set(globalThis, "clientDependencyGraph", clientDependencyGraph);
     }
@@ -75,28 +78,20 @@ export default {
         asJsModule,
         hmr: isDev,
       });
+      clientDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
       resBody = code;
       if (!asJsModule) {
         resType = "text/css";
       }
-      clientDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
     } else {
       const { atomicCSS, jsxConfig, importMap, buildTarget } = options;
-      const graphVersions = clientDependencyGraph.modules.filter((mod) =>
-        !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
-      ).reduce((acc, { specifier, version }) => {
-        acc[specifier] = version.toString(16);
-        return acc;
-      }, {} as Record<string, string>);
       const alephPkgUri = getAlephPkgUri();
-      const { code, deps } = await transform(specifier, rawCode, {
+      let { code, deps, map } = await transform(specifier, rawCode, {
         ...jsxConfig,
         lang: lang as TransformOptions["lang"],
         stripDataExport: isRouteFile(specifier),
         target: buildTarget ?? (isDev ? "es2022" : "es2015"),
         alephPkgUri,
-        graphVersions,
-        initialGraphVersion: clientDependencyGraph.initialVersion.toString(16),
         importMap: JSON.stringify(importMap),
         isDev,
       });
@@ -110,16 +105,39 @@ export default {
           inlineCSS = css;
         }
       }
+      const locDeps = deps?.filter((dep) => !util.isLikelyHttpURL(dep.specifier));
+      if (locDeps?.length) {
+        const s = new MagicString(code);
+        locDeps.forEach((dep) => {
+          const { specifier, importUrl, loc } = dep;
+          const versionStr = clientDependencyGraph.get(specifier)?.version || clientDependencyGraph.initialVersion;
+          let url = importUrl;
+          if (url.includes("?")) {
+            url = `"${url}&v=${versionStr}"`;
+          } else {
+            url = `"${url}?v=${versionStr}"`;
+          }
+          s.overwrite(loc.start, loc.end, url);
+        });
+        code = s.toString();
+      }
       if (inlineCSS) {
+        resBody += `\nimport { applyCSS as __applyCSS } from "${
+          toLocalPath(alephPkgUri)
+        }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`;
+        deps = [...(deps || []), { specifier: alephPkgUri + "/framework/core/style.ts" }] as typeof deps;
+      }
+      clientDependencyGraph.mark(specifier, { deps });
+      if (map) {
+        const m = JSON.parse(map);
+        if (!util.isLikelyHttpURL(specifier)) {
+          m.sources = [`file://source/${util.trimPrefix(specifier, ".")}`];
+        }
+        m.sourcesContent = [rawCode];
         resBody = code +
-          `\nimport { applyCSS as __applyCSS } from "${
-            toLocalPath(alephPkgUri)
-          }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`;
-        deps?.push({ specifier: alephPkgUri + "/framework/core/style.ts" });
-        clientDependencyGraph.mark(specifier, { deps });
+          `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}`;
       } else {
         resBody = code;
-        clientDependencyGraph.mark(specifier, { deps });
       }
     }
     return new Response(resBody, {

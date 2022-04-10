@@ -1,5 +1,6 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.30.12";
-import { fastTransform } from "../compiler/mod.ts";
+import MagicString from "https://esm.sh/magic-string@0.26.1";
+import { parseDeps } from "../compiler/mod.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
@@ -44,17 +45,6 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
   const contentType = lang ? getContentType(`file.${lang}`) : undefined;
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
   if (serverDependencyGraph) {
-    const graphVersions = serverDependencyGraph.modules.filter((mod) =>
-      !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
-    ).reduce((acc, { specifier, version }) => {
-      acc[specifier] = version.toString(16);
-      return acc;
-    }, {} as Record<string, string>);
-    const { code, deps } = await fastTransform(specifier, rawCode, {
-      importMap: JSON.stringify(env.importMap),
-      initialGraphVersion: serverDependencyGraph.initialVersion.toString(16),
-      graphVersions,
-    });
     let inlineCSS = input.inlineCSS;
     if (Boolean(config?.atomicCSS?.presets?.length) && isJSX) {
       const uno = createGenerator(config?.atomicCSS);
@@ -70,9 +60,26 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
         }
       }
     }
+    const deps = await parseDeps(specifier, rawCode, { importMap: JSON.stringify(env.importMap) });
     serverDependencyGraph.mark(specifier, { deps, inlineCSS });
+    const locDeps = deps.filter((dep) => !util.isLikelyHttpURL(dep.specifier));
+    if (locDeps.length) {
+      const s = new MagicString(rawCode);
+      locDeps.forEach((dep) => {
+        const { specifier, importUrl, loc } = dep;
+        const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
+        let url = importUrl;
+        if (url.includes("?")) {
+          url = `"${url}&v=${versionStr}"`;
+        } else {
+          url = `"${url}?v=${versionStr}"`;
+        }
+        s.overwrite(loc.start, loc.end, url);
+      });
+      return { content: s.toString(), contentType };
+    }
     return {
-      content: code,
+      content: rawCode,
       contentType,
     };
   }
