@@ -15,7 +15,6 @@ mod tests;
 
 use resolver::{DependencyDescriptor, Resolver};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::str::FromStr;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, SWC};
@@ -37,12 +36,6 @@ pub struct Options {
 
   #[serde(default)]
   pub import_map: Option<String>,
-
-  #[serde(default)]
-  pub graph_versions: HashMap<String, String>,
-
-  #[serde(default)]
-  pub initial_graph_version: Option<String>,
 
   #[serde(default = "default_target")]
   pub target: String,
@@ -78,8 +71,18 @@ pub struct TransformOutput {
   pub map: Option<String>,
 }
 
-#[wasm_bindgen(js_name = "fastTransform")]
-pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = "parseExportNames")]
+pub fn parse_export_names(specifier: &str, code: &str) -> Result<JsValue, JsValue> {
+  console_error_panic_hook::set_once();
+
+  let module = SWC::parse(specifier, code, EsVersion::Es2022, None).expect("could not parse the module");
+  let names = module.parse_export_names().expect("could not parse the module");
+
+  Ok(JsValue::from_serde(&names).unwrap())
+}
+
+#[wasm_bindgen(js_name = "parseDeps")]
+pub fn parse_deps(specifier: &str, code: &str, options: JsValue) -> Result<JsValue, JsValue> {
   console_error_panic_hook::set_once();
 
   let options: Options = options
@@ -93,41 +96,12 @@ pub fn fast_transform(specifier: &str, code: &str, options: JsValue) -> Result<J
   .expect("could not pause the import map")
   .import_map;
   let resolver = Rc::new(RefCell::new(Resolver::new(
-    specifier,
-    "",
-    None,
-    None,
-    None,
-    importmap,
-    options.graph_versions,
-    options.initial_graph_version,
-    false,
-    false,
+    specifier, "", None, None, None, importmap, false, false,
   )));
   let module = SWC::parse(specifier, code, EsVersion::Es2022, options.lang).expect("could not parse the module");
-  let (code, map) = module
-    .fast_transform(resolver.clone())
-    .expect("could not transform the module");
-  let r = resolver.borrow();
+  let deps = module.parse_deps(resolver).expect("could not parse the module");
 
-  Ok(
-    JsValue::from_serde(&TransformOutput {
-      code,
-      deps: r.deps.clone(),
-      map,
-    })
-    .unwrap(),
-  )
-}
-
-#[wasm_bindgen(js_name = "parseExportNames")]
-pub fn parse_export_names(specifier: &str, code: &str) -> Result<JsValue, JsValue> {
-  console_error_panic_hook::set_once();
-
-  let module = SWC::parse(specifier, code, EsVersion::Es2022, None).expect("could not parse the module");
-  let names = module.parse_export_names().expect("could not parse the module");
-
-  Ok(JsValue::from_serde(&names).unwrap())
+  Ok(JsValue::from_serde(&deps).unwrap())
 }
 
 #[wasm_bindgen(js_name = "transform")]
@@ -151,8 +125,6 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     options.jsx_runtime_version,
     options.jsx_runtime_cdn_version,
     importmap,
-    options.graph_versions,
-    options.initial_graph_version,
     options.is_dev,
     true,
   )));

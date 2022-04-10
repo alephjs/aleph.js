@@ -112,17 +112,16 @@ function addHeapObject(obj) {
 /**
  * @param {string} specifier
  * @param {string} code
- * @param {any} options
  * @returns {any}
  */
-export function fastTransform(specifier, code, options) {
+export function parseExportNames(specifier, code) {
   try {
     const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
     const ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len1 = WASM_VECTOR_LEN;
-    wasm.fastTransform(retptr, ptr0, len0, ptr1, len1, addHeapObject(options));
+    wasm.parseExportNames(retptr, ptr0, len0, ptr1, len1);
     var r0 = getInt32Memory0()[retptr / 4 + 0];
     var r1 = getInt32Memory0()[retptr / 4 + 1];
     var r2 = getInt32Memory0()[retptr / 4 + 2];
@@ -138,16 +137,17 @@ export function fastTransform(specifier, code, options) {
 /**
  * @param {string} specifier
  * @param {string} code
+ * @param {any} options
  * @returns {any}
  */
-export function parseExportNames(specifier, code) {
+export function parseDeps(specifier, code, options) {
   try {
     const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
     const ptr0 = passStringToWasm0(specifier, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len1 = WASM_VECTOR_LEN;
-    wasm.parseExportNames(retptr, ptr0, len0, ptr1, len1);
+    wasm.parseDeps(retptr, ptr0, len0, ptr1, len1, addHeapObject(options));
     var r0 = getInt32Memory0()[retptr / 4 + 0];
     var r1 = getInt32Memory0()[retptr / 4 + 1];
     var r2 = getInt32Memory0()[retptr / 4 + 2];

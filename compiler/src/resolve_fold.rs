@@ -35,7 +35,7 @@ impl Fold for ResolveFold {
                 ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl))
               } else {
                 let mut resolver = self.resolver.borrow_mut();
-                let resolved_url = resolver.resolve(import_decl.src.value.as_ref(), false);
+                let resolved_url = resolver.resolve(import_decl.src.value.as_ref(), &import_decl.src.span, false);
                 ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
                   src: new_str(&resolved_url),
                   ..import_decl
@@ -62,7 +62,7 @@ impl Fold for ResolveFold {
                 }))
               } else {
                 let mut resolver = self.resolver.borrow_mut();
-                let resolved_url = resolver.resolve(src.value.as_ref(), false);
+                let resolved_url = resolver.resolve(src.value.as_ref(), &src.span, false);
                 ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(NamedExport {
                   span,
                   specifiers,
@@ -75,7 +75,7 @@ impl Fold for ResolveFold {
             // match: export * from "https://esm.sh/react"
             ModuleDecl::ExportAll(ExportAll { src, span, asserts }) => {
               let mut resolver = self.resolver.borrow_mut();
-              let resolved_url = resolver.resolve(src.value.as_ref(), false);
+              let resolved_url = resolver.resolve(src.value.as_ref(), &src.span, false);
               ModuleItem::ModuleDecl(ModuleDecl::ExportAll(ExportAll {
                 span,
                 src: new_str(&resolved_url),
@@ -154,23 +154,23 @@ impl Fold for ResolveFold {
     };
     if ok {
       if let Some(args) = &mut new_expr.args {
-        let url = match args.first() {
+        let src = match args.first() {
           Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
             Expr::Lit(lit) => match lit {
-              Lit::Str(s) => Some(s.value.as_ref()),
+              Lit::Str(s) => Some(s),
               _ => None,
             },
             _ => None,
           },
           _ => None,
         };
-        if let Some(url) = url {
+        if let Some(src) = src {
           let mut resolver = self.resolver.borrow_mut();
-          let new_url = resolver.resolve(url, true);
+          let new_src = resolver.resolve(src.value.as_ref(), &src.span, true);
 
           args[0] = ExprOrSpread {
             spread: None,
-            expr: Box::new(Expr::Lit(Lit::Str(new_str(&new_url)))),
+            expr: Box::new(Expr::Lit(Lit::Str(new_str(&new_src)))),
           }
         }
       }
@@ -182,23 +182,23 @@ impl Fold for ResolveFold {
   // fold&resolve dynamic import url
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
-      let url = match call.args.first() {
+      let src = match call.args.first() {
         Some(ExprOrSpread { expr, .. }) => match expr.as_ref() {
           Expr::Lit(lit) => match lit {
-            Lit::Str(s) => Some(s.value.as_ref()),
+            Lit::Str(s) => Some(s),
             _ => None,
           },
           _ => None,
         },
         _ => None,
       };
-      if let Some(url) = url {
+      if let Some(src) = src {
         let mut resolver = self.resolver.borrow_mut();
-        let new_url = resolver.resolve(url, true);
+        let new_src = resolver.resolve(src.value.as_ref(), &src.span, true);
 
         call.args[0] = ExprOrSpread {
           spread: None,
-          expr: Box::new(Expr::Lit(Lit::Str(new_str(&new_url)))),
+          expr: Box::new(Expr::Lit(Lit::Str(new_str(&new_src)))),
         }
       }
     }

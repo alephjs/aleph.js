@@ -1,8 +1,6 @@
 export type TransformOptions = {
   alephPkgUri?: string;
-  graphVersions?: Record<string, string>;
   importMap?: string;
-  initialGraphVersion?: string;
   isDev?: boolean;
   jsxImportSource?: string;
   jsxRuntime?: "react" | "preact";
@@ -13,14 +11,6 @@ export type TransformOptions = {
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
 };
 
-export type FastTransformOptions = Pick<
-  TransformOptions,
-  | "graphVersions"
-  | "importMap"
-  | "initialGraphVersion"
-  | "lang"
->;
-
 export type TransformResult = {
   readonly code: string;
   readonly map?: string;
@@ -29,6 +19,8 @@ export type TransformResult = {
 
 export type DependencyDescriptor = {
   readonly specifier: string;
+  readonly importUrl: string;
+  readonly loc: { start: number; end: number; ctxt: number };
   readonly dynamic?: boolean;
 };
 

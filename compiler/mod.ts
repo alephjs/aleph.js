@@ -3,14 +3,14 @@ import { dirname, join } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { existsFile } from "../lib/fs.ts";
 import { isCanary, VERSION } from "../version.ts";
 import init, {
-  fastTransform as fastSWC,
-  parseExportNames as parseExportNamesSWC,
-  transform as swc,
+  parseDeps as parseDepsWasmFn,
+  parseExportNames as parseExportNamesWasmFn,
+  transform as transformWasmFn,
   transformCSS as parcelCSS,
 } from "./dist/compiler.js";
 import decodeWasmData from "./dist/wasm.js";
 import {
-  FastTransformOptions,
+  DependencyDescriptor,
   TransformCSSOptions,
   TransformCSSResult,
   TransformOptions,
@@ -56,17 +56,17 @@ export async function parseExportNames(
   code: string,
 ): Promise<string[]> {
   await checkWasmReady();
-  return parseExportNamesSWC(specifier, code);
+  return parseExportNamesWasmFn(specifier, code);
 }
 
 /** fast transform without transpile code raw syntax */
-export async function fastTransform(
+export async function parseDeps(
   specifier: string,
   code: string,
-  options: FastTransformOptions = {},
-): Promise<TransformResult> {
+  options: Pick<TransformOptions, "importMap" | "lang"> = {},
+): Promise<DependencyDescriptor[]> {
   await checkWasmReady();
-  return fastSWC(specifier, code, options);
+  return parseDepsWasmFn(specifier, code, options);
 }
 
 /**
@@ -91,7 +91,7 @@ export async function transform(
   options: TransformOptions = {},
 ): Promise<TransformResult> {
   await checkWasmReady();
-  return swc(specifier, code, options);
+  return transformWasmFn(specifier, code, options);
 }
 
 /**

@@ -7,7 +7,7 @@ use crate::resolver::{DependencyDescriptor, Resolver};
 use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::{Handler, HandlerFlags};
-use swc_common::{chain, FileName, Globals, Mark, SourceMap};
+use swc_common::{chain, FileName, Globals, Mark, SourceMap, DUMMY_SP};
 use swc_ecma_transforms::proposals::decorators;
 use swc_ecma_transforms::react;
 use swc_ecma_transforms::typescript::strip;
@@ -90,15 +90,13 @@ impl SWC {
     Ok(parser.names)
   }
 
-  /// fast transform
-  pub fn fast_transform(self, resolver: Rc<RefCell<Resolver>>) -> Result<(String, Option<String>), anyhow::Error> {
-    swc_common::GLOBALS.set(&Globals::new(), || {
-      Ok(
-        self
-          .apply_fold(resolve_fold(resolver.clone(), false), true, false)
-          .unwrap(),
-      )
-    })
+  /// parse deps in the module.
+  pub fn parse_deps(&self, resolver: Rc<RefCell<Resolver>>) -> Result<Vec<DependencyDescriptor>, anyhow::Error> {
+    let program = Program::Module(self.module.clone());
+    let mut resolve_fold = resolve_fold(resolver.clone(), false);
+    program.fold_with(&mut resolve_fold);
+    let resolver = resolver.borrow();
+    Ok(resolver.deps.clone())
   }
 
   /// transform a JS/TS/JSX/TSX file into a JS file, based on the supplied options.
@@ -116,7 +114,7 @@ impl SWC {
       let react_options = if let Some(jsx_import_source) = &options.jsx_import_source {
         let mut resolver = resolver.borrow_mut();
         let runtime = if is_dev { "/jsx-dev-runtime" } else { "/jsx-runtime" };
-        let import_source = resolver.resolve(&(jsx_import_source.to_owned() + runtime), false);
+        let import_source = resolver.resolve(&(jsx_import_source.to_owned() + runtime), &DUMMY_SP, false);
         let import_source = import_source
           .strip_suffix("?dev")
           .unwrap_or(&import_source)
@@ -200,7 +198,7 @@ impl SWC {
         hygiene()
       );
 
-      let (code, map) = self.apply_fold(passes, options.source_map, options.minify).unwrap();
+      let (code, map) = self.emit(passes, options.source_map, options.minify).unwrap();
 
       // remove dead deps by tree-shaking
       if options.strip_data_export {
@@ -220,7 +218,7 @@ impl SWC {
   }
 
   /// Apply transform with the fold.
-  pub fn apply_fold<T: Fold>(
+  pub fn emit<T: Fold>(
     &self,
     mut fold: T,
     source_map: bool,
