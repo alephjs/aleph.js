@@ -34,7 +34,7 @@ dependencies = [
 
 [[package]]
 name = "aleph-compiler"
-version = "1.0.0-alpha.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "base64 0.13.0",
