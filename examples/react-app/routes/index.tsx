@@ -16,14 +16,14 @@ export default function Index() {
         <title>About Aleph.js</title>
       </Head>
       <p className="logo">
-        <img src="/assets/logo.svg" height="60" title="Aleph.js" />
+        <img src="/assets/logo.svg" height="75" title="Aleph.js" />
       </p>
       <h1>
         The Fullstack Framework in Deno.
       </h1>
       <p>
         <strong>Aleph.js</strong> gives you the best developer experience for building web applications<br />{" "}
-        with modern tooling.
+        with modern toolings.
       </p>
       <div className="links">
         <a href="https://alephjs.org/docs/get-started" target="_blank">
