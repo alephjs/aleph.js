@@ -22,7 +22,6 @@ export const supportedPlatforms: Record<BuildPlatform, string> = {
 };
 
 export async function build(
-  workingDir: string,
   platform: BuildPlatform,
   serverEntry?: string,
 ): Promise<{ clientModules: Set<string> }> {
@@ -30,6 +29,7 @@ export async function build(
     log.fatal(`Deploy to ${supportedPlatforms[platform]} is not supported yet`);
   }
 
+  const workingDir = Deno.cwd();
   const tmpDir = await Deno.makeTempDir();
   const alephPkgUri = getAlephPkgUri();
   const importMap = await loadImportMap();

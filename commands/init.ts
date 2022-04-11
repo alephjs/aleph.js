@@ -18,7 +18,7 @@ const versions = {
 
 export const helpMessage = `
 Usage:
-    aleph init <name> [...options]
+    deno run -A https://deno.land/x/aleph/cli.ts init <name> [...options]
 
 <name> represents the name of new app.
 

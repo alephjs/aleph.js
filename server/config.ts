@@ -20,7 +20,7 @@ export function getAlephPkgUri() {
 
 export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
   const jsxConfig: JSXConfig = {};
-  const denoConfigFile = await findFile(Deno.cwd(), ["deno.jsonc", "deno.json", "tsconfig.json"]);
+  const denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"]);
 
   if (denoConfigFile) {
     try {
@@ -119,7 +119,6 @@ export async function loadImportMap(): Promise<ImportMap> {
   }
 
   const importMapFile = await findFile(
-    Deno.cwd(),
     ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`),
   );
   if (importMapFile) {

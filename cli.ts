@@ -4,7 +4,7 @@ import { writeAll } from "https://deno.land/std@0.134.0/streams/conversion.ts";
 import { basename, resolve } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { readImportMap } from "./server/config.ts";
 import { parse } from "./lib/flags.ts";
-import { existsDir, findFile } from "./lib/fs.ts";
+import { findFile } from "./lib/fs.ts";
 import log, { stripColor } from "./lib/log.ts";
 import { serveDir } from "./lib/serve.ts";
 import util from "./lib/util.ts";
@@ -24,7 +24,7 @@ Docs: https://alephjs.org/docs
 Bugs: https://github.com/alephjs/aleph.js/issues
 
 Usage:
-    aleph <command> [...options]
+    deno run -A https://deno.land/x/aleph/cli.ts <command> [...options]
 
 Commands:
     ${
@@ -83,16 +83,16 @@ async function main() {
     return;
   }
 
-  // get denoDir
+  // get moudle cache directory
   const p = Deno.run({
     cmd: [Deno.execPath(), "info", "--json"],
     stdout: "piped",
     stderr: "null",
   });
   const output = (new TextDecoder()).decode(await p.output());
-  const { denoDir } = JSON.parse(output);
-  if (util.isFilledString(denoDir)) {
-    Deno.env.set("DENO_DIR", denoDir);
+  const { modulesCache } = JSON.parse(output);
+  if (util.isFilledString(modulesCache)) {
+    Deno.env.set("MODULES_CACHE_DIR", modulesCache);
   }
   p.close();
 
@@ -106,13 +106,8 @@ async function main() {
     serveDir({ cwd: Deno.cwd(), port: 2020 });
     log.debug(`Proxy https://deno.land/x/aleph on http://localhost:2020`);
   } else {
-    const workingDir = resolve(String(args[0] || "."));
-    if (!(await existsDir(workingDir))) {
-      log.fatal("No such directory:", workingDir);
-    }
-    runOptions.denoConfigFile = await findFile(workingDir, ["deno.jsonc", "deno.json", "tsconfig.json"]);
+    runOptions.denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"]);
     runOptions.importMapFile = await findFile(
-      workingDir,
       ["import_map", "import-map", "importmap", "importMap"].map((name) => `${name}.json`),
     );
     if (runOptions.importMapFile) {
@@ -158,6 +153,9 @@ async function main() {
     }
   }
 
+  if (args.length > 0) {
+    Deno.chdir(String(args[0]));
+  }
   await run(command, runOptions);
 }
 
@@ -170,14 +168,15 @@ type RunOptions = {
 
 async function run(command: string, options: RunOptions) {
   const { version, isCanary, denoConfigFile, importMapFile } = options;
+  const rwDirs = [".", Deno.env.get("MODULES_CACHE_DIR"), Deno.env.get("ALEPH_DEV_ROOT")].filter(Boolean);
   const cmd: string[] = [
     Deno.execPath(),
     "run",
     "--allow-env",
     "--allow-net",
-    "--allow-read",
-    "--allow-write",
-    "--allow-run",
+    "--allow-read=" + rwDirs.join(","),
+    "--allow-write=" + rwDirs.join(","),
+    "--allow-hrtime",
     "--location=http://localhost",
     "--no-check",
   ];

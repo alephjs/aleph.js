@@ -1,8 +1,8 @@
-import { basename, relative, resolve } from "https://deno.land/std@0.134.0/path/mod.ts";
+import { basename, relative } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.134.0/http/server.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
-import { existsDir, findFile, watchFs } from "../lib/fs.ts";
+import { findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -15,10 +15,7 @@ import type { AlephConfig } from "../server/types.ts";
 
 export const helpMessage = `
 Usage:
-    aleph dev <dir> [...options]
-
-<dir> represents the directory of Aleph.js app,
-if the <dir> is empty, the current directory will be used.
+    deno run -A https://deno.land/x/aleph/cli.ts dev [...options]
 
 Options:
     -p, --port      <port>       A port number to start the Aleph.js app, default is 8080
@@ -90,16 +87,7 @@ const handleHMRSocket = (req: Request): Response => {
 };
 
 if (import.meta.main) {
-  const { args, options } = parse();
-
-  // check working dir
-  const workingDir = resolve(String(args[0] || "."));
-  if (!await existsDir(workingDir)) {
-    log.fatal("No such directory:", workingDir);
-  }
-  Deno.chdir(workingDir);
-  Deno.env.set("ALEPH_ENV", "development");
-
+  const { options } = parse();
   const port = parsePortNumber(getFlag(options, ["p", "port"], "8080"));
   const hostname = getFlag(options, ["hostname"]);
   const certFile = getFlag(options, ["tls-cert"]);
@@ -111,13 +99,18 @@ if (import.meta.main) {
     log.fatal("missing `--tls-key` option");
   }
 
+  // development mode
+  Deno.env.set("ALEPH_ENV", "development");
+
+  // serve app modules
   const importMap = await loadImportMap();
   const moduleLoaders = await initModuleLoaders(importMap);
   serveAppModules(6060, { importMap, moduleLoaders });
 
   log.info(`Watching files for changes...`);
-  watchFs(workingDir, (kind, path) => {
-    const specifier = "./" + relative(workingDir, path);
+  const cwd = Deno.cwd();
+  watchFs(cwd, (kind, path) => {
+    const specifier = "./" + relative(cwd, path);
     const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
     if (kind === "remove") {
@@ -151,9 +144,9 @@ if (import.meta.main) {
 
   const emitter = createEmitter();
   const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
-    findFile(workingDir, ["deno.jsonc", "deno.json", "tsconfig.json"]),
-    findFile(workingDir, ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
-    findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`)),
+    findFile(["deno.jsonc", "deno.json", "tsconfig.json"]),
+    findFile(["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
+    findFile(builtinModuleExts.map((ext) => `server.${ext}`)),
   ]);
   const importServerHandler = async (): Promise<void> => {
     if (serverEntry) {

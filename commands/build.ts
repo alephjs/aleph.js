@@ -1,6 +1,6 @@
-import { basename, resolve } from "https://deno.land/std@0.134.0/path/mod.ts";
+import { basename } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { getFlag, parse } from "../lib/flags.ts";
-import { existsDir, findFile } from "../lib/fs.ts";
+import { findFile } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -11,10 +11,7 @@ import { serveAppModules } from "../server/serve_modules.ts";
 
 export const helpMessage = `
 Usage:
-    aleph build <dir> [...options]
-
-<dir> represents the directory of Aleph.js app,
-if the <dir> is empty, the current directory will be used.
+    deno run -A https://deno.land/x/aleph/cli.ts build [...options]
 
 Options:
     -P, --platform  <platform>   Set deploy platform [possible values: deno, cf-worker, vercel]
@@ -23,7 +20,7 @@ Options:
 `;
 
 if (import.meta.main) {
-  const { args, options } = parse();
+  const { options } = parse();
 
   let platform = getFlag(options, ["P", "platform"])?.toLowerCase() as BuildPlatform | undefined;
   if (platform) {
@@ -51,20 +48,12 @@ if (import.meta.main) {
     }
   }
 
-  const start = performance.now();
-
-  // check working dir
-  const workingDir = resolve(String(args[0] || "."));
-  if (!await existsDir(workingDir)) {
-    log.fatal("No such directory:", workingDir);
-  }
-  Deno.chdir(workingDir);
-
+  // serve app modules
   const importMap = await loadImportMap();
   const moduleLoaders = await initModuleLoaders(importMap);
   serveAppModules(6060, { importMap, moduleLoaders });
 
-  let serverEntry = await findFile(workingDir, builtinModuleExts.map((ext) => `server.${ext}`));
+  let serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {
     await import(
       `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/${basename(serverEntry)}?t=${Date.now().toString(16)}`
@@ -79,9 +68,11 @@ if (import.meta.main) {
   }
 
   log.info(`Building for ${supportedPlatforms[platform]}...`);
-  const { clientModules } = await build(workingDir, platform as unknown as "deno-deploy", serverEntry);
-  log.info(`${clientModules.size} client modules built`);
 
+  const start = performance.now();
+  const { clientModules } = await build(platform as unknown as "deno-deploy", serverEntry);
+
+  log.info(`${clientModules.size} client modules built`);
   log.info(`Done in ${(performance.now() - start)}ms`);
   Deno.exit(0);
 }

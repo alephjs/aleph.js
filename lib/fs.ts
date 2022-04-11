@@ -30,9 +30,10 @@ export async function existsFile(path: string): Promise<boolean> {
 }
 
 /* find file in the directory */
-export async function findFile(dir: string, filenames: string[]): Promise<string | undefined> {
+export async function findFile(filenames: string[]): Promise<string | undefined> {
+  const cwd = Deno.cwd();
   for (const filename of filenames) {
-    const fullPath = join(dir, filename);
+    const fullPath = join(cwd, filename);
     if (await existsFile(fullPath)) {
       return fullPath;
     }
@@ -71,9 +72,9 @@ export async function readCode(
     if (url.hostname === "esm.sh" && !url.searchParams.has("target")) {
       url.searchParams.set("target", "esnext");
     }
-    const res = await cache(url.toString());
+    const res = await cache(url.href);
     if (res.status >= 400) {
-      throw new Error(`fetch ${url} ${specifier}: ${res.status} - ${res.statusText}`);
+      throw new Error(`fetch ${url.href}: ${res.status} - ${res.statusText}`);
     }
     const val = res.headers.get("Last-Modified");
     const mtime = val ? new Date(val).getTime() : undefined;

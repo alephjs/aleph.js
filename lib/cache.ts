@@ -12,20 +12,20 @@ export default async function cache(
 ): Promise<Response> {
   const { protocol, hostname, port, pathname, search } = new URL(url);
   const isLocalhost = ["localhost", "0.0.0.0", "127.0.0.1"].includes(hostname);
-  const denoDir = Deno.env.get("DENO_DIR");
+  const modulesCacheDir = Deno.env.get("MODULES_CACHE_DIR");
   const hashname = isLocalhost ? "" : await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
 
   let cacheDir = "";
   let metaFilepath = "";
   let contentFilepath = "";
-  if (denoDir) {
-    cacheDir = join(denoDir, "deps", util.trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
+  if (modulesCacheDir) {
+    cacheDir = join(modulesCacheDir, util.trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
     contentFilepath = join(cacheDir, hashname);
     metaFilepath = join(cacheDir, hashname + ".metadata.json");
   }
 
   if (!options?.forceRefresh && !isLocalhost) {
-    if (denoDir) {
+    if (modulesCacheDir) {
       if (await existsFile(contentFilepath) && await existsFile(metaFilepath)) {
         const [content, meta] = await Promise.all([
           Deno.readFile(contentFilepath),
@@ -68,7 +68,7 @@ export default async function cache(
       res.headers.forEach((val, key) => {
         headers[key] = val;
       });
-      if (denoDir) {
+      if (modulesCacheDir) {
         if (!(await existsDir(cacheDir))) {
           await Deno.mkdir(cacheDir, { recursive: true });
         }
