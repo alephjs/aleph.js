@@ -1,18 +1,14 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { FetchError } from "../../lib/helpers.ts";
 import { DataContext } from "./context.ts";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
+
 export type UpdateStrategy<T> = "none" | "replace" | {
   optimisticUpdate?: (data: T) => T;
-  onFailure?: (error: FetchError) => void;
+  onFailure?: (error: Error) => void;
   replace?: boolean;
 };
-
-class FetchError extends Error {
-  constructor(public method: HttpMethod, public status: number, public message: string) {
-    super(message);
-  }
-}
 
 export const useData = <T = unknown>(): {
   data: T;
@@ -21,7 +17,16 @@ export const useData = <T = unknown>(): {
   reload: (signal?: AbortSignal) => Promise<void>;
 } => {
   const { dataUrl, dataCache } = useContext(DataContext);
-  const [data, setData] = useState(() => dataCache.get(dataUrl)?.data as T);
+  const [data, setData] = useState(() => {
+    const cached = dataCache.get(dataUrl);
+    if (cached) {
+      if (cached.error) {
+        throw cached.error;
+      }
+      return cached.data as T;
+    }
+    throw new Error("Data not found");
+  });
   const [isMutating, setIsMutating] = useState<HttpMethod>();
   const action = useCallback(async (method: HttpMethod, fetcher: Promise<Response>, update: UpdateStrategy<T>) => {
     const updateIsObject = update && typeof update === "object" && update !== null;
@@ -47,8 +52,7 @@ export const useData = <T = unknown>(): {
       if (optimistic && rollbackData !== undefined) {
         setData(rollbackData);
         if (update.onFailure) {
-          const error = new FetchError(method, res.status, res.statusText);
-          update.onFailure(error);
+          update.onFailure(await FetchError.fromResponse(res));
         }
       } else {
         setIsMutating(undefined);
@@ -76,12 +80,11 @@ export const useData = <T = unknown>(): {
         const dataCacheTtl = dataCache.get(dataUrl)?.dataCacheTtl;
         dataCache.set(dataUrl, { data, dataCacheTtl, dataExpires: Date.now() + (dataCacheTtl || 1) * 1000 });
         setData(data);
-      } catch (err) {
+      } catch (_) {
         if (optimistic && rollbackData !== undefined) {
           setData(rollbackData);
           if (update.onFailure) {
-            const error = new FetchError(method, res.status, err.message);
-            update.onFailure(error);
+            update.onFailure(new FetchError(500, {}, "Data must be valid JSON"));
           }
         } else {
           setIsMutating(undefined);
@@ -97,14 +100,14 @@ export const useData = <T = unknown>(): {
     try {
       const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
       if (res.status >= 400) {
-        throw new FetchError("get", res.status, await res.text());
+        throw await FetchError.fromResponse(res);
       }
       if (res.status >= 300) {
         const redirectUrl = res.headers.get("Location");
         if (redirectUrl) {
           location.href = redirectUrl;
         }
-        return;
+        throw new FetchError(500, {}, "Missing the `Location` header");
       }
       if (res.ok) {
         const data = await res.json();
@@ -114,10 +117,10 @@ export const useData = <T = unknown>(): {
         dataCache.set(dataUrl, { data, dataExpires });
         setData(data);
       } else {
-        throw new FetchError("get", res.status, await res.text());
+        throw new FetchError(500, {}, "Data must be valid JSON");
       }
-    } catch (err) {
-      throw new FetchError("get", 0, err.message);
+    } catch (error) {
+      throw error;
     }
   }, [dataUrl]);
   const mutation = useMemo(() => {

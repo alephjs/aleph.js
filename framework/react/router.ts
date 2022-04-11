@@ -1,8 +1,10 @@
 import type { FC, ReactElement, ReactNode } from "react";
-import { createElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { matchRoutes } from "../../lib/helpers.ts";
+import { Component, createElement, useContext, useEffect, useMemo, useState } from "react";
+import { FetchError } from "../../lib/helpers.ts";
+import type { Route, RouteMeta, RouteModule } from "../../lib/route.ts";
+import { matchRoutes } from "../../lib/route.ts";
 import { URLPatternCompat } from "../../lib/urlpattern.ts";
-import type { RenderModule, Route, RouteMeta, SSRContext } from "../../server/types.ts";
+import type { SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import { DataContext, ForwardPropsContext, RouterContext } from "./context.ts";
@@ -13,11 +15,15 @@ export type RouterProps = {
 
 export const Router: FC<RouterProps> = ({ ssrContext }) => {
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location.href));
-  const [modules, setModules] = useState(() => ssrContext?.modules || loadSSRModulesFromTag());
+  const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
-    const cache = new Map<string, { data?: unknown; dataCacheTtl?: number; dataExpires?: number }>();
-    modules.forEach(({ url, data, dataCacheTtl }) => {
+    const cache = new Map<
+      string,
+      { error?: Error; data?: unknown; dataCacheTtl?: number; dataExpires?: number }
+    >();
+    modules.forEach(({ url, data, dataCacheTtl, error }) => {
       cache.set(url.pathname + url.search, {
+        error,
         data,
         dataCacheTtl,
         dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
@@ -25,10 +31,13 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     });
     return cache;
   }, []);
-  const createDataDriver = useCallback((modules: RenderModule[]): ReactElement => {
+  const createRouteEl = (modules: RouteModule[]): ReactElement => {
+    const ErrorBoundaryHandler: undefined | FC<{ error: Error }> = ssrContext?.errorBoundaryModule?.defaultExport ||
+      // deno-lint-ignore no-explicit-any
+      (window as any).__ERROR_BOUNDARY_HANDLER;
     const currentModule = modules[0];
     const dataUrl = currentModule.url.pathname + currentModule.url.search;
-    return createElement(
+    const el = createElement(
       DataContext.Provider,
       {
         value: {
@@ -41,22 +50,22 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         ? createElement(
           currentModule.defaultExport as FC,
           null,
-          modules.length > 1 ? createDataDriver(modules.slice(1)) : undefined,
+          modules.length > 1 ? createRouteEl(modules.slice(1)) : undefined,
         )
         : createElement(Err, {
           status: 400,
           statusText: "missing default export as a valid React component",
         }),
     );
-  }, []);
-  const dataDirver = useMemo<ReactElement | null>(
+    if (ErrorBoundaryHandler) {
+      return createElement(ErrorBoundary, { Handler: ErrorBoundaryHandler }, el);
+    }
+    return el;
+  };
+  const routeEl = useMemo<ReactElement | null>(
     () =>
-      modules.length > 0
-        ? createDataDriver(modules)
-        : createElement(Err, { status: 404, statusText: "page not found" }),
-    [
-      modules,
-    ],
+      modules.length > 0 ? createRouteEl(modules) : createElement(Err, { status: 404, statusText: "page not found" }),
+    [modules],
   );
 
   useEffect(() => {
@@ -82,8 +91,11 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         return {};
       }
       if (res.status >= 400) {
-        const message = await res.text();
-        console.warn(`prefetchData: ${res.status} ${message}`);
+        const error = await FetchError.fromResponse(res);
+        dataCache.set(dataUrl, {
+          error,
+          dataExpires: Date.now() + 1000,
+        });
         return {};
       }
       if (res.status >= 300) {
@@ -91,6 +103,11 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         if (redirectUrl) {
           location.href = redirectUrl;
         }
+        const error = new FetchError(500, {}, "Missing the `Location` header");
+        dataCache.set(dataUrl, {
+          error,
+          dataExpires: Date.now() + 1000,
+        });
         return {};
       }
       const data = await res.json();
@@ -121,7 +138,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       const matches = matchRoutes(url, routes);
       const modules = await Promise.all(matches.map(async ([ret, meta]) => {
         const { filename } = meta;
-        const rmod: RenderModule = {
+        const rmod: RouteModule = {
           url: new URL(ret.pathname.input + url.search, url.href),
           filename,
         };
@@ -161,8 +178,27 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     };
   }, []);
 
-  return createElement(RouterContext.Provider, { value: { url } }, dataDirver);
+  return createElement(RouterContext.Provider, { value: { url } }, routeEl);
 };
+
+class ErrorBoundary extends Component<{ Handler: FC<{ error: Error }> }, { error: Error | null }> {
+  constructor(props: { Handler: FC<{ error: Error }> }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return createElement(this.props.Handler, { error: this.state.error });
+    }
+
+    return this.props.children;
+  }
+}
 
 function Err({ status, statusText }: { status: number; statusText: string }) {
   return createElement(
@@ -218,7 +254,7 @@ function loadRoutesFromTag(): Route[] {
   return [];
 }
 
-function loadSSRModulesFromTag(): RenderModule[] {
+function loadSSRModulesFromTag(): RouteModule[] {
   const ROUTE_MODULES = getRouteModules();
   const el = window.document?.getElementById("ssr-modules");
   if (el) {

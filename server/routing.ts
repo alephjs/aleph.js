@@ -1,9 +1,10 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { getFiles } from "../lib/fs.ts";
+import type { Route } from "../lib/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../lib/urlpattern.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
-import type { AlephConfig, Route, RoutesConfig } from "./types.ts";
+import type { AlephConfig, RoutesConfig } from "./types.ts";
 
 type RouteRegExp = {
   prefix: string;
@@ -62,7 +63,7 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cw
     }
   });
   if (routes.length > 0) {
-    // roder routes by length of pathname
+    // sort routes by length of pathname
     routes.sort((a, b) => getRouteOrder(a) - getRouteOrder(b));
     // check nesting routes
     routes.forEach(([_, meta]) => {

@@ -1,64 +1,30 @@
-import type { Route, RouteMeta } from "../server/types.ts";
-import { createStaticURLPatternResult, type URLPatternResult } from "./urlpattern.ts";
 import util from "./util.ts";
 
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
-/** match routes against the given url */
-export function matchRoutes(url: URL, routes: Route[]): [ret: URLPatternResult, route: RouteMeta][] {
-  let { pathname } = url;
-  if (pathname !== "/") {
-    pathname = util.trimSuffix(url.pathname, "/");
+export class FetchError extends Error {
+  constructor(
+    public status: number,
+    public details: Record<string, unknown>,
+    message: string,
+    opts?: ErrorOptions,
+  ) {
+    super(message, opts);
   }
-  const matches: [ret: URLPatternResult, route: RouteMeta][] = [];
-  if (routes.length > 0) {
-    routes.forEach(([pattern, meta]) => {
-      const ret = pattern.exec({ host: url.host, pathname });
-      if (ret) {
-        matches.push([ret, meta]);
-        // find the nesting index of the route
-        if (meta.nesting && meta.pattern.pathname !== "/_app") {
-          for (const [p, m] of routes) {
-            const [_, name] = util.splitBy(m.pattern.pathname, "/", true);
-            if (!name.startsWith(":")) {
-              const ret = p.exec({ host: url.host, pathname: pathname + "/index" });
-              if (ret) {
-                matches.push([ret, m]);
-                break;
-              }
-            }
-          }
-        }
-      } else if (meta.nesting) {
-        const parts = util.splitPath(pathname);
-        for (let i = parts.length - 1; i > 0; i--) {
-          const pathname = "/" + parts.slice(0, i).join("/");
-          const ret = pattern.exec({ host: url.host, pathname });
-          if (ret) {
-            matches.push([ret, meta]);
-            break;
-          }
-        }
+
+  static async fromResponse(res: Response): Promise<FetchError> {
+    let message = res.statusText;
+    let details: Record<string, unknown> = {};
+    if (res.headers.get("content-type")?.startsWith("application/json")) {
+      details = await res.json();
+      if (typeof details.message === "string") {
+        message = details.message;
       }
-    });
-    if (matches.filter(([_, meta]) => !meta.nesting).length === 0) {
-      for (const [_, meta] of routes) {
-        if (meta.pattern.pathname === "/_404") {
-          matches.push([createStaticURLPatternResult(url.host, "/_404"), meta]);
-          break;
-        }
-      }
+    } else {
+      message = await res.text();
     }
-    if (matches.length > 0) {
-      for (const [_, meta] of routes) {
-        if (meta.pattern.pathname === "/_app") {
-          matches.unshift([createStaticURLPatternResult(url.host, "/_app"), meta]);
-          break;
-        }
-      }
-    }
+    return new FetchError(res.status, details, message);
   }
-  return matches;
 }
 
 /**

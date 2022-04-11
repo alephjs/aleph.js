@@ -3,6 +3,7 @@ import { readableStreamFromReader } from "https://deno.land/std@0.134.0/streams/
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
+import type { Route } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
@@ -10,7 +11,7 @@ import renderer, { type HTMLRewriterHandlers } from "./renderer.ts";
 import { content, json } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
-import type { AlephConfig, FetchHandler, Middleware, Route, SSRContext } from "./types.ts";
+import type { AlephConfig, FetchHandler, Middleware, SSRContext } from "./types.ts";
 
 export type ServerOptions = {
   hostname?: string;
@@ -180,12 +181,8 @@ export const serve = (options: ServerOptions = {}) => {
             if (err.stack) {
               log.error(err.stack);
             }
-            return new Response(
-              isDev || (util.isInt(err.status) && err.status < 500) ? err.message : "Internal Server Error",
-              {
-                status: err.status || 500,
-              },
-            );
+            const status = util.isUint(err.status || err.code) ? err.status || err.code : 500;
+            return json({ ...err, message: err.message, status }, { status });
           }
         }
       }

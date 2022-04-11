@@ -10,7 +10,7 @@ export const RouterContext = createContext<RouterContextProps>({
 
 export type DataContextProps = {
   dataUrl: string;
-  dataCache: Map<string, { data?: unknown; dataCacheTtl?: number; dataExpires?: number }>;
+  dataCache: Map<string, { data?: unknown; dataCacheTtl?: number; dataExpires?: number; error?: Error }>;
   ssrHeadCollection?: string[];
 };
 

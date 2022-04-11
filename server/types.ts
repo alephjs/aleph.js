@@ -1,5 +1,5 @@
 import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.30.12";
-import type { URLPatternCompat, URLPatternInput } from "../lib/urlpattern.ts";
+import type { RouteModule } from "../lib/route.ts";
 
 export type AlephConfig = {
   atomicCSS?: AtomicCSSConfig;
@@ -49,32 +49,12 @@ export interface Middleware {
   fetch(request: Request, context: Record<string, unknown>): Promise<Response | void> | Response | void;
 }
 
-export type RenderModule = {
-  url: URL;
-  filename: string;
-  error?: { message: string; status: number };
-  redirect?: { headers: Headers; status: number };
-  defaultExport?: unknown;
-  data?: unknown;
-  dataCacheTtl?: number;
-};
-
 export type SSRContext = {
   readonly url: URL;
-  readonly modules: RenderModule[];
+  readonly routeModules: RouteModule[];
+  readonly errorBoundaryModule?: RouteModule;
   readonly headCollection: string[];
 };
-
-export type RouteMeta = {
-  filename: string;
-  pattern: URLPatternInput;
-  nesting?: boolean;
-};
-
-export type Route = readonly [
-  pattern: URLPatternCompat,
-  meta: RouteMeta,
-];
 
 export type ImportMap = {
   readonly __filename: string;
