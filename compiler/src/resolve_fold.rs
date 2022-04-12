@@ -82,6 +82,7 @@ impl Fold for ResolveFold {
                 asserts,
               }))
             }
+            // match: export const data = { ... }
             ModuleDecl::ExportDecl(ExportDecl {
               decl: Decl::Var(var),
               span,
@@ -146,7 +147,7 @@ impl Fold for ResolveFold {
     items
   }
 
-  // fold&resolve worker import url
+  // resolve worker import url
   fn fold_new_expr(&mut self, mut new_expr: NewExpr) -> NewExpr {
     let ok = match new_expr.callee.as_ref() {
       Expr::Ident(id) => id.sym.as_ref().eq("Worker"),
@@ -179,7 +180,7 @@ impl Fold for ResolveFold {
     new_expr.fold_children_with(self)
   }
 
-  // fold&resolve dynamic import url
+  // resolve dynamic import url
   fn fold_call_expr(&mut self, mut call: CallExpr) -> CallExpr {
     if is_call_expr_by_name(&call, "import") {
       let src = match call.args.first() {
