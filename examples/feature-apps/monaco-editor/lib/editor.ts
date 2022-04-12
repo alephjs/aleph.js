@@ -22,7 +22,7 @@ export function createModel(name: string, source: string) {
     return null;
   }
 
-  const uri = Uri.parse(`file:///playground/${name}`);
+  const uri = Uri.parse(`file:///src/${name}`);
   const model = editor.createModel(source, lang, uri);
   return model;
 }
@@ -32,8 +32,6 @@ export function createEditor(container: HTMLElement, readOnly?: boolean) {
     readOnly,
     automaticLayout: true,
     contextmenu: true,
-    fontFamily: '"Dank Mono", "Source Code Pro", monospace',
-    fontLigatures: true,
     fontSize: 14,
     lineHeight: 18,
     minimap: { enabled: false },
