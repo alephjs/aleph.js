@@ -3,6 +3,7 @@ import { transform } from "../compiler/mod.ts";
 import type { TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import { restoreUrl, toLocalPath } from "../lib/helpers.ts";
+import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
 import { getAlephPkgUri } from "./config.ts";
@@ -120,13 +121,18 @@ export default {
       }
       clientDependencyGraph.mark(specifier, { deps });
       if (map) {
-        const m = JSON.parse(map);
-        if (!util.isLikelyHttpURL(specifier)) {
-          m.sources = [`file://source/${util.trimPrefix(specifier, ".")}`];
+        try {
+          const m = JSON.parse(map);
+          if (!util.isLikelyHttpURL(specifier)) {
+            m.sources = [`file://source/${util.trimPrefix(specifier, ".")}`];
+          }
+          m.sourcesContent = [rawCode];
+          resBody = code +
+            `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}`;
+        } catch {
+          log.warn(`Failed to add source map for '${specifier}'`);
+          resBody = code;
         }
-        m.sourcesContent = [rawCode];
-        resBody = code +
-          `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}`;
       } else {
         resBody = code;
       }
