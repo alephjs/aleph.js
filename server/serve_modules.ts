@@ -67,14 +67,16 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
       const s = new MagicString(rawCode);
       locDeps.forEach((dep) => {
         const { specifier, importUrl, loc } = dep;
-        const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
-        let url = importUrl;
-        if (url.includes("?")) {
-          url = `"${url}&v=${versionStr}"`;
-        } else {
-          url = `"${url}?v=${versionStr}"`;
+        if (loc) {
+          const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
+          let url = importUrl;
+          if (url.includes("?")) {
+            url = `"${url}&v=${versionStr}"`;
+          } else {
+            url = `"${url}?v=${versionStr}"`;
+          }
+          s.overwrite(loc.start, loc.end, url);
         }
-        s.overwrite(loc.start, loc.end, url);
       });
       return { content: s.toString(), contentType };
     }

@@ -4,6 +4,7 @@ use path_slash::PathBufExt;
 use pathdiff::diff_paths;
 use regex::Regex;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use swc_common::Span;
@@ -20,7 +21,8 @@ lazy_static! {
 pub struct DependencyDescriptor {
   pub specifier: String,
   pub import_url: String,
-  pub loc: Span,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub loc: Option<Span>,
   #[serde(skip_serializing_if = "is_false")]
   pub dynamic: bool,
 }
@@ -46,6 +48,8 @@ pub struct Resolver {
   resolve_remote_deps: bool,
   jsx_runtime_version: Option<String>,
   jsx_runtime_cdn_version: Option<String>,
+  graph_versions: HashMap<String, String>,
+  initial_graph_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -64,6 +68,8 @@ impl Resolver {
     jsx_runtime_version: Option<String>,
     jsx_runtime_cdn_version: Option<String>,
     import_map: ImportMap,
+    graph_versions: HashMap<String, String>,
+    initial_graph_version: Option<String>,
     is_dev: bool,
     resolve_remote_deps: bool,
   ) -> Self {
@@ -77,6 +83,8 @@ impl Resolver {
       jsx_runtime_cdn_version,
       jsx_static_classes: IndexSet::new(),
       import_map,
+      graph_versions,
+      initial_graph_version,
       is_dev,
       resolve_remote_deps,
     }
@@ -120,7 +128,7 @@ impl Resolver {
   }
 
   /// Resolve import/export URLs.
-  pub fn resolve(&mut self, url: &str, span: &Span, dynamic: bool) -> String {
+  pub fn resolve(&mut self, url: &str, dynamic: bool, loc: Option<Span>) -> String {
     let referrer = if self.specifier_is_remote {
       Url::from_str(self.specifier.as_str()).unwrap()
     } else {
@@ -208,16 +216,32 @@ impl Resolver {
       }
     }
 
-    // fix remote url to local path if allowed
-    if is_remote && self.resolve_remote_deps {
-      import_url = self.to_local_path(&import_url);
+    if is_remote {
+      // fix remote url to local path if allowed
+      if self.resolve_remote_deps {
+        import_url = self.to_local_path(&import_url);
+      }
+    } else {
+      // apply graph version if exists
+      let v = if self.graph_versions.contains_key(&fixed_url) {
+        self.graph_versions.get(&fixed_url)
+      } else {
+        self.initial_graph_version.as_ref()
+      };
+      if let Some(version) = v {
+        if import_url.contains("?") {
+          import_url = format!("{}&v={}", import_url, version);
+        } else {
+          import_url = format!("{}?v={}", import_url, version);
+        }
+      }
     }
 
     // update dep graph
     self.deps.push(DependencyDescriptor {
       specifier: fixed_url.clone(),
-      loc: span.clone(),
       import_url: import_url.clone(),
+      loc,
       dynamic,
     });
 

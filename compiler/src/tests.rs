@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::HashMap;
 
 fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) -> (String, Rc<RefCell<Resolver>>) {
   let importmap = import_map::parse_from_json(
@@ -12,6 +13,8 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
   )
   .expect("could not pause the import map")
   .import_map;
+  let mut graph_versions: HashMap<String, String> = HashMap::new();
+  graph_versions.insert("./foo.ts".into(), "100".into());
   let module =
     SWC::parse(specifer, source, swc_ecmascript::ast::EsVersion::Es2022, None).expect("could not parse module");
   let resolver = Rc::new(RefCell::new(Resolver::new(
@@ -21,6 +24,8 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
     Some("17.0.2".into()),
     Some("64".into()),
     importmap,
+    graph_versions,
+    None,
     is_dev,
     true,
   )));
@@ -86,7 +91,7 @@ fn import_resolving() {
   let (code, _) = transform("./pages/blog/$id.tsx", source, false, &EmitOptions::default());
   assert!(code.contains("\"/-/esm.sh/react@17.0.2\""));
   assert!(code.contains("\"/-/cdn.esm.sh/v64/react-dom@17.0.2\""));
-  assert!(code.contains("\"../../foo.ts\""));
+  assert!(code.contains("\"../../foo.ts?v=100\""));
   assert!(code.contains("\"./Layout.tsx\""));
   assert!(code.contains("\"/-/esm.sh/@fullcalendar/daygrid?css&dev&module\""));
   assert!(code.contains("\"../../style/app.css?module\""));

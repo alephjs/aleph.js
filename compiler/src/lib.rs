@@ -15,6 +15,7 @@ mod tests;
 
 use resolver::{DependencyDescriptor, Resolver};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::{cell::RefCell, rc::Rc};
 use swc::{EmitOptions, SWC};
@@ -36,6 +37,12 @@ pub struct Options {
 
   #[serde(default)]
   pub import_map: Option<String>,
+
+  #[serde(default)]
+  pub graph_versions: HashMap<String, String>,
+
+  #[serde(default)]
+  pub initial_graph_version: Option<String>,
 
   #[serde(default = "default_target")]
   pub target: String,
@@ -96,7 +103,16 @@ pub fn parse_deps(specifier: &str, code: &str, options: JsValue) -> Result<JsVal
   .expect("could not pause the import map")
   .import_map;
   let resolver = Rc::new(RefCell::new(Resolver::new(
-    specifier, "", None, None, None, importmap, false, false,
+    specifier,
+    "",
+    None,
+    None,
+    None,
+    importmap,
+    HashMap::new(),
+    None,
+    false,
+    false,
   )));
   let module = SWC::parse(specifier, code, EsVersion::Es2022, options.lang).expect("could not parse the module");
   let deps = module.parse_deps(resolver).expect("could not parse the module");
@@ -125,6 +141,8 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     options.jsx_runtime_version,
     options.jsx_runtime_cdn_version,
     importmap,
+    options.graph_versions,
+    options.initial_graph_version,
     options.is_dev,
     true,
   )));

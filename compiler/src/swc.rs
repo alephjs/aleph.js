@@ -7,7 +7,7 @@ use crate::resolver::{DependencyDescriptor, Resolver};
 use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::{Handler, HandlerFlags};
-use swc_common::{chain, FileName, Globals, Mark, SourceMap, DUMMY_SP};
+use swc_common::{chain, FileName, Globals, Mark, SourceMap};
 use swc_ecma_transforms::proposals::decorators;
 use swc_ecma_transforms::react;
 use swc_ecma_transforms::typescript::strip;
@@ -93,7 +93,7 @@ impl SWC {
   /// parse deps in the module.
   pub fn parse_deps(&self, resolver: Rc<RefCell<Resolver>>) -> Result<Vec<DependencyDescriptor>, anyhow::Error> {
     let program = Program::Module(self.module.clone());
-    let mut resolve_fold = resolve_fold(resolver.clone(), false);
+    let mut resolve_fold = resolve_fold(resolver.clone(), false, true);
     program.fold_with(&mut resolve_fold);
     let resolver = resolver.borrow();
     Ok(resolver.deps.clone())
@@ -114,7 +114,7 @@ impl SWC {
       let react_options = if let Some(jsx_import_source) = &options.jsx_import_source {
         let mut resolver = resolver.borrow_mut();
         let runtime = if is_dev { "/jsx-dev-runtime" } else { "/jsx-runtime" };
-        let import_source = resolver.resolve(&(jsx_import_source.to_owned() + runtime), &DUMMY_SP, false);
+        let import_source = resolver.resolve(&(jsx_import_source.to_owned() + runtime), false, None);
         let import_source = import_source
           .strip_suffix("?dev")
           .unwrap_or(&import_source)
@@ -148,7 +148,7 @@ impl SWC {
       let passes = chain!(
         resolver_with_mark(top_level_mark),
         Optional::new(react::jsx_src(is_dev, self.source_map.clone()), is_jsx),
-        resolve_fold(resolver.clone(), options.strip_data_export),
+        resolve_fold(resolver.clone(), options.strip_data_export, false),
         decorators::decorators(decorators::Config {
           legacy: true,
           emit_metadata: false

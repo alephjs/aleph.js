@@ -1,6 +1,8 @@
 export type TransformOptions = {
   alephPkgUri?: string;
   importMap?: string;
+  graphVersions?: Record<string, string>;
+  initialGraphVersion?: string;
   isDev?: boolean;
   jsxImportSource?: string;
   jsxRuntime?: "react" | "preact";
@@ -20,7 +22,7 @@ export type TransformResult = {
 export type DependencyDescriptor = {
   readonly specifier: string;
   readonly importUrl: string;
-  readonly loc: { start: number; end: number; ctxt: number };
+  readonly loc?: { start: number; end: number; ctxt: number };
   readonly dynamic?: boolean;
 };
 

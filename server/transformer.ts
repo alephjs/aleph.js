@@ -1,5 +1,4 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.30.12";
-import MagicString from "https://esm.sh/magic-string@0.26.1";
 import { transform } from "../compiler/mod.ts";
 import type { TransformOptions } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
@@ -86,6 +85,12 @@ export default {
     } else {
       const { atomicCSS, jsxConfig, importMap, buildTarget } = options;
       const alephPkgUri = getAlephPkgUri();
+      const graphVersions = clientDependencyGraph.modules.filter((mod) =>
+        !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
+      ).reduce((acc, { specifier, version }) => {
+        acc[specifier] = version.toString(16);
+        return acc;
+      }, {} as Record<string, string>);
       let { code, deps, map } = await transform(specifier, rawCode, {
         ...jsxConfig,
         lang: lang as TransformOptions["lang"],
@@ -93,6 +98,8 @@ export default {
         target: buildTarget ?? (isDev ? "es2022" : "es2015"),
         alephPkgUri,
         importMap: JSON.stringify(importMap),
+        graphVersions,
+        initialGraphVersion: clientDependencyGraph.initialVersion.toString(16),
         isDev,
       });
       let inlineCSS = loaded?.inlineCSS;
@@ -104,22 +111,6 @@ export default {
         } else {
           inlineCSS = css;
         }
-      }
-      const locDeps = deps?.filter((dep) => !util.isLikelyHttpURL(dep.specifier));
-      if (locDeps?.length) {
-        const s = new MagicString(code);
-        locDeps.forEach((dep) => {
-          const { specifier, importUrl, loc } = dep;
-          const versionStr = clientDependencyGraph.get(specifier)?.version || clientDependencyGraph.initialVersion;
-          let url = importUrl;
-          if (url.includes("?")) {
-            url = `"${url}&v=${versionStr}"`;
-          } else {
-            url = `"${url}?v=${versionStr}"`;
-          }
-          s.overwrite(loc.start, loc.end, url);
-        });
-        code = s.toString();
       }
       if (inlineCSS) {
         resBody += `\nimport { applyCSS as __applyCSS } from "${
