@@ -124,7 +124,7 @@ export async function build(
     jsxFragment: jsxCofig.jsxRuntime === "preact" ? "Fragment" : "React.Fragment",
     inject: [jsxShimFile as string].filter(Boolean),
     plugins: [{
-      name: "aleph-server-build-plugin",
+      name: "aleph-esbuild-plugin",
       setup(build) {
         build.onResolve({ filter: /.*/ }, (args) => {
           let importUrl = args.path;

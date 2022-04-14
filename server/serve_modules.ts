@@ -62,18 +62,19 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
     }
     const deps = await parseDeps(specifier, rawCode, { importMap: JSON.stringify(env.importMap) });
     serverDependencyGraph.mark(specifier, { deps, inlineCSS });
-    const locDeps = deps.filter((dep) => !util.isLikelyHttpURL(dep.specifier));
-    if (locDeps.length) {
+    if (deps.length) {
       const s = new MagicString(rawCode);
-      locDeps.forEach((dep) => {
+      deps.forEach((dep) => {
         const { specifier, importUrl, loc } = dep;
         if (loc) {
-          const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
-          let url = importUrl;
-          if (url.includes("?")) {
-            url = `"${url}&v=${versionStr}"`;
-          } else {
-            url = `"${url}?v=${versionStr}"`;
+          let url = `"${importUrl}"`;
+          if (!util.isLikelyHttpURL(specifier)) {
+            const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
+            if (importUrl.includes("?")) {
+              url = `"${importUrl}&v=${versionStr}"`;
+            } else {
+              url = `"${importUrl}?v=${versionStr}"`;
+            }
           }
           s.overwrite(loc.start, loc.end, url);
         }
