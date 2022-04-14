@@ -1,6 +1,6 @@
 import { basename, dirname, extname, join } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.134.0/fs/ensure_dir.ts";
-import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.34/mod.js";
+import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.36/mod.js";
 import { parseExportNames } from "../compiler/mod.ts";
 import cache from "../lib/cache.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
@@ -30,7 +30,6 @@ export async function build(
   }
 
   const workingDir = Deno.cwd();
-  const tmpDir = await Deno.makeTempDir();
   const alephPkgUri = getAlephPkgUri();
   const importMap = await loadImportMap();
   const jsxCofig = await loadJSXConfig(importMap);
@@ -84,7 +83,7 @@ export async function build(
   // since esbuild doesn't support jsx automic transform, we need to manually import jsx runtime
   let jsxShimFile: string | null = null;
   if (serverEntry && util.endsWithAny(serverEntry, ".jsx", ".tsx") && jsxCofig.jsxImportSource) {
-    jsxShimFile = join(tmpDir, "jsx-shim.js");
+    jsxShimFile = join(outputDir, "jsx-shim.js");
     await Deno.writeTextFile(
       jsxShimFile,
       (jsxCofig.jsxRuntime === "preact"
@@ -257,7 +256,9 @@ export async function build(
   }
 
   // clean up then exit
-  await Deno.remove(tmpDir, { recursive: true });
+  if (jsxShimFile) {
+    await Deno.remove(jsxShimFile);
+  }
   stop();
 
   return { clientModules };

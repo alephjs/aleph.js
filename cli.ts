@@ -168,7 +168,13 @@ type RunOptions = {
 
 async function run(command: string, options: RunOptions) {
   const { version, isCanary, denoConfigFile, importMapFile } = options;
-  const rwDirs = [".", Deno.env.get("MODULES_CACHE_DIR"), Deno.env.get("ALEPH_DEV_ROOT")].filter(Boolean);
+  const { esbuildBinDir, esbuildBinPath } = getEsbuildPath("0.14.36");
+  const rwDirs = [
+    ".",
+    Deno.env.get("MODULES_CACHE_DIR"),
+    Deno.env.get("ALEPH_DEV_ROOT"),
+    esbuildBinDir,
+  ].filter(Boolean);
   const cmd: string[] = [
     Deno.execPath(),
     "run",
@@ -176,7 +182,7 @@ async function run(command: string, options: RunOptions) {
     "--allow-net",
     "--allow-read=" + rwDirs.join(","),
     "--allow-write=" + rwDirs.join(","),
-    "--allow-hrtime",
+    "--allow-run=" + esbuildBinPath,
     "--location=http://localhost",
     "--no-check",
   ];
@@ -229,6 +235,70 @@ function fixLine(line: string): string | null {
     return l.replace(ret[0], `.${url.pathname}${ret[2]}`);
   }
   return line;
+}
+
+function getEsbuildPath(version: string) {
+  let name: string;
+  let baseDir: string | undefined;
+  switch (Deno.build.os) {
+    case "darwin": {
+      baseDir = Deno.env.get("HOME");
+      if (baseDir) {
+        baseDir += "/Library/Caches";
+      }
+      break;
+    }
+    case "windows": {
+      baseDir = Deno.env.get("LOCALAPPDATA");
+      if (!baseDir) {
+        baseDir = Deno.env.get("USERPROFILE");
+        if (baseDir) {
+          baseDir += "/AppData/Local";
+        }
+      }
+      if (baseDir) {
+        baseDir += "/Cache";
+      }
+      break;
+    }
+    case "linux": {
+      const xdg = Deno.env.get("XDG_CACHE_HOME");
+      if (xdg && xdg[0] === "/") {
+        baseDir = xdg;
+      }
+      break;
+    }
+  }
+  if (!baseDir) {
+    baseDir = Deno.env.get("HOME");
+    if (baseDir) {
+      baseDir += "/.cache";
+    }
+  }
+  if (!baseDir) {
+    throw new Error("Failed to find cache directory");
+  }
+  const platformKey = Deno.build.target;
+  const knownWindowsPackages: Record<string, string> = {
+    "x86_64-pc-windows-msvc": "esbuild-windows-64",
+  };
+  const knownUnixlikePackages: Record<string, string> = {
+    "aarch64-apple-darwin": "esbuild-darwin-arm64",
+    "aarch64-unknown-linux-gnu": "esbuild-linux-arm64",
+    "x86_64-apple-darwin": "esbuild-darwin-64",
+    "x86_64-unknown-linux-gnu": "esbuild-linux-64",
+  };
+  if (platformKey in knownWindowsPackages) {
+    name = knownWindowsPackages[platformKey];
+  } else if (platformKey in knownUnixlikePackages) {
+    name = knownUnixlikePackages[platformKey];
+  } else {
+    throw new Error(`Unsupported platform: ${platformKey}`);
+  }
+
+  const esbuildBinDir = baseDir + `/esbuild/bin`;
+  const esbuildBinPath = esbuildBinDir + `/${name}@${version}`;
+  return { esbuildBinDir, esbuildBinPath };
 }
 
 if (import.meta.main) {

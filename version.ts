@@ -6,6 +6,10 @@ export const isCanary = false;
 
 /** `prepublish` will be invoked before publish */
 export async function prepublish(): Promise<boolean> {
+  if (!window.confirm("Build compiler wasm ?")) {
+    return true;
+  }
+
   const p = Deno.run({
     cmd: ["deno", "run", "-A", "build.ts"],
     cwd: "./compiler",
