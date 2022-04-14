@@ -93,7 +93,7 @@ export function Link(props: LinkProps) {
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         prefetch();
-      }, 300);
+      }, 150);
     }
   }, [prefetch, href, propOnMouseEnter]);
   const onMouseLeave = useCallback((e: MouseEvent) => {

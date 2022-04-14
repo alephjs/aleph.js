@@ -134,7 +134,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       });
     };
     const onpopstate = async (e: Record<string, unknown>) => {
-      const url = new URL(window.location.href);
+      const url = (e.url as URL | undefined) || new URL(window.location.href);
       const matches = matchRoutes(url, routes);
       const modules = await Promise.all(matches.map(async ([ret, meta]) => {
         const { filename } = meta;
@@ -159,7 +159,12 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       }));
       setModules(modules);
       setUrl(url);
-      if (e.resetScroll) {
+      if (e.url) {
+        if (e.replace) {
+          history.replaceState(null, "", e.url as URL);
+        } else {
+          history.pushState(null, "", e.url as URL);
+        }
         window.scrollTo(0, 0);
       }
     };
