@@ -114,9 +114,9 @@ export default {
         }
       }
       if (inlineCSS) {
-        resBody += `\nimport { applyCSS as __applyCSS } from "${
+        code += `\nimport { applyCSS as __applyCSS } from "${
           toLocalPath(alephPkgUri)
-        }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});`;
+        }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});\n`;
         deps = [...(deps || []), { specifier: alephPkgUri + "/framework/core/style.ts" }] as typeof deps;
       }
       clientDependencyGraph.mark(specifier, { deps });
@@ -128,7 +128,7 @@ export default {
           }
           m.sourcesContent = [rawCode];
           resBody = code +
-            `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}`;
+            `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}\n`;
         } catch {
           log.warn(`Failed to add source map for '${specifier}'`);
           resBody = code;
