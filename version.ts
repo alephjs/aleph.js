@@ -6,7 +6,7 @@ export const isCanary = false;
 
 /** `prepublish` will be invoked before publish */
 export async function prepublish(): Promise<boolean> {
-  if (!window.confirm("Build compiler wasm ?")) {
+  if (!window.confirm("Build compiler wasm?")) {
     return true;
   }
 
