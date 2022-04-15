@@ -1,6 +1,6 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { getFiles } from "../lib/fs.ts";
-import type { Route } from "../lib/route.ts";
+import type { Route, Routes } from "../lib/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../lib/urlpattern.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
@@ -34,8 +34,8 @@ export async function importRouteModule(filename: string) {
 
 /* check if the filename is a route */
 export function isRouteFile(filename: string): boolean {
-  const currentRoutes: Route[] | undefined = Reflect.get(globalThis, "__ALEPH_ROUTES");
-  const index = currentRoutes?.findIndex(([_, meta]) => meta.filename === filename);
+  const currentRoutes: Routes | undefined = Reflect.get(globalThis, "__ALEPH_ROUTES");
+  const index = currentRoutes?.routes.findIndex(([_, meta]) => meta.filename === filename);
   if (index !== undefined && index !== -1) {
     return true;
   }
@@ -48,18 +48,32 @@ export function isRouteFile(filename: string): boolean {
 }
 
 /** initialize routes from routes config */
-export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cwd = Deno.cwd()): Promise<Route[]> {
+export async function initRoutes(
+  config: string | RoutesConfig | RouteRegExp,
+  cwd = Deno.cwd(),
+): Promise<Routes> {
   const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
   const files = await getFiles(join(cwd, reg.prefix));
   const routes: Route[] = [];
+  let _app: Route | undefined = undefined;
+  let _404: Route | undefined = undefined;
+  let _error: Route | undefined = undefined;
   files.forEach((file) => {
     const filename = reg.prefix + file.slice(1);
     const pattern = reg.exec(filename);
     if (pattern) {
-      routes.push([
+      const route: Route = [
         new URLPatternCompat(pattern),
         { pattern, filename },
-      ]);
+      ];
+      routes.push(route);
+      if (pattern.pathname === "/_app") {
+        _app = route;
+      } else if (pattern.pathname === "/_404") {
+        _404 = route;
+      } else if (pattern.pathname === "/_error") {
+        _error = route;
+      }
     }
   });
   if (routes.length > 0) {
@@ -76,8 +90,9 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cw
       }
     });
   }
-  Reflect.set(globalThis, "__ALEPH_ROUTES", routes);
-  return routes;
+  const ret = { routes, _404, _app, _error };
+  Reflect.set(globalThis, "__ALEPH_ROUTES", ret);
+  return ret;
 }
 
 /** convert route config to `RouteRegExp` */
@@ -98,13 +113,13 @@ export function toRouteRegExp(config: string | RoutesConfig): RouteRegExp {
     exec: (filename: string): URLPatternInput | null => {
       if (reg.test(filename)) {
         const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
-          // replace `/p/[...path]` to `/p/:path+`
-          if (part.startsWith("[...") && part.startsWith("]") && part.length > 5) {
-            return ":" + part.slice(4, -1) + "+";
+          // replace `/blog/[...path]` to `/blog/:path+`
+          if (part.startsWith("[...") && part.includes("]") && part.length > 5) {
+            return ":" + part.slice(4).replace("]", "+");
           }
           // replace `/blog/[id]` to `/blog/:id`
-          if (part.startsWith("[") && part.startsWith("]") && part.length > 2) {
-            return ":" + part.slice(1, -1);
+          if (part.startsWith("[") && part.includes("]") && part.length > 2) {
+            return ":" + part.slice(1).replace("]", "");
           }
           // replace `/blog/$id` to `/blog/:id`
           if (part.startsWith("$") && part.length > 1) {
@@ -139,6 +154,6 @@ function getRouteOrder([_, meta]: Route): number {
     case "/_error":
       return 0;
     default:
-      return filename.split("/").length;
+      return filename.split("/").length + (pattern.pathname.split("/:").length - 1) * 0.01;
   }
 }

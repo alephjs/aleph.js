@@ -47,7 +47,7 @@ export async function build(
 
   let routeFiles: [filename: string, exportNames: string[]][] = [];
   if (config?.routeFiles) {
-    const routes = await initRoutes(config?.routeFiles);
+    const { routes } = await initRoutes(config?.routeFiles);
     routeFiles = await Promise.all(routes.map(async ([_, { filename }]) => {
       const code = await Deno.readTextFile(filename);
       const exportNames = await parseExportNames(filename, code);

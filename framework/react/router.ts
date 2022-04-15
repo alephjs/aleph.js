@@ -1,7 +1,7 @@
 import type { FC, ReactElement, ReactNode } from "react";
 import { Component, createElement, useContext, useEffect, useMemo, useState } from "react";
 import { FetchError } from "../../lib/helpers.ts";
-import type { Route, RouteMeta, RouteModule } from "../../lib/route.ts";
+import type { Route, RouteMeta, RouteModule, Routes } from "../../lib/route.ts";
 import { matchRoutes } from "../../lib/route.ts";
 import { URLPatternCompat } from "../../lib/urlpattern.ts";
 import type { SSRContext } from "../../server/types.ts";
@@ -244,19 +244,34 @@ export const forwardProps = (children?: ReactNode, props: Record<string, unknown
   return createElement(ForwardPropsContext.Provider, { value: { props } }, children);
 };
 
-function loadRoutesFromTag(): Route[] {
+function loadRoutesFromTag(): Routes {
   const el = window.document?.getElementById("route-manifest");
   if (el) {
     try {
       const manifest = JSON.parse(el.innerText);
       if (Array.isArray(manifest.routes)) {
-        return manifest.routes.map((meta: RouteMeta) => [new URLPatternCompat(meta.pattern), meta]);
+        let _app: Route | undefined = undefined;
+        let _404: Route | undefined = undefined;
+        let _error: Route | undefined = undefined;
+        const routes = manifest.routes.map((meta: RouteMeta) => {
+          const { pattern } = meta;
+          const route: Route = [new URLPatternCompat(pattern), meta];
+          if (pattern.pathname === "/_app") {
+            _app = route;
+          } else if (pattern.pathname === "/_404") {
+            _404 = route;
+          } else if (pattern.pathname === "/_error") {
+            _error = route;
+          }
+          return route;
+        });
+        return { routes, _app, _404, _error };
       }
     } catch (_e) {
       console.error("loadRoutesFromTag: invalid JSON");
     }
   }
-  return [];
+  return { routes: [] };
 }
 
 function loadSSRModulesFromTag(): RouteModule[] {

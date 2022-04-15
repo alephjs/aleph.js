@@ -6,7 +6,7 @@ import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph } from "./graph.ts";
 import { importRouteModule } from "./routing.ts";
 import type { SSRContext } from "./types.ts";
-import type { Route, RouteModule } from "../lib/route.ts";
+import type { RouteModule, Routes } from "../lib/route.ts";
 import { matchRoutes } from "../lib/route.ts";
 
 export type HTMLRewriterHandlers = {
@@ -15,7 +15,7 @@ export type HTMLRewriterHandlers = {
 
 export type RenderOptions = {
   indexHtml: string;
-  routes: Route[];
+  routes: Routes;
   isDev: boolean;
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   ssr?: (ssr: SSRContext) => string | Promise<string>;
@@ -259,8 +259,8 @@ export default {
             if (commonHandler.handled) {
               return;
             }
-            if (routes.length > 0) {
-              const json = JSON.stringify({ routes: routes.map(([_, meta]) => meta) });
+            if (routes.routes.length > 0) {
+              const json = JSON.stringify({ routes: routes.routes.map(([_, meta]) => meta) });
               el.append(`<script id="route-manifest" type="application/json">${json}</script>`, {
                 html: true,
               });
@@ -301,7 +301,7 @@ export default {
 async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
-  routes: Route[],
+  routes: Routes,
 ): Promise<[url: URL, routeModules: RouteModule[], errorBoundaryModule: RouteModule | undefined]> {
   const url = new URL(req.url);
   const matches = matchRoutes(url, routes);
@@ -347,10 +347,8 @@ async function initSSR(
     return rmod;
   }));
   const routeModules = modules.filter(({ defaultExport }) => defaultExport !== undefined);
-  const errorBoundaryRoute = routes.find(([_, meta]) => meta.pattern.pathname === "/_error");
-
-  if (errorBoundaryRoute) {
-    const [_, meta] = errorBoundaryRoute;
+  if (routes._error) {
+    const [_, meta] = routes._error;
     const mod = await importRouteModule(meta.filename);
     if (mod.default !== undefined) {
       const errorBoundaryModule: RouteModule = {

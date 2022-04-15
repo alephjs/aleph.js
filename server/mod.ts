@@ -3,7 +3,7 @@ import { readableStreamFromReader } from "https://deno.land/std@0.134.0/streams/
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
-import type { Route } from "../lib/route.ts";
+import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
@@ -31,7 +31,7 @@ export const serve = (options: ServerOptions = {}) => {
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then((importMap) => loadJSXConfig(importMap));
   const moduleLoadersPromise = importMapPromise.then((importMap) => initModuleLoaders(importMap));
-  const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve([]);
+  const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve({ routes: [] } as Routes);
   const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {
     const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
     return util.computeHash("sha-1", buildArgs);
@@ -159,9 +159,9 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request data
-    const routes = (Reflect.get(globalThis, "__ALEPH_ROUTES") as Route[] | undefined) || await routesPromise;
-    if (routes.length > 0) {
-      for (const [pattern, { filename }] of routes) {
+    const routes: Routes = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routesPromise;
+    if (routes.routes.length > 0) {
+      for (const [pattern, { filename }] of routes.routes) {
         const ret = pattern.exec({ host, pathname });
         if (ret) {
           try {

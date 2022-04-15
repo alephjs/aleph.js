@@ -29,7 +29,7 @@ export class FetchError extends Error {
 
 /**
  * fix remote url to local path.
- * e.g. `https://esm.sh/react@17.0.2` -> `/-/esm.sh/react@17.0.2`
+ * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`
  */
 export function toLocalPath(url: string): string {
   if (util.isLikelyHttpURL(url)) {
