@@ -1,6 +1,7 @@
 import { createGenerator } from "https://esm.sh/@unocss/core@0.30.12";
-import { transform } from "../compiler/mod.ts";
-import type { TransformOptions } from "../compiler/types.ts";
+import MagicString from "https://esm.sh/magic-string@0.26.1";
+import { parseDeps, transform } from "../compiler/mod.ts";
+import type { TransformOptions, TransformResult } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import { restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
@@ -30,17 +31,17 @@ export default {
     let mtime: number | undefined;
     let lang: string | undefined;
     let isCSS: boolean;
-    let enableAtomicCSS: boolean;
+    let useUno: boolean;
     if (loaded) {
       rawCode = loaded.code;
       mtime = loaded.modtime;
       lang = loaded.lang;
       isCSS = loaded.lang === "css";
-      enableAtomicCSS = !!loaded.atomicCSS;
+      useUno = !!loaded.atomicCSS;
     } else {
       let ctype: string;
       [rawCode, mtime, ctype] = await readCode(specifier);
-      enableAtomicCSS = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
+      useUno = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
       isCSS = ctype.startsWith("text/css") || ctype.startsWith("text/postcss");
     }
     const etag = mtime
@@ -84,27 +85,46 @@ export default {
         resType = "text/css";
       }
     } else {
-      const { atomicCSS, jsxConfig, importMap, buildTarget } = options;
       const alephPkgUri = getAlephPkgUri();
-      const graphVersions = clientDependencyGraph.modules.filter((mod) =>
-        !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
-      ).reduce((acc, { specifier, version }) => {
-        acc[specifier] = version.toString(16);
-        return acc;
-      }, {} as Record<string, string>);
-      let { code, deps, map } = await transform(specifier, rawCode, {
-        ...jsxConfig,
-        lang: lang as TransformOptions["lang"],
-        stripDataExport: isRouteFile(specifier),
-        target: buildTarget ?? (isDev ? "es2022" : "es2015"),
-        alephPkgUri,
-        importMap: JSON.stringify(importMap),
-        graphVersions,
-        initialGraphVersion: clientDependencyGraph.initialVersion.toString(16),
-        isDev,
-      });
+      const { atomicCSS, jsxConfig, importMap, buildTarget } = options;
+      let ret: TransformResult;
+      if (/^https?:\/\/(cdn\.)esm\.sh\//.test(specifier)) {
+        // don't transform modules imported from esm.sh
+        const deps = await parseDeps(specifier, rawCode, { importMap: JSON.stringify(importMap) });
+        if (deps.length > 0) {
+          const s = new MagicString(rawCode);
+          deps.forEach((dep) => {
+            const { importUrl, loc } = dep;
+            if (loc) {
+              s.overwrite(loc.start, loc.end, `"${toLocalPath(importUrl)}"`);
+            }
+          });
+          ret = { code: s.toString(), deps };
+        } else {
+          ret = { code: rawCode, deps };
+        }
+      } else {
+        const graphVersions = clientDependencyGraph.modules.filter((mod) =>
+          !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
+        ).reduce((acc, { specifier, version }) => {
+          acc[specifier] = version.toString(16);
+          return acc;
+        }, {} as Record<string, string>);
+        ret = await transform(specifier, rawCode, {
+          ...jsxConfig,
+          lang: lang as TransformOptions["lang"],
+          stripDataExport: isRouteFile(specifier),
+          target: buildTarget ?? (isDev ? "es2022" : "es2015"),
+          alephPkgUri,
+          importMap: JSON.stringify(importMap),
+          graphVersions,
+          initialGraphVersion: clientDependencyGraph.initialVersion.toString(16),
+          isDev,
+        });
+      }
+      let { code, map, deps } = ret;
       let inlineCSS = loaded?.inlineCSS;
-      if (enableAtomicCSS && Boolean(atomicCSS?.presets?.length)) {
+      if (useUno && Boolean(atomicCSS?.presets?.length)) {
         const uno = createGenerator(atomicCSS);
         const { css } = await uno.generate(rawCode, { id: specifier, minify: !isDev });
         if (inlineCSS) {
@@ -130,7 +150,7 @@ export default {
           resBody = code +
             `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}\n`;
         } catch {
-          log.warn(`Failed to add source map for '${specifier}'`);
+          log.warn(`[dev] Failed to add source map for '${specifier}'`);
           resBody = code;
         }
       } else {
