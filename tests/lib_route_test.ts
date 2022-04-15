@@ -15,7 +15,6 @@ Deno.test("lib/helpers.ts: matchRoutes", async () => {
     "./routes/docs/index.mdx",
     "./routes/index.tsx",
     "./routes/utils.ts",
-    "./routes/post/[date]/[...slug].tsx",
     "./routes/works.tsx",
     "./routes/works/$id.tsx",
     "./routes/works/$id/$page+.tsx",
@@ -23,12 +22,17 @@ Deno.test("lib/helpers.ts: matchRoutes", async () => {
     "./routes/works/$id/order.tsx",
     "./routes/works/index.tsx",
     "./routes/works/new.tsx",
+    "./routes/users/index.tsx",
+    "./routes/users/$uid.tsx",
+    "./routes/users/$uid/index.tsx",
+    "./routes/users/$uid/settings/$page.tsx",
+    "./routes/post/[date]/[...slug].tsx",
   ];
   await Promise.all(files.map((file) => Deno.mkdir(join(tmpDir, dirname(file)), { recursive: true })));
   await Promise.all(files.map((file) => Deno.writeTextFile(join(tmpDir, file), "")));
   const routes = await initRoutes("./routes/**/*.{tsx,mdx}", tmpDir);
   assertEquals(routes.routes.length, files.length - 1);
-  assertEquals(routes.routes.filter(([_, meta]) => meta.nesting).length, 4);
+  assertEquals(routes.routes.filter(([_, meta]) => meta.nesting).length, 5);
 
   let matches = matchRoutes(new URL("/", "http://localhost:3000"), routes);
   assertEquals(matches.map(([ret]) => ret.pathname.input), ["/_app", "/"]);
@@ -118,5 +122,31 @@ Deno.test("lib/helpers.ts: matchRoutes", async () => {
     "./routes/works.tsx",
     "./routes/works/$id.tsx",
     "./routes/works/$id/$page+.tsx",
+  ]);
+
+  matches = matchRoutes(new URL("/users", "http://localhost:3000"), routes);
+  assertEquals(matches.map(([ret]) => ret.pathname.input), ["/_app", "/users/index"]);
+  assertEquals(matches.map(([ret]) => ret.pathname.groups), [{}, {}]);
+  assertEquals(matches.map(([_, meta]) => meta.filename), [
+    "./routes/_app.tsx",
+    "./routes/users/index.tsx",
+  ]);
+
+  matches = matchRoutes(new URL("/users/ije", "http://localhost:3000"), routes);
+  assertEquals(matches.map(([ret]) => ret.pathname.input), ["/_app", "/users/ije", "/users/ije/index"]);
+  assertEquals(matches.map(([ret]) => ret.pathname.groups), [{}, { uid: "ije" }, { uid: "ije" }]);
+  assertEquals(matches.map(([_, meta]) => meta.filename), [
+    "./routes/_app.tsx",
+    "./routes/users/$uid.tsx",
+    "./routes/users/$uid/index.tsx",
+  ]);
+
+  matches = matchRoutes(new URL("/users/ije/settings/profile", "http://localhost:3000"), routes);
+  assertEquals(matches.map(([ret]) => ret.pathname.input), ["/_app", "/users/ije", "/users/ije/settings/profile"]);
+  assertEquals(matches.map(([ret]) => ret.pathname.groups), [{}, { uid: "ije" }, { uid: "ije", page: "profile" }]);
+  assertEquals(matches.map(([_, meta]) => meta.filename), [
+    "./routes/_app.tsx",
+    "./routes/users/$uid.tsx",
+    "./routes/users/$uid/settings/$page.tsx",
   ]);
 });

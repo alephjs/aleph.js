@@ -52,6 +52,18 @@ export function matchRoutes(
         }
       }
     }
+    if (matches.length === 0) {
+      // find index route
+      for (const [p, m] of routes) {
+        if (m.pattern.pathname.endsWith("/index")) {
+          const ret = p.exec({ host: url.host, pathname: pathname + "/index" });
+          if (ret) {
+            matches.push([ret, m]);
+            break;
+          }
+        }
+      }
+    }
     if (matches.length > 0) {
       const directMatch = matches[matches.length - 1][1];
       const parts = util.splitPath(pathname);
@@ -71,7 +83,7 @@ export function matchRoutes(
       }
 
       if (directMatch.nesting) {
-        // find the nesting index of the route
+        // find index route
         for (const [p, m] of routes) {
           if (m.pattern.pathname === directMatch.pattern.pathname + "/index") {
             const ret = p.exec({ host: url.host, pathname: pathname + "/index" });
