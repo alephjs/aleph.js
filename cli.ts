@@ -157,13 +157,14 @@ type RunOptions = {
 async function run(command: string, options: RunOptions) {
   const { version, isCanary, denoConfigFile, importMapFile } = options;
   const { esbuildBinDir, esbuildBinPath } = getEsbuildPath("0.14.36");
+  const devPort = Deno.env.get("ALEPH_DEV_PORT");
   const rwDirs = [
-    ".",
     Deno.env.get("MODULES_CACHE_DIR"),
     Deno.env.get("ALEPH_DEV_ROOT"),
     esbuildBinDir,
+    ".",
   ].filter(Boolean);
-  const cmd: string[] = [
+  const cmd = [
     Deno.execPath(),
     "run",
     "--allow-env",
@@ -173,17 +174,11 @@ async function run(command: string, options: RunOptions) {
     "--allow-run=" + esbuildBinPath,
     "--location=http://localhost",
     "--no-check",
-  ];
-  const devPort = Deno.env.get("ALEPH_DEV_PORT");
-  if (devPort) {
-    cmd.push(`--reload=http://localhost:${devPort}`);
-  }
-  if (denoConfigFile) {
-    cmd.push("--config", denoConfigFile);
-  }
-  if (importMapFile) {
-    cmd.push("--import-map", importMapFile);
-  }
+    "--unstable",
+    denoConfigFile && `--config=${denoConfigFile}`,
+    importMapFile && `--import-map=${importMapFile}`,
+    devPort && `--reload=http://localhost:${devPort}`,
+  ].filter(Boolean) as string[];
   if (version) {
     const pkgName = isCanary ? "aleph_canary" : "aleph";
     cmd.push(`https://deno.land/x/${pkgName}@${version}/commands/${command}.ts`);
