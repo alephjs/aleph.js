@@ -75,9 +75,10 @@ export default {
               const kvs = routeModules.map(({ filename, data }, idx) =>
                 `${JSON.stringify(filename)}:{defaultExport:$${idx}${data !== undefined ? ",withData:true" : ""}}`
               ).join(",");
-              const ssrModules = routeModules.map(({ url, filename, error, data, dataCacheTtl }) => ({
+              const ssrModules = routeModules.map(({ url, params, filename, error, data, dataCacheTtl }) => ({
                 url: url.pathname + url.search,
-                module: filename,
+                params,
+                filename,
                 error,
                 data,
                 dataCacheTtl,
@@ -317,6 +318,7 @@ async function initSSR(
     const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),
+      params: ret.pathname.groups,
       filename: filename,
       defaultExport: mod.default,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
@@ -360,6 +362,7 @@ async function initSSR(
     if (mod.default !== undefined) {
       const errorBoundaryModule: RouteModule = {
         url: new URL("/_error" + url.search, url.href),
+        params: {},
         filename: meta.filename,
         defaultExport: mod.default,
       };

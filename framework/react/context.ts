@@ -2,10 +2,12 @@ import { createContext } from "react";
 
 export type RouterContextProps = {
   url: URL;
+  params: Record<string, string>;
 };
 
 export const RouterContext = createContext<RouterContextProps>({
   url: new URL("http://localhost/"),
+  params: {},
 });
 
 export type DataContextProps = {

@@ -4,6 +4,7 @@ import util from "./util.ts";
 
 export type RouteModule = {
   url: URL;
+  params: Record<string, string>;
   filename: string;
   error?: Error;
   redirect?: { headers: Headers; status: number };

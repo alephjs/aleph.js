@@ -4,10 +4,16 @@ import { FetchError } from "../../lib/helpers.ts";
 import type { Route, RouteMeta, RouteModule, Routes } from "../../lib/route.ts";
 import { matchRoutes } from "../../lib/route.ts";
 import { URLPatternCompat } from "../../lib/urlpattern.ts";
-import type { SSRContext } from "../../server/types.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import { DataContext, ForwardPropsContext, RouterContext } from "./context.ts";
+
+export type SSRContext = {
+  readonly url: URL;
+  readonly routeModules: RouteModule[];
+  readonly errorBoundaryModule?: RouteModule;
+  readonly headCollection: string[];
+};
 
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
@@ -45,6 +51,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
           dataCache,
           ssrHeadCollection: ssrContext?.headCollection,
         },
+        key: dataUrl,
       },
       typeof currentModule.defaultExport === "function"
         ? createElement(
@@ -62,11 +69,19 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     }
     return el;
   };
-  const routeEl = useMemo<ReactElement | null>(
-    () =>
-      modules.length > 0 ? createRouteEl(modules) : createElement(Err, { status: 404, statusText: "page not found" }),
-    [modules],
-  );
+  const routeEl = useMemo(() => {
+    if (modules.length > 0) {
+      return createRouteEl(modules);
+    }
+    return createElement(Err, { status: 404, statusText: "page not found" });
+  }, [modules]);
+  const params = useMemo(() => {
+    const params: Record<string, string> = {};
+    modules.forEach((m) => {
+      Object.assign(params, m.params);
+    });
+    return params;
+  }, [modules]);
 
   useEffect(() => {
     // remove ssr head elements
@@ -140,6 +155,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         const { filename } = meta;
         const rmod: RouteModule = {
           url: new URL(ret.pathname.input + url.search, url.href),
+          params: ret.pathname.groups,
           filename,
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;
@@ -183,7 +199,11 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     };
   }, []);
 
-  return createElement(RouterContext.Provider, { value: { url } }, routeEl);
+  return createElement(
+    RouterContext.Provider,
+    { value: { url, params } },
+    routeEl,
+  );
 };
 
 class ErrorBoundary extends Component<{ Handler: FC<{ error: Error }> }, { error: Error | null }> {
@@ -224,9 +244,9 @@ function Err({ status, statusText }: { status: number; statusText: string }) {
   );
 }
 
-export const useRouter = (): { url: URL; redirect: typeof redirect } => {
-  const { url } = useContext(RouterContext);
-  return { url, redirect };
+export const useRouter = (): { url: URL; params: Record<string, string>; redirect: typeof redirect } => {
+  const { url, params } = useContext(RouterContext);
+  return { url, params, redirect };
 };
 
 export const useForwardProps = <T = Record<string, unknown>>(): T => {
@@ -279,11 +299,12 @@ function loadSSRModulesFromTag(): RouteModule[] {
   const el = window.document?.getElementById("ssr-modules");
   if (el) {
     try {
-      const ssrData = JSON.parse(el.innerText);
-      if (Array.isArray(ssrData)) {
-        return ssrData.map(({ url, module: filename, ...rest }) => {
+      const data = JSON.parse(el.innerText);
+      if (Array.isArray(data)) {
+        return data.map(({ url, params, filename, ...rest }) => {
           return {
             url: new URL(url, location.href),
+            params,
             filename,
             defaultExport: ROUTE_MODULES[filename].defaultExport,
             ...rest,
