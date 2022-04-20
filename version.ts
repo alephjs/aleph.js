@@ -1,10 +1,10 @@
 /** `VERSION` managed by https://deno.land/x/publish */
-export const VERSION = "1.0.0-alpha.2";
+export const VERSION = "1.0.0-alpha.3";
 
-/** whether is canary version */
+/** The flag indicates that the version is canary version. */
 export const isCanary = false;
 
-/** `prepublish` will be invoked before publish */
+/** `prepublish` will be invoked before publish. */
 export async function prepublish(): Promise<boolean> {
   if (!window.confirm("Build compiler wasm?")) {
     return true;
