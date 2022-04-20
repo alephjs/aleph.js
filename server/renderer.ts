@@ -5,9 +5,15 @@ import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
 import type { DependencyGraph } from "./graph.ts";
 import { importRouteModule } from "./routing.ts";
-import type { SSRContext } from "./types.ts";
 import type { RouteModule, Routes } from "../lib/route.ts";
 import { matchRoutes } from "../lib/route.ts";
+
+export type SSRContext = {
+  readonly url: URL;
+  readonly routeModules: RouteModule[];
+  readonly errorBoundaryModule?: RouteModule;
+  readonly headCollection: string[];
+};
 
 export type HTMLRewriterHandlers = {
   element?: (element: Element) => void;

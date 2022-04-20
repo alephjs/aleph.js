@@ -5,7 +5,14 @@ import { globalIt } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
-import type { ImportMap, JSXConfig, ModuleLoader } from "./types.ts";
+import type { ImportMap, ModuleLoader } from "./types.ts";
+
+export type JSXConfig = {
+  jsxRuntime?: "react" | "preact";
+  jsxImportSource?: string;
+  jsxRuntimeVersion?: string;
+  jsxRuntimeCdnVersion?: string;
+};
 
 export function getAlephPkgUri() {
   return globalIt("__ALEPH_PKG_URI", () => {

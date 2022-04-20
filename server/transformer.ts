@@ -7,10 +7,10 @@ import { restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
-import { getAlephPkgUri } from "./config.ts";
+import { getAlephPkgUri, type JSXConfig } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { AtomicCSSConfig, ImportMap, JSXConfig, ModuleLoaderContent } from "./types.ts";
+import type { AtomicCSSConfig, ImportMap, ModuleLoaderContent } from "./types.ts";
 
 export type TransformerOptions = {
   buildHash: string;

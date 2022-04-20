@@ -1,5 +1,4 @@
 import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.31.6";
-import type { RouteModule } from "../lib/route.ts";
 
 export type AlephConfig = {
   /* The basePath of the app. */
@@ -10,26 +9,6 @@ export type AlephConfig = {
   routes?: RoutesConfig | string;
   /** The config for atomic css powered by unocss. */
   atomicCSS?: AtomicCSSConfig;
-};
-
-export type ModuleLoader = {
-  test(pathname: string): boolean;
-  load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderContent> | ModuleLoaderContent;
-};
-
-export type ModuleLoaderEnv = {
-  importMap?: ImportMap;
-  isDev?: boolean;
-  ssr?: boolean;
-};
-
-export type ModuleLoaderContent = {
-  code: string;
-  inlineCSS?: string;
-  atomicCSS?: boolean;
-  lang?: "js" | "jsx" | "ts" | "tsx" | "css";
-  map?: string;
-  modtime?: number;
 };
 
 export type BuildPlatform = "deno" | "cloudflare" | "vercel";
@@ -63,24 +42,30 @@ export interface Middleware {
   ): Promise<Response | MiddlewareCallback | void> | Response | MiddlewareCallback | void;
 }
 
-export type SSRContext = {
-  readonly url: URL;
-  readonly routeModules: RouteModule[];
-  readonly errorBoundaryModule?: RouteModule;
-  readonly headCollection: string[];
-};
-
 export type ImportMap = {
   readonly __filename: string;
   readonly imports: Record<string, string>;
   readonly scopes: Record<string, Record<string, string>>;
 };
 
-export type JSXConfig = {
-  jsxRuntime?: "react" | "preact";
-  jsxImportSource?: string;
-  jsxRuntimeVersion?: string;
-  jsxRuntimeCdnVersion?: string;
+export type ModuleLoader = {
+  test(pathname: string): boolean;
+  load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderContent> | ModuleLoaderContent;
+};
+
+export type ModuleLoaderEnv = {
+  importMap?: ImportMap;
+  isDev?: boolean;
+  ssr?: boolean;
+};
+
+export type ModuleLoaderContent = {
+  code: string;
+  inlineCSS?: string;
+  atomicCSS?: boolean;
+  lang?: "js" | "jsx" | "ts" | "tsx" | "css";
+  map?: string;
+  modtime?: number;
 };
 
 export { AtomicCSSConfig };
