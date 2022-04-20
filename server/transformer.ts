@@ -1,4 +1,4 @@
-import { createGenerator } from "https://esm.sh/@unocss/core@0.30.12";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.31.6";
 import MagicString from "https://esm.sh/magic-string@0.26.1";
 import { parseDeps, transform } from "../compiler/mod.ts";
 import type { TransformOptions, TransformResult } from "../compiler/types.ts";
