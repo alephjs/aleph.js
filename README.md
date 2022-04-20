@@ -5,16 +5,8 @@
   <a href="https://twitter.com/intent/follow?screen_name=alephjs"><img src="https://img.shields.io/twitter/follow/alephjs?style=social" alt="Twitter"></a>
 </p>
 
-## Getting Started
-
-Visit [https://alephjs.org/docs/get-started](https://alephjs.org/docs/get-started) to get started with Aleph.js.
-
-## Community
-
-The Aleph.js community can be found on [GitHub Discussions](https://github.com/alephjs/aleph.js/discussions), where you can ask questions, voice ideas, and share your projects.
-
-To chat with other community members you can join the Aleph.js [Discord](https://discord.com/invite/pWGdS7sAqD).
-
-## Contributing
-
-Please see our [contributing.md](https://github.com/alephjs/aleph.js/blob/master/CONTRIBUTING.md).
+> ⚠️ DO NOT USE. WE ARE CURRENTLY REWRITING THIS FRAMEWORK, MANY THINGS ARE STILL SUBJECT TO CHANGE AT ANY TIME.
+>
+> The new docs site is working in progress: https://aleph.deno.dev ([PR](https://github.com/alephjs/alephjs.org/pull/58))
+>
+> You can join the Aleph.js [Discord](https://discord.com/invite/pWGdS7sAqD) to get the dev progress.
