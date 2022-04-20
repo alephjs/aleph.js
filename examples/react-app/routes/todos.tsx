@@ -1,5 +1,4 @@
 import { Head, useData } from "aleph/react";
-import { json } from "aleph/server";
 
 type TodoItem = {
   id: number;
@@ -9,19 +8,19 @@ type TodoItem = {
 
 let todos: TodoItem[] = JSON.parse(window.localStorage?.getItem("todos") || "[]");
 
-export const data = {
-  get: (req: Request) => {
-    return json({ todos });
+export const data: Data = {
+  get: (_req, ctx) => {
+    return ctx.json({ todos });
   },
-  put: async (req: Request) => {
+  put: async (req, ctx) => {
     const { message } = await req.json();
     if (typeof message === "string") {
       todos.push({ id: Date.now(), message, completed: false });
       window.localStorage?.setItem("todos", JSON.stringify(todos));
     }
-    return json({ todos });
+    return ctx.json({ todos });
   },
-  patch: async (req: Request) => {
+  patch: async (req, ctx) => {
     const { id, message, completed } = await req.json();
     const todo = todos.find((todo) => todo.id === id);
     if (todo) {
@@ -33,15 +32,15 @@ export const data = {
       }
       window.localStorage?.setItem("todos", JSON.stringify(todos));
     }
-    return json({ todos });
+    return ctx.json({ todos });
   },
-  delete: async (req: Request) => {
+  delete: async (req, ctx) => {
     const { id } = await req.json();
     if (id) {
       todos = todos.filter((todo) => todo.id !== id);
       window.localStorage?.setItem("todos", JSON.stringify(todos));
     }
-    return json({ todos });
+    return ctx.json({ todos });
   },
 };
 
