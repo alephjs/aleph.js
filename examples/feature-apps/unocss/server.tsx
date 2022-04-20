@@ -1,5 +1,5 @@
-import presetUno from "https://esm.sh/@unocss/preset-uno@0.31.6";
-import presetIcons from "https://esm.sh/@unocss/preset-icons@0.31.6?no-require";
+import presetUno from "@unocss/preset-uno.ts";
+import presetIcons from "@unocss/preset-icons.ts";
 import carbonIcons from "https://esm.sh/@iconify-json/carbon@1.1.2/icons.json" assert { type: "json" };
 import { renderToString } from "react-dom/server";
 import { Router } from "aleph/react";

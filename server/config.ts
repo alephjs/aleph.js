@@ -109,6 +109,7 @@ export async function loadImportMap(): Promise<ImportMap> {
       __filename,
       imports: {
         ...imports,
+        "@unocss/": `${alephPkgUri}/lib/@unocss/`,
         "aleph/": `${alephPkgUri}/`,
         "aleph/server": `${alephPkgUri}/server/mod.ts`,
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,

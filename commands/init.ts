@@ -75,6 +75,7 @@ export default async function (nameArg: string | undefined, template = "react") 
   const importMap = {
     imports: {
       "~/": "./",
+      "@unocss/": `${alephPkgUri}/lib/@unocss/`,
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
     },
