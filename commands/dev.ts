@@ -83,12 +83,12 @@ if (import.meta.main) {
   }
 
   // serve app modules
+  const cwd = Deno.cwd();
   const importMap = await loadImportMap();
   const moduleLoaders = await initModuleLoaders(importMap);
   proxyModules(6060, { importMap, moduleLoaders });
 
   log.info(`Watching files for changes...`);
-  const cwd = Deno.cwd();
   watchFs(cwd, (kind, path) => {
     const specifier = "./" + relative(cwd, path);
     const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
@@ -122,44 +122,19 @@ if (import.meta.main) {
     }
   });
 
+  let ac: AbortController | null = null;
+  const bs = async () => {
+    ac?.abort();
+    ac = new AbortController();
+    await bootstrap(ac.signal, serverEntry);
+  };
+
   const emitter = createEmitter();
   const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
     findFile(["deno.jsonc", "deno.json", "tsconfig.json"]),
     findFile(["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
     findFile(builtinModuleExts.map((ext) => `server.${ext}`)),
   ]);
-  const importServerHandler = async (reloaded?: boolean): Promise<void> => {
-    if (serverEntry) {
-      await import(
-        `http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/${basename(serverEntry)}?t=${
-          Date.now().toString(16)
-        }`
-      );
-      if (reloaded) {
-        log.info(`Reload ${blue(basename(serverEntry))}...`);
-      }
-    }
-  };
-  if (serverEntry) {
-    emitter.on(`hotUpdate:./${basename(serverEntry)}`, () => importServerHandler(true));
-    if (denoConfigFile) {
-      emitter.on(`modify:./${basename(denoConfigFile)}`, () => importServerHandler(true));
-    }
-    if (importMapFile) {
-      emitter.on(`modify:./${basename(importMapFile)}`, async () => {
-        // update import maps for `proxyModules`
-        Object.assign(importMap, await loadImportMap());
-        importServerHandler(true);
-      });
-    }
-    await importServerHandler();
-    log.info(`Bootstrap server from ${blue(basename(serverEntry))}...`);
-  }
-
-  // make the default handler
-  if (!Reflect.has(globalThis, "__ALEPH_SERVER")) {
-    serve();
-  }
 
   // update routes when fs change
   const updateRoutes = ({ specifier }: { specifier: string }) => {
@@ -174,8 +149,40 @@ if (import.meta.main) {
   emitter.on("create", updateRoutes);
   emitter.on("remove", updateRoutes);
 
-  const { hostname, port = 8080, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
-  const devHandler = (req: Request) => {
+  if (serverEntry) {
+    emitter.on(`hotUpdate:./${basename(serverEntry)}`, bs);
+    if (denoConfigFile) {
+      emitter.on(`modify:./${basename(denoConfigFile)}`, bs);
+    }
+    if (importMapFile) {
+      emitter.on(`modify:./${basename(importMapFile)}`, async () => {
+        // update import maps for `proxyModules`
+        Object.assign(importMap, await loadImportMap());
+        bs();
+      });
+    }
+  }
+  await bs();
+}
+
+async function bootstrap(signal: AbortSignal, entry?: string): Promise<void> {
+  if (Reflect.has(globalThis, "__ALEPH_SERVER")) {
+    Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
+  }
+  if (entry) {
+    await import(
+      `http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/${basename(entry)}?t=${Date.now().toString(16)}`
+    );
+    log.info(`Bootstrap server from ${blue(basename(entry))}...`);
+  }
+  // make the default handler
+  if (!Reflect.has(globalThis, "__ALEPH_SERVER")) {
+    serve();
+  }
+
+  const { hostname, port = 8080, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") ||
+    {};
+  const finalHandler = (req: Request) => {
     const { pathname } = new URL(req.url);
 
     // handle HMR sockets
@@ -188,8 +195,8 @@ if (import.meta.main) {
 
   log.info(`Server ready on http://localhost:${port}`);
   if (certFile && keyFile) {
-    await serveTls(devHandler, { port, hostname, certFile, keyFile });
+    await serveTls(finalHandler, { port, hostname, certFile, keyFile, signal });
   } else {
-    await stdServe(devHandler, { port, hostname });
+    await stdServe(finalHandler, { port, hostname, signal });
   }
 }

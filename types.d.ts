@@ -6,11 +6,29 @@ declare type HTMLRewriterHandlers = {
   end?: (end: import("https://deno.land/x/lol_html@0.0.3/types.d.ts").DocumentEnd) => void;
 };
 
+declare type CacheControlOptions = {
+  maxAge?: number;
+  sMaxAge?: number;
+  public?: boolean;
+  private?: boolean;
+  immutable?: boolean;
+  mustRevalidate?: boolean;
+};
+
 declare interface Context extends Record<string, unknown> {
   readonly params: Record<string, string>;
+  readonly headers: Headers;
   readonly HTMLRewriter: {
     on: (selector: string, handlers: HTMLRewriterHandlers) => void;
   };
+  json(data: unknown, init?: ResponseInit): Response;
+  content(
+    content: BodyInit,
+    init?: ResponseInit & {
+      contentType?: string;
+      cacheControl?: CacheControlOptions | "immutable" | "no-cache";
+    },
+  ): Response;
 }
 
 declare interface Data {

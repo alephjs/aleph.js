@@ -53,12 +53,11 @@ if (import.meta.main) {
   await import(distServerEntry);
   log.info(`Bootstrap server from ${blue(join(outputDir, "server.js"))}...`);
 
-  const { hostname, port = 8080, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
-
+  const { hostname, port = 8080, certFile, keyFile, signal, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
   log.info(`Server ready on http://localhost:${port}`);
   if (certFile && keyFile) {
-    await serveTls(handler, { port, hostname, certFile, keyFile });
+    await serveTls(handler, { port, hostname, certFile, keyFile, signal });
   } else {
-    await stdServe(handler, { port, hostname });
+    await stdServe(handler, { port, hostname, signal });
   }
 }

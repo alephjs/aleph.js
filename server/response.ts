@@ -1,13 +1,10 @@
 export function json(data: unknown, init?: ResponseInit): Response {
   const headers = new Headers(init?.headers);
   headers.append("content-type", "application/json; charset=utf-8");
-  return new Response(JSON.stringify(data), {
-    ...init,
-    headers,
-  });
+  return new Response(JSON.stringify(data), { ...init, headers });
 }
 
-export type CacheControl = {
+export type CacheControlOptions = {
   maxAge?: number;
   sMaxAge?: number;
   public?: boolean;
@@ -17,10 +14,10 @@ export type CacheControl = {
 };
 
 export function content(
-  content: BodyInit,
+  body: BodyInit,
   init?: ResponseInit & {
     contentType?: string;
-    cacheContorl?: CacheControl | "immutable" | "no-cache";
+    cacheControl?: CacheControlOptions | "immutable" | "no-cache";
   },
 ): Response {
   const headers = new Headers(init?.headers);
@@ -30,19 +27,19 @@ export function content(
     headers.set("Content-Type", contentType);
   }
 
-  const cacheContorl = init?.cacheContorl;
-  if (cacheContorl) {
-    if (cacheContorl === "no-cache") {
+  const cacheControl = init?.cacheControl;
+  if (cacheControl) {
+    if (cacheControl === "no-cache") {
       headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
-    } else if (cacheContorl === "immutable") {
+    } else if (cacheControl === "immutable") {
       headers.set("Cache-Control", "public, max-age=31536000, immutable");
     } else {
-      const { maxAge, sMaxAge, immutable, mustRevalidate } = cacheContorl;
+      const { maxAge, sMaxAge, immutable, mustRevalidate } = cacheControl;
       headers.set(
         "Cache-Control",
         [
-          cacheContorl.public && "public",
-          cacheContorl.private && "private",
+          cacheControl.public && "public",
+          cacheControl.private && "private",
           maxAge && `max-age=${maxAge}`,
           sMaxAge && `s-maxage=${sMaxAge}`,
           immutable && "immutable",
@@ -52,5 +49,5 @@ export function content(
     }
   }
 
-  return new Response(content, { ...init, headers });
+  return new Response(body, { ...init, headers });
 }

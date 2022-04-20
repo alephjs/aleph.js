@@ -30,8 +30,9 @@ export type RenderOptions = {
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
     const { indexHtml, routes, isDev, customHTMLRewriter, ssr } = options;
-    const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
+    const headers = new Headers(ctx.headers as Headers);
     const ssrHTMLRewriter: Map<string, HTMLRewriterHandlers> = new Map();
+    headers.set("Content-Type", "text/html; charset=utf-8");
     if (ssr) {
       const [url, routeModules, errorBoundaryModule] = await initSSR(req, ctx, routes);
       for (const { redirect } of routeModules) {

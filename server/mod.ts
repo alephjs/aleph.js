@@ -1,4 +1,4 @@
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.135.0/http/server.ts";
+import { serve as stdServe, type ServeInit, serveTls } from "https://deno.land/std@0.135.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.135.0/streams/conversion.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { LevelName } from "../lib/log.ts";
@@ -14,17 +14,15 @@ import { importRouteModule, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware, MiddlewareCallback } from "./types.ts";
 
-export type ServerOptions = {
-  hostname?: string;
-  port?: number;
+export type ServerOptions = ServeInit & {
   certFile?: string;
   keyFile?: string;
-  hmrWebSocketUrl?: string;
-  logLevel?: LevelName;
   config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: (ctx: SSRContext) => string | Promise<string>;
+  logLevel?: LevelName;
+  hmrWebSocketUrl?: string;
 };
 
 export const serve = (options: ServerOptions = {}) => {
@@ -137,10 +135,35 @@ export const serve = (options: ServerOptions = {}) => {
     const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
     const ctx = {
       params: {},
+      headers: new Headers(),
       HTMLRewriter: {
         on: (selector: string, handlers: HTMLRewriterHandlers) => {
           customHTMLRewriter.set(selector, handlers);
         },
+      },
+      json: (data: unknown, init?: ResponseInit): Response => {
+        let hasCustomHeaders = false;
+        const headers = new Headers(init?.headers);
+        ctx.headers.forEach((value, name) => {
+          headers.set(name, value);
+          hasCustomHeaders = true;
+        });
+        if (!hasCustomHeaders) {
+          return json(data, init);
+        }
+        return json(data, { ...init, headers });
+      },
+      content: (body: BodyInit, init?: ResponseInit): Response => {
+        let hasCustomHeaders = false;
+        const headers = new Headers(init?.headers);
+        ctx.headers.forEach((value, name) => {
+          headers.set(name, value);
+          hasCustomHeaders = true;
+        });
+        if (!hasCustomHeaders) {
+          return content(body, init);
+        }
+        return content(body, { ...init, headers });
       },
     };
 
@@ -190,8 +213,8 @@ export const serve = (options: ServerOptions = {}) => {
             if (err.stack) {
               log.error(err.stack);
             }
-            const status = util.isUint(err.status || err.code) ? err.status || err.code : 500;
-            return json({ ...err, message: err.message, status }, { status });
+            const status: number = util.isUint(err.status || err.code) ? err.status || err.code : 500;
+            return ctx.json({ ...err, message: err.message, status }, { status });
           }
         }
       }
@@ -279,14 +302,14 @@ export const serve = (options: ServerOptions = {}) => {
   // inject global `__ALEPH_CONFIG`
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
 
-  const { hostname, port = 8080, certFile, keyFile } = options;
+  const { hostname, port = 8080, certFile, keyFile, signal } = options;
   if (Deno.env.get("ALEPH_CLI")) {
-    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler });
+    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
   } else {
     if (certFile && keyFile) {
-      serveTls(handler, { hostname, port, certFile, keyFile });
+      serveTls(handler, { hostname, port, certFile, keyFile, signal });
     } else {
-      stdServe(handler, { hostname, port });
+      stdServe(handler, { hostname, port, signal });
     }
     log.info(`Server ready on http://localhost:${port}`);
   }
