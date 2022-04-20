@@ -4,7 +4,7 @@ import type { AlephConfig } from "./types.ts";
 
 export default {
   fetch: async (req: Request): Promise<Response> => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
+    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     const outputDir = config?.build?.outputDir ?? "dist";
     const { pathname, searchParams } = new URL(req.url);
     try {

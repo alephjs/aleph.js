@@ -21,8 +21,13 @@ declare interface Data {
   delete?(request: Request, context: Context): Promise<Response> | Response;
 }
 
+type MiddlewareCallback = () => Promise<void> | void;
+
 declare interface Middleware {
-  fetch(request: Request, context: Context): Promise<Response | void> | Response | void;
+  fetch(
+    request: Request,
+    context: Context,
+  ): Promise<Response | MiddlewareCallback | void> | Response | MiddlewareCallback | void;
 }
 
 declare interface ImportMeta {

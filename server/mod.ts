@@ -1,7 +1,7 @@
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.134.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.134.0/streams/conversion.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
-import log from "../lib/log.ts";
+import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
@@ -11,7 +11,7 @@ import renderer, { type HTMLRewriterHandlers } from "./renderer.ts";
 import { content, json } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
-import type { AlephConfig, FetchHandler, Middleware, SSRContext } from "./types.ts";
+import type { AlephConfig, FetchHandler, Middleware, MiddlewareCallback, SSRContext } from "./types.ts";
 
 export type ServerOptions = {
   hostname?: string;
@@ -19,6 +19,7 @@ export type ServerOptions = {
   certFile?: string;
   keyFile?: string;
   hmrWebSocketUrl?: string;
+  logLevel?: LevelName;
   config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
@@ -26,7 +27,7 @@ export type ServerOptions = {
 };
 
 export const serve = (options: ServerOptions = {}) => {
-  const { config, middlewares, fetch, ssr } = options;
+  const { config, middlewares, fetch, ssr, logLevel } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then((importMap) => loadJSXConfig(importMap));
@@ -121,6 +122,17 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
+    // use fetch handler if available
+    if (typeof fetch === "function") {
+      let res = fetch(req);
+      if (res instanceof Promise) {
+        res = await res;
+      }
+      if (res instanceof Response) {
+        return res;
+      }
+    }
+
     const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
     const ctx = {
       params: {},
@@ -132,7 +144,8 @@ export const serve = (options: ServerOptions = {}) => {
     };
 
     // use middlewares
-    if (Array.isArray(middlewares)) {
+    if (Array.isArray(middlewares) && middlewares.length > 0) {
+      const callbacks: MiddlewareCallback[] = [];
       for (const mw of middlewares) {
         const handler = mw.fetch;
         if (typeof handler === "function") {
@@ -143,18 +156,13 @@ export const serve = (options: ServerOptions = {}) => {
           if (res instanceof Response) {
             return res;
           }
+          if (typeof res === "function") {
+            callbacks.push(res);
+          }
         }
       }
-    }
-
-    // use fetch handler if available
-    if (typeof fetch === "function") {
-      let res = fetch(req, ctx);
-      if (res instanceof Promise) {
-        res = await res;
-      }
-      if (res instanceof Response) {
-        return res;
+      for (const callback of callbacks) {
+        await callback();
       }
     }
 
@@ -245,7 +253,7 @@ export const serve = (options: ServerOptions = {}) => {
     });
   };
 
-  // inject browser navigator polyfill
+  // inject navigator browser polyfill to fix some ssr errors
   Object.assign(globalThis.navigator, {
     connection: {
       downlink: 10,
@@ -262,18 +270,18 @@ export const serve = (options: ServerOptions = {}) => {
     vendor: "Deno Land Inc.",
   });
 
-  Reflect.set(globalThis, "__ALEPH_SERVER_CONFIG", Object.assign({}, config));
-  Reflect.set(globalThis, "__ALEPH_SERVER_HANDLER", handler);
+  // set log level
+  if (logLevel) {
+    log.setLevel(logLevel);
+  }
 
-  // support deno deploy
-  if (Deno.env.get("DENO_DEPLOYMENT_ID")) {
-    self.addEventListener("fetch", (e) => {
-      // deno-lint-ignore ban-ts-comment
-      // @ts-ignore
-      e.respondWith(handler(e.request));
-    });
-  } else if (!Deno.env.get("ALEPH_APP_MODULES_PORT")) {
-    const { hostname, port = 8080, certFile, keyFile } = options;
+  // inject global `__ALEPH_CONFIG`
+  Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
+
+  const { hostname, port = 8080, certFile, keyFile } = options;
+  if (Deno.env.get("ALEPH_CLI")) {
+    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler });
+  } else {
     if (certFile && keyFile) {
       serveTls(handler, { hostname, port, certFile, keyFile });
     } else {

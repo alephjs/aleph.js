@@ -1,7 +1,6 @@
 import { basename, relative } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.134.0/http/server.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
-import { getFlag, parse, parsePortNumber } from "../lib/flags.ts";
 import { findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
@@ -10,21 +9,8 @@ import { initModuleLoaders, loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
 import type { DependencyGraph } from "../server/graph.ts";
-import { serveAppModules } from "../server/serve_modules.ts";
+import { proxyModules } from "../server/proxy_modules.ts";
 import type { AlephConfig } from "../server/types.ts";
-
-export const helpMessage = `
-Usage:
-    deno run -A https://deno.land/x/aleph/cli.ts dev [...options]
-
-Options:
-    -p, --port      <port>       A port number to start the Aleph.js app, default is 8080
-        --hostname  <hostname>   The address at which the server is to be started
-        --tls-cert  <cert-file>  The server certificate file
-        --tls-key   <key-file>   The server public key file
-    -L, --log-level <log-level>  Set log level [possible values: debug, info]
-    -h, --help                   Prints help message
-`;
 
 type FsEvents = {
   [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: { specifier: string };
@@ -52,7 +38,7 @@ const handleHMRSocket = (req: Request): Response => {
   };
   socket.addEventListener("open", () => {
     emitter.on("create", ({ specifier }) => {
-      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
+      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
       if (config && config.routeFiles) {
         const reg = toRouteRegExp(config.routeFiles);
         const routePattern = reg.exec(specifier);
@@ -87,25 +73,17 @@ const handleHMRSocket = (req: Request): Response => {
 };
 
 if (import.meta.main) {
-  const { options } = parse();
-  const port = parsePortNumber(getFlag(options, ["p", "port"], "8080"));
-  const hostname = getFlag(options, ["hostname"]);
-  const certFile = getFlag(options, ["tls-cert"]);
-  const keyFile = getFlag(options, ["tls-key"]);
-
-  if (keyFile !== undefined && certFile === undefined) {
-    log.fatal("missing `--tls-cert` option");
-  } else if (certFile !== undefined && keyFile === undefined) {
-    log.fatal("missing `--tls-key` option");
-  }
-
-  // development mode
+  // add envs
+  Deno.env.set("ALEPH_CLI", "true");
   Deno.env.set("ALEPH_ENV", "development");
+
+  // set log level from flags `--log-level=[debug|info]`
+  log.setLevelFromFlag();
 
   // serve app modules
   const importMap = await loadImportMap();
   const moduleLoaders = await initModuleLoaders(importMap);
-  serveAppModules(6060, { importMap, moduleLoaders });
+  proxyModules(6060, { importMap, moduleLoaders });
 
   log.info(`Watching files for changes...`);
   const cwd = Deno.cwd();
@@ -148,38 +126,42 @@ if (import.meta.main) {
     findFile(["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
     findFile(builtinModuleExts.map((ext) => `server.${ext}`)),
   ]);
-  const importServerHandler = async (): Promise<void> => {
+  const importServerHandler = async (reloaded?: boolean): Promise<void> => {
     if (serverEntry) {
       await import(
-        `http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/${basename(serverEntry)}?t=${
+        `http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/${basename(serverEntry)}?t=${
           Date.now().toString(16)
         }`
       );
-      log.info(`Server handler imported from ${blue(basename(serverEntry))}`);
+      if (reloaded) {
+        log.info(`Reload ${blue(basename(serverEntry))}...`);
+      }
     }
   };
   if (serverEntry) {
-    emitter.on(`modify:./${basename(serverEntry)}`, importServerHandler);
+    emitter.on(`hotUpdate:./${basename(serverEntry)}`, () => importServerHandler(true));
     if (denoConfigFile) {
-      emitter.on(`modify:./${basename(denoConfigFile)}`, importServerHandler);
+      emitter.on(`modify:./${basename(denoConfigFile)}`, () => importServerHandler(true));
     }
     if (importMapFile) {
       emitter.on(`modify:./${basename(importMapFile)}`, async () => {
+        // update import maps for `proxyModules`
         Object.assign(importMap, await loadImportMap());
-        importServerHandler();
+        importServerHandler(true);
       });
     }
     await importServerHandler();
+    log.info(`Bootstrap server from ${blue(basename(serverEntry))}...`);
   }
 
   // make the default handler
-  if (!Reflect.has(globalThis, "__ALEPH_SERVER_HANDLER")) {
+  if (!Reflect.has(globalThis, "__ALEPH_SERVER")) {
     serve();
   }
 
   // update routes when fs change
   const updateRoutes = ({ specifier }: { specifier: string }) => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
+    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     if (config && config.routeFiles) {
       const reg = toRouteRegExp(config.routeFiles);
       if (reg.test(specifier)) {
@@ -190,8 +172,8 @@ if (import.meta.main) {
   emitter.on("create", updateRoutes);
   emitter.on("remove", updateRoutes);
 
-  // final server handler
-  const handler = (req: Request) => {
+  const { hostname, port = 8080, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
+  const devHandler = (req: Request) => {
     const { pathname } = new URL(req.url);
 
     // handle HMR sockets
@@ -199,13 +181,13 @@ if (import.meta.main) {
       return handleHMRSocket(req);
     }
 
-    return Reflect.get(globalThis, "__ALEPH_SERVER_HANDLER")?.(req);
+    return handler?.(req);
   };
 
   log.info(`Server ready on http://localhost:${port}`);
   if (certFile && keyFile) {
-    await serveTls(handler, { port, hostname, certFile, keyFile });
+    await serveTls(devHandler, { port, hostname, certFile, keyFile });
   } else {
-    await stdServe(handler, { port, hostname });
+    await stdServe(devHandler, { port, hostname });
   }
 }

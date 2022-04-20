@@ -1,11 +1,10 @@
-import { bold } from "https://deno.land/std@0.134.0/fmt/colors.ts";
+import { parse } from "https://deno.land/std@0.134.0/flags/mod.ts";
 import { readLines } from "https://deno.land/std@0.134.0/io/mod.ts";
 import { writeAll } from "https://deno.land/std@0.134.0/streams/conversion.ts";
 import { basename, resolve } from "https://deno.land/std@0.134.0/path/mod.ts";
 import { readImportMap } from "./server/config.ts";
-import { parse } from "./lib/flags.ts";
 import { findFile } from "./lib/fs.ts";
-import log, { stripColor } from "./lib/log.ts";
+import log, { bold, dim, stripColor } from "./lib/log.ts";
 import { serveDir } from "./lib/serve.ts";
 import util from "./lib/util.ts";
 import { VERSION } from "./version.ts";
@@ -33,12 +32,13 @@ Commands:
 }
 
 Options:
-    -v, --version  Prints version number
-    -h, --help     Prints help message
+    -L, --log-level <log-level>  Set log level [possible values: debug, info]
+    -v, --version                Prints version number
+    -h, --help                   Prints help message
 `;
 
 async function main() {
-  const { args, options } = parse();
+  const { _: args, ...options } = parse(Deno.args);
 
   // prints aleph.js version
   if (options.v) {
@@ -58,23 +58,14 @@ async function main() {
     Deno.exit(0);
   }
 
-  // prints help message when the command not found
-  if (!(args.length > 0 && args[0] in commands)) {
+  // prints help message
+  if (options.h || options.help || !(args.length > 0 && args[0] in commands)) {
     console.log(helpMessage);
     Deno.exit(0);
   }
 
   const command = String(args.shift()) as keyof typeof commands;
-
-  // prints command help message
-  if (options.h || options.help) {
-    const { helpMessage: cmdHelpMessage } = await import(
-      `./commands/${command}.ts`
-    );
-    console.log(commands[command]);
-    console.log(cmdHelpMessage);
-    Deno.exit(0);
-  }
+  const runOptions: RunOptions = {};
 
   // invoke `init` command
   if (command === "init") {
@@ -96,15 +87,13 @@ async function main() {
   }
   p.close();
 
-  const runOptions: RunOptions = {};
-
   if (Deno.env.get("ALEPH_DEV")) {
     runOptions.denoConfigFile = resolve("./deno.json");
     runOptions.importMapFile = resolve("./import_map.json");
     Deno.env.set("ALEPH_DEV_ROOT", Deno.cwd());
     Deno.env.set("ALEPH_DEV_PORT", "2020");
     serveDir({ cwd: Deno.cwd(), port: 2020 });
-    log.debug(`Proxy https://deno.land/x/aleph on http://localhost:2020`);
+    console.debug(dim("DEBUG"), `Proxy https://deno.land/x/aleph on http://localhost:2020`);
   } else {
     runOptions.denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"]);
     runOptions.importMapFile = await findFile(

@@ -28,7 +28,10 @@ export type ModuleLoaderContent = {
   modtime?: number;
 };
 
+export type BuildPlatform = "deno" | "cloudflare" | "vercel";
+
 export type BuildOptions = {
+  platform?: BuildPlatform;
   /** The output directory. default is "dist" */
   outputDir?: string;
   /** build target */
@@ -42,11 +45,16 @@ export type RoutesConfig = {
 };
 
 export type FetchHandler = {
-  (request: Request, context: Record<string, unknown>): Promise<Response> | Response;
+  (request: Request): Promise<Response> | Response;
 };
 
+export type MiddlewareCallback = () => Promise<void> | void;
+
 export interface Middleware {
-  fetch(request: Request, context: Record<string, unknown>): Promise<Response | void> | Response | void;
+  fetch(
+    request: Request,
+    context: Record<string, unknown>,
+  ): Promise<Response | MiddlewareCallback | void> | Response | MiddlewareCallback | void;
 }
 
 export type SSRContext = {

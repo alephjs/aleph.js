@@ -11,30 +11,26 @@ import util from "../lib/util.ts";
 import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "../server/config.ts";
 import { DependencyGraph } from "../server/graph.ts";
 import { initRoutes } from "../server/routing.ts";
-import type { AlephConfig, FetchHandler } from "../server/types.ts";
+import type { AlephConfig, BuildPlatform, FetchHandler } from "../server/types.ts";
 
-export type BuildPlatform = "deno-deploy" | "cf-worker" | "vercel";
-
-export const supportedPlatforms: Record<BuildPlatform, string> = {
-  "deno-deploy": "Deno Deploy",
-  "cf-worker": "Cloudflare Worker",
+const supportedPlatforms: Record<BuildPlatform, string> = {
+  "deno": "Deno",
+  "cloudflare": "Cloudflare",
   "vercel": "Vercel",
 };
 
-export async function build(
-  platform: BuildPlatform,
-  serverEntry?: string,
-): Promise<{ clientModules: Set<string> }> {
-  if (platform === "cf-worker" || platform === "vercel") {
-    log.fatal(`Deploy to ${supportedPlatforms[platform]} is not supported yet`);
-  }
-
+export async function build(serverEntry?: string) {
   const workingDir = Deno.cwd();
   const alephPkgUri = getAlephPkgUri();
   const importMap = await loadImportMap();
   const jsxCofig = await loadJSXConfig(importMap);
-  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
+  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+  const platform = config?.build?.platform ?? "deno";
   const outputDir = join(workingDir, config?.build?.outputDir ?? "dist");
+
+  if (platform === "cloudflare" || platform === "vercel") {
+    log.fatal(`Deploy to ${supportedPlatforms[platform]} is not supported yet`);
+  }
 
   // clean previous build
   if (await existsDir(outputDir)) {
@@ -54,7 +50,7 @@ export async function build(
       return [filename, exportNames];
     }));
   }
-  const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
+  const port = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
   const serverEntryCode = [
     `import { DependencyGraph } from "${alephPkgUri}/server/graph.ts";`,
     `import graph from "./server_dependency_graph.js";`,
@@ -103,7 +99,7 @@ export async function build(
       importUrl === alephPkgUri + "/server/transformer.ts" ||
       // since deno deploy doesn't support importMap, we need to resolve the 'react' import
       importUrl.startsWith(alephPkgUri + "/framework/react/") ||
-      importUrl.startsWith(`http://localhost:${Deno.env.get("ALEPH_APP_MODULES_PORT")}/`);
+      importUrl.startsWith(`http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/`);
   };
 
   // build server entry
@@ -217,7 +213,7 @@ export async function build(
   tasks.push(`${alephPkgUri}/framework/core/style.ts`);
 
   // transform client modules
-  const serverHandler: FetchHandler | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_HANDLER");
+  const serverHandler: FetchHandler | undefined = Reflect.get(globalThis, "__ALEPH_SERVER")?.handler;
   const clientModules = new Set<string>();
   if (serverHandler) {
     while (tasks.length > 0) {
@@ -226,7 +222,6 @@ export async function build(
         const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
         const isCSS = url.pathname.endsWith(".css");
         const req = new Request(url.toString());
-        const ctx: Record<string, unknown> = {};
         let savePath = join(outputDir, url.pathname);
         if (specifier.startsWith("https://esm.sh/")) {
           savePath += ".js";
@@ -235,7 +230,7 @@ export async function build(
         }
         await ensureDir(dirname(savePath));
         const [res, file] = await Promise.all([
-          serverHandler(req, ctx),
+          serverHandler(req),
           Deno.open(savePath, { write: true, create: true }),
         ]);
         await res.body?.pipeTo(file.writable);
@@ -261,5 +256,5 @@ export async function build(
   }
   stop();
 
-  return { clientModules };
+  return { clientModules, routeFiles };
 }

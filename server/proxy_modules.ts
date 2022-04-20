@@ -39,7 +39,7 @@ const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
 
 const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent, env: ModuleLoaderEnv) => {
   const { code: rawCode, pathname, lang } = input;
-  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
+  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   const specifier = "." + pathname;
   const isJSX = lang === "tsx" || lang === "jsx" || pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
   const contentType = lang ? getContentType(`file.${lang}`) : undefined;
@@ -118,13 +118,13 @@ type ServerOptions = {
   signal?: AbortSignal;
 };
 
-/** serve app modules to support module loader that allows you import NON-JS modules like `.css/.vue/.svelet`... */
-export async function serveAppModules(port: number, options: ServerOptions) {
+/** serve app modules to support module loader that allows you import Non-JavaScript modules like `.css/.vue/.svelet/...` */
+export async function proxyModules(port: number, options: ServerOptions) {
   if (!Reflect.has(globalThis, "serverDependencyGraph")) {
     Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
   }
-  Deno.env.set("ALEPH_APP_MODULES_PORT", port.toString());
-  log.debug(`Serve app modules on http://localhost:${port}`);
+  Deno.env.set("ALEPH_MODULES_PROXY_PORT", port.toString());
+  log.info(`Proxy modules on http://localhost:${port}`);
   try {
     await serveDir({
       port,
@@ -137,7 +137,7 @@ export async function serveAppModules(port: number, options: ServerOptions) {
     });
   } catch (error) {
     if (error instanceof Deno.errors.AddrInUse) {
-      serveAppModules(port + 1, options);
+      proxyModules(port + 1, options);
     } else {
       throw error;
     }

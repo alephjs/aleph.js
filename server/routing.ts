@@ -26,7 +26,7 @@ export async function importRouteModule(filename: string) {
   } else {
     const graph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
     const version = graph?.get(filename)?.version || graph?.mark(filename, {}).version || Date.now().toString(16);
-    const port = Deno.env.get("ALEPH_APP_MODULES_PORT");
+    const port = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
     mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version}`);
   }
   return mod;
@@ -39,7 +39,7 @@ export function isRouteFile(filename: string): boolean {
   if (index !== undefined && index !== -1) {
     return true;
   }
-  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_CONFIG");
+  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   if (config && config.routeFiles) {
     const reg = toRouteRegExp(config.routeFiles);
     return reg.test(filename);
