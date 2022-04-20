@@ -1,4 +1,4 @@
-import { join } from "https://deno.land/std@0.134.0/path/mod.ts";
+import { join } from "https://deno.land/std@0.135.0/path/mod.ts";
 import cache from "./cache.ts";
 import { getContentType } from "./mime.ts";
 import util from "./util.ts";

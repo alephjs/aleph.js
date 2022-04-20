@@ -1,6 +1,6 @@
-import { readableStreamFromReader } from "https://deno.land/std@0.134.0/streams/conversion.ts";
-import { basename, join } from "https://deno.land/std@0.134.0/path/mod.ts";
-import { serve } from "https://deno.land/std@0.134.0/http/server.ts";
+import { readableStreamFromReader } from "https://deno.land/std@0.135.0/streams/conversion.ts";
+import { basename, join } from "https://deno.land/std@0.135.0/path/mod.ts";
+import { serve } from "https://deno.land/std@0.135.0/http/server.ts";
 import { getContentType } from "./mime.ts";
 
 export type ServeDirOptions = {

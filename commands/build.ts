@@ -1,4 +1,4 @@
-import { basename } from "https://deno.land/std@0.134.0/path/mod.ts";
+import { basename } from "https://deno.land/std@0.135.0/path/mod.ts";
 import { findFile } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue, bold } from "../lib/log.ts";

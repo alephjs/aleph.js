@@ -1,5 +1,5 @@
-import { basename, join } from "https://deno.land/std@0.134.0/path/mod.ts";
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.134.0/http/server.ts";
+import { basename, join } from "https://deno.land/std@0.135.0/path/mod.ts";
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.135.0/http/server.ts";
 import { findFile } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";

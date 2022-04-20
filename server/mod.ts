@@ -1,5 +1,5 @@
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.134.0/http/server.ts";
-import { readableStreamFromReader } from "https://deno.land/std@0.134.0/streams/conversion.ts";
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.135.0/http/server.ts";
+import { readableStreamFromReader } from "https://deno.land/std@0.135.0/streams/conversion.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
