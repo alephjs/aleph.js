@@ -13,12 +13,12 @@ import { DependencyGraph } from "./graph.ts";
 import type { AtomicCSSConfig, ImportMap, JSXConfig, ModuleLoaderContent } from "./types.ts";
 
 export type TransformerOptions = {
-  atomicCSS?: AtomicCSSConfig;
   buildHash: string;
   buildTarget?: TransformOptions["target"];
   importMap: ImportMap;
   isDev: boolean;
   jsxConfig?: JSXConfig;
+  atomicCSS?: AtomicCSSConfig;
   loaded?: ModuleLoaderContent;
 };
 
@@ -31,17 +31,17 @@ export default {
     let mtime: number | undefined;
     let lang: string | undefined;
     let isCSS: boolean;
-    let useUno: boolean;
+    let uno: boolean;
     if (loaded) {
       rawCode = loaded.code;
       mtime = loaded.modtime;
       lang = loaded.lang;
       isCSS = loaded.lang === "css";
-      useUno = !!loaded.atomicCSS;
+      uno = !!loaded.atomicCSS;
     } else {
       let ctype: string;
       [rawCode, mtime, ctype] = await readCode(specifier);
-      useUno = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
+      uno = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
       isCSS = ctype.startsWith("text/css") || ctype.startsWith("text/postcss");
     }
     const etag = mtime
@@ -124,7 +124,7 @@ export default {
       }
       let { code, map, deps } = ret;
       let inlineCSS = loaded?.inlineCSS;
-      if (useUno && Boolean(atomicCSS?.presets?.length)) {
+      if (uno && Boolean(atomicCSS?.presets?.length)) {
         const uno = createGenerator(atomicCSS);
         const { css } = await uno.generate(rawCode, { id: specifier, minify: !isDev });
         if (inlineCSS) {

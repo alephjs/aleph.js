@@ -32,7 +32,7 @@ export const serve = (options: ServerOptions = {}) => {
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then((importMap) => loadJSXConfig(importMap));
   const moduleLoadersPromise = importMapPromise.then((importMap) => initModuleLoaders(importMap));
-  const routesPromise = config?.routeFiles ? initRoutes(config.routeFiles) : Promise.resolve({ routes: [] } as Routes);
+  const routesPromise = config?.routes ? initRoutes(config.routes) : Promise.resolve({ routes: [] } as Routes);
   const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {
     const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
     return util.computeHash("sha-1", buildArgs);

@@ -40,8 +40,8 @@ export function isRouteFile(filename: string): boolean {
     return true;
   }
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-  if (config && config.routeFiles) {
-    const reg = toRouteRegExp(config.routeFiles);
+  if (config && config.routes) {
+    const reg = toRouteRegExp(config.routes);
     return reg.test(filename);
   }
   return false;

@@ -4,7 +4,7 @@ import { renderToString } from "react-dom/server";
 
 serve({
   config: {
-    routeFiles: "./routes/**/*.tsx",
+    routes: "./routes/**/*.tsx",
   },
   ssr: (ctx) => renderToString(<Router ssrContext={ctx} />),
 });

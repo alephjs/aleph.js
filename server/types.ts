@@ -2,10 +2,14 @@ import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@
 import type { RouteModule } from "../lib/route.ts";
 
 export type AlephConfig = {
-  atomicCSS?: AtomicCSSConfig;
+  /* The basePath of the app. */
   basePath?: string;
+  /** The build optioins for `build` command. */
   build?: BuildOptions;
-  routeFiles?: string | RoutesConfig;
+  /** The config for file-system based routing.  */
+  routes?: RoutesConfig | string;
+  /** The config for atomic css powered by unocss. */
+  atomicCSS?: AtomicCSSConfig;
 };
 
 export type ModuleLoader = {
@@ -31,10 +35,11 @@ export type ModuleLoaderContent = {
 export type BuildPlatform = "deno" | "cloudflare" | "vercel";
 
 export type BuildOptions = {
+  /** The supported platform. default is "deno" */
   platform?: BuildPlatform;
-  /** The output directory. default is "dist" */
+  /** The directory for build output files. default is "dist" */
   outputDir?: string;
-  /** build target */
+  /** The build target passes to esbuild. */
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
 };
 
@@ -42,6 +47,7 @@ export type RoutesConfig = {
   dir: string;
   exts: string[];
   host?: boolean;
+  generate?: boolean;
 };
 
 export type FetchHandler = {

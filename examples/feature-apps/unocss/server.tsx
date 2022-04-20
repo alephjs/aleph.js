@@ -7,7 +7,7 @@ import { serve } from "aleph/server";
 
 serve({
   config: {
-    routeFiles: "./routes/**/*.tsx",
+    routes: "./routes/**/*.tsx",
     atomicCSS: {
       presets: [
         presetUno(),

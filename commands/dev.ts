@@ -39,8 +39,8 @@ const handleHMRSocket = (req: Request): Response => {
   socket.addEventListener("open", () => {
     emitter.on("create", ({ specifier }) => {
       const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-      if (config && config.routeFiles) {
-        const reg = toRouteRegExp(config.routeFiles);
+      if (config && config.routes) {
+        const reg = toRouteRegExp(config.routes);
         const routePattern = reg.exec(specifier);
         if (routePattern) {
           send({ type: "create", specifier, routePattern });
@@ -164,8 +164,8 @@ if (import.meta.main) {
   // update routes when fs change
   const updateRoutes = ({ specifier }: { specifier: string }) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    if (config && config.routeFiles) {
-      const reg = toRouteRegExp(config.routeFiles);
+    if (config && config.routes) {
+      const reg = toRouteRegExp(config.routes);
       if (reg.test(specifier)) {
         initRoutes(reg);
       }
