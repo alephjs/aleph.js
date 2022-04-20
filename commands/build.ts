@@ -10,7 +10,7 @@ import { proxyModules } from "../server/proxy_modules.ts";
 if (import.meta.main) {
   // add envs
   Deno.env.set("ALEPH_CLI", "true");
-  Deno.env.set("ALEPH_ENV", "prouduction");
+  Deno.env.set("ALEPH_ENV", "production");
 
   // set log level to 'debug' when in aleph framework dev mode
   if (Deno.env.get("ALEPH_DEV")) {

@@ -166,9 +166,11 @@ if (import.meta.main) {
 }
 
 async function bootstrap(signal: AbortSignal, entry?: string): Promise<void> {
+  // delete previous server handler
   if (Reflect.has(globalThis, "__ALEPH_SERVER")) {
     Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
   }
+
   if (entry) {
     await import(
       `http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/${basename(entry)}?t=${Date.now().toString(16)}`
@@ -180,8 +182,13 @@ async function bootstrap(signal: AbortSignal, entry?: string): Promise<void> {
     serve();
   }
 
-  const { hostname, port = 8080, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") ||
-    {};
+  const {
+    port = 8080,
+    hostname,
+    certFile,
+    keyFile,
+    handler,
+  } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
   const finalHandler = (req: Request) => {
     const { pathname } = new URL(req.url);
 
