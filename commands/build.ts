@@ -12,8 +12,10 @@ if (import.meta.main) {
   Deno.env.set("ALEPH_CLI", "true");
   Deno.env.set("ALEPH_ENV", "prouduction");
 
-  // set log level from flags `--log-level=[debug|info]`
-  log.setLevelFromFlag();
+  // set log level to 'debug' when in aleph framework dev mode
+  if (Deno.env.get("ALEPH_DEV")) {
+    log.setLevel("debug");
+  }
 
   // serve app modules
   const importMap = await loadImportMap();

@@ -5,9 +5,9 @@
   },
   "tasks": {
     "test": "deno test -A --unstable --location=http://localhost --import-map=import_map.json",
-    "dev": "ALEPH_DEV=true deno run -A cli.ts dev --log-level=debug",
-    "start": "ALEPH_DEV=true deno run -A cli.ts start --log-level=debug",
-    "build": "ALEPH_DEV=true deno run -A cli.ts build --log-level=debug",
+    "dev": "ALEPH_DEV=true deno run -A cli.ts dev",
+    "start": "ALEPH_DEV=true deno run -A cli.ts start",
+    "build": "ALEPH_DEV=true deno run -A cli.ts build",
     "build_wasm": "deno run -A compiler/build.ts"
   },
   "fmt": {

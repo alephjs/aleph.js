@@ -1,5 +1,4 @@
 import { blue, bold, dim, green, red, stripColor, yellow } from "https://deno.land/std@0.135.0/fmt/colors.ts";
-import { parse } from "https://deno.land/std@0.135.0/flags/mod.ts";
 
 export type LevelName = "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -64,14 +63,6 @@ export class Logger {
       case "fatal":
         this.#level = Level.Fatal;
         break;
-    }
-  }
-
-  setLevelFromFlag(): void {
-    const options = parse(Deno.args);
-    const v = options.L || options["log-level"];
-    if (v) {
-      this.setLevel(v.toLowerCase());
     }
   }
 

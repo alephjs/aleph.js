@@ -32,7 +32,6 @@ Commands:
 }
 
 Options:
-    -L, --log-level <log-level>  Set log level [possible values: debug, info]
     -v, --version                Prints version number
     -h, --help                   Prints help message
 `;
