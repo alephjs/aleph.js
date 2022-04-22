@@ -7,7 +7,7 @@ import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
-import type { HTMLRewriterHandlers, SSRContext } from "./renderer.ts";
+import type { HTMLRewriterHandlers, SSR } from "./renderer.ts";
 import renderer from "./renderer.ts";
 import { content, json } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
@@ -17,12 +17,12 @@ import type { AlephConfig, FetchHandler, Middleware, MiddlewareCallback } from "
 export type ServerOptions = ServeInit & {
   certFile?: string;
   keyFile?: string;
+  logLevel?: LevelName;
+  hmrWebSocketUrl?: string;
   config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
-  ssr?: (ctx: SSRContext) => string | Promise<string>;
-  logLevel?: LevelName;
-  hmrWebSocketUrl?: string;
+  ssr?: SSR;
 };
 
 export const serve = (options: ServerOptions = {}) => {

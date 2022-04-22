@@ -1,5 +1,5 @@
 import { builtinModuleExts, FetchError, toLocalPath } from "../lib/helpers.ts";
-import { type Element, HTMLRewriter } from "../lib/html.ts";
+import { type Comment, type Element, HTMLRewriter } from "../lib/html.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri } from "./config.ts";
@@ -13,33 +13,55 @@ export type SSRContext = {
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
   readonly errorBoundaryHandler?: CallableFunction;
+  readonly suspense: boolean;
+  readonly signal: AbortSignal;
+  readonly bootstrapScripts?: string[];
 };
 
 export type HTMLRewriterHandlers = {
   element?: (element: Element) => void;
+  comments?: (element: Comment) => void;
 };
+
+export type SSR = {
+  suspense: true;
+  render(ssr: SSRContext): Promise<ReadableStream> | ReadableStream;
+} | {
+  suspense?: false;
+  render(ssr: SSRContext): Promise<string> | string;
+} | ((ssr: SSRContext) => Promise<string> | string);
 
 export type RenderOptions = {
   indexHtml: string;
   routes: Routes;
   isDev: boolean;
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
-  ssr?: (ssr: SSRContext) => string | Promise<string>;
+  ssr?: SSR;
 };
+
+type SSRResult = {
+  context: SSRContext;
+  errorBoundaryHandlerFilename?: string;
+  body: string | ReadableStream;
+};
+
+/* The virtual `bootstrapScript` to mark the ssr streaming initial UI ready */
+const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* hydrate bootstrap */")}`;
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
     const { indexHtml, routes, isDev, customHTMLRewriter, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
-    const ssrHTMLRewriter: Map<string, HTMLRewriterHandlers> = new Map();
-    headers.set("Content-Type", "text/html; charset=utf-8");
+    let ssrResult: SSRResult | null = null;
     if (ssr) {
-      const [url, routeModules, errorBoundaryHandler] = await initSSR(req, ctx, routes);
+      const suspense = typeof ssr === "function" ? false : !!ssr.suspense;
+      const [url, routeModules, errorBoundaryHandler] = await initSSR(req, ctx, routes, suspense);
       for (const { redirect } of routeModules) {
         if (redirect) {
           return new Response(null, redirect);
         }
       }
+      const render = typeof ssr === "function" ? ssr : ssr.render;
       try {
         const headCollection: string[] = [];
         const ssrContext = {
@@ -47,8 +69,11 @@ export default {
           routeModules,
           errorBoundaryHandler: errorBoundaryHandler?.default,
           headCollection,
+          suspense,
+          signal: req.signal,
+          bootstrapScripts: suspense ? [bootstrapScript] : undefined,
         };
-        const ssrOutput = await ssr(ssrContext);
+        const body = await render(ssrContext);
         const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
         if (serverDependencyGraph) {
           const styles: string[] = [];
@@ -71,55 +96,6 @@ export default {
           }
           headCollection.push(...styles);
         }
-        ssrHTMLRewriter.set("ssr-head", {
-          element(el: Element) {
-            headCollection.forEach((h) => util.isFilledString(h) && el.before(h, { html: true }));
-            if (routeModules.length > 0) {
-              const importStmts = routeModules.map(({ filename }, idx) =>
-                `import $${idx} from ${JSON.stringify(filename.slice(1))};`
-              ).join("");
-              const kvs = routeModules.map(({ filename, data }, idx) =>
-                `${JSON.stringify(filename)}:{defaultExport:$${idx}${data !== undefined ? ",withData:true" : ""}}`
-              ).join(",");
-              const ssrModules = routeModules.map(({ url, params, filename, error, data, dataCacheTtl }) => ({
-                url: url.pathname + url.search,
-                params,
-                filename,
-                error,
-                data,
-                dataCacheTtl,
-              }));
-              el.before(
-                `<script id="ssr-modules" type="application/json">${
-                  // replace "/" to "\/" to prevent xss
-                  JSON.stringify(ssrModules).replaceAll("/", "\\/")
-                }</script>`,
-                {
-                  html: true,
-                },
-              );
-              el.before(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
-                html: true,
-              });
-              if (errorBoundaryHandler) {
-                el.before(
-                  `<script type="module">import Handler from ${
-                    JSON.stringify(errorBoundaryHandler.filename.slice(1))
-                  };window.__ERROR_BOUNDARY_HANDLER=Handler</script>`,
-                  {
-                    html: true,
-                  },
-                );
-              }
-            }
-            el.remove();
-          },
-        });
-        ssrHTMLRewriter.set("ssr-body", {
-          element(el: Element) {
-            el.replace(ssrOutput, { html: true });
-          },
-        });
         const ttls = routeModules.filter(({ dataCacheTtl }) =>
           typeof dataCacheTtl === "number" && !Number.isNaN(dataCacheTtl) && dataCacheTtl > 0
         ).map(({ dataCacheTtl }) => Number(dataCacheTtl));
@@ -130,8 +106,12 @@ export default {
         } else {
           headers.append("Cache-Control", "public, max-age=0, must-revalidate");
         }
+        ssrResult = {
+          context: ssrContext,
+          errorBoundaryHandlerFilename: errorBoundaryHandler?.filename,
+          body,
+        };
       } catch (error) {
-        // todo: better UI & reload
         let message: string;
         if (error instanceof Error) {
           const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
@@ -149,72 +129,10 @@ export default {
         } else {
           message = error?.toString?.() || String(error);
         }
-        log.error(error);
-        const errorHtml = `
-          <!DOCTYPE html>
-          <html lang="en">
-            <head>
-              <meta charset="utf-8">
-              <title>SSR Error - Aleph.js</title>
-              <style>
-                body {
-                  overflow: hidden;
-                }
-                .error {
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  width: 100vw;
-                  height: 100vh;
-                }
-                .error .box {
-                  box-sizing: border-box;
-                  position: relative;
-                  max-width: 80%;
-                  max-height: 90%;
-                  overflow: auto;
-                  padding: 24px 36px;
-                  border-radius: 12px;
-                  border: 2px solid rgba(255, 0, 0, 0.8);
-                  background-color: rgba(255, 0, 0, 0.1);
-                  color: rgba(255, 0, 0, 1);
-                }
-                .aleph-logo {
-                  position: absolute;
-                  top: 50%;
-                  left: 50%;
-                  margin-top: -45px;
-                  margin-left: -45px;
-                  opacity: 0.1;
-                }
-                .error pre {
-                  position: relative;
-                  line-height: 1.4;
-                }
-                .error code {
-                  font-size: 14px;
-                }
-              </style>
-            </head>
-            <body>
-              <div class="error">
-                <div class="box">
-                  <div class="aleph-logo">
-                    <svg width="90" height="90" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M52.9528 11.1C54.0959 11.1 55.1522 11.7097 55.7239 12.6995C68.5038 34.8259 81.2837 56.9524 94.0636 79.0788C94.642 80.0802 94.6355 81.316 94.0425 82.3088C93.0466 83.9762 92.028 85.6661 91.0325 87.3331C90.4529 88.3035 89.407 88.9 88.2767 88.9C62.7077 88.9 37.0519 88.9 11.4828 88.9C10.3207 88.9 9.25107 88.2693 8.67747 87.2586C7.75465 85.6326 6.81025 84.0065 5.88797 82.3805C5.33314 81.4023 5.34422 80.2041 5.90662 79.2302C18.6982 57.0794 31.4919 34.8415 44.3746 12.6907C44.9474 11.7058 46.0009 11.1 47.1402 11.1C49.0554 11.1 51.0005 11.1 52.9528 11.1Z" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linejoin="round"/>
-                      <path d="M28.2002 72.8H80.8002L45.8187 12.5494" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-                      <path d="M71.4999 72.7L45.1999 27.2L10.6519 87.1991" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-                      <path d="M49.8 35.3L23.5 80.8H93.9333" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </div>
-                  <pre><code>${message}</code></pre>
-                </div>
-              </div>
-            </body>
-          </html>
-        `;
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
-        return new Response(errorHtml, { headers });
+        headers.append("Content-Type", "text/html; charset=utf-8");
+        log.error(error);
+        return new Response(errorHtml(message), { headers });
       }
     } else {
       const { mtime, size } = await Deno.lstat("./index.html");
@@ -228,11 +146,20 @@ export default {
       }
       headers.append("Cache-Control", "public, max-age=0, must-revalidate");
     }
+
     const stream = new ReadableStream({
       start: (controller) => {
-        const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => controller.enqueue(chunk));
+        let ssrStreaming = false;
+        const suspenseChunks: Uint8Array[] = [];
         const alephPkgUri = getAlephPkgUri();
-        const linkHandler = {
+        const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
+          if (ssrStreaming) {
+            suspenseChunks.push(chunk);
+          } else {
+            controller.enqueue(chunk);
+          }
+        });
+        const linkHandlers = {
           element(el: Element) {
             let href = el.getAttribute("href");
             if (href) {
@@ -254,34 +181,37 @@ export default {
             }
           },
         };
-        const scriptHandler = {
-          nomoduleInserted: false,
+        const scriptHandlers = {
+          hasModule: false,
           element(el: Element) {
             const src = el.getAttribute("src");
             if (src && !util.isLikelyHttpURL(src)) {
               el.setAttribute("src", util.cleanPath(src));
             }
-            if (el.getAttribute("type") === "module" && !scriptHandler.nomoduleInserted) {
+            if (src) {
+              el.setAttribute("defer", "");
+            }
+            if (!scriptHandlers.hasModule && el.getAttribute("type") === "module") {
               el.after(
                 `<script nomodule src="${toLocalPath(alephPkgUri)}/framework/core/nomodule.ts"></script>`,
                 { html: true },
               );
-              scriptHandler.nomoduleInserted = true;
+              scriptHandlers.hasModule = true;
             }
           },
         };
-        const commonHandler = {
-          handled: false,
+        const headHandlers = {
           element(el: Element) {
-            if (commonHandler.handled) {
-              return;
-            }
             if (routes.routes.length > 0) {
               const json = JSON.stringify({ routes: routes.routes.map(([_, meta]) => meta) });
-              el.append(`<script id="route-manifest" type="application/json">${json}</script>`, {
+              el.append(`<script id="routes-manifest" type="application/json">${json}</script>`, {
                 html: true,
               });
             }
+          },
+        };
+        const bodyHandlers = {
+          element(el: Element) {
             if (isDev) {
               el.append(
                 `<script type="module">import hot from "${
@@ -289,27 +219,139 @@ export default {
                 }/framework/core/hmr.ts";hot("./index.html").decline();</script>`,
                 { html: true },
               );
-              commonHandler.handled = true;
             }
           },
         };
 
+        // apply user defined html rewrite handlers
         customHTMLRewriter.forEach((handlers, selector) => rewriter.on(selector, handlers));
-        ssrHTMLRewriter.forEach((handlers, selector) => rewriter.on(selector, handlers));
-        rewriter.on("link", linkHandler);
-        rewriter.on("script", scriptHandler);
-        rewriter.on("head", commonHandler);
-        rewriter.on("body", commonHandler);
+
+        if (ssrResult) {
+          const {
+            context: { routeModules, headCollection },
+            errorBoundaryHandlerFilename,
+            body,
+          } = ssrResult;
+          rewriter.on("head", {
+            element(el: Element) {
+              headCollection.forEach((h) => util.isFilledString(h) && el.append(h, { html: true }));
+              if (routeModules.length > 0) {
+                const ssrModules = routeModules.map(({ url, params, filename, error, data, dataCacheTtl }) => ({
+                  url: url.pathname + url.search,
+                  params,
+                  filename,
+                  error,
+                  data,
+                  dataCacheTtl,
+                }));
+                el.append(
+                  `<script id="ssr-modules" type="application/json">${
+                    /*! replace "/" to "\/" to prevent xss */
+                    JSON.stringify(ssrModules).replaceAll("/", "\\/")
+                  }</script>`,
+                  {
+                    html: true,
+                  },
+                );
+              }
+            },
+          });
+          rewriter.on("body", {
+            element(el: Element) {
+              if (routeModules.length > 0) {
+                const importStmts = routeModules.map(({ filename }, idx) =>
+                  `import $${idx} from ${JSON.stringify(filename.slice(1))};`
+                ).join("");
+                const kvs = routeModules.map(({ filename, data }, idx) =>
+                  `${JSON.stringify(filename)}:{defaultExport:$${idx}${data !== undefined ? ",withData:true" : ""}}`
+                ).join(",");
+                el.append(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
+                  html: true,
+                });
+                if (errorBoundaryHandlerFilename) {
+                  el.append(
+                    `<script type="module">import Handler from ${
+                      JSON.stringify(errorBoundaryHandlerFilename.slice(1))
+                    };window.__ERROR_BOUNDARY_HANDLER=Handler</script>`,
+                    {
+                      html: true,
+                    },
+                  );
+                }
+              }
+            },
+          });
+          if (typeof body === "string") {
+            rewriter.on("*", {
+              comments(c: Comment) {
+                const text = c.text.trim().toLowerCase();
+                if (text === "ssr-body" || text === "ssr-output") {
+                  c.replace(body, { html: true });
+                }
+              },
+            });
+          } else if (body instanceof ReadableStream) {
+            rewriter.on("*", {
+              comments(c: Comment) {
+                const text = c.text.trim().toLowerCase();
+                if (text === "ssr-body" || text === "ssr-output") {
+                  ssrStreaming = true;
+                  c.remove();
+                }
+              },
+            });
+            const rw = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
+              controller.enqueue(chunk);
+            });
+            rw.on("script", {
+              element(el: Element) {
+                if (el.getAttribute("src") === bootstrapScript) {
+                  suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
+                  el.remove();
+                }
+              },
+            });
+            const reader = body.getReader();
+            const send = async () => {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) {
+                    break;
+                  }
+                  rw.write(value);
+                }
+                rw.end();
+                if (suspenseChunks.length > 0) {
+                  suspenseChunks.forEach((chunk) => controller.enqueue(chunk));
+                }
+              } finally {
+                controller.close();
+                rw.free();
+              }
+            };
+            send();
+          }
+        }
+
+        rewriter.on("link", linkHandlers);
+        rewriter.on("script", scriptHandlers);
+        rewriter.on("head", headHandlers);
+        rewriter.on("body", bodyHandlers);
+
         try {
           rewriter.write(util.utf8TextEncoder.encode(indexHtml));
           rewriter.end();
         } finally {
-          controller.close();
+          if (!ssrResult || typeof ssrResult.body === "string") {
+            controller.close();
+          }
           rewriter.free();
         }
       },
     });
 
+    headers.set("Content-Type", "text/html; charset=utf-8");
     return new Response(stream, { headers });
   },
 };
@@ -319,6 +361,7 @@ async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
   routes: Routes,
+  suspense: boolean,
 ): Promise<
   [
     url: URL,
@@ -340,32 +383,36 @@ async function initSSR(
     };
     const fetcher = dataConfig.get;
     if (typeof fetcher === "function") {
-      try {
-        let res = fetcher(req, { ...ctx, params: ret.pathname.groups });
-        if (res instanceof Promise) {
-          res = await res;
-        }
-        if (res instanceof Response) {
-          if (res.status >= 400) {
-            rmod.error = await FetchError.fromResponse(res);
-            return rmod;
+      if (suspense) {
+        rmod.data = () => fetcher(rmod.params, ctx);
+      } else {
+        try {
+          let res = fetcher(req, { ...ctx, params: ret.pathname.groups });
+          if (res instanceof Promise) {
+            res = await res;
           }
-          if (res.status >= 300) {
-            if (res.headers.has("Location")) {
-              rmod.redirect = { headers: res.headers, status: res.status };
-            } else {
-              rmod.error = new FetchError(500, {}, "Missing the `Location` header");
+          if (res instanceof Response) {
+            if (res.status >= 400) {
+              rmod.error = await FetchError.fromResponse(res);
+              return rmod;
             }
-            return rmod;
+            if (res.status >= 300) {
+              if (res.headers.has("Location")) {
+                rmod.redirect = { headers: res.headers, status: res.status };
+              } else {
+                rmod.error = new FetchError(500, {}, "Missing the `Location` header");
+              }
+              return rmod;
+            }
+            try {
+              rmod.data = await res.json();
+            } catch (_e) {
+              rmod.error = new FetchError(500, {}, "Data must be valid JSON");
+            }
           }
-          try {
-            rmod.data = await res.json();
-          } catch (_e) {
-            rmod.error = new FetchError(500, {}, "Data must be valid JSON");
-          }
+        } catch (error) {
+          rmod.error = error;
         }
-      } catch (error) {
-        rmod.error = error;
       }
     }
     return rmod;
@@ -380,3 +427,67 @@ async function initSSR(
   }
   return [url, routeModules, undefined];
 }
+
+const errorHtml = (message: string) => `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>SSR Error - Aleph.js</title>
+    <style>
+      body {
+        overflow: hidden;
+      }
+      .error {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
+        height: 100vh;
+      }
+      .error .box {
+        box-sizing: border-box;
+        position: relative;
+        max-width: 80%;
+        max-height: 90%;
+        overflow: auto;
+        padding: 24px 36px;
+        border-radius: 12px;
+        border: 2px solid rgba(255, 0, 0, 0.8);
+        background-color: rgba(255, 0, 0, 0.1);
+        color: rgba(255, 0, 0, 1);
+      }
+      .error pre {
+        position: relative;
+        line-height: 1.4;
+      }
+      .error code {
+        font-size: 14px;
+      }
+      .logo {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin-top: -45px;
+        margin-left: -45px;
+        opacity: 0.1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="error">
+      <div class="box">
+        <div class="logo">
+          <svg width="90" height="90" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M52.9528 11.1C54.0959 11.1 55.1522 11.7097 55.7239 12.6995C68.5038 34.8259 81.2837 56.9524 94.0636 79.0788C94.642 80.0802 94.6355 81.316 94.0425 82.3088C93.0466 83.9762 92.028 85.6661 91.0325 87.3331C90.4529 88.3035 89.407 88.9 88.2767 88.9C62.7077 88.9 37.0519 88.9 11.4828 88.9C10.3207 88.9 9.25107 88.2693 8.67747 87.2586C7.75465 85.6326 6.81025 84.0065 5.88797 82.3805C5.33314 81.4023 5.34422 80.2041 5.90662 79.2302C18.6982 57.0794 31.4919 34.8415 44.3746 12.6907C44.9474 11.7058 46.0009 11.1 47.1402 11.1C49.0554 11.1 51.0005 11.1 52.9528 11.1Z" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linejoin="round"/>
+            <path d="M28.2002 72.8H80.8002L45.8187 12.5494" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M71.4999 72.7L45.1999 27.2L10.6519 87.1991" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M49.8 35.3L23.5 80.8H93.9333" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <pre><code>${message}</code></pre>
+      </div>
+    </div>
+  </body>
+</html>
+`;
