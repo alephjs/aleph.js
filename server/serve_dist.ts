@@ -1,4 +1,4 @@
-import { readableStreamFromReader } from "https://deno.land/std@0.135.0/streams/conversion.ts";
+import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import log from "../lib/log.ts";
 import type { AlephConfig } from "./types.ts";
 
