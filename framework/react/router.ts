@@ -12,7 +12,7 @@ export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
-  readonly errorBoundaryHandler?: FC;
+  readonly errorBoundaryHandler?: CallableFunction;
 };
 
 export type RouterProps = {
