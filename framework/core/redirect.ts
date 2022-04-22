@@ -21,15 +21,19 @@ export function redirect(url: string, replace?: boolean) {
     return;
   }
 
-  if (util.isLikelyHttpURL(url) || url.startsWith("file://") || url.startsWith("mailto:")) {
+  if (util.isLikelyHttpURL(url) || url.startsWith("file://") || url.startsWith("mailto:") || url.startsWith("data:")) {
     location.href = url;
     return;
   }
 
-  const redirectOptions = { url: new URL(url, location.href), replace };
+  const next = new URL(url, location.href);
+  if (next.href === location.href) {
+    return;
+  }
+
   if (routerReady) {
-    events.emit("popstate", { type: "popstate", ...redirectOptions });
+    events.emit("popstate", { type: "popstate", url: next, replace });
   } else {
-    preRedirect = redirectOptions;
+    preRedirect = { url: next, replace };
   }
 }

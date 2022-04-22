@@ -16,7 +16,7 @@ export type LinkProps = PropsWithChildren<
 >;
 
 /**
- * Link Component to link between pages.
+ * The `<Link>` component to link between pages.
  */
 export function Link(props: LinkProps) {
   const {
@@ -32,7 +32,7 @@ export function Link(props: LinkProps) {
     children,
     ...rest
   } = props;
-  const { url: { pathname, searchParams } } = useRouter();
+  const { url: { pathname } } = useRouter();
   const href = useMemo(() => {
     if (!util.isFilledString(to)) {
       throw new Error("<Link>: prop `to` is required.");
@@ -48,24 +48,6 @@ export function Link(props: LinkProps) {
     }
     return [p, q].filter(Boolean).join("?");
   }, [pathname, to]);
-  const isActivated = useMemo(() => {
-    if (!util.isFilledString(to)) {
-      return false;
-    }
-
-    const [p, q] = util.splitBy(to, "?");
-    if (util.trimSuffix(p, "/") !== pathname) {
-      return false;
-    }
-
-    const search = new URLSearchParams(q);
-    search.sort();
-    if (search.toString() !== searchParams.toString()) {
-      return false;
-    }
-
-    return true;
-  }, [pathname, searchParams, to]);
   const ariaCurrent = useMemo(() => {
     if (util.isFilledString(propAriaCurrent)) {
       return propAriaCurrent;
@@ -75,14 +57,14 @@ export function Link(props: LinkProps) {
     }
     return undefined;
   }, [href, propAriaCurrent]);
-  const timerRef = useRef<number | null>(null);
   const prefetch = useCallback(() => {
-    if (!util.isLikelyHttpURL(href) && !isActivated && !prefetched.has(href)) {
+    if (!util.isLikelyHttpURL(href) && !prefetched.has(href)) {
       events.emit("moduleprefetch", { href });
       prefetched.add(href);
     }
-  }, [href, isActivated]);
-  const onMouseEnter = useCallback((e: MouseEvent) => {
+  }, [href]);
+  const timerRef = useRef<number | null>(null);
+  const onMouseEnter = (e: MouseEvent) => {
     if (typeof propOnMouseEnter === "function") {
       propOnMouseEnter(e);
     }
@@ -95,8 +77,8 @@ export function Link(props: LinkProps) {
         prefetch();
       }, 150);
     }
-  }, [prefetch, href, propOnMouseEnter]);
-  const onMouseLeave = useCallback((e: MouseEvent) => {
+  };
+  const onMouseLeave = (e: MouseEvent) => {
     if (typeof propOnMouseLeave === "function") {
       propOnMouseLeave(e);
     }
@@ -107,8 +89,8 @@ export function Link(props: LinkProps) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-  }, [propOnMouseLeave]);
-  const onClick = useCallback((e: MouseEvent) => {
+  };
+  const onClick = (e: MouseEvent) => {
     if (typeof propOnClick === "function") {
       propOnClick(e);
     }
@@ -116,10 +98,8 @@ export function Link(props: LinkProps) {
       return;
     }
     e.preventDefault();
-    if (!isActivated) {
-      redirect(href, replace);
-    }
-  }, [isActivated, href, replace]);
+    redirect(href, replace);
+  };
 
   useEffect(() => {
     if (propPrefetch) {
@@ -149,35 +129,43 @@ export function Link(props: LinkProps) {
   );
 }
 
+export type NavLinkProps = LinkProps & {
+  exact?: boolean;
+  activeClassName?: string;
+  activeStyle?: CSSProperties;
+};
+
 /**
- * Link Component to link between pages.
+ * A special version of the `<Link>` that will add styling attributes to the rendered element when it matches the current URL.
  */
-export function NavLink(props: LinkProps & { activeClassName?: string; activeStyle?: CSSProperties }) {
-  const { to, className: propClassName, style: propStyle, activeStyle, activeClassName, ...rest } = props;
-  const { url: { pathname, searchParams } } = useRouter();
+export function NavLink(props: NavLinkProps) {
+  const { to, exact, className: propClassName, style: propStyle, activeStyle, activeClassName, ...rest } = props;
+  const { url } = useRouter();
   const isActivated = useMemo(() => {
     if (!util.isFilledString(to)) {
       return false;
     }
 
     const [p, q] = util.splitBy(to, "?");
-    if (util.trimSuffix(p, "/") !== pathname) {
-      return false;
+    const currentPathname = util.trimSuffix(url.pathname, "/");
+    let pathname: string;
+    if (p.startsWith("/")) {
+      pathname = util.cleanPath(p);
+    } else {
+      pathname = util.cleanPath(currentPathname + "/" + p);
     }
 
-    const search = new URLSearchParams(q);
-    search.sort();
-    if (search.toString() !== searchParams.toString()) {
-      return false;
+    console.log(pathname, currentPathname);
+    if (!exact) {
+      return pathname === currentPathname || currentPathname.startsWith(pathname + "/");
     }
-
-    return true;
-  }, [pathname, searchParams, to]);
+    return pathname === currentPathname && q === url.searchParams.toString();
+  }, [url.pathname, url.searchParams, to, exact]);
   const className = useMemo(() => {
     if (!isActivated || !activeClassName) {
       return propClassName;
     }
-    return [propClassName, activeClassName].filter(util.isFilledString).map((n) => n.trim()).filter(Boolean).join(" ");
+    return [propClassName, activeClassName].filter(util.isFilledString).join(" ");
   }, [propClassName, activeClassName, isActivated]);
   const style = useMemo(() => {
     if (!isActivated || !activeStyle) {
