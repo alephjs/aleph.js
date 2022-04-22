@@ -6,8 +6,5 @@ serve({
   config: {
     routes: "./routes/**/*.tsx",
   },
-  ssr: {
-    suspense: false,
-    render: (ctx) => renderToString(<Router ssrContext={ctx} />),
-  },
+  ssr: (ctx) => renderToString(<Router ssrContext={ctx} />),
 });
