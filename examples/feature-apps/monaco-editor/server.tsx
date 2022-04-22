@@ -1,6 +1,6 @@
-import { renderToString } from "react-dom/server";
 import { Router } from "aleph/react";
 import { serve } from "aleph/server";
+import { renderToString } from "react-dom/server";
 
 serve({
   config: {
