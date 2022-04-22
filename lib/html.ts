@@ -1,4 +1,4 @@
-import type { Element } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
+import type { Comment, Element } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import decodeLolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
 import util from "./util.ts";
@@ -42,4 +42,4 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
   });
 }
 
-export { Element, HTMLRewriter };
+export { Comment, Element, HTMLRewriter };

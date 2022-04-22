@@ -1,9 +1,9 @@
-import { Untar } from "https://deno.land/std@0.135.0/archive/tar.ts";
-import { Buffer } from "https://deno.land/std@0.135.0/io/buffer.ts";
-import { copy, readAll } from "https://deno.land/std@0.135.0/streams/conversion.ts";
-import { blue, cyan, dim, green, red } from "https://deno.land/std@0.135.0/fmt/colors.ts";
-import { ensureDir } from "https://deno.land/std@0.135.0/fs/ensure_dir.ts";
-import { basename, join } from "https://deno.land/std@0.135.0/path/mod.ts";
+import { Untar } from "https://deno.land/std@0.136.0/archive/tar.ts";
+import { Buffer } from "https://deno.land/std@0.136.0/io/buffer.ts";
+import { copy, readAll } from "https://deno.land/std@0.136.0/streams/conversion.ts";
+import { blue, cyan, dim, green, red } from "https://deno.land/std@0.136.0/fmt/colors.ts";
+import { ensureDir } from "https://deno.land/std@0.136.0/fs/ensure_dir.ts";
+import { basename, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import { existsDir } from "../lib/fs.ts";
 import log from "../lib/log.ts";
@@ -12,7 +12,7 @@ import { isCanary, VERSION } from "../version.ts";
 
 const templates = ["react", "preact", "vue", "svelte", "lit", "vanilla", "api"];
 const versions = {
-  react: "17.0.2",
+  react: "18.0.0",
   vue: "3.2.31",
 };
 
@@ -113,7 +113,7 @@ export default async function (nameArg: string | undefined, template = "react") 
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
         "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/react-dom@${versions.react}`,
-        "react-dom/server": `https://esm.sh/react-dom@${versions.react}/server`,
+        "react-dom/": `https://esm.sh/react-dom@${versions.react}/`,
       });
       Object.assign(denoConfig.compilerOptions, {
         "jsx": "react-jsx",

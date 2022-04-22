@@ -6,8 +6,6 @@ export type RouteModule = {
   url: URL;
   params: Record<string, string>;
   filename: string;
-  error?: Error;
-  redirect?: { headers: Headers; status: number };
   defaultExport?: unknown;
   data?: unknown;
   dataCacheTtl?: number;

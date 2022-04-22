@@ -20,12 +20,19 @@ export const useData = <T = unknown>(): {
   const [data, setData] = useState(() => {
     const cached = dataCache.get(dataUrl);
     if (cached) {
-      if (cached.error) {
-        throw cached.error;
+      if (typeof cached.data === "function") {
+        const data = cached.data();
+        if (data instanceof Promise) {
+          throw data.then((data) => {
+            cached.data = data;
+            return data;
+          });
+        }
+        throw new Error(`Data for ${dataUrl} has invalid type [function].`);
       }
       return cached.data as T;
     }
-    throw new Error("Data not found");
+    throw new Error(`Data for ${dataUrl} is not found`);
   });
   const [isMutating, setIsMutating] = useState<HttpMethod>();
   const action = useCallback(async (method: HttpMethod, fetcher: Promise<Response>, update: UpdateStrategy<T>) => {

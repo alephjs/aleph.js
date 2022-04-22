@@ -8,7 +8,7 @@ export default function Index() {
     (async () => {
       const { createEditor, createModel } = await import("../lib/editor.ts");
       const editor = createEditor(editorContainerRef.current!);
-      editor.setModel(createModel("mod.ts", `console.log("Hello, world!");`));
+      editor.setModel(createModel("mod.ts", `// Aleph.js with Monaco Editor \n\nconsole.log("Hello, world!");\n`));
       setReady(true);
     })();
   }, []);

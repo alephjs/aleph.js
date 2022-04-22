@@ -1,4 +1,4 @@
-import { join } from "https://deno.land/std@0.135.0/path/mod.ts";
+import { join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import cache from "./cache.ts";
 import { getContentType } from "./mime.ts";
 import util from "./util.ts";
@@ -80,6 +80,8 @@ export async function readCode(
     const mtime = val ? new Date(val).getTime() : undefined;
     return [await res.text(), mtime, res.headers.get("Content-Type") || getContentType(url.pathname)];
   }
+
+  specifier = util.splitBy(specifier, "?")[0];
   const stat = await Deno.stat(specifier);
   return [await Deno.readTextFile(specifier), stat.mtime?.getTime(), getContentType(specifier)];
 }

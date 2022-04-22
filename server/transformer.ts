@@ -39,10 +39,10 @@ export default {
       isCSS = loaded.lang === "css";
       uno = !!loaded.atomicCSS;
     } else {
-      let ctype: string;
-      [rawCode, mtime, ctype] = await readCode(specifier);
+      let codeType: string;
+      [rawCode, mtime, codeType] = await readCode(specifier);
+      isCSS = codeType.startsWith("text/css");
       uno = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
-      isCSS = ctype.startsWith("text/css") || ctype.startsWith("text/postcss");
     }
     const etag = mtime
       ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${
@@ -67,6 +67,7 @@ export default {
     if (isCSS) {
       const asJsModule = searchParams.has("module");
       const { code, deps } = await bundleCSS(specifier, rawCode, {
+        // todo: support borwserslist
         targets: {
           android: 95,
           chrome: 95,
@@ -75,7 +76,7 @@ export default {
           safari: 14,
         },
         minify: !isDev,
-        cssModules: asJsModule && /\.module\.(p|post)?css$/.test(pathname),
+        cssModules: asJsModule && pathname.endsWith(".module.css"),
         asJsModule,
         hmr: isDev,
       });

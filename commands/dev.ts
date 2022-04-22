@@ -1,5 +1,5 @@
-import { basename, relative } from "https://deno.land/std@0.135.0/path/mod.ts";
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.135.0/http/server.ts";
+import { basename, relative } from "https://deno.land/std@0.136.0/path/mod.ts";
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";

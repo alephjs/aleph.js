@@ -1,4 +1,4 @@
-import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.135.0/path/mod.ts";
+import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { findFile } from "../lib/fs.ts";
 import { globalIt } from "../lib/helpers.ts";
