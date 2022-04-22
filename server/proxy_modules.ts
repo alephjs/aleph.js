@@ -16,6 +16,7 @@ const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
     specifier,
     await Deno.readTextFile(specifier),
     {
+      // todo: support borwserslist
       targets: {
         android: 95,
         chrome: 95,
@@ -92,7 +93,7 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
   };
 };
 
-const initLoader = (moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) => {
+const buildLoader = (moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) => {
   return async (req: Request): Promise<{ content: string | Uint8Array; contentType?: string } | undefined> => {
     const { pathname } = new URL(req.url);
     if (pathname.endsWith(".css")) {
@@ -112,14 +113,14 @@ const initLoader = (moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) => {
   };
 };
 
-type ServerOptions = {
+type ProxyModulesOptions = {
   moduleLoaders: ModuleLoader[];
   importMap: ImportMap;
   signal?: AbortSignal;
 };
 
 /** serve app modules to support module loader that allows you import Non-JavaScript modules like `.css/.vue/.svelet/...` */
-export async function proxyModules(port: number, options: ServerOptions) {
+export async function proxyModules(port: number, options: ProxyModulesOptions) {
   if (!Reflect.has(globalThis, "serverDependencyGraph")) {
     Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
   }
@@ -129,7 +130,7 @@ export async function proxyModules(port: number, options: ServerOptions) {
     await serveDir({
       port,
       signal: options.signal,
-      loader: initLoader(options.moduleLoaders, {
+      loader: buildLoader(options.moduleLoaders, {
         importMap: options.importMap,
         isDev: Deno.env.get("ALEPH_ENV") === "development",
         ssr: true,

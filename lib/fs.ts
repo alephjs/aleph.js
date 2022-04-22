@@ -80,6 +80,8 @@ export async function readCode(
     const mtime = val ? new Date(val).getTime() : undefined;
     return [await res.text(), mtime, res.headers.get("Content-Type") || getContentType(url.pathname)];
   }
+
+  specifier = util.splitBy(specifier, "?")[0];
   const stat = await Deno.stat(specifier);
   return [await Deno.readTextFile(specifier), stat.mtime?.getTime(), getContentType(specifier)];
 }

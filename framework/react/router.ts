@@ -1,4 +1,4 @@
-import type { FC, ReactElement, ReactNode } from "react";
+import type { FC, PropsWithChildren, ReactElement, ReactNode } from "react";
 import { Component, createElement, useContext, useEffect, useMemo, useState } from "react";
 import { FetchError } from "../../lib/helpers.ts";
 import type { Route, RouteMeta, RouteModule, Routes } from "../../lib/route.ts";
@@ -17,6 +17,7 @@ export type SSRContext = {
 
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
+  readonly suspense?: boolean;
 };
 
 export const Router: FC<RouterProps> = ({ ssrContext }) => {
@@ -206,8 +207,8 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
   );
 };
 
-class ErrorBoundary extends Component<{ Handler: FC<{ error: Error }> }, { error: Error | null }> {
-  constructor(props: { Handler: FC<{ error: Error }> }) {
+class ErrorBoundary extends Component<PropsWithChildren<{ Handler: FC<{ error: Error }> }>, { error: Error | null }> {
+  constructor(props: PropsWithChildren<{ Handler: FC<{ error: Error }> }>) {
     super(props);
     this.state = { error: null };
   }
@@ -265,7 +266,7 @@ export const forwardProps = (children?: ReactNode, props: Record<string, unknown
 };
 
 function loadRoutesFromTag(): Routes {
-  const el = window.document?.getElementById("route-manifest");
+  const el = window.document?.getElementById("routes-manifest");
   if (el) {
     try {
       const manifest = JSON.parse(el.innerText);
