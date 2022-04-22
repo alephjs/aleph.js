@@ -13,6 +13,7 @@ export type SSRContext = {
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
   readonly errorBoundaryHandler?: CallableFunction;
+  readonly suspense: boolean;
 };
 
 export type RouterProps = {
@@ -20,17 +21,22 @@ export type RouterProps = {
   readonly suspense?: boolean;
 };
 
-export const Router: FC<RouterProps> = ({ ssrContext }) => {
+type DataCache = {
+  data?: unknown;
+  dataCacheTtl?: number;
+  dataExpires?: number;
+};
+
+// deno-lint-ignore no-explicit-any
+const global = window as any;
+
+export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
-    const cache = new Map<
-      string,
-      { error?: Error; data?: unknown; dataCacheTtl?: number; dataExpires?: number }
-    >();
-    modules.forEach(({ url, data, dataCacheTtl, error }) => {
+    const cache = new Map<string, DataCache>();
+    modules.forEach(({ url, data, dataCacheTtl }) => {
       cache.set(url.pathname + url.search, {
-        error,
         data,
         dataCacheTtl,
         dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
@@ -40,10 +46,9 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
   }, []);
   const createRouteEl = (modules: RouteModule[]): ReactElement => {
     const ErrorBoundaryHandler: undefined | FC<{ error: Error }> = ssrContext?.errorBoundaryHandler ||
-      // deno-lint-ignore no-explicit-any
-      (window as any).__ERROR_BOUNDARY_HANDLER;
-    const currentModule = modules[0];
-    const dataUrl = currentModule.url.pathname + currentModule.url.search;
+      global.__ERROR_BOUNDARY_HANDLER;
+    const { url, defaultExport } = modules[0];
+    const dataUrl = url.pathname + url.search;
     const el = createElement(
       DataContext.Provider,
       {
@@ -54,9 +59,9 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
         },
         key: dataUrl,
       },
-      typeof currentModule.defaultExport === "function"
+      typeof defaultExport === "function"
         ? createElement(
-          currentModule.defaultExport as FC,
+          defaultExport as FC,
           null,
           modules.length > 1 ? createRouteEl(modules.slice(1)) : undefined,
         )
@@ -100,41 +105,35 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
       ROUTE_MODULES[filename] = { defaultExport, withData };
       return { defaultExport, withData };
     };
+    const isSuspense = document.body.getAttribute("data-suspense") ?? suspense;
     const prefetchData = async (dataUrl: string) => {
-      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
-      if (res.status === 404 || res.status === 405) {
-        dataCache.set(dataUrl, {});
-        return {};
-      }
-      if (res.status >= 400) {
-        const error = await FetchError.fromResponse(res);
-        dataCache.set(dataUrl, {
-          error,
-          dataExpires: Date.now() + 1000,
-        });
-        return {};
-      }
-      if (res.status >= 300) {
-        const redirectUrl = res.headers.get("Location");
-        if (redirectUrl) {
-          location.href = redirectUrl;
+      const cache: DataCache = {};
+      const fetchData = async () => {
+        const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
+        if (res.status === 404 || res.status === 405) {
+          return undefined;
         }
-        const error = new FetchError(500, {}, "Missing the `Location` header");
-        dataCache.set(dataUrl, {
-          error,
-          dataExpires: Date.now() + 1000,
-        });
-        return {};
+        if (res.status >= 400) {
+          throw await FetchError.fromResponse(res);
+        }
+        if (res.status >= 300) {
+          const redirectUrl = res.headers.get("Location");
+          if (redirectUrl) {
+            location.href = redirectUrl;
+          }
+          throw new FetchError(500, {}, "Missing the `Location` header");
+        }
+        const cc = res.headers.get("Cache-Control");
+        cache.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+        cache.dataExpires = Date.now() + (cache.dataCacheTtl || 1) * 1000;
+        return await res.json();
+      };
+      if (isSuspense) {
+        cache.data = fetchData;
+      } else {
+        cache.data = await fetchData();
       }
-      const data = await res.json();
-      const cc = res.headers.get("Cache-Control");
-      const dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-      dataCache.set(dataUrl, {
-        data,
-        dataCacheTtl,
-        dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
-      });
-      return { data, dataCacheTtl };
+      dataCache.set(dataUrl, cache);
     };
     const onmoduleprefetch = (e: Record<string, unknown>) => {
       const pageUrl = new URL(e.href as string, location.href);
@@ -166,11 +165,8 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
           const { defaultExport } = await importModule(meta);
           rmod.defaultExport = defaultExport;
         }
-        if (dataCache.has(dataUrl)) {
-          Object.assign(rmod, dataCache.get(dataUrl));
-        } else if (ROUTE_MODULES[filename]?.withData === true) {
-          const ret = await prefetchData(dataUrl);
-          Object.assign(rmod, ret);
+        if (!dataCache.has(dataUrl) && ROUTE_MODULES[filename]?.withData === true) {
+          await prefetchData(dataUrl);
         }
         return rmod;
       }));
@@ -302,10 +298,23 @@ function loadSSRModulesFromTag(): RouteModule[] {
     try {
       const data = JSON.parse(el.innerText);
       if (Array.isArray(data)) {
-        return data.map(({ url, params, filename, ...rest }) => {
+        let suspenseData: Record<string, unknown> | null | undefined = undefined;
+        return data.map(({ url, filename, suspense, ...rest }) => {
+          if (suspense) {
+            if (suspenseData === undefined) {
+              const el = window.document?.getElementById("suspense-data");
+              if (el) {
+                suspenseData = JSON.parse(el.innerText);
+              } else {
+                suspenseData = null;
+              }
+            }
+            if (suspenseData) {
+              rest.data = suspenseData[url];
+            }
+          }
           return {
             url: new URL(url, location.href),
-            params,
             filename,
             defaultExport: ROUTE_MODULES[filename].defaultExport,
             ...rest,
@@ -320,7 +329,5 @@ function loadSSRModulesFromTag(): RouteModule[] {
 }
 
 function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
-  // deno-lint-ignore no-explicit-any
-  const global = globalThis as any;
   return global.__ROUTE_MODULES || (global.__ROUTE_MODULES = {});
 }

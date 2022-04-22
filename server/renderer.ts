@@ -28,8 +28,8 @@ export type SSR = {
   render(ssr: SSRContext): Promise<ReadableStream> | ReadableStream;
 } | {
   suspense?: false;
-  render(ssr: SSRContext): Promise<string> | string;
-} | ((ssr: SSRContext) => Promise<string> | string);
+  render(ssr: SSRContext): Promise<string | ReadableStream> | string | ReadableStream;
+} | ((ssr: SSRContext) => Promise<string | ReadableStream> | string | ReadableStream);
 
 export type RenderOptions = {
   indexHtml: string;
@@ -43,24 +43,20 @@ type SSRResult = {
   context: SSRContext;
   errorBoundaryHandlerFilename?: string;
   body: string | ReadableStream;
+  suspenseData: Record<string, unknown>;
 };
 
-/* The virtual `bootstrapScript` to mark the ssr streaming initial UI ready */
+/** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
 const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* hydrate bootstrap */")}`;
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
     const { indexHtml, routes, isDev, customHTMLRewriter, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
-    let ssrResult: SSRResult | null = null;
+    let ssrRes: SSRResult | null = null;
     if (ssr) {
       const suspense = typeof ssr === "function" ? false : !!ssr.suspense;
-      const [url, routeModules, errorBoundaryHandler] = await initSSR(req, ctx, routes, suspense);
-      for (const { redirect } of routeModules) {
-        if (redirect) {
-          return new Response(null, redirect);
-        }
-      }
+      const [url, routeModules, suspenseData, errorBoundaryHandler] = await initSSR(req, ctx, routes, suspense);
       const render = typeof ssr === "function" ? ssr : ssr.render;
       try {
         const headCollection: string[] = [];
@@ -106,16 +102,20 @@ export default {
         } else {
           headers.append("Cache-Control", "public, max-age=0, must-revalidate");
         }
-        ssrResult = {
+        ssrRes = {
           context: ssrContext,
           errorBoundaryHandlerFilename: errorBoundaryHandler?.filename,
           body,
+          suspenseData,
         };
-      } catch (error) {
+      } catch (e) {
+        if (e instanceof Response) {
+          return e;
+        }
         let message: string;
-        if (error instanceof Error) {
+        if (e instanceof Error) {
           const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
-          message = (error.stack as string).split("\n").map((line, i) => {
+          message = (e.stack as string).split("\n").map((line, i) => {
             const ret = line.match(regStackLoc);
             if (ret) {
               const url = new URL(ret[1]);
@@ -126,12 +126,12 @@ export default {
             }
             return line;
           }).join("\n");
+          log.error(e);
         } else {
-          message = error?.toString?.() || String(error);
+          message = e?.toString?.() || String(e);
         }
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
         headers.append("Content-Type", "text/html; charset=utf-8");
-        log.error(error);
         return new Response(errorHtml(message), { headers });
       }
     } else {
@@ -226,32 +226,33 @@ export default {
         // apply user defined html rewrite handlers
         customHTMLRewriter.forEach((handlers, selector) => rewriter.on(selector, handlers));
 
-        if (ssrResult) {
+        if (ssrRes) {
           const {
-            context: { routeModules, headCollection },
+            context: { routeModules, headCollection, suspense },
             errorBoundaryHandlerFilename,
             body,
-          } = ssrResult;
+            suspenseData,
+          } = ssrRes;
           rewriter.on("head", {
             element(el: Element) {
               headCollection.forEach((h) => util.isFilledString(h) && el.append(h, { html: true }));
               if (routeModules.length > 0) {
-                const ssrModules = routeModules.map(({ url, params, filename, error, data, dataCacheTtl }) => ({
-                  url: url.pathname + url.search,
-                  params,
-                  filename,
-                  error,
-                  data,
-                  dataCacheTtl,
-                }));
+                const ssrModules = routeModules.map(({ url, params, filename, data, dataCacheTtl }) => {
+                  const suspense = typeof data === "function" ? true : undefined;
+                  return {
+                    url: url.pathname + url.search,
+                    params,
+                    filename,
+                    data: suspense ? undefined : data,
+                    suspense,
+                    dataCacheTtl,
+                  };
+                });
+                /*! replace "/" to "\/" to prevent xss */
+                const modulesJSON = JSON.stringify(ssrModules).replaceAll("/", "\\/");
                 el.append(
-                  `<script id="ssr-modules" type="application/json">${
-                    /*! replace "/" to "\/" to prevent xss */
-                    JSON.stringify(ssrModules).replaceAll("/", "\\/")
-                  }</script>`,
-                  {
-                    html: true,
-                  },
+                  `<script id="ssr-modules" type="application/json">${modulesJSON}</script>`,
+                  { html: true },
                 );
               }
             },
@@ -268,14 +269,15 @@ export default {
                 el.append(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
                   html: true,
                 });
+                if (suspense) {
+                  el.setAttribute("data-suspense", "true");
+                }
                 if (errorBoundaryHandlerFilename) {
                   el.append(
                     `<script type="module">import Handler from ${
                       JSON.stringify(errorBoundaryHandlerFilename.slice(1))
                     };window.__ERROR_BOUNDARY_HANDLER=Handler</script>`,
-                    {
-                      html: true,
-                    },
+                    { html: true },
                   );
                 }
               }
@@ -325,6 +327,13 @@ export default {
                 if (suspenseChunks.length > 0) {
                   suspenseChunks.forEach((chunk) => controller.enqueue(chunk));
                 }
+                if (Object.keys(suspenseData).length > 0) {
+                  controller.enqueue(
+                    util.utf8TextEncoder.encode(
+                      `<script type="application/json" id="suspense-data">${JSON.stringify(suspenseData)}</script>`,
+                    ),
+                  );
+                }
               } finally {
                 controller.close();
                 rw.free();
@@ -343,7 +352,7 @@ export default {
           rewriter.write(util.utf8TextEncoder.encode(indexHtml));
           rewriter.end();
         } finally {
-          if (!ssrResult || typeof ssrResult.body === "string") {
+          if (!ssrRes || typeof ssrRes.body === "string") {
             controller.close();
           }
           rewriter.free();
@@ -366,11 +375,13 @@ async function initSSR(
   [
     url: URL,
     routeModules: RouteModule[],
+    suspenseData: Record<string, unknown>,
     errorBoundaryHandler: { filename: string; default: CallableFunction } | undefined,
   ]
 > {
   const url = new URL(req.url);
   const matches = matchRoutes(url, routes);
+  const suspenseData: Record<string, unknown> = {};
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
     const mod = await importRouteModule(filename);
     const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
@@ -383,36 +394,36 @@ async function initSSR(
     };
     const fetcher = dataConfig.get;
     if (typeof fetcher === "function") {
-      if (suspense) {
-        rmod.data = () => fetcher(rmod.params, ctx);
-      } else {
-        try {
-          let res = fetcher(req, { ...ctx, params: ret.pathname.groups });
-          if (res instanceof Promise) {
-            res = await res;
-          }
-          if (res instanceof Response) {
-            if (res.status >= 400) {
-              rmod.error = await FetchError.fromResponse(res);
-              return rmod;
-            }
-            if (res.status >= 300) {
-              if (res.headers.has("Location")) {
-                rmod.redirect = { headers: res.headers, status: res.status };
-              } else {
-                rmod.error = new FetchError(500, {}, "Missing the `Location` header");
-              }
-              return rmod;
-            }
-            try {
-              rmod.data = await res.json();
-            } catch (_e) {
-              rmod.error = new FetchError(500, {}, "Data must be valid JSON");
-            }
-          }
-        } catch (error) {
-          rmod.error = error;
+      const fetchData = async () => {
+        let res = fetcher(req, { ...ctx, params: rmod.params });
+        if (res instanceof Promise) {
+          res = await res;
         }
+        if (res instanceof Response) {
+          if (res.status >= 400) {
+            throw await FetchError.fromResponse(res);
+          }
+          if (res.status >= 300) {
+            if (res.headers.has("Location")) {
+              throw Response.redirect(res.headers.get("Location")!, res.status);
+            }
+            throw new FetchError(500, {}, "Missing the `Location` header");
+          }
+          try {
+            const data = await res.json();
+            suspenseData[rmod.url.pathname + rmod.url.search] = data;
+            return data;
+          } catch (_e) {
+            throw new FetchError(500, {}, "Data must be valid JSON");
+          }
+        } else {
+          throw new Error("Data response must be a JSON");
+        }
+      };
+      if (suspense) {
+        rmod.data = fetchData;
+      } else {
+        rmod.data = await fetchData();
       }
     }
     return rmod;
@@ -422,10 +433,10 @@ async function initSSR(
     const [_, meta] = routes._error;
     const mod = await importRouteModule(meta.filename);
     if (typeof mod.default === "function") {
-      return [url, routeModules, { filename: meta.filename, default: mod.default }];
+      return [url, routeModules, suspenseData, { filename: meta.filename, default: mod.default }];
     }
   }
-  return [url, routeModules, undefined];
+  return [url, routeModules, suspenseData, undefined];
 }
 
 const errorHtml = (message: string) => `
