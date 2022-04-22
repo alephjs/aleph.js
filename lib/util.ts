@@ -20,6 +20,14 @@ export default {
     const p = s.slice(0, 8).toLowerCase();
     return p === "https://" || p.slice(0, 7) === "http://";
   },
+  startsWithAny(str: string, ...prefixs: string[]) {
+    for (const prefix of prefixs) {
+      if (str.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
+  },
   endsWithAny(str: string, ...suffixes: string[]) {
     for (const suffix of suffixes) {
       if (str.endsWith(suffix)) {
@@ -40,7 +48,7 @@ export default {
     }
     return s;
   },
-  splitBy(s: string, searchString: string, fromLast = false): [string, string] {
+  splitBy(s: string, searchString: string, fromLast = false): [prefix: string, suffix: string] {
     const i = fromLast ? s.lastIndexOf(searchString) : s.indexOf(searchString);
     if (i >= 0) {
       return [s.slice(0, i), s.slice(i + 1)];
