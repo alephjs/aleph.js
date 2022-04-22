@@ -12,7 +12,7 @@ import { isCanary, VERSION } from "../version.ts";
 
 const templates = ["react", "preact", "vue", "svelte", "lit", "vanilla", "api"];
 const versions = {
-  react: "17.0.2",
+  react: "18.0.0",
   vue: "3.2.31",
 };
 
@@ -113,7 +113,7 @@ export default async function (nameArg: string | undefined, template = "react") 
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
         "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/react-dom@${versions.react}`,
-        "react-dom/server": `https://esm.sh/react-dom@${versions.react}/server`,
+        "react-dom/": `https://esm.sh/react-dom@${versions.react}/`,
       });
       Object.assign(denoConfig.compilerOptions, {
         "jsx": "react-jsx",
