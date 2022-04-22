@@ -1,3 +1,6 @@
+// @ts-nocheck
+// deno-lint-ignore-file
+
 (function (document) {
   var containerEl = document.createElement("div");
   var hEl = document.createElement("h2");

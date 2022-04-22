@@ -262,7 +262,10 @@ export default {
               el.setAttribute("src", util.cleanPath(src));
             }
             if (el.getAttribute("type") === "module" && !scriptHandler.nomoduleInserted) {
-              el.after(`<script nomodule src="${alephPkgUri}/lib/nomodule.js"></script>`, { html: true });
+              el.after(
+                `<script nomodule src="${toLocalPath(alephPkgUri)}/framework/core/nomodule.ts"></script>`,
+                { html: true },
+              );
               scriptHandler.nomoduleInserted = true;
             }
           },
