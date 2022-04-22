@@ -27,8 +27,7 @@
     "files": {
       "exclude": [
         "compiler/dist/",
-        "compiler/pkg/",
-        "lib/nomodule.js"
+        "compiler/pkg/"
       ]
     }
   }
