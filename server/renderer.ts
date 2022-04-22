@@ -11,8 +11,8 @@ import { matchRoutes } from "../lib/route.ts";
 export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
-  readonly errorBoundaryModule?: RouteModule;
   readonly headCollection: string[];
+  readonly errorBoundaryHandler?: CallableFunction;
 };
 
 export type HTMLRewriterHandlers = {
@@ -34,7 +34,7 @@ export default {
     const ssrHTMLRewriter: Map<string, HTMLRewriterHandlers> = new Map();
     headers.set("Content-Type", "text/html; charset=utf-8");
     if (ssr) {
-      const [url, routeModules, errorBoundaryModule] = await initSSR(req, ctx, routes);
+      const [url, routeModules, errorBoundaryHandler] = await initSSR(req, ctx, routes);
       for (const { redirect } of routeModules) {
         if (redirect) {
           return new Response(null, redirect);
@@ -42,7 +42,13 @@ export default {
       }
       try {
         const headCollection: string[] = [];
-        const ssrOutput = await ssr({ url, routeModules, errorBoundaryModule, headCollection });
+        const ssrContext = {
+          url,
+          routeModules,
+          errorBoundaryHandler: errorBoundaryHandler?.default,
+          headCollection,
+        };
+        const ssrOutput = await ssr(ssrContext);
         const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
         if (serverDependencyGraph) {
           const styles: string[] = [];
@@ -95,10 +101,10 @@ export default {
               el.before(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
                 html: true,
               });
-              if (errorBoundaryModule) {
+              if (errorBoundaryHandler) {
                 el.before(
                   `<script type="module">import Handler from ${
-                    JSON.stringify(errorBoundaryModule.filename.slice(1))
+                    JSON.stringify(errorBoundaryHandler.filename.slice(1))
                   };window.__ERROR_BOUNDARY_HANDLER=Handler</script>`,
                   {
                     html: true,
@@ -310,7 +316,13 @@ async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
   routes: Routes,
-): Promise<[url: URL, routeModules: RouteModule[], errorBoundaryModule: RouteModule | undefined]> {
+): Promise<
+  [
+    url: URL,
+    routeModules: RouteModule[],
+    errorBoundaryHandler: { filename: string; default: CallableFunction } | undefined,
+  ]
+> {
   const url = new URL(req.url);
   const matches = matchRoutes(url, routes);
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
@@ -359,14 +371,8 @@ async function initSSR(
   if (routes._error) {
     const [_, meta] = routes._error;
     const mod = await importRouteModule(meta.filename);
-    if (mod.default !== undefined) {
-      const errorBoundaryModule: RouteModule = {
-        url: new URL("/_error" + url.search, url.href),
-        params: {},
-        filename: meta.filename,
-        defaultExport: mod.default,
-      };
-      return [url, routeModules, errorBoundaryModule];
+    if (typeof mod.default === "function") {
+      return [url, routeModules, { filename: meta.filename, default: mod.default }];
     }
   }
   return [url, routeModules, undefined];

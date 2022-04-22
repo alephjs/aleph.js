@@ -11,8 +11,8 @@ import { DataContext, ForwardPropsContext, RouterContext } from "./context.ts";
 export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
-  readonly errorBoundaryModule?: RouteModule;
   readonly headCollection: string[];
+  readonly errorBoundaryHandler?: FC;
 };
 
 export type RouterProps = {
@@ -20,7 +20,7 @@ export type RouterProps = {
 };
 
 export const Router: FC<RouterProps> = ({ ssrContext }) => {
-  const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location.href));
+  const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
     const cache = new Map<
@@ -38,7 +38,7 @@ export const Router: FC<RouterProps> = ({ ssrContext }) => {
     return cache;
   }, []);
   const createRouteEl = (modules: RouteModule[]): ReactElement => {
-    const ErrorBoundaryHandler: undefined | FC<{ error: Error }> = ssrContext?.errorBoundaryModule?.defaultExport ||
+    const ErrorBoundaryHandler: undefined | FC<{ error: Error }> = ssrContext?.errorBoundaryHandler ||
       // deno-lint-ignore no-explicit-any
       (window as any).__ERROR_BOUNDARY_HANDLER;
     const currentModule = modules[0];
@@ -319,7 +319,7 @@ function loadSSRModulesFromTag(): RouteModule[] {
 }
 
 function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
-  // deno-lint-ignore ban-ts-comment
-  // @ts-ignore
-  return window.__ROUTE_MODULES || (window.__ROUTE_MODULES = {});
+  // deno-lint-ignore no-explicit-any
+  const global = globalThis as any;
+  return global.__ROUTE_MODULES || (global.__ROUTE_MODULES = {});
 }
