@@ -1,5 +1,5 @@
-import type { FC, PropsWithChildren, ReactElement, ReactNode } from "react";
-import { Component, createElement, useContext, useEffect, useMemo, useState } from "react";
+import type { FC, ReactElement, ReactNode } from "react";
+import { createElement, useContext, useEffect, useMemo, useState } from "react";
 import { FetchError } from "../../lib/helpers.ts";
 import type { Route, RouteMeta, RouteModule, Routes } from "../../lib/route.ts";
 import { matchRoutes } from "../../lib/route.ts";
@@ -7,6 +7,7 @@ import { URLPatternCompat } from "../../lib/urlpattern.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import { DataContext, ForwardPropsContext, RouterContext } from "./context.ts";
+import { Err, ErrorBoundary } from "./error.ts";
 
 export type SSRContext = {
   readonly url: URL;
@@ -203,52 +204,9 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
   );
 };
 
-class ErrorBoundary extends Component<PropsWithChildren<{ Handler: FC<{ error: Error }> }>, { error: Error | null }> {
-  constructor(props: PropsWithChildren<{ Handler: FC<{ error: Error }> }>) {
-    super(props);
-    this.state = { error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return createElement(this.props.Handler, { error: this.state.error });
-    }
-
-    return this.props.children;
-  }
-}
-
-function Err({ status, statusText }: { status: number; statusText: string }) {
-  return createElement(
-    "div",
-    {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100vw",
-        height: "100vh",
-        fontSize: 16,
-      },
-    },
-    createElement("strong", { style: { fontWeight: "500" } }, status),
-    createElement("small", { style: { color: "#999", padding: "0 6px" } }, "-"),
-    statusText,
-  );
-}
-
 export const useRouter = (): { url: URL; params: Record<string, string>; redirect: typeof redirect } => {
   const { url, params } = useContext(RouterContext);
   return { url, params, redirect };
-};
-
-export const useForwardProps = <T = Record<string, unknown>>(): T => {
-  const { props } = useContext(ForwardPropsContext);
-  return props as T;
 };
 
 export const forwardProps = (children?: ReactNode, props: Record<string, unknown> = {}) => {
@@ -259,6 +217,11 @@ export const forwardProps = (children?: ReactNode, props: Record<string, unknown
     return children;
   }
   return createElement(ForwardPropsContext.Provider, { value: { props } }, children);
+};
+
+export const useForwardProps = <T = Record<string, unknown>>(): T => {
+  const { props } = useContext(ForwardPropsContext);
+  return props as T;
 };
 
 function loadRoutesFromTag(): Routes {
@@ -284,18 +247,18 @@ function loadRoutesFromTag(): Routes {
         });
         return { routes, _app, _404, _error };
       }
-    } catch (_e) {
-      console.error("loadRoutesFromTag: invalid JSON");
+    } catch (e) {
+      throw new Error(`loadRoutesFromTag: ${e.message}`);
     }
   }
   return { routes: [] };
 }
 
 function loadSSRModulesFromTag(): RouteModule[] {
-  const ROUTE_MODULES = getRouteModules();
   const el = window.document?.getElementById("ssr-modules");
   if (el) {
     try {
+      const ROUTE_MODULES = getRouteModules();
       const data = JSON.parse(el.innerText);
       if (Array.isArray(data)) {
         let suspenseData: Record<string, unknown> | null | undefined = undefined;
@@ -321,8 +284,8 @@ function loadSSRModulesFromTag(): RouteModule[] {
           };
         });
       }
-    } catch (_e) {
-      console.error("loadSSRModulesFromTag: invalid JSON");
+    } catch (e) {
+      throw new Error(`loadSSRModulesFromTag: ${e.message}`);
     }
   }
   return [];
