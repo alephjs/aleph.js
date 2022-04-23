@@ -150,8 +150,8 @@ export default {
           m.sourcesContent = [rawCode];
           resBody = code +
             `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}\n`;
-        } catch {
-          log.warn(`[dev] Failed to add source map for '${specifier}'`);
+        } catch (e) {
+          log.debug(`[dev] Failed to add source map for '${specifier}'`, e);
           resBody = code;
         }
       } else {
