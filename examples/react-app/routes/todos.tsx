@@ -72,13 +72,13 @@ export default function Todos() {
         ))}
       </ul>
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           const form = e.currentTarget;
           const fd = new FormData(form);
           const message = fd.get("message")?.toString().trim();
           if (message) {
-            mutation.put({ message }, {
+            await mutation.put({ message }, {
               // optimistic update without waiting for the server response
               optimisticUpdate: (data) => {
                 return {
@@ -89,6 +89,9 @@ export default function Todos() {
               replace: true,
             });
             form.reset();
+            setTimeout(() => {
+              form.querySelector("input")?.focus();
+            }, 0);
           }
         }}
       >
