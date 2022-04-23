@@ -99,11 +99,11 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
       }
     });
 
-    const ROUTE_MODULES = getRouteModules();
+    const routeModules = getRouteModules();
     const routes = loadRoutesFromTag();
     const importModule = async ({ filename }: RouteMeta) => {
       const { default: defaultExport, data: withData } = await import(filename.slice(1)); // todo: add version
-      ROUTE_MODULES[filename] = { defaultExport, withData };
+      routeModules[filename] = { defaultExport, withData };
       return { defaultExport, withData };
     };
     const isSuspense = document.body.getAttribute("data-suspense") ?? suspense;
@@ -141,7 +141,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
       const matches = matchRoutes(pageUrl, routes);
       matches.map(([_, meta]) => {
         const { filename } = meta;
-        if (!(filename in ROUTE_MODULES)) {
+        if (!(filename in routeModules)) {
           const link = document.createElement("link");
           link.setAttribute("rel", "modulepreload");
           link.setAttribute("href", meta.filename.slice(1));
@@ -160,13 +160,13 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
           filename,
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;
-        if (filename in ROUTE_MODULES) {
-          rmod.defaultExport = ROUTE_MODULES[filename].defaultExport;
+        if (filename in routeModules) {
+          rmod.defaultExport = routeModules[filename].defaultExport;
         } else {
           const { defaultExport } = await importModule(meta);
           rmod.defaultExport = defaultExport;
         }
-        if (!dataCache.has(dataUrl) && ROUTE_MODULES[filename]?.withData === true) {
+        if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
           await prefetchData(dataUrl);
         }
         return rmod;
@@ -258,10 +258,10 @@ function loadSSRModulesFromTag(): RouteModule[] {
   const el = window.document?.getElementById("ssr-modules");
   if (el) {
     try {
-      const ROUTE_MODULES = getRouteModules();
       const data = JSON.parse(el.innerText);
       if (Array.isArray(data)) {
         let suspenseData: Record<string, unknown> | null | undefined = undefined;
+        const routeModules = getRouteModules();
         return data.map(({ url, filename, suspense, ...rest }) => {
           if (suspense) {
             if (suspenseData === undefined) {
@@ -279,7 +279,7 @@ function loadSSRModulesFromTag(): RouteModule[] {
           return {
             url: new URL(url, location.href),
             filename,
-            defaultExport: ROUTE_MODULES[filename].defaultExport,
+            defaultExport: routeModules[filename].defaultExport,
             ...rest,
           };
         });

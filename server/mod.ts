@@ -260,16 +260,11 @@ export const serve = (options: ServerOptions = {}) => {
     if (indexHtml === undefined) {
       try {
         indexHtml = await Deno.readTextFile("./index.html");
-        // since `lol-html` can't handle `<ssr-body />` correctly then replace it to `<ssr-body></ssr-body>`
-        indexHtml = indexHtml.replace(
-          /<ssr-(head|body)[ \/]*> *(<\/ssr-(head|body)>)?/g,
-          "<ssr-$1></ssr-$1>",
-        );
       } catch (err) {
         if (err instanceof Deno.errors.NotFound) {
           indexHtml = null;
         } else {
-          log.error("read index.html:", err.message);
+          log.error("read index.html:", err);
           return new Response("Internal Server Error", { status: 500 });
         }
       }
