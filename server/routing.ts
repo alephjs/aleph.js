@@ -1,4 +1,4 @@
-import { extname, globToRegExp } from "https://deno.land/std@0.136.0/path/mod.ts";
+import { extname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { parseExportNames } from "../compiler/mod.ts";
 import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
@@ -52,9 +52,9 @@ type RouteRegExp = {
 };
 
 /** initialize routes from routes config */
-export async function initRoutes(config: string | RoutesConfig | RouteRegExp): Promise<Routes> {
+export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cwd = Deno.cwd()): Promise<Routes> {
   const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
-  const files = await getFiles(reg.prefix);
+  const files = await getFiles(join(cwd, reg.prefix));
   const routes: Route[] = [];
   let _app: Route | undefined = undefined;
   let _404: Route | undefined = undefined;

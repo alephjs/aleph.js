@@ -1,15 +1,15 @@
 import util from "./util.ts";
 
-// MIME Types for Web
+// MIME types for web
 const mimeTypes: Record<string, string[]> = {
   // application
   "application/javascript": ["js", "mjs"],
-  "application/typescript": ["ts", "mts", "cts"],
+  "application/typescript": ["ts", "mts"],
   "application/wasm": ["wasm"],
   "application/json": ["json", "jsonc", "map"],
   "application/json5": ["json5"],
   "application/pdf": ["pdf"],
-  "application/xml": ["xml", "xsl"],
+  "application/xml": ["xml"],
   "application/zip": ["zip"],
   // text
   "text/html": ["html", "htm"],
@@ -26,7 +26,7 @@ const mimeTypes: Record<string, string[]> = {
   "text/stylus": ["stylus", "styl"],
   "text/csv": ["csv"],
   "text/yaml": ["yaml"],
-  "text/plain": ["txt", "text", "conf", "ini", "log", "glsl"],
+  "text/plain": ["txt", "glsl"],
   // font
   "font/ttf": ["ttf"],
   "font/otf": ["otf"],
@@ -58,7 +58,6 @@ const mimeTypes: Record<string, string[]> = {
   "x-shader/x-vertex": ["vert"],
 };
 
-// map types
 const typesMap = Object.entries(mimeTypes).reduce((map, [contentType, exts]) => {
   exts.forEach((ext) => map.set(ext, contentType));
   return map;
