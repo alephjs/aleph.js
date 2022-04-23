@@ -9,7 +9,7 @@ import { VERSION } from "../version.ts";
 import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
 import type { HTMLRewriterHandlers, SSR } from "./renderer.ts";
 import renderer from "./renderer.ts";
-import { content, json } from "./response.ts";
+import { content, type CookieOptions, json, setCookieHeader } from "./response.ts";
 import { importRouteModule, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware, MiddlewareCallback } from "./types.ts";
@@ -132,14 +132,42 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
+    let cookies: Map<string, string> | null = null;
+
     const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
     const ctx = {
       params: {},
       headers: new Headers(),
-      HTMLRewriter: {
+      cookies: {
+        get: (name: string) => {
+          if (cookies === null) {
+            cookies = new Map<string, string>();
+            const cookieHeader = req.headers.get("Cookie");
+            if (cookieHeader) {
+              for (const cookie of cookieHeader.split(";")) {
+                const [key, value] = util.splitBy(cookie, "=");
+                cookies.set(key.trim(), value);
+              }
+            }
+          }
+          return cookies.get(name);
+        },
+        set: (name: string, value: string, options?: CookieOptions) => {
+          ctx.headers.set("Set-Cookie", setCookieHeader(name, value, options));
+        },
+        delete: (name: string, options?: CookieOptions) => {
+          ctx.headers.set("Set-Cookie", setCookieHeader(name, "", { ...options, expires: new Date(0) }));
+        },
+      },
+      htmlRewriter: {
         on: (selector: string, handlers: HTMLRewriterHandlers) => {
           customHTMLRewriter.set(selector, handlers);
         },
+      },
+      redirect(url: string | URL, code?: number) {
+        const headers = new Headers(ctx.headers);
+        headers.set("Location", url.toString());
+        return new Response(null, { status: code || 302, headers });
       },
       json: (data: unknown, init?: ResponseInit): Response => {
         let hasCustomHeaders = false;
@@ -315,4 +343,4 @@ export const serve = (options: ServerOptions = {}) => {
   }
 };
 
-export { content, json };
+export { content, json, setCookieHeader };

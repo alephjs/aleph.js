@@ -51,3 +51,41 @@ export function content(
 
   return new Response(body, { ...init, headers });
 }
+
+export type CookieOptions = {
+  expires?: number | Date;
+  maxAge?: number;
+  domain?: string;
+  path?: string;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "lax" | "strict" | "none";
+};
+
+export function setCookieHeader(name: string, value: string, options?: CookieOptions): string {
+  const cookie = [`${name}=${value}`];
+  if (options) {
+    if (options.expires) {
+      cookie.push(`Expires=${new Date(options.expires).toUTCString()}`);
+    }
+    if (options.maxAge) {
+      cookie.push(`Max-Age=${options.maxAge}`);
+    }
+    if (options.domain) {
+      cookie.push(`Domain=${options.domain}`);
+    }
+    if (options.path) {
+      cookie.push(`Path=${options.path}`);
+    }
+    if (options.httpOnly) {
+      cookie.push("HttpOnly");
+    }
+    if (options.secure) {
+      cookie.push("Secure");
+    }
+    if (options.sameSite) {
+      cookie.push(`SameSite=${options.sameSite}`);
+    }
+  }
+  return cookie.join("; ");
+}
