@@ -1,9 +1,10 @@
+import util from "./util.ts";
+
 // MIME Types for Web
 const mimeTypes: Record<string, string[]> = {
   // application
   "application/javascript": ["js", "mjs"],
   "application/typescript": ["ts", "mts", "cts"],
-  "application/node": ["cjs"],
   "application/wasm": ["wasm"],
   "application/json": ["json", "jsonc", "map"],
   "application/json5": ["json5"],
@@ -63,12 +64,17 @@ const typesMap = Object.entries(mimeTypes).reduce((map, [contentType, exts]) => 
   return map;
 }, new Map<string, string>());
 
-/** get content type by file name */
+/** register a new mime type */
+export function registerMimeType(ext: string, contentType: string) {
+  typesMap.set(util.trimPrefix(ext, "."), contentType);
+}
+
+/** get the content type by file name */
 export function getContentType(filename: string, charset?: string): string {
-  const ext = filename.split(".").pop()!.toLowerCase();
-  let ctype = typesMap.get(ext);
-  if (charset) {
-    ctype = `${ctype}; charset=${charset}`;
+  const [_, ext] = util.splitBy(filename, ".", true);
+  const ctype = typesMap.get(ext);
+  if (ctype && charset) {
+    return `${ctype}; charset=${charset}`;
   }
   return ctype ?? "application/octet-stream";
 }

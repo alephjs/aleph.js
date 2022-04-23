@@ -93,31 +93,34 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // serve static files
-    try {
-      let filePath = `.${pathname}`;
-      let stat = await Deno.lstat(filePath);
-      if (stat.isDirectory && pathname !== "/") {
-        filePath = `${util.trimSuffix(filePath, "/")}/index.html`;
-        stat = await Deno.lstat(filePath);
-      }
-      if (stat.isFile) {
-        const { mtime } = stat;
-        const etag = mtime ? mtime.getTime().toString(16) + "-" + stat.size.toString(16) : null;
-        if (etag && req.headers.get("If-None-Match") === etag) {
-          return new Response(null, { status: 304 });
+    const contentType = getContentType(pathname);
+    if (!pathname.startsWith("/.") && contentType !== "application/octet-stream") {
+      try {
+        let filePath = `.${pathname}`;
+        let stat = await Deno.lstat(filePath);
+        if (stat.isDirectory && pathname !== "/") {
+          filePath = `${util.trimSuffix(filePath, "/")}/index.html`;
+          stat = await Deno.lstat(filePath);
         }
-        const file = await Deno.open(filePath, { read: true });
-        const headers = new Headers({ "Content-Type": getContentType(pathname) });
-        if (mtime) {
-          headers.set("Etag", etag!);
-          headers.set("Last-Modified", mtime.toUTCString());
+        if (stat.isFile) {
+          const { mtime } = stat;
+          const etag = mtime ? mtime.getTime().toString(16) + "-" + stat.size.toString(16) : null;
+          if (etag && req.headers.get("If-None-Match") === etag) {
+            return new Response(null, { status: 304 });
+          }
+          const file = await Deno.open(filePath, { read: true });
+          const headers = new Headers({ "Content-Type": contentType });
+          if (mtime) {
+            headers.set("Etag", etag!);
+            headers.set("Last-Modified", mtime.toUTCString());
+          }
+          return new Response(readableStreamFromReader(file), { headers });
         }
-        return new Response(readableStreamFromReader(file), { headers });
-      }
-    } catch (err) {
-      if (!(err instanceof Deno.errors.NotFound)) {
-        log.error(err);
-        return new Response("Internal Server Error", { status: 500 });
+      } catch (err) {
+        if (!(err instanceof Deno.errors.NotFound)) {
+          log.error(err);
+          return new Response("Internal Server Error", { status: 500 });
+        }
       }
     }
 
