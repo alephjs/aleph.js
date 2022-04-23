@@ -1,10 +1,13 @@
 import { Router } from "aleph/react";
 import { serve } from "aleph/server";
-import { renderToString } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server";
 
 serve({
   config: {
-    routes: "./routes/**/*.tsx",
+    routes: "./routes/**/*.{tsx,ts}",
   },
-  ssr: (ctx) => renderToString(<Router ssrContext={ctx} />),
+  ssr: {
+    suspense: true,
+    render: (ctx) => renderToReadableStream(<Router ssrContext={ctx} />, ctx),
+  },
 });
