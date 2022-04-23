@@ -12,7 +12,7 @@ export type UpdateStrategy<T> = "none" | "replace" | {
 
 export const useData = <T = unknown>(): {
   data: T;
-  isMutating?: HttpMethod;
+  isMutating: HttpMethod | boolean;
   mutation: typeof mutation;
   reload: (signal?: AbortSignal) => Promise<void>;
 } => {
@@ -34,11 +34,13 @@ export const useData = <T = unknown>(): {
     }
     throw new Error(`Data for ${dataUrl} is not found`);
   });
-  const [isMutating, setIsMutating] = useState<HttpMethod>();
+  const [isMutating, setIsMutating] = useState<HttpMethod | boolean>(false);
   const action = useCallback(async (method: HttpMethod, fetcher: Promise<Response>, update: UpdateStrategy<T>) => {
     const updateIsObject = update && typeof update === "object" && update !== null;
     const optimistic = updateIsObject && typeof update.optimisticUpdate === "function";
     const replace = update === "replace" || (updateIsObject && !!update.replace);
+
+    setIsMutating(method);
 
     let rollbackData: T | undefined = undefined;
     if (optimistic) {
@@ -50,20 +52,19 @@ export const useData = <T = unknown>(): {
         }
         return prev;
       });
-    } else {
-      setIsMutating(method);
     }
 
     const res = await fetcher;
     if (res.status >= 400) {
-      if (optimistic && rollbackData !== undefined) {
-        setData(rollbackData);
+      if (optimistic) {
+        if (rollbackData !== undefined) {
+          setData(rollbackData);
+        }
         if (update.onFailure) {
           update.onFailure(await FetchError.fromResponse(res));
         }
-      } else {
-        setIsMutating(undefined);
       }
+      setIsMutating(false);
       return res;
     }
 
@@ -71,14 +72,12 @@ export const useData = <T = unknown>(): {
       const redirectUrl = res.headers.get("Location");
       if (redirectUrl) {
         location.href = new URL(redirectUrl, location.href).href;
-      } else {
-        if (optimistic && rollbackData !== undefined) {
-          setData(rollbackData);
-        } else {
-          setIsMutating(undefined);
-        }
-        return res;
       }
+      if (optimistic && rollbackData !== undefined) {
+        setData(rollbackData);
+      }
+      setIsMutating(false);
+      return res;
     }
 
     if (replace && res.ok) {
@@ -88,19 +87,18 @@ export const useData = <T = unknown>(): {
         dataCache.set(dataUrl, { data, dataCacheTtl, dataExpires: Date.now() + (dataCacheTtl || 1) * 1000 });
         setData(data);
       } catch (_) {
-        if (optimistic && rollbackData !== undefined) {
-          setData(rollbackData);
+        if (optimistic) {
+          if (rollbackData !== undefined) {
+            setData(rollbackData);
+          }
           if (update.onFailure) {
             update.onFailure(new FetchError(500, {}, "Data must be valid JSON"));
           }
-        } else {
-          setIsMutating(undefined);
         }
       }
-      return res;
     }
 
-    setIsMutating(undefined);
+    setIsMutating(false);
     return res;
   }, [dataUrl]);
   const reload = useCallback(async (signal?: AbortSignal) => {
