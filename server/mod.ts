@@ -10,7 +10,7 @@ import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
 import type { HTMLRewriterHandlers, SSR } from "./renderer.ts";
 import renderer from "./renderer.ts";
 import { content, type CookieOptions, json, setCookieHeader } from "./response.ts";
-import { importRouteModule, initRoutes } from "./routing.ts";
+import { importRouteModule, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware, MiddlewareCallback } from "./types.ts";
 
@@ -341,4 +341,4 @@ export const serve = (options: ServerOptions = {}) => {
   }
 };
 
-export { content, json, setCookieHeader };
+export { content, json, revive, setCookieHeader };

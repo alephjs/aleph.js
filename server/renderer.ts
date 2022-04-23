@@ -388,10 +388,10 @@ async function initSSR(
           res = await res;
         }
         if (res instanceof Response) {
-          if (res.status >= 400) {
+          if (res.status >= 500) {
             throw await FetchError.fromResponse(res);
           }
-          if (res.status >= 300) {
+          if (res.status >= 300 && res.status < 400) {
             if (res.headers.has("Location")) {
               throw Response.redirect(res.headers.get("Location")!, res.status);
             }
@@ -399,7 +399,9 @@ async function initSSR(
           }
           try {
             const data = await res.json();
-            suspenseData[rmod.url.pathname + rmod.url.search] = data;
+            if (suspense) {
+              suspenseData[rmod.url.pathname + rmod.url.search] = data;
+            }
             return data;
           } catch (_e) {
             throw new FetchError(500, {}, "Data must be valid JSON");

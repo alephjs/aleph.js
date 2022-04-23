@@ -1,7 +1,7 @@
 import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.31.6";
 
 export type AlephConfig = {
-  /* The basePath of the app. */
+  /** The basePath of the app. */
   basePath?: string;
   /** The build optioins for `build` command. */
   build?: BuildOptions;
@@ -23,10 +23,9 @@ export type BuildOptions = {
 };
 
 export type RoutesConfig = {
-  dir: string;
-  exts: string[];
-  host?: boolean;
+  glob: string;
   generate?: boolean;
+  host?: boolean;
 };
 
 export type FetchHandler = {

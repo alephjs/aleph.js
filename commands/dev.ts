@@ -122,13 +122,6 @@ if (import.meta.main) {
     }
   });
 
-  let ac: AbortController | null = null;
-  const bs = async () => {
-    ac?.abort();
-    ac = new AbortController();
-    await bootstrap(ac.signal, serverEntry);
-  };
-
   const emitter = createEmitter();
   const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
     findFile(["deno.jsonc", "deno.json", "tsconfig.json"]),
@@ -136,13 +129,21 @@ if (import.meta.main) {
     findFile(builtinModuleExts.map((ext) => `server.${ext}`)),
   ]);
 
+  let ac: AbortController | null = null;
+  const bs = async () => {
+    ac?.abort();
+    ac = new AbortController();
+    await bootstrap(ac.signal, serverEntry);
+  };
+
   // update routes when fs change
-  const updateRoutes = ({ specifier }: { specifier: string }) => {
+  const updateRoutes = async ({ specifier }: { specifier: string }) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    if (config && config.routes) {
-      const reg = toRouteRegExp(config.routes);
-      if (reg.test(specifier)) {
-        initRoutes(reg);
+    const rc = config?.routes;
+    if (rc) {
+      const reg = toRouteRegExp(rc);
+      if (!specifier || reg.test(specifier)) {
+        await initRoutes(reg);
       }
     }
   };
@@ -175,6 +176,7 @@ async function bootstrap(signal: AbortSignal, entry?: string): Promise<void> {
     await import(
       `http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/${basename(entry)}?t=${Date.now().toString(16)}`
     );
+    Deno.env.set("ALEPH_SERVER_ENTRY", basename(entry));
     log.info(`Bootstrap server from ${blue(basename(entry))}...`);
   }
   // make the default handler
