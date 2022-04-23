@@ -188,9 +188,6 @@ export default {
             if (src && !util.isLikelyHttpURL(src)) {
               el.setAttribute("src", util.cleanPath(src));
             }
-            if (src) {
-              el.setAttribute("defer", "");
-            }
             if (!scriptHandlers.hasModule && el.getAttribute("type") === "module") {
               el.after(
                 `<script nomodule src="${toLocalPath(alephPkgUri)}/framework/core/nomodule.ts"></script>`,
@@ -208,10 +205,6 @@ export default {
                 html: true,
               });
             }
-          },
-        };
-        const bodyHandlers = {
-          element(el: Element) {
             if (isDev) {
               el.append(
                 `<script type="module">import hot from "${
@@ -248,18 +241,13 @@ export default {
                     dataCacheTtl,
                   };
                 });
-                /*! replace "/" to "\/" to prevent xss */
+                // replace "/" to "\/" to prevent xss
                 const modulesJSON = JSON.stringify(ssrModules).replaceAll("/", "\\/");
                 el.append(
                   `<script id="ssr-modules" type="application/json">${modulesJSON}</script>`,
                   { html: true },
                 );
-              }
-            },
-          });
-          rewriter.on("body", {
-            element(el: Element) {
-              if (routeModules.length > 0) {
+
                 const importStmts = routeModules.map(({ filename }, idx) =>
                   `import $${idx} from ${JSON.stringify(filename.slice(1))};`
                 ).join("");
@@ -269,9 +257,7 @@ export default {
                 el.append(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
                   html: true,
                 });
-                if (suspense) {
-                  el.setAttribute("data-suspense", "true");
-                }
+
                 if (errorBoundaryHandlerFilename) {
                   el.append(
                     `<script type="module">import Handler from ${
@@ -283,70 +269,72 @@ export default {
               }
             },
           });
-          if (typeof body === "string") {
-            rewriter.on("*", {
-              comments(c: Comment) {
-                const text = c.text.trim().toLowerCase();
-                if (text === "ssr-body" || text === "ssr-output") {
-                  c.replace(body, { html: true });
-                }
-              },
-            });
-          } else if (body instanceof ReadableStream) {
-            rewriter.on("*", {
-              comments(c: Comment) {
-                const text = c.text.trim().toLowerCase();
-                if (text === "ssr-body" || text === "ssr-output") {
-                  ssrStreaming = true;
-                  c.remove();
-                }
-              },
-            });
-            const rw = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
-              controller.enqueue(chunk);
-            });
-            rw.on("script", {
-              element(el: Element) {
-                if (el.getAttribute("src") === bootstrapScript) {
-                  suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
-                  el.remove();
-                }
-              },
-            });
-            const reader = body.getReader();
-            const send = async () => {
-              try {
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) {
-                    break;
-                  }
-                  rw.write(value);
-                }
-                rw.end();
-                if (suspenseChunks.length > 0) {
-                  suspenseChunks.forEach((chunk) => controller.enqueue(chunk));
-                }
-                if (Object.keys(suspenseData).length > 0) {
-                  controller.enqueue(
-                    util.utf8TextEncoder.encode(
-                      `<script type="application/json" id="suspense-data">${JSON.stringify(suspenseData)}</script>`,
-                    ),
-                  );
-                }
-              } finally {
-                controller.close();
-                rw.free();
+          rewriter.on("body", {
+            element(el: Element) {
+              if (suspense) {
+                el.setAttribute("data-suspense", "true");
               }
-            };
-            send();
-          }
+            },
+          });
+          rewriter.on("*", {
+            comments(c: Comment) {
+              const text = c.text.trim().toLowerCase();
+              if (text === "ssr-body" || text === "ssr-output") {
+                if (typeof body === "string") {
+                  c.replace(body, { html: true });
+                } else if (body instanceof ReadableStream) {
+                  c.remove();
+                  ssrStreaming = true;
+
+                  const rw = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
+                    controller.enqueue(chunk);
+                  });
+                  rw.on("script", {
+                    element(el: Element) {
+                      if (el.getAttribute("src") === bootstrapScript) {
+                        suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
+                        el.remove();
+                      }
+                    },
+                  });
+                  const send = async () => {
+                    try {
+                      const reader = body.getReader();
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                          break;
+                        }
+                        rw.write(value);
+                      }
+                      rw.end();
+                      if (suspenseChunks.length > 0) {
+                        suspenseChunks.forEach((chunk) => controller.enqueue(chunk));
+                      }
+                      if (Object.keys(suspenseData).length > 0) {
+                        controller.enqueue(
+                          util.utf8TextEncoder.encode(
+                            `<script type="application/json" id="suspense-data">${
+                              JSON.stringify(suspenseData)
+                            }</script>`,
+                          ),
+                        );
+                      }
+                    } finally {
+                      controller.close();
+                      rw.free();
+                    }
+                  };
+                  send();
+                }
+              }
+            },
+          });
         }
 
         rewriter.on("link", linkHandlers);
         rewriter.on("script", scriptHandlers);
         rewriter.on("head", headHandlers);
-        rewriter.on("body", bodyHandlers);
 
         try {
           rewriter.write(util.utf8TextEncoder.encode(indexHtml));
