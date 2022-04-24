@@ -106,7 +106,7 @@ if (import.meta.main) {
         // emit HMR event
         if (e.all.has(`hotUpdate:${specifier}`)) {
           e.emit(`hotUpdate:${specifier}`, { specifier });
-        } else if (specifier !== "./route.gen.ts") {
+        } else if (specifier !== "./routes.gen.ts") {
           clientDependencyGraph?.lookup(specifier, (specifier) => {
             if (e.all.has(`hotUpdate:${specifier}`)) {
               e.emit(`hotUpdate:${specifier}`, { specifier });
