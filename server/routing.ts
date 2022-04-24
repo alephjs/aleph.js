@@ -12,7 +12,7 @@ const revivedModules: Map<string, Record<string, unknown>> = new Map();
 
 /** revive a route module. */
 export function revive(filename: string, module: Record<string, unknown>) {
-  if (!Deno.env.get("ALEPH_CLI")) {
+  if (Deno.env.get("ALEPH_ENV") === "production") {
     revivedModules.set(filename, module);
   }
 }

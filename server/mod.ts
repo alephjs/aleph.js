@@ -294,6 +294,7 @@ export const serve = (options: ServerOptions = {}) => {
       indexHtml,
       routes,
       customHTMLRewriter,
+      isDev,
       ssr,
     });
   };

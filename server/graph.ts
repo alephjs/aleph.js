@@ -1,7 +1,7 @@
 export type Module = {
   readonly specifier: string;
-  readonly sourceCode: string;
   readonly version: number;
+  readonly sourceCode?: string;
   readonly deps?: ReadonlyArray<DependencyDescriptor>;
   readonly inlineCSS?: string;
   readonly atomicCSS?: boolean;
@@ -108,7 +108,7 @@ export class DependencyGraph {
   #walk(specifier: string, callback: (mod: Module) => void, __tracing = new Set<string>()) {
     if (this.#modules.has(specifier)) {
       const mod = this.#modules.get(specifier)!;
-      callback({ ...mod, deps: mod.deps?.map((dep) => ({ ...dep })) });
+      callback(mod);
       __tracing.add(specifier);
       mod.deps?.forEach((dep) => {
         if (!__tracing.has(dep.specifier)) {

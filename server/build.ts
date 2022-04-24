@@ -5,7 +5,7 @@ import { parseExportNames } from "../compiler/mod.ts";
 import cache from "../lib/cache.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
 import { builtinModuleExts, toLocalPath } from "../lib/helpers.ts";
-import { parseHtmlLinks } from "../lib/html.ts";
+import { parseHtmlLinks } from "./html.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "../server/config.ts";
@@ -55,7 +55,7 @@ export async function build(serverEntry?: string) {
     `import { DependencyGraph } from "${alephPkgUri}/server/graph.ts";`,
     `import graph from "./server_dependency_graph.js";`,
     `globalThis.serverDependencyGraph = new DependencyGraph(graph.modules);`,
-    routeFiles.length > 0 && `import { register } from "${alephPkgUri}/server/routing.ts";`,
+    routeFiles.length > 0 && `import { revive } from "${alephPkgUri}/server/routing.ts";`,
     ...routeFiles.map(([filename, exportNames], idx) => {
       const hasDefaultExport = exportNames.includes("default");
       const hasDataExport = exportNames.includes("data");
@@ -64,11 +64,18 @@ export async function build(serverEntry?: string) {
       }
       const url = `http://localhost:${port}${filename.slice(1)}`;
       return [
-        hasDefaultExport && `import _${idx} from ${JSON.stringify(url)};`,
-        !hasDefaultExport && `const _${idx} = undefined;`,
-        hasDataExport && `import { data as $${idx} } from ${JSON.stringify(url)};`,
-        !hasDataExport && `const $${idx} = undefined;`,
-        `register(${JSON.stringify(filename)}, { default: _${idx}, data: $${idx} });`,
+        `import { ${
+          [
+            hasDefaultExport && `default as $${idx}`,
+            hasDataExport && `data as $$${idx}`,
+          ].filter(Boolean).join(", ")
+        } } from ${JSON.stringify(url)};`,
+        `revive(${JSON.stringify(filename)}, { ${
+          [
+            hasDefaultExport && `default: $${idx}`,
+            hasDataExport && `data: $$${idx}`,
+          ].filter(Boolean).join(", ")
+        } });`,
       ];
     }).flat().filter(Boolean),
     serverEntry && `import "http://localhost:${port}/${basename(serverEntry)}";`,
@@ -189,9 +196,11 @@ export async function build(serverEntry?: string) {
   // create server_dependency_graph.js
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
   if (serverDependencyGraph) {
+    // deno-lint-ignore no-unused-vars
+    const modules = serverDependencyGraph.modules.map(({ sourceCode, ...ret }) => ret);
     await Deno.writeTextFile(
       join(outputDir, "server_dependency_graph.js"),
-      "export default " + JSON.stringify({ modules: serverDependencyGraph.modules }),
+      "export default " + JSON.stringify({ modules }),
     );
   }
 

@@ -4,7 +4,7 @@ import util from "../lib/util.ts";
 import type { RouteModule, Routes } from "../lib/route.ts";
 import { matchRoutes } from "../lib/route.ts";
 import { getUnoGenerator } from "./config.ts";
-import type { DependencyGraph } from "./graph.ts";
+import type { DependencyGraph, Module } from "./graph.ts";
 import type { Comment, Element } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
@@ -36,6 +36,7 @@ export type RenderOptions = {
   indexHtml: Uint8Array;
   routes: Routes;
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
+  isDev: boolean;
   ssr?: SSR;
 };
 
@@ -51,7 +52,7 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* hy
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routes, customHTMLRewriter, ssr } = options;
+    const { indexHtml, routes, customHTMLRewriter, isDev, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (ssr) {
@@ -72,27 +73,27 @@ export default {
         const body = await render(ssrContext);
         const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
         if (serverDependencyGraph) {
-          const atomicCSSSource: string[] = [];
+          const atomicCSSSource: Promise<string>[] = [];
+          const lookupModuleStyle = (mod: Module) => {
+            const { specifier, sourceCode, atomicCSS, inlineCSS } = mod;
+            if (atomicCSS) {
+              atomicCSSSource.push(
+                sourceCode ? Promise.resolve(sourceCode) : Deno.readTextFile(specifier).then((text) => {
+                  Object.assign(mod, { sourceCode: text });
+                  return text;
+                }),
+              );
+            }
+            if (inlineCSS) {
+              headCollection.push(`<style data-module-id="${specifier}">${inlineCSS}</style>`);
+            }
+          };
           for (const { filename } of routeModules) {
-            serverDependencyGraph.walk(filename, (mod) => {
-              if (mod.atomicCSS) {
-                atomicCSSSource.push(mod.sourceCode);
-              }
-              if (mod.inlineCSS) {
-                headCollection.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
-              }
-            });
+            serverDependencyGraph.walk(filename, lookupModuleStyle);
           }
           for (const serverEntry of builtinModuleExts.map((ext) => `./server.${ext}`)) {
             if (serverDependencyGraph.get(serverEntry)) {
-              serverDependencyGraph.walk(serverEntry, (mod) => {
-                if (mod.atomicCSS) {
-                  atomicCSSSource.push(mod.sourceCode);
-                }
-                if (mod.inlineCSS) {
-                  headCollection.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
-                }
-              });
+              serverDependencyGraph.walk(serverEntry, lookupModuleStyle);
               break;
             }
           }
@@ -101,7 +102,10 @@ export default {
             const unoGenerator = getUnoGenerator();
             if (unoGenerator) {
               const start = performance.now();
-              const { css } = await unoGenerator.generate(atomicCSSSource.join("\n"));
+              const input = (await Promise.all(atomicCSSSource)).join("\n");
+              const { css } = await unoGenerator.generate(input, {
+                minify: !isDev,
+              });
               if (css) {
                 headCollection.push(
                   `<style data-unocss="${unoGenerator.version}" data-build-time="${
