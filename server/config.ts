@@ -160,29 +160,31 @@ export async function loadImportMap(): Promise<ImportMap> {
 
 export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoader[]> {
   const loaders: ModuleLoader[] = [];
-  for (const key in importMap.imports) {
-    if (/^\*\.[a-z0-9]+$/i.test(key)) {
-      let src = importMap.imports[key];
-      if (src.endsWith("!loader")) {
-        src = util.trimSuffix(src, "!loader");
-        if (src.startsWith("./") || src.startsWith("../")) {
-          src = "file://" + join(dirname(importMap.__filename), src);
-        }
-        let { default: loader } = await import(src);
-        if (typeof loader === "function") {
-          loader = new loader();
-        }
-        if (
-          typeof loader === "object" && loader !== null &&
-          typeof loader.test === "function" && typeof loader.load === "function"
-        ) {
-          const reg = globToRegExp("/**/" + key);
-          loaders.push({
-            test: (pathname: string) => {
-              return reg.test(pathname) && loader.test(pathname);
-            },
-            load: (pathname: string, env: Record<string, unknown>) => loader.load(pathname, env),
-          });
+  if (Deno.env.get("ALEPH_CLI")) {
+    for (const key in importMap.imports) {
+      if (/^\*\.[a-z0-9]+$/i.test(key)) {
+        let src = importMap.imports[key];
+        if (src.endsWith("!loader")) {
+          src = util.trimSuffix(src, "!loader");
+          if (src.startsWith("./") || src.startsWith("../")) {
+            src = "file://" + join(dirname(importMap.__filename), src);
+          }
+          let { default: loader } = await import(src);
+          if (typeof loader === "function") {
+            loader = new loader();
+          }
+          if (
+            typeof loader === "object" && loader !== null &&
+            typeof loader.test === "function" && typeof loader.load === "function"
+          ) {
+            const reg = globToRegExp("/**/" + key);
+            loaders.push({
+              test: (pathname: string) => {
+                return reg.test(pathname) && loader.test(pathname);
+              },
+              load: (pathname: string, env: Record<string, unknown>) => loader.load(pathname, env),
+            });
+          }
         }
       }
     }

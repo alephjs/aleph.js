@@ -86,7 +86,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return new Response("Internal Server Error", { status: 500 });
+          return new Response(err.message, { status: 500 });
         }
       }
     }
