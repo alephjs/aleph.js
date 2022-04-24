@@ -120,14 +120,12 @@ type ProxyModulesOptions = {
 };
 
 /** serve app modules to support module loader that allows you import Non-JavaScript modules like `.css/.vue/.svelet/...` */
-export async function proxyModules(port: number, options: ProxyModulesOptions) {
-  if (!Reflect.has(globalThis, "serverDependencyGraph")) {
-    Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
-  }
-  Deno.env.set("ALEPH_MODULES_PROXY_PORT", port.toString());
-  log.info(`Proxy modules on http://localhost:${port}`);
-  try {
-    await serveDir({
+export function proxyModules(port: number, options: ProxyModulesOptions) {
+  return new Promise<void>((resolve, reject) => {
+    if (!Reflect.has(globalThis, "serverDependencyGraph")) {
+      Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+    }
+    serveDir({
       port,
       signal: options.signal,
       loader: buildLoader(options.moduleLoaders, {
@@ -135,12 +133,17 @@ export async function proxyModules(port: number, options: ProxyModulesOptions) {
         isDev: Deno.env.get("ALEPH_ENV") === "development",
         ssr: true,
       }),
+      onListenSuccess: (port) => {
+        Deno.env.set("ALEPH_MODULES_PROXY_PORT", port.toString());
+        log.info(`Proxy modules on http://localhost:${port}`);
+        resolve();
+      },
+    }).catch((err) => {
+      if (err instanceof Deno.errors.AddrInUse) {
+        proxyModules(port + 1, options).then(resolve).catch(reject);
+      } else {
+        reject(err);
+      }
     });
-  } catch (error) {
-    if (error instanceof Deno.errors.AddrInUse) {
-      proxyModules(port + 1, options);
-    } else {
-      throw error;
-    }
-  }
+  });
 }

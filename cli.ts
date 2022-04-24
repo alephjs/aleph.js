@@ -91,8 +91,13 @@ async function main() {
     runOptions.importMapFile = resolve("./import_map.json");
     Deno.env.set("ALEPH_DEV_ROOT", Deno.cwd());
     Deno.env.set("ALEPH_DEV_PORT", "2020");
-    serveDir({ cwd: Deno.cwd(), port: 2020 });
-    console.debug(dim("DEBUG"), `Proxy https://deno.land/x/aleph on http://localhost:2020`);
+    serveDir({
+      port: 2020,
+      workingDir: Deno.cwd(),
+      onListenSuccess: (port) => {
+        console.debug(dim("DEBUG"), `Proxy https://deno.land/x/aleph on http://localhost:${port}`);
+      },
+    });
   } else {
     runOptions.denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"]);
     runOptions.importMapFile = await findFile(

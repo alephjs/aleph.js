@@ -1,24 +1,64 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import { basename, join } from "https://deno.land/std@0.136.0/path/mod.ts";
-import { serve } from "https://deno.land/std@0.136.0/http/server.ts";
+import { Server, type ServerInit } from "https://deno.land/std@0.136.0/http/server.ts";
 import { getContentType } from "./mime.ts";
 
-export type ServeDirOptions = {
-  port: number;
-  cwd?: string;
+export type ServeInit = ServerInit & {
+  certFile?: string;
+  keyFile?: string;
   signal?: AbortSignal;
+  onListenSuccess?: (port: number) => void;
+};
+
+export async function serve(options: ServeInit) {
+  const server = new Server(options);
+
+  let port: number;
+  let listener: Deno.Listener;
+
+  if (options.certFile && options.keyFile) {
+    port = options.port ?? 443;
+    listener = Deno.listenTls({
+      port,
+      hostname: options.hostname ?? "0.0.0.0",
+      certFile: options.certFile,
+      keyFile: options.keyFile,
+      transport: "tcp",
+      // ALPN protocol support not yet stable.
+      // alpnProtocols: ["h2", "http/1.1"],
+    });
+  } else {
+    port = options.port ?? 80;
+    listener = Deno.listen({
+      port,
+      hostname: options.hostname ?? "0.0.0.0",
+      transport: "tcp",
+    });
+  }
+
+  options?.signal?.addEventListener("abort", () => server.close(), {
+    once: true,
+  });
+
+  options.onListenSuccess?.(port);
+
+  await server.serve(listener);
+}
+
+export type ServeDirOptions = Omit<ServeInit, "handler"> & {
+  workingDir?: string;
   loader?: (req: Request) => Promise<{ content: string | Uint8Array; contentType?: string } | null | undefined>;
 };
 
 export async function serveDir(options: ServeDirOptions) {
-  const cwd = options.cwd || Deno.cwd();
+  const workingDir = options.workingDir || Deno.cwd();
   const handler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
-    const filepath = join(cwd, url.pathname);
+    const filepath = join(workingDir, url.pathname);
     try {
       const stat = await Deno.lstat(filepath);
       if (stat.isDirectory) {
-        const title = basename(cwd) + url.pathname;
+        const title = basename(workingDir) + url.pathname;
         const items: string[] = [];
         for await (const item of Deno.readDir(filepath)) {
           if (!item.name.startsWith(".")) {
@@ -67,5 +107,6 @@ export async function serveDir(options: ServeDirOptions) {
       return new Response(err.message, { status: 500 });
     }
   };
-  await serve(handler, { port: options.port, signal: options.signal });
+
+  await serve({ ...options, handler });
 }

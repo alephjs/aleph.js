@@ -20,7 +20,7 @@ if (import.meta.main) {
   // serve app modules
   const importMap = await loadImportMap();
   const moduleLoaders = await initModuleLoaders(importMap);
-  proxyModules(6060, { importMap, moduleLoaders });
+  await proxyModules(6060, { importMap, moduleLoaders });
 
   let serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {

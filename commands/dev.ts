@@ -1,10 +1,10 @@
 import { basename, relative } from "https://deno.land/std@0.136.0/path/mod.ts";
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { findFile, watchFs } from "../lib/fs.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
+import { serve as httpServe } from "../lib/serve.ts";
 import { initModuleLoaders, loadImportMap } from "../server/config.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
@@ -86,7 +86,7 @@ if (import.meta.main) {
   const cwd = Deno.cwd();
   const importMap = await loadImportMap();
   const moduleLoaders = await initModuleLoaders(importMap);
-  proxyModules(6060, { importMap, moduleLoaders });
+  await proxyModules(6060, { importMap, moduleLoaders });
 
   log.info(`Watching files for changes...`);
   watchFs(cwd, (kind, path) => {
@@ -113,6 +113,12 @@ if (import.meta.main) {
               return false;
             }
           });
+          serverDependencyGraph?.lookup(specifier, (specifier) => {
+            if (e.all.has(`hotUpdate:${specifier}`)) {
+              e.emit(`hotUpdate:${specifier}`, { specifier });
+              return false;
+            }
+          });
         }
       });
     } else {
@@ -131,7 +137,10 @@ if (import.meta.main) {
 
   let ac: AbortController | null = null;
   const bs = async () => {
-    ac?.abort();
+    if (ac) {
+      ac.abort();
+      log.info(`Restart server...`);
+    }
     ac = new AbortController();
     await bootstrap(ac.signal, serverEntry);
   };
@@ -166,18 +175,21 @@ if (import.meta.main) {
   await bs();
 }
 
-async function bootstrap(signal: AbortSignal, entry?: string): Promise<void> {
+async function bootstrap(signal: AbortSignal, entry: string | undefined, forcePort?: number): Promise<void> {
   // delete previous server handler
   if (Reflect.has(globalThis, "__ALEPH_SERVER")) {
     Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
   }
 
   if (entry) {
+    const entryName = basename(entry);
     await import(
-      `http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/${basename(entry)}?t=${Date.now().toString(16)}`
+      `http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/${entryName}?t=${Date.now().toString(16)}`
     );
-    Deno.env.set("ALEPH_SERVER_ENTRY", basename(entry));
-    log.info(`Bootstrap server from ${blue(basename(entry))}...`);
+    if (Deno.env.get("ALEPH_SERVER_ENTRY") !== entryName) {
+      Deno.env.set("ALEPH_SERVER_ENTRY", entryName);
+      log.info(`Bootstrap server from ${blue(entryName)}...`);
+    }
   }
   // make the default handler
   if (!Reflect.has(globalThis, "__ALEPH_SERVER")) {
@@ -185,27 +197,39 @@ async function bootstrap(signal: AbortSignal, entry?: string): Promise<void> {
   }
 
   const {
-    port = 8080,
+    port: userPort,
     hostname,
     certFile,
     keyFile,
     handler,
   } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
-  const finalHandler = (req: Request) => {
-    const { pathname } = new URL(req.url);
+  const port = forcePort || userPort || 8080;
 
-    // handle HMR sockets
-    if (pathname === "/-/hmr") {
-      return handleHMRSocket(req);
+  try {
+    await httpServe({
+      port,
+      hostname,
+      certFile,
+      keyFile,
+      signal,
+      onListenSuccess: (port) => log.info(`Server ready on http://localhost:${port}`),
+      handler: (req: Request) => {
+        const { pathname } = new URL(req.url);
+
+        // handle HMR sockets
+        if (pathname === "/-/hmr") {
+          return handleHMRSocket(req);
+        }
+
+        return handler?.(req);
+      },
+    });
+  } catch (error) {
+    if (error instanceof Deno.errors.AddrInUse) {
+      log.warn(`Port ${port} is in use, try ${port + 1}...`);
+      await bootstrap(signal, entry, port + 1);
+    } else {
+      throw error;
     }
-
-    return handler?.(req);
-  };
-
-  log.info(`Server ready on http://localhost:${port}`);
-  if (certFile && keyFile) {
-    await serveTls(finalHandler, { port, hostname, certFile, keyFile, signal });
-  } else {
-    await stdServe(finalHandler, { port, hostname, signal });
   }
 }

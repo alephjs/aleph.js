@@ -23,7 +23,7 @@ if (import.meta.main) {
   const ac = new AbortController();
   const importMap = await loadImportMap();
   const moduleLoaders = await initModuleLoaders(importMap);
-  proxyModules(6060, { importMap, moduleLoaders, signal: ac.signal });
+  await proxyModules(6060, { importMap, moduleLoaders, signal: ac.signal });
 
   let serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`));
   if (serverEntry) {
