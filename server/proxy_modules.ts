@@ -1,4 +1,3 @@
-import { createGenerator } from "https://esm.sh/@unocss/core@0.31.6";
 import MagicString from "https://esm.sh/magic-string@0.26.1";
 import { parseDeps } from "../compiler/mod.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
@@ -8,7 +7,7 @@ import { serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { AlephConfig, ImportMap, ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "./types.ts";
+import type { ImportMap, ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "./types.ts";
 
 const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
   const specifier = "." + pathname;
@@ -39,32 +38,16 @@ const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
 };
 
 const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent, env: ModuleLoaderEnv) => {
-  const { code: rawCode, pathname, lang } = input;
-  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+  const { code: sourceCode, pathname, lang, inlineCSS } = input;
   const specifier = "." + pathname;
-  const isJSX = lang === "tsx" || lang === "jsx" || pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
+  const atomicCSS = input.atomicCSS || pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
   const contentType = lang ? getContentType(`file.${lang}`) : undefined;
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
   if (serverDependencyGraph) {
-    let inlineCSS = input.inlineCSS;
-    if (Boolean(config?.atomicCSS?.presets?.length) && isJSX) {
-      const uno = createGenerator(config?.atomicCSS);
-      const { css } = await uno.generate(rawCode, {
-        id: specifier,
-        minify: !env.isDev,
-      });
-      if (css) {
-        if (inlineCSS) {
-          inlineCSS = `${inlineCSS}\n${css}`;
-        } else {
-          inlineCSS = css;
-        }
-      }
-    }
-    const deps = await parseDeps(specifier, rawCode, { importMap: JSON.stringify(env.importMap) });
-    serverDependencyGraph.mark(specifier, { deps, inlineCSS });
+    const deps = await parseDeps(specifier, sourceCode, { importMap: JSON.stringify(env.importMap) });
+    serverDependencyGraph.mark(specifier, { sourceCode, deps, inlineCSS, atomicCSS });
     if (deps.length) {
-      const s = new MagicString(rawCode);
+      const s = new MagicString(sourceCode);
       deps.forEach((dep) => {
         const { specifier, importUrl, loc } = dep;
         if (loc) {
@@ -83,12 +66,12 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
       return { content: s.toString(), contentType };
     }
     return {
-      content: rawCode,
+      content: sourceCode,
       contentType,
     };
   }
   return {
-    content: rawCode,
+    content: sourceCode,
     contentType,
   };
 };

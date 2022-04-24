@@ -12,13 +12,15 @@ const revivedModules: Map<string, Record<string, unknown>> = new Map();
 
 /** revive a route module. */
 export function revive(filename: string, module: Record<string, unknown>) {
-  revivedModules.set(filename, module);
+  if (!Deno.env.get("ALEPH_CLI")) {
+    revivedModules.set(filename, module);
+  }
 }
 
 /** import the route module. */
 export async function importRouteModule(filename: string) {
   let mod: Record<string, unknown>;
-  if (!Deno.env.get("ALEPH_CLI") && revivedModules.has(filename)) {
+  if (revivedModules.has(filename)) {
     mod = revivedModules.get(filename)!;
   } else {
     const graph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");

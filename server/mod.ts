@@ -65,7 +65,6 @@ export const serve = (options: ServerOptions = {}) => {
         jsxConfig,
         buildHash,
         buildTarget: config?.build?.target,
-        atomicCSS: config?.atomicCSS,
       });
     }
 
@@ -82,7 +81,6 @@ export const serve = (options: ServerOptions = {}) => {
           loaded,
           buildHash,
           buildTarget: config?.build?.target,
-          atomicCSS: config?.atomicCSS,
         });
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
@@ -327,6 +325,9 @@ export const serve = (options: ServerOptions = {}) => {
 
   // inject global `__ALEPH_CONFIG`
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
+
+  // delete previous `__UNO_GENERATOR`
+  Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;
   if (Deno.env.get("ALEPH_CLI")) {

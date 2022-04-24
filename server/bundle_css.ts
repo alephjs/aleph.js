@@ -21,11 +21,11 @@ export type BundleCSSResult = {
 
 export async function bundleCSS(
   specifier: string,
-  rawCode: string,
+  sourceCode: string,
   options: BundleCSSOptions,
   tracing = new Set<string>(),
 ): Promise<BundleCSSResult> {
-  let { code: css, dependencies, exports } = await transformCSS(specifier, rawCode, {
+  let { code: css, dependencies, exports } = await transformCSS(specifier, sourceCode, {
     ...options,
     analyzeDependencies: true,
     drafts: {

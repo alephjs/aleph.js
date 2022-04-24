@@ -2,11 +2,11 @@ import { builtinModuleExts, FetchError, toLocalPath } from "../lib/helpers.ts";
 import { type Comment, type Element, HTMLRewriter } from "../lib/html.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { getAlephPkgUri } from "./config.ts";
-import type { DependencyGraph } from "./graph.ts";
-import { importRouteModule } from "./routing.ts";
 import type { RouteModule, Routes } from "../lib/route.ts";
 import { matchRoutes } from "../lib/route.ts";
+import { getAlephPkgUri, getUnoGenerator } from "./config.ts";
+import type { DependencyGraph } from "./graph.ts";
+import { importRouteModule } from "./routing.ts";
 
 export type SSRContext = {
   readonly url: URL;
@@ -72,25 +72,45 @@ export default {
         const body = await render(ssrContext);
         const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
         if (serverDependencyGraph) {
-          const styles: string[] = [];
+          const atomicCSSSource: string[] = [];
           for (const { filename } of routeModules) {
             serverDependencyGraph.walk(filename, (mod) => {
+              if (mod.atomicCSS) {
+                atomicCSSSource.push(mod.sourceCode);
+              }
               if (mod.inlineCSS) {
-                styles.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
+                headCollection.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
               }
             });
           }
           for (const serverEntry of builtinModuleExts.map((ext) => `./server.${ext}`)) {
             if (serverDependencyGraph.get(serverEntry)) {
               serverDependencyGraph.walk(serverEntry, (mod) => {
+                if (mod.atomicCSS) {
+                  atomicCSSSource.push(mod.sourceCode);
+                }
                 if (mod.inlineCSS) {
-                  styles.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
+                  headCollection.push(`<style data-module-id="${mod.specifier}">${mod.inlineCSS}</style>`);
                 }
               });
               break;
             }
           }
-          headCollection.push(...styles);
+          if (atomicCSSSource.length > 0) {
+            // todo: cache the atomic CSS in production mode
+            const unoGenerator = getUnoGenerator();
+            if (unoGenerator) {
+              const start = performance.now();
+              const { css } = await unoGenerator.generate(atomicCSSSource.join("\n"));
+              if (css) {
+                headCollection.push(
+                  `<style data-unocss="${unoGenerator.version}" data-build-time="${
+                    performance.now() - start
+                  }ms">${css}</style>`,
+                );
+              }
+            }
+          }
         }
         const ttls = routeModules.filter(({ dataCacheTtl }) =>
           typeof dataCacheTtl === "number" && !Number.isNaN(dataCacheTtl) && dataCacheTtl > 0

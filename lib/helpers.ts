@@ -71,6 +71,8 @@ export function globalIt<T>(name: string, fn: () => T): T {
     return cache;
   }
   const ret = fn();
-  Reflect.set(globalThis, name, ret);
+  if (ret !== undefined) {
+    Reflect.set(globalThis, name, ret);
+  }
   return ret;
 }

@@ -2,10 +2,11 @@ import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.1
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { findFile } from "../lib/fs.ts";
 import { globalIt } from "../lib/helpers.ts";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.31.6";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
-import type { ImportMap, ModuleLoader } from "./types.ts";
+import type { AlephConfig, ImportMap, ModuleLoader } from "./types.ts";
 
 export type JSXConfig = {
   jsxRuntime?: "react" | "preact";
@@ -22,6 +23,16 @@ export function getAlephPkgUri() {
     }
     const version = Deno.env.get("ALEPH_VERSION") || VERSION;
     return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${version}`;
+  });
+}
+
+export function getUnoGenerator() {
+  return globalIt("__UNO_GENERATOR", () => {
+    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+    if (config?.atomicCSS?.presets?.length) {
+      return createGenerator(config.atomicCSS);
+    }
+    return null;
   });
 }
 

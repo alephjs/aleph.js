@@ -1,4 +1,3 @@
-import { createGenerator } from "https://esm.sh/@unocss/core@0.31.6";
 import MagicString from "https://esm.sh/magic-string@0.26.1";
 import { parseDeps, transform } from "../compiler/mod.ts";
 import type { TransformOptions, TransformResult } from "../compiler/types.ts";
@@ -7,10 +6,10 @@ import { restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
-import { getAlephPkgUri, type JSXConfig } from "./config.ts";
+import { getAlephPkgUri, getUnoGenerator, type JSXConfig } from "./config.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { AtomicCSSConfig, ImportMap, ModuleLoaderContent } from "./types.ts";
+import type { ImportMap, ModuleLoaderContent } from "./types.ts";
 
 export type TransformerOptions = {
   buildHash: string;
@@ -18,7 +17,6 @@ export type TransformerOptions = {
   importMap: ImportMap;
   isDev: boolean;
   jsxConfig?: JSXConfig;
-  atomicCSS?: AtomicCSSConfig;
   loaded?: ModuleLoaderContent;
 };
 
@@ -27,28 +25,28 @@ export default {
     const { isDev, buildHash, loaded } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
-    let rawCode: string;
+    let sourceCode: string;
     let mtime: number | undefined;
     let lang: string | undefined;
     let isCSS: boolean;
     let uno: boolean;
     if (loaded) {
-      rawCode = loaded.code;
+      sourceCode = loaded.code;
       mtime = loaded.modtime;
       lang = loaded.lang;
       isCSS = loaded.lang === "css";
       uno = !!loaded.atomicCSS;
     } else {
       let codeType: string;
-      [rawCode, mtime, codeType] = await readCode(specifier);
+      [sourceCode, mtime, codeType] = await readCode(specifier);
       isCSS = codeType.startsWith("text/css");
       uno = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
     }
     const etag = mtime
-      ? `${mtime.toString(16)}-${rawCode.length.toString(16)}-${
-        rawCode.charCodeAt(Math.floor(rawCode.length / 2)).toString(16)
+      ? `${mtime.toString(16)}-${sourceCode.length.toString(16)}-${
+        sourceCode.charCodeAt(Math.floor(sourceCode.length / 2)).toString(16)
       }${buildHash.slice(0, 8)}`
-      : await util.computeHash("sha-1", rawCode + buildHash);
+      : await util.computeHash("sha-1", sourceCode + buildHash);
     if (req.headers.get("If-None-Match") === etag) {
       return new Response(null, { status: 304 });
     }
@@ -66,7 +64,7 @@ export default {
 
     if (isCSS) {
       const asJsModule = searchParams.has("module");
-      const { code, deps } = await bundleCSS(specifier, rawCode, {
+      const { code, deps } = await bundleCSS(specifier, sourceCode, {
         // todo: support borwserslist
         targets: {
           android: 95,
@@ -87,13 +85,13 @@ export default {
       }
     } else {
       const alephPkgUri = getAlephPkgUri();
-      const { atomicCSS, jsxConfig, importMap, buildTarget } = options;
+      const { jsxConfig, importMap, buildTarget } = options;
       let ret: TransformResult;
       if (/^https?:\/\/(cdn\.)esm\.sh\//.test(specifier)) {
         // don't transform modules imported from esm.sh
-        const deps = await parseDeps(specifier, rawCode, { importMap: JSON.stringify(importMap) });
+        const deps = await parseDeps(specifier, sourceCode, { importMap: JSON.stringify(importMap) });
         if (deps.length > 0) {
-          const s = new MagicString(rawCode);
+          const s = new MagicString(sourceCode);
           deps.forEach((dep) => {
             const { importUrl, loc } = dep;
             if (loc) {
@@ -102,7 +100,7 @@ export default {
           });
           ret = { code: s.toString(), deps };
         } else {
-          ret = { code: rawCode, deps };
+          ret = { code: sourceCode, deps };
         }
       } else {
         const graphVersions = clientDependencyGraph.modules.filter((mod) =>
@@ -111,7 +109,7 @@ export default {
           acc[specifier] = version.toString(16);
           return acc;
         }, {} as Record<string, string>);
-        ret = await transform(specifier, rawCode, {
+        ret = await transform(specifier, sourceCode, {
           ...jsxConfig,
           lang: lang as TransformOptions["lang"],
           stripDataExport: isRouteFile(specifier),
@@ -125,13 +123,15 @@ export default {
       }
       let { code, map, deps } = ret;
       let inlineCSS = loaded?.inlineCSS;
-      if (uno && Boolean(atomicCSS?.presets?.length)) {
-        const uno = createGenerator(atomicCSS);
-        const { css } = await uno.generate(rawCode, { id: specifier, minify: !isDev });
-        if (inlineCSS) {
-          inlineCSS = `${inlineCSS}\n${css}`;
-        } else {
-          inlineCSS = css;
+      if (uno) {
+        const unoGenerator = getUnoGenerator();
+        if (unoGenerator) {
+          const { css } = await unoGenerator.generate(sourceCode, { id: specifier, minify: !isDev });
+          if (inlineCSS) {
+            inlineCSS = `${inlineCSS}\n${css}`;
+          } else {
+            inlineCSS = css;
+          }
         }
       }
       if (inlineCSS) {
@@ -147,7 +147,7 @@ export default {
           if (!util.isLikelyHttpURL(specifier)) {
             m.sources = [`file://source/${util.trimPrefix(specifier, ".")}`];
           }
-          m.sourcesContent = [rawCode];
+          m.sourcesContent = [sourceCode];
           resBody = code +
             `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}\n`;
         } catch (e) {
