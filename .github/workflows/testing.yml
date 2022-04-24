@@ -52,7 +52,7 @@ jobs:
           - name: aleph-hello
             dir: examples/react-app
           - name: aleph-vue
-            dir: examples/react-vue
+            dir: examples/vue-app
           - name: aleph-monaco-editor
             dir: examples/feature-apps/monaco-editor
           - name: aleph-unocss
