@@ -8,7 +8,7 @@ import { builtinModuleExts, toLocalPath } from "../lib/helpers.ts";
 import { parseHtmlLinks } from "./html.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { getAlephPkgUri, loadImportMap, loadJSXConfig } from "../server/config.ts";
+import { getAlephPkgUri, initModuleLoaders, loadImportMap, loadJSXConfig } from "../server/config.ts";
 import { DependencyGraph } from "../server/graph.ts";
 import { initRoutes } from "../server/routing.ts";
 import type { AlephConfig, BuildPlatform, FetchHandler } from "../server/types.ts";
@@ -24,6 +24,7 @@ export async function build(serverEntry?: string) {
   const alephPkgUri = getAlephPkgUri();
   const importMap = await loadImportMap();
   const jsxCofig = await loadJSXConfig(importMap);
+  const moduleLoaders = await initModuleLoaders(importMap);
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   const platform = config?.build?.platform ?? "deno";
   const outputDir = join(workingDir, config?.build?.outputDir ?? "dist");
@@ -56,6 +57,20 @@ export async function build(serverEntry?: string) {
     `import graph from "./server_dependency_graph.js";`,
     `globalThis.serverDependencyGraph = new DependencyGraph(graph.modules);`,
     routeFiles.length > 0 && `import { revive } from "${alephPkgUri}/server/routing.ts";`,
+    moduleLoaders.length > 0 &&
+    `import { globToRegExp } from "https://deno.land/std@0.136.0/path/mod.ts";const moduleLoaders = []; globalThis["__ALEPH_MODULE_LOADERS"] = moduleLoaders;`,
+    moduleLoaders.length > 0 &&
+    moduleLoaders.map(({ meta }, idx) => `
+      import loader_${idx} from ${JSON.stringify(meta.src)};
+      const reg = globToRegExp(${JSON.stringify(meta.glob)});
+      moduleLoaders.push({
+        meta: ${JSON.stringify(meta)},
+        test: (pathname) => {
+          return reg.test(pathname) && loader_${idx}.test(pathname);
+        },
+        load: (pathname, env) => loader_${idx}.load(pathname, env),
+      })
+    `).join("\n"),
     ...routeFiles.map(([filename, exportNames], idx) => {
       const hasDefaultExport = exportNames.includes("default");
       const hasDataExport = exportNames.includes("data");
@@ -77,11 +92,11 @@ export async function build(serverEntry?: string) {
           ].filter(Boolean).join(", ")
         } });`,
       ];
-    }).flat().filter(Boolean),
+    }),
     serverEntry && `import "http://localhost:${port}/${basename(serverEntry)}";`,
     !serverEntry && `import { serve } from "${alephPkgUri}/server/mode.ts";`,
     !serverEntry && `serve();`,
-  ].filter(Boolean).join("\n");
+  ].flat().filter(Boolean).join("\n");
 
   // since esbuild doesn't support jsx automic transform, we need to manually import jsx runtime
   let jsxShimFile: string | null = null;
@@ -130,13 +145,8 @@ export async function build(serverEntry?: string) {
       name: "aleph-esbuild-plugin",
       setup(build) {
         build.onResolve({ filter: /.*/ }, (args) => {
-          let importUrl = args.path;
-          if (importUrl in importMap.imports) {
-            importUrl = importMap.imports[importUrl];
-          }
-
-          const isRemote = util.isLikelyHttpURL(importUrl);
-          const [path] = util.splitBy(isRemote ? importUrl : util.trimPrefix(importUrl, "file://"), "#");
+          const isRemote = util.isLikelyHttpURL(args.path);
+          const [path] = util.splitBy(isRemote ? args.path : util.trimPrefix(args.path, "file://"), "#");
 
           if (args.kind === "dynamic-import") {
             return { path, external: true };
@@ -156,6 +166,12 @@ export async function build(serverEntry?: string) {
 
           if (isRemote || path === "./server_dependency_graph.js") {
             return { path, external: true };
+          }
+
+          if (path.startsWith("./") || path.startsWith("../")) {
+            return {
+              path: join(dirname(args.importer), path),
+            };
           }
 
           return { path };

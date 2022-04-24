@@ -48,6 +48,7 @@ export type ImportMap = {
 };
 
 export type ModuleLoader = {
+  readonly meta: { src: string; glob: string };
   test(pathname: string): boolean;
   load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderContent> | ModuleLoaderContent;
 };

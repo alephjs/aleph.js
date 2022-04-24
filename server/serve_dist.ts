@@ -1,8 +1,14 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import log from "../lib/log.ts";
+import { builtinModuleExts } from "../lib/helpers.ts";
 import type { AlephConfig } from "./types.ts";
 
 export default {
+  test: (pathname: string) => {
+    return pathname.startsWith("/-/") ||
+      (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) && !pathname.endsWith(".d.ts")) ||
+      pathname.endsWith(".css");
+  },
   fetch: async (req: Request): Promise<Response> => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     const outputDir = config?.build?.outputDir ?? "dist";

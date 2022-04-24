@@ -159,7 +159,10 @@ export async function loadImportMap(): Promise<ImportMap> {
 }
 
 export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoader[]> {
-  const loaders: ModuleLoader[] = [];
+  const loaders: ModuleLoader[] = Reflect.get(globalThis, "__ALEPH_MODULE_LOADERS") || [];
+  if (loaders.length > 0) {
+    return loaders;
+  }
   if (Deno.env.get("ALEPH_CLI")) {
     for (const key in importMap.imports) {
       if (/^\*\.[a-z0-9]+$/i.test(key)) {
@@ -177,8 +180,10 @@ export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoa
             typeof loader === "object" && loader !== null &&
             typeof loader.test === "function" && typeof loader.load === "function"
           ) {
-            const reg = globToRegExp("/**/" + key);
+            const glob = "/**/" + key;
+            const reg = globToRegExp(glob);
             loaders.push({
+              meta: { src, glob },
               test: (pathname: string) => {
                 return reg.test(pathname) && loader.test(pathname);
               },
@@ -189,6 +194,7 @@ export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoa
       }
     }
   }
+  Reflect.set(globalThis, "__ALEPH_MODULE_LOADERS", loaders);
   return loaders;
 }
 

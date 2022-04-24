@@ -1,6 +1,5 @@
 import { serve as stdServe, type ServeInit, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
-import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import type { Routes } from "../lib/route.ts";
@@ -50,22 +49,18 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // transform client modules
-    if (
-      pathname.startsWith("/-/") ||
-      (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) && !pathname.endsWith(".d.ts")) ||
-      pathname.endsWith(".css")
-    ) {
+    if (clientModuleTransformer.test(pathname)) {
       const [buildHash, jsxConfig, importMap] = await Promise.all([
         buildHashPromise,
         jsxConfigPromise,
         importMapPromise,
       ]);
       return clientModuleTransformer.fetch(req, {
-        isDev,
         importMap,
         jsxConfig,
         buildHash,
         buildTarget: config?.build?.target,
+        isDev,
       });
     }
 
@@ -73,15 +68,20 @@ export const serve = (options: ServerOptions = {}) => {
     const moduleLoaders = await moduleLoadersPromise;
     const loader = moduleLoaders.find((loader) => loader.test(pathname));
     if (loader) {
-      const [buildHash, importMap] = await Promise.all([buildHashPromise, importMapPromise]);
+      const [buildHash, jsxConfig, importMap] = await Promise.all([
+        buildHashPromise,
+        jsxConfigPromise,
+        importMapPromise,
+      ]);
       try {
         const loaded = await loader.load(pathname, { isDev, importMap });
         return clientModuleTransformer.fetch(req, {
-          isDev,
-          importMap,
           loaded,
+          importMap,
+          jsxConfig,
           buildHash,
           buildTarget: config?.build?.target,
+          isDev,
         });
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
