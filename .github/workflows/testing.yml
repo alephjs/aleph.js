@@ -1,4 +1,4 @@
-name: Aleph.js Testing
+name: Aleph.js CI
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    name: Test
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -36,3 +37,41 @@ jobs:
 
       - name: Cargo test
         run: cd compiler && cargo test --all
+
+  deploy_examples:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write # Needed for auth with Deno Deploy
+      contents: read # Needed to clone the repository
+
+    strategy:
+      matrix:
+        include:
+          - name: aleph-hello
+            dir: examples/react-app
+          - name: aleph-vue
+            dir: examples/react-vue
+          - name: aleph-monaco-editor
+            dir: examples/feature-apps/monaco-editor
+          - name: aleph-unocss
+            dir: examples/feature-apps/unocss
+          - name: aleph-suspense-ssr
+            dir: examples/feature-apps/suspense-ssr
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v1
+
+      - name: Build App
+        run: deno task build ${{ matrix.dir }}
+
+      - name: Deploy to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          project: ${{ matrix.name }}
+          entrypoint: ${{ matrix.dir }}/dist/server.js
