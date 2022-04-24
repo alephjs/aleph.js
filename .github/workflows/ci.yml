@@ -76,4 +76,5 @@ jobs:
         uses: denoland/deployctl@v1
         with:
           project: ${{ matrix.name }}
-          entrypoint: ${{ matrix.dir }}/dist/server.js
+          root: ${{ matrix.dir }}
+          entrypoint: dist/server.js
