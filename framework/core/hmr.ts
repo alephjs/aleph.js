@@ -1,3 +1,4 @@
+import util from "../../lib/util.ts";
 import events from "./events.ts";
 
 // ESM Hot Module Replacement (ESM-HMR) Specification
@@ -30,6 +31,18 @@ class Module {
   decline(): void {
     this._isDeclined = true;
     this.accept();
+  }
+
+  watchFile(filename: string, callback: () => void) {
+    const specifier = "." + util.cleanPath(filename);
+    const handler = (data: Record<string, unknown>) => {
+      if (data.specifier === specifier) {
+        callback();
+      }
+    };
+    events.on("hmr:modify", handler);
+    sendMessage({ specifier, type: "modify" });
+    return () => events.off("hmr:modify", handler);
   }
 
   // don't accept updates if the module is locked
@@ -118,13 +131,15 @@ function connect() {
         const { type, specifier, routePattern } = JSON.parse(data);
         switch (type) {
           case "create": {
-            events.emit("create-file", { routePattern, specifier });
+            events.emit("hmr:create", { specifier, routePattern });
             break;
           }
           case "modify": {
             const mod = modules.get(specifier);
             if (mod) {
               mod.applyUpdate();
+            } else {
+              events.emit("hmr:modify", { specifier });
             }
             break;
           }
@@ -132,7 +147,7 @@ function connect() {
             if (modules.has(specifier)) {
               modules.delete(specifier);
             }
-            events.emit("remove-file", { specifier });
+            events.emit("hmr:remove", { specifier });
             break;
           }
           case "reload": {

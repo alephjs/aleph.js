@@ -58,8 +58,11 @@ const handleHMRSocket = (req: Request): Response => {
     if (util.isFilledString(e.data)) {
       try {
         const { type, specifier } = JSON.parse(e.data);
-        if (type === "hotAccept" && util.isFilledString(specifier)) {
-          emitter.on(`hotUpdate:${specifier}`, () => send({ type: "modify", specifier }));
+        if ((type === "modify" || type === "hotUpdate") && util.isFilledString(specifier)) {
+          emitter.on(
+            type === "modify" ? `modify:${specifier}` : `hotUpdate:${specifier}`,
+            () => send({ type: "modify", specifier }),
+          );
         }
       } catch (_e) {
         log.error("invlid socket message:", e.data);
@@ -103,7 +106,6 @@ if (import.meta.main) {
     if (kind === "modify") {
       emitters.forEach((e) => {
         e.emit(`modify:${specifier}`, { specifier });
-        // emit HMR event
         if (e.all.has(`hotUpdate:${specifier}`)) {
           e.emit(`hotUpdate:${specifier}`, { specifier });
         } else if (specifier !== "./routes.gen.ts") {

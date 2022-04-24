@@ -69,6 +69,7 @@ declare interface Middleware {
 
 declare interface ImportMeta {
   readonly hot?: {
+    watchFile: (filename: string, callback: () => void) => () => void;
     accept: (callback?: (module: unknown) => void) => void;
     decline: () => void;
   };
