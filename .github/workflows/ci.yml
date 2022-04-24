@@ -68,6 +68,8 @@ jobs:
         uses: denoland/setup-deno@v1
 
       - name: Build App
+        env:
+          ALEPH_PKG_URI: https://raw.githubusercontent.com/alephjs/aleph.js/${{ github.sha }}
         run: deno task build ${{ matrix.dir }}
 
       - name: Deploy to Deno Deploy
