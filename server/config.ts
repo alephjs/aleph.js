@@ -124,7 +124,7 @@ export async function loadImportMap(): Promise<ImportMap> {
   const importMap: ImportMap = { __filename: "", imports: {}, scopes: {} };
 
   if (Deno.env.get("ALEPH_DEV")) {
-    const alephPkgUri = `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
+    const alephPkgUri = Deno.env.get("ALEPH_PKG_URI") || `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
     const importMapFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "import_map.json");
     const { __filename, imports, scopes } = await readImportMap(importMapFile);
     Object.assign(importMap, {
