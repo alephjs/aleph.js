@@ -7,6 +7,7 @@ import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
+import { loadAndFixIndexHtml } from "./html.ts";
 import type { HTMLRewriterHandlers, SSR } from "./renderer.ts";
 import renderer from "./renderer.ts";
 import { content, type CookieOptions, json, setCookieHeader } from "./response.ts";
@@ -257,10 +258,10 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // load the `index.html`
-    let indexHtml: string | null | undefined = Reflect.get(globalThis, "__ALEPH_INDEX_HTML");
+    let indexHtml: Uint8Array | null | undefined = Reflect.get(globalThis, "__ALEPH_INDEX_HTML");
     if (indexHtml === undefined) {
       try {
-        indexHtml = await Deno.readTextFile("./index.html");
+        indexHtml = await loadAndFixIndexHtml(isDev, typeof ssr === "function" ? {} : ssr);
       } catch (err) {
         if (err instanceof Deno.errors.NotFound) {
           indexHtml = null;
@@ -270,11 +271,8 @@ export const serve = (options: ServerOptions = {}) => {
         }
       }
     }
-
-    // cache indexHtml to global(memory) in production mode
-    if (!isDev) {
-      Reflect.set(globalThis, "__ALEPH_INDEX_HTML", indexHtml);
-    }
+    // cache `index.html` to memory
+    Reflect.set(globalThis, "__ALEPH_INDEX_HTML", indexHtml);
 
     // no root `index.html` found
     if (indexHtml === null) {
@@ -296,7 +294,6 @@ export const serve = (options: ServerOptions = {}) => {
       indexHtml,
       routes,
       customHTMLRewriter,
-      isDev,
       ssr,
     });
   };

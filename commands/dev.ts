@@ -103,6 +103,9 @@ if (import.meta.main) {
       clientDependencyGraph?.update(specifier);
       serverDependencyGraph?.update(specifier);
     }
+    if (specifier === "./index.html") {
+      Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
+    }
     if (kind === "modify") {
       emitters.forEach((e) => {
         e.emit(`modify:${specifier}`, { specifier });

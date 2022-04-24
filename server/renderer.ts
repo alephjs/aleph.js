@@ -1,11 +1,12 @@
-import { builtinModuleExts, FetchError, toLocalPath } from "../lib/helpers.ts";
-import { type Comment, type Element, HTMLRewriter } from "../lib/html.ts";
+import { builtinModuleExts, FetchError } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { RouteModule, Routes } from "../lib/route.ts";
 import { matchRoutes } from "../lib/route.ts";
-import { getAlephPkgUri, getUnoGenerator } from "./config.ts";
+import { getUnoGenerator } from "./config.ts";
 import type { DependencyGraph } from "./graph.ts";
+import type { Comment, Element } from "./html.ts";
+import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
 
 export type SSRContext = {
@@ -32,9 +33,8 @@ export type SSR = {
 } | ((ssr: SSRContext) => Promise<string | ReadableStream> | string | ReadableStream);
 
 export type RenderOptions = {
-  indexHtml: string;
+  indexHtml: Uint8Array;
   routes: Routes;
-  isDev: boolean;
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   ssr?: SSR;
 };
@@ -51,7 +51,7 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* hy
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routes, isDev, customHTMLRewriter, ssr } = options;
+    const { indexHtml, routes, customHTMLRewriter, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (ssr) {
@@ -171,7 +171,6 @@ export default {
       start: (controller) => {
         let ssrStreaming = false;
         const suspenseChunks: Uint8Array[] = [];
-        const alephPkgUri = getAlephPkgUri();
         const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
           if (ssrStreaming) {
             suspenseChunks.push(chunk);
@@ -179,45 +178,12 @@ export default {
             controller.enqueue(chunk);
           }
         });
-        const linkHandlers = {
-          element(el: Element) {
-            let href = el.getAttribute("href");
-            if (href) {
-              const isHttpUrl = util.isLikelyHttpURL(href);
-              if (!isHttpUrl) {
-                href = util.cleanPath(href);
-                el.setAttribute("href", href);
-              }
-              if (href.endsWith(".css") && !isHttpUrl && isDev) {
-                const specifier = `.${href}`;
-                el.setAttribute("data-module-id", specifier);
-                el.after(
-                  `<script type="module">import hot from "${toLocalPath(alephPkgUri)}/framework/core/hmr.ts";hot(${
-                    JSON.stringify(specifier)
-                  }).accept();</script>`,
-                  { html: true },
-                );
-              }
-            }
-          },
-        };
-        const scriptHandlers = {
-          hasModule: false,
-          element(el: Element) {
-            const src = el.getAttribute("src");
-            if (src && !util.isLikelyHttpURL(src)) {
-              el.setAttribute("src", util.cleanPath(src));
-            }
-            if (!scriptHandlers.hasModule && el.getAttribute("type") === "module") {
-              el.after(
-                `<script nomodule src="${toLocalPath(alephPkgUri)}/framework/core/nomodule.ts"></script>`,
-                { html: true },
-              );
-              scriptHandlers.hasModule = true;
-            }
-          },
-        };
-        const headHandlers = {
+
+        // apply user defined html rewrite handlers
+        customHTMLRewriter.forEach((handlers, selector) => rewriter.on(selector, handlers));
+
+        // inject the roures manifest
+        rewriter.on("head", {
           element(el: Element) {
             if (routes.routes.length > 0) {
               const json = JSON.stringify({ routes: routes.routes.map(([_, meta]) => meta) });
@@ -225,23 +191,12 @@ export default {
                 html: true,
               });
             }
-            if (isDev) {
-              el.append(
-                `<script type="module">import hot from "${
-                  toLocalPath(alephPkgUri)
-                }/framework/core/hmr.ts";hot("./index.html").decline();</script>`,
-                { html: true },
-              );
-            }
           },
-        };
-
-        // apply user defined html rewrite handlers
-        customHTMLRewriter.forEach((handlers, selector) => rewriter.on(selector, handlers));
+        });
 
         if (ssrRes) {
           const {
-            context: { routeModules, headCollection, suspense },
+            context: { routeModules, headCollection },
             errorBoundaryHandlerFilename,
             body,
             suspenseData,
@@ -289,75 +244,59 @@ export default {
               }
             },
           });
-          rewriter.on("body", {
+          rewriter.on("ssr-body", {
             element(el: Element) {
-              if (suspense) {
-                el.setAttribute("data-suspense", "true");
-              }
-            },
-          });
-          rewriter.on("*", {
-            comments(c: Comment) {
-              const text = c.text.trim().toLowerCase();
-              if (text === "ssr-body" || text === "ssr-output") {
-                if (typeof body === "string") {
-                  c.replace(body, { html: true });
-                } else if (body instanceof ReadableStream) {
-                  c.remove();
-                  ssrStreaming = true;
+              if (typeof body === "string") {
+                el.replace(body, { html: true });
+              } else if (body instanceof ReadableStream) {
+                el.remove();
+                ssrStreaming = true;
 
-                  const rw = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
-                    controller.enqueue(chunk);
-                  });
-                  rw.on("script", {
-                    element(el: Element) {
-                      if (el.getAttribute("src") === bootstrapScript) {
-                        suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
-                        el.remove();
-                      }
-                    },
-                  });
-                  const send = async () => {
-                    try {
-                      const reader = body.getReader();
-                      while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) {
-                          break;
-                        }
-                        rw.write(value);
-                      }
-                      rw.end();
-                      if (suspenseChunks.length > 0) {
-                        suspenseChunks.forEach((chunk) => controller.enqueue(chunk));
-                      }
-                      if (Object.keys(suspenseData).length > 0) {
-                        controller.enqueue(
-                          util.utf8TextEncoder.encode(
-                            `<script type="application/json" id="suspense-data">${
-                              JSON.stringify(suspenseData)
-                            }</script>`,
-                          ),
-                        );
-                      }
-                    } finally {
-                      controller.close();
-                      rw.free();
+                const rw = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
+                  controller.enqueue(chunk);
+                });
+                rw.on("script", {
+                  element(el: Element) {
+                    if (el.getAttribute("src") === bootstrapScript) {
+                      suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
+                      el.remove();
                     }
-                  };
-                  send();
-                }
+                  },
+                });
+                const send = async () => {
+                  try {
+                    const reader = body.getReader();
+                    while (true) {
+                      const { done, value } = await reader.read();
+                      if (done) {
+                        break;
+                      }
+                      rw.write(value);
+                    }
+                    rw.end();
+                    if (suspenseChunks.length > 0) {
+                      suspenseChunks.forEach((chunk) => controller.enqueue(chunk));
+                    }
+                    if (Object.keys(suspenseData).length > 0) {
+                      controller.enqueue(
+                        util.utf8TextEncoder.encode(
+                          `<script type="application/json" id="suspense-data">${JSON.stringify(suspenseData)}</script>`,
+                        ),
+                      );
+                    }
+                  } finally {
+                    controller.close();
+                    rw.free();
+                  }
+                };
+                send();
               }
             },
           });
         }
 
-        rewriter.on("link", linkHandlers);
-        rewriter.on("script", scriptHandlers);
-        rewriter.on("head", headHandlers);
-
         try {
-          rewriter.write(util.utf8TextEncoder.encode(indexHtml));
+          rewriter.write(indexHtml);
           rewriter.end();
         } finally {
           if (!ssrRes || typeof ssrRes.body === "string") {
