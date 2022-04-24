@@ -46,6 +46,7 @@ if (import.meta.main) {
 
   // close the app modules server
   ac.abort();
+  Deno.env.delete("ALEPH_MODULES_PROXY_PORT");
 
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   const outputDir = config?.build?.outputDir ?? "dist";
