@@ -1,11 +1,10 @@
-import "./routes.gen.ts"
 import { Router } from "aleph/react";
 import { serve } from "aleph/server";
 import { renderToReadableStream } from "react-dom/server";
 
 serve({
   config: {
-    routes: { glob: "./routes/**/*.{tsx,ts}", generate: true },
+    routes: "./routes/**/*.{tsx,ts}",
   },
   ssr: {
     suspense: true,
