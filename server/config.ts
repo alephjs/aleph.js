@@ -182,13 +182,14 @@ export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoa
           ) {
             const glob = "/**/" + key;
             const reg = globToRegExp(glob);
-            loaders.push({
+            const Loader = {
               meta: { src, glob },
               test: (pathname: string) => {
                 return reg.test(pathname) && loader.test(pathname);
               },
               load: (pathname: string, env: Record<string, unknown>) => loader.load(pathname, env),
-            });
+            };
+            loaders.push(Loader);
           }
         }
       }

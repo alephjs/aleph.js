@@ -60,17 +60,26 @@ export async function build(serverEntry?: string) {
     moduleLoaders.length > 0 &&
     `import { globToRegExp } from "https://deno.land/std@0.136.0/path/mod.ts";const moduleLoaders = []; globalThis["__ALEPH_MODULE_LOADERS"] = moduleLoaders;`,
     moduleLoaders.length > 0 &&
-    moduleLoaders.map(({ meta }, idx) => `
-      import loader_${idx} from ${JSON.stringify(meta.src)};
-      const reg = globToRegExp(${JSON.stringify(meta.glob)});
-      moduleLoaders.push({
-        meta: ${JSON.stringify(meta)},
-        test: (pathname) => {
-          return reg.test(pathname) && loader_${idx}.test(pathname);
-        },
-        load: (pathname, env) => loader_${idx}.load(pathname, env),
-      })
-    `).join("\n"),
+    moduleLoaders.map((loader, idx) => {
+      const meta = Reflect.get(loader, "meta");
+      return `
+        import loader$${idx} from ${JSON.stringify(meta.src)};
+        {
+          const reg = globToRegExp(${JSON.stringify(meta.glob)});
+          let loader = loader$${idx};
+          if (typeof loader === "function") {
+            loader = new loader();
+          }
+          moduleLoaders.push({
+            meta: ${JSON.stringify(meta)},
+            test: (pathname) => {
+              return reg.test(pathname) && loader.test(pathname);
+            },
+            load: (pathname, env) => loader.load(pathname, env),
+          })
+        }
+      `;
+    }).join("\n"),
     ...routeFiles.map(([filename, exportNames], idx) => {
       const hasDefaultExport = exportNames.includes("default");
       const hasDataExport = exportNames.includes("data");
@@ -145,8 +154,13 @@ export async function build(serverEntry?: string) {
       name: "aleph-esbuild-plugin",
       setup(build) {
         build.onResolve({ filter: /.*/ }, (args) => {
-          const isRemote = util.isLikelyHttpURL(args.path);
-          const [path] = util.splitBy(isRemote ? args.path : util.trimPrefix(args.path, "file://"), "#");
+          let importUrl = args.path;
+          if (importUrl in importMap.imports) {
+            importUrl = importMap.imports[importUrl];
+          }
+
+          const isRemote = util.isLikelyHttpURL(importUrl);
+          const [path] = util.splitBy(isRemote ? importUrl : util.trimPrefix(importUrl, "file://"), "#");
 
           if (args.kind === "dynamic-import") {
             return { path, external: true };
