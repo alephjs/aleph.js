@@ -10,3 +10,13 @@
 > The new docs site is working in progress: https://aleph.deno.dev ([PR](https://github.com/alephjs/alephjs.org/pull/58))
 >
 > You can join the Aleph.js [Discord](https://discord.com/invite/pWGdS7sAqD) to get the dev progress.
+
+Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new architecture:
+
+- React Hello-world: https://aleph-hello.deno.dev/
+- Vue Hello-world: https://aleph-vue.deno.dev/
+- React 18 Suspense SSR: https://aleph-suspense-ssr.deno.dev/
+- UnoCSS(tailwind): https://aleph-unocss.deno.dev/
+- Monaco Editor: https://aleph-monaco-editor.deno.dev/
+
+Source code: https://github.com/alephjs/aleph.js/tree/main/examples
