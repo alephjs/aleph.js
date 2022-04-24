@@ -154,8 +154,6 @@ export function NavLink(props: NavLinkProps) {
     } else {
       pathname = util.cleanPath(currentPathname + "/" + p);
     }
-
-    console.log(pathname, currentPathname);
     if (!exact) {
       return pathname === currentPathname || currentPathname.startsWith(pathname + "/");
     }
