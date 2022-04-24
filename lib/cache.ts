@@ -49,7 +49,7 @@ export default async function cache(
   for (let i = 0; i < retryTimes; i++) {
     if (i === 0) {
       if (!isLocalhost) {
-        log.info("Download", url);
+        log.debug("Download", url);
       }
     } else {
       log.warn(`Download ${url} failed, retrying...`);
