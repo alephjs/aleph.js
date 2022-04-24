@@ -17,6 +17,10 @@ export type JSXConfig = {
 
 export function getAlephPkgUri() {
   return globalIt("__ALEPH_PKG_URI", () => {
+    const uriFromEnv = Deno.env.get("ALEPH_PKG_URI");
+    if (uriFromEnv) {
+      return uriFromEnv;
+    }
     const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
     if (DEV_PORT) {
       return `http://localhost:${DEV_PORT}`;
