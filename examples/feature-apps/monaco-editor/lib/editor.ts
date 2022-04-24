@@ -3,7 +3,7 @@
 import { editor, Uri } from "https://esm.sh/monaco-editor@0.33.0";
 import editorWorker from "https://esm.sh/monaco-editor@0.33.0/esm/vs/editor/editor.worker?worker";
 import tsWorker from "https://esm.sh/monaco-editor@0.33.0/esm/vs/language/typescript/ts.worker?worker";
-import "https://esm.sh/monaco-editor@0.33.0?css";
+import "https://cdn.esm.sh/v78/monaco-editor@0.33.0/esnext/monaco-editor.css";
 
 // deno-lint-ignore ban-ts-comment
 // @ts-ignore
