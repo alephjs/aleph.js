@@ -5,7 +5,7 @@ type HTMLRewriterHandlers = {
 };
 
 type HTMLRewriter = {
-  on: (selector: string, HTMLRewriterHandlers) => void;
+  on: (selector: string, handlers: HTMLRewriterHandlers) => void;
 };
 
 declare type CookieOptions = {
