@@ -1,7 +1,9 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
-import log from "../lib/log.ts";
 import { builtinModuleExts } from "../lib/helpers.ts";
+import log from "../lib/log.ts";
 import type { AlephConfig } from "./types.ts";
+
+const REG_FULL_VERSION = /@\d+\.\d+\.\d+/;
 
 export default {
   test: (pathname: string) => {
@@ -22,27 +24,39 @@ export default {
       if (pathname.endsWith(".css") && !searchParams.has("module")) {
         ctype = "text/css; charset=utf-8";
       }
-      const stat = await Deno.lstat(filePath);
-      if (stat.isFile) {
-        const { mtime } = stat;
-        const etag = mtime ? mtime.getTime().toString(16) + "-" + stat.size.toString(16) : null;
-        if (etag && req.headers.get("If-None-Match") === etag) {
-          return new Response(null, { status: 304 });
+      const headers = new Headers({ "Content-Type": ctype });
+      const deplyId = Deno.env.get("DENO_DEPLOYMENT_ID");
+      let etag: string | null = null;
+      if (deplyId) {
+        etag = `${btoa(pathname).replace(/[^a-z0-9]/g, "")}-${deplyId}`;
+      } else {
+        const stat = await Deno.lstat(filePath);
+        if (!stat.isFile) {
+          return new Response("File Not Found", { status: 404 });
         }
-        const file = await Deno.open(filePath, { read: true });
-        const headers = new Headers({ "Content-Type": ctype });
+        const { mtime, size } = stat;
         if (mtime) {
-          headers.set("Etag", etag!);
-          headers.set("Last-Modified", mtime.toUTCString());
+          etag = mtime.getTime().toString(16) + "-" + size.toString(16);
+          headers.append("Last-Modified", new Date(mtime).toUTCString());
         }
-        return new Response(readableStreamFromReader(file), { headers });
       }
+      if (etag && req.headers.get("If-None-Match") === etag) {
+        return new Response(null, { status: 304 });
+      }
+      const file = await Deno.open(filePath, { read: true });
+      if (etag) {
+        headers.append("Etag", etag);
+      }
+      if (searchParams.get("v") || (pathname.startsWith("/-/") && REG_FULL_VERSION.test(pathname))) {
+        headers.append("Cache-Control", "public, max-age=31536000, immutable");
+      }
+      return new Response(readableStreamFromReader(file), { headers });
     } catch (err) {
-      if (!(err instanceof Deno.errors.NotFound)) {
-        log.error(err);
-        return new Response("Internal Server Error", { status: 500 });
+      if (err instanceof Deno.errors.NotFound) {
+        return new Response("File Not Found", { status: 404 });
       }
+      log.error(err);
+      return new Response("Internal Server Error", { status: 500 });
     }
-    return new Response("Not Found", { status: 404 });
   },
 };
