@@ -41,7 +41,7 @@ class Module {
       }
     };
     events.on("hmr:modify", handler);
-    sendMessage({ specifier, type: "modify" });
+    sendMessage({ specifier, type: "hotAccept" });
     return () => events.off("hmr:modify", handler);
   }
 
@@ -138,9 +138,8 @@ function connect() {
             const mod = modules.get(specifier);
             if (mod) {
               mod.applyUpdate();
-            } else {
-              events.emit("hmr:modify", { specifier });
             }
+            events.emit("hmr:modify", { specifier });
             break;
           }
           case "remove": {

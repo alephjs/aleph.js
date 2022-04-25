@@ -58,9 +58,9 @@ const handleHMRSocket = (req: Request): Response => {
     if (util.isFilledString(e.data)) {
       try {
         const { type, specifier } = JSON.parse(e.data);
-        if ((type === "modify" || type === "hotUpdate") && util.isFilledString(specifier)) {
+        if (type === "hotAccept" && util.isFilledString(specifier)) {
           emitter.on(
-            type === "modify" ? `modify:${specifier}` : `hotUpdate:${specifier}`,
+            `hotUpdate:${specifier}`,
             () => send({ type: "modify", specifier }),
           );
         }
