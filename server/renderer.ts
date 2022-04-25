@@ -13,8 +13,8 @@ export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
-  readonly errorBoundaryHandler?: CallableFunction;
   readonly suspense: boolean;
+  readonly errorBoundaryHandler?: CallableFunction;
   readonly signal: AbortSignal;
   readonly bootstrapScripts?: string[];
 };
@@ -32,23 +32,23 @@ export type SSR = {
   render(ssr: SSRContext): Promise<string | ReadableStream> | string | ReadableStream;
 } | ((ssr: SSRContext) => Promise<string | ReadableStream> | string | ReadableStream);
 
+type SSRResult = {
+  context: SSRContext;
+  errorBoundaryHandlerFilename?: string;
+  body: ReadableStream | string;
+  suspenseData: Record<string, unknown>;
+};
+
 export type RenderOptions = {
-  indexHtml: Uint8Array;
   routes: Routes;
+  indexHtml: Uint8Array;
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   isDev: boolean;
   ssr?: SSR;
 };
 
-type SSRResult = {
-  context: SSRContext;
-  errorBoundaryHandlerFilename?: string;
-  body: string | ReadableStream;
-  suspenseData: Record<string, unknown>;
-};
-
 /** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
-const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* hydrate bootstrap */")}`;
+const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* stage ready */")}`;
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
@@ -68,7 +68,7 @@ export default {
           headCollection,
           suspense,
           signal: req.signal,
-          bootstrapScripts: suspense ? [bootstrapScript] : undefined,
+          bootstrapScripts: [bootstrapScript],
         };
         const body = await render(ssrContext);
         const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
@@ -421,20 +421,20 @@ const errorHtml = (message: string) => `
         background-color: rgba(255, 0, 0, 0.1);
         color: rgba(255, 0, 0, 1);
       }
-      .error pre {
-        position: relative;
-        line-height: 1.4;
-      }
-      .error code {
-        font-size: 14px;
-      }
-      .logo {
+      .error .logo {
         position: absolute;
         top: 50%;
         left: 50%;
         margin-top: -45px;
         margin-left: -45px;
         opacity: 0.1;
+      }
+      .error pre {
+        position: relative;
+        line-height: 1.4;
+      }
+      .error code {
+        font-size: 14px;
       }
     </style>
   </head>

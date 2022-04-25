@@ -51,7 +51,7 @@ export async function build(serverEntry?: string) {
       return [filename, exportNames];
     }));
   }
-  const port = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
+  const modulesProxyPort = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
   const serverEntryCode = [
     `import { DependencyGraph } from "${alephPkgUri}/server/graph.ts";`,
     `import graph from "./server_dependency_graph.js";`,
@@ -86,7 +86,7 @@ export async function build(serverEntry?: string) {
       if (!hasDefaultExport && !hasDataExport) {
         return [];
       }
-      const url = `http://localhost:${port}${filename.slice(1)}`;
+      const url = `http://localhost:${modulesProxyPort}${filename.slice(1)}`;
       return [
         `import { ${
           [
@@ -102,7 +102,7 @@ export async function build(serverEntry?: string) {
         } });`,
       ];
     }),
-    serverEntry && `import "http://localhost:${port}/${basename(serverEntry)}";`,
+    serverEntry && `import "http://localhost:${modulesProxyPort}/${basename(serverEntry)}";`,
     !serverEntry && `import { serve } from "${alephPkgUri}/server/mode.ts";`,
     !serverEntry && `serve();`,
   ].flat().filter(Boolean).join("\n");
@@ -125,15 +125,15 @@ export async function build(serverEntry?: string) {
     );
   }
 
-  const forceBundle = (importUrl: string) => {
+  const shouldBundle = (importUrl: string) => {
     return importUrl === alephPkgUri + "/server/mod.ts" ||
       importUrl === alephPkgUri + "/server/transformer.ts" ||
       // since deno deploy doesn't support importMap, we need to resolve the 'react' import
       importUrl.startsWith(alephPkgUri + "/framework/react/") ||
-      importUrl.startsWith(`http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/`);
+      importUrl.startsWith(`http://localhost:${modulesProxyPort}/`);
   };
 
-  // build server entry
+  // build the server entry
   await esbuild({
     stdin: {
       contents: serverEntryCode,
@@ -144,7 +144,7 @@ export async function build(serverEntry?: string) {
     format: "esm",
     target: ["esnext"],
     bundle: true,
-    minify: !Deno.env.get("ALEPH_DEV_PORT"),
+    minify: !Deno.env.get("ALEPH_DEV"),
     treeShaking: true,
     sourcemap: true,
     jsxFactory: jsxCofig.jsxRuntime === "preact" ? "h" : "React.createElement",
@@ -156,6 +156,7 @@ export async function build(serverEntry?: string) {
         build.onResolve({ filter: /.*/ }, (args) => {
           let importUrl = args.path;
           if (importUrl in importMap.imports) {
+            // since deno deploy doesn't support importMap, we need to resolve the 'react' import
             importUrl = importMap.imports[importUrl];
           }
 
@@ -168,13 +169,13 @@ export async function build(serverEntry?: string) {
 
           if (args.namespace === "http") {
             const { href } = new URL(path, args.importer);
-            if (!forceBundle(href)) {
+            if (!shouldBundle(href)) {
               return { path: href, external: true };
             }
             return { path: href, namespace: "http" };
           }
 
-          if (isRemote && forceBundle(path)) {
+          if (isRemote && shouldBundle(path)) {
             return { path, namespace: "http" };
           }
 
@@ -258,6 +259,7 @@ export async function build(serverEntry?: string) {
     while (tasks.length > 0) {
       const deps = new Set<string>();
       await Promise.all(tasks.map(async (specifier) => {
+        clientModules.add(specifier);
         const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
         const isCSS = url.pathname.endsWith(".css");
         const req = new Request(url.toString());
@@ -273,7 +275,6 @@ export async function build(serverEntry?: string) {
           Deno.open(savePath, { write: true, create: true }),
         ]);
         await res.body?.pipeTo(file.writable);
-        clientModules.add(specifier);
         if (!isCSS) {
           const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
           clientDependencyGraph?.get(specifier)?.deps?.forEach(({ specifier }) => {
