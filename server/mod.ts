@@ -102,17 +102,22 @@ export const serve = (options: ServerOptions = {}) => {
           stat = await Deno.lstat(filePath);
         }
         if (stat.isFile) {
-          const { mtime } = stat;
-          const etag = mtime ? mtime.getTime().toString(16) + "-" + stat.size.toString(16) : null;
+          const headers = new Headers({ "Content-Type": contentType });
+          const deployId = Deno.env.get("DENO_DEPLOYMENT_ID");
+          let etag: string | null = null;
+          if (deployId) {
+            etag = `${btoa(pathname).replace(/[^a-z0-9]/g, "")}-${deployId}`;
+          } else {
+            const { mtime, size } = stat;
+            if (mtime) {
+              etag = mtime.getTime().toString(16) + "-" + size.toString(16);
+              headers.append("Last-Modified", new Date(mtime).toUTCString());
+            }
+          }
           if (etag && req.headers.get("If-None-Match") === etag) {
             return new Response(null, { status: 304 });
           }
           const file = await Deno.open(filePath, { read: true });
-          const headers = new Headers({ "Content-Type": contentType });
-          if (mtime) {
-            headers.set("Etag", etag!);
-            headers.set("Last-Modified", mtime.toUTCString());
-          }
           return new Response(readableStreamFromReader(file), { headers });
         }
       } catch (err) {
@@ -134,30 +139,31 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    let cookies: Map<string, string> | null = null;
-
     const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
     const ctx = {
       params: {},
       headers: new Headers(),
       cookies: {
-        get: (name: string) => {
-          if (cookies === null) {
-            cookies = new Map<string, string>();
+        _cookies: null as Map<string, string> | null,
+        get(name: string) {
+          if (this._cookies === null) {
+            this._cookies = new Map<string, string>();
             const cookieHeader = req.headers.get("Cookie");
             if (cookieHeader) {
               for (const cookie of cookieHeader.split(";")) {
                 const [key, value] = util.splitBy(cookie, "=");
-                cookies.set(key.trim(), value);
+                this._cookies.set(key.trim(), value);
               }
             }
           }
-          return cookies.get(name);
+          return this._cookies.get(name);
         },
-        set: (name: string, value: string, options?: CookieOptions) => {
+        set(name: string, value: string, options?: CookieOptions) {
+          this._cookies?.set(name, value);
           ctx.headers.set("Set-Cookie", setCookieHeader(name, value, options));
         },
-        delete: (name: string, options?: CookieOptions) => {
+        delete(name: string, options?: CookieOptions) {
+          this._cookies?.delete(name);
           ctx.headers.set("Set-Cookie", setCookieHeader(name, "", { ...options, expires: new Date(0) }));
         },
       },
@@ -321,11 +327,12 @@ export const serve = (options: ServerOptions = {}) => {
     log.setLevel(logLevel);
   }
 
+  // clean global cached objects
+  Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
+  Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
+
   // inject global `__ALEPH_CONFIG`
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
-
-  // delete previous `__UNO_GENERATOR`
-  Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;
   if (Deno.env.get("ALEPH_CLI")) {

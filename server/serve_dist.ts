@@ -25,10 +25,10 @@ export default {
         ctype = "text/css; charset=utf-8";
       }
       const headers = new Headers({ "Content-Type": ctype });
-      const deplyId = Deno.env.get("DENO_DEPLOYMENT_ID");
+      const deployId = Deno.env.get("DENO_DEPLOYMENT_ID");
       let etag: string | null = null;
-      if (deplyId) {
-        etag = `${btoa(pathname).replace(/[^a-z0-9]/g, "")}-${deplyId}`;
+      if (deployId) {
+        etag = `${btoa(pathname).replace(/[^a-z0-9]/g, "")}-${deployId}`;
       } else {
         const stat = await Deno.lstat(filePath);
         if (!stat.isFile) {

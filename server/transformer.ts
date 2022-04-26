@@ -30,6 +30,7 @@ export default {
     const { isDev, buildHash, loaded } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
+
     let sourceCode: string;
     let mtime: number | undefined;
     let lang: string | undefined;
@@ -47,10 +48,9 @@ export default {
       isCSS = codeType.startsWith("text/css");
       uno = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
     }
+
     const etag = mtime
-      ? `${mtime.toString(16)}-${sourceCode.length.toString(16)}-${
-        sourceCode.charCodeAt(Math.floor(sourceCode.length / 2)).toString(16)
-      }${buildHash.slice(0, 8)}`
+      ? `${mtime.toString(16)}-${sourceCode.length.toString(16)}-${buildHash.slice(0, 8)}`
       : await util.computeHash("sha-1", sourceCode + buildHash);
     if (req.headers.get("If-None-Match") === etag) {
       return new Response(null, { status: 304 });
