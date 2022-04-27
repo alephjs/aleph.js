@@ -184,16 +184,23 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
           clearTimeout(loading);
           loadingBar.remove();
         } else {
-          const fadeOutTime = 1.0;
-          loadingBar.style.transition = `opacity ${fadeOutTime}s ease-in-out, width ${fadeOutTime}s ease-in-out`;
-          setTimeout(() => {
+          const moveOutTime = 0.7;
+          const fadeOutTime = 0.3;
+          const t1 = setTimeout(() => {
             loadingBar.style.opacity = "0";
+          }, moveOutTime * 1000);
+          const t2 = setTimeout(() => {
+            global.__loading_bar_cleanup = null;
+            loadingBar.remove();
+          }, (moveOutTime + fadeOutTime) * 1000);
+          global.__loading_bar_cleanup = () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+          };
+          loadingBar.style.transition = `opacity ${fadeOutTime}s ease-out, width ${moveOutTime}s ease-in-out`;
+          setTimeout(() => {
             loadingBar.style.width = "100%";
           }, 0);
-          global.__loading_bar_remove_timer = setTimeout(() => {
-            global.__loading_bar_remove_timer = null;
-            loadingBar.remove();
-          }, fadeOutTime * 1000);
         }
       }, 0);
       if (e.url) {
@@ -310,9 +317,9 @@ function loadSSRModulesFromTag(): RouteModule[] {
 }
 
 function getLoadingBar(): HTMLDivElement {
-  if (typeof global.__loading_bar_remove_timer === "number") {
-    clearTimeout(global.__loading_bar_remove_timer);
-    global.__loading_bar_remove_timer = null;
+  if (typeof global.__loading_bar_cleanup === "function") {
+    global.__loading_bar_cleanup();
+    global.__loading_bar_cleanup = null;
   }
   let bar = (document.getElementById("loading-bar") as HTMLDivElement | null);
   if (!bar) {
@@ -324,11 +331,12 @@ function getLoadingBar(): HTMLDivElement {
     position: "fixed",
     top: "0",
     left: "0",
+    zIndex: "9999",
     width: "0",
     height: "1px",
     opacity: "0",
     background: "rgba(128, 128, 128, 0.9)",
-    transition: "opacity 0.6s ease-in-out, width 3s ease-in-out",
+    transition: "opacity 0.6s ease-in, width 3s ease-in",
   });
   return bar;
 }
