@@ -20,3 +20,5 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 - Monaco Editor: https://aleph-monaco-editor.deno.dev/
 
 Source code: https://github.com/alephjs/aleph.js/tree/main/examples
+
+**If you are finding the old version docs, please check https://alephjs.vercel.app**
