@@ -267,7 +267,11 @@ export const serve = (options: ServerOptions = {}) => {
     let indexHtml: Uint8Array | null | undefined = Reflect.get(globalThis, "__ALEPH_INDEX_HTML");
     if (indexHtml === undefined) {
       try {
-        indexHtml = await loadAndFixIndexHtml(isDev, typeof ssr === "function" ? {} : ssr);
+        indexHtml = await loadAndFixIndexHtml({
+          isDev,
+          ssr: typeof ssr === "function" ? {} : ssr,
+          hmrWebSocketUrl: options.hmrWebSocketUrl,
+        });
       } catch (err) {
         if (err instanceof Deno.errors.NotFound) {
           indexHtml = null;
@@ -283,16 +287,6 @@ export const serve = (options: ServerOptions = {}) => {
     // no root `index.html` found
     if (indexHtml === null) {
       return new Response("Not Found", { status: 404 });
-    }
-
-    if (isDev && options.hmrWebSocketUrl) {
-      customHTMLRewriter.set("head", {
-        element(el) {
-          el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(options.hmrWebSocketUrl)};</script>`, {
-            html: true,
-          });
-        },
-      });
     }
 
     // render html

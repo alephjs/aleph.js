@@ -8,6 +8,12 @@ import { getAlephPkgUri } from "./config.ts";
 
 await initLolHtml(decodeLolHtmlWasm());
 
+type LoadOptions = {
+  isDev: boolean;
+  ssr?: { suspense?: boolean };
+  hmrWebSocketUrl?: string;
+};
+
 // laod the `index.html`
 // - fix relative url to absolute url of `src` and `href`
 // - add `./framework/core/hmr.ts` when in `development` mode
@@ -15,9 +21,9 @@ await initLolHtml(decodeLolHtmlWasm());
 // - check the `<head>` and `<body>` elements
 // - check the `<ssr-body>` element if the ssr is enabled
 // - add `data-suspense` attribute to `<body>` if using suspense ssr
-export async function loadAndFixIndexHtml(isDev: boolean, ssr?: { suspense?: boolean }): Promise<Uint8Array> {
+export async function loadAndFixIndexHtml(options: LoadOptions): Promise<Uint8Array> {
   const { html, hasSSRBody } = await loadIndexHtml();
-  return fixIndexHtml(html, { isDev, ssr, hasSSRBody });
+  return fixIndexHtml(html, hasSSRBody, options);
 }
 
 async function loadIndexHtml(): Promise<{ html: Uint8Array; hasSSRBody: boolean }> {
@@ -84,11 +90,8 @@ async function loadIndexHtml(): Promise<{ html: Uint8Array; hasSSRBody: boolean 
   }
 }
 
-function fixIndexHtml(
-  html: Uint8Array,
-  options: { isDev: boolean; ssr?: { suspense?: boolean }; hasSSRBody: boolean },
-): Uint8Array {
-  const { isDev, ssr, hasSSRBody } = options;
+function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOptions): Uint8Array {
+  const { isDev, ssr, hmrWebSocketUrl } = options;
   const alephPkgUri = getAlephPkgUri();
   const chunks: Uint8Array[] = [];
   const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
@@ -154,6 +157,15 @@ function fixIndexHtml(
     rewriter.on("body", {
       element: (el: Element) => {
         el.setAttribute("data-suspense", "true");
+      },
+    });
+  }
+  if (isDev && hmrWebSocketUrl) {
+    rewriter.on("head", {
+      element(el: Element) {
+        el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(hmrWebSocketUrl)};</script>`, {
+          html: true,
+        });
       },
     });
   }
