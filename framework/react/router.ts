@@ -157,7 +157,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
         loading = null;
         loadingBar.style.opacity = "1";
         loadingBar.style.width = "50%";
-      }, 200);
+      }, 300);
       const modules = await Promise.all(matches.map(async ([ret, meta]) => {
         const { filename } = meta;
         const rmod: RouteModule = {
