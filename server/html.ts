@@ -37,6 +37,16 @@ async function loadIndexHtml(): Promise<{ html: Uint8Array; hasSSRBody: boolean 
     element: () => hasSSRBody = true,
   });
   rewriter.on("*", {
+    element: (e: Element) => {
+      if (e.hasAttribute("data-ssr-root")) {
+        if (hasSSRBody) {
+          e.removeAttribute("data-ssr-root");
+        } else {
+          e.setInnerContent("<ssr-body></ssr-body>", { html: true });
+          hasSSRBody = true;
+        }
+      }
+    },
     comments: (c: Comment) => {
       const text = c.text.trim();
       if (text === "ssr-body" || text === "ssr-output") {

@@ -2,12 +2,12 @@ import util from "../../lib/util.ts";
 import events from "./events.ts";
 
 let routerReady = false;
-let preRedirect: { url: URL; replace?: boolean } | null = null;
+let preRedirect: URL | null = null;
 
 const onrouterready = (_: Record<string, unknown>) => {
   events.off("routerready", onrouterready);
   if (preRedirect) {
-    events.emit("popstate", { type: "popstate", ...preRedirect });
+    events.emit("popstate", { type: "popstate", url: preRedirect });
     preRedirect = null;
   }
   routerReady = true;
@@ -26,14 +26,20 @@ export function redirect(url: string, replace?: boolean) {
     return;
   }
 
-  const next = new URL(url, location.href);
-  if (next.href === location.href) {
+  const to = new URL(url, location.href);
+  if (to.href === location.href) {
     return;
   }
 
-  if (routerReady) {
-    events.emit("popstate", { type: "popstate", url: next, replace });
+  if (replace) {
+    history.replaceState(null, "", to);
   } else {
-    preRedirect = { url: next, replace };
+    history.pushState(null, "", to);
+  }
+
+  if (routerReady) {
+    events.emit("popstate", { type: "popstate", url: to });
+  } else {
+    preRedirect = to;
   }
 }

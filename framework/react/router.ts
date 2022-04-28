@@ -22,7 +22,7 @@ export type RouterProps = {
   readonly suspense?: boolean;
 };
 
-type DataCache = {
+type RouteData = {
   data?: unknown;
   dataCacheTtl?: number;
   dataExpires?: number;
@@ -35,7 +35,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
-    const cache = new Map<string, DataCache>();
+    const cache = new Map<string, RouteData>();
     modules.forEach(({ url, data, dataCacheTtl }) => {
       cache.set(url.pathname + url.search, {
         data,
@@ -108,7 +108,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
     };
     const isSuspense = document.body.getAttribute("data-suspense") ?? suspense;
     const prefetchData = async (dataUrl: string) => {
-      const cache: DataCache = {};
+      const rd: RouteData = {};
       const fetchData = async () => {
         const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
         if (res.status === 404 || res.status === 405) {
@@ -125,16 +125,16 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
           throw new FetchError(500, {}, "Missing the `Location` header");
         }
         const cc = res.headers.get("Cache-Control");
-        cache.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-        cache.dataExpires = Date.now() + (cache.dataCacheTtl || 1) * 1000;
+        rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+        rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
         return await res.json();
       };
       if (isSuspense) {
-        cache.data = fetchData;
+        rd.data = fetchData;
       } else {
-        cache.data = await fetchData();
+        rd.data = await fetchData();
       }
-      dataCache.set(dataUrl, cache);
+      dataCache.set(dataUrl, rd);
     };
     const onmoduleprefetch = (e: Record<string, unknown>) => {
       const pageUrl = new URL(e.href as string, location.href);
@@ -152,6 +152,12 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
     const onpopstate = async (e: Record<string, unknown>) => {
       const url = (e.url as URL | undefined) || new URL(window.location.href);
       const matches = matchRoutes(url, routes);
+      const loadingBar = getLoadingBar();
+      let loading: number | null = setTimeout(() => {
+        loading = null;
+        loadingBar.style.opacity = "1";
+        loadingBar.style.width = "50%";
+      }, 200);
       const modules = await Promise.all(matches.map(async ([ret, meta]) => {
         const { filename } = meta;
         const rmod: RouteModule = {
@@ -173,12 +179,31 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
       }));
       setModules(modules);
       setUrl(url);
-      if (e.url) {
-        if (e.replace) {
-          history.replaceState(null, "", e.url as URL);
+      setTimeout(() => {
+        if (loading) {
+          clearTimeout(loading);
+          loadingBar.remove();
         } else {
-          history.pushState(null, "", e.url as URL);
+          const moveOutTime = 0.7;
+          const fadeOutTime = 0.3;
+          const t1 = setTimeout(() => {
+            loadingBar.style.opacity = "0";
+          }, moveOutTime * 1000);
+          const t2 = setTimeout(() => {
+            global.__loading_bar_cleanup = null;
+            loadingBar.remove();
+          }, (moveOutTime + fadeOutTime) * 1000);
+          global.__loading_bar_cleanup = () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+          };
+          loadingBar.style.transition = `opacity ${fadeOutTime}s ease-out, width ${moveOutTime}s ease-in-out`;
+          setTimeout(() => {
+            loadingBar.style.width = "100%";
+          }, 0);
         }
+      }, 0);
+      if (e.url) {
         window.scrollTo(0, 0);
       }
     };
@@ -289,6 +314,31 @@ function loadSSRModulesFromTag(): RouteModule[] {
     }
   }
   return [];
+}
+
+function getLoadingBar(): HTMLDivElement {
+  if (typeof global.__loading_bar_cleanup === "function") {
+    global.__loading_bar_cleanup();
+    global.__loading_bar_cleanup = null;
+  }
+  let bar = (document.getElementById("loading-bar") as HTMLDivElement | null);
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "loading-bar";
+    document.body.appendChild(bar);
+  }
+  Object.assign(bar.style, {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    zIndex: "9999",
+    width: "0",
+    height: "1px",
+    opacity: "0",
+    background: "rgba(128, 128, 128, 0.9)",
+    transition: "opacity 0.6s ease-in, width 3s ease-in",
+  });
+  return bar;
 }
 
 function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
