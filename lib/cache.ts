@@ -3,7 +3,16 @@ import { existsDir, existsFile } from "./fs.ts";
 import log from "./log.ts";
 import util from "./util.ts";
 
-const memoryCache = new Map<string, [Uint8Array, { headers: Record<string, string> }]>();
+type Meta = {
+  url: string;
+  headers: Record<string, string>;
+  now: {
+    secs_since_epoch: number;
+    nanos_since_epoch: number;
+  };
+};
+
+const memoryCache = new Map<string, [content: Uint8Array, meta: Meta]>();
 
 /** fetch and cache remote contents */
 export default async function cache(
@@ -27,20 +36,24 @@ export default async function cache(
   if (!options?.forceRefresh && !isLocalhost) {
     if (modulesCacheDir) {
       if (await existsFile(contentFilepath) && await existsFile(metaFilepath)) {
-        const [content, meta] = await Promise.all([
+        const [content, metaJSON] = await Promise.all([
           Deno.readFile(contentFilepath),
           Deno.readTextFile(metaFilepath),
         ]);
         try {
-          const { headers = {} } = JSON.parse(meta);
-          return new Response(content, { headers: { ...headers, "cache-hit": "true" } });
+          const meta = JSON.parse(metaJSON);
+          if (!isExpired(meta)) {
+            return new Response(content, { headers: { ...meta.headers, "cache-hit": "true" } });
+          }
         } catch (_e) {
-          return new Response(content);
+          log.debug(`skip cache of ${url}: invalid cache metadata file`);
         }
       }
     } else if (memoryCache.has(hashname)) {
-      const [content, { headers }] = memoryCache.get(hashname)!;
-      return new Response(content, { headers: { ...headers, "cache-hit": "true" } });
+      const [content, meta] = memoryCache.get(hashname)!;
+      if (!isExpired(meta)) {
+        return new Response(content, { headers: { ...meta.headers, "cache-hit": "true" } });
+      }
     }
   }
 
@@ -64,9 +77,16 @@ export default async function cache(
     if (res.ok && !isLocalhost) {
       const buffer = await res.arrayBuffer();
       const content = new Uint8Array(buffer);
-      const headers: Record<string, string> = {};
+      const meta: Meta = {
+        url,
+        headers: {},
+        now: {
+          secs_since_epoch: Math.round(Date.now() / 1000),
+          nanos_since_epoch: 0,
+        },
+      };
       res.headers.forEach((val, key) => {
-        headers[key] = val;
+        meta.headers[key] = val;
       });
       if (modulesCacheDir) {
         if (!(await existsDir(cacheDir))) {
@@ -74,17 +94,10 @@ export default async function cache(
         }
         await Promise.all([
           Deno.writeFile(contentFilepath, content),
-          Deno.writeTextFile(
-            metaFilepath,
-            JSON.stringify(
-              { headers, url, now: { secs_since_epoch: Math.round(Date.now() / 1000), nanos_since_epoch: 0 } },
-              undefined,
-              2,
-            ),
-          ),
+          Deno.writeTextFile(metaFilepath, JSON.stringify(meta, undefined, 2)),
         ]);
       } else {
-        memoryCache.set(hashname, [content, { headers }]);
+        memoryCache.set(hashname, [content, meta]);
       }
       return new Response(content, { headers: res.headers });
     }
@@ -93,4 +106,17 @@ export default async function cache(
   }
 
   return finalRes;
+}
+
+function isExpired(meta: Meta) {
+  const cc = meta.headers["cache-control"];
+  const dataCacheTtl = cc && cc.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+  if (dataCacheTtl) {
+    const now = Date.now();
+    const expireTime = (meta.now.secs_since_epoch + dataCacheTtl) * 1000;
+    if (now > expireTime) {
+      return true;
+    }
+  }
+  return false;
 }

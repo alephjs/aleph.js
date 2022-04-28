@@ -2,7 +2,7 @@ import MagicString from "https://esm.sh/magic-string@0.26.1";
 import { parseDeps, transform } from "../compiler/mod.ts";
 import type { TransformOptions, TransformResult } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
-import { builtinModuleExts, restoreUrl, toLocalPath } from "../lib/helpers.ts";
+import { builtinModuleExts, regFullVersion, restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
@@ -163,11 +163,13 @@ export default {
         resBody = code;
       }
     }
-    return new Response(resBody, {
-      headers: {
-        "Content-Type": `${resType}; charset=utf-8`,
-        "Etag": etag,
-      },
+    const headers = new Headers({
+      "Content-Type": `${resType}; charset=utf-8`,
+      "Etag": etag,
     });
+    if (searchParams.get("v") || (pathname.startsWith("/-/") && regFullVersion.test(pathname))) {
+      headers.append("Cache-Control", "public, max-age=31536000, immutable");
+    }
+    return new Response(resBody, { headers });
   },
 };

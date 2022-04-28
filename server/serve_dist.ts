@@ -1,9 +1,7 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
-import { builtinModuleExts } from "../lib/helpers.ts";
+import { builtinModuleExts, regFullVersion } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import type { AlephConfig } from "./types.ts";
-
-const REG_FULL_VERSION = /@\d+\.\d+\.\d+/;
 
 export default {
   test: (pathname: string) => {
@@ -47,7 +45,7 @@ export default {
       if (etag) {
         headers.append("Etag", etag);
       }
-      if (searchParams.get("v") || (pathname.startsWith("/-/") && REG_FULL_VERSION.test(pathname))) {
+      if (searchParams.get("v") || (pathname.startsWith("/-/") && regFullVersion.test(pathname))) {
         headers.append("Cache-Control", "public, max-age=31536000, immutable");
       }
       return new Response(readableStreamFromReader(file), { headers });

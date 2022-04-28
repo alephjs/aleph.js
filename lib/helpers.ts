@@ -1,5 +1,6 @@
 import util from "./util.ts";
 
+export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
 export class FetchError extends Error {
