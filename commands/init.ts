@@ -13,7 +13,7 @@ import { isCanary, VERSION } from "../version.ts";
 const templates = ["react", "preact", "vue", "svelte", "lit", "vanilla", "api"];
 const versions = {
   react: "18.1.0",
-  vue: "3.2.31",
+  vue: "3.2.33",
 };
 
 export const helpMessage = `
