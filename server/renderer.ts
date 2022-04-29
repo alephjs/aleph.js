@@ -17,6 +17,7 @@ export type SSRContext = {
   readonly errorBoundaryHandler?: CallableFunction;
   readonly signal: AbortSignal;
   readonly bootstrapScripts?: string[];
+  readonly onError?: (error: unknown) => void;
 };
 
 export type HTMLRewriterHandlers = {
@@ -61,14 +62,17 @@ export default {
       const render = typeof ssr === "function" ? ssr : ssr.render;
       try {
         const headCollection: string[] = [];
-        const ssrContext = {
+        const ssrContext: SSRContext = {
           url,
           routeModules,
-          errorBoundaryHandler: errorBoundaryHandler?.default,
           headCollection,
           suspense,
+          errorBoundaryHandler: errorBoundaryHandler?.default,
           signal: req.signal,
           bootstrapScripts: [bootstrapScript],
+          onError: (_error: unknown) => {
+            // todo: handle suspense error
+          },
         };
         const body = await render(ssrContext);
         const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
@@ -150,7 +154,7 @@ export default {
             }
             return line;
           }).join("\n");
-          log.error(e);
+          log.error("SSR", e);
         } else {
           message = e?.toString?.() || String(e);
         }
@@ -370,7 +374,7 @@ async function initSSR(
             throw new FetchError(500, {}, "Data must be valid JSON");
           }
         } else {
-          throw new Error("Data response must be a JSON");
+          throw new FetchError(500, {}, "Data must be valid JSON");
         }
       };
       if (suspense) {

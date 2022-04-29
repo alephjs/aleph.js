@@ -12,7 +12,7 @@ import renderer from "./renderer.ts";
 import { content, type CookieOptions, json, setCookieHeader } from "./response.ts";
 import { importRouteModule, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
-import type { AlephConfig, FetchHandler, Middleware, MiddlewareCallback } from "./types.ts";
+import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
 
 export type ServerOptions = ServeInit & {
   certFile?: string;
@@ -23,10 +23,11 @@ export type ServerOptions = ServeInit & {
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: SSR;
+  onError?(error: unknown): Promise<Response> | Response;
 };
 
 export const serve = (options: ServerOptions = {}) => {
-  const { config, middlewares, fetch, ssr, logLevel } = options;
+  const { config, middlewares, fetch, ssr, logLevel, onError } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then((importMap) => loadJSXConfig(importMap));
@@ -50,32 +51,39 @@ export const serve = (options: ServerOptions = {}) => {
 
     // transform client modules
     if (clientModuleTransformer.test(pathname)) {
-      const [buildHash, jsxConfig, importMap] = await Promise.all([
-        buildHashPromise,
-        jsxConfigPromise,
-        importMapPromise,
-      ]);
-      return clientModuleTransformer.fetch(req, {
-        importMap,
-        jsxConfig,
-        buildHash,
-        buildTarget: config?.build?.target,
-        isDev,
-      });
+      try {
+        const [buildHash, jsxConfig, importMap] = await Promise.all([
+          buildHashPromise,
+          jsxConfigPromise,
+          importMapPromise,
+        ]);
+        return await clientModuleTransformer.fetch(req, {
+          importMap,
+          jsxConfig,
+          buildHash,
+          buildTarget: config?.build?.target,
+          isDev,
+        });
+      } catch (err) {
+        if (!(err instanceof Deno.errors.NotFound)) {
+          log.error(err);
+          return onError?.(err) ?? new Response(err.message, { status: 500 });
+        }
+      }
     }
 
     // use loader to load modules
     const moduleLoaders = await moduleLoadersPromise;
     const loader = moduleLoaders.find((loader) => loader.test(pathname));
     if (loader) {
-      const [buildHash, jsxConfig, importMap] = await Promise.all([
-        buildHashPromise,
-        jsxConfigPromise,
-        importMapPromise,
-      ]);
       try {
+        const [buildHash, jsxConfig, importMap] = await Promise.all([
+          buildHashPromise,
+          jsxConfigPromise,
+          importMapPromise,
+        ]);
         const loaded = await loader.load(pathname, { isDev, importMap });
-        return clientModuleTransformer.fetch(req, {
+        return await clientModuleTransformer.fetch(req, {
           loaded,
           importMap,
           jsxConfig,
@@ -86,7 +94,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return new Response(err.message, { status: 500 });
+          return onError?.(err) ?? new Response(err.message, { status: 500 });
         }
       }
     }
@@ -123,7 +131,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return new Response("Internal Server Error", { status: 500 });
+          return onError?.(err) ?? new Response(err.message, { status: 500 });
         }
       }
     }
@@ -205,24 +213,24 @@ export const serve = (options: ServerOptions = {}) => {
 
     // use middlewares
     if (Array.isArray(middlewares) && middlewares.length > 0) {
-      const callbacks: MiddlewareCallback[] = [];
-      for (const mw of middlewares) {
-        const handler = mw.fetch;
-        if (typeof handler === "function") {
-          let res = handler(req, ctx);
-          if (res instanceof Promise) {
-            res = await res;
-          }
-          if (res instanceof Response) {
-            return res;
-          }
-          if (typeof res === "function") {
-            callbacks.push(res);
+      try {
+        for (const mw of middlewares) {
+          const handler = mw.fetch;
+          if (typeof handler === "function") {
+            let res = handler(req, ctx);
+            if (res instanceof Promise) {
+              res = await res;
+            }
+            if (res instanceof Response) {
+              return res;
+            }
+            if (typeof res === "function") {
+              setTimeout(res, 0);
+            }
           }
         }
-      }
-      for (const callback of callbacks) {
-        await callback();
+      } catch (err) {
+        return onError?.(err) ?? new Response(err.message, { status: 500 });
       }
     }
 
@@ -241,7 +249,23 @@ export const serve = (options: ServerOptions = {}) => {
             ) {
               const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
-                return fetcher(req, { ...ctx, params: ret.pathname.groups });
+                const res = await fetcher(req, { ...ctx, params: ret.pathname.groups });
+                console.log(res);
+                if (res instanceof Response) {
+                  return res;
+                }
+                if (
+                  typeof res === "string" || res instanceof ArrayBuffer || res instanceof ReadableStream
+                ) {
+                  return new Response(res);
+                }
+                if (res instanceof Blob) {
+                  return new Response(res, { headers: { "Content-Type": res.type } });
+                }
+                if (util.isPlainObject(res) || Array.isArray(res) || res === null) {
+                  return json(res);
+                }
+                return new Response(null);
               }
               return new Response("Method not allowed", { status: 405 });
             }
@@ -277,7 +301,7 @@ export const serve = (options: ServerOptions = {}) => {
           indexHtml = null;
         } else {
           log.error("read index.html:", err);
-          return new Response("Internal Server Error", { status: 500 });
+          return onError?.(err) ?? new Response(err.message, { status: 500 });
         }
       }
     }

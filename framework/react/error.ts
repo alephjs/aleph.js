@@ -14,7 +14,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
   }
 
   render() {
-    if (this.state.error) {
+    if (this.state.error instanceof Error) {
       return createElement(this.props.Handler, { error: this.state.error });
     }
 

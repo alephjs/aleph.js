@@ -51,29 +51,36 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
     const { url, defaultExport } = modules[0];
     const dataUrl = url.pathname + url.search;
     const el = createElement(
-      DataContext.Provider,
+      ErrorBoundary,
       {
-        value: {
-          dataUrl,
-          dataCache,
-          ssrHeadCollection: ssrContext?.headCollection,
-        },
-        key: dataUrl,
+        Handler: ErrorBoundaryHandler || (({ error }: { error: Error }) =>
+          createElement(Err, {
+            status: 500,
+            statusText: error.message,
+          })),
       },
-      typeof defaultExport === "function"
-        ? createElement(
-          defaultExport as FC,
-          null,
-          modules.length > 1 ? createRouteEl(modules.slice(1)) : undefined,
-        )
-        : createElement(Err, {
-          status: 400,
-          statusText: "missing default export as a valid React component",
-        }),
+      createElement(
+        DataContext.Provider,
+        {
+          value: {
+            dataUrl,
+            dataCache,
+            ssrHeadCollection: ssrContext?.headCollection,
+          },
+          key: dataUrl,
+        },
+        typeof defaultExport === "function"
+          ? createElement(
+            defaultExport as FC,
+            null,
+            modules.length > 1 ? createRouteEl(modules.slice(1)) : undefined,
+          )
+          : createElement(Err, {
+            status: 400,
+            statusText: "missing default export as a valid React component",
+          }),
+      ),
     );
-    if (ErrorBoundaryHandler) {
-      return createElement(ErrorBoundary, { Handler: ErrorBoundaryHandler }, el);
-    }
     return el;
   };
   const routeEl = useMemo(() => {

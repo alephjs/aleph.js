@@ -92,7 +92,7 @@ export default {
       const alephPkgUri = getAlephPkgUri();
       const { jsxConfig, importMap, buildTarget } = options;
       let ret: TransformResult;
-      if (/^https?:\/\/(cdn\.)esm\.sh\//.test(specifier)) {
+      if (/^https?:\/\/((cdn\.)?esm\.sh|unpkg\.com)\//.test(specifier)) {
         // don't transform modules imported from esm.sh
         const deps = await parseDeps(specifier, sourceCode, { importMap: JSON.stringify(importMap) });
         if (deps.length > 0) {

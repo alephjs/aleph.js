@@ -20,12 +20,16 @@ export const useData = <T = unknown>(): {
   const [data, setData] = useState(() => {
     const cached = dataCache.get(dataUrl);
     if (cached) {
+      if (cached.data instanceof Error) {
+        throw cached.data;
+      }
       if (typeof cached.data === "function") {
         const data = cached.data();
         if (data instanceof Promise) {
           throw data.then((data) => {
             cached.data = data;
-            return data;
+          }).catch((error) => {
+            cached.data = error;
           });
         }
         throw new Error(`Data for ${dataUrl} has invalid type [function].`);
