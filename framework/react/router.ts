@@ -114,7 +114,6 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
       if (deployId) {
         url += `?v=${deployId}`;
       }
-      console.log(url);
       const { default: defaultExport, data: withData } = await import(url);
       routeModules[filename] = { defaultExport, withData };
       return { defaultExport, withData };
