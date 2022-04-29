@@ -11,31 +11,23 @@ export enum Level {
 }
 
 export class Timing {
-  #t: number;
-
-  constructor(quit?: boolean) {
-    this.#t = !quit ? performance.now() : 0;
-  }
+  #t = performance.now();
 
   reset() {
-    if (this.#t > 0) {
-      this.#t = performance.now();
-    }
+    this.#t = performance.now();
   }
 
   stop(message: string) {
-    if (this.#t > 0) {
-      const now = performance.now();
-      const d = Math.round(now - this.#t);
-      let cf = green;
-      if (d > 10000) {
-        cf = red;
-      } else if (d > 1000) {
-        cf = yellow;
-      }
-      this.#t = now;
-      console.debug(dim("TIMING"), message, "in", cf(d + "ms"));
+    const now = performance.now();
+    const d = Math.round(now - this.#t);
+    let cf = green;
+    if (d > 10000) {
+      cf = red;
+    } else if (d > 1000) {
+      cf = yellow;
     }
+    console.debug(dim("TIMING"), message, "in", cf(d + "ms"));
+    this.#t = now;
   }
 }
 
@@ -97,10 +89,13 @@ export class Logger {
     }
   }
 
-  timing(): Timing {
-    return new Timing(this.level > Level.Debug);
+  timing(): { reset(): void; stop(message: string): void } {
+    if (this.level === Level.Debug) {
+      return new Timing();
+    }
+    return { reset: () => {}, stop: () => {} };
   }
 }
 
-export default new Logger();
 export { blue, bold, dim, green, red, stripColor, yellow };
+export default new Logger();

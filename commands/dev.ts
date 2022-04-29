@@ -1,11 +1,10 @@
 import { basename, relative } from "https://deno.land/std@0.136.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { findFile, watchFs } from "../lib/fs.ts";
-import { builtinModuleExts } from "../lib/helpers.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { serve as httpServe } from "../lib/serve.ts";
-import { initModuleLoaders, loadImportMap } from "../server/config.ts";
+import { builtinModuleExts, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
 import type { DependencyGraph } from "../server/graph.ts";

@@ -1,5 +1,5 @@
 import { assertEquals } from "std/testing/asserts.ts";
-import { restoreUrl, toLocalPath } from "../lib/helpers.ts";
+import { restoreUrl, toLocalPath } from "../server/helpers.ts";
 
 Deno.test("lib/helpers.ts: toLocalPath", () => {
   assertEquals(toLocalPath("https://foo.com/lib@0.1.0?action"), "/-/foo.com/lib@0.1.0?action");

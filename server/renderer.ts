@@ -1,10 +1,10 @@
-import { builtinModuleExts, FetchError } from "../lib/helpers.ts";
+import FetchError from "../lib/fetch_error.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { RouteModule, Routes } from "../lib/route.ts";
 import { matchRoutes } from "../lib/route.ts";
-import { getUnoGenerator } from "./config.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
+import { builtinModuleExts, getUnoGenerator } from "./helpers.ts";
 import type { Comment, Element } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";

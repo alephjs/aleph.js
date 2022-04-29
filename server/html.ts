@@ -2,9 +2,8 @@ import { concat } from "https://deno.land/std@0.136.0/bytes/mod.ts";
 import type { Comment, DocumentEnd, Element } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import decodeLolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
-import { toLocalPath } from "../lib/helpers.ts";
 import util from "../lib/util.ts";
-import { getAlephPkgUri } from "./config.ts";
+import { getAlephPkgUri, toLocalPath } from "./helpers.ts";
 
 await initLolHtml(decodeLolHtmlWasm());
 

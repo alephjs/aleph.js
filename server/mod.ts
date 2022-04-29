@@ -5,7 +5,7 @@ import { getContentType } from "../lib/mime.ts";
 import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
-import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./config.ts";
+import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import type { HTMLRewriterHandlers, SSR } from "./renderer.ts";
 import renderer from "./renderer.ts";
@@ -250,7 +250,6 @@ export const serve = (options: ServerOptions = {}) => {
               const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
                 const res = await fetcher(req, { ...ctx, params: ret.pathname.groups });
-                console.log(res);
                 if (res instanceof Response) {
                   return res;
                 }

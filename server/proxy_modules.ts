@@ -1,12 +1,12 @@
 import MagicString from "https://esm.sh/magic-string@0.26.1";
 import { parseDeps } from "../compiler/mod.ts";
-import { builtinModuleExts } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import { serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
 import { DependencyGraph } from "./graph.ts";
+import { builtinModuleExts } from "./helpers.ts";
 import type { ImportMap, ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "./types.ts";
 
 const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {

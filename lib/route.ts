@@ -1,5 +1,5 @@
-import type { URLPatternCompat, URLPatternInput, URLPatternResult } from "./urlpattern.ts";
-import { createStaticURLPatternResult } from "./urlpattern.ts";
+import type { URLPatternCompat, URLPatternInput, URLPatternResult } from "./url_pattern.ts";
+import { createStaticURLPatternResult } from "./url_pattern.ts";
 import util from "./util.ts";
 
 export type RouteModule = {

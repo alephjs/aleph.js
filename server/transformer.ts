@@ -2,11 +2,18 @@ import MagicString from "https://esm.sh/magic-string@0.26.1";
 import { parseDeps, transform } from "../compiler/mod.ts";
 import type { TransformOptions, TransformResult } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
-import { builtinModuleExts, regFullVersion, restoreUrl, toLocalPath } from "../lib/helpers.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
-import { getAlephPkgUri, getUnoGenerator, type JSXConfig } from "./config.ts";
+import type { JSXConfig } from "./helpers.ts";
+import {
+  builtinModuleExts,
+  getAlephPkgUri,
+  getUnoGenerator,
+  regFullVersion,
+  restoreUrl,
+  toLocalPath,
+} from "./helpers.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
 import type { ImportMap, ModuleLoaderContent } from "./types.ts";

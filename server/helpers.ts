@@ -1,7 +1,6 @@
 import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { findFile } from "../lib/fs.ts";
-import { globalIt } from "../lib/helpers.ts";
 import { createGenerator } from "https://esm.sh/@unocss/core@0.31.6";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -14,6 +13,59 @@ export type JSXConfig = {
   jsxRuntimeVersion?: string;
   jsxRuntimeCdnVersion?: string;
 };
+
+export const regFullVersion = /@\d+\.\d+\.\d+/;
+export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
+
+/**
+ * fix remote url to local path.
+ * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`
+ */
+export function toLocalPath(url: string): string {
+  if (util.isLikelyHttpURL(url)) {
+    let { hostname, pathname, port, protocol, search } = new URL(url);
+    const isHttp = protocol === "http:";
+    if ((isHttp && port === "80") || (protocol === "https:" && port === "443")) {
+      port = "";
+    }
+    return [
+      "/-/",
+      isHttp && "http_",
+      hostname,
+      port && "_" + port,
+      util.trimSuffix(pathname, "/"),
+      search,
+    ].filter(Boolean).join("");
+  }
+  return url;
+}
+
+/**
+ * restore the remote url from local path.
+ * e.g. `/-/esm.sh/react@17.0.2` -> `https://esm.sh/react@17.0.2`
+ */
+export function restoreUrl(pathname: string): string {
+  let [h, ...rest] = pathname.substring(3).split("/");
+  let protocol = "https";
+  if (h.startsWith("http_")) {
+    h = h.substring(5);
+    protocol = "http";
+  }
+  const [host, port] = h.split("_");
+  return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
+}
+
+export function globalIt<T>(name: string, fn: () => T): T {
+  const cache: T | undefined = Reflect.get(globalThis, name);
+  if (cache !== undefined) {
+    return cache;
+  }
+  const ret = fn();
+  if (ret !== undefined) {
+    Reflect.set(globalThis, name, ret);
+  }
+  return ret;
+}
 
 export function getAlephPkgUri() {
   return globalIt("__ALEPH_PKG_URI", () => {

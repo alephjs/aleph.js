@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { FetchError } from "../../lib/helpers.ts";
+import FetchError from "../../lib/fetch_error.ts";
 import { DataContext } from "./context.ts";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";

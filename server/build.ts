@@ -4,14 +4,20 @@ import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild
 import { parseExportNames } from "../compiler/mod.ts";
 import cache from "../lib/cache.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
-import { builtinModuleExts, toLocalPath } from "../lib/helpers.ts";
 import { parseHtmlLinks } from "./html.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { getAlephPkgUri, initModuleLoaders, loadImportMap, loadJSXConfig } from "../server/config.ts";
-import { DependencyGraph } from "../server/graph.ts";
-import { initRoutes } from "../server/routing.ts";
-import type { AlephConfig, BuildPlatform, FetchHandler } from "../server/types.ts";
+import { DependencyGraph } from "./graph.ts";
+import {
+  builtinModuleExts,
+  getAlephPkgUri,
+  initModuleLoaders,
+  loadImportMap,
+  loadJSXConfig,
+  toLocalPath,
+} from "./helpers.ts";
+import { initRoutes } from "./routing.ts";
+import type { AlephConfig, BuildPlatform, FetchHandler } from "./types.ts";
 
 const supportedPlatforms: Record<BuildPlatform, string> = {
   "deno": "Deno",
