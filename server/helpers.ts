@@ -1,7 +1,7 @@
 import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { findFile } from "../lib/fs.ts";
-import { createGenerator } from "https://esm.sh/@unocss/core@0.32.2";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.32.1";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
@@ -85,8 +85,8 @@ export function getAlephPkgUri() {
 export function getUnoGenerator() {
   return globalIt("__UNO_GENERATOR", () => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    if (config?.atomicCSS?.presets?.length) {
-      return createGenerator(config.atomicCSS);
+    if (config?.unocss?.presets?.length) {
+      return createGenerator(config.unocss);
     }
     return null;
   });

@@ -1,4 +1,4 @@
-import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.32.2";
+import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.32.1";
 
 export type AlephConfig = {
   /** The basePath of the app. */
@@ -8,7 +8,7 @@ export type AlephConfig = {
   /** The config for file-system based routing.  */
   routes?: RoutesConfig | string;
   /** The config for atomic css powered by unocss. */
-  atomicCSS?: AtomicCSSConfig;
+  unocss?: UnoConfig;
 };
 
 export type BuildPlatform = "deno" | "cloudflare" | "vercel";
@@ -67,4 +67,4 @@ export type ModuleLoaderContent = {
   modtime?: number;
 };
 
-export { AtomicCSSConfig };
+export { UnoConfig };
