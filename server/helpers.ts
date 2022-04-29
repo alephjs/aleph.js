@@ -1,7 +1,7 @@
 import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
-import { findFile } from "../lib/fs.ts";
 import { createGenerator } from "https://esm.sh/@unocss/core@0.32.1";
+import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
@@ -28,7 +28,7 @@ export function getAlephPkgUri() {
 export function getUnoGenerator() {
   return globalIt("__UNO_GENERATOR", () => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    if (config?.unocss?.presets?.length) {
+    if (config?.unocss?.presets) {
       return createGenerator(config.unocss);
     }
     return null;
@@ -269,6 +269,19 @@ export async function parseImportMap(importMapFile: string): Promise<ImportMap> 
   }
   Object.assign(importMap, { imports, scopes });
   return importMap;
+}
+
+export function applyImportMap(specifier: string, importMap: ImportMap): string {
+  if (specifier in importMap.imports) {
+    return importMap.imports[specifier];
+  }
+  for (const key in importMap.imports) {
+    if (key.endsWith("/") && specifier.startsWith(key)) {
+      return importMap.imports[key] + specifier.slice(key.length);
+    }
+  }
+  // todo: support scopes
+  return specifier;
 }
 
 function toStringMap(v: unknown): Record<string, string> {

@@ -1,5 +1,5 @@
 import { assertEquals } from "std/testing/asserts.ts";
-import { restoreUrl, toLocalPath } from "../server/helpers.ts";
+import { applyImportMap, restoreUrl, toLocalPath } from "../server/helpers.ts";
 
 Deno.test("lib/helpers.ts: toLocalPath", () => {
   assertEquals(toLocalPath("https://foo.com/lib@0.1.0?action"), "/-/foo.com/lib@0.1.0?action");
@@ -15,4 +15,20 @@ Deno.test("lib/helpers.ts: restoreUrl", () => {
   assertEquals(restoreUrl("/-/deno.land/x/aleph@0.1.0"), "https://deno.land/x/aleph@0.1.0");
   assertEquals(restoreUrl("/-/http_foo.com/bar?lang=us-en"), "http://foo.com/bar?lang=us-en");
   assertEquals(restoreUrl("/-/http_foo.com_8080/bar"), "http://foo.com:8080/bar");
+});
+
+Deno.test("lib/helpers.ts: applyImportMap", () => {
+  const importMap = {
+    __filename: "",
+    imports: {
+      "aleph": "https://deno.land/x/aleph/mod.ts",
+      "aleph/": "https://deno.land/x/aleph/",
+    },
+    scopes: {},
+  };
+  assertEquals(applyImportMap("aleph", importMap), "https://deno.land/x/aleph/mod.ts");
+  assertEquals(
+    applyImportMap("aleph/framework/react/mod.ts", importMap),
+    "https://deno.land/x/aleph/framework/react/mod.ts",
+  );
 });
