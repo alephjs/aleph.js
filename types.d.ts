@@ -33,13 +33,13 @@ declare type CacheControlOptions = {
   mustRevalidate?: boolean;
 };
 
-declare interface Context extends Record<string, unknown> {
+declare interface Context<T = unknown> extends Record<string, unknown> {
   readonly params: Record<string, string>;
   readonly headers: Headers;
   readonly cookies: Cookies;
   readonly htmlRewriter: HTMLRewriter;
   redirect(url: string | URL, code?: number): Response;
-  json(data: unknown, init?: ResponseInit): Response;
+  json(data: T, init?: ResponseInit): Response;
   content(
     content: BodyInit,
     init?: ResponseInit & {
@@ -49,9 +49,9 @@ declare interface Context extends Record<string, unknown> {
   ): Response;
 }
 
-declare interface Data {
+declare interface Data<T = unknown> {
   cacheTtl?: number;
-  get?(request: Request, context: Context): Promise<Response> | Response;
+  get?(request: Request, context: Context<T>): Promise<Response> | Response;
   post?(request: Request, context: Context): Promise<Response> | Response;
   put?(request: Request, context: Context): Promise<Response> | Response;
   patch?(request: Request, context: Context): Promise<Response> | Response;
