@@ -8,13 +8,15 @@ use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::{Handler, HandlerFlags};
 use swc_common::{chain, FileName, Globals, Mark, SourceMap};
+use swc_ecma_transforms::pass::Optional;
 use swc_ecma_transforms::proposals::decorators;
-use swc_ecma_transforms::react;
 use swc_ecma_transforms::typescript::strip;
-use swc_ecma_transforms::{fixer, helpers, hygiene, pass::Optional, resolver_with_mark};
+use swc_ecma_transforms::{fixer, helpers, hygiene, react};
 use swc_ecmascript::ast::{EsVersion, Module, Program};
-use swc_ecmascript::codegen::{text_writer::JsWriter, Node};
-use swc_ecmascript::parser::{lexer::Lexer, EsConfig, StringInput, Syntax, TsConfig};
+use swc_ecmascript::codegen::text_writer::JsWriter;
+use swc_ecmascript::codegen::Node;
+use swc_ecmascript::parser::lexer::Lexer;
+use swc_ecmascript::parser::{EsConfig, StringInput, Syntax, TsConfig};
 use swc_ecmascript::visit::{Fold, FoldWith};
 
 /// Options for transpiling a module.
@@ -106,9 +108,12 @@ impl SWC {
     options: &EmitOptions,
   ) -> Result<(String, Option<String>), anyhow::Error> {
     swc_common::GLOBALS.set(&Globals::new(), || {
+      let unresolved_mark = Mark::new();
       let top_level_mark = Mark::fresh(Mark::root());
       let jsx_runtime = resolver.borrow().jsx_runtime.clone();
       let specifier_is_remote = resolver.borrow().specifier_is_remote;
+      let is_ts =
+        self.specifier.ends_with(".ts") || self.specifier.ends_with(".mts") || self.specifier.ends_with(".tsx");
       let is_jsx = self.specifier.ends_with(".tsx") || self.specifier.ends_with(".jsx");
       let is_dev = resolver.borrow().is_dev;
       let react_options = if let Some(jsx_import_source) = &options.jsx_import_source {
@@ -146,7 +151,7 @@ impl SWC {
         false
       };
       let passes = chain!(
-        resolver_with_mark(top_level_mark),
+        swc_ecma_transforms::resolver(unresolved_mark, top_level_mark, is_ts),
         Optional::new(react::jsx_src(is_dev, self.source_map.clone()), is_jsx),
         resolve_fold(resolver.clone(), options.strip_data_export, false),
         decorators::decorators(decorators::Config {
@@ -260,7 +265,7 @@ fn get_es_config(jsx: bool) -> EsConfig {
   EsConfig {
     fn_bind: true,
     export_default_from: true,
-    import_assertions: true, 
+    import_assertions: true,
     private_in_object: true,
     allow_super_outside_method: true,
     jsx,

@@ -21,7 +21,7 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
     specifer,
     "https://deno.land/x/aleph",
     Some("react".into()),
-    Some("17.0.2".into()),
+    Some("18".into()),
     Some("64".into()),
     importmap,
     graph_versions,
@@ -89,8 +89,8 @@ fn import_resolving() {
       }, 1000)
     "#;
   let (code, _) = transform("./pages/blog/$id.tsx", source, false, &EmitOptions::default());
-  assert!(code.contains("\"/-/esm.sh/react@17.0.2\""));
-  assert!(code.contains("\"/-/cdn.esm.sh/v64/react-dom@17.0.2\""));
+  assert!(code.contains("\"/-/esm.sh/react@18\""));
+  assert!(code.contains("\"/-/cdn.esm.sh/v64/react-dom@18\""));
   assert!(code.contains("\"../../foo.ts?v=100\""));
   assert!(code.contains("\"./Layout.tsx\""));
   assert!(code.contains("\"/-/esm.sh/@fullcalendar/daygrid?css&dev&module\""));
@@ -115,17 +115,17 @@ fn jsx_automtic() {
     source,
     false,
     &EmitOptions {
-      jsx_import_source: Some("https://esm.sh/react@17.0.2".to_owned()),
+      jsx_import_source: Some("https://esm.sh/react@18".to_owned()),
       ..Default::default()
     },
   );
-  assert!(code.contains("import { jsx as _jsx, Fragment as _Fragment } from \"/-/esm.sh/react@17.0.2/jsx-runtime\""));
+  assert!(code.contains("import { jsx as _jsx, Fragment as _Fragment } from \"/-/esm.sh/react@18/jsx-runtime\""));
   assert!(code.contains("_jsx(_Fragment, {"));
   assert!(code.contains("_jsx(\"h1\", {"));
   assert!(code.contains("children: \"Hello world!\""));
   assert_eq!(
     resolver.borrow().deps.get(0).unwrap().specifier,
-    "https://esm.sh/react@17.0.2/jsx-runtime"
+    "https://esm.sh/react@18/jsx-runtime"
   );
 }
 
