@@ -1,4 +1,5 @@
-import { Router } from "aleph/react";
-import { hydrateRoot } from "react-dom/client";
+import { createRoot } from "react-dom/client";
+import App from "./App.tsx";
 
-hydrateRoot(document.querySelector("#root")!, <Router />);
+const root = createRoot(document.querySelector("#root")!);
+root.render(<App />);

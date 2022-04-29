@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function Index() {
+export default function App() {
   const [ready, setReady] = useState(false);
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     (async () => {
-      const { createEditor, createModel } = await import("../lib/editor.ts");
+      const { createEditor, createModel } = await import("./editor.ts");
       const editor = createEditor(editorContainerRef.current!);
       editor.setModel(createModel("mod.ts", `// Aleph.js with Monaco Editor \n\nconsole.log("Hello, world!");\n`));
       setReady(true);
@@ -14,7 +14,7 @@ export default function Index() {
   }, []);
 
   return (
-    <div style={{ width: "100vw", height: "100vh" }} ref={editorContainerRef}>
+    <div className="editor" ref={editorContainerRef}>
       {!ready && <p>Loading...</p>}
     </div>
   );
