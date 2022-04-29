@@ -5,7 +5,7 @@ import { getContentType } from "../lib/mime.ts";
 import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
-import { initModuleLoaders, loadImportMap, loadJSXConfig } from "./helpers.ts";
+import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import type { HTMLRewriterHandlers, SSR } from "./renderer.ts";
 import renderer from "./renderer.ts";
@@ -111,7 +111,7 @@ export const serve = (options: ServerOptions = {}) => {
         }
         if (stat.isFile) {
           const headers = new Headers({ "Content-Type": contentType });
-          const deployId = Deno.env.get("DENO_DEPLOYMENT_ID");
+          const deployId = getDeploymentId();
           let etag: string | null = null;
           if (deployId) {
             etag = `${btoa(pathname).replace(/[^a-z0-9]/g, "")}-${deployId}`;

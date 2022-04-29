@@ -1,6 +1,6 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import log from "../lib/log.ts";
-import { builtinModuleExts, regFullVersion } from "./helpers.ts";
+import { builtinModuleExts, getDeploymentId, regFullVersion } from "./helpers.ts";
 import type { AlephConfig } from "./types.ts";
 
 export default {
@@ -23,7 +23,7 @@ export default {
         ctype = "text/css; charset=utf-8";
       }
       const headers = new Headers({ "Content-Type": ctype });
-      const deployId = Deno.env.get("DENO_DEPLOYMENT_ID");
+      const deployId = getDeploymentId();
       let etag: string | null = null;
       if (deployId) {
         etag = `${btoa(pathname).replace(/[^a-z0-9]/g, "")}-${deployId}`;

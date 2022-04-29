@@ -17,6 +17,35 @@ export type JSXConfig = {
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
+export function getAlephPkgUri() {
+  return globalIt("__ALEPH_PKG_URI", () => {
+    const uriFromEnv = Deno.env.get("ALEPH_PKG_URI");
+    if (uriFromEnv) {
+      return uriFromEnv;
+    }
+    const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
+    if (DEV_PORT) {
+      return `http://localhost:${DEV_PORT}`;
+    }
+    const version = Deno.env.get("ALEPH_VERSION") || VERSION;
+    return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${version}`;
+  });
+}
+
+export function getUnoGenerator() {
+  return globalIt("__UNO_GENERATOR", () => {
+    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+    if (config?.unocss?.presets?.length) {
+      return createGenerator(config.unocss);
+    }
+    return null;
+  });
+}
+
+export function getDeploymentId(): string | null {
+  return Deno.env.get("DENO_DEPLOYMENT_ID") ?? null;
+}
+
 /**
  * fix remote url to local path.
  * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`
@@ -65,31 +94,6 @@ export function globalIt<T>(name: string, fn: () => T): T {
     Reflect.set(globalThis, name, ret);
   }
   return ret;
-}
-
-export function getAlephPkgUri() {
-  return globalIt("__ALEPH_PKG_URI", () => {
-    const uriFromEnv = Deno.env.get("ALEPH_PKG_URI");
-    if (uriFromEnv) {
-      return uriFromEnv;
-    }
-    const DEV_PORT = Deno.env.get("ALEPH_DEV_PORT");
-    if (DEV_PORT) {
-      return `http://localhost:${DEV_PORT}`;
-    }
-    const version = Deno.env.get("ALEPH_VERSION") || VERSION;
-    return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${version}`;
-  });
-}
-
-export function getUnoGenerator() {
-  return globalIt("__UNO_GENERATOR", () => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    if (config?.unocss?.presets?.length) {
-      return createGenerator(config.unocss);
-    }
-    return null;
-  });
 }
 
 export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {

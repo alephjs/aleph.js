@@ -3,7 +3,7 @@ import type { Comment, DocumentEnd, Element } from "https://deno.land/x/lol_html
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import decodeLolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
 import util from "../lib/util.ts";
-import { getAlephPkgUri, toLocalPath } from "./helpers.ts";
+import { getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 
 await initLolHtml(decodeLolHtmlWasm());
 
@@ -94,6 +94,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
   const alephPkgUri = getAlephPkgUri();
   const chunks: Uint8Array[] = [];
   const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
+  const deployId = getDeploymentId();
 
   rewriter.on("link", {
     element: (el: Element) => {
@@ -102,6 +103,9 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
         const isHttpUrl = util.isLikelyHttpURL(href);
         if (!isHttpUrl) {
           href = util.cleanPath(href);
+          if (deployId) {
+            href += (href.includes("?") ? "&v=" : "?v=") + deployId;
+          }
           el.setAttribute("href", href);
         }
         if (href.endsWith(".css") && !isHttpUrl && isDev) {
@@ -120,9 +124,13 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
   let nomoduleInserted = false;
   rewriter.on("script", {
     element: (el: Element) => {
-      const src = el.getAttribute("src");
+      let src = el.getAttribute("src");
       if (src && !util.isLikelyHttpURL(src)) {
-        el.setAttribute("src", util.cleanPath(src));
+        src = util.cleanPath(src);
+        if (deployId) {
+          src += (src.includes("?") ? "&v=" : "?v=") + deployId;
+        }
+        el.setAttribute("src", src);
       }
       if (!nomoduleInserted && el.getAttribute("type") === "module") {
         el.after(
@@ -145,20 +153,20 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
       }
     },
   });
-  if (!hasSSRBody && ssr) {
-    rewriter.on("body", {
-      element: (el: Element) => {
-        el.prepend("<ssr-body></ssr-body>", { html: true });
-      },
-    });
-  }
-  if (ssr?.suspense) {
-    rewriter.on("body", {
-      element: (el: Element) => {
+  rewriter.on("body", {
+    element: (el: Element) => {
+      if (ssr?.suspense) {
         el.setAttribute("data-suspense", "true");
-      },
-    });
-  }
+      }
+      if (deployId) {
+        el.setAttribute("data-deployment-id", deployId);
+      }
+      if (ssr && !hasSSRBody) {
+        el.prepend("<ssr-body></ssr-body>", { html: true });
+      }
+    },
+  });
+
   if (isDev && hmrWebSocketUrl) {
     rewriter.on("head", {
       element(el: Element) {

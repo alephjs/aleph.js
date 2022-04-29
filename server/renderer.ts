@@ -4,7 +4,7 @@ import util from "../lib/util.ts";
 import type { RouteModule, Routes } from "../lib/route.ts";
 import { matchRoutes } from "../lib/route.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
-import { builtinModuleExts, getUnoGenerator } from "./helpers.ts";
+import { builtinModuleExts, getDeploymentId, getUnoGenerator } from "./helpers.ts";
 import type { Comment, Element } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
@@ -231,8 +231,9 @@ export default {
                   { html: true },
                 );
 
+                const deployId = getDeploymentId();
                 const importStmts = routeModules.map(({ filename }, idx) =>
-                  `import $${idx} from ${JSON.stringify(filename.slice(1))};`
+                  `import $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))} ;`
                 ).join("");
                 const kvs = routeModules.map(({ filename, data }, idx) =>
                   `${JSON.stringify(filename)}:{defaultExport:$${idx}${data !== undefined ? ",withData:true" : ""}}`

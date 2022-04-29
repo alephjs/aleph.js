@@ -109,7 +109,13 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
     const routeModules = getRouteModules();
     const routes = loadRoutesFromTag();
     const importModule = async ({ filename }: RouteMeta) => {
-      const { default: defaultExport, data: withData } = await import(filename.slice(1)); // todo: add version
+      const deployId = document.body.getAttribute("data-deployment-id");
+      let url = filename.slice(1);
+      if (deployId) {
+        url += `?v=${deployId}`;
+      }
+      console.log(url);
+      const { default: defaultExport, data: withData } = await import(url);
       routeModules[filename] = { defaultExport, withData };
       return { defaultExport, withData };
     };
@@ -144,14 +150,19 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
       dataCache.set(dataUrl, rd);
     };
     const onmoduleprefetch = (e: Record<string, unknown>) => {
+      const deployId = document.body.getAttribute("data-deployment-id");
       const pageUrl = new URL(e.href as string, location.href);
       const matches = matchRoutes(pageUrl, routes);
       matches.map(([_, meta]) => {
         const { filename } = meta;
         if (!(filename in routeModules)) {
           const link = document.createElement("link");
+          let href = meta.filename.slice(1);
+          if (deployId) {
+            href += `?v=${deployId}`;
+          }
           link.setAttribute("rel", "modulepreload");
-          link.setAttribute("href", meta.filename.slice(1));
+          link.setAttribute("href", href);
           document.head.appendChild(link);
         }
       });
