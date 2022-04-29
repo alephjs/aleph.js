@@ -292,6 +292,7 @@ export const serve = (options: ServerOptions = {}) => {
       try {
         indexHtml = await loadAndFixIndexHtml({
           isDev,
+          importMap: await importMapPromise,
           ssr: typeof ssr === "function" ? {} : ssr,
           hmrWebSocketUrl: options.hmrWebSocketUrl,
         });

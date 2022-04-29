@@ -3,12 +3,14 @@ import type { Comment, DocumentEnd, Element } from "https://deno.land/x/lol_html
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import decodeLolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
 import util from "../lib/util.ts";
-import { getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
+import { applyImportMap, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
+import type { ImportMap } from "./types.ts";
 
 await initLolHtml(decodeLolHtmlWasm());
 
 type LoadOptions = {
   isDev: boolean;
+  importMap: ImportMap;
   ssr?: { suspense?: boolean };
   hmrWebSocketUrl?: string;
 };
@@ -90,7 +92,7 @@ async function loadIndexHtml(): Promise<{ html: Uint8Array; hasSSRBody: boolean 
 }
 
 function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOptions): Uint8Array {
-  const { isDev, ssr, hmrWebSocketUrl } = options;
+  const { isDev, importMap, ssr, hmrWebSocketUrl } = options;
   const alephPkgUri = getAlephPkgUri();
   const chunks: Uint8Array[] = [];
   const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
@@ -100,6 +102,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
     element: (el: Element) => {
       let href = el.getAttribute("href");
       if (href) {
+        href = applyImportMap(href, importMap);
         const isHttpUrl = util.isLikelyHttpURL(href);
         if (!isHttpUrl) {
           href = util.cleanPath(href);
@@ -107,8 +110,11 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
             href += (href.includes("?") ? "&v=" : "?v=") + deployId;
           }
           el.setAttribute("href", href);
+        } else {
+          href = toLocalPath(href);
         }
-        if (href.endsWith(".css") && !isHttpUrl && isDev) {
+        el.setAttribute("href", href);
+        if (isDev && !isHttpUrl && href.split("?")[0].endsWith(".css")) {
           const specifier = `.${href}`;
           el.setAttribute("data-module-id", specifier);
           el.after(
@@ -125,10 +131,16 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
   rewriter.on("script", {
     element: (el: Element) => {
       let src = el.getAttribute("src");
-      if (src && !util.isLikelyHttpURL(src)) {
-        src = util.cleanPath(src);
-        if (deployId) {
-          src += (src.includes("?") ? "&v=" : "?v=") + deployId;
+      if (src) {
+        src = applyImportMap(src, importMap);
+        if (!util.isLikelyHttpURL(src)) {
+          src = util.cleanPath(src);
+          if (deployId) {
+            src += (src.includes("?") ? "&v=" : "?v=") + deployId;
+          }
+          el.setAttribute("src", src);
+        } else {
+          src = toLocalPath(src);
         }
         el.setAttribute("src", src);
       }
