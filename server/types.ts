@@ -1,4 +1,4 @@
-import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.31.6";
+import type { UserConfig as AtomicCSSConfig } from "https://esm.sh/@unocss/core@0.32.2";
 
 export type AlephConfig = {
   /** The basePath of the app. */
