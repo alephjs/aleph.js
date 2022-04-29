@@ -13,10 +13,11 @@ const commands = {
   "init": "Create a new app",
   "dev": "Start the app in `development` mode",
   "start": "Start the app in `production` mode",
-  "build": "Build the app into a worker",
+  "build": "Build the app into a worker for serverless platform",
 };
 
-const helpMessage = `Aleph.js v${VERSION}
+const commandsFmt = Object.entries(commands).map(([n, d]) => n.padEnd(16) + d).join("\n".padEnd(5));
+const helpMessage = `${bold("Aleph.js")} v${VERSION}
 The Full-stack Framework in Deno.
 
 Docs: https://alephjs.org/docs
@@ -26,14 +27,12 @@ Usage:
     deno run -A https://deno.land/x/aleph/cli.ts <command> [...options]
 
 Commands:
-    ${
-  Object.entries(commands).map(([name, desc]) => `${name.padEnd(15)}${desc}`)
-    .join("\n    ")
-}
+    ${commandsFmt}
 
 Options:
-    -v, --version                Prints version number
-    -h, --help                   Prints help message
+    -r, --reload    Reload source code cache (recompile TypeScript)
+    -v, --version   Prints version number
+    -h, --help      Prints help message
 `;
 
 async function main() {
@@ -58,7 +57,7 @@ async function main() {
   }
 
   // prints help message
-  if (options.h || options.help || !(args.length > 0 && args[0] in commands)) {
+  if (options.h || options.help || args.length === 0 || !(args[0] in commands)) {
     console.log(helpMessage);
     Deno.exit(0);
   }
@@ -85,6 +84,13 @@ async function main() {
     Deno.env.set("MODULES_CACHE_DIR", modulesCache);
   }
   p.close();
+
+  // check `reload` flag
+  const reload = options.r ?? options.reload;
+  if (reload) {
+    runOptions.reload = true;
+    Deno.env.set("ALEPH_RELOAD_FLAG", "true");
+  }
 
   if (Deno.env.get("ALEPH_DEV")) {
     runOptions.denoConfigFile = resolve("./deno.json");
@@ -157,10 +163,11 @@ type RunOptions = {
   isCanary?: boolean;
   denoConfigFile?: string;
   importMapFile?: string;
+  reload?: boolean;
 };
 
 async function run(command: string, options: RunOptions) {
-  const { version, isCanary, denoConfigFile, importMapFile } = options;
+  const { version, isCanary, denoConfigFile, importMapFile, reload } = options;
   const { esbuildBinDir, esbuildBinPath } = getEsbuildPath("0.14.36");
   const devPort = Deno.env.get("ALEPH_DEV_PORT");
   const rwDirs = [
@@ -180,9 +187,10 @@ async function run(command: string, options: RunOptions) {
     "--location=http://localhost",
     "--no-check",
     "--unstable",
+    reload && "--reload",
+    !reload && devPort && `--reload=http://localhost:${devPort}`,
     denoConfigFile && `--config=${denoConfigFile}`,
     importMapFile && `--import-map=${importMapFile}`,
-    devPort && `--reload=http://localhost:${devPort}`,
   ].filter(Boolean) as string[];
   if (version) {
     const pkgName = isCanary ? "aleph_canary" : "aleph";

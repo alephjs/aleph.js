@@ -13,6 +13,7 @@ type Meta = {
 };
 
 const memoryCache = new Map<string, [content: Uint8Array, meta: Meta]>();
+const reloaded = new Set<string>();
 
 /** fetch and cache remote contents */
 export default async function cache(
@@ -36,17 +37,22 @@ export default async function cache(
   if (!options?.forceRefresh && !isLocalhost) {
     if (modulesCacheDir) {
       if (await existsFile(contentFilepath) && await existsFile(metaFilepath)) {
-        const [content, metaJSON] = await Promise.all([
-          Deno.readFile(contentFilepath),
-          Deno.readTextFile(metaFilepath),
-        ]);
-        try {
-          const meta = JSON.parse(metaJSON);
-          if (!isExpired(meta)) {
-            return new Response(content, { headers: { ...meta.headers, "cache-hit": "true" } });
+        const reload = Deno.env.get("ALEPH_RELOAD_FLAG");
+        if (!reload || reloaded.has(url)) {
+          const [content, metaJSON] = await Promise.all([
+            Deno.readFile(contentFilepath),
+            Deno.readTextFile(metaFilepath),
+          ]);
+          try {
+            const meta = JSON.parse(metaJSON);
+            if (!isExpired(meta)) {
+              return new Response(content, { headers: { ...meta.headers, "cache-hit": "true" } });
+            }
+          } catch (_e) {
+            log.debug(`skip cache of ${url}: invalid cache metadata file`);
           }
-        } catch (_e) {
-          log.debug(`skip cache of ${url}: invalid cache metadata file`);
+        } else {
+          reloaded.add(url);
         }
       }
     } else if (memoryCache.has(hashname)) {
