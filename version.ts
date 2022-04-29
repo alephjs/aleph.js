@@ -5,18 +5,16 @@ export const VERSION = "1.0.0-alpha.27";
 export const isCanary = false;
 
 /** `prepublish` will be invoked before publish. */
-export async function prepublish(): Promise<boolean> {
-  if (!window.confirm("Build compiler wasm?")) {
-    return true;
+export async function prepublish(): Promise<boolean | void> {
+  if (window.confirm("Build compiler wasm?")) {
+    const p = Deno.run({
+      cmd: ["deno", "run", "-A", "build.ts"],
+      cwd: "./compiler",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const { success } = await p.status();
+    p.close();
+    return success;
   }
-
-  const p = Deno.run({
-    cmd: ["deno", "run", "-A", "build.ts"],
-    cwd: "./compiler",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const { success } = await p.status();
-  p.close();
-  return success;
 }

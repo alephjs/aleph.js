@@ -5,14 +5,7 @@ import { createGenerator } from "https://esm.sh/@unocss/core@0.32.1";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
-import type { AlephConfig, ImportMap, ModuleLoader } from "./types.ts";
-
-export type JSXConfig = {
-  jsxRuntime?: "react" | "preact";
-  jsxImportSource?: string;
-  jsxRuntimeVersion?: string;
-  jsxRuntimeCdnVersion?: string;
-};
+import type { AlephConfig, ImportMap, JSXConfig, ModuleLoader } from "./types.ts";
 
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
@@ -131,7 +124,7 @@ export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
     }
   }
 
-  let fuzzReactUrl: string | null = null;
+  let fuzzRuntimeUrl: string | null = null;
 
   for (const url of Object.values(importMap.imports)) {
     let m = url.match(/^https?:\/\/esm\.sh\/(p?react)@(\d+\.\d+\.\d+(-[a-z\d.]+)*)(\?|$)/);
@@ -152,16 +145,16 @@ export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
           jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${m[2]}`;
         }
       } else {
-        fuzzReactUrl = url;
+        fuzzRuntimeUrl = url;
       }
       break;
     }
   }
 
   // get acctual react version from esm.sh
-  if (fuzzReactUrl) {
+  if (fuzzRuntimeUrl) {
     log.info(`Checking ${jsxConfig.jsxRuntime} version...`);
-    const text = await fetch(fuzzReactUrl).then((resp) => resp.text());
+    const text = await fetch(fuzzRuntimeUrl).then((resp) => resp.text());
     const m = text.match(/https?:\/\/cdn\.esm\.sh\/(v\d+)\/p?react@(\d+\.\d+\.\d+(-[a-z\d.]+)*)\//);
     if (m) {
       jsxConfig.jsxRuntimeCdnVersion = m[1].slice(1);
@@ -182,7 +175,7 @@ export async function loadImportMap(): Promise<ImportMap> {
   if (Deno.env.get("ALEPH_DEV")) {
     const alephPkgUri = Deno.env.get("ALEPH_PKG_URI") || `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
     const importMapFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "import_map.json");
-    const { __filename, imports, scopes } = await readImportMap(importMapFile);
+    const { __filename, imports, scopes } = await parseImportMap(importMapFile);
     Object.assign(importMap, {
       __filename,
       imports: {
@@ -202,7 +195,7 @@ export async function loadImportMap(): Promise<ImportMap> {
   );
   if (importMapFile) {
     try {
-      const { __filename, imports, scopes } = await readImportMap(importMapFile);
+      const { __filename, imports, scopes } = await parseImportMap(importMapFile);
       Object.assign(importMap, { __filename });
       Object.assign(importMap.imports, imports);
       Object.assign(importMap.scopes, scopes);
@@ -219,6 +212,7 @@ export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoa
   if (loaders.length > 0) {
     return loaders;
   }
+  // only init loaders in `CLI` mode
   if (Deno.env.get("ALEPH_CLI")) {
     for (const key in importMap.imports) {
       if (/^\*\.[a-z0-9]+$/i.test(key)) {
@@ -263,7 +257,7 @@ export async function parseJSONFile(jsonFile: string): Promise<Record<string, un
   return JSON.parse(raw);
 }
 
-export async function readImportMap(importMapFile: string): Promise<ImportMap> {
+export async function parseImportMap(importMapFile: string): Promise<ImportMap> {
   const importMap: ImportMap = { __filename: importMapFile, imports: {}, scopes: {} };
   const data = await parseJSONFile(importMapFile);
   const imports: Record<string, string> = toStringMap(data.imports);

@@ -5,7 +5,6 @@ import { readCode } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
-import type { JSXConfig } from "./helpers.ts";
 import {
   builtinModuleExts,
   getAlephPkgUri,
@@ -16,7 +15,7 @@ import {
 } from "./helpers.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { ImportMap, ModuleLoaderContent } from "./types.ts";
+import type { ImportMap, JSXConfig, ModuleLoaderContent } from "./types.ts";
 
 export type TransformerOptions = {
   buildHash: string;

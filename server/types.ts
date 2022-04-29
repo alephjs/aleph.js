@@ -32,19 +32,24 @@ export type FetchHandler = {
   (request: Request): Promise<Response> | Response;
 };
 
-export type MiddlewareCallback = () => Promise<void> | void;
-
 export interface Middleware {
   fetch(
     request: Request,
     context: Record<string, unknown>,
-  ): Promise<Response | MiddlewareCallback | void> | Response | MiddlewareCallback | void;
+  ): Promise<Response | CallableFunction | void> | Response | CallableFunction | void;
 }
 
 export type ImportMap = {
   readonly __filename: string;
   readonly imports: Record<string, string>;
   readonly scopes: Record<string, Record<string, string>>;
+};
+
+export type JSXConfig = {
+  jsxRuntime?: "react" | "preact";
+  jsxImportSource?: string;
+  jsxRuntimeVersion?: string;
+  jsxRuntimeCdnVersion?: string;
 };
 
 export type ModuleLoader = {

@@ -2,7 +2,7 @@ import { parse } from "https://deno.land/std@0.136.0/flags/mod.ts";
 import { readLines } from "https://deno.land/std@0.136.0/io/mod.ts";
 import { writeAll } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import { basename, resolve } from "https://deno.land/std@0.136.0/path/mod.ts";
-import { readImportMap } from "./server/helpers.ts";
+import { parseImportMap } from "./server/helpers.ts";
 import { findFile } from "./lib/fs.ts";
 import log, { bold, dim, stripColor } from "./lib/log.ts";
 import { serveDir } from "./lib/serve.ts";
@@ -112,7 +112,7 @@ async function main() {
     if (runOptions.importMapFile) {
       try {
         let update: boolean | null = null;
-        const importMap = await readImportMap(runOptions.importMapFile);
+        const importMap = await parseImportMap(runOptions.importMapFile);
         for (const key in importMap.imports) {
           const url = importMap.imports[key];
           if (
