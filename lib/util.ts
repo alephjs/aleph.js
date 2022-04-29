@@ -67,9 +67,9 @@ export default {
     return this.toHex(sum);
   },
   prettyBytes(bytes: number) {
-    const units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
+    const units = ["", "K", "M", "G", "T", "P", "E"];
     const exp = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${Math.round(bytes * 100 / Math.pow(1024, exp)) / 100}${units[exp]}`;
+    return `${Math.round(bytes * 100 / Math.pow(1024, exp)) / 100}${units[exp]}B`;
   },
   splitPath(path: string): string[] {
     return path
