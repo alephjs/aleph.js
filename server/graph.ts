@@ -69,17 +69,17 @@ export class DependencyGraph {
     this.#update(specifier);
   }
 
-  #update(specifier: string, __tracing = new Set<string>()) {
+  #update(specifier: string, _set = new Set<string>()) {
     const module = this.#modules.get(specifier);
     if (module) {
       // deno-lint-ignore ban-ts-comment
       // @ts-ignore
       module.version++;
-      __tracing.add(specifier);
+      _set.add(specifier);
       this.#modules.forEach((module) => {
         if (module.deps?.find((dep) => dep.specifier === specifier)) {
-          if (!__tracing.has(module.specifier)) {
-            this.#update(module.specifier, __tracing);
+          if (!_set.has(module.specifier)) {
+            this.#update(module.specifier, _set);
           }
         }
       });
@@ -90,12 +90,12 @@ export class DependencyGraph {
     this.#lookup(specifier, callback);
   }
 
-  #lookup(specifier: string, callback: (specifier: string) => void | false, __tracing = new Set<string>()) {
-    __tracing.add(specifier);
+  #lookup(specifier: string, callback: (specifier: string) => void | false, _set = new Set<string>()) {
+    _set.add(specifier);
     for (const module of this.#modules.values()) {
       if (module.deps?.find((dep) => dep.specifier === specifier)) {
-        if (!__tracing.has(module.specifier) && callback(module.specifier) !== false) {
-          this.#lookup(module.specifier, callback, __tracing);
+        if (!_set.has(module.specifier) && callback(module.specifier) !== false) {
+          this.#lookup(module.specifier, callback, _set);
         }
       }
     }
@@ -105,14 +105,14 @@ export class DependencyGraph {
     this.#walk(specifier, callback);
   }
 
-  #walk(specifier: string, callback: (mod: Module) => void, __tracing = new Set<string>()) {
+  #walk(specifier: string, callback: (mod: Module) => void, _set = new Set<string>()) {
     if (this.#modules.has(specifier)) {
       const mod = this.#modules.get(specifier)!;
       callback(mod);
-      __tracing.add(specifier);
+      _set.add(specifier);
       mod.deps?.forEach((dep) => {
-        if (!__tracing.has(dep.specifier)) {
-          this.#walk(dep.specifier, callback, __tracing);
+        if (!_set.has(dep.specifier)) {
+          this.#walk(dep.specifier, callback, _set);
         }
       });
     }

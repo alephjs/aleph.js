@@ -1,5 +1,5 @@
 import { transformCSS } from "../compiler/mod.ts";
-import { Targets } from "../compiler/types.ts";
+import type { Targets } from "../compiler/types.ts";
 import { readCode } from "../lib/fs.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri, toLocalPath } from "./helpers.ts";
