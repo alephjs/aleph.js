@@ -6,6 +6,7 @@ import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { errorHtml } from "./error.ts";
+import { DependencyGraph } from "./graph.ts";
 import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig } from "./helpers.ts";
 import { type HTMLRewriterHandlers, loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
@@ -357,12 +358,14 @@ export const serve = (options: ServerOptions = {}) => {
   Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
   Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
 
-  // inject global `__ALEPH_CONFIG`
+  // inject global objects
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
+  Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;
   if (Deno.env.get("ALEPH_CLI")) {
     Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
+    Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
   } else {
     if (certFile && keyFile) {
       serveTls(handler, { hostname, port, certFile, keyFile, signal });

@@ -7,13 +7,14 @@ import { existsDir, existsFile } from "../lib/fs.ts";
 import { parseHtmlLinks } from "./html.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { DependencyGraph } from "./graph.ts";
+import type { DependencyGraph } from "./graph.ts";
 import {
   builtinModuleExts,
   getAlephPkgUri,
   initModuleLoaders,
   loadImportMap,
   loadJSXConfig,
+  restoreUrl,
   toLocalPath,
 } from "./helpers.ts";
 import { initRoutes } from "./routing.ts";
@@ -33,6 +34,7 @@ export async function build(serverEntry?: string) {
   const moduleLoaders = await initModuleLoaders(importMap);
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   const platform = config?.build?.platform ?? "deno";
+  const target = config?.build?.target ?? "es2015";
   const outputDir = join(workingDir, config?.build?.outputDir ?? "dist");
 
   if (platform === "cloudflare" || platform === "vercel") {
@@ -57,6 +59,7 @@ export async function build(serverEntry?: string) {
       return [filename, exportNames];
     }));
   }
+
   const modulesProxyPort = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
   const serverEntryCode = [
     `import { DependencyGraph } from "${alephPkgUri}/server/graph.ts";`,
@@ -162,7 +165,7 @@ export async function build(serverEntry?: string) {
         build.onResolve({ filter: /.*/ }, (args) => {
           let importUrl = args.path;
           if (importUrl in importMap.imports) {
-            // since deno deploy doesn't support importMap, we need to resolve the 'react' import
+            // since deno deploy doesn't support importMap yet, we need to resolve the 'react' import
             importUrl = importMap.imports[importUrl];
           }
 
@@ -230,8 +233,10 @@ export async function build(serverEntry?: string) {
     }],
   });
 
-  // create server_dependency_graph.js
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+  const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
+
+  // create server_dependency_graph.js
   if (serverDependencyGraph) {
     // deno-lint-ignore no-unused-vars
     const modules = serverDependencyGraph.modules.map(({ sourceCode, ...ret }) => ret);
@@ -246,26 +251,26 @@ export async function build(serverEntry?: string) {
   if (await existsFile(join(workingDir, "index.html"))) {
     const html = await Deno.readFile(join(workingDir, "index.html"));
     const links = await parseHtmlLinks(html);
-    for (const link of links) {
-      if (!util.isLikelyHttpURL(link)) {
-        const ext = extname(link);
-        if (ext === ".css" || builtinModuleExts.includes(ext.slice(1))) {
-          const specifier = "." + util.cleanPath(link);
+    for (const src of links) {
+      if (!util.isLikelyHttpURL(src)) {
+        const ext = extname(util.splitBy(src, "?")[0]).slice(1);
+        if (ext === "css" || builtinModuleExts.includes(ext)) {
+          const specifier = "." + util.cleanPath(src);
           tasks.push(specifier);
         }
       }
     }
   }
-  tasks.push(`${alephPkgUri}/framework/core/style.ts`);
+
+  const entryModules = new Set(tasks);
+  const allModules = new Set<string>();
 
   // transform client modules
   const serverHandler: FetchHandler | undefined = Reflect.get(globalThis, "__ALEPH_SERVER")?.handler;
-  const clientModules = new Set<string>();
   if (serverHandler) {
     while (tasks.length > 0) {
       const deps = new Set<string>();
       await Promise.all(tasks.map(async (specifier) => {
-        clientModules.add(specifier);
         const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
         const isCSS = url.pathname.endsWith(".css");
         const req = new Request(url.toString());
@@ -282,19 +287,150 @@ export async function build(serverEntry?: string) {
         ]);
         await res.body?.pipeTo(file.writable);
         if (!isCSS) {
-          const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
-          clientDependencyGraph?.get(specifier)?.deps?.forEach(({ specifier }) => {
+          clientDependencyGraph?.get(specifier)?.deps?.forEach(({ specifier, dynamic }) => {
+            if (dynamic) {
+              entryModules.add(specifier);
+            }
             if (specifier.endsWith(".css")) {
               deps.add(specifier + "?module");
             } else {
               deps.add(specifier);
             }
           });
+        } else if (url.searchParams.has("module")) {
+          deps.add(`${alephPkgUri}/framework/core/style.ts`);
         }
+        allModules.add(specifier);
       }));
-      tasks = Array.from(deps).filter((specifier) => !clientModules.has(specifier));
+      tasks = Array.from(deps).filter((specifier) => !allModules.has(specifier));
     }
   }
+
+  // count client module refs
+  const refs = new Map<string, Set<string>>();
+  for (const name of entryModules) {
+    clientDependencyGraph?.walk(name, ({ specifier }, importer) => {
+      if (importer) {
+        let set = refs.get(specifier);
+        if (!set) {
+          set = new Set<string>();
+          refs.set(specifier, set);
+        }
+        set.add(importer.specifier);
+      }
+    });
+  }
+
+  // hygiene 1
+  /*
+        B(1) <-
+   A <-  <-  <- D(1+)  ::  A <- D(1)
+        C(1) <-
+  */
+  refs.forEach((counter, specifier) => {
+    if (counter.size > 1) {
+      const a = Array.from(counter).filter((specifier) => {
+        const set = refs.get(specifier);
+        if (set?.size === 1) {
+          const name = set.values().next().value;
+          if (name && counter.has(name)) {
+            return false;
+          }
+        }
+        return true;
+      });
+      refs.set(specifier, new Set(a));
+    }
+  });
+
+  // hygiene 2 (twice)
+  /*
+        B(1) <-
+   A <- C(1) <- E(1+)  ::  A <- E(1)
+        D(1) <-
+  */
+  for (let i = 0; i < 2; i++) {
+    refs.forEach((counter, specifier) => {
+      if (counter.size > 0) {
+        const a = Array.from(counter);
+        if (
+          a.every((specifier) => {
+            const set = refs.get(specifier);
+            return set?.size === 1;
+          })
+        ) {
+          const set = new Set(a.map((specifier) => {
+            const set = refs.get(specifier);
+            return set?.values().next().value;
+          }));
+          if (set.size === 1) {
+            refs.set(specifier, set);
+          }
+        }
+      }
+    });
+  }
+
+  // find client modules
+  const clientModules = new Set<string>(entryModules);
+  refs.forEach((counter, specifier) => {
+    if (counter.size > 1) {
+      clientModules.add(specifier);
+    }
+    console.log(`${specifier} is referenced by \n  - ${Array.from(counter).join("\n  - ")}`);
+  });
+
+  // bundle client modules
+  const bundling = new Set<string>();
+  clientModules.forEach((specifier) => {
+    if (
+      clientDependencyGraph?.get(specifier)?.deps?.some(({ specifier }) => !clientModules.has(specifier)) &&
+      !util.splitBy(specifier, "?")[0].endsWith(".css")
+    ) {
+      bundling.add(specifier);
+    }
+  });
+  await Promise.all(
+    Array.from(bundling).map(async (entryPoint) => {
+      const url = new URL(util.isLikelyHttpURL(entryPoint) ? toLocalPath(entryPoint) : entryPoint, "http://localhost");
+      let jsFile = join(outputDir, url.pathname);
+      if (entryPoint.startsWith("https://esm.sh/")) {
+        jsFile += ".js";
+      }
+      await esbuild({
+        entryPoints: [jsFile],
+        outfile: jsFile,
+        allowOverwrite: true,
+        platform: "browser",
+        format: "esm",
+        target: [target],
+        bundle: true,
+        minify: true,
+        treeShaking: true,
+        sourcemap: false,
+        plugins: [{
+          name: "aleph-esbuild-plugin",
+          setup(build) {
+            build.onResolve({ filter: /.*/ }, (args) => {
+              const path = util.trimPrefix(args.path, outputDir);
+              let specifier = "." + path;
+              if (args.path.startsWith("/-/")) {
+                specifier = restoreUrl(path);
+              }
+              if (clientModules.has(specifier) && specifier !== entryPoint) {
+                return { path: args.path, external: true };
+              }
+              let jsFile = join(outputDir, path);
+              if (specifier.startsWith("https://esm.sh/")) {
+                jsFile += ".js";
+              }
+              return { path: jsFile };
+            });
+          },
+        }],
+      });
+    }),
+  );
 
   // clean up then exit
   if (jsxShimFile) {

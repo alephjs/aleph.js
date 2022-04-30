@@ -89,11 +89,11 @@ export default {
             }
           };
           for (const { filename } of routeModules) {
-            serverDependencyGraph.walk(filename, lookupModuleStyle);
+            serverDependencyGraph.shallowWalk(filename, lookupModuleStyle);
           }
           for (const serverEntry of builtinModuleExts.map((ext) => `./server.${ext}`)) {
             if (serverDependencyGraph.get(serverEntry)) {
-              serverDependencyGraph.walk(serverEntry, lookupModuleStyle);
+              serverDependencyGraph.shallowWalk(serverEntry, lookupModuleStyle);
               break;
             }
           }

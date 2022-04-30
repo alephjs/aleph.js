@@ -101,18 +101,44 @@ export class DependencyGraph {
     }
   }
 
-  walk(specifier: string, callback: (mod: Module) => void) {
-    this.#walk(specifier, callback);
+  shallowWalk(specifier: string, callback: (mod: Module) => void) {
+    this.#shallowWalk(specifier, callback);
   }
 
-  #walk(specifier: string, callback: (mod: Module) => void, _set = new Set<string>()) {
+  #shallowWalk(
+    specifier: string,
+    callback: (mod: Module) => void,
+    _set = new Set<string>(),
+  ) {
     if (this.#modules.has(specifier)) {
       const mod = this.#modules.get(specifier)!;
       callback(mod);
       _set.add(specifier);
       mod.deps?.forEach((dep) => {
         if (!_set.has(dep.specifier)) {
-          this.#walk(dep.specifier, callback, _set);
+          this.#shallowWalk(dep.specifier, callback, _set);
+        }
+      });
+    }
+  }
+
+  walk(specifier: string, callback: (mod: Module, importer?: Module) => void) {
+    this.#walk(specifier, callback);
+  }
+
+  #walk(
+    specifier: string,
+    callback: (mod: Module, importer?: Module) => void,
+    importer?: Module,
+    _path: string[] = [],
+  ) {
+    if (this.#modules.has(specifier)) {
+      const mod = this.#modules.get(specifier)!;
+      callback(mod, importer);
+      _path.push(specifier);
+      mod.deps?.forEach((dep) => {
+        if (!_path.includes(dep.specifier)) {
+          this.#walk(dep.specifier, callback, mod, [..._path]);
         }
       });
     }

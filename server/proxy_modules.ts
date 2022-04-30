@@ -5,7 +5,7 @@ import { getContentType } from "../lib/mime.ts";
 import { serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
-import { DependencyGraph } from "./graph.ts";
+import type { DependencyGraph } from "./graph.ts";
 import { builtinModuleExts } from "./helpers.ts";
 import type { ImportMap, ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "./types.ts";
 
@@ -105,9 +105,6 @@ type ProxyModulesOptions = {
 /** serve app modules to support module loader that allows you import Non-JavaScript modules like `.css/.vue/.svelet/...` */
 export function proxyModules(port: number, options: ProxyModulesOptions) {
   return new Promise<void>((resolve, reject) => {
-    if (!Reflect.has(globalThis, "serverDependencyGraph")) {
-      Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
-    }
     serveDir({
       port,
       signal: options.signal,

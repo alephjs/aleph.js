@@ -36,6 +36,7 @@ export default {
     const { isDev, buildHash, loaded } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
+    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
 
     let sourceCode: string;
     let mtime: number | undefined;
@@ -62,14 +63,6 @@ export default {
       return new Response(null, { status: 304 });
     }
 
-    let clientDependencyGraph: DependencyGraph;
-    if (Reflect.has(globalThis, "clientDependencyGraph")) {
-      clientDependencyGraph = Reflect.get(globalThis, "clientDependencyGraph");
-    } else {
-      clientDependencyGraph = new DependencyGraph();
-      Reflect.set(globalThis, "clientDependencyGraph", clientDependencyGraph);
-    }
-
     let resBody = "";
     let resType = "application/javascript";
 
@@ -89,7 +82,7 @@ export default {
         asJsModule,
         hmr: isDev,
       });
-      clientDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
+      clientDependencyGraph?.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
       resBody = code;
       if (!asJsModule) {
         resType = "text/css";
@@ -114,7 +107,7 @@ export default {
           ret = { code: sourceCode, deps };
         }
       } else {
-        const graphVersions = clientDependencyGraph.modules.filter((mod) =>
+        const graphVersions = clientDependencyGraph?.modules.filter((mod) =>
           !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
         ).reduce((acc, { specifier, version }) => {
           acc[specifier] = version.toString(16);
@@ -128,7 +121,7 @@ export default {
           alephPkgUri,
           importMap: JSON.stringify(importMap),
           graphVersions,
-          initialGraphVersion: clientDependencyGraph.initialVersion.toString(16),
+          initialGraphVersion: clientDependencyGraph?.initialVersion.toString(16),
           isDev,
         });
       }
@@ -151,7 +144,7 @@ export default {
         }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});\n`;
         deps = [...(deps || []), { specifier: alephPkgUri + "/framework/core/style.ts" }] as typeof deps;
       }
-      clientDependencyGraph.mark(specifier, { deps });
+      clientDependencyGraph?.mark(specifier, { deps });
       if (map) {
         try {
           const m = JSON.parse(map);
