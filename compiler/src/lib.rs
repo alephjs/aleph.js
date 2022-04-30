@@ -5,6 +5,7 @@ mod css;
 mod error;
 mod export_names;
 mod hmr;
+mod jsx_magic;
 mod resolve_fold;
 mod resolver;
 mod swc;
@@ -57,6 +58,9 @@ pub struct Options {
 
   #[serde(default)]
   pub jsx_import_source: Option<String>,
+
+  #[serde(default)]
+  pub jsx_magic: bool,
 
   #[serde(default)]
   pub strip_data_export: bool,
@@ -163,6 +167,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
       resolver.clone(),
       &EmitOptions {
         strip_data_export: options.strip_data_export,
+        jsx_magic: options.jsx_magic,
         jsx_import_source: options.jsx_import_source,
         minify: !options.is_dev,
         source_map: options.is_dev,

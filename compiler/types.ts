@@ -4,10 +4,11 @@ export type TransformOptions = {
   graphVersions?: Record<string, string>;
   initialGraphVersion?: string;
   isDev?: boolean;
-  jsxImportSource?: string;
   jsxRuntime?: "react" | "preact";
-  jsxRuntimeCdnVersion?: string;
+  jsxImportSource?: string;
   jsxRuntimeVersion?: string;
+  jsxRuntimeCdnVersion?: string;
+  jsxMagic?: boolean,
   lang?: "ts" | "tsx" | "js" | "jsx";
   stripDataExport?: boolean;
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";

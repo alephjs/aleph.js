@@ -37,34 +37,34 @@ fn transform(specifer: &str, source: &str, is_dev: bool, options: &EmitOptions) 
 #[test]
 fn typescript() {
   let source = r#"
-       enum D {
-        A,
-        B,
-        C,
-      }
+      enum D {
+      A,
+      B,
+      C,
+    }
 
-      function enumerable(value: boolean) {
-        return function (
-          _target: any,
-          _propertyKey: string,
-          descriptor: PropertyDescriptor,
-        ) {
-          descriptor.enumerable = value;
-        };
-      }
+    function enumerable(value: boolean) {
+      return function (
+        _target: any,
+        _propertyKey: string,
+        descriptor: PropertyDescriptor,
+      ) {
+        descriptor.enumerable = value;
+      };
+    }
 
-      export class A {
-        private b: string;
-        protected c: number = 1;
-        e: "foo";
-        constructor (public d = D.A) {
-          const e = "foo" as const;
-          this.e = e;
-        }
-        @enumerable(false)
-        bar() {}
+    export class A {
+      private b: string;
+      protected c: number = 1;
+      e: "foo";
+      constructor (public d = D.A) {
+        const e = "foo" as const;
+        this.e = e;
       }
-    "#;
+      @enumerable(false)
+      bar() {}
+    }
+  "#;
   let (code, _) = transform("mod.ts", source, false, &EmitOptions::default());
   assert!(code.contains("var D;\n(function(D) {\n"));
   assert!(code.contains("_applyDecoratedDescriptor("));
@@ -73,21 +73,21 @@ fn typescript() {
 #[test]
 fn import_resolving() {
   let source = r#"
-      import React from "react"
-      import React from "https://cdn.esm.sh/v66/react-dom@16.0.4"
-      import { foo } from "~/foo.ts"
-      import Layout from "./Layout.tsx"
-      import "https://esm.sh/@fullcalendar/daygrid?css&dev"
-      import "../../style/app.css"
+    import React from "react"
+    import React from "https://cdn.esm.sh/v66/react-dom@16.0.4"
+    import { foo } from "~/foo.ts"
+    import Layout from "./Layout.tsx"
+    import "https://esm.sh/@fullcalendar/daygrid?css&dev"
+    import "../../style/app.css"
 
-      foo()
-      export default () => <Layout />
+    foo()
+    export default () => <Layout />
 
-      setTimeout(() => {
-        import("https://esm.sh/asksomeonelse")
-        new Worker("https://esm.sh/asksomeonelse")
-      }, 1000)
-    "#;
+    setTimeout(() => {
+      import("https://esm.sh/asksomeonelse")
+      new Worker("https://esm.sh/asksomeonelse")
+    }, 1000)
+  "#;
   let (code, _) = transform("./pages/blog/$id.tsx", source, false, &EmitOptions::default());
   assert!(code.contains("\"/-/esm.sh/react@18\""));
   assert!(code.contains("\"/-/cdn.esm.sh/v64/react-dom@18\""));
@@ -102,14 +102,14 @@ fn import_resolving() {
 #[test]
 fn jsx_automtic() {
   let source = r#"
-      export default function App() {
-        return (
-          <>
-            <h1 className="title">Hello world!</h1>
-          </>
-        )
-      }
-    "#;
+    export default function App() {
+      return (
+        <>
+          <h1 className="title">Hello world!</h1>
+        </>
+      )
+    }
+  "#;
   let (code, resolver) = transform(
     "./app.tsx",
     source,
@@ -127,6 +127,54 @@ fn jsx_automtic() {
     resolver.borrow().deps.get(0).unwrap().specifier,
     "https://esm.sh/react@18/jsx-runtime"
   );
+}
+
+#[test]
+fn jsx_magic() {
+  let source = r#" 
+    import React from "https://esm.sh/react";
+    export default function Index() {
+      return (
+        <>
+          <head>
+            <title>Hello World!</title>
+          </head>
+          <nav>
+            <a href="/about">About</a>
+            <a rel="nav exact prefetch replace" href="/docs" data-active-className="active" data-active-style={{fontWeight: "bold"}}>Docs</a>
+            <a href="/dl" target="_blank">Download</a>
+            <a href="https://github.com">Github</a>
+          </nav>
+        </>
+      )
+    }
+  "#;
+  let (code, resolver) = transform(
+    "./app.tsx",
+    source,
+    false,
+    &EmitOptions {
+      jsx_magic: true,
+      ..Default::default()
+    },
+  );
+  let r = resolver.borrow();
+  assert!(code.contains(
+    "import { Head as __ALEPH__Head, Link as __ALEPH__Link, NavLink as __ALEPH__NavLink } from \"/-/deno.land/x/aleph/framework/react/mod.ts\""
+  ));
+  assert!(code.contains("React.createElement(__ALEPH__Head,"));
+  assert!(code.contains("React.createElement(__ALEPH__Link,"));
+  assert!(code.contains("React.createElement(__ALEPH__NavLink,"));
+  assert!(code.contains("React.createElement(\"a\","));
+  assert!(code.contains("replace: true,"));
+  assert!(code.contains("exact: true,"));
+  assert!(code.contains("prefetch: true,"));
+  assert!(code.contains("activeClassName: \"active\""));
+  assert!(code.contains("activeStyle: {"));
+  assert!(code.contains("href: \"/dl\""));
+  assert!(code.contains("href: \"https://github.com\""));
+  assert_eq!(r.jsx_magic_tags.len(), 3);
+  assert_eq!(r.deps.len(), 2);
 }
 
 #[test]
@@ -162,17 +210,17 @@ fn react_dev() {
 #[test]
 fn strip_data_export() {
   let source = r#"
-      import { json } from "./helper.ts"
-      const count = 0;
-      export const data = {
-        get: (req: Request) => {
-         return json({ count })
-        },
-        post: (req: Request) => {
-          return json({ count })
-         }
-      }
-    "#;
+    import { json } from "./helper.ts"
+    const count = 0;
+    export const data = {
+      get: (req: Request) => {
+        return json({ count })
+      },
+      post: (req: Request) => {
+        return json({ count })
+        }
+    }
+  "#;
   let (code, r) = transform(
     "./app.tsx",
     source,
