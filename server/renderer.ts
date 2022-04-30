@@ -3,9 +3,10 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { RouteModule, Routes } from "../lib/route.ts";
 import { matchRoutes } from "../lib/route.ts";
+import { errorHtml } from "./error.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { builtinModuleExts, getDeploymentId, getUnoGenerator } from "./helpers.ts";
-import type { Comment, Element } from "./html.ts";
+import type { Element, HTMLRewriterHandlers } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
 
@@ -20,11 +21,6 @@ export type SSRContext = {
   readonly onError?: (error: unknown) => void;
 };
 
-export type HTMLRewriterHandlers = {
-  element?: (element: Element) => void;
-  comments?: (element: Comment) => void;
-};
-
 export type SSR = {
   suspense: true;
   render(ssr: SSRContext): Promise<ReadableStream> | ReadableStream;
@@ -33,7 +29,7 @@ export type SSR = {
   render(ssr: SSRContext): Promise<string | ReadableStream> | string | ReadableStream;
 } | ((ssr: SSRContext) => Promise<string | ReadableStream> | string | ReadableStream);
 
-type SSRResult = {
+export type SSRResult = {
   context: SSRContext;
   errorBoundaryHandlerFilename?: string;
   body: ReadableStream | string;
@@ -142,25 +138,14 @@ export default {
         }
         let message: string;
         if (e instanceof Error) {
-          const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
-          message = (e.stack as string).split("\n").map((line, i) => {
-            const ret = line.match(regStackLoc);
-            if (ret) {
-              const url = new URL(ret[1]);
-              line = line.replace(ret[0], `.${url.pathname}${ret[2]}`);
-            }
-            if (i === 0) {
-              return `<strong>SSR ${line}</strong>`;
-            }
-            return line;
-          }).join("\n");
+          message = e.stack as string;
           log.error("SSR", e);
         } else {
           message = e?.toString?.() || String(e);
         }
         headers.append("Cache-Control", "public, max-age=0, must-revalidate");
         headers.append("Content-Type", "text/html; charset=utf-8");
-        return new Response(errorHtml(message), { headers });
+        return new Response(errorHtml(message, "SSR"), { headers });
       }
     } else {
       const { mtime, size } = await Deno.lstat("./index.html");
@@ -338,6 +323,8 @@ async function initSSR(
   const url = new URL(req.url);
   const matches = matchRoutes(url, routes);
   const suspenseData: Record<string, unknown> = {};
+
+  // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
     const mod = await importRouteModule(filename);
     const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
@@ -348,10 +335,24 @@ async function initSSR(
       defaultExport: mod.default,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
     };
+
+    // assign route params to context
+    Object.assign(ctx.params, ret.pathname.groups);
+
+    // check `any` fetch of data, throw if it returns a response object
+    const anyFetcher = dataConfig.any;
+    if (typeof anyFetcher === "function") {
+      const res = await anyFetcher(req, ctx);
+      if (res instanceof Response) {
+        throw res;
+      }
+    }
+
+    // check `get` of data, if `suspense` is enabled then return a promise instead
     const fetcher = dataConfig.get;
     if (typeof fetcher === "function") {
       const fetchData = async () => {
-        let res = fetcher(req, { ...ctx, params: rmod.params });
+        let res = fetcher(req, ctx);
         if (res instanceof Promise) {
           res = await res;
         }
@@ -384,79 +385,31 @@ async function initSSR(
         rmod.data = await fetchData();
       }
     }
+
     return rmod;
   }));
-  const routeModules = modules.filter(({ defaultExport }) => defaultExport !== undefined);
+
+  // find error boundary handler
   if (routes._error) {
     const [_, meta] = routes._error;
     const mod = await importRouteModule(meta.filename);
     if (typeof mod.default === "function") {
-      return [url, routeModules, suspenseData, { filename: meta.filename, default: mod.default }];
+      return [
+        url,
+        modules.filter(({ defaultExport }) => defaultExport !== undefined),
+        suspenseData,
+        {
+          filename: meta.filename,
+          default: mod.default,
+        },
+      ];
     }
   }
-  return [url, routeModules, suspenseData, undefined];
-}
 
-const errorHtml = (message: string) => `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>SSR Error - Aleph.js</title>
-    <style>
-      body {
-        overflow: hidden;
-      }
-      .error {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100vw;
-        height: 100vh;
-      }
-      .error .box {
-        box-sizing: border-box;
-        position: relative;
-        max-width: 80%;
-        max-height: 90%;
-        overflow: auto;
-        padding: 24px 36px;
-        border-radius: 12px;
-        border: 2px solid rgba(255, 0, 0, 0.8);
-        background-color: rgba(255, 0, 0, 0.1);
-        color: rgba(255, 0, 0, 1);
-      }
-      .error .logo {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        margin-top: -45px;
-        margin-left: -45px;
-        opacity: 0.1;
-      }
-      .error pre {
-        position: relative;
-        line-height: 1.4;
-      }
-      .error code {
-        font-size: 14px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="error">
-      <div class="box">
-        <div class="logo">
-          <svg width="90" height="90" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M52.9528 11.1C54.0959 11.1 55.1522 11.7097 55.7239 12.6995C68.5038 34.8259 81.2837 56.9524 94.0636 79.0788C94.642 80.0802 94.6355 81.316 94.0425 82.3088C93.0466 83.9762 92.028 85.6661 91.0325 87.3331C90.4529 88.3035 89.407 88.9 88.2767 88.9C62.7077 88.9 37.0519 88.9 11.4828 88.9C10.3207 88.9 9.25107 88.2693 8.67747 87.2586C7.75465 85.6326 6.81025 84.0065 5.88797 82.3805C5.33314 81.4023 5.34422 80.2041 5.90662 79.2302C18.6982 57.0794 31.4919 34.8415 44.3746 12.6907C44.9474 11.7058 46.0009 11.1 47.1402 11.1C49.0554 11.1 51.0005 11.1 52.9528 11.1Z" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linejoin="round"/>
-            <path d="M28.2002 72.8H80.8002L45.8187 12.5494" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M71.4999 72.7L45.1999 27.2L10.6519 87.1991" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M49.8 35.3L23.5 80.8H93.9333" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <pre><code>${message}</code></pre>
-      </div>
-    </div>
-  </body>
-</html>
-`;
+  return [
+    url,
+    modules.filter(({ defaultExport }) => defaultExport !== undefined),
+    suspenseData,
+    undefined,
+  ];
+}

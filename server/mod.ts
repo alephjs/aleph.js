@@ -5,10 +5,10 @@ import { getContentType } from "../lib/mime.ts";
 import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
+import { errorHtml } from "./error.ts";
 import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig } from "./helpers.ts";
-import { loadAndFixIndexHtml } from "./html.ts";
-import type { HTMLRewriterHandlers, SSR } from "./renderer.ts";
-import renderer from "./renderer.ts";
+import { type HTMLRewriterHandlers, loadAndFixIndexHtml } from "./html.ts";
+import renderer, { type SSR } from "./renderer.ts";
 import { content, type CookieOptions, json, setCookieHeader } from "./response.ts";
 import { importRouteModule, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
@@ -67,7 +67,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err) ?? new Response(err.message, { status: 500 });
+          return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
         }
       }
     }
@@ -94,7 +94,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err) ?? new Response(err.message, { status: 500 });
+          return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
         }
       }
     }
@@ -131,7 +131,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err) ?? new Response(err.message, { status: 500 });
+          return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
         }
       }
     }
@@ -230,7 +230,7 @@ export const serve = (options: ServerOptions = {}) => {
           }
         }
       } catch (err) {
-        return onError?.(err) ?? new Response(err.message, { status: 500 });
+        return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
       }
     }
 
@@ -247,9 +247,17 @@ export const serve = (options: ServerOptions = {}) => {
               req.method !== "GET" || mod.default === undefined || req.headers.get("Accept") === "application/json" ||
               !req.headers.get("Accept")?.includes("html")
             ) {
+              Object.assign(ctx.params, ret.pathname.groups);
+              const anyFetcher = dataConfig.any;
+              if (typeof anyFetcher === "function") {
+                const res = await anyFetcher(req, ctx);
+                if (res instanceof Response) {
+                  return res;
+                }
+              }
               const fetcher = dataConfig[req.method.toLowerCase()];
               if (typeof fetcher === "function") {
-                const res = await fetcher(req, { ...ctx, params: ret.pathname.groups });
+                const res = await fetcher(req, ctx);
                 if (res instanceof Response) {
                   return res;
                 }
@@ -301,7 +309,7 @@ export const serve = (options: ServerOptions = {}) => {
           indexHtml = null;
         } else {
           log.error("read index.html:", err);
-          return onError?.(err) ?? new Response(err.message, { status: 500 });
+          return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
         }
       }
     }
