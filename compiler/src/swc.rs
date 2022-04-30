@@ -130,6 +130,9 @@ impl SWC {
           .strip_suffix(runtime)
           .unwrap()
           .into();
+        if !is_jsx {
+          resolver.deps.pop();
+        }
         react::Options {
           runtime: Some(react::Runtime::Automatic),
           import_source,
