@@ -1,5 +1,4 @@
 use import_map::ImportMap;
-use indexmap::IndexSet;
 use path_slash::PathBufExt;
 use pathdiff::diff_paths;
 use regex::Regex;
@@ -13,7 +12,7 @@ use url::Url;
 lazy_static! {
   pub static ref RE_REACT_URL: Regex =
     Regex::new(r"^https?://(esm\.sh|cdn\.esm\.sh)(/v\d+)?/react(\-dom)?(@[^/]+)?(/.*)?$").unwrap();
-  pub static ref RE_PROTOCOL_URL: Regex = Regex::new(r"^(data:|mailto:|[a-z]+://)").unwrap();
+  pub static ref RE_PROTOCOL_URL: Regex = Regex::new(r"^(mailto:|[a-z]+://)").unwrap();
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -39,17 +38,23 @@ pub struct Resolver {
   pub deps: Vec<DependencyDescriptor>,
   /// jsx runtime: react | preact
   pub jsx_runtime: Option<String>,
-  /// resolved jsx magic tags: `Head`, 'Anchor'
-  pub jsx_magic_tags: IndexSet<String>,
   /// development mode
   pub is_dev: bool,
   // internal
   import_map: ImportMap,
+  resolve_remote_deps: bool,
+  jsx_runtime_version: Option<String>,
+  jsx_runtime_cdn_version: Option<String>,
   graph_versions: HashMap<String, String>,
   initial_graph_version: Option<String>,
-  jsx_runtime_cdn_version: Option<String>,
-  jsx_runtime_version: Option<String>,
-  resolve_remote_deps: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InlineStyle {
+  pub r#type: String,
+  pub quasis: Vec<String>,
+  pub exprs: Vec<String>,
 }
 
 impl Resolver {
@@ -70,7 +75,6 @@ impl Resolver {
       specifier: specifier.into(),
       specifier_is_remote: is_http_url(specifier),
       deps: Vec::new(),
-      jsx_magic_tags: IndexSet::new(),
       jsx_runtime,
       jsx_runtime_version,
       jsx_runtime_cdn_version,

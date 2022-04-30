@@ -3,7 +3,6 @@ use crate::swc_helpers::{is_call_expr_by_name, new_str};
 use std::{cell::RefCell, rc::Rc};
 use swc_common::{Span, DUMMY_SP};
 use swc_ecmascript::ast::*;
-use swc_ecmascript::utils::quote_ident;
 use swc_ecmascript::visit::{noop_fold_type, Fold, FoldWith};
 
 pub fn resolve_fold(
@@ -30,34 +29,6 @@ impl Fold for ResolveFold {
   // fold&resolve import/export url
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {
     let mut items = Vec::<ModuleItem>::new();
-    let jsx_magic_tags = self.resolver.borrow().jsx_magic_tags.to_owned();
-    let jsx_runtime = self.resolver.borrow().jsx_runtime.to_owned();
-
-    if jsx_magic_tags.len() > 0 {
-      if let Some(jsx_runtime) = jsx_runtime {
-        let mut resolver = self.resolver.borrow_mut();
-        let url = format!("{}/framework/{}/mod.ts", resolver.aleph_pkg_uri, jsx_runtime);
-        let src = resolver.resolve(&url, false, None);
-        // import { $TAG as __ALEPH_$TAG } from "$aleph_pkg_uri/framework/$framework/mod.ts"
-        items.push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-          span: DUMMY_SP,
-          specifiers: jsx_magic_tags
-            .into_iter()
-            .map(|tag| {
-              ImportSpecifier::Named(ImportNamedSpecifier {
-                span: DUMMY_SP,
-                local: quote_ident!(format!("__ALEPH__{}", tag)),
-                imported: Some(ModuleExportName::Ident(quote_ident!(tag.as_str()))),
-                is_type_only: false,
-              })
-            })
-            .collect(),
-          src: new_str(&src),
-          type_only: false,
-          asserts: None,
-        })));
-      }
-    }
 
     for item in module_items {
       match item {

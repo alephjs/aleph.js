@@ -1,7 +1,6 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
 use crate::export_names::ExportParser;
 use crate::hmr::hmr;
-use crate::jsx_magic::jsx_magic_fold;
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::{DependencyDescriptor, Resolver};
 
@@ -24,7 +23,6 @@ use swc_ecmascript::visit::{Fold, FoldWith};
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
   pub jsx_import_source: Option<String>,
-  pub jsx_magic: bool,
   pub strip_data_export: bool,
   pub minify: bool,
   pub source_map: bool,
@@ -34,7 +32,6 @@ impl Default for EmitOptions {
   fn default() -> Self {
     EmitOptions {
       jsx_import_source: None,
-      jsx_magic: false,
       strip_data_export: false,
       minify: false,
       source_map: false,
@@ -155,7 +152,6 @@ impl SWC {
       };
       let passes = chain!(
         swc_ecma_transforms::resolver(unresolved_mark, top_level_mark, is_ts),
-        Optional::new(jsx_magic_fold(resolver.clone()), options.jsx_magic),
         Optional::new(react::jsx_src(is_dev, self.source_map.clone()), is_jsx),
         resolve_fold(resolver.clone(), options.strip_data_export, false),
         decorators::decorators(decorators::Config {
@@ -205,7 +201,7 @@ impl SWC {
         Optional::new(hmr(resolver.clone()), is_dev && !specifier_is_remote),
         fixer(Some(&self.comments)),
         hygiene()
-      );
+      ); 
 
       let (code, map) = self.emit(passes, options.source_map, options.minify).unwrap();
 
