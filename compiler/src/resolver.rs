@@ -1,5 +1,4 @@
 use import_map::ImportMap;
-use indexmap::IndexSet;
 use path_slash::PathBufExt;
 use pathdiff::diff_paths;
 use regex::Regex;
@@ -39,8 +38,6 @@ pub struct Resolver {
   pub deps: Vec<DependencyDescriptor>,
   /// jsx runtime: react | preact
   pub jsx_runtime: Option<String>,
-  /// jsx static class names
-  pub jsx_static_classes: IndexSet<String>,
   /// development mode
   pub is_dev: bool,
   // internal
@@ -81,7 +78,6 @@ impl Resolver {
       jsx_runtime,
       jsx_runtime_version,
       jsx_runtime_cdn_version,
-      jsx_static_classes: IndexSet::new(),
       import_map,
       graph_versions,
       initial_graph_version,
@@ -112,15 +108,7 @@ impl Resolver {
       }
     }
     local_path.push_str(pathname.to_owned().to_slash().unwrap().as_str());
-    if is_css_url(url.path()) {
-      if let Some(query) = url.query() {
-        local_path.push('?');
-        local_path.push_str(query);
-        local_path.push_str("&module");
-      } else {
-        local_path.push_str("?module");
-      }
-    } else if let Some(query) = url.query() {
+    if let Some(query) = url.query() {
       local_path.push('?');
       local_path.push_str(query);
     }
@@ -249,12 +237,12 @@ impl Resolver {
   }
 }
 
-pub fn is_esm_sh_url(url: &str) -> bool {
-  return url.starts_with("https://esm.sh/") || url.starts_with("http://esm.sh/");
-}
-
 pub fn is_http_url(url: &str) -> bool {
   return url.starts_with("https://") || url.starts_with("http://");
+}
+
+pub fn is_esm_sh_url(url: &str) -> bool {
+  return url.starts_with("https://esm.sh/") || url.starts_with("http://esm.sh/");
 }
 
 pub fn is_css_url(url: &str) -> bool {
@@ -267,7 +255,7 @@ pub fn is_css_url(url: &str) -> bool {
     }
     return false;
   }
-  return url.ends_with(".css") || url.starts_with(".pcss") || url.starts_with(".postcss");
+  return url.ends_with(".css") || url.contains(".css?");
 }
 
 fn is_false(value: &bool) -> bool {

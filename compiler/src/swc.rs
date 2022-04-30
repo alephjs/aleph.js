@@ -201,7 +201,7 @@ impl SWC {
         Optional::new(hmr(resolver.clone()), is_dev && !specifier_is_remote),
         fixer(Some(&self.comments)),
         hygiene()
-      );
+      ); 
 
       let (code, map) = self.emit(passes, options.source_map, options.minify).unwrap();
 
