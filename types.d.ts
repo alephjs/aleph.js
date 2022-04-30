@@ -33,13 +33,13 @@ declare type CacheControlOptions = {
   mustRevalidate?: boolean;
 };
 
-declare interface Context<T = unknown> extends Record<string, unknown> {
+declare interface Context<DataType = unknown> extends Record<string, unknown> {
   readonly params: Record<string, string>;
   readonly headers: Headers;
   readonly cookies: Cookies;
   readonly htmlRewriter: HTMLRewriter;
   redirect(url: string | URL, code?: number): Response;
-  json(data: T, init?: ResponseInit): Response;
+  json(data: DataType, init?: ResponseInit): Response;
   content(
     content: BodyInit,
     init?: ResponseInit & {
@@ -49,13 +49,14 @@ declare interface Context<T = unknown> extends Record<string, unknown> {
   ): Response;
 }
 
-declare interface Data<T = unknown> {
+declare interface Data<DataType = unknown, ContextExtension = {}> {
   cacheTtl?: number;
-  get?(request: Request, context: Context<T>): Promise<Response> | Response;
-  post?(request: Request, context: Context): Promise<Response> | Response;
-  put?(request: Request, context: Context): Promise<Response> | Response;
-  patch?(request: Request, context: Context): Promise<Response> | Response;
-  delete?(request: Request, context: Context): Promise<Response> | Response;
+  any?(request: Request, context: Context & ContextExtension): Promise<Response | void> | Response | void;
+  get?(request: Request, context: Context<DataType> & ContextExtension): Promise<Response> | Response;
+  post?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
+  put?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
+  patch?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
+  delete?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
 }
 
 declare interface Middleware {
