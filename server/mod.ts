@@ -345,9 +345,9 @@ export const serve = (options: ServerOptions = {}) => {
     log.setLevel(logLevel);
   }
 
-  // clean global cached objects
-  Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
+  // [hmr] clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
+  Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
 
   // inject global `__ALEPH_CONFIG`
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
