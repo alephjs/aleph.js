@@ -6,23 +6,29 @@ type TodoItem = {
   completed: boolean;
 };
 
-let todos: TodoItem[] = JSON.parse(window.localStorage?.getItem("todos") || "[]");
+type DataProps = {
+  todos: TodoItem[];
+};
 
-export const data: Data = {
+const storage: DataProps = {
+  todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
+};
+
+export const data: Data<DataProps> = {
   get: (_req, ctx) => {
-    return ctx.json({ todos });
+    return ctx.json(storage);
   },
   put: async (req, ctx) => {
     const { message } = await req.json();
     if (typeof message === "string") {
-      todos.push({ id: Date.now(), message, completed: false });
-      window.localStorage?.setItem("todos", JSON.stringify(todos));
+      storage.todos.push({ id: Date.now(), message, completed: false });
+      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
     }
-    return ctx.json({ todos });
+    return ctx.json(storage);
   },
   patch: async (req, ctx) => {
     const { id, message, completed } = await req.json();
-    const todo = todos.find((todo) => todo.id === id);
+    const todo = storage.todos.find((todo) => todo.id === id);
     if (todo) {
       if (typeof message === "string") {
         todo.message = message;
@@ -30,27 +36,28 @@ export const data: Data = {
       if (typeof completed === "boolean") {
         todo.completed = completed;
       }
-      window.localStorage?.setItem("todos", JSON.stringify(todos));
+      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
     }
-    return ctx.json({ todos });
+    return ctx.json(storage);
   },
   delete: async (req, ctx) => {
     const { id } = await req.json();
     if (id) {
-      todos = todos.filter((todo) => todo.id !== id);
-      window.localStorage?.setItem("todos", JSON.stringify(todos));
+      storage.todos = storage.todos.filter((todo) => todo.id !== id);
+      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
     }
-    return ctx.json({ todos });
+    return ctx.json(storage);
   },
 };
 
 export default function Todos() {
-  const { data, isMutating, mutation } = useData<{ todos: TodoItem[] }>();
+  const { data, isMutating, mutation } = useData<DataProps>();
 
   return (
     <div className="page todos-app">
       <Head>
-        <title>Todos App by Aleph.js</title>
+        <title>Todos</title>
+        <meta name="description" content="A todos app powered by Aleph.js" />
       </Head>
       <h1>
         <span>Todos</span>

@@ -31,7 +31,7 @@
   font-weight: 600;
 }
 
-.links {
+.external-links {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -39,21 +39,26 @@
   margin-top: 12px;
 }
 
-.links a {
+.external-links a {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   color: #666;
   text-decoration: none;
   transition: color 0.15s ease-in;
 }
 
-.links a svg {
-  color: #aaa;
+.external-links a:hover {
+  color: #000;
 }
 
-.links a:hover {
-  color: #000;
+.external-links a:after {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: url(../assets/external-link.svg) no-repeat center;
+  background-size: contain;
+  content: "";
 }
 
 nav a {
