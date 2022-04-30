@@ -49,14 +49,6 @@ pub struct Resolver {
   initial_graph_version: Option<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InlineStyle {
-  pub r#type: String,
-  pub quasis: Vec<String>,
-  pub exprs: Vec<String>,
-}
-
 impl Resolver {
   pub fn new(
     specifier: &str,
