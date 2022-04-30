@@ -1,6 +1,7 @@
 use crate::error::{DiagnosticBuffer, ErrorBuffer};
-use crate::export_names::ExportParser;
+use crate::export_names::ExportNamePass;
 use crate::hmr::hmr;
+use crate::minifier::MinifierPass;
 use crate::resolve_fold::resolve_fold;
 use crate::resolver::{DependencyDescriptor, Resolver};
 
@@ -8,20 +9,22 @@ use std::{cell::RefCell, path::Path, rc::Rc};
 use swc_common::comments::SingleThreadedComments;
 use swc_common::errors::{Handler, HandlerFlags};
 use swc_common::{chain, FileName, Globals, Mark, SourceMap};
+use swc_ecma_transforms::optimization::simplify::dce;
 use swc_ecma_transforms::pass::Optional;
 use swc_ecma_transforms::proposals::decorators;
 use swc_ecma_transforms::typescript::strip;
-use swc_ecma_transforms::{fixer, helpers, hygiene, react};
+use swc_ecma_transforms::{compat, fixer, helpers, hygiene, react, Assumptions};
 use swc_ecmascript::ast::{EsVersion, Module, Program};
 use swc_ecmascript::codegen::text_writer::JsWriter;
 use swc_ecmascript::codegen::Node;
 use swc_ecmascript::parser::lexer::Lexer;
 use swc_ecmascript::parser::{EsConfig, StringInput, Syntax, TsConfig};
-use swc_ecmascript::visit::{Fold, FoldWith};
+use swc_ecmascript::visit::{as_folder, Fold, FoldWith};
 
 /// Options for transpiling a module.
 #[derive(Debug, Clone)]
 pub struct EmitOptions {
+  pub target: EsVersion,
   pub jsx_import_source: Option<String>,
   pub strip_data_export: bool,
   pub minify: bool,
@@ -31,6 +34,7 @@ pub struct EmitOptions {
 impl Default for EmitOptions {
   fn default() -> Self {
     EmitOptions {
+      target: EsVersion::Es2022,
       jsx_import_source: None,
       strip_data_export: false,
       minify: false,
@@ -87,7 +91,7 @@ impl SWC {
   /// parse export names in the module.
   pub fn parse_export_names(&self) -> Result<Vec<String>, anyhow::Error> {
     let program = Program::Module(self.module.clone());
-    let mut parser = ExportParser { names: vec![] };
+    let mut parser = ExportNamePass { names: vec![] };
     program.fold_with(&mut parser);
     Ok(parser.names)
   }
@@ -150,6 +154,7 @@ impl SWC {
       } else {
         false
       };
+      let assumptions = Assumptions::all();
       let passes = chain!(
         swc_ecma_transforms::resolver(unresolved_mark, top_level_mark, is_ts),
         Optional::new(react::jsx_src(is_dev, self.source_map.clone()), is_jsx),
@@ -158,6 +163,60 @@ impl SWC {
           legacy: true,
           emit_metadata: false
         }),
+        Optional::new(
+          compat::es2022::es2022(
+            Some(&self.comments),
+            compat::es2022::Config {
+              class_properties: compat::es2022::class_properties::Config {
+                private_as_properties: assumptions.private_fields_as_properties,
+                constant_super: assumptions.constant_super,
+                set_public_fields: assumptions.set_public_class_fields,
+                no_document_all: assumptions.no_document_all
+              }
+            }
+          ),
+          should_enable(options.target, EsVersion::Es2022)
+        ),
+        Optional::new(
+          compat::es2021::es2021(),
+          should_enable(options.target, EsVersion::Es2021)
+        ),
+        Optional::new(
+          compat::es2020::es2020(compat::es2020::Config {
+            nullish_coalescing: compat::es2020::nullish_coalescing::Config {
+              no_document_all: assumptions.no_document_all
+            },
+            optional_chaining: compat::es2020::opt_chaining::Config {
+              no_document_all: assumptions.no_document_all,
+              pure_getter: assumptions.pure_getters
+            }
+          }),
+          should_enable(options.target, EsVersion::Es2020)
+        ),
+        Optional::new(
+          compat::es2019::es2019(),
+          should_enable(options.target, EsVersion::Es2019)
+        ),
+        Optional::new(
+          compat::es2018(compat::es2018::Config {
+            object_rest_spread: compat::es2018::object_rest_spread::Config {
+              no_symbol: assumptions.object_rest_no_symbols,
+              set_property: assumptions.set_spread_properties
+            }
+          }),
+          should_enable(options.target, EsVersion::Es2018)
+        ),
+        Optional::new(
+          compat::es2017(compat::es2017::Config {
+            async_to_generator: compat::es2017::async_to_generator::Config {
+              ignore_function_name: assumptions.ignore_function_name,
+              ignore_function_length: assumptions.ignore_function_length
+            }
+          }),
+          should_enable(options.target, EsVersion::Es2017)
+        ),
+        Optional::new(compat::es2016(), should_enable(options.target, EsVersion::Es2016)),
+        compat::reserved_words::reserved_words(),
         helpers::inject_helpers(),
         Optional::new(
           strip::strip_with_config(strip_config_from_emit_options(), top_level_mark),
@@ -199,9 +258,21 @@ impl SWC {
           is_jsx
         ),
         Optional::new(hmr(resolver.clone()), is_dev && !specifier_is_remote),
+        dce::dce(dce::Config {
+          module_mark: Some(unresolved_mark)
+        }),
+        Optional::new(
+          as_folder(MinifierPass {
+            cm: self.source_map.clone(),
+            comments: Some(self.comments.clone()),
+            unresolved_mark,
+            top_level_mark,
+          }),
+          options.minify
+        ),
+        Optional::new(hygiene(), !options.minify),
         fixer(Some(&self.comments)),
-        hygiene()
-      ); 
+      );
 
       let (code, map) = self.emit(passes, options.source_map, options.minify).unwrap();
 
@@ -310,4 +381,8 @@ fn strip_config_from_emit_options() -> strip::Config {
     no_empty_export: true,
     ..Default::default()
   }
+}
+
+fn should_enable(target: EsVersion, feature: EsVersion) -> bool {
+  target < feature
 }

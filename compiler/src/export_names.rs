@@ -1,11 +1,11 @@
 use swc_ecmascript::ast::*;
 use swc_ecmascript::visit::{noop_fold_type, Fold};
 
-pub struct ExportParser {
+pub struct ExportNamePass {
   pub names: Vec<String>,
 }
 
-impl ExportParser {
+impl ExportNamePass {
   fn record_from_pat(&mut self, pat: &Pat) {
     match pat {
       Pat::Ident(BindingIdent { id, .. }) => self.names.push(id.sym.as_ref().into()),
@@ -33,7 +33,7 @@ impl ExportParser {
   }
 }
 
-impl Fold for ExportParser {
+impl Fold for ExportNamePass {
   noop_fold_type!();
 
   fn fold_module_items(&mut self, module_items: Vec<ModuleItem>) -> Vec<ModuleItem> {

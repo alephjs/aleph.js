@@ -184,6 +184,7 @@ fn strip_data_export() {
   );
   assert!(code.contains("export const data = true"));
   assert!(!code.contains("import { json } from \"./helper.ts\""));
+  assert!(!code.contains("const count = 0"));
   assert_eq!(r.borrow().deps.len(), 0);
 }
 

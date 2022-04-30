@@ -5,6 +5,7 @@ mod css;
 mod error;
 mod export_names;
 mod hmr;
+mod minifier;
 mod resolve_fold;
 mod resolver;
 mod swc;
@@ -162,6 +163,7 @@ pub fn transform(specifier: &str, code: &str, options: JsValue) -> Result<JsValu
     .transform(
       resolver.clone(),
       &EmitOptions {
+        target,
         strip_data_export: options.strip_data_export,
         jsx_import_source: options.jsx_import_source,
         minify: !options.is_dev,
