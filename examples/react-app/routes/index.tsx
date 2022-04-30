@@ -4,10 +4,11 @@ export default function Index() {
   return (
     <div className="page y-center">
       <Head>
-        <title>About Aleph.js</title>
+        <title>Aleph.js</title>
+        <meta name="description" content="The Fullstack Framework in Deno." />
       </Head>
       <p className="logo">
-        <img src="/assets/logo.svg" height="75" title="Aleph.js" />
+        <img src="/assets/logo.svg" width="75" height="75" title="Aleph.js" />
       </p>
       <h1>
         The Fullstack Framework in Deno.

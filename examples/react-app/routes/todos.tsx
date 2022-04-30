@@ -10,25 +10,25 @@ type DataProps = {
   todos: TodoItem[];
 };
 
-const storage: DataProps = {
-  todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
-};
-
-export const data: Data<DataProps> = {
+export const data: Data<DataProps, DataProps> = {
+  cacheTtl: 0,
+  any: (_req, ctx) => {
+    ctx.todos = JSON.parse(window.localStorage?.getItem("todos") || "[]");
+  },
   get: (_req, ctx) => {
-    return ctx.json(storage);
+    return ctx.json({ todos: ctx.todos });
   },
   put: async (req, ctx) => {
     const { message } = await req.json();
     if (typeof message === "string") {
-      storage.todos.push({ id: Date.now(), message, completed: false });
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
+      ctx.todos.push({ id: Date.now(), message, completed: false });
+      window.localStorage?.setItem("todos", JSON.stringify(ctx.todos));
     }
-    return ctx.json(storage);
+    return ctx.json({ todos: ctx.todos });
   },
   patch: async (req, ctx) => {
     const { id, message, completed } = await req.json();
-    const todo = storage.todos.find((todo) => todo.id === id);
+    const todo = ctx.todos.find((todo) => todo.id === id);
     if (todo) {
       if (typeof message === "string") {
         todo.message = message;
@@ -36,17 +36,17 @@ export const data: Data<DataProps> = {
       if (typeof completed === "boolean") {
         todo.completed = completed;
       }
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
+      window.localStorage?.setItem("todos", JSON.stringify(ctx.todos));
     }
-    return ctx.json(storage);
+    return ctx.json({ todos: ctx.todos });
   },
   delete: async (req, ctx) => {
     const { id } = await req.json();
     if (id) {
-      storage.todos = storage.todos.filter((todo) => todo.id !== id);
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
+      ctx.todos = ctx.todos.filter((todo) => todo.id !== id);
+      window.localStorage?.setItem("todos", JSON.stringify(ctx.todos));
     }
-    return ctx.json(storage);
+    return ctx.json({ todos: ctx.todos });
   },
 };
 
