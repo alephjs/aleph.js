@@ -71,7 +71,7 @@ function parse(
 ): [{ type: string; props: Record<string, unknown> }[], ReactNode[]] {
   const els: { type: string; props: Record<string, unknown> }[] = [];
   const forwardNodes: ReactNode[] = [];
-  const parseFn = (node: ReactNode) => {
+  const walk = (node: ReactNode) => {
     Children.forEach(node, (child) => {
       if (!isValidElement(child)) {
         return;
@@ -80,7 +80,7 @@ function parse(
       const { type, props } = child;
       switch (type) {
         case Fragment:
-          parseFn(props.children);
+          walk(props.children);
           break;
 
         // case InlineStyle:
@@ -94,7 +94,7 @@ function parse(
         case "meta":
         case "link":
         case "style":
-          // remove the children prop of base/meta/link
+          // remove the children prop of base/meta/link elements
           if (["base", "meta", "link"].includes(type) && "children" in props) {
             const { children: _, ...rest } = props;
             els.push({ type, props: rest });
@@ -106,6 +106,6 @@ function parse(
     });
   };
 
-  parseFn(node);
+  walk(node);
   return [els, forwardNodes];
 }
