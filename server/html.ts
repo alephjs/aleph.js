@@ -1,12 +1,19 @@
 import { concat } from "https://deno.land/std@0.136.0/bytes/mod.ts";
-import type { Comment, DocumentEnd, Element } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
+import type { Comment, DocumentEnd, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import decodeLolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
 import util from "../lib/util.ts";
 import { applyImportMap, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import type { ImportMap } from "./types.ts";
 
+// init lol-html wasm
 await initLolHtml(decodeLolHtmlWasm());
+
+export type HTMLRewriterHandlers = {
+  element?: (element: Element) => void;
+  comments?: (element: Comment) => void;
+  text?: (text: TextChunk) => void;
+};
 
 type LoadOptions = {
   isDev: boolean;
@@ -15,7 +22,7 @@ type LoadOptions = {
   hmrWebSocketUrl?: string;
 };
 
-// laod the `index.html`
+// load and fix the `index.html`
 // - fix relative url to absolute url of `src` and `href`
 // - add `./framework/core/hmr.ts` when in `development` mode
 // - add `./framework/core/nomodule.ts`
@@ -238,4 +245,4 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
   });
 }
 
-export { Comment, Element, HTMLRewriter };
+export { Element, HTMLRewriter };
