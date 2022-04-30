@@ -1,7 +1,7 @@
-const inDeno = typeof Deno !== "undefined" && typeof Deno.env === "object";
+const deno = typeof Deno !== "undefined" && typeof Deno.env === "object";
 
 export function applyCSS(url: string, css: string) {
-  if (!inDeno) {
+  if (!deno) {
     const { document } = window;
     const ssrEl = Array.from<Element>(document.head.children).find((el: Element) =>
       el.getAttribute("data-module-id") === url &&
