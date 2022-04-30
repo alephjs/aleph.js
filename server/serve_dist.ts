@@ -16,8 +16,11 @@ export default {
     try {
       let filePath = `./${outputDir}${pathname}`;
       let ctype = "application/javascript; charset=utf-8";
-      if (searchParams.has("module") || pathname.startsWith("/-/esm.sh/")) {
-        filePath += `.js`;
+      if (
+        searchParams.has("module") ||
+        (pathname.startsWith("/-/esm.sh/") && !pathname.endsWith(".js") && !pathname.endsWith(".css"))
+      ) {
+        filePath += ".js";
       }
       if (pathname.endsWith(".css") && !searchParams.has("module")) {
         ctype = "text/css; charset=utf-8";

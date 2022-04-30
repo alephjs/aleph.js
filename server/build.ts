@@ -34,7 +34,7 @@ export async function build(serverEntry?: string) {
   const moduleLoaders = await initModuleLoaders(importMap);
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   const platform = config?.build?.platform ?? "deno";
-  const target = config?.build?.target ?? "es2015";
+  const target = config?.build?.target ?? "es2020";
   const outputDir = join(workingDir, config?.build?.outputDir ?? "dist");
 
   if (platform === "cloudflare" || platform === "vercel") {
@@ -252,15 +252,15 @@ export async function build(serverEntry?: string) {
     const html = await Deno.readFile(join(workingDir, "index.html"));
     const links = await parseHtmlLinks(html);
     for (const src of links) {
-      if (!util.isLikelyHttpURL(src)) {
-        const ext = extname(util.splitBy(src, "?")[0]).slice(1);
-        if (ext === "css" || builtinModuleExts.includes(ext)) {
-          const specifier = "." + util.cleanPath(src);
-          tasks.push(specifier);
-        }
+      const url = new URL(src, "http://localhost/");
+      const ext = extname(url.pathname).slice(1);
+      if (ext === "css" || builtinModuleExts.includes(ext)) {
+        const specifier = util.isLikelyHttpURL(src) ? src : "." + util.cleanPath(src);
+        tasks.push(specifier);
       }
     }
   }
+  tasks.push(`${alephPkgUri}/framework/core/nomodule.ts`);
 
   const entryModules = new Set(tasks);
   const allModules = new Set<string>();
@@ -275,7 +275,7 @@ export async function build(serverEntry?: string) {
         const isCSS = url.pathname.endsWith(".css");
         const req = new Request(url.toString());
         let savePath = join(outputDir, url.pathname);
-        if (specifier.startsWith("https://esm.sh/")) {
+        if (specifier.startsWith("https://esm.sh/") && !specifier.endsWith(".js") && !specifier.endsWith(".css")) {
           savePath += ".js";
         } else if (isCSS && url.searchParams.has("module")) {
           savePath += ".js";
@@ -377,7 +377,7 @@ export async function build(serverEntry?: string) {
     if (counter.size > 1) {
       clientModules.add(specifier);
     }
-    console.log(`${specifier} is referenced by \n  - ${Array.from(counter).join("\n  - ")}`);
+    // console.log(`[${specifier}] \n  - ${Array.from(counter).join("\n  - ")}`);
   });
 
   // bundle client modules
@@ -394,7 +394,7 @@ export async function build(serverEntry?: string) {
     Array.from(bundling).map(async (entryPoint) => {
       const url = new URL(util.isLikelyHttpURL(entryPoint) ? toLocalPath(entryPoint) : entryPoint, "http://localhost");
       let jsFile = join(outputDir, url.pathname);
-      if (entryPoint.startsWith("https://esm.sh/")) {
+      if (entryPoint.startsWith("https://esm.sh/") && !entryPoint.endsWith(".js") && !entryPoint.endsWith(".css")) {
         jsFile += ".js";
       }
       await esbuild({
@@ -408,11 +408,19 @@ export async function build(serverEntry?: string) {
         minify: true,
         treeShaking: true,
         sourcemap: false,
+        loader: {
+          ".vue": "js",
+        },
         plugins: [{
           name: "aleph-esbuild-plugin",
           setup(build) {
             build.onResolve({ filter: /.*/ }, (args) => {
-              const path = util.trimPrefix(args.path, outputDir);
+              let argsPath = args.path;
+              if (argsPath.startsWith("./") || argsPath.startsWith("../")) {
+                argsPath = join(args.resolveDir, argsPath);
+              }
+              const [fp, q] = util.splitBy(argsPath, "?");
+              const path = util.trimPrefix(fp, outputDir);
               let specifier = "." + path;
               if (args.path.startsWith("/-/")) {
                 specifier = restoreUrl(path);
@@ -421,8 +429,14 @@ export async function build(serverEntry?: string) {
                 return { path: args.path, external: true };
               }
               let jsFile = join(outputDir, path);
-              if (specifier.startsWith("https://esm.sh/")) {
+              if (
+                specifier.startsWith("https://esm.sh/") && !specifier.endsWith(".js") && !specifier.endsWith(".css")
+              ) {
                 jsFile += ".js";
+              } else {
+                if (specifier.endsWith(".css") && new URLSearchParams(q).has("module")) {
+                  jsFile += ".js";
+                }
               }
               return { path: jsFile };
             });

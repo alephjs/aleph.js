@@ -18,7 +18,7 @@ export type BuildOptions = {
   platform?: BuildPlatform;
   /** The directory for build output files. default is "dist" */
   outputDir?: string;
-  /** The build target passes to esbuild. */
+  /** The build target passes to esbuild. default is "es2020" */
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
 };
 

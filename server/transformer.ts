@@ -117,7 +117,7 @@ export default {
           ...jsxConfig,
           lang: lang as TransformOptions["lang"],
           stripDataExport: isRouteFile(specifier),
-          target: buildTarget ?? (isDev ? "es2022" : "es2015"),
+          target: buildTarget ?? (isDev ? "es2022" : "es2020"),
           alephPkgUri,
           importMap: JSON.stringify(importMap),
           graphVersions,
