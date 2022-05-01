@@ -1,6 +1,6 @@
 import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
-import { createGenerator } from "https://esm.sh/@unocss/core@0.32.1";
+import { createGenerator } from "https://esm.sh/@unocss/core@0.32.8";
 import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
