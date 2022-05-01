@@ -142,6 +142,10 @@ export async function build(serverEntry?: string) {
       importUrl.startsWith(`http://localhost:${modulesProxyPort}/`);
   };
 
+  const shouldAppendJSExit = (url: string) => {
+    return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
+  };
+
   // build the server entry
   await esbuild({
     stdin: {
@@ -275,7 +279,7 @@ export async function build(serverEntry?: string) {
         const isCSS = url.pathname.endsWith(".css");
         const req = new Request(url.toString());
         let savePath = join(outputDir, url.pathname);
-        if (specifier.startsWith("https://esm.sh/") && !specifier.endsWith(".js") && !specifier.endsWith(".css")) {
+        if (shouldAppendJSExit(specifier)) {
           savePath += ".js";
         } else if (isCSS && url.searchParams.has("module")) {
           savePath += ".js";
@@ -394,7 +398,7 @@ export async function build(serverEntry?: string) {
     Array.from(bundling).map(async (entryPoint) => {
       const url = new URL(util.isLikelyHttpURL(entryPoint) ? toLocalPath(entryPoint) : entryPoint, "http://localhost");
       let jsFile = join(outputDir, url.pathname);
-      if (entryPoint.startsWith("https://esm.sh/") && !entryPoint.endsWith(".js") && !entryPoint.endsWith(".css")) {
+      if (shouldAppendJSExit(entryPoint)) {
         jsFile += ".js";
       }
       await esbuild({
@@ -429,14 +433,10 @@ export async function build(serverEntry?: string) {
                 return { path: args.path, external: true };
               }
               let jsFile = join(outputDir, path);
-              if (
-                specifier.startsWith("https://esm.sh/") && !specifier.endsWith(".js") && !specifier.endsWith(".css")
-              ) {
+              if (shouldAppendJSExit(specifier)) {
                 jsFile += ".js";
-              } else {
-                if (specifier.endsWith(".css") && new URLSearchParams(q).has("module")) {
-                  jsFile += ".js";
-                }
+              } else if (specifier.endsWith(".css") && new URLSearchParams(q).has("module")) {
+                jsFile += ".js";
               }
               return { path: jsFile };
             });
