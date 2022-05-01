@@ -13,22 +13,9 @@
     "jsxImportSource": "https://esm.sh/react@18.1.0"
   },
   "fmt": {
-    "files": {
-      "exclude": [
-        "compiler/target/",
-        "compiler/pkg/"
-      ]
-    },
     "options": {
       "lineWidth": 120
     }
   },
-  "lint": {
-    "files": {
-      "exclude": [
-        "compiler/dist/",
-        "compiler/pkg/"
-      ]
-    }
-  }
+  "lint": {}
 }

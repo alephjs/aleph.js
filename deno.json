@@ -7,26 +7,12 @@
     "test": "deno test -A --unstable --location=http://localhost --import-map=import_map.json",
     "dev": "ALEPH_DEV=true deno run -A cli.ts dev",
     "start": "ALEPH_DEV=true deno run -A cli.ts start",
-    "build": "ALEPH_DEV=true deno run -A cli.ts build",
-    "build_wasm": "deno run -A compiler/build.ts"
+    "build": "ALEPH_DEV=true deno run -A cli.ts build"
   },
   "fmt": {
-    "files": {
-      "exclude": [
-        "compiler/target/",
-        "compiler/pkg/"
-      ]
-    },
     "options": {
       "lineWidth": 120
     }
   },
-  "lint": {
-    "files": {
-      "exclude": [
-        "compiler/dist/",
-        "compiler/pkg/"
-      ]
-    }
-  }
+  "lint": {}
 }
