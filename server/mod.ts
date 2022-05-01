@@ -236,7 +236,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request data
-    const routes: Routes = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routesPromise;
+    const routes: Routes = await routesPromise;
     if (routes.routes.length > 0) {
       for (const [pattern, { filename }] of routes.routes) {
         const ret = pattern.exec({ host, pathname });
@@ -349,14 +349,10 @@ export const serve = (options: ServerOptions = {}) => {
     vendor: "Deno Land Inc.",
   });
 
-  // set log level
+  // set log level if specified
   if (logLevel) {
     log.setLevel(logLevel);
   }
-
-  // [hmr] clean globally cached objects
-  Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
-  Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
 
   // inject global objects
   Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
@@ -365,7 +361,6 @@ export const serve = (options: ServerOptions = {}) => {
   const { hostname, port = 8080, certFile, keyFile, signal } = options;
   if (Deno.env.get("ALEPH_CLI")) {
     Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
-    Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
   } else {
     if (certFile && keyFile) {
       serveTls(handler, { hostname, port, certFile, keyFile, signal });

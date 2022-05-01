@@ -7,6 +7,7 @@ import { serve as httpServe } from "../lib/serve.ts";
 import { builtinModuleExts, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
+import { generate } from "../server/generate.ts";
 import type { DependencyGraph } from "../server/graph.ts";
 import { proxyModules } from "../server/proxy_modules.ts";
 import type { AlephConfig } from "../server/types.ts";
@@ -150,18 +151,26 @@ if (import.meta.main) {
   };
 
   // update routes when fs change
-  const updateRoutes = async ({ specifier }: { specifier: string }) => {
+  const updateRoutes = async ({ specifier }: { specifier?: string }) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     const rc = config?.routes;
     if (rc) {
       const reg = toRouteRegExp(rc);
       if (!specifier || reg.test(specifier)) {
-        await initRoutes(reg);
+        if (specifier) {
+          Reflect.deleteProperty(globalThis, "__ALEPH_ROUTES");
+        }
+        const { routes } = await initRoutes(reg);
+        if (reg.generate) {
+          await generate(routes);
+          log.debug(`${routes.length} routes generate`);
+        }
       }
     }
   };
   emitter.on("create", updateRoutes);
   emitter.on("remove", updateRoutes);
+  // updateRoutes({});
 
   if (serverEntry) {
     emitter.on(`hotUpdate:./${basename(serverEntry)}`, bs);
@@ -180,10 +189,10 @@ if (import.meta.main) {
 }
 
 async function bootstrap(signal: AbortSignal, entry: string | undefined, forcePort?: number): Promise<void> {
-  // delete previous server handler
-  if (Reflect.has(globalThis, "__ALEPH_SERVER")) {
-    Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
-  }
+  // clean globally cached objects
+  Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
+  Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
+  Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
 
   if (entry) {
     const entryName = basename(entry);
@@ -195,8 +204,10 @@ async function bootstrap(signal: AbortSignal, entry: string | undefined, forcePo
       log.info(`Bootstrap server from ${blue(entryName)}...`);
     }
   }
+
   // make the default handler
   if (!Reflect.has(globalThis, "__ALEPH_SERVER")) {
+    console.warn("No server entry found");
     serve();
   }
 

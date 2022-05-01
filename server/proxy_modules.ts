@@ -1,11 +1,11 @@
 import MagicString from "https://esm.sh/magic-string@0.26.1";
-import { parseDeps } from "../compiler/mod.ts";
+import { parseDeps } from "https://deno.land/x/aleph_compiler@0.1.0/mod.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import { serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
-import type { DependencyGraph } from "./graph.ts";
+import { DependencyGraph } from "./graph.ts";
 import { builtinModuleExts } from "./helpers.ts";
 import type { ImportMap, ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "./types.ts";
 
@@ -28,9 +28,10 @@ const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
     },
   );
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
-  if (serverDependencyGraph) {
-    serverDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })), inlineCSS: code });
+  if (!serverDependencyGraph) {
+    throw new Error("The `serverDependencyGraph` is not defined");
   }
+  serverDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })), inlineCSS: code });
   return {
     content: `export default ${JSON.stringify(cssModulesExports)};`,
     contentType: "application/javascript; charset=utf-8",
@@ -43,32 +44,29 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
   const atomicCSS = input.atomicCSS || pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
   const contentType = lang ? getContentType(`file.${lang}`) : undefined;
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
-  if (serverDependencyGraph) {
-    const deps = await parseDeps(specifier, sourceCode, { importMap: JSON.stringify(env.importMap) });
-    serverDependencyGraph.mark(specifier, { sourceCode, deps, inlineCSS, atomicCSS });
-    if (deps.length) {
-      const s = new MagicString(sourceCode);
-      deps.forEach((dep) => {
-        const { specifier, importUrl, loc } = dep;
-        if (loc) {
-          let url = `"${importUrl}"`;
-          if (!util.isLikelyHttpURL(specifier)) {
-            const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
-            if (importUrl.includes("?")) {
-              url = `"${importUrl}&v=${versionStr}"`;
-            } else {
-              url = `"${importUrl}?v=${versionStr}"`;
-            }
+  if (!serverDependencyGraph) {
+    throw new Error("The `serverDependencyGraph` is not defined");
+  }
+  const deps = await parseDeps(specifier, sourceCode, { importMap: JSON.stringify(env.importMap) });
+  serverDependencyGraph.mark(specifier, { sourceCode, deps, inlineCSS, atomicCSS });
+  if (deps.length) {
+    const s = new MagicString(sourceCode);
+    deps.forEach((dep) => {
+      const { specifier, importUrl, loc } = dep;
+      if (loc) {
+        let url = `"${importUrl}"`;
+        if (!util.isLikelyHttpURL(specifier)) {
+          const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
+          if (importUrl.includes("?")) {
+            url = `"${importUrl}&v=${versionStr}"`;
+          } else {
+            url = `"${importUrl}?v=${versionStr}"`;
           }
-          s.overwrite(loc.start, loc.end, url);
         }
-      });
-      return { content: s.toString(), contentType };
-    }
-    return {
-      content: sourceCode,
-      contentType,
-    };
+        s.overwrite(loc.start, loc.end, url);
+      }
+    });
+    return { content: s.toString(), contentType };
   }
   return {
     content: sourceCode,
@@ -104,6 +102,7 @@ type ProxyModulesOptions = {
 
 /** serve app modules to support module loader that allows you import Non-JavaScript modules like `.css/.vue/.svelet/...` */
 export function proxyModules(port: number, options: ProxyModulesOptions) {
+  Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
   return new Promise<void>((resolve, reject) => {
     serveDir({
       port,

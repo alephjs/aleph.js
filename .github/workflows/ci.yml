@@ -24,19 +24,11 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Setup rust
-        uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: stable
-
       - name: Deno test
         run: deno test -A --unstable --location=http://localhost --import-map=import_map.json
 
       - name: Deno lint
         run: deno lint
-
-      - name: Cargo test
-        run: cd compiler && cargo test --all
 
   deploy_examples:
     name: Deploy

@@ -1,7 +1,7 @@
 import { basename, dirname, extname, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.136.0/fs/ensure_dir.ts";
 import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.38/mod.js";
-import { parseExportNames } from "../compiler/mod.ts";
+import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.1.0/mod.ts";
 import cache from "../lib/cache.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
 import { parseHtmlLinks } from "./html.ts";
@@ -135,11 +135,16 @@ export async function build(serverEntry?: string) {
   }
 
   const shouldBundle = (importUrl: string) => {
-    return importUrl === alephPkgUri + "/server/mod.ts" ||
+    return (
+      // to bundle `server/transformer.ts`, need to bundle `server/mod.ts` first
+      importUrl === alephPkgUri + "/server/mod.ts" ||
+      // bundle `server/transformer.ts` with `server/server_dist.ts` content
       importUrl === alephPkgUri + "/server/transformer.ts" ||
-      // since deno deploy doesn't support importMap, we need to resolve the 'react' import
+      // since deno deploy doesn't support importMap, we need to bundle the framework and resolve the 'react' import
       importUrl.startsWith(alephPkgUri + "/framework/react/") ||
-      importUrl.startsWith(`http://localhost:${modulesProxyPort}/`);
+      // bundle app modules
+      importUrl.startsWith(`http://localhost:${modulesProxyPort}/`)
+    );
   };
 
   const shouldAppendJSExit = (url: string) => {
@@ -207,6 +212,7 @@ export async function build(serverEntry?: string) {
         build.onLoad({ filter: /.*/, namespace: "http" }, async (args) => {
           const url = new URL(args.path);
           if (url.href === `${alephPkgUri}/server/transformer.ts`) {
+            // bundle `server/transformer.ts` with `server/server_dist.ts` content
             url.pathname = util.trimSuffix(url.pathname, "transformer.ts") + "serve_dist.ts";
           }
           const res = await cache(url.href);

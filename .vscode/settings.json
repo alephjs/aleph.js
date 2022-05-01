@@ -9,10 +9,6 @@
     "editor.defaultFormatter": "denoland.vscode-deno",
     "editor.formatOnSave": true
   },
-  "[rust]": {
-    "editor.defaultFormatter": "matklad.rust-analyzer",
-    "editor.formatOnSave": true,
-  },
   "deno.enable": true,
   "deno.lint": true,
   "deno.config": "./deno.dom.json",

@@ -1,6 +1,6 @@
 import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
-import { createGenerator } from "https://esm.sh/@unocss/core@0.32.8";
+import { createGenerator, type UnoGenerator } from "https://esm.sh/@unocss/core@0.32.8";
 import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -10,8 +10,32 @@ import type { AlephConfig, ImportMap, JSXConfig, ModuleLoader } from "./types.ts
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
-export function getAlephPkgUri() {
-  return globalIt("__ALEPH_PKG_URI", () => {
+export async function globalIt<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const cache: T | undefined = Reflect.get(globalThis, name);
+  if (cache !== undefined) {
+    return cache;
+  }
+  const ret = await fn();
+  if (ret !== undefined) {
+    Reflect.set(globalThis, name, ret);
+  }
+  return ret;
+}
+
+export function globalItSync<T>(name: string, fn: () => T): T {
+  const cache: T | undefined = Reflect.get(globalThis, name);
+  if (cache !== undefined) {
+    return cache;
+  }
+  const ret = fn();
+  if (ret !== undefined) {
+    Reflect.set(globalThis, name, ret);
+  }
+  return ret;
+}
+
+export function getAlephPkgUri(): string {
+  return globalItSync("__ALEPH_PKG_URI", () => {
     const uriFromEnv = Deno.env.get("ALEPH_PKG_URI");
     if (uriFromEnv) {
       return uriFromEnv;
@@ -25,8 +49,8 @@ export function getAlephPkgUri() {
   });
 }
 
-export function getUnoGenerator() {
-  return globalIt("__UNO_GENERATOR", () => {
+export function getUnoGenerator(): UnoGenerator | null {
+  return globalItSync("__UNO_GENERATOR", () => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     if (config?.unocss?.presets) {
       return createGenerator(config.unocss);
@@ -75,18 +99,6 @@ export function restoreUrl(pathname: string): string {
   }
   const [host, port] = h.split("_");
   return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
-}
-
-export function globalIt<T>(name: string, fn: () => T): T {
-  const cache: T | undefined = Reflect.get(globalThis, name);
-  if (cache !== undefined) {
-    return cache;
-  }
-  const ret = fn();
-  if (ret !== undefined) {
-    Reflect.set(globalThis, name, ret);
-  }
-  return ret;
 }
 
 export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {

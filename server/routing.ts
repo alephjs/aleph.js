@@ -1,11 +1,11 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
-import { parseExportNames } from "../compiler/mod.ts";
 import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import type { Route, Routes } from "../lib/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../lib/url_pattern.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
+import { globalIt } from "./helpers.ts";
 import type { AlephConfig, RoutesConfig } from "./types.ts";
 
 const revivedModules: Map<string, Record<string, unknown>> = new Map();
@@ -55,105 +55,49 @@ type RouteRegExp = {
 
 /** initialize routes from routes config */
 export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cwd = Deno.cwd()): Promise<Routes> {
-  const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
-  const files = await getFiles(join(cwd, reg.prefix));
-  const routes: Route[] = [];
-  let _app: Route | undefined = undefined;
-  let _404: Route | undefined = undefined;
-  let _error: Route | undefined = undefined;
-  files.forEach((file) => {
-    const filename = reg.prefix + file.slice(1);
-    const pattern = reg.exec(filename);
-    if (pattern) {
-      const route: Route = [
-        new URLPatternCompat(pattern),
-        { pattern, filename },
-      ];
-      routes.push(route);
-      if (pattern.pathname === "/_app") {
-        _app = route;
-      } else if (pattern.pathname === "/_404") {
-        _404 = route;
-      } else if (pattern.pathname === "/_error") {
-        _error = route;
-      }
-    }
-  });
-  if (routes.length > 0) {
-    // sort routes by length of pathname
-    routes.sort((a, b) => getRouteOrder(a) - getRouteOrder(b));
-    // check nesting routes
-    routes.forEach(([_, meta]) => {
-      const { pattern: { pathname } } = meta;
-      const nesting = pathname === "/_app" || (pathname !== "/" && !pathname.endsWith("/index") &&
-        routes.findIndex(([_, { pattern: { pathname: p } }]) => p !== pathname && p.startsWith(pathname + "/")) !==
-          -1);
-      if (nesting) {
-        meta.nesting = true;
+  return await globalIt("__ALEPH_ROUTES", async () => {
+    const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
+    const files = await getFiles(join(cwd, reg.prefix));
+    const routes: Route[] = [];
+    let _app: Route | undefined = undefined;
+    let _404: Route | undefined = undefined;
+    let _error: Route | undefined = undefined;
+    files.forEach((file) => {
+      const filename = reg.prefix + file.slice(1);
+      const pattern = reg.exec(filename);
+      if (pattern) {
+        const route: Route = [
+          new URLPatternCompat(pattern),
+          { pattern, filename },
+        ];
+        routes.push(route);
+        if (pattern.pathname === "/_app") {
+          _app = route;
+        } else if (pattern.pathname === "/_404") {
+          _404 = route;
+        } else if (pattern.pathname === "/_error") {
+          _error = route;
+        }
       }
     });
-  }
-
-  const isDev = Deno.env.get("ALEPH_ENV") === "development";
-  if (reg.generate && isDev) {
-    generate(routes);
-  }
-
-  log.debug(`${routes.length} routes initiated${reg.generate && isDev ? " and generated" : ""}`);
-
-  Reflect.set(globalThis, "__ALEPH_ROUTES", { routes, _404, _app, _error });
-  return { routes, _404, _app, _error };
-}
-
-async function generate(routes: Route[]) {
-  const routeFiles = await Promise.all(routes.map(async ([_, { filename }]) => {
-    const code = await Deno.readTextFile(filename);
-    const exportNames = await parseExportNames(filename, code);
-    return [filename, exportNames];
-  }));
-
-  const imports: string[] = [];
-  const revives: string[] = [];
-
-  routeFiles.forEach(([filename, exportNames], idx) => {
-    const hasDefaultExport = exportNames.includes("default");
-    const hasDataExport = exportNames.includes("data");
-    if (!hasDefaultExport && !hasDataExport) {
-      return [];
+    if (routes.length > 0) {
+      // sort routes by length of pathname
+      routes.sort((a, b) => getRouteOrder(a) - getRouteOrder(b));
+      // check nesting routes
+      routes.forEach(([_, meta]) => {
+        const { pattern: { pathname } } = meta;
+        const nesting = pathname === "/_app" || (pathname !== "/" && !pathname.endsWith("/index") &&
+          routes.findIndex(([_, { pattern: { pathname: p } }]) => p !== pathname && p.startsWith(pathname + "/")) !==
+            -1);
+        if (nesting) {
+          meta.nesting = true;
+        }
+      });
     }
-    imports.push(`import { ${
-      [
-        hasDefaultExport && `default as $${idx}`,
-        hasDataExport && `data as $$${idx}`,
-      ].filter(Boolean).join(", ")
-    } } from ${JSON.stringify(filename)};`);
-    revives.push(`revive(${JSON.stringify(filename)}, { ${
-      [
-        hasDefaultExport && `default: $${idx}`,
-        hasDataExport && `data: $$${idx}`,
-      ].filter(Boolean).join(", ")
-    } });`);
+
+    log.debug(`${routes.length} routes initiated`);
+    return { routes, _404, _app, _error };
   });
-
-  if (imports.length) {
-    const code = [
-      "/*! Generated by Aleph.js, do **NOT** change and ensure the file is **NOT** in the `.gitignore`. */",
-      "",
-      `import { revive } from "aleph/server";`,
-      ...imports,
-      "",
-      ...revives,
-    ].join("\n");
-    await Deno.writeTextFile("routes.gen.ts", code);
-
-    const serverEntry = Deno.env.get("ALEPH_SERVER_ENTRY");
-    if (serverEntry) {
-      const code = await Deno.readTextFile(serverEntry);
-      if (!code.includes(`import "./routes.gen.ts"`)) {
-        await Deno.writeTextFile(serverEntry, `import "./routes.gen.ts"\n${code}`);
-      }
-    }
-  }
 }
 
 /** convert route config to `RouteRegExp` */

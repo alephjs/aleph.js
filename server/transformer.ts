@@ -1,6 +1,6 @@
 import MagicString from "https://esm.sh/magic-string@0.26.1";
-import { parseDeps, transform } from "../compiler/mod.ts";
-import type { TransformOptions, TransformResult } from "../compiler/types.ts";
+import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.1.0/mod.ts";
+import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.1.0/types.ts";
 import { readCode } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
