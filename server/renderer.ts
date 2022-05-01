@@ -1,4 +1,4 @@
-import FetchError from "../lib/fetch_error.ts";
+import FetchError from "../framework/core/fetch_error.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { RouteModule, Routes } from "../lib/route.ts";

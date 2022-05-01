@@ -1,10 +1,10 @@
 import type { FC, ReactElement, ReactNode } from "react";
 import { createElement, useContext, useEffect, useMemo, useState } from "react";
-import FetchError from "../../lib/fetch_error.ts";
 import type { Route, RouteMeta, RouteModule, Routes } from "../../lib/route.ts";
 import { matchRoutes } from "../../lib/route.ts";
 import { URLPatternCompat } from "../../lib/url_pattern.ts";
 import events from "../core/events.ts";
+import FetchError from "../core/fetch_error.ts";
 import { redirect } from "../core/redirect.ts";
 import { DataContext, ForwardPropsContext, RouterContext } from "./context.ts";
 import { Err, ErrorBoundary } from "./error.ts";

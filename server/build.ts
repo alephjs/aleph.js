@@ -157,7 +157,7 @@ export async function build(serverEntry?: string) {
     format: "esm",
     target: ["esnext"],
     bundle: true,
-    minify: !Deno.env.get("ALEPH_DEV"),
+    minify: !Deno.env.get("ALEPH_BUILD_DEBUG"),
     treeShaking: true,
     sourcemap: true,
     jsxFactory: jsxCofig.jsxRuntime === "preact" ? "h" : "React.createElement",
@@ -409,7 +409,7 @@ export async function build(serverEntry?: string) {
         format: "esm",
         target: [target],
         bundle: true,
-        minify: true,
+        minify: !Deno.env.get("ALEPH_BUILD_DEBUG"),
         treeShaking: true,
         sourcemap: false,
         loader: {
