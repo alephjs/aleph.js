@@ -245,7 +245,6 @@ pub fn is_css_url(url: &str) -> bool {
         return true;
       }
     }
-    return false;
   }
   return url.ends_with(".css") || url.contains(".css?");
 }
