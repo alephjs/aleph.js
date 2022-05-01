@@ -1,8 +1,8 @@
 import FetchError from "../framework/core/fetch_error.ts";
+import type { RouteModule, Routes } from "../framework/core/route.ts";
+import { matchRoutes } from "../framework/core/route.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import type { RouteModule, Routes } from "../lib/route.ts";
-import { matchRoutes } from "../lib/route.ts";
 import { errorHtml } from "./error.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { builtinModuleExts, getDeploymentId, getUnoGenerator } from "./helpers.ts";

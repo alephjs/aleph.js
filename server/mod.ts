@@ -2,7 +2,6 @@ import { serve as stdServe, type ServeInit, serveTls } from "https://deno.land/s
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
-import type { Routes } from "../lib/route.ts";
 import util from "../lib/util.ts";
 import { VERSION } from "../version.ts";
 import { errorHtml } from "./error.ts";
@@ -33,7 +32,7 @@ export const serve = (options: ServerOptions = {}) => {
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then((importMap) => loadJSXConfig(importMap));
   const moduleLoadersPromise = importMapPromise.then((importMap) => initModuleLoaders(importMap));
-  const routesPromise = config?.routes ? initRoutes(config.routes) : Promise.resolve({ routes: [] } as Routes);
+  const routesPromise = config?.routes ? initRoutes(config.routes) : Promise.resolve({ routes: [] });
   const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {
     const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
     return util.computeHash("sha-1", buildArgs);
@@ -236,7 +235,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request data
-    const routes: Routes = await routesPromise;
+    const routes = await routesPromise;
     if (routes.routes.length > 0) {
       for (const [pattern, { filename }] of routes.routes) {
         const ret = pattern.exec({ host, pathname });

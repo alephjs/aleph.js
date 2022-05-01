@@ -1,8 +1,8 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
+import type { Route, Routes } from "../framework/core/route.ts";
+import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
 import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
-import type { Route, Routes } from "../lib/route.ts";
-import { URLPatternCompat, type URLPatternInput } from "../lib/url_pattern.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
 import { globalIt } from "./helpers.ts";

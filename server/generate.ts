@@ -1,5 +1,5 @@
 import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.1.0/mod.ts";
-import type { Route } from "../lib/route.ts";
+import type { Route } from "../framework/core/route.ts";
 
 /** generate the `routes.gen.ts` follow the routes config */
 export async function generate(routes: Route[]) {
