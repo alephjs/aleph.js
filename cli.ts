@@ -168,7 +168,7 @@ type RunOptions = {
 
 async function run(command: string, options: RunOptions) {
   const { version, isCanary, denoConfigFile, importMapFile, reload } = options;
-  const { esbuildBinDir, esbuildBinPath } = getEsbuildPath("0.14.36");
+  const { esbuildBinDir, esbuildBinPath } = getEsbuildPath("0.14.38");
   const devPort = Deno.env.get("ALEPH_DEV_PORT");
   const rwDirs = [
     Deno.env.get("MODULES_CACHE_DIR"),
