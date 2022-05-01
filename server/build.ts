@@ -436,7 +436,10 @@ export async function build(serverEntry?: string) {
                 specifier = restoreUrl(path);
               }
               if (clientModules.has(specifier) && specifier !== entryPoint) {
-                return { path: args.path, external: true };
+                return {
+                  path: [path, q].filter(Boolean).join("?"),
+                  external: true,
+                };
               }
               let jsFile = join(outputDir, path);
               if (shouldAppendJSExit(specifier)) {
