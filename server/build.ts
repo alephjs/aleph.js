@@ -140,7 +140,7 @@ export async function build(serverEntry?: string) {
     );
   };
 
-  const shouldAppendJSExit = (url: string) => {
+  const isEsmPkg = (url: string) => {
     return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
   };
 
@@ -278,7 +278,7 @@ export async function build(serverEntry?: string) {
         const isCSS = url.pathname.endsWith(".css");
         const req = new Request(url.toString());
         let savePath = join(outputDir, url.pathname);
-        if (shouldAppendJSExit(specifier)) {
+        if (isEsmPkg(specifier)) {
           savePath += ".js";
         } else if (isCSS && url.searchParams.has("module")) {
           savePath += ".js";
@@ -356,16 +356,8 @@ export async function build(serverEntry?: string) {
     refs.forEach((counter, specifier) => {
       if (counter.size > 0) {
         const a = Array.from(counter);
-        if (
-          a.every((specifier) => {
-            const set = refs.get(specifier);
-            return set?.size === 1;
-          })
-        ) {
-          const set = new Set(a.map((specifier) => {
-            const set = refs.get(specifier);
-            return set?.values().next().value;
-          }));
+        if (a.every((specifier) => refs.get(specifier)?.size === 1)) {
+          const set = new Set(a.map((specifier) => refs.get(specifier)?.values().next().value));
           if (set.size === 1) {
             refs.set(specifier, set);
           }
@@ -397,7 +389,7 @@ export async function build(serverEntry?: string) {
     Array.from(bundling).map(async (entryPoint) => {
       const url = new URL(util.isLikelyHttpURL(entryPoint) ? toLocalPath(entryPoint) : entryPoint, "http://localhost");
       let jsFile = join(outputDir, url.pathname);
-      if (shouldAppendJSExit(entryPoint)) {
+      if (isEsmPkg(entryPoint)) {
         jsFile += ".js";
       }
       await esbuild({
@@ -435,7 +427,7 @@ export async function build(serverEntry?: string) {
                 };
               }
               let jsFile = join(outputDir, path);
-              if (shouldAppendJSExit(specifier)) {
+              if (isEsmPkg(specifier)) {
                 jsFile += ".js";
               } else if (specifier.endsWith(".css") && new URLSearchParams(q).has("module")) {
                 jsFile += ".js";
