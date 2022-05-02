@@ -107,7 +107,10 @@ export const useData = <T = unknown>(): {
   }, [dataUrl]);
   const reload = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, signal });
+      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
+      if (res.type === "opaqueredirect") {
+        throw new Error("opaque redirect");
+      }
       if (!res.ok) {
         throw await FetchError.fromResponse(res);
       }

@@ -122,11 +122,16 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
     const prefetchData = async (dataUrl: string) => {
       const rd: RouteData = {};
       const fetchData = async () => {
-        const res = await fetch(dataUrl, { headers: { "Accept": "application/json" } });
+        const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
+        if (res.type === "opaqueredirect") {
+          location.reload();
+          return;
+        }
         if (!res.ok) {
           const err = await FetchError.fromResponse(res);
           if (err.status >= 300 && err.status < 400 && typeof err.details.location === "string") {
             location.href = err.details.location;
+            location.reload();
             return;
           }
           if (isSuspense) {
