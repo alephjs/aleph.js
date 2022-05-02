@@ -21,7 +21,7 @@ declare type CookieOptions = {
 declare interface Cookies {
   get(key: string): string | undefined;
   set(key: string, value: string, options?: CookieOptions): void;
-  delete(key: string, options: CookieOptions): void;
+  delete(key: string, options?: CookieOptions): void;
 }
 
 declare type CacheControlOptions = {
