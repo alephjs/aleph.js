@@ -1,6 +1,7 @@
 import { serve as stdServe, type ServeInit, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import { VERSION } from "https://deno.land/x/aleph_compiler@0.1.0/version.ts";
+import FetchError from "../framework/core/fetch_error.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
@@ -14,7 +15,7 @@ import { importRouteModule, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
 
-export type ServerOptions = ServeInit & {
+export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
   logLevel?: LevelName;
@@ -23,7 +24,11 @@ export type ServerOptions = ServeInit & {
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: SSR;
-  onError?(error: unknown): Promise<Response> | Response;
+  onError?: (
+    error: unknown,
+    cause: "api" | "ssr" | "transplie" | "fs" | "middleware",
+    url: string,
+  ) => Response | void;
 };
 
 export const serve = (options: ServerOptions = {}) => {
@@ -73,7 +78,11 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
+          return onError?.(err, "transplie", req.url) ??
+            new Response(errorHtml(err.stack ?? err.message), {
+              status: 500,
+              headers: [["Content-Type", "text/html"]],
+            });
         }
       }
     }
@@ -100,7 +109,11 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
+          return onError?.(err, "transplie", req.url) ??
+            new Response(errorHtml(err.stack ?? err.message), {
+              status: 500,
+              headers: [["Content-Type", "text/html"]],
+            });
         }
       }
     }
@@ -137,7 +150,11 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
+          return onError?.(err, "fs", req.url) ??
+            new Response(errorHtml(err.stack ?? err.message), {
+              status: 500,
+              headers: [["Content-Type", "text/html"]],
+            });
         }
       }
     }
@@ -236,7 +253,8 @@ export const serve = (options: ServerOptions = {}) => {
           }
         }
       } catch (err) {
-        return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
+        return onError?.(err, "middleware", req.url) ??
+          new Response(errorHtml(err.stack ?? err.message), { status: 500, headers: [["Content-Type", "text/html"]] });
       }
     }
 
@@ -265,6 +283,10 @@ export const serve = (options: ServerOptions = {}) => {
               if (typeof fetcher === "function") {
                 const res = await fetcher(req, ctx);
                 if (res instanceof Response) {
+                  if (res.status >= 300) {
+                    const err = await FetchError.fromResponse(res);
+                    return ctx.json({ ...err }, { status: err.status >= 400 ? err.status : 501 });
+                  }
                   return res;
                 }
                 if (
@@ -282,12 +304,23 @@ export const serve = (options: ServerOptions = {}) => {
               }
               return new Response("Method not allowed", { status: 405 });
             }
-          } catch (err) {
-            if (err.stack) {
-              log.error(err.stack);
+          } catch (error) {
+            let err = error;
+            if (err instanceof Response) {
+              if (err.ok) {
+                return err;
+              }
+              err = await FetchError.fromResponse(err);
+            }
+            const res = onError?.(err, "api", req.url);
+            if (res instanceof Response) {
+              err = await FetchError.fromResponse(res);
+            }
+            if (err instanceof Error) {
+              log.error(err);
             }
             const status: number = util.isUint(err.status || err.code) ? err.status || err.code : 500;
-            return ctx.json({ ...err, message: err.message, status }, { status });
+            return ctx.json({ ...err, message: err.message, status }, { status: status >= 400 ? status : 501 });
           }
         }
       }
@@ -315,7 +348,11 @@ export const serve = (options: ServerOptions = {}) => {
           indexHtml = null;
         } else {
           log.error("read index.html:", err);
-          return onError?.(err) ?? new Response(errorHtml(err.message), { status: 500 });
+          return onError?.(err, "fs", req.url) ??
+            new Response(errorHtml(err.stack ?? err.message), {
+              status: 500,
+              headers: [["Content-Type", "text/html"]],
+            });
         }
       }
     }
@@ -334,6 +371,7 @@ export const serve = (options: ServerOptions = {}) => {
       customHTMLRewriter,
       isDev,
       ssr,
+      onError,
     });
   };
 

@@ -9,16 +9,29 @@ export default class FetchError extends Error {
   }
 
   static async fromResponse(res: Response): Promise<FetchError> {
+    let status = res.status;
     let message = res.statusText;
     let details: Record<string, unknown> = {};
+    if (status >= 300 && status < 400) {
+      const location = res.headers.get("Location");
+      if (location) {
+        details.location = location;
+      }
+    }
     if (res.headers.get("content-type")?.startsWith("application/json")) {
-      details = await res.json();
-      if (typeof details.message === "string") {
-        message = details.message;
+      const data = await res.json();
+      if (typeof data.status === "number") {
+        status = data.status;
+      }
+      if (typeof data.message === "string") {
+        message = data.message;
+      }
+      if (typeof data.details === "object" && data.details !== null) {
+        details = data.details;
       }
     } else {
       message = await res.text();
     }
-    return new FetchError(res.status, details, message);
+    return new FetchError(status, details, message);
   }
 }

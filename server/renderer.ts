@@ -42,6 +42,7 @@ export type RenderOptions = {
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   isDev: boolean;
   ssr?: SSR;
+  onError?: (error: unknown, cause: "ssr", url: string) => Response | void;
 };
 
 /** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
@@ -49,14 +50,20 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* st
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routes, customHTMLRewriter, isDev, ssr } = options;
+    const { indexHtml, routes, customHTMLRewriter, isDev, ssr, onError } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (ssr) {
       const suspense = typeof ssr === "function" ? false : !!ssr.suspense;
-      const [url, routeModules, suspenseData, errorBoundaryHandler] = await initSSR(req, ctx, routes, suspense);
       const render = typeof ssr === "function" ? ssr : ssr.render;
       try {
+        const [url, routeModules, suspenseData, errorBoundaryHandler] = await initSSR(
+          req,
+          ctx,
+          routes,
+          suspense,
+          onError,
+        );
         const headCollection: string[] = [];
         const ssrContext: SSRContext = {
           url,
@@ -312,6 +319,7 @@ async function initSSR(
   ctx: Record<string, unknown>,
   routes: Routes,
   suspense: boolean,
+  onError?: (error: unknown, cause: "ssr", url: string) => Response | void,
 ): Promise<
   [
     url: URL,
@@ -352,9 +360,16 @@ async function initSSR(
     const fetcher = dataConfig.get;
     if (typeof fetcher === "function") {
       const fetchData = async () => {
-        let res = fetcher(req, ctx);
-        if (res instanceof Promise) {
-          res = await res;
+        let res: unknown;
+        try {
+          res = fetcher(req, ctx);
+          if (res instanceof Promise) {
+            res = await res;
+          }
+        } catch (error) {
+          if (!(res = onError?.(error, "ssr", req.url))) {
+            throw error;
+          }
         }
         if (res instanceof Response) {
           if (res.status >= 500) {
@@ -376,7 +391,7 @@ async function initSSR(
             throw new FetchError(500, {}, "Data must be valid JSON");
           }
         } else {
-          throw new FetchError(500, {}, "Data must be valid JSON");
+          throw new FetchError(500, {}, "No response from data fetcher");
         }
       };
       if (suspense) {

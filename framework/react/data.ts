@@ -107,29 +107,22 @@ export const useData = <T = unknown>(): {
   }, [dataUrl]);
   const reload = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
-      if (res.status >= 400) {
+      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, signal });
+      if (!res.ok) {
         throw await FetchError.fromResponse(res);
       }
-      if (res.status >= 300) {
-        const redirectUrl = res.headers.get("Location");
-        if (redirectUrl) {
-          location.href = redirectUrl;
-        }
-        throw new FetchError(500, {}, "Missing the `Location` header");
-      }
-      if (res.ok) {
+      try {
         const data = await res.json();
         const cc = res.headers.get("Cache-Control");
         const dataCacheTtl = cc && cc.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
         const dataExpires = Date.now() + (dataCacheTtl || 1) * 1000;
         dataCache.set(dataUrl, { data, dataExpires });
         setData(data);
-      } else {
+      } catch (_e) {
         throw new FetchError(500, {}, "Data must be valid JSON");
       }
     } catch (error) {
-      throw error;
+      throw new Error(`Failed to reload data for ${dataUrl}: ${error.message}`);
     }
   }, [dataUrl]);
   const mutation = useMemo(() => {

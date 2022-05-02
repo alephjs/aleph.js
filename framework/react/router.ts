@@ -122,19 +122,20 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
     const prefetchData = async (dataUrl: string) => {
       const rd: RouteData = {};
       const fetchData = async () => {
-        const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
-        if (res.status === 404 || res.status === 405) {
-          return undefined;
-        }
-        if (res.status >= 400) {
-          throw await FetchError.fromResponse(res);
-        }
-        if (res.status >= 300) {
-          const redirectUrl = res.headers.get("Location");
-          if (redirectUrl) {
-            location.href = redirectUrl;
+        const res = await fetch(dataUrl, { headers: { "Accept": "application/json" } });
+        if (!res.ok) {
+          const err = await FetchError.fromResponse(res);
+          if (err.status >= 300 && err.status < 400 && typeof err.details.location === "string") {
+            location.href = err.details.location;
+            return;
           }
-          throw new FetchError(500, {}, "Missing the `Location` header");
+          if (isSuspense) {
+            throw err;
+          } else {
+            alert(`Fetch Data: ${err.message}`);
+            history.back();
+            return;
+          }
         }
         const cc = res.headers.get("Cache-Control");
         rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
