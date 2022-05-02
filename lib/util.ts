@@ -48,6 +48,15 @@ export default {
     }
     return s;
   },
+  pick<T extends Record<string, unknown>, K extends keyof T>(obj: T, ...keys: K[]): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const key of keys) {
+      if (key in obj) {
+        result[key as string] = obj[key];
+      }
+    }
+    return result;
+  },
   splitBy(s: string, searchString: string, fromLast = false): [prefix: string, suffix: string] {
     const i = fromLast ? s.lastIndexOf(searchString) : s.indexOf(searchString);
     if (i >= 0) {
