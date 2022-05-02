@@ -28,8 +28,6 @@ Deno.test("loaders/vue.ts: VueLoader", async () => {
   );
   const loader = new VueLoader();
   const { lang, code, inlineCSS, atomicCSS } = await loader.load("/test.vue", { isDev: false });
-  assertEquals(loader.test("/app.vue"), true);
-  assertEquals(loader.test("/app.jsx"), false);
   assertEquals(lang, "js");
   assertEquals(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`), true);
   assertEquals(code.includes(`setup(__props)`), true);
