@@ -372,10 +372,10 @@ async function initSSR(
           }
         }
         if (res instanceof Response) {
-          if (res.status >= 500) {
+          if (res.status >= 400) {
             throw await FetchError.fromResponse(res);
           }
-          if (res.status >= 300 && res.status < 400) {
+          if (res.status >= 300) {
             if (res.headers.has("Location")) {
               throw Response.redirect(res.headers.get("Location")!, res.status);
             }

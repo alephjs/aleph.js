@@ -263,12 +263,12 @@ export const serve = (options: ServerOptions = {}) => {
     if (routes.routes.length > 0) {
       for (const [pattern, { filename }] of routes.routes) {
         const ret = pattern.exec({ host, pathname });
+        const accept = req.headers.get("Accept");
+        const fromFetchApi = accept === "application/json" || !accept?.includes("html");
         if (ret) {
           try {
             const mod = await importRouteModule(filename);
             const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
-            const accept = req.headers.get("Accept");
-            const fromFetchApi = accept === "application/json" || !accept?.includes("html");
             if (req.method !== "GET" || mod.default === undefined || fromFetchApi) {
               Object.assign(ctx.params, ret.pathname.groups);
               const anyFetcher = dataConfig.any;
@@ -306,13 +306,16 @@ export const serve = (options: ServerOptions = {}) => {
           } catch (error) {
             let err = error;
             if (err instanceof Response) {
-              if (err.ok) {
+              if (err.ok || !fromFetchApi) {
                 return err;
               }
               err = await FetchError.fromResponse(err);
             }
             const res = onError?.(err, "api", req.url);
             if (res instanceof Response) {
+              if (!fromFetchApi) {
+                return err;
+              }
               err = await FetchError.fromResponse(res);
             }
             if (err instanceof Error) {
