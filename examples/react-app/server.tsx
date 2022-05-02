@@ -11,7 +11,7 @@ serve({
     },
   },
   ssr: {
-    // when set `suspense` to `true`, the router will loading data as suspense
+    // when set `suspense` to `true`, the router will loading data in suspense mode
     // please check https://alephjs.org/docs/react/router/suspense
     suspense: false,
     render: (ctx) => renderToReadableStream(<Router ssrContext={ctx} />, ctx),
