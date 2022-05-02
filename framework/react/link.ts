@@ -1,4 +1,4 @@
-import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, PropsWithChildren } from "react";
+import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, MutableRefObject, PropsWithChildren } from "react";
 import { createElement, useCallback, useEffect, useMemo, useRef } from "react";
 import util from "../../lib/util.ts";
 import events from "../core/events.ts";
@@ -12,6 +12,7 @@ export type LinkProps = PropsWithChildren<
     to: string;
     replace?: boolean;
     prefetch?: boolean;
+    innerRef?: MutableRefObject<HTMLAnchorElement | null>;
   } & Omit<AnchorHTMLAttributes<Record<never, never>>, "herf" | "hrefLang">
 >;
 
@@ -30,6 +31,7 @@ export function Link(props: LinkProps) {
     onMouseLeave: propOnMouseLeave,
     ["aria-current"]: propAriaCurrent,
     children,
+    innerRef,
     ...rest
   } = props;
   const { url: { pathname } } = useRouter();
@@ -124,6 +126,7 @@ export function Link(props: LinkProps) {
       onMouseEnter,
       onMouseLeave,
       "aria-current": ariaCurrent,
+      ref: innerRef,
     },
     children,
   );
