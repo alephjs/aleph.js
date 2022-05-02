@@ -219,12 +219,9 @@ export async function loadImportMap(): Promise<ImportMap> {
   return importMap;
 }
 
+/** init loaders in `CLI` mode, or use prebuild loaders */
 export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoader[]> {
   const loaders: ModuleLoader[] = Reflect.get(globalThis, "__ALEPH_MODULE_LOADERS") || [];
-  if (loaders.length > 0) {
-    return loaders;
-  }
-  // only init loaders in `CLI` mode
   if (Deno.env.get("ALEPH_CLI")) {
     for (const key in importMap.imports) {
       if (/^\*\.{?(\w+, ?)*\w+}?$/i.test(key)) {
@@ -252,7 +249,6 @@ export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoa
       }
     }
   }
-  Reflect.set(globalThis, "__ALEPH_MODULE_LOADERS", loaders);
   return loaders;
 }
 

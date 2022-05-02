@@ -1,9 +1,9 @@
 import { serve as stdServe, type ServeInit, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
+import { VERSION } from "https://deno.land/x/aleph_compiler@0.1.0/version.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
-import { VERSION } from "../version.ts";
 import { errorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
 import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig } from "./helpers.ts";
@@ -30,11 +30,17 @@ export const serve = (options: ServerOptions = {}) => {
   const { config, middlewares, fetch, ssr, logLevel, onError } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const importMapPromise = loadImportMap();
-  const jsxConfigPromise = importMapPromise.then((importMap) => loadJSXConfig(importMap));
-  const moduleLoadersPromise = importMapPromise.then((importMap) => initModuleLoaders(importMap));
+  const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
+  const moduleLoadersPromise = importMapPromise.then(initModuleLoaders);
   const routesPromise = config?.routes ? initRoutes(config.routes) : Promise.resolve({ routes: [] });
   const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {
-    const buildArgs = JSON.stringify({ config, jsxConfig, importMap, isDev, VERSION });
+    const buildArgs = JSON.stringify({
+      ...(config ? util.pick(config, "build", "unocss") : undefined),
+      comilper: VERSION,
+      importMap,
+      jsxConfig,
+      isDev,
+    });
     return util.computeHash("sha-1", buildArgs);
   });
   const handler = async (req: Request): Promise<Response> => {
