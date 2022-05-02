@@ -267,10 +267,9 @@ export const serve = (options: ServerOptions = {}) => {
           try {
             const mod = await importRouteModule(filename);
             const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
-            if (
-              req.method !== "GET" || mod.default === undefined || req.headers.get("Accept") === "application/json" ||
-              !req.headers.get("Accept")?.includes("html")
-            ) {
+            const accept = req.headers.get("Accept");
+            const fromFetchApi = accept === "application/json" || !accept?.includes("html");
+            if (req.method !== "GET" || mod.default === undefined || fromFetchApi) {
               Object.assign(ctx.params, ret.pathname.groups);
               const anyFetcher = dataConfig.any;
               if (typeof anyFetcher === "function") {
@@ -283,7 +282,7 @@ export const serve = (options: ServerOptions = {}) => {
               if (typeof fetcher === "function") {
                 const res = await fetcher(req, ctx);
                 if (res instanceof Response) {
-                  if (res.status >= 300) {
+                  if (res.status >= 300 && fromFetchApi) {
                     const err = await FetchError.fromResponse(res);
                     return ctx.json({ ...err }, { status: err.status >= 400 ? err.status : 501 });
                   }
