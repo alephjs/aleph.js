@@ -227,7 +227,7 @@ export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoa
   // only init loaders in `CLI` mode
   if (Deno.env.get("ALEPH_CLI")) {
     for (const key in importMap.imports) {
-      if (/^\*\.[a-z0-9]+$/i.test(key)) {
+      if (/^\*\.{?(\w+, ?)*\w+}?$/i.test(key)) {
         let src = importMap.imports[key];
         if (src.endsWith("!loader")) {
           src = util.trimSuffix(src, "!loader");
@@ -238,17 +238,12 @@ export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoa
           if (typeof loader === "function") {
             loader = new loader();
           }
-          if (
-            typeof loader === "object" && loader !== null &&
-            typeof loader.test === "function" && typeof loader.load === "function"
-          ) {
+          if (loader !== null && typeof loader === "object" && typeof loader.load === "function") {
             const glob = "/**/" + key;
             const reg = globToRegExp(glob);
             const Loader = {
               meta: { src, glob },
-              test: (pathname: string) => {
-                return reg.test(pathname) && loader.test(pathname);
-              },
+              test: (pathname: string) => reg.test(pathname),
               load: (pathname: string, env: Record<string, unknown>) => loader.load(pathname, env),
             };
             loaders.push(Loader);

@@ -69,22 +69,15 @@ export async function build(serverEntry?: string) {
     moduleLoaders.length > 0 &&
     `import { globToRegExp } from "https://deno.land/std@0.136.0/path/mod.ts";const moduleLoaders = []; globalThis["__ALEPH_MODULE_LOADERS"] = moduleLoaders;`,
     moduleLoaders.length > 0 &&
-    moduleLoaders.map((loader, idx) => {
+    moduleLoaders.map((loader) => {
       const meta = Reflect.get(loader, "meta");
       return `
-        import loader$${idx} from ${JSON.stringify(meta.src)};
         {
           const reg = globToRegExp(${JSON.stringify(meta.glob)});
-          let loader = loader$${idx};
-          if (typeof loader === "function") {
-            loader = new loader();
-          }
           moduleLoaders.push({
             meta: ${JSON.stringify(meta)},
-            test: (pathname) => {
-              return reg.test(pathname) && loader.test(pathname);
-            },
-            load: (pathname, env) => loader.load(pathname, env),
+            test: (pathname) => reg.test(pathname),
+            load: (pathname, env) => ({ code: '' }),
           })
         }
       `;
