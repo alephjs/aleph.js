@@ -1,1 +1,1 @@
-// todo: add vue framework support
+export { createSSRApp } from "./router.ts";
