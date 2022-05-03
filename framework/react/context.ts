@@ -1,8 +1,10 @@
+import type { ReactNode, ReactPortal } from "react";
 import { createContext } from "react";
 
 export type RouterContextProps = {
   url: URL;
   params: Record<string, string>;
+  createPortal?: (children: ReactNode, container: Element, key?: null | string) => ReactPortal;
 };
 
 export const RouterContext = createContext<RouterContextProps>({

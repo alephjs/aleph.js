@@ -6,7 +6,7 @@ import { redirect } from "../core/redirect.ts";
 import type { Route, RouteMeta, RouteModule, Routes } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import { URLPatternCompat } from "../core/url_pattern.ts";
-import { DataContext, ForwardPropsContext, RouterContext } from "./context.ts";
+import { DataContext, ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { Err, ErrorBoundary } from "./error.ts";
 
 export type SSRContext = {
@@ -20,6 +20,7 @@ export type SSRContext = {
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
   readonly suspense?: boolean;
+  readonly createPortal?: RouterContextProps["createPortal"];
 };
 
 type RouteData = {
@@ -31,7 +32,7 @@ type RouteData = {
 // deno-lint-ignore no-explicit-any
 const global = window as any;
 
-export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
+export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) => {
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
@@ -247,7 +248,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense }) => {
 
   return createElement(
     RouterContext.Provider,
-    { value: { url, params } },
+    { value: { url, params, createPortal } },
     routeEl,
   );
 };
