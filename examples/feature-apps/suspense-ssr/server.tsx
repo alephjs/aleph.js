@@ -1,4 +1,4 @@
-import { Router } from "aleph/react";
+import { App } from "aleph/react";
 import { serve } from "aleph/server";
 import { renderToReadableStream } from "react-dom/server";
 
@@ -8,6 +8,6 @@ serve({
   },
   ssr: {
     suspense: true,
-    render: (ctx) => renderToReadableStream(<Router ssrContext={ctx} />, ctx),
+    render: (ctx) => renderToReadableStream(<App ssrContext={ctx} />, ctx),
   },
 });
