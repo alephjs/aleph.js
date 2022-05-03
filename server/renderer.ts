@@ -23,9 +23,11 @@ export type SSRContext = {
 
 export type SSR = {
   suspense: true;
+  cacheControl?: "private" | "public";
   render(ssr: SSRContext): Promise<ReadableStream> | ReadableStream;
 } | {
   suspense?: false;
+  cacheControl?: "private" | "public";
   render(ssr: SSRContext): Promise<string | ReadableStream> | string | ReadableStream;
 } | ((ssr: SSRContext) => Promise<string | ReadableStream> | string | ReadableStream);
 
@@ -53,9 +55,11 @@ export default {
     const { indexHtml, routes, customHTMLRewriter, isDev, ssr, onError } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
-    if (ssr) {
-      const suspense = typeof ssr === "function" ? false : !!ssr.suspense;
-      const render = typeof ssr === "function" ? ssr : ssr.render;
+    if (typeof ssr === "function" || typeof ssr?.render === "function") {
+      const isFn = typeof ssr === "function";
+      const suspense = isFn ? false : !!ssr.suspense;
+      const cc = isFn ? "public" : ssr.cacheControl ?? "public";
+      const render = isFn ? ssr : ssr.render;
       try {
         const [url, routeModules, suspenseData, errorBoundaryHandler] = await initSSR(
           req,
@@ -127,11 +131,11 @@ export default {
           typeof dataCacheTtl === "number" && !Number.isNaN(dataCacheTtl) && dataCacheTtl > 0
         ).map(({ dataCacheTtl }) => Number(dataCacheTtl));
         if (ttls.length > 1) {
-          headers.append("Cache-Control", `public, max-age=${Math.min(...ttls)}`);
+          headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
         } else if (ttls.length == 1) {
-          headers.append("Cache-Control", `public, max-age=${ttls[0]}`);
+          headers.append("Cache-Control", `${cc}, max-age=${ttls[0]}`);
         } else {
-          headers.append("Cache-Control", "public, max-age=0, must-revalidate");
+          headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
         }
         ssrRes = {
           context: ssrContext,
@@ -150,19 +154,27 @@ export default {
         } else {
           message = e?.toString?.() || String(e);
         }
-        headers.append("Cache-Control", "public, max-age=0, must-revalidate");
+        headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
         headers.append("Content-Type", "text/html; charset=utf-8");
         return new Response(errorHtml(message, "SSR"), { headers });
       }
     } else {
-      const { mtime, size } = await Deno.lstat("./index.html");
-      if (mtime) {
-        const etag = mtime.getTime().toString(16) + "-" + size.toString(16);
-        if (etag && req.headers.get("If-None-Match") === etag) {
+      const deployId = getDeploymentId();
+      let etag: string | null = null;
+      if (deployId) {
+        etag = `${btoa("./index.html").replace(/[^a-z0-9]/g, "")}-${deployId}`;
+      } else {
+        const { mtime, size } = await Deno.lstat("./index.html");
+        if (mtime) {
+          etag = mtime.getTime().toString(16) + "-" + size.toString(16);
+          headers.append("Last-Modified", new Date(mtime).toUTCString());
+        }
+      }
+      if (etag) {
+        if (req.headers.get("If-None-Match") === etag) {
           return new Response(null, { status: 304 });
         }
-        headers.append("Etag", etag);
-        headers.append("Last-Modified", mtime.toUTCString());
+        headers.append("ETag", etag);
       }
       headers.append("Cache-Control", "public, max-age=0, must-revalidate");
     }

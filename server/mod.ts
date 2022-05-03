@@ -141,8 +141,11 @@ export const serve = (options: ServerOptions = {}) => {
               headers.append("Last-Modified", new Date(mtime).toUTCString());
             }
           }
-          if (etag && req.headers.get("If-None-Match") === etag) {
-            return new Response(null, { status: 304 });
+          if (etag) {
+            if (req.headers.get("If-None-Match") === etag) {
+              return new Response(null, { status: 304 });
+            }
+            headers.append("ETag", etag);
           }
           const file = await Deno.open(filePath, { read: true });
           return new Response(readableStreamFromReader(file), { headers });
