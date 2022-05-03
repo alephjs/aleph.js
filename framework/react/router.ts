@@ -1,5 +1,5 @@
 import type { FC, ReactElement, ReactNode } from "react";
-import { createElement, useContext, useEffect, useMemo, useState } from "react";
+import { createElement, StrictMode, useContext, useEffect, useMemo, useState } from "react";
 import events from "../core/events.ts";
 import FetchError from "../core/fetch_error.ts";
 import { redirect } from "../core/redirect.ts";
@@ -23,7 +23,7 @@ export type RouterProps = {
   readonly createPortal?: RouterContextProps["createPortal"];
 };
 
-type RouteData = {
+export type RouteData = {
   data?: unknown;
   dataCacheTtl?: number;
   dataExpires?: number;
@@ -32,6 +32,7 @@ type RouteData = {
 // deno-lint-ignore no-explicit-any
 const global = window as any;
 
+/** The `Router` component for react. */
 export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) => {
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
@@ -250,6 +251,15 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
     RouterContext.Provider,
     { value: { url, params, createPortal } },
     routeEl,
+  );
+};
+
+/** The `App` component alias to the `Router` in `StrictMode` mode. */
+export const App: FC<RouterProps> = (props) => {
+  return createElement(
+    StrictMode,
+    null,
+    createElement(Router, props),
   );
 };
 
