@@ -32,12 +32,10 @@ export function usePortal(
     }
 
     const portalRoot = document.createElement("div");
-    if (className) {
-      portalRoot.className = className;
-    }
     if (key) {
       portalRoot.id = key;
     }
+    portalRoot.className = className ?? "portal-root";
     document.body.appendChild(portalRoot);
     setPortalRoot(portalRoot);
 
@@ -52,12 +50,12 @@ export function usePortal(
     };
   }, [key, className, preventScroll]);
 
-  if (!createPortal) {
-    throw new Error("Please ensure to pass the `React.createPortal` in `Router` props");
-  }
-
   if (!portalRoot) {
     return () => null;
+  }
+
+  if (!createPortal) {
+    throw new Error("Please ensure to pass the `React.createPortal` in `Router` props");
   }
 
   return (el: ReactNode) => createPortal(el, portalRoot, key);
