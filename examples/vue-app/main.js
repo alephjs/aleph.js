@@ -1,4 +1,8 @@
-import { createSSRApp } from "aleph/vue";
+import { Link, createSSRApp } from "aleph/vue";
 import App from "./app.vue";
 
-createSSRApp(App).mount("#root", true);
+const app = createSSRApp(App)
+
+app.component('Link', Link)
+
+app.mount("#root", true)
