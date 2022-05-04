@@ -1,20 +1,49 @@
-import { Component, createApp, createSSRApp, MethodOptions } from "vue";
-import { createMemoryHistory, createRouter } from "vue-router";
+import { Component, createApp, createSSRApp } from "vue";
+import type { SSRContext } from "../../server/renderer.ts";
+import { RouterContext } from "./context.ts";
+import { defineComponent } from "vue";
 
-const createSSRApp_ = async (app: Component, routes: any, ctx: { url: { pathname: any } }) => {
-  const ssrApp = createSSRApp(app);
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes,
-  });
-  ssrApp.use(router);
+export const App = defineComponent({
+  name: "App",
+  props: {
+    ssrContext: {
+      type: String,
+      default: "",
+    },
+  },
+  setup() {
+    console.log("App");
+  },
+  render() {
+    return this.$slots.default ? this.$slots.default() : [];
+  },
+});
 
-  const pathname = ctx.url.pathname;
-  await router.push(pathname);
+const createSSRApp_ = (app: Component, { ssrContext }: { ssrContext: SSRContext }) => {
+  const routeModules = ssrContext?.routeModules;
 
-  await router.isReady();
+  if (ssrContext?.url) {
+    RouterContext.value.url = ssrContext?.url;
+  }
 
-  return ssrApp;
+  if (routeModules.length > 0) {
+    const defaultRouteModules = routeModules[0];
+    const { defaultExport } = defaultRouteModules;
+    if (defaultExport) {
+      return createSSRApp(defaultExport as Component);
+    }
+  }
+
+  return createSSRApp(app);
 };
 
-export { createSSRApp_ as createSSRApp };
+const createApp_ = (app: Component) => {
+  return createApp(app);
+};
+
+export const useRouter = () => {
+  const { url, params } = RouterContext.value;
+  return { url, params };
+};
+
+export { createApp_ as createApp, createSSRApp_ as createSSRApp };

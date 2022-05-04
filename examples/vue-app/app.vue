@@ -1,18 +1,17 @@
 <script setup>
 import { ref } from "vue"
+import { Link } from "aleph/vue"
 
 const msg = ref("Hello world!")
-
-function click() {
-  location.pathname = '/hello'
-}
 </script>
 
 <template>
   <h1 v-if="msg">{{ msg }}</h1>
   <h1 v-if="!msg" style="color: #ccc;">Please type something</h1>
   <input v-model="msg" placeholder="Please type something">
-  <button @click="click">hello page</button>
+  <Link to="/hello">hello page</Link>
+  <br />
+  <Link to="/blog">blog page</Link>
 </template>
 
 <style scoped>
