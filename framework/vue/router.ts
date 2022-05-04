@@ -1,8 +1,9 @@
-import { Component, createApp, createSSRApp } from "vue";
+import { Component, createApp, createSSRApp, defineComponent, resolveComponent } from "vue";
 import type { SSRContext } from "../../server/renderer.ts";
-import { RouterContext } from "./context.ts";
-import { defineComponent } from "vue";
+import { DataContext, RouterContext } from "./context.ts";
 import { RouteModule } from "../core/route.ts";
+import { Link } from "./link.ts";
+import { Head } from "./head.ts";
 
 // deno-lint-ignore no-explicit-any
 const global = window as any;
@@ -16,7 +17,10 @@ export const App = defineComponent({
     },
   },
   setup() {
-    console.log("App");
+    console.log("App setup");
+  },
+  mounted() {
+    console.log("App mounted");
   },
   render() {
     return this.$slots.default ? this.$slots.default() : [];
@@ -31,19 +35,34 @@ const createSSRApp_ = (app: Component, props?: RootProps) => {
   const { ssrContext } = props || {};
   const routeModules = ssrContext?.routeModules || loadSSRModulesFromTag();
 
-  if (ssrContext?.url) {
-    RouterContext.value.url = ssrContext?.url;
-  }
+  let routeComponent = undefined;
 
   if (routeModules && routeModules.length > 0) {
     const defaultRouteModules = routeModules[0];
     const { defaultExport } = defaultRouteModules;
-    if (defaultExport) {
-      return createSSRApp(defaultExport as Component);
+    if (defaultExport) routeComponent = defaultExport as Component;
+  }
+
+  const ssrApp = createSSRApp(routeComponent || app);
+
+  if (ssrContext?.url) {
+    RouterContext.value.url = ssrContext?.url;
+  }
+
+  const ssrHeadCollection = DataContext?.value?.ssrHeadCollection;
+  if (ssrHeadCollection && ssrHeadCollection.length > 0) {
+    if (ssrContext?.headCollection) {
+      ssrHeadCollection.forEach((item) => {
+        ssrContext.headCollection.push(item);
+      });
     }
   }
 
-  return createSSRApp(app);
+  // registe aleph/vue component
+  ssrApp.component("Link", Link);
+  ssrApp.component("Head", Head);
+
+  return ssrApp;
 };
 
 function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {

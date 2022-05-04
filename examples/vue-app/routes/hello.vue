@@ -10,3 +10,13 @@ const msg = ref("hello page")
     <br />
     <Link to="/">go back</Link>
 </template>
+
+<style scoped>
+h2 {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1;
+    color: #42b883;
+    margin: 0;
+}
+</style>

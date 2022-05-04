@@ -1,11 +1,15 @@
 <script setup>
 import { ref } from "vue"
-import { Link } from "aleph/vue"
+import { Link, Head } from "aleph/vue"
 
 const msg = ref("Hello world!")
 </script>
 
 <template>
+
+  <Head>
+    <title>aleph/vue - hello world</title>
+  </Head>
   <h1 v-if="msg">{{ msg }}</h1>
   <h1 v-if="!msg" style="color: #ccc;">Please type something</h1>
   <input v-model="msg" placeholder="Please type something">
