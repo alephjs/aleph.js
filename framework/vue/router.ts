@@ -1,4 +1,4 @@
-import { Component, createApp, createSSRApp, defineComponent, resolveComponent } from "vue";
+import { Component, createApp, createSSRApp, defineComponent, h } from "vue";
 import type { SSRContext } from "../../server/renderer.ts";
 import { DataContext, RouterContext } from "./context.ts";
 import { RouteModule } from "../core/route.ts";
@@ -7,6 +7,10 @@ import { Head } from "./head.ts";
 
 // deno-lint-ignore no-explicit-any
 const global = window as any;
+
+type RootProps = {
+  ssrContext?: SSRContext;
+};
 
 export const App = defineComponent({
   name: "App",
@@ -27,16 +31,42 @@ export const App = defineComponent({
   },
 });
 
-type RootProps = {
-  ssrContext?: SSRContext;
-};
+export const Err = defineComponent({
+  name: "Err",
+  props: {
+    status: {
+      type: String,
+      default: "404",
+    },
+  },
+  render() {
+    return h("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100vw",
+        height: "100vh",
+        fontSize: 16,
+      },
+    }, [
+      h("strong", { style: { fontWeight: "500" } }, this.$props.status),
+      h("small", { style: { color: "#999", padding: "0 6px" } }, "-"),
+      "page not found",
+    ]);
+  },
+});
 
-const createSSRApp_ = (app: Component, props?: RootProps) => {
+const createSSRApp_ = (_app: Component, props?: RootProps) => {
   const { ssrContext } = props || {};
   const routeModules = ssrContext?.routeModules || loadSSRModulesFromTag();
 
   // clean
   DataContext.value.ssrHeadCollection = [];
+
+  if (ssrContext?.url) {
+    RouterContext.value.url = ssrContext?.url;
+  }
 
   let routeComponent = undefined;
 
@@ -46,24 +76,26 @@ const createSSRApp_ = (app: Component, props?: RootProps) => {
     if (defaultExport) routeComponent = defaultExport as Component;
   }
 
-  const ssrApp = createSSRApp(routeComponent || app);
+  if (routeComponent) {
+    const ssrApp = createSSRApp(routeComponent);
 
-  if (ssrContext?.url) {
-    RouterContext.value.url = ssrContext?.url;
-  }
-
-  const ssrHeadCollection = DataContext?.value?.ssrHeadCollection;
-  if (ssrHeadCollection && ssrHeadCollection.length > 0) {
-    if (ssrContext?.headCollection) {
-      ssrHeadCollection.forEach((item) => {
-        ssrContext.headCollection.push(item);
-      });
+    const ssrHeadCollection = DataContext?.value?.ssrHeadCollection;
+    if (ssrHeadCollection && ssrHeadCollection.length > 0) {
+      if (ssrContext?.headCollection) {
+        ssrHeadCollection.forEach((item) => {
+          ssrContext.headCollection.push(item);
+        });
+      }
     }
+
+    // registe aleph/vue component
+    ssrApp.component("Link", Link);
+    ssrApp.component("Head", Head);
+
+    return ssrApp;
   }
 
-  // registe aleph/vue component
-  ssrApp.component("Link", Link);
-  ssrApp.component("Head", Head);
+  const ssrApp = createSSRApp(Err);
 
   return ssrApp;
 };
