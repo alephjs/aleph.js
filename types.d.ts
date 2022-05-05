@@ -61,7 +61,10 @@ declare interface Context<DataType = unknown> extends Record<string, unknown> {
 declare interface Data<DataType = unknown, ContextExtension = Record<never, never>> {
   cacheTtl?: number;
   any?(request: Request, context: Context & ContextExtension): Promise<Response | void> | Response | void;
-  get?(request: Request, context: Context<DataType> & ContextExtension): Promise<Response> | Response;
+  get?(
+    request: Request,
+    context: Context<DataType> & ContextExtension,
+  ): Promise<Response | DataType> | Response | DataType;
   post?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
   put?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
   patch?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
