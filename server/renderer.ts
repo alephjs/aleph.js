@@ -380,8 +380,9 @@ async function initSSR(
             res = await res;
           }
         } catch (error) {
-          if (!(res = onError?.(error, { by: "ssr", url: req.url }))) {
-            throw error;
+          res = onError?.(error, { by: "ssr", url: req.url });
+          if (res instanceof Response) {
+            throw res;
           }
         }
         if (res instanceof Response) {
