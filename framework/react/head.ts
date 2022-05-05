@@ -1,10 +1,10 @@
 import type { FC, ReactNode } from "react";
 import { Children, createElement, Fragment, isValidElement, useContext, useEffect, useMemo } from "react";
 import util from "../../lib/util.ts";
-import { DataContext } from "./context.ts";
+import { RouterContext } from "./context.ts";
 
 export const Head: FC<{ children?: ReactNode }> = (props) => {
-  const { ssrHeadCollection } = useContext(DataContext);
+  const { ssrHeadCollection } = useContext(RouterContext);
   const [els, forwardNodes] = useMemo(() => parse(props.children), [
     props.children,
   ]);

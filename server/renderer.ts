@@ -402,7 +402,7 @@ async function initSSR(
           } catch (_e) {
             throw new FetchError(500, {}, "Data must be valid JSON");
           }
-        } else if (util.isPlainObject(res) || Array.isArray(res)) {
+        } else if (res === null || util.isPlainObject(res) || Array.isArray(res)) {
           return res;
         } else {
           throw new FetchError(500, {}, "No response from data fetcher");

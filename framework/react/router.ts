@@ -1,4 +1,4 @@
-import type { FC, ReactElement, ReactNode } from "react";
+import type { FC, ReactNode } from "react";
 import { createElement, StrictMode, useContext, useEffect, useMemo, useState } from "react";
 import events from "../core/events.ts";
 import FetchError from "../core/fetch_error.ts";
@@ -6,7 +6,8 @@ import { redirect } from "../core/redirect.ts";
 import type { Route, RouteMeta, RouteModule, Routes } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import { URLPatternCompat } from "../core/url_pattern.ts";
-import { DataContext, ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
+import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
+import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
 
 export type SSRContext = {
@@ -21,12 +22,6 @@ export type RouterProps = {
   readonly ssrContext?: SSRContext;
   readonly suspense?: boolean;
   readonly createPortal?: RouterContextProps["createPortal"];
-};
-
-export type RouteData = {
-  data?: unknown;
-  dataCacheTtl?: number;
-  dataExpires?: number;
 };
 
 // deno-lint-ignore no-explicit-any
@@ -47,50 +42,6 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
     });
     return cache;
   }, []);
-  const createRouteEl = (modules: RouteModule[]): ReactElement => {
-    const ErrorBoundaryHandler: undefined | FC<{ error: Error }> = ssrContext?.errorBoundaryHandler ||
-      global.__ERROR_BOUNDARY_HANDLER;
-    const { url, defaultExport } = modules[0];
-    const dataUrl = url.pathname + url.search;
-    const el = createElement(
-      ErrorBoundary,
-      {
-        Handler: ErrorBoundaryHandler || (({ error }: { error: Error }) =>
-          createElement(Err, {
-            status: 500,
-            statusText: error.message,
-          })),
-      },
-      createElement(
-        DataContext.Provider,
-        {
-          value: {
-            dataUrl,
-            dataCache,
-            ssrHeadCollection: ssrContext?.headCollection,
-          },
-          key: dataUrl,
-        },
-        typeof defaultExport === "function"
-          ? createElement(
-            defaultExport as FC,
-            null,
-            modules.length > 1 ? createRouteEl(modules.slice(1)) : undefined,
-          )
-          : createElement(Err, {
-            status: 400,
-            statusText: "missing default export as a valid React component",
-          }),
-      ),
-    );
-    return el;
-  };
-  const routeEl = useMemo(() => {
-    if (modules.length > 0) {
-      return createRouteEl(modules);
-    }
-    return createElement(Err, { status: 404, statusText: "page not found" });
-  }, [modules]);
   const params = useMemo(() => {
     const params: Record<string, string> = {};
     modules.forEach((m) => {
@@ -136,18 +87,26 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
             location.reload();
             return;
           }
+          // clean up data cache
+          setTimeout(() => dataCache.delete(dataUrl), 0);
           if (isSuspense) {
             throw err;
           } else {
+            // todo: better notify UI
             alert(`Fetch Data: ${err.message}`);
             history.back();
             return;
           }
         }
-        const cc = res.headers.get("Cache-Control");
-        rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-        rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
-        return await res.json();
+        try {
+          const data = await res.json();
+          const cc = res.headers.get("Cache-Control");
+          rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+          rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
+          return data;
+        } catch (_e) {
+          throw new FetchError(500, {}, "Data must be valid JSON");
+        }
       };
       if (isSuspense) {
         rd.data = fetchData;
@@ -247,10 +206,57 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
     };
   }, []);
 
+  if (modules.length === 0) {
+    return createElement(Err, { status: 404, statusText: "page not found" });
+  }
+
   return createElement(
     RouterContext.Provider,
-    { value: { url, params, createPortal } },
-    routeEl,
+    {
+      value: {
+        url,
+        params,
+        ssrHeadCollection: ssrContext?.headCollection,
+        createPortal,
+      },
+    },
+    createElement(RouteRoot, { modules, dataCache, ssrContext }),
+  );
+};
+
+const RouteRoot: FC<{ modules: RouteModule[]; dataCache: Map<string, RouteData>; ssrContext?: SSRContext }> = (
+  { modules, dataCache, ssrContext },
+) => {
+  const { url, defaultExport } = modules[0];
+  const errorHandler: FC<{ error: Error }> = ssrContext?.errorBoundaryHandler ?? global.__ERROR_BOUNDARY_HANDLER ??
+    (({ error }) =>
+      createElement(Err, {
+        status: 500,
+        statusText: error.message,
+      }));
+
+  return createElement(
+    ErrorBoundary,
+    { Handler: errorHandler },
+    createElement(
+      DataProvider,
+      {
+        dataUrl: url.pathname + url.search,
+        dataCache,
+      },
+      typeof defaultExport === "function"
+        ? createElement(
+          defaultExport as FC,
+          null,
+          modules.length > 1
+            ? createElement(RouteRoot, { modules: modules.slice(1), dataCache, ssrContext })
+            : undefined,
+        )
+        : createElement(Err, {
+          status: 400,
+          statusText: "missing default export as a valid React component",
+        }),
+    ),
   );
 };
 
