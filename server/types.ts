@@ -1,4 +1,4 @@
-import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.32.8";
+import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.32.12";
 
 export type AlephConfig = {
   /** The basePath of the app. */
