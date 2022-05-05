@@ -1,4 +1,4 @@
-const deno = typeof Deno !== "undefined" && typeof Deno.env === "object";
+const deno = typeof Deno === "object" && Deno !== null && typeof Deno.env === "object";
 
 export function applyCSS(url: string, css: string) {
   if (!deno) {

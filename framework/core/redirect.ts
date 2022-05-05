@@ -4,6 +4,8 @@ import events from "./events.ts";
 let routerReady = false;
 let preRedirect: URL | null = null;
 
+const deno = typeof Deno === "object" && Deno !== null && typeof Deno.env === "object";
+
 const onrouterready = (_: Record<string, unknown>) => {
   events.off("routerready", onrouterready);
   if (preRedirect) {
@@ -15,11 +17,11 @@ const onrouterready = (_: Record<string, unknown>) => {
 events.on("routerready", onrouterready);
 
 export function redirect(url: string, replace?: boolean) {
-  const { location } = window;
-
-  if (!util.isFilledString(url)) {
+  if (!util.isFilledString(url) || deno) {
     return;
   }
+
+  const { location } = window;
 
   if (util.isLikelyHttpURL(url) || url.startsWith("file://") || url.startsWith("mailto:") || url.startsWith("data:")) {
     location.href = url;
