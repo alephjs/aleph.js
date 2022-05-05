@@ -1,23 +1,27 @@
-import { onBeforeUnmount, Ref, ref, toRaw, watch } from "vue";
+import { inject, onBeforeUnmount, Ref, ref, toRaw, watch } from "vue";
 import FetchError from "../core/fetch_error.ts";
-import { DataContext } from "./context.ts";
+import type { SSRContext } from "../../server/renderer.ts";
+import { HttpMethod, UpdateStrategy } from "./context.ts";
 
-type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
-
-type UpdateStrategy<T> = "none" | "replace" | {
-  optimisticUpdate?: (data: T) => T;
-  onFailure?: (error: Error) => void;
-  replace?: boolean;
+export type RouteData = {
+  data?: unknown;
+  dataCacheTtl?: number;
+  dataExpires?: number;
 };
 
-export const useData = <T = unknown>(): {
-  data: Ref<T>;
-  isMutating: Ref<HttpMethod | boolean>;
-  mutation: typeof mutation;
-  reload: (signal?: AbortSignal) => Promise<void>;
-} => {
-  const { dataUrl, dataCache } = DataContext;
-  const cached = dataCache.get(dataUrl);
+export type DataProviderProps = {
+  dataUrl: string;
+  dataCache: Map<string, RouteData>;
+};
+
+const createDataProvider = () => {
+  const dataCache: Map<string, RouteData> = inject("dataCache") || new Map();
+  const ssrContext: SSRContext | undefined = inject("ssrContext");
+  const url = ssrContext?.url || new URL(window.location?.href);
+  const defaultDataUrl = url.pathname + url.search;
+  const dataUrl: string = inject("dataUrl") || defaultDataUrl;
+
+  const cached = dataCache?.get(dataUrl);
 
   if (cached) {
     if (cached.data instanceof Error) {
@@ -26,7 +30,7 @@ export const useData = <T = unknown>(): {
     if (typeof cached.data === "function") {
       const data = cached.data();
       if (data instanceof Promise) {
-        throw data.then((data) => {
+        data.then((data) => {
           cached.data = data;
         }).catch((error) => {
           cached.data = error;
@@ -38,25 +42,24 @@ export const useData = <T = unknown>(): {
     throw new Error(`Data for ${dataUrl} is not found`);
   }
 
-  const _data: Ref<T> = ref(cached.data);
+  const _data: Ref<unknown> = ref(cached?.data);
   const isMutating = ref<HttpMethod | boolean>(false);
 
-  const action = async (method: HttpMethod, fetcher: Promise<Response>, update: UpdateStrategy<T>) => {
+  const action = async (method: HttpMethod, fetcher: Promise<Response>, update: UpdateStrategy) => {
     const updateIsObject = update && typeof update === "object" && update !== null;
     const optimistic = updateIsObject && typeof update.optimisticUpdate === "function";
     const replace = update === "replace" || (updateIsObject && !!update.replace);
 
-    isMutating.value = method;
-
-    let rollbackData: T | undefined = undefined;
+    let rollbackData: unknown = undefined;
     if (optimistic) {
       const optimisticUpdate = update.optimisticUpdate!;
       if (_data.value !== undefined) {
         rollbackData = toRaw(_data.value);
-        _data.value = optimisticUpdate(clone(toRaw(_data.value)));
+        _data.value = optimisticUpdate(shallowClone(toRaw(_data.value)));
       }
     }
 
+    isMutating.value = method;
     const res = await fetcher;
     if (res.status >= 400) {
       if (optimistic) {
@@ -132,16 +135,16 @@ export const useData = <T = unknown>(): {
   };
 
   const mutation = {
-    post: (data?: unknown, update?: UpdateStrategy<T>) => {
+    post: (data?: unknown, update?: UpdateStrategy) => {
       return action("post", send("post", dataUrl, data), update ?? "none");
     },
-    put: (data?: unknown, update?: UpdateStrategy<T>) => {
+    put: (data?: unknown, update?: UpdateStrategy) => {
       return action("put", send("put", dataUrl, data), update ?? "none");
     },
-    patch: (data?: unknown, update?: UpdateStrategy<T>) => {
+    patch: (data?: unknown, update?: UpdateStrategy) => {
       return action("patch", send("patch", dataUrl, data), update ?? "none");
     },
-    delete: (data?: unknown, update?: UpdateStrategy<T>) => {
+    delete: (data?: unknown, update?: UpdateStrategy) => {
       return action("delete", send("delete", dataUrl, data), update ?? "none");
     },
   };
@@ -163,6 +166,10 @@ export const useData = <T = unknown>(): {
   });
 
   return { data: _data, isMutating, mutation, reload };
+};
+
+export const useData = () => {
+  return createDataProvider();
 };
 
 function send(method: HttpMethod, href: string, data: unknown) {
@@ -190,8 +197,12 @@ function send(method: HttpMethod, href: string, data: unknown) {
   return fetch(href, { method, body, headers, redirect: "manual" });
 }
 
-function clone<T>(obj: T): T {
-  // deno-lint-ignore ban-ts-comment
-  // @ts-ignore
-  return typeof structuredClone === "function" ? structuredClone(obj) : JSON.parse(JSON.stringify(obj));
+function shallowClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return [...obj] as unknown as T;
+  }
+  return { ...obj };
 }

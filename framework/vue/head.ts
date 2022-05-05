@@ -1,13 +1,11 @@
-import { defineComponent, onBeforeUnmount } from "vue";
-import { DataContext } from "./context.ts";
+import { defineComponent, inject, onBeforeUnmount } from "vue";
 import util from "../../lib/util.ts";
 
 export const Head = defineComponent({
   name: "Head",
-  props: {},
   setup(_props, ctx) {
-    if (ctx.slots.default) {
-      const ssrHeadCollection: string[] = [];
+    const ssrHeadCollection: string[] | undefined = inject("ssrHeadCollection");
+    if (ctx.slots.default && ssrHeadCollection) {
       const children = ctx?.slots.default();
       children.forEach((vnode) => {
         const { type, children } = vnode;
@@ -18,7 +16,6 @@ export const Head = defineComponent({
             ssrHeadCollection.push(`<title ssr>${children.join("")}</title>`);
           }
         }
-        DataContext.ssrHeadCollection = ssrHeadCollection;
       });
     }
   },

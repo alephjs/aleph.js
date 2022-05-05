@@ -91,7 +91,7 @@ export const data = {
       <span>Todos</span>
     </h1>
     <ul>
-      <li v-for="todo in data.todos" :key="todo.id">
+      <li v-for="todo in data?.todos" :key="todo.id">
         <input type="checkbox" :checked="todo.completed" @change="onChange(todo)" />
         <label :class="todo.completed ? 'completed' : ''">{{ todo.message }}</label>
         <button @click="onClick(todo)"></button>
