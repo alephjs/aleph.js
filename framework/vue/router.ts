@@ -35,6 +35,9 @@ const createSSRApp_ = (app: Component, props?: RootProps) => {
   const { ssrContext } = props || {};
   const routeModules = ssrContext?.routeModules || loadSSRModulesFromTag();
 
+  // clean
+  DataContext.value.ssrHeadCollection = [];
+
   let routeComponent = undefined;
 
   if (routeModules && routeModules.length > 0) {
