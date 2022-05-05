@@ -217,14 +217,15 @@ export default {
             element(el: Element) {
               headCollection.forEach((h) => util.isFilledString(h) && el.append(h, { html: true }));
               if (routeModules.length > 0) {
-                const ssrModules = routeModules.map(({ url, params, filename, data, dataCacheTtl }) => {
+                const ssrModules = routeModules.map(({ url, params, filename, withData, data, dataCacheTtl }) => {
                   const suspense = typeof data === "function" ? true : undefined;
                   return {
                     url: url.pathname + url.search,
                     params,
                     filename,
-                    data: suspense ? undefined : data,
+                    withData,
                     suspense,
+                    data: suspense ? undefined : data,
                     dataCacheTtl,
                   };
                 });
@@ -408,6 +409,7 @@ async function initSSR(
           throw new FetchError(500, {}, "No response from data fetcher");
         }
       };
+      rmod.withData = true;
       if (suspense) {
         rmod.data = fetchData;
       } else {

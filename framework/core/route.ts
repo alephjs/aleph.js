@@ -7,6 +7,7 @@ export type RouteModule = {
   params: Record<string, string>;
   filename: string;
   defaultExport?: unknown;
+  withData?: boolean;
   data?: unknown;
   dataCacheTtl?: number;
 };

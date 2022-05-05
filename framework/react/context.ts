@@ -12,6 +12,7 @@ export const RouterContext = createContext<RouterContextProps>({
   url: new URL("http://localhost/"),
   params: {},
 });
+RouterContext.displayName = "RouterContext";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
@@ -47,6 +48,7 @@ export const DataContext = createContext<DataContextProps>({
   },
   reload: () => Promise.resolve(undefined),
 });
+DataContext.displayName = "DataContext";
 
 export type ForwardPropsContextProps = {
   props: Record<string, unknown>;
@@ -55,3 +57,4 @@ export type ForwardPropsContextProps = {
 export const ForwardPropsContext = createContext<ForwardPropsContextProps>({
   props: {},
 });
+ForwardPropsContext.displayName = "ForwardPropsContext";

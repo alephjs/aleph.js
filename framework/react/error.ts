@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
   }
 }
 
-export function Err({ status, statusText }: { status: number; statusText: string }) {
+export function Err({ status, message }: { status?: number; message: string }) {
   return createElement(
     "div",
     {
@@ -35,8 +35,8 @@ export function Err({ status, statusText }: { status: number; statusText: string
         fontSize: 16,
       },
     },
-    createElement("strong", { style: { fontWeight: "500" } }, status),
-    createElement("small", { style: { color: "#999", padding: "0 6px" } }, "-"),
-    statusText,
+    status && createElement("strong", { style: { fontWeight: "500" } }, status),
+    status && createElement("small", { style: { color: "#999", padding: "0 6px" } }, "-"),
+    message,
   );
 }

@@ -151,12 +151,13 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;
         if (filename in routeModules) {
-          rmod.defaultExport = routeModules[filename].defaultExport;
+          Object.assign(rmod, routeModules[filename]);
         } else {
-          const { defaultExport } = await importModule(meta);
-          rmod.defaultExport = defaultExport;
+          const { defaultExport, withData } = await importModule(meta);
+          Object.assign(rmod, { defaultExport, withData });
         }
         if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
+          rmod.withData = true;
           await prefetchData(dataUrl);
         }
         return rmod;
@@ -207,7 +208,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
   }, []);
 
   if (modules.length === 0) {
-    return createElement(Err, { status: 404, statusText: "page not found" });
+    return createElement(Err, { status: 404, message: "page not found" });
   }
 
   return createElement(
@@ -227,38 +228,37 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
 const RouteRoot: FC<{ modules: RouteModule[]; dataCache: Map<string, RouteData>; ssrContext?: SSRContext }> = (
   { modules, dataCache, ssrContext },
 ) => {
-  const { url, defaultExport } = modules[0];
+  const { url, defaultExport, withData } = modules[0];
   const dataUrl = url.pathname + url.search;
-  const errorHandler: FC<{ error: Error }> = ssrContext?.errorBoundaryHandler ?? global.__ERROR_BOUNDARY_HANDLER ??
-    (({ error }) =>
-      createElement(Err, {
-        status: 500,
-        statusText: error.message,
-      }));
+  const errorHandler: FC<{ error: Error }> = ssrContext?.errorBoundaryHandler ?? global.__ERROR_BOUNDARY_HANDLER ?? Err;
+  const el = typeof defaultExport === "function"
+    ? createElement(
+      defaultExport as FC,
+      null,
+      modules.length > 1 && createElement(
+        RouteRoot,
+        { modules: modules.slice(1), dataCache, ssrContext },
+      ),
+    )
+    : createElement(Err, {
+      status: 400,
+      message: "missing default export as a valid React component",
+    });
 
   return createElement(
     ErrorBoundary,
     { Handler: errorHandler },
-    createElement(
-      DataProvider,
-      {
-        dataCache,
-        dataUrl: dataUrl,
-        key: dataUrl,
-      },
-      typeof defaultExport === "function"
-        ? createElement(
-          defaultExport as FC,
-          null,
-          modules.length > 1
-            ? createElement(RouteRoot, { modules: modules.slice(1), dataCache, ssrContext })
-            : undefined,
-        )
-        : createElement(Err, {
-          status: 400,
-          statusText: "missing default export as a valid React component",
-        }),
-    ),
+    withData
+      ? createElement(
+        DataProvider,
+        {
+          dataCache,
+          dataUrl: dataUrl,
+          key: dataUrl,
+        },
+        el,
+      )
+      : el,
   );
 };
 
