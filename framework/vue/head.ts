@@ -18,7 +18,7 @@ export const Head = defineComponent({
             ssrHeadCollection.push(`<title ssr>${children.join("")}</title>`);
           }
         }
-        DataContext.value.ssrHeadCollection = ssrHeadCollection;
+        DataContext.ssrHeadCollection = ssrHeadCollection;
       });
     }
   },

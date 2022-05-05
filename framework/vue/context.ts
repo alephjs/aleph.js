@@ -5,13 +5,14 @@ export const RouterContext = ref({
   params: {},
 });
 
-type DataContextProps = Ref<{
+type DataContextProps = {
   dataUrl: string;
   dataCache: Map<any, any>;
   ssrHeadCollection?: string[];
-}>;
+};
 
-export const DataContext: DataContextProps = ref({
+export const DataContext: DataContextProps = {
   dataUrl: "/",
   dataCache: new Map(),
-});
+  ssrHeadCollection: [],
+};

@@ -8,6 +8,12 @@ import { Head } from "./head.ts";
 // deno-lint-ignore no-explicit-any
 const global = window as any;
 
+type RouteData = {
+  data?: unknown;
+  dataCacheTtl?: number;
+  dataExpires?: number;
+};
+
 type RootProps = {
   ssrContext?: SSRContext;
 };
@@ -61,25 +67,40 @@ const createSSRApp_ = (_app: Component, props?: RootProps) => {
   const { ssrContext } = props || {};
   const routeModules = ssrContext?.routeModules || loadSSRModulesFromTag();
 
-  // clean
-  DataContext.value.ssrHeadCollection = [];
+  const dataCache = new Map<string, RouteData>();
+  routeModules.forEach(({ url, data, dataCacheTtl }) => {
+    dataCache.set(url.pathname + url.search, {
+      data,
+      dataCacheTtl,
+      dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+    });
+  });
 
-  if (ssrContext?.url) {
-    RouterContext.value.url = ssrContext?.url;
-  }
+  // clean
+  DataContext.ssrHeadCollection = [];
 
   let routeComponent = undefined;
 
   if (routeModules && routeModules.length > 0) {
     const defaultRouteModules = routeModules[0];
-    const { defaultExport } = defaultRouteModules;
-    if (defaultExport) routeComponent = defaultExport as Component;
+    const { url, defaultExport } = defaultRouteModules;
+    if (defaultExport) {
+      routeComponent = defaultExport as Component;
+    }
+
+    const dataUrl = url.pathname + url.search;
+    DataContext.dataUrl = dataUrl;
+    DataContext.dataCache = dataCache;
+  }
+
+  if (ssrContext?.url) {
+    RouterContext.value.url = ssrContext?.url;
   }
 
   if (routeComponent) {
     const ssrApp = createSSRApp(routeComponent);
 
-    const ssrHeadCollection = DataContext?.value?.ssrHeadCollection;
+    const ssrHeadCollection = DataContext?.ssrHeadCollection;
     if (ssrHeadCollection && ssrHeadCollection.length > 0) {
       if (ssrContext?.headCollection) {
         ssrHeadCollection.forEach((item) => {
