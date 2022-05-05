@@ -33,7 +33,16 @@ declare type CacheControlOptions = {
   mustRevalidate?: boolean;
 };
 
+/** Information about the connection a request arrived on. */
+declare interface ConnInfo {
+  /** The local address of the connection. */
+  readonly localAddr: Deno.Addr;
+  /** The remote address of the connection. */
+  readonly remoteAddr: Deno.Addr;
+}
+
 declare interface Context<DataType = unknown> extends Record<string, unknown> {
+  readonly connInfo: ConnInfo;
   readonly params: Record<string, string>;
   readonly headers: Headers;
   readonly cookies: Cookies;
