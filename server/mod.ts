@@ -1,4 +1,5 @@
-import { serve as stdServe, type ServeInit, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
+import type { ConnInfo, ServeInit } from "https://deno.land/std@0.136.0/http/server.ts";
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import { VERSION } from "https://deno.land/x/aleph_compiler@0.1.0/version.ts";
 import FetchError from "../framework/core/fetch_error.ts";
@@ -26,8 +27,10 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   ssr?: SSR;
   onError?: (
     error: unknown,
-    cause: "api" | "ssr" | "transplie" | "fs" | "middleware",
-    url: string,
+    cause: {
+      by: "data-fetching" | "ssr" | "transplie" | "fs" | "middleware";
+      url: string;
+    },
   ) => Response | void;
 };
 
@@ -48,7 +51,7 @@ export const serve = (options: ServerOptions = {}) => {
     });
     return util.computeHash("sha-1", buildArgs);
   });
-  const handler = async (req: Request): Promise<Response> => {
+  const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const url = new URL(req.url);
     const { host, pathname } = url;
 
@@ -78,7 +81,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, "transplie", req.url) ??
+          return onError?.(err, { by: "transplie", url: req.url }) ??
             new Response(errorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
@@ -109,7 +112,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, "transplie", req.url) ??
+          return onError?.(err, { by: "transplie", url: req.url }) ??
             new Response(errorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
@@ -153,7 +156,7 @@ export const serve = (options: ServerOptions = {}) => {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, "fs", req.url) ??
+          return onError?.(err, { by: "fs", url: req.url }) ??
             new Response(errorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
@@ -175,6 +178,7 @@ export const serve = (options: ServerOptions = {}) => {
 
     const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
     const ctx = {
+      connInfo,
       params: {},
       headers: new Headers(),
       cookies: {
@@ -239,8 +243,8 @@ export const serve = (options: ServerOptions = {}) => {
 
     // use middlewares
     if (Array.isArray(middlewares) && middlewares.length > 0) {
-      try {
-        for (const mw of middlewares) {
+      for (const mw of middlewares) {
+        try {
           const handler = mw.fetch;
           if (typeof handler === "function") {
             let res = handler(req, ctx);
@@ -254,10 +258,13 @@ export const serve = (options: ServerOptions = {}) => {
               setTimeout(res, 0);
             }
           }
+        } catch (err) {
+          return onError?.(err, { by: "middleware", url: req.url }) ??
+            new Response(errorHtml(err.stack ?? err.message), {
+              status: 500,
+              headers: [["Content-Type", "text/html"]],
+            });
         }
-      } catch (err) {
-        return onError?.(err, "middleware", req.url) ??
-          new Response(errorHtml(err.stack ?? err.message), { status: 500, headers: [["Content-Type", "text/html"]] });
       }
     }
 
@@ -296,7 +303,7 @@ export const serve = (options: ServerOptions = {}) => {
                 ) {
                   return new Response(res);
                 }
-                if (res instanceof Blob) {
+                if (res instanceof Blob || res instanceof File) {
                   return new Response(res, { headers: { "Content-Type": res.type } });
                 }
                 if (util.isPlainObject(res) || Array.isArray(res) || res === null) {
@@ -306,26 +313,25 @@ export const serve = (options: ServerOptions = {}) => {
               }
               return new Response("Method not allowed", { status: 405 });
             }
-          } catch (error) {
-            let err = error;
-            if (err instanceof Response) {
-              if (err.ok || !fromFetchApi) {
-                return err;
-              }
-              err = await FetchError.fromResponse(err);
-            }
-            const res = onError?.(err, "api", req.url);
+          } catch (err) {
+            const res = onError?.(err, { by: "data-fetching", url: req.url });
             if (res instanceof Response) {
-              if (!fromFetchApi) {
-                return err;
-              }
-              err = await FetchError.fromResponse(res);
+              return res;
             }
-            if (err instanceof Error) {
+            if (err instanceof Response) {
+              return err;
+            }
+            if (err instanceof Error || typeof err === "string") {
               log.error(err);
             }
             const status: number = util.isUint(err.status || err.code) ? err.status || err.code : 500;
-            return ctx.json({ ...err, message: err.message, status }, { status: status >= 400 ? status : 501 });
+            return ctx.json({
+              ...err,
+              message: err.message || String(err),
+              status,
+            }, {
+              status: status >= 400 ? status : 501,
+            });
           }
         }
       }
@@ -353,7 +359,7 @@ export const serve = (options: ServerOptions = {}) => {
           indexHtml = null;
         } else {
           log.error("read index.html:", err);
-          return onError?.(err, "fs", req.url) ??
+          return onError?.(err, { by: "fs", url: req.url }) ??
             new Response(errorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],

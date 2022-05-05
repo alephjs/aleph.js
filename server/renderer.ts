@@ -44,7 +44,7 @@ export type RenderOptions = {
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   isDev: boolean;
   ssr?: SSR;
-  onError?: (error: unknown, cause: "ssr", url: string) => Response | void;
+  onError?: (error: unknown, cause: { by: "ssr"; url: string }) => Response | void;
 };
 
 /** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
@@ -331,7 +331,7 @@ async function initSSR(
   ctx: Record<string, unknown>,
   routes: Routes,
   suspense: boolean,
-  onError?: (error: unknown, cause: "ssr", url: string) => Response | void,
+  onError?: (error: unknown, cause: { by: "ssr"; url: string }) => Response | void,
 ): Promise<
   [
     url: URL,
@@ -379,7 +379,7 @@ async function initSSR(
             res = await res;
           }
         } catch (error) {
-          if (!(res = onError?.(error, "ssr", req.url))) {
+          if (!(res = onError?.(error, { by: "ssr", url: req.url }))) {
             throw error;
           }
         }
@@ -389,7 +389,7 @@ async function initSSR(
           }
           if (res.status >= 300) {
             if (res.headers.has("Location")) {
-              throw Response.redirect(res.headers.get("Location")!, res.status);
+              throw res;
             }
             throw new FetchError(500, {}, "Missing the `Location` header");
           }
@@ -402,6 +402,8 @@ async function initSSR(
           } catch (_e) {
             throw new FetchError(500, {}, "Data must be valid JSON");
           }
+        } else if (util.isPlainObject(res) || Array.isArray(res)) {
+          return res;
         } else {
           throw new FetchError(500, {}, "No response from data fetcher");
         }
