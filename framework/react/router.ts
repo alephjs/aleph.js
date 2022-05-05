@@ -228,6 +228,7 @@ const RouteRoot: FC<{ modules: RouteModule[]; dataCache: Map<string, RouteData>;
   { modules, dataCache, ssrContext },
 ) => {
   const { url, defaultExport } = modules[0];
+  const dataUrl = url.pathname + url.search;
   const errorHandler: FC<{ error: Error }> = ssrContext?.errorBoundaryHandler ?? global.__ERROR_BOUNDARY_HANDLER ??
     (({ error }) =>
       createElement(Err, {
@@ -241,8 +242,9 @@ const RouteRoot: FC<{ modules: RouteModule[]; dataCache: Map<string, RouteData>;
     createElement(
       DataProvider,
       {
-        dataUrl: url.pathname + url.search,
         dataCache,
+        dataUrl: dataUrl,
+        key: dataUrl,
       },
       typeof defaultExport === "function"
         ? createElement(

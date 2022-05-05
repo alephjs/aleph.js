@@ -20,12 +20,17 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
   const [data, setData] = useState(() => {
     const cached = dataCache.get(dataUrl);
     if (cached) {
+      if (cached.data instanceof Error) {
+        throw cached.data;
+      }
       if (typeof cached.data === "function") {
-        const data = cached.data();
-        if (data instanceof Promise) {
-          return data.then((data) => {
+        const res = cached.data();
+        if (res instanceof Promise) {
+          return res.then((data) => {
+            dataCache.set(dataUrl, data);
             suspenseData.current = data;
           }).catch((error) => {
+            dataCache.set(dataUrl, error);
             suspenseData.current = error;
           });
         }
@@ -84,7 +89,11 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
       try {
         const data = await res.json();
         const dataCacheTtl = dataCache.get(dataUrl)?.dataCacheTtl;
-        dataCache.set(dataUrl, { data, dataCacheTtl, dataExpires: Date.now() + (dataCacheTtl || 1) * 1000 });
+        dataCache.set(dataUrl, {
+          data,
+          dataCacheTtl,
+          dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+        });
         setData(data);
       } catch (_) {
         if (optimistic) {
