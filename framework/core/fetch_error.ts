@@ -26,8 +26,8 @@ export default class FetchError extends Error {
       if (typeof data.message === "string") {
         message = data.message;
       }
-      if (typeof data.details === "object" && data.details !== null) {
-        details = data.details;
+      if (data.details !== null && typeof data.details === "object" && !Array.isArray(data.details)) {
+        details = { ...details, ...data.detials };
       }
     } else {
       message = await res.text();

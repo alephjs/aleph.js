@@ -14,7 +14,7 @@ export default {
     return Array.isArray(a) && a.length > 0;
   },
   isPlainObject<T = Record<string, unknown>>(a: unknown): a is T {
-    return typeof a === "object" && a !== null && Object.getPrototypeOf(a) === Object.prototype;
+    return a !== null && typeof a === "object" && Object.getPrototypeOf(a) === Object.prototype;
   },
   isLikelyHttpURL(s: string): boolean {
     const p = s.slice(0, 8).toLowerCase();
@@ -68,12 +68,11 @@ export default {
     const bytes = new Uint8Array(buffer);
     return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
   },
-  async computeHash(algorithm: AlgorithmIdentifier, data: string | Uint8Array): Promise<string> {
-    const sum = await crypto.subtle.digest(
+  computeHash(algorithm: AlgorithmIdentifier, data: string | Uint8Array): Promise<string> {
+    return crypto.subtle.digest(
       algorithm,
       typeof data === "string" ? this.utf8TextEncoder.encode(data) : data,
-    );
-    return this.toHex(sum);
+    ).then((sum) => this.toHex(sum));
   },
   prettyBytes(bytes: number) {
     const units = ["", "K", "M", "G", "T", "P", "E"];
