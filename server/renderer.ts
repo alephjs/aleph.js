@@ -24,10 +24,12 @@ export type SSRContext = {
 export type SSR = {
   suspense: true;
   cacheControl?: "private" | "public";
+  csp?: string | string[];
   render(ssr: SSRContext): Promise<ReadableStream> | ReadableStream;
 } | {
   suspense?: false;
   cacheControl?: "private" | "public";
+  csp?: string | string[];
   render(ssr: SSRContext): Promise<string | ReadableStream> | string | ReadableStream;
 } | ((ssr: SSRContext) => Promise<string | ReadableStream> | string | ReadableStream);
 
@@ -59,6 +61,7 @@ export default {
       const isFn = typeof ssr === "function";
       const suspense = isFn ? false : !!ssr.suspense;
       const cc = isFn ? "public" : ssr.cacheControl ?? "public";
+      const csp = isFn ? undefined : ssr.csp;
       const render = isFn ? ssr : ssr.render;
       try {
         const [url, routeModules, suspenseData, errorBoundaryHandler] = await initSSR(
@@ -136,6 +139,9 @@ export default {
           headers.append("Cache-Control", `${cc}, max-age=${ttls[0]}`);
         } else {
           headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
+        }
+        if (csp) {
+          headers.append("Content-Security-Policy", [csp].flat().join("; "));
         }
         ssrRes = {
           context: ssrContext,
