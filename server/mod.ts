@@ -55,10 +55,14 @@ export const serve = (options: ServerOptions = {}) => {
     const url = new URL(req.url);
     const { host, pathname, searchParams } = url;
 
+    // close the hot-reloading websocket connection and tell the client to reload
     if (pathname === "/-/hmr") {
       const { socket, response } = Deno.upgradeWebSocket(req, {});
       socket.addEventListener("open", () => {
         socket.send(JSON.stringify({ type: "reload" }));
+        setTimeout(() => {
+          socket.close();
+        }, 50);
       });
       return response;
     }

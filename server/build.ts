@@ -26,6 +26,13 @@ const supportedPlatforms: Record<BuildPlatform, string> = {
   "vercel": "Vercel",
 };
 
+/**
+ * Build the app into a worker for serverless platform. Functions include:
+ * - import routes modules (since deno deploy/clouflare don't support dynamic import)
+ * - resolve import maps
+ * - pre-compile client modules
+ * - bundle client modules
+ */
 export async function build(serverEntry?: string) {
   const workingDir = Deno.cwd();
   const alephPkgUri = getAlephPkgUri();
@@ -50,6 +57,7 @@ export async function build(serverEntry?: string) {
     await Deno.mkdir(outputDir, { recursive: true });
   }
 
+  // find route files by the `routes` config
   let routeFiles: [filename: string, exportNames: string[]][] = [];
   if (config?.routes) {
     const { routes } = await initRoutes(config?.routes);
@@ -140,6 +148,7 @@ export async function build(serverEntry?: string) {
     );
   };
 
+  // check if the url is esm.sh package
   const isEsmPkg = (url: string) => {
     return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
   };
@@ -236,6 +245,7 @@ export async function build(serverEntry?: string) {
     }],
   });
 
+  // get depndency graph
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
   const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
 

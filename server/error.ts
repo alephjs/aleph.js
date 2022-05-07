@@ -1,28 +1,30 @@
 const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
 
-export const errorHtml = (message: string, prefix?: string): string => {
-  return errorTemplate(
-    message.split("\n").map((line, i) => {
-      const ret = line.match(regStackLoc);
-      if (ret) {
-        const url = new URL(ret[1]);
-        line = line.replace(ret[0], `.${url.pathname}${ret[2]}`);
+export const errorHtml = (message: string, type?: string): string => {
+  const formatMessage = message.split("\n").map((line, i) => {
+    const ret = line.match(regStackLoc);
+    if (ret) {
+      const url = new URL(ret[1]);
+      line = line.replace(ret[0], `.${url.pathname}${ret[2]}`);
+    }
+    if (i === 0) {
+      if (type) {
+        return `<strong>${type} ${line}</strong>`;
       }
-      if (i === 0 && prefix) {
-        return `<strong>${prefix} ${line}</strong>`;
-      }
-      return line;
-    }).join("\n"),
-  );
+      return `<strong>${line}</strong>`;
+    }
+    return line;
+  }).join("\n");
+  return errorTemplate(formatMessage, type);
 };
 
-const errorTemplate = (message: string) => `
+const errorTemplate = (message: string, type?: string) => `
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>SSR Error - Aleph.js</title>
+    <title>${type} Error - Aleph.js</title>
     <style>
       body {
         overflow: hidden;
