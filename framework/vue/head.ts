@@ -1,4 +1,5 @@
 import { defineComponent, inject, onBeforeUnmount } from "vue";
+import { ssrRenderComponent } from "vue/server-renderer";
 import util from "../../lib/util.ts";
 
 export const Head = defineComponent({
@@ -6,16 +7,13 @@ export const Head = defineComponent({
   setup(_props, ctx) {
     const ssrHeadCollection: string[] | undefined = inject("ssrHeadCollection");
     if (ctx.slots.default && ssrHeadCollection) {
-      const children = ctx?.slots.default();
+      const children = ctx.slots.default();
       children.forEach((vnode) => {
-        const { type, children } = vnode;
-        if (type === "title") {
-          if (util.isFilledString(children)) {
-            ssrHeadCollection.push(`<title ssr>${children}</title>`);
-          } else if (util.isFilledArray(children)) {
-            ssrHeadCollection.push(`<title ssr>${children.join("")}</title>`);
-          }
-        }
+        const { props } = vnode;
+        // add srr attr
+        vnode.props = { ...props, ssr: "" };
+        const s = ssrRenderComponent({ render: () => vnode }) as string[];
+        ssrHeadCollection.push(...s);
       });
     }
   },
