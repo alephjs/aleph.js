@@ -8,7 +8,7 @@ import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
 import { errorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
-import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig } from "./helpers.ts";
+import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig, regFullVersion } from "./helpers.ts";
 import { type HTMLRewriterHandlers, loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
 import { content, type CookieOptions, json, setCookieHeader } from "./response.ts";
@@ -53,7 +53,7 @@ export const serve = (options: ServerOptions = {}) => {
   });
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const url = new URL(req.url);
-    const { host, pathname } = url;
+    const { host, pathname, searchParams } = url;
 
     if (pathname === "/-/hmr") {
       const { socket, response } = Deno.upgradeWebSocket(req, {});
@@ -150,6 +150,9 @@ export const serve = (options: ServerOptions = {}) => {
             }
             headers.append("ETag", etag);
           }
+          if (searchParams.get("v") || regFullVersion.test(pathname)) {
+            headers.append("Cache-Control", "public, max-age=31536000, immutable");
+          }
           const file = await Deno.open(filePath, { read: true });
           return new Response(readableStreamFromReader(file), { headers });
         }
@@ -176,6 +179,7 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
+    // create context object
     const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
     const ctx = {
       connInfo,
