@@ -52,14 +52,14 @@ const createRouter = (props?: RootProps) => {
   const { defaultExport } = defaultRouteModules;
 
   if (defaultExport) {
-    const router = defineComponent({
-      name: "Router",
+    const App = defineComponent({
+      name: "App",
       render() {
         return [h(defaultExport as Component)];
       },
     });
 
-    const app = VueCreateSSRApp(router);
+    const app = VueCreateSSRApp(App);
 
     app.provide("modules", modules);
     app.provide("dataCache", dataCache);
