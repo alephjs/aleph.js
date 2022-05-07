@@ -18,6 +18,11 @@ export type BundleCSSResult = {
   deps?: string[];
 };
 
+/**
+ * bundle css with `parcel-css`.
+ *
+ * https://github.com/parcel-bundler/parcel-css
+ */
 export async function bundleCSS(
   specifier: string,
   sourceCode: string,

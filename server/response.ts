@@ -1,9 +1,3 @@
-export function json(data: unknown, init?: ResponseInit): Response {
-  const headers = new Headers(init?.headers);
-  headers.append("content-type", "application/json; charset=utf-8");
-  return new Response(JSON.stringify(data), { ...init, headers });
-}
-
 export type CacheControlOptions = {
   maxAge?: number;
   sMaxAge?: number;
@@ -50,6 +44,12 @@ export function content(
   }
 
   return new Response(body, { ...init, headers });
+}
+
+export function json(data: unknown, init?: ResponseInit): Response {
+  const headers = new Headers(init?.headers);
+  headers.append("content-type", "application/json; charset=utf-8");
+  return new Response(JSON.stringify(data), { ...init, headers });
 }
 
 export type CookieOptions = {

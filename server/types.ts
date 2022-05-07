@@ -11,8 +11,10 @@ export type AlephConfig = {
   unocss?: UnoConfig;
 };
 
+/** The build platform.  */
 export type BuildPlatform = "deno" | "cloudflare" | "vercel";
 
+/** The build optioins for `build` command. */
 export type BuildOptions = {
   /** The supported platform. default is "deno" */
   platform?: BuildPlatform;

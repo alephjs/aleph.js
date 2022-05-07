@@ -74,7 +74,7 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
   };
 };
 
-const buildLoader = (moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) => {
+function initLoader(moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) {
   return async (req: Request): Promise<{ content: string | Uint8Array; contentType?: string } | undefined> => {
     const { pathname } = new URL(req.url);
     if (pathname.endsWith(".css")) {
@@ -92,7 +92,7 @@ const buildLoader = (moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) => {
       }
     }
   };
-};
+}
 
 type ProxyModulesOptions = {
   moduleLoaders: ModuleLoader[];
@@ -107,7 +107,7 @@ export function proxyModules(port: number, options: ProxyModulesOptions) {
     serveDir({
       port,
       signal: options.signal,
-      loader: buildLoader(options.moduleLoaders, {
+      loader: initLoader(options.moduleLoaders, {
         importMap: options.importMap,
         isDev: Deno.env.get("ALEPH_ENV") === "development",
         ssr: true,
