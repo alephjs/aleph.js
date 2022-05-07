@@ -10,7 +10,6 @@
     "react-dom": "https://esm.sh/react-dom@18.1.0",
     "react-dom/": "https://esm.sh/react-dom@18.1.0/",
     "vue": "https://esm.sh/vue@3.2.33",
-    "vue-router": "https://esm.sh/vue-router@4.0.14",
     "vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.33",
     "*.vue": "./loaders/vue.ts!loader"
   }
