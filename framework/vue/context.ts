@@ -6,10 +6,10 @@ export type RouterContextProps = {
   ssrHeadCollection?: string[];
 };
 
-export const RouterContext = {
+export const RouterContext = ref({
   url: new URL("http://localhost/"),
   params: {},
-};
+});
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 

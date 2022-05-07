@@ -1,4 +1,4 @@
-import { Component, createApp, createSSRApp, defineComponent } from "vue";
+import { Component, createSSRApp as VueCreateSSRApp, defineComponent, h } from "vue";
 import type { SSRContext } from "../../server/renderer.ts";
 import { RouterContext } from "./context.ts";
 import { RouteModule } from "../core/route.ts";
@@ -19,31 +19,24 @@ type RootProps = {
   ssrContext?: SSRContext;
 };
 
-export const App = defineComponent({
-  name: "App",
-  props: {
-    ssrContext: {
-      type: String,
-      default: "",
-    },
-  },
-  render() {
-    return this.$slots.default ? this.$slots.default() : [];
-  },
-});
+const createApp = (props?: RootProps) => {
+  return createRouter(props);
+};
 
-const createSSRApp_ = (_app: Component, props?: RootProps) => {
+const createRouter = (props?: RootProps) => {
   const { ssrContext } = props || {};
   const modules = ssrContext?.routeModules || loadSSRModulesFromTag();
 
   if (modules.length === 0) {
-    return createSSRApp(Err, { status: 404, message: "page not found" });
+    return VueCreateSSRApp(Err, { status: 404, message: "page not found" });
   }
 
   const url = ssrContext?.url || new URL(window.location?.href);
   const dataUrl = url.pathname + url.search;
   const params: Record<string, string> = {};
   const dataCache = new Map<string, RouteData>();
+
+  RouterContext.value = { url, params };
 
   modules.forEach((module) => {
     const { params: _params, data, dataCacheTtl } = module;
@@ -55,34 +48,43 @@ const createSSRApp_ = (_app: Component, props?: RootProps) => {
     });
   });
 
-  let routeComponent = undefined;
-
   const defaultRouteModules = modules[0];
   const { defaultExport } = defaultRouteModules;
 
   if (defaultExport) {
-    routeComponent = defaultExport as Component;
+    const router = defineComponent({
+      name: "Router",
+      render() {
+        return h(defaultExport as Component);
+      },
+    });
 
-    if (routeComponent) {
-      const router = createApp(routeComponent);
+    const app = VueCreateSSRApp(router);
 
-      router.provide("modules", modules);
-      router.provide("dataCache", dataCache);
-      router.provide("ssrContext", ssrContext);
-      router.provide("ssrHeadCollection", ssrContext?.headCollection);
-      router.provide("dataUrl", dataUrl);
+    app.provide("modules", modules);
+    app.provide("dataCache", dataCache);
+    app.provide("ssrContext", ssrContext);
+    app.provide("ssrHeadCollection", ssrContext?.headCollection);
+    app.provide("dataUrl", dataUrl);
 
-      // registe aleph/vue component
-      router.component("Link", Link);
-      router.component("Head", Head);
+    // registe aleph/vue component
+    app.component("Link", Link);
+    app.component("Head", Head);
 
-      return router;
-    }
+    return app;
   }
 
-  const ssrApp = createSSRApp(Err);
+  const errApp = VueCreateSSRApp(Err);
 
-  return ssrApp;
+  return errApp;
+};
+
+const createSSRApp = (createSSRAppApi: (props?: RootProps) => Component, props?: RootProps) => {
+  if (createSSRAppApi === undefined) {
+    throw new Error("[aleph/vue] createSSRApp without `App` component");
+  }
+
+  return createSSRAppApi(props);
 };
 
 function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
@@ -126,13 +128,8 @@ function loadSSRModulesFromTag(): RouteModule[] {
   return [];
 }
 
-const createApp_ = (app: Component) => {
-  return createApp(app);
+const useRouter = () => {
+  return RouterContext;
 };
 
-export const useRouter = () => {
-  const { url, params } = RouterContext;
-  return { url, params };
-};
-
-export { createApp_ as createApp, createSSRApp_ as createSSRApp };
+export { createApp as App, createSSRApp, useRouter };
