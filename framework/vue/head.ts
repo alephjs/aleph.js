@@ -7,7 +7,7 @@ export const Head = defineComponent({
   setup(_props, ctx) {
     const ssrHeadCollection: string[] | undefined = inject("ssrHeadCollection");
     if (ctx.slots.default && ssrHeadCollection) {
-      const children = parseSlots(ctx.slots.default());
+      const children = ctx.slots.default();
       children.forEach((vnode) => {
         const { props } = vnode;
         // add srr attr
