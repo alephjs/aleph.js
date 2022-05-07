@@ -55,7 +55,7 @@ const createRouter = (props?: RootProps) => {
     const router = defineComponent({
       name: "Router",
       render() {
-        return h(defaultExport as Component);
+        return [h(defaultExport as Component)];
       },
     });
 
