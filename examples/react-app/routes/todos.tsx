@@ -52,22 +52,20 @@ export const data: Data<DataProps> = {
 };
 
 export default function Todos() {
-  const { data, isMutating, mutation } = useData<DataProps>();
+  const { data: { todos }, isMutating, mutation } = useData<DataProps>();
 
   return (
-    <div className="page todos-app">
+    <div className="todos-app">
       <Head>
         <title>Todos</title>
         <meta name="description" content="A todos app powered by Aleph.js" />
       </Head>
       <h1>
         <span>Todos</span>
-        {data && data.todos.length > 0 && (
-          <em>{data.todos.filter((todo) => todo.completed).length}/{data.todos.length}</em>
-        )}
+        {todos.length > 0 && <em>{todos.filter((todo) => todo.completed).length}/{todos.length}</em>}
       </h1>
       <ul>
-        {data?.todos.map((todo) => (
+        {todos.map((todo) => (
           <li key={todo.id}>
             <input
               type="checkbox"

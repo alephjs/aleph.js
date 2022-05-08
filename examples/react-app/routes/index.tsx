@@ -2,7 +2,7 @@ import { Head, Link } from "aleph/react";
 
 export default function Index() {
   return (
-    <div className="page y-center">
+    <div className="screen index">
       <Head>
         <title>Aleph.js</title>
         <meta name="description" content="The Fullstack Framework in Deno." />
@@ -29,8 +29,8 @@ export default function Index() {
         </a>
       </div>
       <nav>
-        <Link to="/todos">
-          <button>Todos App Demo</button>
+        <Link role="button" to="/todos">
+          Todos App Demo
         </Link>
       </nav>
     </div>

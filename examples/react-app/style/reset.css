@@ -2,7 +2,6 @@
   margin: 0;
   padding: 0;
   border: none;
-  outline: none;
   font: inherit;
   font-size: 100%;
   vertical-align: baseline;
@@ -22,4 +21,8 @@ body {
     sans-serif,
     'Apple Color Emoji',
     'Segoe UI Emoji';
+}
+
+strong {
+  font-weight: 600;
 }
