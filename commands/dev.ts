@@ -170,7 +170,7 @@ if (import.meta.main) {
   };
   emitter.on("create", updateRoutes);
   emitter.on("remove", updateRoutes);
-  // updateRoutes({});
+  updateRoutes({});
 
   if (serverEntry) {
     emitter.on(`hotUpdate:./${basename(serverEntry)}`, bs);

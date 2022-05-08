@@ -3,6 +3,7 @@ import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import { VERSION } from "https://deno.land/x/aleph_compiler@0.1.0/version.ts";
 import FetchError from "../framework/core/fetch_error.ts";
+import type { RouteRecord } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
@@ -277,7 +278,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request data
-    const routes = await routesPromise;
+    const routes: RouteRecord = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routesPromise;
     if (routes.routes.length > 0) {
       for (const [pattern, { filename }] of routes.routes) {
         const ret = pattern.exec({ host, pathname });
