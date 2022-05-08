@@ -275,8 +275,8 @@ export async function build(serverEntry?: string) {
   }
   tasks.push(`${alephPkgUri}/framework/core/nomodule.ts`);
 
-  const entryModules = new Set(tasks);
-  const allModules = new Set<string>();
+  const entryModules = new Map(tasks.map((task) => [task, 0]));
+  const tracing = new Set<string>();
 
   // transform client modules
   const serverHandler: FetchHandler | undefined = Reflect.get(globalThis, "__ALEPH_SERVER")?.handler;
@@ -302,7 +302,7 @@ export async function build(serverEntry?: string) {
         if (!isCSS) {
           clientDependencyGraph?.get(specifier)?.deps?.forEach(({ specifier, dynamic }) => {
             if (dynamic) {
-              entryModules.add(specifier);
+              entryModules.set(specifier, 1);
             }
             if (specifier.endsWith(".css")) {
               deps.add(specifier + "?module");
@@ -313,15 +313,15 @@ export async function build(serverEntry?: string) {
         } else if (url.searchParams.has("module")) {
           deps.add(`${alephPkgUri}/framework/core/style.ts`);
         }
-        allModules.add(specifier);
+        tracing.add(specifier);
       }));
-      tasks = Array.from(deps).filter((specifier) => !allModules.has(specifier));
+      tasks = Array.from(deps).filter((specifier) => !tracing.has(specifier));
     }
   }
 
   // count client module refs
   const refs = new Map<string, Set<string>>();
-  for (const name of entryModules) {
+  for (const [name] of entryModules) {
     clientDependencyGraph?.walk(name, ({ specifier }, importer) => {
       if (importer) {
         let set = refs.get(specifier);
@@ -334,70 +334,47 @@ export async function build(serverEntry?: string) {
     });
   }
 
-  // hygiene 1
-  /*
-        B(1) <-
-   A <-  <-  <- D(1+)  ::  A <- D(1)
-        C(1) <-
-  */
-  refs.forEach((counter, specifier) => {
-    if (counter.size > 1) {
-      const a = Array.from(counter).filter((specifier) => {
-        const set = refs.get(specifier);
-        if (set?.size === 1) {
-          const name = set.values().next().value;
-          if (name && counter.has(name)) {
-            return false;
-          }
-        }
-        return true;
-      });
-      refs.set(specifier, new Set(a));
-    }
-  });
+  const clientModules = new Map(entryModules);
 
-  // hygiene 2 (twice)
-  /*
-        B(1) <-
-   A <- C(1) <- E(1+)  ::  A <- E(1)
-        D(1) <-
-  */
-  for (let i = 0; i < 2; i++) {
-    refs.forEach((counter, specifier) => {
-      if (counter.size > 0) {
-        const a = Array.from(counter);
-        if (a.every((specifier) => refs.get(specifier)?.size === 1)) {
-          const set = new Set(a.map((specifier) => refs.get(specifier)?.values().next().value));
-          if (set.size === 1) {
-            refs.set(specifier, set);
-          }
-        }
-      }
-    });
+  // find shared modules
+  for (const [specifier, counter] of refs) {
+    if (counter.size > 1) {
+      clientModules.set(specifier, 2);
+    }
   }
 
-  // find client modules
-  const clientModules = new Set<string>(entryModules);
-  refs.forEach((counter, specifier) => {
-    if (counter.size > 1) {
-      clientModules.add(specifier);
+  // hygiene check, make sure all shared modules are not only referenced by other shared modules
+  for (let i = 0; i < 100; i++) {
+    const toHygiene = new Set<string>();
+    for (const [specifier, type] of clientModules) {
+      if (type === 2) {
+        const sharedBy = new Set<string>();
+        clientDependencyGraph?.lookup(specifier, (specifier) => {
+          if (clientModules.has(specifier)) {
+            sharedBy.add(specifier);
+            return false;
+          }
+        });
+        if (sharedBy.size === 1) {
+          toHygiene.add(specifier);
+        }
+      }
     }
-    // console.log(`[${specifier}] \n  - ${Array.from(counter).join("\n  - ")}`);
-  });
+    // break the loop when there are no more modules to hygiene
+    if (toHygiene.size === 0) {
+      break;
+    }
+    toHygiene.forEach((specifier) => clientModules.delete(specifier));
+    log.debug(`hygiene#${i + 1}`, toHygiene);
+  }
 
   // bundle client modules
-  const bundling = new Set<string>();
-  clientModules.forEach((specifier) => {
-    if (
-      clientDependencyGraph?.get(specifier)?.deps?.some(({ specifier }) => !clientModules.has(specifier)) &&
-      !util.splitBy(specifier, "?")[0].endsWith(".css")
-    ) {
-      bundling.add(specifier);
-    }
-  });
   await Promise.all(
-    Array.from(bundling).map(async (entryPoint) => {
+    Array.from(clientModules.keys()).map(async (entryPoint) => {
       const url = new URL(util.isLikelyHttpURL(entryPoint) ? toLocalPath(entryPoint) : entryPoint, "http://localhost");
+      if (url.pathname.endsWith(".css")) {
+        return;
+      }
       let jsFile = join(outputDir, url.pathname);
       if (isEsmPkg(entryPoint)) {
         jsFile += ".js";
