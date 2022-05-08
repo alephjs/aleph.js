@@ -272,9 +272,14 @@ export const App: FC<RouterProps> = (props) => {
   );
 };
 
-export const useRouter = (): { url: URL; params: Record<string, string>; redirect: typeof redirect } => {
-  const { url, params } = useContext(RouterContext);
-  return { url, params, redirect };
+export const useRouter = (): {
+  url: URL;
+  params: Record<string, string>;
+  e404?: boolean;
+  redirect: typeof redirect;
+} => {
+  const { url, params, e404 } = useContext(RouterContext);
+  return { url, params, e404, redirect };
 };
 
 export const forwardProps = (children?: ReactNode, props: Record<string, unknown> = {}) => {
