@@ -23,17 +23,17 @@ export type Route = readonly [
   meta: RouteMeta,
 ];
 
-export type Routes = {
+export type RouteRecord = {
+  routes: Route[];
   _404?: Route;
   _app?: Route;
   _error?: Route;
-  routes: Route[];
 };
 
 /** match routes against the given url */
 export function matchRoutes(
   url: URL,
-  { routes, _app, _404 }: Routes,
+  { routes, _app, _404 }: RouteRecord,
 ): [ret: URLPatternResult, route: RouteMeta][] {
   let { pathname } = url;
   if (pathname !== "/") {

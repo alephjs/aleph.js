@@ -3,7 +3,7 @@ import { createElement, StrictMode, useContext, useEffect, useMemo, useState } f
 import events from "../core/events.ts";
 import FetchError from "../core/fetch_error.ts";
 import { redirect } from "../core/redirect.ts";
-import type { Route, RouteMeta, RouteModule, Routes } from "../core/route.ts";
+import type { Route, RouteMeta, RouteModule, RouteRecord } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import { URLPatternCompat } from "../core/url_pattern.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
@@ -217,6 +217,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
       value: {
         url,
         params,
+        e404: modules[modules.length - 1].url.pathname === "/_404" ? true : undefined,
         ssrHeadCollection: ssrContext?.headCollection,
         createPortal,
       },
@@ -291,7 +292,7 @@ export const useForwardProps = <T = Record<string, unknown>>(): T => {
   return props as T;
 };
 
-function loadRoutesFromTag(): Routes {
+function loadRoutesFromTag(): RouteRecord {
   const el = window.document?.getElementById("routes-manifest");
   if (el) {
     try {

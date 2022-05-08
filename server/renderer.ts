@@ -1,5 +1,5 @@
 import FetchError from "../framework/core/fetch_error.ts";
-import type { RouteModule, Routes } from "../framework/core/route.ts";
+import type { RouteModule, RouteRecord } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -41,7 +41,7 @@ export type SSRResult = {
 };
 
 export type RenderOptions = {
-  routes: Routes;
+  routes: RouteRecord;
   indexHtml: Uint8Array;
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   isDev: boolean;
@@ -336,7 +336,7 @@ export default {
 async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
-  routes: Routes,
+  routes: RouteRecord,
   suspense: boolean,
   onError?: (error: unknown, cause: { by: "ssr"; url: string }) => Response | void,
 ): Promise<

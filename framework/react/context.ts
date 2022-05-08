@@ -4,6 +4,7 @@ import { createContext } from "react";
 export type RouterContextProps = {
   url: URL;
   params: Record<string, string>;
+  e404?: boolean;
   ssrHeadCollection?: string[];
   createPortal?: (children: ReactNode, container: Element, key?: null | string) => ReactPortal;
 };
