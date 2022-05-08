@@ -19,9 +19,9 @@ const createDataProvider = () => {
   const ssrContext: SSRContext | undefined = inject("ssrContext");
   const url = ssrContext?.url || new URL(window.location?.href);
   const defaultDataUrl = url.pathname + url.search;
-  const dataUrl: string = inject("dataUrl") || defaultDataUrl;
+  const dataUrl: Ref<string> = inject("dataUrl") || ref(defaultDataUrl);
 
-  const cached = dataCache?.get(dataUrl);
+  const cached = dataCache?.get(dataUrl.value);
 
   if (cached) {
     if (cached.data instanceof Error) {
@@ -89,8 +89,8 @@ const createDataProvider = () => {
     if (replace && res.ok) {
       try {
         const data = await res.json();
-        const dataCacheTtl = dataCache.get(dataUrl)?.dataCacheTtl;
-        dataCache.set(dataUrl, { data, dataCacheTtl, dataExpires: Date.now() + (dataCacheTtl || 1) * 1000 });
+        const dataCacheTtl = dataCache.get(dataUrl.value)?.dataCacheTtl;
+        dataCache.set(dataUrl.value, { data, dataCacheTtl, dataExpires: Date.now() + (dataCacheTtl || 1) * 1000 });
         _data.value = data;
       } catch (_) {
         if (optimistic) {
@@ -112,7 +112,7 @@ const createDataProvider = () => {
     console.log("reload");
 
     try {
-      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
+      const res = await fetch(dataUrl.value, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
       if (res.type === "opaqueredirect") {
         throw new Error("opaque redirect");
       }
@@ -124,34 +124,34 @@ const createDataProvider = () => {
         const cc = res.headers.get("Cache-Control");
         const dataCacheTtl = cc && cc.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
         const dataExpires = Date.now() + (dataCacheTtl || 1) * 1000;
-        dataCache.set(dataUrl, { data, dataExpires });
+        dataCache.set(dataUrl.value, { data, dataExpires });
         _data.value = data;
       } catch (_e) {
         throw new FetchError(500, {}, "Data must be valid JSON");
       }
     } catch (error) {
-      throw new Error(`Failed to reload data for ${dataUrl}: ${error.message}`);
+      throw new Error(`Failed to reload data for ${dataUrl.value}: ${error.message}`);
     }
   };
 
   const mutation = {
     post: (data?: unknown, update?: UpdateStrategy) => {
-      return action("post", send("post", dataUrl, data), update ?? "none");
+      return action("post", send("post", dataUrl.value, data), update ?? "none");
     },
     put: (data?: unknown, update?: UpdateStrategy) => {
-      return action("put", send("put", dataUrl, data), update ?? "none");
+      return action("put", send("put", dataUrl.value, data), update ?? "none");
     },
     patch: (data?: unknown, update?: UpdateStrategy) => {
-      return action("patch", send("patch", dataUrl, data), update ?? "none");
+      return action("patch", send("patch", dataUrl.value, data), update ?? "none");
     },
     delete: (data?: unknown, update?: UpdateStrategy) => {
-      return action("delete", send("delete", dataUrl, data), update ?? "none");
+      return action("delete", send("delete", dataUrl.value, data), update ?? "none");
     },
   };
 
-  watch(() => dataUrl, () => {
+  watch(() => dataUrl.value, () => {
     const now = Date.now();
-    const cache = dataCache.get(dataUrl);
+    const cache = dataCache.get(dataUrl.value);
     let ac: AbortController | null = null;
     if (cache === undefined || cache.dataExpires === undefined || cache.dataExpires < now) {
       ac = new AbortController();
