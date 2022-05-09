@@ -57,7 +57,7 @@ export default {
     }
 
     const etag = mtime
-      ? `${mtime.toString(16)}-${sourceCode.length.toString(16)}-${buildHash.slice(0, 8)}`
+      ? `W/${mtime.toString(16)}-${sourceCode.length.toString(16)}-${buildHash.slice(0, 8)}`
       : await util.computeHash("sha-1", sourceCode + buildHash);
     if (req.headers.get("If-None-Match") === etag) {
       return new Response(null, { status: 304 });

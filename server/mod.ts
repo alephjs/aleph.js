@@ -141,11 +141,11 @@ export const serve = (options: ServerOptions = {}) => {
           const deployId = getDeploymentId();
           let etag: string | null = null;
           if (deployId) {
-            etag = `${btoa(pathname).replace(/[^a-z0-9]/g, "")}-${deployId}`;
+            etag = `W/${btoa(pathname).replace(/[^a-z0-9]/g, "")}-${deployId}`;
           } else {
             const { mtime, size } = stat;
             if (mtime) {
-              etag = mtime.getTime().toString(16) + "-" + size.toString(16);
+              etag = `W/${mtime.getTime().toString(16)}-${size.toString(16)}`;
               headers.append("Last-Modified", new Date(mtime).toUTCString());
             }
           }

@@ -168,11 +168,11 @@ export default {
       const deployId = getDeploymentId();
       let etag: string | null = null;
       if (deployId) {
-        etag = `${btoa("./index.html").replace(/[^a-z0-9]/g, "")}-${deployId}`;
+        etag = `W/${btoa("./index.html").replace(/[^a-z0-9]/g, "")}-${deployId}`;
       } else {
         const { mtime, size } = await Deno.lstat("./index.html");
         if (mtime) {
-          etag = mtime.getTime().toString(16) + "-" + size.toString(16);
+          etag = `W/${mtime.getTime().toString(16)}-${size.toString(16)}`;
           headers.append("Last-Modified", new Date(mtime).toUTCString());
         }
       }
