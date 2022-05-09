@@ -19,7 +19,7 @@ export type BundleCSSResult = {
 };
 
 /**
- * bundle css with `parcel-css`.
+ * Bundle the css using `parcel-css` with `nesting` and `customMedia` draft support.
  *
  * https://github.com/parcel-bundler/parcel-css
  */

@@ -28,10 +28,12 @@ const supportedPlatforms: Record<BuildPlatform, string> = {
 
 /**
  * Build the app into a worker for serverless platform. Functions include:
- * - import routes modules (since deno deploy/clouflare don't support dynamic import)
+ * - import routes modules (since deno-deploy/cloudflare don't support dynamic import)
+ * - apply module loaders
+ * - pre-compile/bundle client modules
  * - resolve import maps
- * - pre-compile client modules
- * - bundle client modules
+ *
+ * after build, you need to bootstrap the server from `./dist/server.js`
  */
 export async function build(serverEntry?: string) {
   const workingDir = Deno.cwd();
@@ -276,7 +278,7 @@ export async function build(serverEntry?: string) {
   tasks.push(`${alephPkgUri}/framework/core/nomodule.ts`);
 
   const entryModules = new Map(tasks.map((task) => [task, 0]));
-  const tracing = new Set<string>();
+  const allClientModules = new Set<string>();
 
   // transform client modules
   const serverHandler: FetchHandler | undefined = Reflect.get(globalThis, "__ALEPH_SERVER")?.handler;
@@ -313,14 +315,16 @@ export async function build(serverEntry?: string) {
         } else if (url.searchParams.has("module")) {
           deps.add(`${alephPkgUri}/framework/core/style.ts`);
         }
-        tracing.add(specifier);
+        allClientModules.add(specifier);
       }));
-      tasks = Array.from(deps).filter((specifier) => !tracing.has(specifier));
+      tasks = Array.from(deps).filter((specifier) => !allClientModules.has(specifier));
     }
   }
 
-  // count client module refs
+  const clientModules = new Map(entryModules);
   const refs = new Map<string, Set<string>>();
+
+  // count client module refs
   for (const [name] of entryModules) {
     clientDependencyGraph?.walk(name, ({ specifier }, importer) => {
       if (importer) {
@@ -333,8 +337,6 @@ export async function build(serverEntry?: string) {
       }
     });
   }
-
-  const clientModules = new Map(entryModules);
 
   // find shared modules
   for (const [specifier, counter] of refs) {
@@ -428,6 +430,7 @@ export async function build(serverEntry?: string) {
   );
 
   // clean up then exit
+  // todo: remove dead client modules
   if (jsxShimFile) {
     await Deno.remove(jsxShimFile);
   }
