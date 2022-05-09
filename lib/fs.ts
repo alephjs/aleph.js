@@ -66,7 +66,7 @@ export async function getFiles(
 /* read source code from fs/cdn/cache */
 export async function readCode(
   specifier: string,
-): Promise<[code: string, mtime: number | undefined, contentType: string]> {
+): Promise<[code: string, contentType: string]> {
   if (util.isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
     if (url.hostname === "esm.sh" && !url.searchParams.has("target")) {
@@ -76,14 +76,11 @@ export async function readCode(
     if (res.status >= 400) {
       throw new Error(`fetch ${url.href}: ${res.status} - ${res.statusText}`);
     }
-    const val = res.headers.get("Last-Modified");
-    const mtime = val ? new Date(val).getTime() : undefined;
-    return [await res.text(), mtime, res.headers.get("Content-Type") || getContentType(url.pathname)];
+    return [await res.text(), res.headers.get("Content-Type") || getContentType(url.pathname)];
   }
 
   specifier = util.splitBy(specifier, "?")[0];
-  const stat = await Deno.stat(specifier);
-  return [await Deno.readTextFile(specifier), stat.mtime?.getTime(), getContentType(specifier)];
+  return [await Deno.readTextFile(specifier), getContentType(specifier)];
 }
 
 /* watch the given directory and its subdirectories */

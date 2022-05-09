@@ -29,7 +29,6 @@ export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
   }
 
   async load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderContent> {
-    const stat = await Deno.lstat(`.${pathname}`);
     const content = await Deno.readTextFile(`.${pathname}`);
     const filename = "." + pathname;
     const id = (await util.computeHash("SHA-256", filename)).slice(0, 8);
@@ -133,7 +132,6 @@ export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
 
     return {
       code: output.join("\n"),
-      modtime: stat?.mtime?.getTime(),
       lang: isTS ? "ts" : "js",
       inlineCSS: css || undefined,
       atomicCSS: true,

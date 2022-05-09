@@ -71,7 +71,6 @@ export type ModuleLoaderContent = {
   atomicCSS?: boolean;
   lang?: "js" | "jsx" | "ts" | "tsx" | "css";
   map?: string;
-  modtime?: number;
 };
 
 export { UnoConfig };

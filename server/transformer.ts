@@ -8,6 +8,7 @@ import { bundleCSS } from "./bundle_css.ts";
 import {
   builtinModuleExts,
   getAlephPkgUri,
+  getDeploymentId,
   getUnoGenerator,
   regFullVersion,
   restoreUrl,
@@ -18,7 +19,6 @@ import { DependencyGraph } from "./graph.ts";
 import type { ImportMap, JSXConfig, ModuleLoaderContent } from "./types.ts";
 
 export type TransformerOptions = {
-  buildHash: string;
   buildTarget?: TransformOptions["target"];
   importMap: ImportMap;
   isDev: boolean;
@@ -33,33 +33,30 @@ export default {
       pathname.endsWith(".css");
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { isDev, buildHash, loaded } = options;
+    const { isDev, loaded } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
 
     let sourceCode: string;
-    let mtime: number | undefined;
     let lang: string | undefined;
     let isCSS: boolean;
     let uno: boolean;
     if (loaded) {
       sourceCode = loaded.code;
-      mtime = loaded.modtime;
       lang = loaded.lang;
       isCSS = loaded.lang === "css";
       uno = !!loaded.atomicCSS;
     } else {
       let codeType: string;
-      [sourceCode, mtime, codeType] = await readCode(specifier);
+      [sourceCode, codeType] = await readCode(specifier);
       isCSS = codeType.startsWith("text/css");
       uno = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
     }
 
-    const etag = mtime
-      ? `W/${mtime.toString(16)}-${sourceCode.length.toString(16)}-${buildHash.slice(0, 8)}`
-      : await util.computeHash("sha-1", sourceCode + buildHash);
-    if (req.headers.get("If-None-Match") === etag) {
+    const deployId = getDeploymentId();
+    const etag = deployId ? `W/${deployId}` : null;
+    if (etag && req.headers.get("If-None-Match") === etag) {
       return new Response(null, { status: 304 });
     }
 
@@ -162,10 +159,10 @@ export default {
         resBody = code;
       }
     }
-    const headers = new Headers({
-      "Content-Type": `${resType}; charset=utf-8`,
-      "Etag": etag,
-    });
+    const headers = new Headers([["Content-Type", `${resType}; charset=utf-8`]]);
+    if (etag) {
+      headers.set("ETag", etag);
+    }
     if (searchParams.get("v") || (pathname.startsWith("/-/") && regFullVersion.test(pathname))) {
       headers.append("Cache-Control", "public, max-age=31536000, immutable");
     }

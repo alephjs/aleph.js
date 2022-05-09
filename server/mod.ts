@@ -1,7 +1,6 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.136.0/http/server.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
-import { VERSION } from "https://deno.land/x/aleph_compiler@0.1.0/version.ts";
 import FetchError from "../framework/core/fetch_error.ts";
 import type { RouteRecord } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
@@ -42,16 +41,6 @@ export const serve = (options: ServerOptions = {}) => {
   const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
   const moduleLoadersPromise = importMapPromise.then(initModuleLoaders);
   const routesPromise = config?.routes ? initRoutes(config.routes) : Promise.resolve({ routes: [] });
-  const buildHashPromise = Promise.all([jsxConfigPromise, importMapPromise]).then(([jsxConfig, importMap]) => {
-    const buildArgs = JSON.stringify({
-      ...(config ? util.pick(config, "build", "unocss") : undefined),
-      comilper: VERSION,
-      importMap,
-      jsxConfig,
-      isDev,
-    });
-    return util.computeHash("sha-1", buildArgs);
-  });
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const url = new URL(req.url);
     const { host, pathname, searchParams } = url;
@@ -71,15 +60,13 @@ export const serve = (options: ServerOptions = {}) => {
     // transform client modules
     if (clientModuleTransformer.test(pathname)) {
       try {
-        const [buildHash, jsxConfig, importMap] = await Promise.all([
-          buildHashPromise,
+        const [jsxConfig, importMap] = await Promise.all([
           jsxConfigPromise,
           importMapPromise,
         ]);
         return await clientModuleTransformer.fetch(req, {
           importMap,
           jsxConfig,
-          buildHash,
           buildTarget: config?.build?.target,
           isDev,
         });
@@ -100,8 +87,7 @@ export const serve = (options: ServerOptions = {}) => {
     const loader = moduleLoaders.find((loader) => loader.test(pathname));
     if (loader) {
       try {
-        const [buildHash, jsxConfig, importMap] = await Promise.all([
-          buildHashPromise,
+        const [jsxConfig, importMap] = await Promise.all([
           jsxConfigPromise,
           importMapPromise,
         ]);
@@ -110,7 +96,6 @@ export const serve = (options: ServerOptions = {}) => {
           loaded,
           importMap,
           jsxConfig,
-          buildHash,
           buildTarget: config?.build?.target,
           isDev,
         });
