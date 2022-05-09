@@ -32,6 +32,7 @@ export function createEditor(container: HTMLElement, readOnly?: boolean) {
     contextmenu: true,
     fontSize: 14,
     lineHeight: 18,
+    lineNumbersMinChars: 2,
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
     smoothScrolling: true,
