@@ -67,7 +67,8 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
       if (deployId) {
         url += `?v=${deployId}`;
       }
-      const { default: defaultExport, data: withData } = await import(url);
+      const { default: defaultExport, data, GET } = await import(url);
+      const withData = Boolean(data ?? GET);
       routeModules[filename] = { defaultExport, withData };
       return { defaultExport, withData };
     };

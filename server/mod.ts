@@ -271,18 +271,19 @@ export const serve = (options: ServerOptions = {}) => {
         const fromFetchApi = accept === "application/json" || !accept?.includes("html");
         if (ret) {
           try {
+            const { method } = req;
             const mod = await importRouteModule(filename);
-            const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
-            if (req.method !== "GET" || mod.default === undefined || fromFetchApi) {
+            const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
+            if (method !== "GET" || mod.default === undefined || fromFetchApi) {
               Object.assign(ctx.params, ret.pathname.groups);
-              const anyFetcher = dataConfig.any;
+              const anyFetcher = dataConfig.any ?? dataConfig.ANY;
               if (typeof anyFetcher === "function") {
                 const res = await anyFetcher(req, ctx);
                 if (res instanceof Response) {
                   return res;
                 }
               }
-              const fetcher = dataConfig[req.method.toLowerCase()];
+              const fetcher = dataConfig[method.toLowerCase()] ?? dataConfig[method];
               if (typeof fetcher === "function") {
                 const res = await fetcher(req, ctx);
                 if (res instanceof Response) {

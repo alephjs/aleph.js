@@ -3,33 +3,31 @@ import type { Route } from "../framework/core/route.ts";
 
 /** generate the `routes.gen.ts` follow the routes config */
 export async function generate(routes: Route[]) {
-  const routeFiles = await Promise.all(routes.map(async ([_, { filename }]) => {
-    const code = await Deno.readTextFile(filename);
-    const exportNames = await parseExportNames(filename, code);
-    return [filename, exportNames];
-  }));
+  const routeFiles: [fiilename: string, exportNames: string[]][] = await Promise.all(
+    routes.map(async ([_, { filename }]) => {
+      const code = await Deno.readTextFile(filename);
+      const exportNames = await parseExportNames(filename, code);
+      return [filename, exportNames];
+    }),
+  );
 
   const imports: string[] = [];
   const revives: string[] = [];
 
   routeFiles.forEach(([filename, exportNames], idx) => {
-    const hasDefaultExport = exportNames.includes("default");
-    const hasDataExport = exportNames.includes("data");
-    if (!hasDefaultExport && !hasDataExport) {
+    if (exportNames.length === 0) {
       return [];
     }
-    imports.push(`import { ${
-      [
-        hasDefaultExport && `default as $${idx}`,
-        hasDataExport && `data as $$${idx}`,
-      ].filter(Boolean).join(", ")
-    } } from ${JSON.stringify(filename)};`);
-    revives.push(`revive(${JSON.stringify(filename)}, { ${
-      [
-        hasDefaultExport && `default: $${idx}`,
-        hasDataExport && `data: $$${idx}`,
-      ].filter(Boolean).join(", ")
-    } });`);
+    imports.push(
+      `import { ${exportNames.map((name) => `${name} as ${"$".repeat(idx + 1)}${idx}`).join(", ")} } from ${
+        JSON.stringify(filename)
+      };`,
+    );
+    revives.push(
+      `revive(${JSON.stringify(filename)}, { ${
+        exportNames.map((name) => `${name}: ${"$".repeat(idx + 1)}${idx}`).join(", ")
+      } });`,
+    );
   });
 
   if (imports.length) {

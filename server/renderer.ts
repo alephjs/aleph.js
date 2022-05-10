@@ -130,17 +130,16 @@ export default {
             }
           }
         }
-        const ttls = routeModules.filter(({ dataCacheTtl }) =>
-          typeof dataCacheTtl === "number" && !Number.isNaN(dataCacheTtl) && dataCacheTtl > 0
-        ).map(({ dataCacheTtl }) => Number(dataCacheTtl));
-        if (ttls.length > 1) {
+        if (
+          routeModules.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)
+        ) {
+          const ttls = routeModules.map(({ dataCacheTtl }) => Number(dataCacheTtl));
           headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
-        } else if (ttls.length == 1) {
-          headers.append("Cache-Control", `${cc}, max-age=${ttls[0]}`);
         } else {
           headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
         }
         if (csp) {
+          // todo: parse nonce
           headers.append("Content-Security-Policy", [csp].flat().join("; "));
         }
         ssrRes = {
@@ -354,7 +353,7 @@ async function initSSR(
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
     const mod = await importRouteModule(filename);
-    const dataConfig: Record<string, unknown> = util.isPlainObject(mod.data) ? mod.data : {};
+    const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),
       params: ret.pathname.groups,
@@ -366,19 +365,19 @@ async function initSSR(
     // assign route params to context
     Object.assign(ctx.params, ret.pathname.groups);
 
-    // check `any` fetch of data, throw if it returns a response object
-    const anyFetcher = dataConfig.any;
-    if (typeof anyFetcher === "function") {
-      const res = await anyFetcher(req, ctx);
-      if (res instanceof Response) {
-        throw res;
-      }
-    }
-
-    // check `get` of data, if `suspense` is enabled then return a promise instead
-    const fetcher = dataConfig.get;
+    // check the `get` method of data, if `suspense` is enabled then return a promise instead
+    const fetcher = dataConfig.get ?? dataConfig.GET;
     if (typeof fetcher === "function") {
       const fetchData = async () => {
+        // check the `any` method of data, throw the response object if it returns one
+        const anyFetcher = dataConfig.any ?? dataConfig.ANY;
+        if (typeof anyFetcher === "function") {
+          const res = await anyFetcher(req, ctx);
+          if (res instanceof Response) {
+            throw res;
+          }
+        }
+
         let res: unknown;
         try {
           res = fetcher(req, ctx);

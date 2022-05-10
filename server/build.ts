@@ -93,24 +93,16 @@ export async function build(serverEntry?: string) {
       `;
     }).join("\n"),
     ...routeFiles.map(([filename, exportNames], idx) => {
-      const hasDefaultExport = exportNames.includes("default");
-      const hasDataExport = exportNames.includes("data");
-      if (!hasDefaultExport && !hasDataExport) {
+      if (exportNames.length === 0) {
         return [];
       }
       const url = `http://localhost:${modulesProxyPort}${filename.slice(1)}`;
       return [
-        `import { ${
-          [
-            hasDefaultExport && `default as $${idx}`,
-            hasDataExport && `data as $$${idx}`,
-          ].filter(Boolean).join(", ")
-        } } from ${JSON.stringify(url)};`,
+        `import { ${exportNames.map((name) => `${name} as ${"$".repeat(idx + 1)}${idx}`).join(", ")} } from ${
+          JSON.stringify(url)
+        };`,
         `revive(${JSON.stringify(filename)}, { ${
-          [
-            hasDefaultExport && `default: $${idx}`,
-            hasDataExport && `data: $$${idx}`,
-          ].filter(Boolean).join(", ")
+          exportNames.map((name) => `${name}: ${"$".repeat(idx + 1)}${idx}`).join(", ")
         } });`,
       ];
     }),
