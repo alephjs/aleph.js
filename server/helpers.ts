@@ -10,6 +10,7 @@ import type { AlephConfig, ImportMap, JSXConfig, ModuleLoader } from "./types.ts
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
+/** Stores and returns the `fn` output in the `globalThis` object */
 export async function globalIt<T>(name: string, fn: () => Promise<T>): Promise<T> {
   const cache: T | undefined = Reflect.get(globalThis, name);
   if (cache !== undefined) {
@@ -22,6 +23,7 @@ export async function globalIt<T>(name: string, fn: () => Promise<T>): Promise<T
   return ret;
 }
 
+/** Stores and returns the `fn` output in the `globalThis` object synchronously. */
 export function globalItSync<T>(name: string, fn: () => T): T {
   const cache: T | undefined = Reflect.get(globalThis, name);
   if (cache !== undefined) {
@@ -34,6 +36,7 @@ export function globalItSync<T>(name: string, fn: () => T): T {
   return ret;
 }
 
+/* Get Aleph.js package URI. */
 export function getAlephPkgUri(): string {
   return globalItSync("__ALEPH_PKG_URI", () => {
     const uriFromEnv = Deno.env.get("ALEPH_PKG_URI");
@@ -49,9 +52,13 @@ export function getAlephPkgUri(): string {
   });
 }
 
+/** Get the UnoCSS generator, return `null` if the presets are empty. */
 export function getUnoGenerator(): UnoGenerator | null {
+  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+  if (config === undefined) {
+    return null;
+  }
   return globalItSync("__UNO_GENERATOR", () => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     if (config?.unocss?.presets) {
       return createGenerator(config.unocss);
     }
@@ -59,6 +66,7 @@ export function getUnoGenerator(): UnoGenerator | null {
   });
 }
 
+/** Get the deployment ID. */
 export function getDeploymentId(): string | null {
   return Deno.env.get("DENO_DEPLOYMENT_ID") ?? null;
 }
@@ -101,6 +109,40 @@ export function restoreUrl(pathname: string): string {
   return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
 }
 
+/** init loaders in `CLI` mode, or use prebuild loaders */
+export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoader[]> {
+  const loaders: ModuleLoader[] = Reflect.get(globalThis, "__ALEPH_MODULE_LOADERS") || [];
+  if (Deno.env.get("ALEPH_CLI")) {
+    for (const key in importMap.imports) {
+      if (/^\*\.{?(\w+, ?)*\w+}?$/i.test(key)) {
+        let src = importMap.imports[key];
+        if (src.endsWith("!loader")) {
+          src = util.trimSuffix(src, "!loader");
+          if (src.startsWith("./") || src.startsWith("../")) {
+            src = "file://" + join(dirname(importMap.__filename), src);
+          }
+          let { default: loader } = await import(src);
+          if (typeof loader === "function") {
+            loader = new loader();
+          }
+          if (loader !== null && typeof loader === "object" && typeof loader.load === "function") {
+            const glob = "/**/" + key;
+            const reg = globToRegExp(glob);
+            const Loader = {
+              meta: { src, glob },
+              test: (pathname: string) => reg.test(pathname),
+              load: (pathname: string, env: Record<string, unknown>) => loader.load(pathname, env),
+            };
+            loaders.push(Loader);
+          }
+        }
+      }
+    }
+  }
+  return loaders;
+}
+
+/** Load the JSX config base the given import maps and the existing deno config. */
 export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
   const jsxConfig: JSXConfig = {};
   const denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"]);
@@ -181,6 +223,7 @@ export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
   return jsxConfig;
 }
 
+/** Load the import maps from the working directory. */
 export async function loadImportMap(): Promise<ImportMap> {
   const importMap: ImportMap = { __filename: "", imports: {}, scopes: {} };
 
@@ -219,37 +262,17 @@ export async function loadImportMap(): Promise<ImportMap> {
   return importMap;
 }
 
-/** init loaders in `CLI` mode, or use prebuild loaders */
-export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoader[]> {
-  const loaders: ModuleLoader[] = Reflect.get(globalThis, "__ALEPH_MODULE_LOADERS") || [];
-  if (Deno.env.get("ALEPH_CLI")) {
-    for (const key in importMap.imports) {
-      if (/^\*\.{?(\w+, ?)*\w+}?$/i.test(key)) {
-        let src = importMap.imports[key];
-        if (src.endsWith("!loader")) {
-          src = util.trimSuffix(src, "!loader");
-          if (src.startsWith("./") || src.startsWith("../")) {
-            src = "file://" + join(dirname(importMap.__filename), src);
-          }
-          let { default: loader } = await import(src);
-          if (typeof loader === "function") {
-            loader = new loader();
-          }
-          if (loader !== null && typeof loader === "object" && typeof loader.load === "function") {
-            const glob = "/**/" + key;
-            const reg = globToRegExp(glob);
-            const Loader = {
-              meta: { src, glob },
-              test: (pathname: string) => reg.test(pathname),
-              load: (pathname: string, env: Record<string, unknown>) => loader.load(pathname, env),
-            };
-            loaders.push(Loader);
-          }
-        }
-      }
+export function applyImportMap(specifier: string, importMap: ImportMap): string {
+  if (specifier in importMap.imports) {
+    return importMap.imports[specifier];
+  }
+  for (const key in importMap.imports) {
+    if (key.endsWith("/") && specifier.startsWith(key)) {
+      return importMap.imports[key] + specifier.slice(key.length);
     }
   }
-  return loaders;
+  // todo: support scopes
+  return specifier;
 }
 
 export async function parseJSONFile(jsonFile: string): Promise<Record<string, unknown>> {
@@ -272,19 +295,6 @@ export async function parseImportMap(importMapFile: string): Promise<ImportMap> 
   }
   Object.assign(importMap, { imports, scopes });
   return importMap;
-}
-
-export function applyImportMap(specifier: string, importMap: ImportMap): string {
-  if (specifier in importMap.imports) {
-    return importMap.imports[specifier];
-  }
-  for (const key in importMap.imports) {
-    if (key.endsWith("/") && specifier.startsWith(key)) {
-      return importMap.imports[key] + specifier.slice(key.length);
-    }
-  }
-  // todo: support scopes
-  return specifier;
 }
 
 function toStringMap(v: unknown): Record<string, string> {

@@ -81,22 +81,17 @@ export default {
           signal: req.signal,
           bootstrapScripts: [bootstrapScript],
           onError: (_error: unknown) => {
-            // todo: handle suspense error
+            // todo: handle suspense ssr error
           },
         };
         const body = await render(ssrContext);
         const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
         if (serverDependencyGraph) {
-          const atomicCSSSource: Promise<string>[] = [];
+          const unocssTokens: ReadonlyArray<string>[] = [];
           const lookupModuleStyle = (mod: Module) => {
-            const { specifier, sourceCode, atomicCSS, inlineCSS } = mod;
+            const { specifier, atomicCSS, inlineCSS } = mod;
             if (atomicCSS) {
-              atomicCSSSource.push(
-                sourceCode ? Promise.resolve(sourceCode) : Deno.readTextFile(specifier).then((text) => {
-                  Object.assign(mod, { sourceCode: text });
-                  return text;
-                }),
-              );
+              unocssTokens.push(atomicCSS.tokens);
             }
             if (inlineCSS) {
               headCollection.push(`<style data-module-id="${specifier}">${inlineCSS}</style>`);
@@ -111,20 +106,17 @@ export default {
               break;
             }
           }
-          if (atomicCSSSource.length > 0) {
-            // todo: cache the atomic CSS in production mode
+          if (unocssTokens.length > 0) {
             const unoGenerator = getUnoGenerator();
             if (unoGenerator) {
               const start = performance.now();
-              const input = (await Promise.all(atomicCSSSource)).join("\n");
-              const { css } = await unoGenerator.generate(input, {
+              const { css } = await unoGenerator.generate(new Set(unocssTokens.flat()), {
                 minify: !isDev,
               });
               if (css) {
+                const buildTime = performance.now() - start;
                 headCollection.push(
-                  `<style data-unocss="${unoGenerator.version}" data-build-time="${
-                    performance.now() - start
-                  }ms">${css}</style>`,
+                  `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
                 );
               }
             }

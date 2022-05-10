@@ -123,22 +123,27 @@ export default {
         });
       }
       let { code, map, deps } = ret;
-      let inlineCSS = loaded?.inlineCSS;
+      let hasInlineCSS = false;
       if (uno) {
         const unoGenerator = getUnoGenerator();
         if (unoGenerator) {
           const { css } = await unoGenerator.generate(sourceCode, { id: specifier, minify: !isDev });
-          if (inlineCSS) {
-            inlineCSS = `${inlineCSS}\n${css}`;
-          } else {
-            inlineCSS = css;
+
+          if (css) {
+            code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${
+              toLocalPath(alephPkgUri)
+            }/framework/core/style.ts";\n__applyUnoCSS(${JSON.stringify(specifier)}, ${JSON.stringify(css)});\n`;
+            hasInlineCSS = true;
           }
         }
       }
-      if (inlineCSS) {
+      if (loaded?.inlineCSS) {
         code += `\nimport { applyCSS as __applyCSS } from "${
           toLocalPath(alephPkgUri)
-        }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});\n`;
+        }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(loaded?.inlineCSS)});\n`;
+        hasInlineCSS = true;
+      }
+      if (hasInlineCSS) {
         deps = [...(deps || []), { specifier: alephPkgUri + "/framework/core/style.ts" }] as typeof deps;
       }
       clientDependencyGraph?.mark(specifier, { deps });

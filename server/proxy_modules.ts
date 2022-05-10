@@ -6,8 +6,8 @@ import { serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
 import { DependencyGraph } from "./graph.ts";
-import { builtinModuleExts } from "./helpers.ts";
-import type { ImportMap, ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "./types.ts";
+import { builtinModuleExts, getUnoGenerator } from "./helpers.ts";
+import type { ImportMap, ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "./types.ts";
 
 const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
   const specifier = "." + pathname;
@@ -38,19 +38,26 @@ const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
   };
 };
 
-const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent, env: ModuleLoaderEnv) => {
-  const { code: sourceCode, pathname, lang, inlineCSS } = input;
-  const specifier = "." + pathname;
-  const atomicCSS = input.atomicCSS || pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
-  const contentType = lang ? getContentType(`file.${lang}`) : undefined;
+const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, env: ModuleLoaderEnv) => {
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
   if (!serverDependencyGraph) {
     throw new Error("The `serverDependencyGraph` is not defined");
   }
-  const deps = await parseDeps(specifier, sourceCode, { importMap: JSON.stringify(env.importMap) });
-  serverDependencyGraph.mark(specifier, { sourceCode, deps, inlineCSS, atomicCSS });
+
+  const { code, pathname, lang, inlineCSS, isTemplateLanguage } = input;
+  const specifier = "." + pathname;
+  const contentType = lang ? getContentType(`file.${lang}`) : undefined;
+  const unoGenerator = isTemplateLanguage || lang === "jsx" || lang === "tsx" || pathname.endsWith(".tsx") ||
+      pathname.endsWith(".jsx")
+    ? getUnoGenerator()
+    : null;
+  const [deps, atomicCSS] = await Promise.all([
+    parseDeps(specifier, code, { importMap: JSON.stringify(env.importMap) }),
+    unoGenerator ? unoGenerator.generate(code).then((ret) => ({ tokens: [...ret.matched] })) : undefined,
+  ]);
+  serverDependencyGraph.mark(specifier, { deps, inlineCSS, atomicCSS });
   if (deps.length) {
-    const s = new MagicString(sourceCode);
+    const s = new MagicString(code);
     deps.forEach((dep) => {
       const { specifier, importUrl, loc } = dep;
       if (loc) {
@@ -69,7 +76,7 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderContent,
     return { content: s.toString(), contentType };
   }
   return {
-    content: sourceCode,
+    content: code,
     contentType,
   };
 };

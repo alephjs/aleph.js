@@ -1,10 +1,11 @@
 export type Module = {
   readonly specifier: string;
   readonly version: number;
-  readonly sourceCode?: string;
   readonly deps?: ReadonlyArray<DependencyDescriptor>;
   readonly inlineCSS?: string;
-  readonly atomicCSS?: boolean;
+  readonly atomicCSS?: {
+    readonly tokens: ReadonlyArray<string>;
+  };
 };
 
 export type DependencyDescriptor = {
@@ -52,7 +53,6 @@ export class DependencyGraph {
 
     const mod: Module = {
       specifier,
-      sourceCode: "",
       version: this.#initialVersion,
       ...props,
     };
