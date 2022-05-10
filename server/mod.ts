@@ -6,7 +6,7 @@ import type { RouteRecord } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
-import { errorHtml } from "./error.ts";
+import { ErrorCallback, generateErrorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
 import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig, regFullVersion } from "./helpers.ts";
 import { type HTMLRewriterHandlers, loadAndFixIndexHtml } from "./html.ts";
@@ -24,13 +24,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: SSR;
-  onError?: (
-    error: unknown,
-    cause: {
-      by: "route-api" | "ssr" | "transplie" | "fs" | "middleware";
-      url: string;
-    },
-  ) => Response | void;
+  onError?: ErrorCallback;
 } & AlephConfig;
 
 export const serve = (options: ServerOptions = {}) => {
@@ -73,7 +67,7 @@ export const serve = (options: ServerOptions = {}) => {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
           return onError?.(err, { by: "transplie", url: req.url }) ??
-            new Response(errorHtml(err.stack ?? err.message), {
+            new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
             });
@@ -102,7 +96,7 @@ export const serve = (options: ServerOptions = {}) => {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
           return onError?.(err, { by: "transplie", url: req.url }) ??
-            new Response(errorHtml(err.stack ?? err.message), {
+            new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
             });
@@ -149,7 +143,7 @@ export const serve = (options: ServerOptions = {}) => {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
           return onError?.(err, { by: "fs", url: req.url }) ??
-            new Response(errorHtml(err.stack ?? err.message), {
+            new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
             });
@@ -209,25 +203,27 @@ export const serve = (options: ServerOptions = {}) => {
         return new Response(null, { status: code || 302, headers });
       },
       json: (data: unknown, init?: ResponseInit): Response => {
-        let hasCustomHeaders = false;
-        const headers = new Headers(init?.headers);
+        let headers: Headers | null = null;
         ctx.headers.forEach((value, name) => {
+          if (!headers) {
+            headers = new Headers(init?.headers);
+          }
           headers.set(name, value);
-          hasCustomHeaders = true;
         });
-        if (!hasCustomHeaders) {
+        if (!headers) {
           return json(data, init);
         }
         return json(data, { ...init, headers });
       },
       content: (body: BodyInit, init?: ResponseInit): Response => {
-        let hasCustomHeaders = false;
-        const headers = new Headers(init?.headers);
+        let headers: Headers | null = null;
         ctx.headers.forEach((value, name) => {
+          if (!headers) {
+            headers = new Headers(init?.headers);
+          }
           headers.set(name, value);
-          hasCustomHeaders = true;
         });
-        if (!hasCustomHeaders) {
+        if (!headers) {
           return content(body, init);
         }
         return content(body, { ...init, headers });
@@ -252,8 +248,8 @@ export const serve = (options: ServerOptions = {}) => {
             }
           }
         } catch (err) {
-          return onError?.(err, { by: "middleware", url: req.url }) ??
-            new Response(errorHtml(err.stack ?? err.message), {
+          return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
+            new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
             });
@@ -295,20 +291,20 @@ export const serve = (options: ServerOptions = {}) => {
                 if (
                   typeof res === "string" || res instanceof ArrayBuffer || res instanceof ReadableStream
                 ) {
-                  return new Response(res);
+                  return ctx.content(res);
                 }
                 if (res instanceof Blob || res instanceof File) {
-                  return new Response(res, { headers: { "Content-Type": res.type } });
+                  return ctx.content(res, { headers: { "Content-Type": res.type } });
                 }
                 if (util.isPlainObject(res) || Array.isArray(res) || res === null) {
-                  return json(res);
+                  return ctx.json(res);
                 }
-                return new Response(null);
+                return new Response(null, { headers: ctx.headers });
               }
               return new Response("Method not allowed", { status: 405 });
             }
           } catch (err) {
-            const res = onError?.(err, { by: "route-api", url: req.url });
+            const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
             if (res instanceof Response) {
               return res;
             }
@@ -354,7 +350,7 @@ export const serve = (options: ServerOptions = {}) => {
         } else {
           log.error("read index.html:", err);
           return onError?.(err, { by: "fs", url: req.url }) ??
-            new Response(errorHtml(err.stack ?? err.message), {
+            new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
             });

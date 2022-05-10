@@ -1,6 +1,17 @@
+export type ErrorCallback = {
+  (
+    error: unknown,
+    cause: {
+      by: "route-api" | "ssr" | "transplie" | "fs" | "middleware";
+      url: string;
+      context?: Record<string, unknown>;
+    },
+  ): Response | void;
+};
+
 const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
 
-export const errorHtml = (message: string, type?: string): string => {
+export const generateErrorHtml = (message: string, type?: string): string => {
   const formatMessage = message.split("\n").map((line, i) => {
     const ret = line.match(regStackLoc);
     if (ret) {

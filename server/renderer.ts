@@ -3,7 +3,7 @@ import type { RouteModule, RouteRecord } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { errorHtml } from "./error.ts";
+import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { builtinModuleExts, getDeploymentId, getUnoGenerator } from "./helpers.ts";
 import type { Element, HTMLRewriterHandlers } from "./html.ts";
@@ -21,17 +21,21 @@ export type SSRContext = {
   readonly onError?: (error: unknown) => void;
 };
 
+export type SSRFn = {
+  (ssr: SSRContext): Promise<ReadableStream> | ReadableStream;
+};
+
 export type SSR = {
   suspense: true;
   cacheControl?: "private" | "public";
   csp?: string | string[];
-  render(ssr: SSRContext): Promise<ReadableStream> | ReadableStream;
+  render: SSRFn;
 } | {
   suspense?: false;
   cacheControl?: "private" | "public";
   csp?: string | string[];
-  render(ssr: SSRContext): Promise<string | ReadableStream> | string | ReadableStream;
-} | ((ssr: SSRContext) => Promise<string | ReadableStream> | string | ReadableStream);
+  render: SSRFn;
+} | SSRFn;
 
 export type SSRResult = {
   context: SSRContext;
@@ -46,7 +50,7 @@ export type RenderOptions = {
   customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
   isDev: boolean;
   ssr?: SSR;
-  onError?: (error: unknown, cause: { by: "ssr"; url: string }) => Response | void;
+  onError?: ErrorCallback;
 };
 
 /** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
@@ -153,7 +157,7 @@ export default {
         }
         headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
         headers.append("Content-Type", "text/html; charset=utf-8");
-        return new Response(errorHtml(message, "SSR"), { headers });
+        return new Response(generateErrorHtml(message, "SSR"), { headers });
       }
     } else {
       const deployId = getDeploymentId();
@@ -329,7 +333,7 @@ async function initSSR(
   ctx: Record<string, unknown>,
   routes: RouteRecord,
   suspense: boolean,
-  onError?: (error: unknown, cause: { by: "ssr"; url: string }) => Response | void,
+  onError?: ErrorCallback,
 ): Promise<
   [
     url: URL,
@@ -377,7 +381,7 @@ async function initSSR(
             res = await res;
           }
         } catch (error) {
-          res = onError?.(error, { by: "ssr", url: req.url });
+          res = onError?.(error, { by: "ssr", url: req.url, context: ctx });
           if (res instanceof Response) {
             throw res;
           }
