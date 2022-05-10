@@ -6,30 +6,30 @@ type TodoItem = {
   completed: boolean;
 };
 
-type DataProps = {
+type Store = {
   todos: TodoItem[];
 };
 
-const storage: DataProps = {
+const store: Store = {
   todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
 };
 
-export const data: Data<DataProps> = {
-  cacheTtl: 0,
-  get: (_req, ctx) => {
-    return ctx.json(storage);
+export const data: Data<Store, Store> = {
+  cacheTtl: 0, // no cache
+  get: () => {
+    return store;
   },
-  put: async (req, ctx) => {
+  put: async (req) => {
     const { message } = await req.json();
     if (typeof message === "string") {
-      storage.todos.push({ id: Date.now(), message, completed: false });
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
+      store.todos.push({ id: Date.now(), message, completed: false });
+      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
     }
-    return ctx.json(storage);
+    return store;
   },
-  patch: async (req, ctx) => {
+  patch: async (req) => {
     const { id, message, completed } = await req.json();
-    const todo = storage.todos.find((todo) => todo.id === id);
+    const todo = store.todos.find((todo) => todo.id === id);
     if (todo) {
       if (typeof message === "string") {
         todo.message = message;
@@ -37,22 +37,22 @@ export const data: Data<DataProps> = {
       if (typeof completed === "boolean") {
         todo.completed = completed;
       }
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
+      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
     }
-    return ctx.json(storage);
+    return store;
   },
-  delete: async (req, ctx) => {
+  delete: async (req) => {
     const { id } = await req.json();
     if (id) {
-      storage.todos = storage.todos.filter((todo) => todo.id !== id);
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
+      store.todos = store.todos.filter((todo) => todo.id !== id);
+      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
     }
-    return ctx.json(storage);
+    return store;
   },
 };
 
 export default function Todos() {
-  const { data: { todos }, isMutating, mutation } = useData<DataProps>();
+  const { data: { todos }, isMutating, mutation } = useData<Store>();
 
   return (
     <div className="todos-app">
@@ -85,13 +85,13 @@ export default function Todos() {
           const message = fd.get("message")?.toString().trim();
           if (message) {
             await mutation.put({ message }, {
-              // optimistic update without waiting for the server response
+              // optimistic update data without waiting for the server response
               optimisticUpdate: (data) => {
                 return {
                   todos: [...data.todos, { id: 0, message, completed: false }],
                 };
               },
-              // replace the data with the new data from the server
+              // replace the data from the server response
               replace: true,
             });
             form.reset();

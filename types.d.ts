@@ -1,14 +1,12 @@
-type HTMLRewriterHandlers = {
-  element?: (element: import("https://deno.land/x/lol_html@0.0.3/types.d.ts").Element) => void;
-  comments?: (comment: import("https://deno.land/x/lol_html@0.0.3/types.d.ts").Comment) => void;
-  text?: (text: import("https://deno.land/x/lol_html@0.0.3/types.d.ts").TextChunk) => void;
-};
+/** Information about the connection a request arrived on. */
+interface ConnInfo {
+  /** The local address of the connection. */
+  readonly localAddr: Deno.Addr;
+  /** The remote address of the connection. */
+  readonly remoteAddr: Deno.Addr;
+}
 
-type HTMLRewriter = {
-  on: (selector: string, handlers: HTMLRewriterHandlers) => void;
-};
-
-declare type CookieOptions = {
+interface CookieOptions {
   expires?: number | Date;
   maxAge?: number;
   domain?: string;
@@ -16,64 +14,60 @@ declare type CookieOptions = {
   httpOnly?: boolean;
   secure?: boolean;
   sameSite?: "lax" | "strict" | "none";
-};
+}
 
-declare interface Cookies {
+interface Cookies {
   get(key: string): string | undefined;
   set(key: string, value: string, options?: CookieOptions): void;
   delete(key: string, options?: CookieOptions): void;
 }
 
-declare type CacheControlOptions = {
-  maxAge?: number;
-  sMaxAge?: number;
-  public?: boolean;
-  private?: boolean;
-  immutable?: boolean;
-  mustRevalidate?: boolean;
-};
-
-/** Information about the connection a request arrived on. */
-declare interface ConnInfo {
-  /** The local address of the connection. */
-  readonly localAddr: Deno.Addr;
-  /** The remote address of the connection. */
-  readonly remoteAddr: Deno.Addr;
+interface HTMLRewriterHandlers {
+  element?: (element: import("https://deno.land/x/lol_html@0.0.3/types.d.ts").Element) => void;
+  comments?: (comment: import("https://deno.land/x/lol_html@0.0.3/types.d.ts").Comment) => void;
+  text?: (text: import("https://deno.land/x/lol_html@0.0.3/types.d.ts").TextChunk) => void;
 }
 
-declare interface Context<DataType = unknown> extends Record<string, unknown> {
+interface HTMLRewriter {
+  on: (selector: string, handlers: HTMLRewriterHandlers) => void;
+}
+
+declare interface Context extends Record<string, unknown> {
   readonly connInfo: ConnInfo;
   readonly params: Record<string, string>;
   readonly headers: Headers;
   readonly cookies: Cookies;
   readonly htmlRewriter: HTMLRewriter;
-  redirect(url: string | URL, code?: number): Response;
-  json(data: DataType, init?: ResponseInit): Response;
-  content(
-    content: BodyInit,
-    init?: ResponseInit & {
-      contentType?: string;
-      cacheControl?: "no-cache" | "immutable" | CacheControlOptions;
-    },
-  ): Response;
 }
 
-declare interface Data<DataType = unknown, ContextExtension = Record<never, never>> {
+declare type ResponseLike =
+  | Response
+  | ReadableStream
+  | ArrayBuffer
+  | Uint8Array
+  | string
+  | Blob
+  | File
+  | Record<string, unknown>
+  | Array<unknown>
+  | null;
+
+declare interface Data<GetDataType = ResponseLike, ActionDataType = ResponseLike> {
   cacheTtl?: number;
-  any?(request: Request, context: Context & ContextExtension): Promise<Response | void> | Response | void;
+  any?(request: Request, context: Context): Promise<Response | void> | Response | void;
   get?(
     request: Request,
-    context: Context<DataType> & ContextExtension,
-  ): Promise<Response | DataType> | Response | DataType;
-  post?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
-  put?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
-  patch?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
-  delete?(request: Request, context: Context & ContextExtension): Promise<Response> | Response;
+    context: Context,
+  ): Promise<GetDataType> | GetDataType;
+  post?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;
+  put?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;
+  patch?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;
+  delete?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;
 }
 
 declare interface Middleware {
-  name?: string;
-  version?: string;
+  readonly name?: string;
+  readonly version?: string;
   fetch(
     request: Request,
     context: Context,

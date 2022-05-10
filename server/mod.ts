@@ -197,37 +197,6 @@ export const serve = (options: ServerOptions = {}) => {
           customHTMLRewriter.set(selector, handlers);
         },
       },
-      redirect(url: string | URL, code?: number) {
-        const headers = new Headers(ctx.headers);
-        headers.set("Location", url.toString());
-        return new Response(null, { status: code || 302, headers });
-      },
-      json: (data: unknown, init?: ResponseInit): Response => {
-        let headers: Headers | null = null;
-        ctx.headers.forEach((value, name) => {
-          if (!headers) {
-            headers = new Headers(init?.headers);
-          }
-          headers.set(name, value);
-        });
-        if (!headers) {
-          return json(data, init);
-        }
-        return json(data, { ...init, headers });
-      },
-      content: (body: BodyInit, init?: ResponseInit): Response => {
-        let headers: Headers | null = null;
-        ctx.headers.forEach((value, name) => {
-          if (!headers) {
-            headers = new Headers(init?.headers);
-          }
-          headers.set(name, value);
-        });
-        if (!headers) {
-          return content(body, init);
-        }
-        return content(body, { ...init, headers });
-      },
     };
 
     // use middlewares
@@ -248,6 +217,7 @@ export const serve = (options: ServerOptions = {}) => {
             }
           }
         } catch (err) {
+          log.error(`Middleare${mw.name ? `(${mw.name}${mw.version ? " " + mw.version : ""})` : ""}:`, err);
           return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
@@ -284,24 +254,42 @@ export const serve = (options: ServerOptions = {}) => {
                 if (res instanceof Response) {
                   if (res.status >= 300 && fromFetchApi) {
                     const err = await FetchError.fromResponse(res);
-                    return ctx.json({ ...err }, { status: err.status >= 400 ? err.status : 501 });
+                    return json({ ...err }, { status: err.status >= 400 ? err.status : 501, headers: ctx.headers });
+                  }
+                  let headers: Headers | null = null;
+                  ctx.headers.forEach((value, name) => {
+                    if (!headers) {
+                      headers = new Headers(res.headers);
+                    }
+                    headers.set(name, value);
+                  });
+                  if (headers) {
+                    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
                   }
                   return res;
                 }
                 if (
-                  typeof res === "string" || res instanceof ArrayBuffer || res instanceof ReadableStream
+                  typeof res === "string" ||
+                  res instanceof ArrayBuffer ||
+                  res instanceof Uint8Array ||
+                  res instanceof ReadableStream
                 ) {
-                  return ctx.content(res);
+                  return new Response(res, { headers: ctx.headers });
                 }
                 if (res instanceof Blob || res instanceof File) {
-                  return ctx.content(res, { headers: { "Content-Type": res.type } });
+                  ctx.headers.set("Content-Type", res.type);
+                  ctx.headers.set("Content-Length", res.size.toString());
+                  return new Response(res, { headers: ctx.headers });
                 }
-                if (util.isPlainObject(res) || Array.isArray(res) || res === null) {
-                  return ctx.json(res);
+                if (util.isPlainObject(res) || Array.isArray(res)) {
+                  return json(res, { headers: ctx.headers });
                 }
-                return new Response(null, { headers: ctx.headers });
+                if (res === null) {
+                  return new Response(null, { headers: ctx.headers });
+                }
+                return new Response("Invalid Reponse Type", { status: 500 });
               }
-              return new Response("Method not allowed", { status: 405 });
+              return new Response("Method Not Allowed", { status: 405 });
             }
           } catch (err) {
             const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
@@ -315,12 +303,9 @@ export const serve = (options: ServerOptions = {}) => {
               log.error(err);
             }
             const status: number = util.isUint(err.status || err.code) ? err.status || err.code : 500;
-            return ctx.json({
-              ...err,
-              message: err.message || String(err),
-              status,
-            }, {
+            return json({ ...err, message: err.message || String(err), status }, {
               status: status >= 400 ? status : 501,
+              headers: ctx.headers,
             });
           }
         }

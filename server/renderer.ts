@@ -22,7 +22,7 @@ export type SSRContext = {
 };
 
 export type SSRFn = {
-  (ssr: SSRContext): Promise<ReadableStream> | ReadableStream;
+  (ssr: SSRContext): Promise<ReadableStream | string> | ReadableStream | string;
 };
 
 export type SSR = {
@@ -406,9 +406,12 @@ async function initSSR(
             throw new FetchError(500, {}, "Data must be valid JSON");
           }
         } else if (res === null || util.isPlainObject(res) || Array.isArray(res)) {
+          if (suspense) {
+            suspenseData[rmod.url.pathname + rmod.url.search] = res;
+          }
           return res;
         } else {
-          throw new FetchError(500, {}, "No response from data fetcher");
+          throw new FetchError(500, {}, "Data must be valid JSON");
         }
       };
       rmod.withData = true;

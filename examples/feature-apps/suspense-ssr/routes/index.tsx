@@ -10,15 +10,15 @@ import Comments from "../components/Comments.tsx";
 const delay = 3000;
 
 export const data: Data = {
-  get: async (_req, ctx) => {
+  get: async () => {
     await new Promise((resolve) => setTimeout(resolve, delay));
-    return ctx.json({
+    return {
       comments: [
         "Wait, it doesn't wait for React to load?",
         "How does this even work?",
         "I like marshmallows",
       ],
-    });
+    };
   },
 };
 
