@@ -19,13 +19,13 @@ export async function generate(routes: Route[]) {
       return [];
     }
     imports.push(
-      `import { ${exportNames.map((name) => `${name} as ${"$".repeat(idx + 1)}${idx}`).join(", ")} } from ${
+      `import { ${exportNames.map((name, i) => `${name} as ${"$".repeat(i + 1)}${idx}`).join(", ")} } from ${
         JSON.stringify(filename)
       };`,
     );
     revives.push(
       `revive(${JSON.stringify(filename)}, { ${
-        exportNames.map((name) => `${name}: ${"$".repeat(idx + 1)}${idx}`).join(", ")
+        exportNames.map((name, i) => `${name}: ${"$".repeat(i + 1)}${idx}`).join(", ")
       } });`,
     );
   });

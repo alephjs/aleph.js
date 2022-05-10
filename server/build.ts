@@ -98,11 +98,11 @@ export async function build(serverEntry?: string) {
       }
       const url = `http://localhost:${modulesProxyPort}${filename.slice(1)}`;
       return [
-        `import { ${exportNames.map((name) => `${name} as ${"$".repeat(idx + 1)}${idx}`).join(", ")} } from ${
+        `import { ${exportNames.map((name, i) => `${name} as ${"$".repeat(i + 1)}${idx}`).join(", ")} } from ${
           JSON.stringify(url)
         };`,
         `revive(${JSON.stringify(filename)}, { ${
-          exportNames.map((name) => `${name}: ${"$".repeat(idx + 1)}${idx}`).join(", ")
+          exportNames.map((name, i) => `${name}: ${"$".repeat(i + 1)}${idx}`).join(", ")
         } });`,
       ];
     }),
