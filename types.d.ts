@@ -72,6 +72,8 @@ declare interface Data<DataType = unknown, ContextExtension = Record<never, neve
 }
 
 declare interface Middleware {
+  name?: string;
+  version?: string;
   fetch(
     request: Request,
     context: Context,

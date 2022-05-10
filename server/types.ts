@@ -35,6 +35,8 @@ export type FetchHandler = {
 };
 
 export interface Middleware {
+  name?: string;
+  version?: string;
   fetch(
     request: Request,
     context: Record<string, unknown>,
