@@ -1,4 +1,3 @@
-import { createApp } from "vue";
-import app from "./app.vue";
+import { App, createSSRApp } from "aleph/vue";
 
-createApp(app).mount("#root", true);
+createSSRApp(App).mount("#root", true);

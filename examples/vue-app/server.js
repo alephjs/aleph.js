@@ -1,8 +1,14 @@
+import { App, createSSRApp } from "aleph/vue";
 import { serve } from "aleph/server";
-import { createSSRApp } from "vue";
 import { renderToString } from "vue/server-renderer";
-import app from "./app.vue";
 
 serve({
-  ssr: async (_ctx) => await renderToString(createSSRApp(app)),
+  config: {
+    routes: "./routes/**/*.{vue,tsx,ts}",
+    unocss: {
+      // to enable unocss, please add presets:
+      // presets: [ unoPreset ],
+    },
+  },
+  ssr: async (ctx) => await renderToString(createSSRApp(App, { ssrContext: ctx }), ctx),
 });

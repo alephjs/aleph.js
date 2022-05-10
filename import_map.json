@@ -5,6 +5,7 @@
     "aleph/": "./",
     "aleph/server": "./server/mod.ts",
     "aleph/react": "./framework/react/mod.ts",
+    "aleph/vue": "./framework/vue/mod.ts",
     "react": "https://esm.sh/react@18.1.0",
     "react-dom": "https://esm.sh/react-dom@18.1.0",
     "react-dom/": "https://esm.sh/react-dom@18.1.0/",
