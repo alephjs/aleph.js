@@ -13,7 +13,7 @@ import {
 } from "https://esm.sh/@vue/compiler-sfc@3.2.33";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import type { ModuleLoader, ModuleLoaderContent, ModuleLoaderEnv } from "../server/types.ts";
+import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../server/types.ts";
 
 type Options = {
   script?: Omit<SFCScriptCompileOptions, "id">;
@@ -28,7 +28,7 @@ export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
     this.#options = { ...options };
   }
 
-  async load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderContent> {
+  async load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
     const content = await Deno.readTextFile(`.${pathname}`);
     const filename = "." + pathname;
     const id = (await util.computeHash("SHA-256", filename)).slice(0, 8);
@@ -134,7 +134,7 @@ export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
       code: output.join("\n"),
       lang: isTS ? "ts" : "js",
       inlineCSS: css || undefined,
-      atomicCSS: true,
+      isTemplateLanguage: true,
     };
   }
 }

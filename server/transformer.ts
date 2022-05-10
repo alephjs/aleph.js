@@ -16,14 +16,14 @@ import {
 } from "./helpers.ts";
 import { isRouteFile } from "./routing.ts";
 import { DependencyGraph } from "./graph.ts";
-import type { ImportMap, JSXConfig, ModuleLoaderContent } from "./types.ts";
+import type { ImportMap, JSXConfig, ModuleLoaderOutput } from "./types.ts";
 
 export type TransformerOptions = {
   buildTarget?: TransformOptions["target"];
   importMap: ImportMap;
   isDev: boolean;
   jsxConfig?: JSXConfig;
-  loaded?: ModuleLoaderContent;
+  loaded?: ModuleLoaderOutput;
 };
 
 export default {
@@ -46,7 +46,7 @@ export default {
       sourceCode = loaded.code;
       lang = loaded.lang;
       isCSS = loaded.lang === "css";
-      uno = !!loaded.atomicCSS;
+      uno = Boolean(loaded.isTemplateLanguage || loaded.lang === "jsx" || loaded.lang === "tsx");
     } else {
       let codeType: string;
       [sourceCode, codeType] = await readCode(specifier);

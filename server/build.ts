@@ -245,8 +245,7 @@ export async function build(serverEntry?: string) {
 
   // create server_dependency_graph.js
   if (serverDependencyGraph) {
-    // deno-lint-ignore no-unused-vars
-    const modules = serverDependencyGraph.modules.map(({ sourceCode, ...ret }) => ret);
+    const { modules } = serverDependencyGraph;
     await Deno.writeTextFile(
       join(outputDir, "server_dependency_graph.js"),
       "export default " + JSON.stringify({ modules }),
