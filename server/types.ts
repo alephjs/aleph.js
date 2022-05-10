@@ -1,9 +1,7 @@
 import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.32.12";
 
 export type AlephConfig = {
-  /** The basePath of the app. */
-  basePath?: string;
-  /** The build optioins for `build` command. */
+  /** The build options for `build` command. */
   build?: BuildOptions;
   /** The config for file-system based routing.  */
   routes?: RoutesConfig | string;
@@ -14,7 +12,7 @@ export type AlephConfig = {
 /** The build platform.  */
 export type BuildPlatform = "deno" | "cloudflare" | "vercel";
 
-/** The build optioins for `build` command. */
+/** The build options for `build` command. */
 export type BuildOptions = {
   /** The supported platform. default is "deno" */
   platform?: BuildPlatform;

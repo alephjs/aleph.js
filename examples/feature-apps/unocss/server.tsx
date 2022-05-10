@@ -5,16 +5,14 @@ import { serve } from "aleph/server";
 import { renderToString } from "react-dom/server";
 
 serve({
-  config: {
-    routes: "./routes/**/*.tsx",
-    unocss: {
-      presets: [
-        presetUno(),
-        presetIcons({
-          cdn: "https://esm.sh/",
-        }),
-      ],
-    },
+  routes: "./routes/**/*.tsx",
+  unocss: {
+    presets: [
+      presetUno(),
+      presetIcons({
+        cdn: "https://esm.sh/",
+      }),
+    ],
   },
   ssr: (ctx) => renderToString(<App ssrContext={ctx} />),
 });

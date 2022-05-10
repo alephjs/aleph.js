@@ -3,12 +3,11 @@ import { serve } from "aleph/server";
 import { renderToReadableStream } from "react-dom/server";
 
 serve({
-  config: {
-    routes: "./routes/**/*.{tsx,ts}",
-    unocss: {
-      // to enable unocss, please add presets:
-      // presets: [ unoPreset ],
-    },
+  routes: "./routes/**/*.{tsx,ts}",
+  // to enable unocss, please add presets to unocss options
+  // please check https://alephjs.org/docs/unocss
+  unocss: {
+    // presets: [ unoPreset ],
   },
   ssr: {
     // when set `suspense` to `true`, the router will loading data in suspense mode

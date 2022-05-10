@@ -21,26 +21,25 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   keyFile?: string;
   logLevel?: LevelName;
   hmrWebSocketUrl?: string;
-  config?: AlephConfig;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: SSR;
   onError?: (
     error: unknown,
     cause: {
-      by: "data-fetching" | "ssr" | "transplie" | "fs" | "middleware";
+      by: "route-api" | "ssr" | "transplie" | "fs" | "middleware";
       url: string;
     },
   ) => Response | void;
-};
+} & AlephConfig;
 
 export const serve = (options: ServerOptions = {}) => {
-  const { config, middlewares, fetch, ssr, logLevel, onError } = options;
+  const { routes, build, unocss, middlewares, fetch, ssr, logLevel, onError } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
   const moduleLoadersPromise = importMapPromise.then(initModuleLoaders);
-  const routesPromise = config?.routes ? initRoutes(config.routes) : Promise.resolve({ routes: [] });
+  const routesPromise = routes ? initRoutes(routes) : Promise.resolve({ routes: [] });
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const url = new URL(req.url);
     const { host, pathname, searchParams } = url;
@@ -67,7 +66,7 @@ export const serve = (options: ServerOptions = {}) => {
         return await clientModuleTransformer.fetch(req, {
           importMap,
           jsxConfig,
-          buildTarget: config?.build?.target,
+          buildTarget: build?.target,
           isDev,
         });
       } catch (err) {
@@ -96,7 +95,7 @@ export const serve = (options: ServerOptions = {}) => {
           loaded,
           importMap,
           jsxConfig,
-          buildTarget: config?.build?.target,
+          buildTarget: build?.target,
           isDev,
         });
       } catch (err) {
@@ -262,7 +261,7 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    // request data
+    // request route api
     const routes: RouteRecord = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routesPromise;
     if (routes.routes.length > 0) {
       for (const [pattern, { filename }] of routes.routes) {
@@ -309,7 +308,7 @@ export const serve = (options: ServerOptions = {}) => {
               return new Response("Method not allowed", { status: 405 });
             }
           } catch (err) {
-            const res = onError?.(err, { by: "data-fetching", url: req.url });
+            const res = onError?.(err, { by: "route-api", url: req.url });
             if (res instanceof Response) {
               return res;
             }
@@ -404,7 +403,7 @@ export const serve = (options: ServerOptions = {}) => {
   }
 
   // inject global objects
-  Reflect.set(globalThis, "__ALEPH_CONFIG", Object.assign({}, config));
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { build, routes, unocss });
   Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;
