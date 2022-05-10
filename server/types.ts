@@ -1,4 +1,4 @@
-import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.32.12";
+import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.33.2";
 
 export type AlephConfig = {
   /** The build options for `build` command. */
@@ -56,7 +56,7 @@ export type JSXConfig = {
 
 export type ModuleLoader = {
   test(pathname: string): boolean;
-  load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderContent> | ModuleLoaderContent;
+  load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
 };
 
 export type ModuleLoaderEnv = {
@@ -65,11 +65,11 @@ export type ModuleLoaderEnv = {
   ssr?: boolean;
 };
 
-export type ModuleLoaderContent = {
+export type ModuleLoaderOutput = {
   code: string;
   inlineCSS?: string;
-  atomicCSS?: boolean;
   lang?: "js" | "jsx" | "ts" | "tsx" | "css";
+  isTemplateLanguage?: boolean;
   map?: string;
 };
 
