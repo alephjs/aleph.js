@@ -4,9 +4,11 @@ import { renderToReadableStream } from "react-dom/server";
 
 serve({
   routes: "./routes/**/*.{tsx,ts}",
-  unocss: {
-    // to enable unocss, please add presets to unocss options
-    // please check https://alephjs.org/docs/unocss
+  build: {
+    unocss: {
+      // to enable unocss, please add presets to unocss options
+      // please check https://alephjs.org/docs/unocss
+    },
   },
   ssr: {
     // when set `suspense` to `true`, the router will loading data in suspense mode

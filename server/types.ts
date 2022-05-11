@@ -5,8 +5,6 @@ export type AlephConfig = {
   build?: BuildOptions;
   /** The config for file-system based routing.  */
   routes?: RoutesConfig | string;
-  /** The config for atomic css powered by unocss. */
-  unocss?: UnoConfig;
 };
 
 /** The build platform.  */
@@ -20,6 +18,8 @@ export type BuildOptions = {
   outputDir?: string;
   /** The build target passes to esbuild. default is "es2020" */
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
+  /** The config for atomic css powered by unocss. */
+  unocss?: UnoConfig;
 };
 
 export type RoutesConfig = {
