@@ -1,14 +1,5 @@
 import type { Component, Ref, ShallowRef } from "vue";
-import {
-  computed,
-  createSSRApp as vueCreateSSRApp,
-  defineComponent,
-  h,
-  onBeforeUnmount,
-  ref,
-  shallowRef,
-  watch,
-} from "vue";
+import { createSSRApp as vueCreateSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
 import type { Route, RouteMeta, RouteModule, RouteRecord } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import events from "../core/events.ts";
