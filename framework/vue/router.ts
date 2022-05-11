@@ -214,7 +214,11 @@ const createRouter = (props: RouterProps) => {
       };
     },
     render() {
-      return [h(this.defaultExport as Component)];
+      return [
+        h(this.defaultExport as Component),
+        modules.value.length > 1 &&
+        h(createRouter({ modules: shallowRef(modules.value.slice(1)), url, dataCache, dataUrl })),
+      ];
     },
   });
 
