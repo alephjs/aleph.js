@@ -2,7 +2,6 @@ import { basename, dirname, extname, join } from "https://deno.land/std@0.136.0/
 import { ensureDir } from "https://deno.land/std@0.136.0/fs/ensure_dir.ts";
 import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.38/mod.js";
 import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.1.0/mod.ts";
-import cache from "../lib/cache.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
 import { parseHtmlLinks } from "./html.ts";
 import log from "../lib/log.ts";
@@ -45,6 +44,7 @@ export async function build(serverEntry?: string) {
   const platform = config?.build?.platform ?? "deno";
   const target = config?.build?.target ?? "es2020";
   const outputDir = join(workingDir, config?.build?.outputDir ?? "dist");
+  const modulesProxyPort = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
 
   if (platform === "cloudflare" || platform === "vercel") {
     log.fatal(`Deploy to ${supportedPlatforms[platform]} is not supported yet`);
@@ -64,13 +64,20 @@ export async function build(serverEntry?: string) {
   if (config?.routes) {
     const { routes } = await initRoutes(config?.routes);
     routeFiles = await Promise.all(routes.map(async ([_, { filename }]) => {
-      const code = await Deno.readTextFile(filename);
+      let code: string;
+      const ext = extname(filename).slice(1);
+      if (builtinModuleExts.includes(ext)) {
+        code = await Deno.readTextFile(filename);
+      } else if (modulesProxyPort) {
+        code = await fetch(`http://localhost:${modulesProxyPort}/${filename.slice(1)}`).then((res) => res.text());
+      } else {
+        throw new Error(`Unsupported module type: ${ext}`);
+      }
       const exportNames = await parseExportNames(filename, code);
       return [filename, exportNames];
     }));
   }
 
-  const modulesProxyPort = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
   const serverEntryCode = [
     `import { DependencyGraph } from "${alephPkgUri}/server/graph.ts";`,
     `import graph from "./server_dependency_graph.js";`,
@@ -211,7 +218,7 @@ export async function build(serverEntry?: string) {
             // bundle `server/transformer.ts` with `server/server_dist.ts` content
             url.pathname = util.trimSuffix(url.pathname, "transformer.ts") + "serve_dist.ts";
           }
-          const res = await cache(url.href);
+          const res = await fetch(url.href);
           const contents = await res.text();
           let ext = extname(url.pathname).slice(1);
           if (ext === "mjs") {
