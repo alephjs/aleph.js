@@ -1,12 +1,12 @@
 @import url('./reset.css');
 
-/* header a  {
+header a  {
   display: inline-flex;
 }
 
 header a:hover {
   color: #000!important;
-} */
+}
 
 .screen {
   display: flex;
@@ -14,10 +14,10 @@ header a:hover {
   flex-direction: column;
   justify-content: center;
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - 2 * 80px);
 }
 
-/* .e404 h2 {
+.e404 h2 {
   font-size: 24px;
   font-weight: 500;
 }
@@ -33,4 +33,4 @@ header a:hover {
 
 .e404 p a:hover {
   text-decoration: underline;
-} */
+}
