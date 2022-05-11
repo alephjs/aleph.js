@@ -37,21 +37,36 @@ export function applyUnoCSS(url: string, css: string) {
   }
 
   if (unocssSheet) {
-    const tokens = new Set(
-      Array.from(unocssSheet.cssRules).map((rule) => {
-        // @ts-ignore
-        return rule.selectorText || rule.cssText.split("{")[0].trim();
-      }),
-    );
     try {
       const sheet = new CSSStyleSheet();
       // @ts-ignore
       sheet.replaceSync(css);
+      const tokens = new Set(
+        Array.from(unocssSheet.cssRules).map((rule) => {
+          // @ts-ignore
+          if (rule.media || rule.cssText.startsWith("@media")) {
+            return rule.cssText.split("{").slice(0, 2).join(">").trim();
+          }
+          // @ts-ignore
+          return rule.selectorText || rule.cssText.split("{")[0].trim();
+        }),
+      );
       for (const rule of sheet.cssRules) {
+        let key: string;
         // @ts-ignore
-        const selectorText = rule.selectorText || rule.cssText.split("{")[0].trim();
-        if (!tokens.has(selectorText)) {
-          unocssSheet.insertRule(rule.cssText, unocssSheet.cssRules.length);
+        if (rule.media || rule.cssText.startsWith("@media")) {
+          key = rule.cssText.split("{").slice(0, 2).join(">").trim();
+        } else {
+          // @ts-ignore
+          key = rule.selectorText || rule.cssText.split("{")[0].trim();
+        }
+        if (!tokens.has(key)) {
+          let { cssText } = rule;
+          // fix for chrome drop `mask` webkit prefix
+          if (key.startsWith(".i-")) {
+            cssText = cssText.replace(/(mask:[^;]+;)/, "$1-webkit-$1");
+          }
+          unocssSheet.insertRule(cssText, unocssSheet.cssRules.length);
         }
       }
       return;
