@@ -365,17 +365,16 @@ async function initSSR(
     const fetcher = dataConfig.get ?? dataConfig.GET;
     if (typeof fetcher === "function") {
       const fetchData = async () => {
-        // check the `any` method of data, throw the response object if it returns one
-        const anyFetcher = dataConfig.any ?? dataConfig.ANY;
-        if (typeof anyFetcher === "function") {
-          const res = await anyFetcher(req, ctx);
-          if (res instanceof Response) {
-            throw res;
-          }
-        }
-
         let res: unknown;
         try {
+          // check the `any` method of data, throw the response object if it returns one
+          const anyFetcher = dataConfig.any ?? dataConfig.ANY;
+          if (typeof anyFetcher === "function") {
+            const res = await anyFetcher(req, ctx);
+            if (res instanceof Response) {
+              throw res;
+            }
+          }
           res = fetcher(req, ctx);
           if (res instanceof Promise) {
             res = await res;
@@ -385,6 +384,7 @@ async function initSSR(
           if (res instanceof Response) {
             throw res;
           }
+          throw error;
         }
         if (res instanceof Response) {
           if (res.status >= 400) {
