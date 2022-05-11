@@ -40,13 +40,13 @@ import { Link } from "aleph/vue";
         <a href="https://deno.land/x/aleph" :style='{ fontSize: "20px", color: "#454545", }'>
           <svg xmlns="http://www.w3.org/2000/svg" :style='{ width: "1em", height: "1em", }' viewBox="0 0 512 512">
             <title>Deno Land</title>
-            <mask id="a">
+            <mask id="deno-logo-mask">
               <circle fill="white" cx="256" cy="256" r="230" />
             </mask>
             <circle fill="currentColor" cx="256" cy="256" r="256" />
-            <path mask="url(#a)" stroke="white" strokeWidth="25" strokeLinecap="round"
+            <path mask="url(#deno-logo-mask)" stroke="white" stroke-width="25" stroke-linecap="round"
               d="M71 319l17-63M107.964 161.095l17-63M36.93 221l17-63M125.964 385l17-63M160.372 486.829l17-63M230 456.329l17-63M206.257 92.587l17-63M326.395 173.004l17-63M452.182 304.693l17-63M409.124 221l17-63M299.027 54.558l17-63M400.624 86.058l17-63" />
-            <path mask="url(#a)" fill="white" stroke="black" strokeWidth="12"
+            <path mask="url(#deno-logo-mask)" fill="white" stroke="black" stroke-width="12"
               d="M252.225 344.418c-86.65 2.61-144.576-34.5-144.576-94.363 0-61.494 60.33-111.145 138.351-111.145 37.683 0 69.532 10.65 94.392 30.092 21.882 17.113 37.521 40.526 45.519 66.312 2.574 8.301 22.863 83.767 61.112 227.295l1.295 4.86-159.793 74.443-1.101-8.063c-8.85-64.778-16.546-113.338-23.076-145.634-3.237-16.004-6.178-27.96-8.79-35.794-1.227-3.682-2.355-6.361-3.303-7.952a12.56 12.56 0 00-.03-.05z" />
             <circle mask="url(#a)" cx="262" cy="203" r="16" />
           </svg>
