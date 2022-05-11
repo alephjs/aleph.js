@@ -1,25 +1,24 @@
+import type { Component, Ref, ShallowRef } from "vue";
 import {
-  Component,
   computed,
-  createSSRApp as VueCreateSSRApp,
+  createSSRApp as vueCreateSSRApp,
   defineComponent,
   h,
   onBeforeUnmount,
-  Ref,
   ref,
-  ShallowRef,
   shallowRef,
   watch,
 } from "vue";
-import { matchRoutes, Route, RouteMeta, RouteModule, Routes } from "../core/route.ts";
+import type { Route, RouteMeta, RouteModule, RouteRecord } from "../core/route.ts";
+import { matchRoutes } from "../core/route.ts";
 import events from "../core/events.ts";
 import FetchError from "../core/fetch_error.ts";
+import { URLPatternCompat } from "../core/url_pattern.ts";
 import type { SSRContext } from "../../server/renderer.ts";
 import { RouterContext } from "./context.ts";
 import { Link } from "./link.ts";
 import { Head } from "./head.ts";
 import { Err } from "./error.ts";
-import { URLPatternCompat } from "../core/url_pattern.ts";
 
 // deno-lint-ignore no-explicit-any
 const global = window as any;
@@ -143,10 +142,10 @@ const createRouter = (props: RouterProps) => {
       };
       const dataUrl = rmod.url.pathname + rmod.url.search;
       if (filename in routeModules) {
-        rmod.defaultExport = routeModules[filename].defaultExport;
+        Object.assign(rmod, routeModules[filename]);
       } else {
-        const { defaultExport } = await importModule(meta);
-        rmod.defaultExport = defaultExport;
+        const { defaultExport, withData } = await importModule(meta);
+        Object.assign(rmod, { defaultExport, withData });
       }
       if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
         await prefetchData(dataUrl);
@@ -227,7 +226,7 @@ const createAppApi = (props?: RootProps) => {
   const modules = shallowRef(ssrContext?.routeModules || loadSSRModulesFromTag());
 
   if (modules.value.length === 0) {
-    return VueCreateSSRApp(Err, { status: 404, message: "page not found" });
+    return vueCreateSSRApp(Err, { status: 404, message: "page not found" });
   }
 
   const url = ref(ssrContext?.url || new URL(window.location?.href));
@@ -246,7 +245,7 @@ const createAppApi = (props?: RootProps) => {
       },
     });
 
-    const app = VueCreateSSRApp(App);
+    const app = vueCreateSSRApp(App);
 
     app.provide("modules", modules);
     app.provide("dataCache", dataCache);
@@ -261,7 +260,7 @@ const createAppApi = (props?: RootProps) => {
     return app;
   }
 
-  const errApp = VueCreateSSRApp(Err);
+  const errApp = vueCreateSSRApp(Err);
 
   return errApp;
 };
@@ -340,7 +339,7 @@ function getLoadingBar(): HTMLDivElement {
   return bar;
 }
 
-function loadRoutesFromTag(): Routes {
+function loadRoutesFromTag(): RouteRecord {
   const el = window.document?.getElementById("routes-manifest");
   if (el) {
     try {

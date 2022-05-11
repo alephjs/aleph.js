@@ -109,8 +109,6 @@ const createDataProvider = () => {
   };
 
   const reload = async (signal?: AbortSignal) => {
-    console.log("reload");
-
     try {
       const res = await fetch(dataUrl.value, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
       if (res.type === "opaqueredirect") {

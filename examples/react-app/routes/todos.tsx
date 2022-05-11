@@ -91,7 +91,7 @@ export default function Todos() {
                   todos: [...data.todos, { id: 0, message, completed: false }],
                 };
               },
-              // replace the data from the server response
+              // replace the data with the new data that is from the server response
               replace: true,
             });
             form.reset();
