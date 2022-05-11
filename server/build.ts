@@ -144,6 +144,7 @@ export async function build(serverEntry?: string) {
       importUrl === alephPkgUri + "/server/transformer.ts" ||
       // since deno deploy doesn't support importMap, we need to bundle the framework and resolve the 'react' import
       importUrl.startsWith(alephPkgUri + "/framework/react/") ||
+      importUrl.startsWith(alephPkgUri + "/framework/vue/") ||
       // bundle app modules
       importUrl.startsWith(`http://localhost:${modulesProxyPort}/`)
     );
