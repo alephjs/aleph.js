@@ -1,3 +1,4 @@
+import { Link } from "aleph/react";
 export default function Index() {
   return (
     <>
@@ -9,7 +10,10 @@ export default function Index() {
           <div className="op30 text-lg fw300 m1">
             The instant on-demand Atomic CSS engine.
           </div>
-          <div className="m2 flex justify-center text-2xl op30 hover:op80">
+          <div>
+            <Link to="/about">About</Link>
+          </div>
+          <div className="m2 flex justify-center text-2xl op30 hover:op80 lt-md:m4">
             <a
               className="i-carbon-logo-github text-inherit"
               href="https://github.com/antfu/unocss"
