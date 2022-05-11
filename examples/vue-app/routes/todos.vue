@@ -1,3 +1,47 @@
+<script>
+const store = {
+  todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
+};
+
+export const data = {
+  cacheTtl: 0, // no cache
+  get: () => {
+    return store;
+  },
+  put: async (req) => {
+    const { message } = await req.json();
+    if (typeof message === "string") {
+      const id = Date.now();
+      store.todos.push({ id, message, completed: false });
+      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+    }
+    return store;
+  },
+  patch: async (req) => {
+    const { id, message, completed } = await req.json();
+    const todo = store.todos.find((todo) => todo.id === id);
+    if (todo) {
+      if (typeof message === "string") {
+        todo.message = message;
+      }
+      if (typeof completed === "boolean") {
+        todo.completed = completed;
+      }
+      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+    }
+    return store;
+  },
+  delete: async (req) => {
+    const { id } = await req.json();
+    if (id) {
+      store.todos = store.todos.filter((todo) => todo.id !== id);
+      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+    }
+    return store;
+  },
+};
+</script>
+
 <script setup>
 import { Head, useData } from "aleph/vue"
 
@@ -22,7 +66,7 @@ async function onSubmit(e) {
           todos: [...data.todos, { id: 0, message, completed: false }],
         };
       },
-      // replace the data with the new data from the server
+      // replace the data with the new data that is from the server response
       replace: true,
     });
     form.reset();
@@ -37,52 +81,8 @@ function onClick(todo) {
 }
 </script>
 
-<script>
-const storage = {
-  todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
-};
-
-export const data = {
-  cacheTtl: 0,
-  get: (_req, ctx) => {
-    return ctx.json(storage);
-  },
-  put: async (req, ctx) => {
-    const { message } = await req.json();
-    if (typeof message === "string") {
-      const id = Date.now();
-      storage.todos.push({ id, message, completed: false });
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
-    }
-    return ctx.json(storage);
-  },
-  patch: async (req, ctx) => {
-    const { id, message, completed } = await req.json();
-    const todo = storage.todos.find((todo) => todo.id === id);
-    if (todo) {
-      if (typeof message === "string") {
-        todo.message = message;
-      }
-      if (typeof completed === "boolean") {
-        todo.completed = completed;
-      }
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
-    }
-    return ctx.json(storage);
-  },
-  delete: async (req, ctx) => {
-    const { id } = await req.json();
-    if (id) {
-      storage.todos = storage.todos.filter((todo) => todo.id !== id);
-      window.localStorage?.setItem("todos", JSON.stringify(storage.todos));
-    }
-    return ctx.json(storage);
-  },
-};
-</script>
-
 <template>
-  <div className="page todos-app">
+  <div className="todos-app">
     <Head>
       <title>Todos</title>
       <meta name="description" content="A todos app powered by Aleph.js" />
@@ -103,3 +103,157 @@ export const data = {
     </form>
   </div>
 </template>
+
+<style>
+.todos-app {
+  width: 90%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding-top: 60px;
+}
+
+.todos-app h1 {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px;
+  font-size: 48px;
+  font-weight: 200;
+  text-align: left;
+  color: #333;
+}
+
+.todos-app h1 em {
+  font-size: 24px;
+  font-weight: 100;
+  color: #ccc;
+}
+
+.todos-app ul {
+  width: 100%;
+  list-style: none;
+  margin-bottom: 6px;
+}
+
+.todos-app ul li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.todos-app ul li:hover {
+  background-color: #f9f9f9;
+}
+
+.todos-app ul li input {
+  position: relative;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.todos-app ul li input:hover,
+.todos-app ul li input:checked {
+  border: 1px solid #b8dad4;
+}
+
+.todos-app ul li input:checked::after {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: #5dc2af;
+  content: " ";
+}
+
+.todos-app ul li label {
+  line-height: 20px;
+  flex-grow: 1;
+  font-size: 20px;
+  font-weight: 300;
+  color: #333;
+  transition: color 0.15s ease;
+}
+
+.todos-app ul li label.completed {
+  color: #aaa;
+  text-decoration: line-through;
+}
+
+.todos-app ul li button {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  overflow: hidden;
+  color: #ddd;
+  transition: color 0.15s ease;
+  cursor: pointer;
+}
+
+.todos-app ul li:hover button {
+  color: #ccc;
+}
+
+.todos-app ul li button:hover {
+  color: #c26c5d;
+}
+
+.todos-app ul li button:before,
+.todos-app ul li button:after {
+  content: " ";
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  width: 16px;
+  height: 1px;
+  margin-left: -8px;
+  background: currentColor;
+}
+
+.todos-app ul li button:before {
+  transform: rotate(45deg);
+}
+
+.todos-app ul li button:after {
+  transform: rotate(-45deg);
+}
+
+.todos-app form {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+}
+
+.todos-app form input {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  margin: 0 -12px;
+  border-radius: 6px;
+  font-size: 24px;
+  font-weight: 300;
+  color: #333;
+}
+
+.todos-app form input:focus{
+  background-color: #f9f9f9;
+  outline: none;
+}
+
+.todos-app form input::placeholder{
+  font-style: italic;
+  font-weight: 300;
+  color: #aaa;
+}
+</style>

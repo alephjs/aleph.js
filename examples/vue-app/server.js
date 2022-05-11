@@ -3,12 +3,10 @@ import { serve } from "aleph/server";
 import { renderToString } from "vue/server-renderer";
 
 serve({
-  config: {
-    routes: "./routes/**/*.{vue,tsx,ts}",
-    unocss: {
-      // to enable unocss, please add presets:
-      // presets: [ unoPreset ],
-    },
+  routes: "./routes/**/*.{vue,ts}",
+  unocss: {
+    // to enable unocss, please add presets to unocss options
+    // please check https://alephjs.org/docs/unocss
   },
   ssr: async (ctx) => await renderToString(createSSRApp(App, { ssrContext: ctx }), ctx),
 });
