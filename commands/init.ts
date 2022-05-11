@@ -3,14 +3,23 @@ import { Buffer } from "https://deno.land/std@0.136.0/io/buffer.ts";
 import { copy, readAll } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import { blue, cyan, dim, green, red } from "https://deno.land/std@0.136.0/fmt/colors.ts";
 import { ensureDir } from "https://deno.land/std@0.136.0/fs/ensure_dir.ts";
-import { basename, join } from "https://deno.land/std@0.136.0/path/mod.ts";
+import { basename, dirname, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import { existsDir } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 
-const templates = ["react", "preact", "vue", "svelte", "lit", "vanilla", "api"];
+const templates = [
+  "react",
+  "vue",
+  // todo:
+  // "preact",
+  // "svelte",
+  // "lit",
+  // "vanilla",
+  // "api",
+];
 const versions = {
   react: "18.1.0",
   vue: "3.2.33",
@@ -29,7 +38,7 @@ Options:
 
 export default async function (nameArg: string | undefined, template = "react") {
   if (!templates.includes(template)) {
-    log.fatal(`Invalid template ${red(template)}, must be one of ${templates.join(",")}`);
+    log.fatal(`Invalid template name ${red(template)}, must be one of [${blue(templates.join(","))}]`);
   }
 
   const name = nameArg || (prompt("Project Name:") || "").trim();
@@ -138,6 +147,49 @@ export default async function (nameArg: string | undefined, template = "react") 
     Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
 
+  if (confirm("Deploy to Deno Deploy™️?")) {
+    console.log(`  1. ${blue("build")} mode by Github Action`);
+    console.log(`  2. ${green("generte")} mode without build`);
+    const mode = prompt("Please choose the deploy mode:");
+    if (mode === "1") {
+      const ciFile = join(workingDir, ".github/workflows/deploy.yml");
+      await ensureDir(dirname(ciFile));
+      await Deno.writeTextFile(
+        ciFile,
+        `name: Deploy
+on: [push]
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Needed for auth with Deno Deploy
+      contents: read # Needed to clone the repository
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v1
+
+      - name: Build App
+        run: deno task build
+
+      - name: Deploy to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          project: PROJECT_NAME # todo: change this to your project name in https://dash.deno.com
+          entrypoint: dist/server.js
+`,
+      );
+    } else if (mode === "2") {
+      // todo: add `genrate` option
+    }
+  }
+
+  // todo: remove this step when deno-vsc support auto enable mode
   if (confirm("Using VS Code?")) {
     const extensions = {
       "recommendations": [

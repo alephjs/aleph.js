@@ -56,20 +56,24 @@ async function main() {
     Deno.exit(0);
   }
 
-  // prints help message
-  if (options.h || options.help || args.length === 0 || !(args[0] in commands)) {
-    console.log(helpMessage);
-    Deno.exit(0);
-  }
-
   const command = String(args.shift()) as keyof typeof commands;
   const runOptions: RunOptions = {};
 
   // invoke `init` command
   if (command === "init") {
-    const { default: init } = await import(`./commands/init.ts`);
+    const { default: init, helpMessage } = await import(`./commands/init.ts`);
+    if (options.h || options.help) {
+      console.log(helpMessage);
+      Deno.exit(0);
+    }
     await init(args[0], options?.template);
     return;
+  }
+
+  // prints help message
+  if (options.h || options.help) {
+    console.log(helpMessage);
+    Deno.exit(0);
   }
 
   // get moudle cache directory
