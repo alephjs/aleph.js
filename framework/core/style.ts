@@ -25,7 +25,7 @@ export function applyCSS(url: string, css: string) {
   }
 }
 
-export function applyUnoCSS(url: string, css: string) {
+export function applyUnoCSS(url: string, css: string, debug = false) {
   let unocssSheet: CSSStyleSheet | null = null;
   if (globalThis.document?.styleSheets) {
     for (const sheet of document.styleSheets) {
@@ -41,33 +41,28 @@ export function applyUnoCSS(url: string, css: string) {
       const sheet = new CSSStyleSheet();
       // @ts-ignore
       sheet.replaceSync(css);
-      const tokens = new Set(
-        Array.from(unocssSheet.cssRules).map((rule) => {
-          // @ts-ignore
-          if (rule.media || rule.cssText.startsWith("@media")) {
-            return rule.cssText.split("{").slice(0, 2).join(">").trim();
-          }
-          // @ts-ignore
-          return rule.selectorText || rule.cssText.split("{")[0].trim();
-        }),
-      );
+      const oldRules: number[] = [];
+      for (let index = 0; index < unocssSheet.cssRules.length; index++) {
+        const rule = unocssSheet.cssRules[index] as unknown as { ownerUrl: string };
+        if (rule.ownerUrl === url) {
+          oldRules.unshift(index);
+        }
+      }
       for (const rule of sheet.cssRules) {
-        let key: string;
+        let { cssText } = rule;
+        // fix for chrome drops `mask` webkit prefix
+        if (cssText.startsWith(".i-")) {
+          cssText = cssText.replace(/(mask:[^;]+;)/, "$1-webkit-$1");
+        }
+        unocssSheet.insertRule(cssText, unocssSheet.cssRules.length);
         // @ts-ignore
-        if (rule.media || rule.cssText.startsWith("@media")) {
-          key = rule.cssText.split("{").slice(0, 2).join(">").trim();
-        } else {
-          // @ts-ignore
-          key = rule.selectorText || rule.cssText.split("{")[0].trim();
-        }
-        if (!tokens.has(key)) {
-          let { cssText } = rule;
-          // fix for chrome drop `mask` webkit prefix
-          if (key.startsWith(".i-")) {
-            cssText = cssText.replace(/(mask:[^;]+;)/, "$1-webkit-$1");
-          }
-          unocssSheet.insertRule(cssText, unocssSheet.cssRules.length);
-        }
+        unocssSheet.cssRules[unocssSheet.cssRules.length - 1].ownerUrl = url;
+      }
+      for (const index of oldRules) {
+        unocssSheet.deleteRule(index);
+      }
+      if (debug) {
+        console.log(`[UnoCSS] ${sheet.cssRules.length} rules added, ${oldRules.length} rules deleted by "${url}"`);
       }
       return;
     } catch (error) {

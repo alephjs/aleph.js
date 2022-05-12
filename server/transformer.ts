@@ -132,7 +132,9 @@ export default {
           if (css) {
             code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${
               toLocalPath(alephPkgUri)
-            }/framework/core/style.ts";\n__applyUnoCSS(${JSON.stringify(specifier)}, ${JSON.stringify(css)});\n`;
+            }/framework/core/style.ts";\n__applyUnoCSS(${JSON.stringify(specifier)}, ${
+              JSON.stringify(css)
+            }, !!(import.meta.hot));\n`;
             hasInlineCSS = true;
           }
         }
