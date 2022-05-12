@@ -65,8 +65,10 @@ export function applyUnoCSS(url: string, css: string, debug = false) {
         console.log(`[UnoCSS] ${sheet.cssRules.length} rules added, ${oldRules.length} rules deleted by "${url}"`);
       }
       return;
-    } catch (error) {
-      console.error(error);
+    } catch (_e) {
+      if (debug) {
+        console.warn("The browser doesn't support the CSSStyleSheet.");
+      }
     }
   }
 
