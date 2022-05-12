@@ -1,14 +1,5 @@
 import type { Component, Ref, ShallowRef } from "vue";
-import {
-  computed,
-  createSSRApp as vueCreateSSRApp,
-  defineComponent,
-  h,
-  onBeforeUnmount,
-  ref,
-  shallowRef,
-  watch,
-} from "vue";
+import { createSSRApp as vueCreateSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
 import type { Route, RouteMeta, RouteModule, RouteRecord } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import events from "../core/events.ts";
@@ -44,25 +35,32 @@ type RouterProps = {
   dataUrl: Ref<string>;
 };
 
+type RouterRootProps = {
+  modules: ShallowRef<RouteModule[]>;
+  dataCache: Map<string, RouteData>;
+  ssrContext?: SSRContext;
+};
+
 const createRouter = (props: RouterProps) => {
   const { modules, url, dataCache, dataUrl } = props;
 
   const routeModules = getRouteModules();
   const routes = loadRoutesFromTag();
 
+  const _dataUrl = url.value.pathname + url.value.search;
+  modules.value.forEach((module) => {
+    const { data, dataCacheTtl } = module;
+    dataCache.set(_dataUrl, {
+      data,
+      dataCacheTtl,
+      dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+    });
+  });
+
   watch(() => modules.value, () => {
     const params: Record<string, string> = {};
-    const _dataUrl = url.value.pathname + url.value.search;
-    modules.value.forEach((module) => {
-      const { params: _params, data, dataCacheTtl } = module;
-      Object.assign(params, _params);
-      dataCache.set(_dataUrl, {
-        data,
-        dataCacheTtl,
-        dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
-      });
-    });
-    dataUrl.value = _dataUrl;
+    modules.value.forEach((m) => Object.assign(params, m.params));
+    dataUrl.value = url.value.pathname + url.value.search;
     RouterContext.value = { url: url.value, params };
   }, { immediate: true });
 
@@ -96,10 +94,15 @@ const createRouter = (props: RouterProps) => {
         history.back();
         return;
       }
-      const cc = res.headers.get("Cache-Control");
-      rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-      rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
-      return await res.json();
+      try {
+        const data = await res.json();
+        const cc = res.headers.get("Cache-Control");
+        rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+        rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
+        return data;
+      } catch (_e) {
+        throw new FetchError(500, {}, "Data must be valid JSON");
+      }
     };
     rd.data = await fetchData();
     dataCache.set(dataUrl, rd);
@@ -148,6 +151,7 @@ const createRouter = (props: RouterProps) => {
         Object.assign(rmod, { defaultExport, withData });
       }
       if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
+        rmod.withData = true;
         await prefetchData(dataUrl);
       }
       return rmod;
@@ -188,41 +192,58 @@ const createRouter = (props: RouterProps) => {
   events.on("moduleprefetch", onmoduleprefetch);
   events.emit("routerready", { type: "routerready" });
 
+  // todo: update routes by hmr
   const Router = defineComponent({
     name: "Router",
-    setup() {
-      const defaultExport = computed(() => {
-        if (modules.value.length > 0) {
-          const defaultExport = modules.value[0].defaultExport;
-          if (defaultExport) {
-            return modules.value[0].defaultExport;
-          }
-        }
-        // { status: 404, statusText: "page not found" }
-        return Err;
-      });
-
-      // todo: update routes by hmr
-
-      onBeforeUnmount(() => {
-        removeEventListener("popstate", onpopstate as unknown as EventListener);
-        events.off("popstate", onpopstate);
-        events.off("moduleprefetch", onmoduleprefetch);
-      });
-      return {
-        defaultExport,
-      };
+    beforeUnmount() {
+      removeEventListener("popstate", onpopstate as unknown as EventListener);
+      events.off("popstate", onpopstate);
+      events.off("moduleprefetch", onmoduleprefetch);
     },
     render() {
-      return [
-        h(this.defaultExport as Component),
-        modules.value.length > 1 &&
-        h(createRouter({ modules: shallowRef(modules.value.slice(1)), url, dataCache, dataUrl })),
-      ];
+      if (modules.value.length > 0) {
+        const defaultExport = modules.value[0].defaultExport;
+        if (modules.value.length > 1) {
+          return h(
+            defaultExport as Component,
+            null,
+            () => h(createRouterRoot({ modules: shallowRef(modules.value.slice(1)), dataCache })),
+          );
+        }
+        return h(defaultExport as Component);
+      }
+      return h(Err, { status: 404, message: "page not found" });
     },
   });
 
   return Router;
+};
+
+const createRouterRoot = (props: RouterRootProps) => {
+  const { modules, dataCache } = props;
+
+  const RouterRoot = defineComponent({
+    name: "RouterRoot",
+    render() {
+      if (modules.value.length > 0) {
+        const defaultExport = modules.value[0].defaultExport;
+        if (modules.value.length > 1) {
+          return h(
+            defaultExport as Component,
+            null,
+            () => h(createRouterRoot({ modules: shallowRef(modules.value.slice(1)), dataCache })),
+          );
+        }
+        if (defaultExport && typeof defaultExport === "object") {
+          return h(defaultExport as Component);
+        }
+        return h(Err, { status: 400, message: "missing default export as a valid Vue component" });
+      }
+      throw new Error("modules must be non-empty array");
+    },
+  });
+
+  return RouterRoot;
 };
 
 const createAppApi = (props?: RootProps) => {

@@ -33,8 +33,8 @@ import { Link, Head } from "aleph/vue"
       </a>
     </div>
     <nav>
-      <Link to="/todos">
-      <button>Todos App Demo</button>
+      <Link role="button" to="/todos">
+        Todos App Demo
       </Link>
     </nav>
   </div>

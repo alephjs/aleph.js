@@ -4,8 +4,8 @@ export const Err = defineComponent({
   name: "Err",
   props: {
     status: {
-      type: String,
-      default: "404",
+      type: Number,
+      default: 404,
     },
     message: {
       type: String,
