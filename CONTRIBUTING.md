@@ -56,11 +56,11 @@ deno task test
 ## Project Structure
 
 - **/commands** commands of Aleph.js CLI
-- **/compiler** the compiler of Aleph.js written in Rust, powered by swc and parcel-css
-- **/examples** examples to learn
+- **/examples** examples to get started
 - **/framework**
   - **core** framework core
   - **react** framework in React
+  - **vue** framework in Vue.js
 - **/lib** shared lib
 - **/loaders** builtin loaders
 - **/server** server of Aleph.js
@@ -71,8 +71,8 @@ deno task test
 - Semicolons is good
 - 2 spaces indent
 - Types everything
-- Order your imports
-- Remove unused variables
+- Order the imports
+- Remove unused code
 - Format code before commit
 
 ```bash
