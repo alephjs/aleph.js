@@ -147,16 +147,12 @@ export default async function (nameArg: string | undefined, template = "react") 
     Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
 
-  if (confirm("Deploy to Deno Deploy™️?")) {
-    console.log(`  1. ${blue("build")} mode by Github Action`);
-    console.log(`  2. ${green("generte")} mode without build`);
-    const mode = prompt("Please choose the deploy mode:");
-    if (mode === "1") {
-      const ciFile = join(workingDir, ".github/workflows/deploy.yml");
-      await ensureDir(dirname(ciFile));
-      await Deno.writeTextFile(
-        ciFile,
-        `name: Deploy
+  if (confirm("Add Github Action script for Deno Deploy™️?")) {
+    const ciFile = join(workingDir, ".github/workflows/deploy.yml");
+    await ensureDir(dirname(ciFile));
+    await Deno.writeTextFile(
+      ciFile,
+      `name: Deploy
 on: [push]
 
 jobs:
@@ -183,10 +179,8 @@ jobs:
           project: PROJECT_NAME # todo: change this to your project name in https://dash.deno.com
           entrypoint: dist/server.js
 `,
-      );
-    } else if (mode === "2") {
-      // todo: add `genrate` option
-    }
+    );
+    console.log(`Please update ${blue(".github/workflows/deploy.yml")} with your project name.`);
   }
 
   // todo: remove this step when deno-vsc support auto enable mode
