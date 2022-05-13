@@ -29,12 +29,13 @@ export type RoutesConfig = {
 };
 
 export type FetchHandler = {
-  (request: Request): Promise<Response> | Response;
+  (request: Request, context: Record<string, unknown>): Promise<Response> | Response;
 };
 
 export interface Middleware {
   name?: string;
   version?: string;
+  eager?: boolean;
   fetch(
     request: Request,
     context: Record<string, unknown>,

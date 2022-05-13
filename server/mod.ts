@@ -28,7 +28,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 } & AlephConfig;
 
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, build, unocss, middlewares, fetch, ssr, logLevel, onError } = options;
+  const { routes, build, middlewares, fetch, ssr, logLevel, onError } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
@@ -39,6 +39,7 @@ export const serve = (options: ServerOptions = {}) => {
     const { host, pathname, searchParams } = url;
 
     // close the hot-reloading websocket connection and tell the client to reload
+    // this request occurs when the client try to connect to the hot-reloading websocket in production mode
     if (pathname === "/-/hmr") {
       const { socket, response } = Deno.upgradeWebSocket(req, {});
       socket.addEventListener("open", () => {
@@ -48,6 +49,79 @@ export const serve = (options: ServerOptions = {}) => {
         }, 50);
       });
       return response;
+    }
+
+    const postMiddlewares: Middleware[] = [];
+    const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
+
+    // create the  context object
+    const ctx = {
+      connInfo,
+      params: {},
+      headers: new Headers(),
+      cookies: {
+        _cookies: null as Map<string, string> | null,
+        get(name: string) {
+          if (this._cookies === null) {
+            this._cookies = new Map<string, string>();
+            const cookieHeader = req.headers.get("Cookie");
+            if (cookieHeader) {
+              for (const cookie of cookieHeader.split(";")) {
+                const [key, value] = util.splitBy(cookie, "=");
+                this._cookies.set(key.trim(), value);
+              }
+            }
+          }
+          return this._cookies.get(name);
+        },
+        set(name: string, value: string, options?: CookieOptions) {
+          this._cookies?.set(name, value);
+          ctx.headers.set("Set-Cookie", setCookieHeader(name, value, options));
+        },
+        delete(name: string, options?: CookieOptions) {
+          this._cookies?.delete(name);
+          ctx.headers.set("Set-Cookie", setCookieHeader(name, "", { ...options, expires: new Date(0) }));
+        },
+      },
+      htmlRewriter: {
+        on: (selector: string, handlers: HTMLRewriterHandlers) => {
+          customHTMLRewriter.set(selector, handlers);
+        },
+      },
+    };
+
+    // use eager middlewares
+    if (Array.isArray(middlewares)) {
+      const len = middlewares.length;
+      for (let i = 0; i < len; i++) {
+        const mw = middlewares[i];
+        const handler = mw.fetch;
+        if (typeof handler === "function") {
+          if (mw.eager) {
+            try {
+              let res = handler(req, ctx);
+              if (res instanceof Promise) {
+                res = await res;
+              }
+              if (res instanceof Response) {
+                return res;
+              }
+              if (typeof res === "function") {
+                setTimeout(res, 0);
+              }
+            } catch (err) {
+              log.error(`Middleare${mw.name ? `(${mw.name}${mw.version ? " " + mw.version : ""})` : ""}:`, err);
+              return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
+                new Response(generateErrorHtml(err.stack ?? err.message), {
+                  status: 500,
+                  headers: [["Content-Type", "text/html"]],
+                });
+            }
+          } else {
+            postMiddlewares.push(mw);
+          }
+        }
+      }
     }
 
     // transform client modules
@@ -151,80 +225,32 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    // use fetch handler if available
-    if (typeof fetch === "function") {
-      let res = fetch(req);
-      if (res instanceof Promise) {
-        res = await res;
-      }
-      if (res instanceof Response) {
-        return res;
+    // use post middlewares
+    for (const mw of postMiddlewares) {
+      try {
+        let res = mw.fetch(req, ctx);
+        if (res instanceof Promise) {
+          res = await res;
+        }
+        if (res instanceof Response) {
+          return res;
+        }
+        if (typeof res === "function") {
+          setTimeout(res, 0);
+        }
+      } catch (err) {
+        log.error(`Middleare${mw.name ? `(${mw.name}${mw.version ? " " + mw.version : ""})` : ""}:`, err);
+        return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
+          new Response(generateErrorHtml(err.stack ?? err.message), {
+            status: 500,
+            headers: [["Content-Type", "text/html"]],
+          });
       }
     }
 
-    // create context object
-    const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
-    const ctx = {
-      connInfo,
-      params: {},
-      headers: new Headers(),
-      cookies: {
-        _cookies: null as Map<string, string> | null,
-        get(name: string) {
-          if (this._cookies === null) {
-            this._cookies = new Map<string, string>();
-            const cookieHeader = req.headers.get("Cookie");
-            if (cookieHeader) {
-              for (const cookie of cookieHeader.split(";")) {
-                const [key, value] = util.splitBy(cookie, "=");
-                this._cookies.set(key.trim(), value);
-              }
-            }
-          }
-          return this._cookies.get(name);
-        },
-        set(name: string, value: string, options?: CookieOptions) {
-          this._cookies?.set(name, value);
-          ctx.headers.set("Set-Cookie", setCookieHeader(name, value, options));
-        },
-        delete(name: string, options?: CookieOptions) {
-          this._cookies?.delete(name);
-          ctx.headers.set("Set-Cookie", setCookieHeader(name, "", { ...options, expires: new Date(0) }));
-        },
-      },
-      htmlRewriter: {
-        on: (selector: string, handlers: HTMLRewriterHandlers) => {
-          customHTMLRewriter.set(selector, handlers);
-        },
-      },
-    };
-
-    // use middlewares
-    if (Array.isArray(middlewares) && middlewares.length > 0) {
-      for (const mw of middlewares) {
-        try {
-          const handler = mw.fetch;
-          if (typeof handler === "function") {
-            let res = handler(req, ctx);
-            if (res instanceof Promise) {
-              res = await res;
-            }
-            if (res instanceof Response) {
-              return res;
-            }
-            if (typeof res === "function") {
-              setTimeout(res, 0);
-            }
-          }
-        } catch (err) {
-          log.error(`Middleare${mw.name ? `(${mw.name}${mw.version ? " " + mw.version : ""})` : ""}:`, err);
-          return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
-            new Response(generateErrorHtml(err.stack ?? err.message), {
-              status: 500,
-              headers: [["Content-Type", "text/html"]],
-            });
-        }
-      }
+    // use the `fetch` handler if available
+    if (typeof fetch === "function") {
+      return fetch(req, ctx);
     }
 
     // request route api
@@ -384,7 +410,7 @@ export const serve = (options: ServerOptions = {}) => {
   }
 
   // inject global objects
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { build, routes, unocss });
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { build, routes });
   Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;
