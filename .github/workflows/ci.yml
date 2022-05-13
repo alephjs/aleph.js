@@ -24,11 +24,14 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Deno test
-        run: deno test -A --unstable --location=http://localhost --import-map=import_map.json
+      - name: Deno fmt
+        run: deno fmt --check **/*.(ts|tsx)
 
       - name: Deno lint
-        run: deno lint
+        run: deno lint **/*.(ts|tsx)
+
+      - name: Deno test
+        run: deno test -A --unstable --location=http://localhost --import-map=import_map.json
 
   deploy_examples:
     name: Deploy
