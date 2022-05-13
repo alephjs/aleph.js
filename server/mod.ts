@@ -52,7 +52,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     const postMiddlewares: Middleware[] = [];
-    const customHTMLRewriter = new Map<string, HTMLRewriterHandlers>();
+    const customHTMLRewriter: [string, HTMLRewriterHandlers][] = [];
 
     // create the  context object
     const ctx = {
@@ -85,7 +85,7 @@ export const serve = (options: ServerOptions = {}) => {
       },
       htmlRewriter: {
         on: (selector: string, handlers: HTMLRewriterHandlers) => {
-          customHTMLRewriter.set(selector, handlers);
+          customHTMLRewriter.push([selector, handlers]);
         },
       },
     };

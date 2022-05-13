@@ -47,7 +47,7 @@ export type SSRResult = {
 export type RenderOptions = {
   routes: RouteRecord;
   indexHtml: Uint8Array;
-  customHTMLRewriter: Map<string, HTMLRewriterHandlers>;
+  customHTMLRewriter: [string, HTMLRewriterHandlers][];
   isDev: boolean;
   ssr?: SSR;
   onError?: ErrorCallback;
@@ -192,8 +192,8 @@ export default {
           }
         });
 
-        // apply user defined html rewrite handlers
-        customHTMLRewriter.forEach((handlers, selector) => rewriter.on(selector, handlers));
+        // apply custom html rewrite handlers defined by middlewares
+        customHTMLRewriter.forEach(([selector, handlers]) => rewriter.on(selector, handlers));
 
         // inject the roures manifest
         rewriter.on("head", {
