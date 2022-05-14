@@ -7,6 +7,25 @@ on:
     branches: [main]
 
 jobs:
+  format:
+    name: Foramt
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup deno
+        uses: denoland/setup-deno@main
+        with:
+          deno-version: v1.x
+
+      - name: Deno fmt
+        run: deno fmt --check **/*.{ts,tsx}
+
+      - name: Deno lint
+        run: deno lint
+
   test:
     name: Test
     runs-on: ${{ matrix.os }}
@@ -23,12 +42,6 @@ jobs:
         uses: denoland/setup-deno@main
         with:
           deno-version: v1.x
-
-      - name: Deno fmt
-        run: deno fmt --check
-
-      - name: Deno lint
-        run: deno lint
 
       - name: Deno test
         run: deno test -A --unstable --location=http://localhost --import-map=import_map.json
