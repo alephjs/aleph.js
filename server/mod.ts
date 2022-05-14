@@ -110,7 +110,7 @@ export const serve = (options: ServerOptions = {}) => {
                 setTimeout(res, 0);
               }
             } catch (err) {
-              log.error(`Middleare${mw.name ? `(${mw.name}${mw.version ? " " + mw.version : ""})` : ""}:`, err);
+              log.error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
               return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
                 new Response(generateErrorHtml(err.stack ?? err.message), {
                   status: 500,
@@ -239,7 +239,7 @@ export const serve = (options: ServerOptions = {}) => {
           setTimeout(res, 0);
         }
       } catch (err) {
-        log.error(`Middleare${mw.name ? `(${mw.name}${mw.version ? " " + mw.version : ""})` : ""}:`, err);
+        log.error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
         return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
           new Response(generateErrorHtml(err.stack ?? err.message), {
             status: 500,

@@ -60,7 +60,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
     });
 
     const routeModules = getRouteModules();
-    const routes = loadRoutesFromTag();
+    const routeRecord = loadRoutesFromTag();
     const importModule = async ({ filename }: RouteMeta) => {
       const deployId = document.body.getAttribute("data-deployment-id");
       let url = filename.slice(1);
@@ -119,7 +119,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
     const onmoduleprefetch = (e: Record<string, unknown>) => {
       const deployId = document.body.getAttribute("data-deployment-id");
       const pageUrl = new URL(e.href as string, location.href);
-      const matches = matchRoutes(pageUrl, routes);
+      const matches = matchRoutes(pageUrl, routeRecord);
       matches.map(([_, meta]) => {
         const { filename } = meta;
         if (!(filename in routeModules)) {
@@ -136,7 +136,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
     };
     const onpopstate = async (e: Record<string, unknown>) => {
       const url = (e.url as URL | undefined) || new URL(window.location.href);
-      const matches = matchRoutes(url, routes);
+      const matches = matchRoutes(url, routeRecord);
       const loadingBar = getLoadingBar();
       let loading: number | null = setTimeout(() => {
         loading = null;
