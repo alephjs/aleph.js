@@ -17,10 +17,7 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 
 > **Source code**: https://github.com/alephjs/aleph.js/tree/main/examples
 
-# 
-
-The new docs site is working in progress: https://aleph.deno.dev ([PR](https://github.com/alephjs/alephjs.org/pull/58))
-
+The new docs site is working in progress: https://aleph.deno.dev ([PR](https://github.com/alephjs/alephjs.org/pull/58)).
 You can join the Aleph.js [Discord](https://discord.com/invite/pWGdS7sAqD) to get the dev progress.
 
 # 
