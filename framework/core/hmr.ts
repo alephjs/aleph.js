@@ -108,7 +108,7 @@ function connect() {
   ws.addEventListener("open", () => {
     conn = ws;
     messageQueue.splice(0, messageQueue.length).forEach((msg) => ws.send(msg));
-    console.log("[HMR] listening for file changes...");
+    console.log("%c[HMR]", "color:#999", "listening for file changes...");
   });
 
   ws.addEventListener("close", () => {
@@ -153,7 +153,7 @@ function connect() {
             location.reload();
           }
         }
-        console.log(`[HMR] ${type} ${JSON.stringify(specifier)}`);
+        console.log("%c[HMR]", "color:#999", `${type} ${JSON.stringify(specifier)}`);
       } catch (err) {
         console.warn(err);
       }
