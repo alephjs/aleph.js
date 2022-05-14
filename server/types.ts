@@ -34,7 +34,6 @@ export type FetchHandler = {
 
 export interface Middleware {
   name?: string;
-  version?: string;
   eager?: boolean;
   fetch(
     request: Request,

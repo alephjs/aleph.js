@@ -67,7 +67,7 @@ declare interface Data<GetDataType = ResponseLike, ActionDataType = ResponseLike
 
 declare interface Middleware {
   readonly name?: string;
-  readonly version?: string;
+  readonly eager?: boolean;
   fetch(
     request: Request,
     context: Context,
