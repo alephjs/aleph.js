@@ -25,10 +25,10 @@ jobs:
           deno-version: v1.x
 
       - name: Deno fmt
-        run: deno fmt --check **/*.{ts,tsx}
+        run: deno fmt --check **/*.(ts|tsx)
 
       - name: Deno lint
-        run: deno lint **/*.{ts,tsx}
+        run: deno lint
 
       - name: Deno test
         run: deno test -A --unstable --location=http://localhost --import-map=import_map.json
