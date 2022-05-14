@@ -76,7 +76,7 @@ deno task test
 - Format code before commit
 
 ```bash
-deno fmt **/*.(ts|tsx)
+deno fmt **/*.{ts,tsx}
 ```
 
 ## Code of Conduct

@@ -12,6 +12,9 @@
   "fmt": {
     "options": {
       "lineWidth": 120
+    },
+    "files": {
+      "exclude": ["CODE_OF_CONDUCT.md", ".vscode"]
     }
   },
   "lint": {}

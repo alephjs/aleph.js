@@ -6,10 +6,6 @@
 </p>
 
 > ⚠️ DO NOT USE. WE ARE CURRENTLY REWRITING THIS FRAMEWORK, MANY THINGS ARE STILL SUBJECT TO CHANGE AT ANY TIME.
->
-> The new docs site is working in progress: https://aleph.deno.dev ([PR](https://github.com/alephjs/alephjs.org/pull/58))
->
-> You can join the Aleph.js [Discord](https://discord.com/invite/pWGdS7sAqD) to get the dev progress.
 
 Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new architecture:
 
@@ -19,6 +15,14 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 - UnoCSS(tailwind): https://aleph-unocss.deno.dev/
 - Monaco Editor: https://aleph-monaco-editor.deno.dev/
 
-Source code: https://github.com/alephjs/aleph.js/tree/main/examples
+> **Source code**: https://github.com/alephjs/aleph.js/tree/main/examples
+
+<hr>
+
+The new docs site is working in progress: https://aleph.deno.dev ([PR](https://github.com/alephjs/alephjs.org/pull/58))
+
+You can join the Aleph.js [Discord](https://discord.com/invite/pWGdS7sAqD) to get the dev progress.
+
+<hr>
 
 **If you are finding the old version docs, please check https://alephjs.vercel.app**
