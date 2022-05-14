@@ -25,7 +25,7 @@ jobs:
           deno-version: v1.x
 
       - name: Deno fmt
-        run: deno fmt --check **/*.(ts|tsx)
+        run: deno fmt --check **/*.{ts,tsx}
 
       - name: Deno lint
         run: deno lint
