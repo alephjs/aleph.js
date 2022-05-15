@@ -5,7 +5,7 @@
   <a href="https://twitter.com/intent/follow?screen_name=alephjs"><img src="https://img.shields.io/twitter/follow/alephjs?style=social" alt="Twitter"></a>
 </p>
 
-> ⚠️ DO NOT USE. WE ARE CURRENTLY REWRITING THIS FRAMEWORK, MANY THINGS ARE STILL SUBJECT TO CHANGE AT ANY TIME.
+> ⚠️ WE ARE CURRENTLY REWRITING THIS FRAMEWORK, MANY THINGS ARE STILL SUBJECT TO CHANGE AT ANY TIME.
 
 Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new architecture:
 
@@ -17,9 +17,24 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 
 > **Source code**: https://github.com/alephjs/aleph.js/tree/main/examples
 
+## Get started
+
+```bash
+# initialize a new project, you can pick a start template with `--template` flag, available templates: [react, vue]
+deno run -A https://deno.land/x/aleph/cli.ts init
+
+# go to the app root created by `init`
+cd APPDIR
+
+# after init, you can run the app in devlopment mode
+deno task dev
+
+# or run the app in production mode
+deno task start
+
+# or build the app for severless deployment
+deno task build
+```
+
 The new docs site is working in progress: https://aleph.deno.dev ([PR](https://github.com/alephjs/alephjs.org/pull/58)).
 You can join the Aleph.js [Discord](https://discord.com/invite/pWGdS7sAqD) to get the dev progress.
-
-# 
-
-**If you are finding the old version docs, please check https://alephjs.vercel.app**
