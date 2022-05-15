@@ -22,10 +22,10 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 Initialize a new project, you can pick a start template with `--template` flag, available templates: `[react, vue]`
 
 ```bash
-deno run -A https://deno.land/x/aleph@1.0.0-alpha.46/cli.ts init
+deno run -A https://deno.land/x/aleph@1.0.0-alpha.46/cli.ts init --template react
 ```
 
-after init, you can run the app with deno tasks
+after `init`, you can run the app with deno tasks:
 
 ```bash
 # go to the app root created by the `init`
@@ -41,5 +41,6 @@ deno task start
 deno task build
 ```
 
-The new docs site is working in progress: https://aleph.deno.dev ([PR](https://github.com/alephjs/alephjs.org/pull/58)).
-You can join the Aleph.js [Discord](https://discord.com/invite/pWGdS7sAqD) to get the dev progress.
+> The new docs site is working in progress: https://aleph.deno.dev
+> ([PR](https://github.com/alephjs/alephjs.org/pull/58)). You can join the Aleph.js
+> [Discord](https://discord.com/invite/pWGdS7sAqD) to get helps.
