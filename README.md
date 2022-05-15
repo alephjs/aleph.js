@@ -19,20 +19,25 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 
 ## Get started
 
-```bash
-# initialize a new project, you can pick a start template with `--template` flag, available templates: [react, vue]
-deno run -A https://deno.land/x/aleph/cli.ts init
+Initialize a new project, you can pick a start template with `--template` flag, available templates: `[react, vue]`
 
-# go to the app root created by `init`
+```bash
+deno run -A https://deno.land/x/aleph@1.0.0-alpha.46/cli.ts init
+```
+
+after init, you can run the app with deno tasks
+
+```bash
+# go to the app root created by the `init`
 cd APPDIR
 
-# after init, you can run the app in devlopment mode
+# run the app in devlopment mode
 deno task dev
 
-# or run the app in production mode
+# run the app in production mode
 deno task start
 
-# or build the app for severless deployment
+# build the app for severless deployment
 deno task build
 ```
 
