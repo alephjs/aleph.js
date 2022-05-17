@@ -199,7 +199,6 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
     events.on("moduleprefetch", onmoduleprefetch);
     events.emit("routerready", { type: "routerready" });
 
-    // todo: update routes by hmr
     const oncreate = (e: Record<string, unknown>) => {
       const route: Route = [
         new URLPatternCompat(e.routePattern as URLPatternInput),
@@ -209,21 +208,21 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
         },
       ];
       const pathname = (e.routePattern as URLPatternInput).pathname.slice(1);
-      if (pathname == "_app" || pathname == "_404" || pathname == "_error") {
+      if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
         routeRecord[pathname] = route;
       }
       routeRecord.routes.push(route);
-      onpopstate({ type: "popstate" });
     };
     events.on("hmr:create", oncreate);
 
     const onremove = (e: Record<string, unknown>) => {
-      const route = routeRecord.routes.find((v) => v[1].filename == e.specifier);
+      const route = routeRecord.routes.find((v) => v[1].filename === e.specifier);
       const pathname = (route?.[1].pattern.pathname)?.slice(1);
-      if (pathname == "_app" || pathname == "_404" || pathname == "_error") {
+      if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
         routeRecord[pathname] = undefined;
       }
       routeRecord.routes = routeRecord.routes.filter((v) => v[1].filename != e.specifier);
+      onpopstate({ type: "popstate" });
     };
     events.on("hmr:remove", onremove);
 
