@@ -5,7 +5,7 @@ import FetchError from "../core/fetch_error.ts";
 import { redirect } from "../core/redirect.ts";
 import type { Route, RouteMeta, RouteModule, RouteRecord } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
-import { URLPatternCompat } from "../core/url_pattern.ts";
+import { URLPatternCompat, URLPatternInput } from "../core/url_pattern.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
@@ -199,12 +199,39 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
     events.on("moduleprefetch", onmoduleprefetch);
     events.emit("routerready", { type: "routerready" });
 
-    // todo: update routes by hmr
+    const oncreate = (e: Record<string, unknown>) => {
+      const route: Route = [
+        new URLPatternCompat(e.routePattern as URLPatternInput),
+        {
+          filename: e.specifier as string,
+          pattern: e.routePattern as URLPatternInput,
+        },
+      ];
+      const pathname = (e.routePattern as URLPatternInput).pathname.slice(1);
+      if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
+        routeRecord[pathname] = route;
+      }
+      routeRecord.routes.push(route);
+    };
+    events.on("hmr:create", oncreate);
+
+    const onremove = (e: Record<string, unknown>) => {
+      const route = routeRecord.routes.find((v) => v[1].filename === e.specifier);
+      const pathname = (route?.[1].pattern.pathname)?.slice(1);
+      if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
+        routeRecord[pathname] = undefined;
+      }
+      routeRecord.routes = routeRecord.routes.filter((v) => v[1].filename != e.specifier);
+      onpopstate({ type: "popstate" });
+    };
+    events.on("hmr:remove", onremove);
 
     return () => {
       removeEventListener("popstate", onpopstate as unknown as EventListener);
       events.off("popstate", onpopstate);
       events.off("moduleprefetch", onmoduleprefetch);
+      events.off("hmr:create", oncreate);
+      events.off("hmr:remove", onremove);
     };
   }, []);
 
