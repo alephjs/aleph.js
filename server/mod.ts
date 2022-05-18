@@ -400,9 +400,10 @@ export const serve = (options: ServerOptions = {}) => {
     language: "en",
     languages: ["en"],
     onLine: true,
-    userAgent: `Deno/${Deno.version?.deno || "deploy"}`,
     vendor: "Deno Land Inc.",
   });
+  // deno-lint-ignore no-explicit-any
+  (globalThis.navigator as any).userAgent ??= `Deno/${Deno.version?.deno || "deploy"}`;
 
   // set log level if specified
   if (logLevel) {
