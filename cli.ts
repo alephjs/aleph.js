@@ -209,6 +209,9 @@ async function run(command: string, options: RunOptions) {
   const p = Deno.run({ cmd, stdout: "piped", stderr: "piped" });
   pipe(p.stdout, Deno.stdout);
   pipe(p.stderr, Deno.stderr);
+  addEventListener("unload", () => {
+    p.kill("SIGTERM");
+  });
   const { code } = await p.status();
   Deno.exit(code);
 }
