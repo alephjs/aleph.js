@@ -210,6 +210,7 @@ async function run(command: string, options: RunOptions) {
   pipe(p.stdout, Deno.stdout);
   pipe(p.stderr, Deno.stderr);
   addEventListener("unload", () => {
+    console.log("killing child")
     p.kill("SIGTERM");
   });
   const { code } = await p.status();
