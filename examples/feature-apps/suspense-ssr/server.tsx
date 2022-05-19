@@ -5,7 +5,7 @@ import { renderToReadableStream } from "react-dom/server";
 serve({
   routes: "./routes/**/*.tsx",
   ssr: {
-    suspense: true,
+    dataDefer: true,
     render: (ctx) => renderToReadableStream(<App ssrContext={ctx} />, ctx),
   },
 });

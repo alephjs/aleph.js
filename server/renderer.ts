@@ -14,7 +14,7 @@ export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
-  readonly suspense: boolean;
+  readonly dataDefer: boolean;
   readonly errorBoundaryHandler?: CallableFunction;
   readonly signal: AbortSignal;
   readonly bootstrapScripts?: string[];
@@ -26,12 +26,12 @@ export type SSRFn = {
 };
 
 export type SSR = {
-  suspense: true;
+  dataDefer: true;
   cacheControl?: "private" | "public";
   csp?: string | string[];
   render: SSRFn;
 } | {
-  suspense?: false;
+  dataDefer?: false;
   cacheControl?: "private" | "public";
   csp?: string | string[];
   render: SSRFn;
@@ -41,7 +41,7 @@ export type SSRResult = {
   context: SSRContext;
   errorBoundaryHandlerFilename?: string;
   body: ReadableStream | string;
-  suspenseData: Record<string, unknown>;
+  deferedData: Record<string, unknown>;
 };
 
 export type RenderOptions = {
@@ -63,16 +63,16 @@ export default {
     let ssrRes: SSRResult | null = null;
     if (typeof ssr === "function" || typeof ssr?.render === "function") {
       const isFn = typeof ssr === "function";
-      const suspense = isFn ? false : !!ssr.suspense;
+      const dataDefer = isFn ? false : !!ssr.dataDefer;
       const cc = isFn ? "public" : ssr.cacheControl ?? "public";
       const csp = isFn ? undefined : ssr.csp;
       const render = isFn ? ssr : ssr.render;
       try {
-        const [url, routeModules, suspenseData, errorBoundaryHandler] = await initSSR(
+        const [url, routeModules, deferedData, errorBoundaryHandler] = await initSSR(
           req,
           ctx,
           routes,
-          suspense,
+          dataDefer,
           onError,
         );
         const headCollection: string[] = [];
@@ -80,7 +80,7 @@ export default {
           url,
           routeModules,
           headCollection,
-          suspense,
+          dataDefer,
           errorBoundaryHandler: errorBoundaryHandler?.default,
           signal: req.signal,
           bootstrapScripts: [bootstrapScript],
@@ -142,7 +142,7 @@ export default {
           context: ssrContext,
           errorBoundaryHandlerFilename: errorBoundaryHandler?.filename,
           body,
-          suspenseData,
+          deferedData,
         };
       } catch (e) {
         if (e instanceof Response) {
@@ -212,22 +212,22 @@ export default {
             context: { routeModules, headCollection },
             errorBoundaryHandlerFilename,
             body,
-            suspenseData,
+            deferedData,
           } = ssrRes;
           rewriter.on("head", {
             element(el: Element) {
               headCollection.forEach((h) => util.isFilledString(h) && el.append(h, { html: true }));
               if (routeModules.length > 0) {
                 const ssrModules = routeModules.map(({ url, params, filename, withData, data, dataCacheTtl }) => {
-                  const suspense = typeof data === "function" ? true : undefined;
+                  const defered = typeof data === "function" ? true : undefined;
                   return {
                     url: url.pathname + url.search,
                     params,
                     filename,
                     withData,
-                    suspense,
-                    data: suspense ? undefined : data,
+                    data: defered ? undefined : data,
                     dataCacheTtl,
+                    dataDefered: defered,
                   };
                 });
                 // replace "/" to "\/" to prevent xss
@@ -292,10 +292,10 @@ export default {
                     if (suspenseChunks.length > 0) {
                       suspenseChunks.forEach((chunk) => controller.enqueue(chunk));
                     }
-                    if (Object.keys(suspenseData).length > 0) {
+                    if (Object.keys(deferedData).length > 0) {
                       controller.enqueue(
                         util.utf8TextEncoder.encode(
-                          `<script type="application/json" id="suspense-data">${JSON.stringify(suspenseData)}</script>`,
+                          `<script type="application/json" id="defered-data">${JSON.stringify(deferedData)}</script>`,
                         ),
                       );
                     }
@@ -332,19 +332,19 @@ async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
   routes: RouteRecord,
-  suspense: boolean,
+  dataDefer: boolean,
   onError?: ErrorCallback,
 ): Promise<
   [
     url: URL,
     routeModules: RouteModule[],
-    suspenseData: Record<string, unknown>,
+    deferedData: Record<string, unknown>,
     errorBoundaryHandler: { filename: string; default: CallableFunction } | undefined,
   ]
 > {
   const url = new URL(req.url);
   const matches = matchRoutes(url, routes);
-  const suspenseData: Record<string, unknown> = {};
+  const deferedData: Record<string, unknown> = {};
 
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
@@ -398,16 +398,16 @@ async function initSSR(
           }
           try {
             const data = await res.json();
-            if (suspense) {
-              suspenseData[rmod.url.pathname + rmod.url.search] = data;
+            if (dataDefer) {
+              deferedData[rmod.url.pathname + rmod.url.search] = data;
             }
             return data;
           } catch (_e) {
             throw new FetchError(500, {}, "Data must be valid JSON");
           }
         } else if (res === null || util.isPlainObject(res) || Array.isArray(res)) {
-          if (suspense) {
-            suspenseData[rmod.url.pathname + rmod.url.search] = res;
+          if (dataDefer) {
+            deferedData[rmod.url.pathname + rmod.url.search] = res;
           }
           return res;
         } else {
@@ -415,7 +415,7 @@ async function initSSR(
         }
       };
       rmod.withData = true;
-      if (suspense) {
+      if (dataDefer) {
         rmod.data = fetchData;
       } else {
         rmod.data = await fetchData();
@@ -433,7 +433,7 @@ async function initSSR(
       return [
         url,
         modules.filter(({ defaultExport }) => defaultExport !== undefined),
-        suspenseData,
+        deferedData,
         {
           filename: meta.filename,
           default: mod.default,
@@ -445,7 +445,7 @@ async function initSSR(
   return [
     url,
     modules.filter(({ defaultExport }) => defaultExport !== undefined),
-    suspenseData,
+    deferedData,
     undefined,
   ];
 }

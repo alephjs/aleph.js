@@ -18,7 +18,7 @@ export type HTMLRewriterHandlers = {
 type LoadOptions = {
   isDev: boolean;
   importMap: ImportMap;
-  ssr?: { suspense?: boolean };
+  ssr?: { dataDefer?: boolean };
   hmrWebSocketUrl?: string;
 };
 
@@ -28,7 +28,7 @@ type LoadOptions = {
 // - add `./framework/core/nomodule.ts`
 // - check the `<head>` and `<body>` elements
 // - check the `<ssr-body>` element if the ssr is enabled
-// - add `data-suspense` attribute to `<body>` if using suspense ssr
+// - add `data-defer` attribute to `<body>` if possible
 export async function loadAndFixIndexHtml(options: LoadOptions): Promise<Uint8Array> {
   const { html, hasSSRBody } = await loadIndexHtml();
   return fixIndexHtml(html, hasSSRBody, options);
@@ -174,8 +174,8 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
   });
   rewriter.on("body", {
     element: (el: Element) => {
-      if (ssr?.suspense) {
-        el.setAttribute("data-suspense", "true");
+      if (ssr?.dataDefer) {
+        el.setAttribute("data-defer", "true");
       }
       if (deployId) {
         el.setAttribute("data-deployment-id", deployId);

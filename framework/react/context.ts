@@ -31,7 +31,7 @@ export type Mutation<T> = {
 };
 
 export type DataContextProps<T = unknown> = {
-  suspenseData?: { current?: T };
+  deferedData?: { current?: T };
   data: T;
   isMutating: HttpMethod | boolean;
   mutation: Mutation<T>;

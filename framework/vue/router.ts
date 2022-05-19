@@ -308,20 +308,20 @@ function loadSSRModulesFromTag(): RouteModule[] {
     try {
       const data = JSON.parse(el.innerText);
       if (Array.isArray(data)) {
-        let suspenseData: Record<string, unknown> | null | undefined = undefined;
+        let deferedData: Record<string, unknown> | null | undefined = undefined;
         const routeModules = getRouteModules();
-        return data.map(({ url, filename, suspense, ...rest }) => {
-          if (suspense) {
-            if (suspenseData === undefined) {
-              const el = window.document?.getElementById("suspense-data");
+        return data.map(({ url, filename, dataDefered, ...rest }) => {
+          if (dataDefered) {
+            if (deferedData === undefined) {
+              const el = window.document?.getElementById("defered-data");
               if (el) {
-                suspenseData = JSON.parse(el.innerText);
+                deferedData = JSON.parse(el.innerText);
               } else {
-                suspenseData = null;
+                deferedData = null;
               }
             }
-            if (suspenseData) {
-              rest.data = suspenseData[url];
+            if (deferedData) {
+              rest.data = deferedData[url];
             }
           }
           return {
