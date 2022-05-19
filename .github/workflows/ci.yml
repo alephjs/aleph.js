@@ -91,6 +91,9 @@ jobs:
           ALEPH_PKG_URI: https://raw.githubusercontent.com/alephjs/aleph.js/${{ github.sha }}
         run: deno task build ${{ matrix.dir }}
 
+      - name: Clean up
+        run: rm -rf target/
+
       - name: Deploy to Deno Deploy
         uses: denoland/deployctl@v1
         with:
