@@ -77,6 +77,15 @@ jobs:
       - name: Install Deno
         uses: denoland/setup-deno@v1
 
+      - name: Setup rust
+        uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: stable
+
+      - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: latest
+
       - name: Build App
         env:
           ALEPH_PKG_URI: https://raw.githubusercontent.com/alephjs/aleph.js/${{ github.sha }}
