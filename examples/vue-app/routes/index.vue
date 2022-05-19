@@ -98,11 +98,6 @@ import { Link, Head } from "aleph/vue"
   content: "";
 }
 
-.index nav a {
-  color: #000;
-  text-decoration: none;
-}
-
 .index nav {
   display: flex;
   justify-content: center;
