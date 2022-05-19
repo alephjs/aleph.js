@@ -61,7 +61,6 @@ jobs:
             dir: examples/react-app
           - name: aleph-vue
             dir: examples/vue-app
-          - name: aleph-monaco-editor
           - name: aleph-yew
             dir: examples/yew-app
           - name: aleph-monaco-editor
