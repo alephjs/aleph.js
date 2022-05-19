@@ -92,7 +92,7 @@ jobs:
         run: deno task build ${{ matrix.dir }}
 
       - name: Clean up
-        run: rm -rf target/
+        run: rm -rf ${{ matrix.dir }}/target
 
       - name: Deploy to Deno Deploy
         uses: denoland/deployctl@v1
