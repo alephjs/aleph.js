@@ -1,6 +1,6 @@
 .DS_Store
 .env
 .env.*
-**/.idea
-Thumbs.db
 examples/**/dist/
+examples/**/pkg/
+examples/**/target/
