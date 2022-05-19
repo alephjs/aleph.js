@@ -20,7 +20,6 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
   logLevel?: LevelName;
-  hmrWebSocketUrl?: string;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: SSR;
@@ -28,7 +27,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 } & AlephConfig;
 
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, build, middlewares, fetch, ssr, logLevel, onError } = options;
+  const { routes, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
@@ -353,7 +352,7 @@ export const serve = (options: ServerOptions = {}) => {
           isDev,
           importMap: await importMapPromise,
           ssr: typeof ssr === "function" ? {} : ssr,
-          hmrWebSocketUrl: options.hmrWebSocketUrl,
+          hmrWebSocketUrl: options.devServer?.hmrWebSocketUrl,
         });
       } catch (err) {
         if (err instanceof Deno.errors.NotFound) {
@@ -387,31 +386,13 @@ export const serve = (options: ServerOptions = {}) => {
     });
   };
 
-  // inject navigator browser polyfill to fix some ssr errors
-  Object.assign(globalThis.navigator, {
-    connection: {
-      downlink: 10,
-      effectiveType: "4g",
-      onchange: null,
-      rtt: 50,
-      saveData: false,
-    },
-    cookieEnabled: false,
-    language: "en",
-    languages: ["en"],
-    onLine: true,
-    vendor: "Deno Land Inc.",
-  });
-  // deno-lint-ignore no-explicit-any
-  (globalThis.navigator as any).userAgent ??= `Deno/${Deno.version?.deno || "deploy"}`;
-
   // set log level if specified
   if (logLevel) {
     log.setLevel(logLevel);
   }
 
   // inject global objects
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { build, routes });
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { build, routes, devServer });
   Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;

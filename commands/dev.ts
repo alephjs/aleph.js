@@ -126,10 +126,6 @@ if (import.meta.main) {
           });
         }
       });
-    } else {
-      emitters.forEach((e) => {
-        e.emit(kind, { specifier });
-      });
     }
   });
 
@@ -142,6 +138,9 @@ if (import.meta.main) {
 
   let ac: AbortController | null = null;
   const bs = async () => {
+    if (Deno.env.get("PREVENT_SERVER_RESTART") === "true") {
+      return;
+    }
     if (ac) {
       ac.abort();
       log.info(`Restart server...`);
@@ -188,7 +187,7 @@ if (import.meta.main) {
   await bs();
 }
 
-async function bootstrap(signal: AbortSignal, entry: string | undefined, forcePort?: number): Promise<void> {
+async function bootstrap(signal: AbortSignal, entry: string | undefined, fixedPort?: number): Promise<void> {
   // clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
   Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
@@ -211,14 +210,28 @@ async function bootstrap(signal: AbortSignal, entry: string | undefined, forcePo
     serve();
   }
 
-  const {
-    port: userPort,
-    hostname,
-    certFile,
-    keyFile,
-    handler,
-  } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
-  const port = forcePort || userPort || 8080;
+  const { devServer, build }: AlephConfig = Reflect.get(globalThis, "__ALEPH_CONFIG") || {};
+  const { port: userPort, hostname, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
+  const port = fixedPort || userPort || 8080;
+
+  if (typeof build?.preBuild === "function") {
+    log.info("Pre-build...");
+    await build.preBuild();
+  }
+  if (typeof devServer?.watchFS === "function") {
+    const { watchFS } = devServer;
+    const e = createEmitter();
+    signal.addEventListener("abort", () => {
+      removeEmitter(e);
+    });
+    e.on("*", (kind, { specifier }) => {
+      if (kind.startsWith("modify:")) {
+        watchFS("modify", specifier);
+      } else if (kind === "create" || kind === "remove") {
+        watchFS(kind, specifier);
+      }
+    });
+  }
 
   try {
     await httpServe({
