@@ -62,6 +62,9 @@ jobs:
           - name: aleph-vue
             dir: examples/vue-app
           - name: aleph-monaco-editor
+          - name: aleph-yew
+            dir: examples/yew-app
+          - name: aleph-monaco-editor
             dir: examples/feature-apps/monaco-editor
           - name: aleph-unocss
             dir: examples/feature-apps/unocss

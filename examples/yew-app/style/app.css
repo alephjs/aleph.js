@@ -1,0 +1,128 @@
+@import url('./reset.css');
+
+/* header a  {
+  display: inline-flex;
+}
+
+header a:hover {
+  color: #000!important;
+} */
+
+.screen {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  width: 100vw;
+  height: calc(100vh - 2 * 80px);
+}
+
+/* .e404 h2 {
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.e404 p {
+  margin-top: 8px;
+}
+
+.e404 p a {
+  color: #999;
+  text-decoration: none;
+}
+
+.e404 p a:hover {
+  text-decoration: underline;
+} */
+
+.index h1 {
+  margin: 0;
+  line-height: 1.4;
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  color: #000;
+}
+
+.index p {
+  margin: 0;
+  line-height: 1.2;
+  font-size: 18px;
+  text-align: center;
+  color: #333;
+}
+
+.index p strong {
+  font-weight: 600;
+}
+
+.index p label {
+  display: inline-block;
+  font-weight: 600;
+  border-bottom: 4px #42b883 solid;
+}
+
+.index .external-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 12px;
+}
+
+.index .external-links a {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #666;
+  text-decoration: none;
+  transition: color 0.15s ease-in;
+}
+
+.index .external-links a:hover {
+  color: #000;
+}
+
+.index .external-links a:after {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: url(../assets/external-link.svg) no-repeat center;
+  background-size: contain;
+  content: "";
+}
+
+.index nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 45px;
+}
+
+.index nav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  width: 240px;
+  height: 50px;
+  border: 1px solid #ddd;
+  border-radius: 25px;
+  color: #333;
+  transition: border-color 0.15s ease-in;
+  cursor: pointer;
+}
+
+.index nav button strong   {
+  display: inline-block;
+  width: 30px;
+  background-color: #f3f3f3;
+  border-radius: 2px;
+  text-align: center;
+}
+
+.index nav button small {
+ font-size: 12px;
+ color: #999;
+}
+
