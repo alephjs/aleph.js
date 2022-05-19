@@ -17,7 +17,7 @@ import {
   toLocalPath,
 } from "./helpers.ts";
 import { initRoutes } from "./routing.ts";
-import type { AlephConfig, BuildPlatform, FetchHandler } from "./types.ts";
+import type { AlephConfig, BuildPlatform } from "./types.ts";
 
 const supportedPlatforms: Record<BuildPlatform, string> = {
   "deno": "Deno",
@@ -280,7 +280,8 @@ export async function build(serverEntry?: string) {
   const allClientModules = new Set<string>();
 
   // transform client modules
-  const serverHandler: FetchHandler | undefined = Reflect.get(globalThis, "__ALEPH_SERVER")?.handler;
+  const serverHandler: ((req: Request) => Promise<Response>) | undefined = Reflect.get(globalThis, "__ALEPH_SERVER")
+    ?.handler;
   if (serverHandler) {
     while (tasks.length > 0) {
       const deps = new Set<string>();

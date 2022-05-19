@@ -6,7 +6,7 @@ import type { RouteRecord } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
-import { ErrorCallback, generateErrorHtml } from "./error.ts";
+import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
 import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig, regFullVersion } from "./helpers.ts";
 import { type HTMLRewriterHandlers, loadAndFixIndexHtml } from "./html.ts";
