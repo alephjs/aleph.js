@@ -1,4 +1,4 @@
-import { basename } from "https://deno.land/std@0.136.0/path/mod.ts";
+import { basename, resolve } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { findFile } from "../lib/fs.ts";
 import log, { blue, bold } from "../lib/log.ts";
 import { build } from "../server/build.ts";
@@ -21,7 +21,17 @@ if (import.meta.main) {
   const moduleLoaders = await initModuleLoaders(importMap);
   await proxyModules(6060, { importMap, moduleLoaders });
 
-  let serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`));
+  let [serverEntry, buildScript] = await Promise.all([
+    findFile(builtinModuleExts.map((ext) => `server.${ext}`)),
+    findFile(builtinModuleExts.map((ext) => `build.${ext}`)),
+  ]);
+
+  if (buildScript) {
+    log.info(`Running ${blue(basename(buildScript))}...`);
+    const { default: build } = await import(`file://${resolve(buildScript)}`);
+    await build();
+  }
+
   if (serverEntry) {
     await import(
       `http://localhost:${Deno.env.get("ALEPH_MODULES_PROXY_PORT")}/${basename(serverEntry)}?t=${

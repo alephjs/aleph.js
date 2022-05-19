@@ -41,7 +41,6 @@ export async function build(serverEntry?: string) {
   const jsxCofig = await loadJSXConfig(importMap);
   const moduleLoaders = await initModuleLoaders(importMap);
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-  const preBuild = config?.build?.preBuild;
   const platform = config?.build?.platform ?? "deno";
   const target = config?.build?.target ?? "es2020";
   const outputDir = join(workingDir, config?.build?.outputDir ?? "dist");
@@ -58,11 +57,6 @@ export async function build(serverEntry?: string) {
     }
   } else {
     await Deno.mkdir(outputDir, { recursive: true });
-  }
-
-  if (typeof preBuild === "function") {
-    log.info("Pre-build...");
-    await preBuild();
   }
 
   // find route files by the `routes` config

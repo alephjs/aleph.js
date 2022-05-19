@@ -18,8 +18,6 @@ export type BuildPlatform = "deno" | "cloudflare" | "vercel";
 
 /** The build options for `build` command. */
 export type BuildOptions = {
-  /** The Pre-build task.  */
-  preBuild?: () => Promise<void> | void;
   /** The supported platform. default is "deno" */
   platform?: BuildPlatform;
   /** The directory for build output files. default is "dist" */
