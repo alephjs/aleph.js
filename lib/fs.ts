@@ -99,12 +99,15 @@ export const watchFs = async (dir: string, listener: (kind: "create" | "remove" 
     );
   };
   const w = Deno.watchFs(dir, { recursive: true });
-  const ignoreReg = /[\/\\](\.git(hub)?|vendor|node_modules|dist|output)[\/\\]/;
+  const ignoreReg = /[\/\\](\.git(hub)?|\.vscode|vendor|node_modules|dist|output|target)[\/\\]/;
   const ignore = (path: string) => ignoreReg.test(path) || path.endsWith(".DS_Store");
   const allFiles = new Set<string>(
     (await getFiles(dir)).map((name) => join(dir, name)).filter((path) => !ignore(path)),
   );
   for await (const { kind, paths } of w) {
+    if (kind !== "create" && kind !== "remove" && kind !== "modify") {
+      continue;
+    }
     for (const path of paths) {
       if (ignore(path)) {
         continue;
@@ -126,7 +129,7 @@ export const watchFs = async (dir: string, listener: (kind: "create" | "remove" 
             console.warn("watchFs:", error);
           }
         }
-      }, 50);
+      }, 100);
     }
   }
 };
