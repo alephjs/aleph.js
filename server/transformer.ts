@@ -1,6 +1,6 @@
 import MagicString from "https://esm.sh/magic-string@0.26.1";
-import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.1.0/mod.ts";
-import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.1.0/types.ts";
+import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.3.0/mod.ts";
+import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.3.0/types.ts";
 import { readCode } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -96,7 +96,7 @@ export default {
           deps.forEach((dep) => {
             const { importUrl, loc } = dep;
             if (loc) {
-              s.overwrite(loc.start, loc.end, `"${toLocalPath(importUrl)}"`);
+              s.overwrite(loc.start - 1, loc.end - 1, `"${toLocalPath(importUrl)}"`);
             }
           });
           ret = { code: s.toString(), deps };
