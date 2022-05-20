@@ -8,7 +8,7 @@ on:
 
 jobs:
   format:
-    name: Foramt
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +20,7 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Deno fmt
+      - name: Deno fmt check
         run: deno fmt --check
 
       - name: Deno lint
