@@ -8,7 +8,7 @@ serve({
   devServer: {
     watchFS: (_kind, specifier) => {
       if (specifier.startsWith("./src/") && specifier.endsWith(".rs")) {
-        build(true);
+        build();
       }
     },
   },
