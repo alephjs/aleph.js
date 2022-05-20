@@ -115,6 +115,7 @@ import { Link, Head } from "aleph/vue"
   border-radius: 25px;
   color: #454545;
   transition: border-color 0.15s ease-in;
+  text-decoration: none;
   cursor: pointer;
 }
 
