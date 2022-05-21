@@ -209,10 +209,12 @@ async function run(command: string, options: RunOptions) {
   const p = Deno.run({ cmd, stdout: "piped", stderr: "piped" });
   pipe(p.stdout, Deno.stdout);
   pipe(p.stderr, Deno.stderr);
-  Deno.addSignalListener("SIGINT", () => {
-    p.kill("SIGINT");
-    Deno.exit(2);
-  });
+  if (Deno.build.os !== "windows") {
+    Deno.addSignalListener("SIGINT", () => {
+      p.kill("SIGINT");
+      Deno.exit(2);
+    });
+  }
   const { code } = await p.status();
   Deno.exit(code);
 }
