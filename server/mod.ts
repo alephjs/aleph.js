@@ -53,7 +53,7 @@ export const serve = (options: ServerOptions = {}) => {
     const postMiddlewares: Middleware[] = [];
     const customHTMLRewriter: [string, HTMLRewriterHandlers][] = [];
 
-    // create the  context object
+    // create the context object
     const ctx = {
       connInfo,
       params: {},
@@ -317,6 +317,12 @@ export const serve = (options: ServerOptions = {}) => {
               return new Response("Method Not Allowed", { status: 405 });
             }
           } catch (err) {
+            if (err instanceof TypeError) {
+              return new Response(generateErrorHtml(err.stack ?? err.message), {
+                status: 500,
+                headers: [["Content-Type", "text/html"]],
+              });
+            }
             const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
             if (res instanceof Response) {
               return res;
