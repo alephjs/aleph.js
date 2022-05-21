@@ -15,12 +15,12 @@ export type SSRContext = {
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
   readonly errorBoundaryHandler?: CallableFunction;
-  readonly suspense: boolean;
+  readonly dataDefer: boolean;
 };
 
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
-  readonly suspense?: boolean;
+  readonly dataDefer?: boolean;
   readonly createPortal?: RouterContextProps["createPortal"];
 };
 
@@ -28,7 +28,7 @@ export type RouterProps = {
 const global = window as any;
 
 /** The `Router` component for react. */
-export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) => {
+export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, createPortal }) => {
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
@@ -72,7 +72,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
       routeModules[filename] = { defaultExport, withData };
       return { defaultExport, withData };
     };
-    const isSuspense = document.body.getAttribute("data-suspense") ?? suspense;
+    const dataDefer = document.body.getAttribute("data-defer") ?? dataDeferProp;
     const prefetchData = async (dataUrl: string) => {
       const rd: RouteData = {};
       const fetchData = async () => {
@@ -90,7 +90,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
           }
           // clean up data cache
           setTimeout(() => dataCache.delete(dataUrl), 0);
-          if (isSuspense) {
+          if (dataDefer) {
             throw err;
           } else {
             // todo: better notify UI
@@ -109,7 +109,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, suspense, createPortal }) 
           throw new FetchError(500, {}, "Data must be valid JSON");
         }
       };
-      if (isSuspense) {
+      if (dataDefer) {
         rd.data = fetchData;
       } else {
         rd.data = await fetchData();
@@ -361,20 +361,20 @@ function loadSSRModulesFromTag(): RouteModule[] {
     try {
       const data = JSON.parse(el.innerText);
       if (Array.isArray(data)) {
-        let suspenseData: Record<string, unknown> | null | undefined = undefined;
+        let deferedData: Record<string, unknown> | null | undefined = undefined;
         const routeModules = getRouteModules();
-        return data.map(({ url, filename, suspense, ...rest }) => {
-          if (suspense) {
-            if (suspenseData === undefined) {
-              const el = window.document?.getElementById("suspense-data");
+        return data.map(({ url, filename, dataDefered, ...rest }) => {
+          if (dataDefered) {
+            if (deferedData === undefined) {
+              const el = window.document?.getElementById("defered-data");
               if (el) {
-                suspenseData = JSON.parse(el.innerText);
+                deferedData = JSON.parse(el.innerText);
               } else {
-                suspenseData = null;
+                deferedData = null;
               }
             }
-            if (suspenseData) {
-              rest.data = suspenseData[url];
+            if (deferedData) {
+              rest.data = deferedData[url];
             }
           }
           return {

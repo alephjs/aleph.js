@@ -16,7 +16,7 @@ export type DataProviderProps = PropsWithChildren<{
 }>;
 
 export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, children }) => {
-  const suspenseData = useRef<unknown>();
+  const deferedData = useRef<unknown>();
   const [data, setData] = useState(() => {
     const cached = dataCache.get(dataUrl);
     if (cached) {
@@ -28,10 +28,10 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
         if (res instanceof Promise) {
           return res.then((data) => {
             dataCache.set(dataUrl, data);
-            suspenseData.current = data;
+            deferedData.current = data;
           }).catch((error) => {
             dataCache.set(dataUrl, error);
-            suspenseData.current = error;
+            deferedData.current = error;
           });
         }
         throw new Error(`Data for ${dataUrl} has invalid type [function].`);
@@ -171,19 +171,19 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
 
   return createElement(
     DataContext.Provider,
-    { value: { suspenseData, data, isMutating, mutation, reload } },
+    { value: { deferedData, data, isMutating, mutation, reload } },
     children,
   );
 };
 
-export const useData = <T = unknown>(): Omit<DataContextProps<T>, "suspenseData"> => {
-  const { suspenseData, data, ...rest } = useContext(DataContext) as DataContextProps<T>;
+export const useData = <T = unknown>(): Omit<DataContextProps<T>, "deferedData"> => {
+  const { deferedData, data, ...rest } = useContext(DataContext) as DataContextProps<T>;
   if (data instanceof Promise) {
-    if (suspenseData?.current instanceof Error) {
-      throw suspenseData.current;
+    if (deferedData?.current instanceof Error) {
+      throw deferedData.current;
     }
-    if (suspenseData?.current !== undefined) {
-      return { ...rest, data: suspenseData.current };
+    if (deferedData?.current !== undefined) {
+      return { ...rest, data: deferedData.current };
     }
     throw data;
   }

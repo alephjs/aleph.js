@@ -1,5 +1,5 @@
 import MagicString from "https://esm.sh/magic-string@0.26.1";
-import { parseDeps } from "https://deno.land/x/aleph_compiler@0.1.0/mod.ts";
+import { parseDeps } from "https://deno.land/x/aleph_compiler@0.3.0/mod.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import { serveDir } from "../lib/serve.ts";
@@ -70,7 +70,7 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, 
             url = `"${importUrl}?v=${versionStr}"`;
           }
         }
-        s.overwrite(loc.start, loc.end, url);
+        s.overwrite(loc.start - 1, loc.end - 1, url);
       }
     });
     return { content: s.toString(), contentType };

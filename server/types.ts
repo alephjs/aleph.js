@@ -1,10 +1,16 @@
 import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.33.2";
 
 export type AlephConfig = {
-  /** The build options for `build` command. */
-  build?: BuildOptions;
   /** The config for file-system based routing.  */
   routes?: RoutesConfig | string;
+  /** The build options for `build` command. */
+  build?: BuildOptions;
+  /** The config for dev server. */
+  devServer?: {
+    watchFS?: (kind: "create" | "remove" | "modify", specifier: string) => void;
+    /** The url for HMR web socket. This is useful for dev server proxy env. */
+    hmrWebSocketUrl?: string;
+  };
 };
 
 /** The build platform.  */

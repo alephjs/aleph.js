@@ -98,11 +98,6 @@ import { Link, Head } from "aleph/vue"
   content: "";
 }
 
-.index nav a {
-  color: #000;
-  text-decoration: none;
-}
-
 .index nav {
   display: flex;
   justify-content: center;
@@ -120,6 +115,7 @@ import { Link, Head } from "aleph/vue"
   border-radius: 25px;
   color: #454545;
   transition: border-color 0.15s ease-in;
+  text-decoration: none;
   cursor: pointer;
 }
 

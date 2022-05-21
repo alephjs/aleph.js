@@ -11,9 +11,9 @@ serve({
     },
   },
   ssr: {
-    // when set `suspense` to `true`, the router will loading data in suspense mode
-    // please check https://alephjs.org/docs/react/router/suspense
-    suspense: false,
+    // when set `dataDefer` to `true`, the router will loading data as defer
+    // please check https://alephjs.org/docs/react/router/data-defer
+    dataDefer: false,
     render: (ctx) => renderToReadableStream(<App ssrContext={ctx} />, ctx),
   },
 });

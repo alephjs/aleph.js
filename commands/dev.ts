@@ -1,4 +1,4 @@
-import { basename, relative } from "https://deno.land/std@0.136.0/path/mod.ts";
+import { basename, relative, resolve } from "https://deno.land/std@0.136.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { findFile, watchFs } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";
@@ -126,22 +126,28 @@ if (import.meta.main) {
           });
         }
       });
-    } else {
-      emitters.forEach((e) => {
-        e.emit(kind, { specifier });
-      });
     }
   });
 
   const emitter = createEmitter();
-  const [denoConfigFile, importMapFile, serverEntry] = await Promise.all([
+  const [denoConfigFile, importMapFile, serverEntry, buildScript] = await Promise.all([
     findFile(["deno.jsonc", "deno.json", "tsconfig.json"]),
     findFile(["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
     findFile(builtinModuleExts.map((ext) => `server.${ext}`)),
+    findFile(builtinModuleExts.map((ext) => `build.${ext}`)),
   ]);
+
+  if (buildScript) {
+    log.info(`Running ${blue(basename(buildScript))}...`);
+    const { default: build } = await import(`file://${resolve(buildScript)}`);
+    await build();
+  }
 
   let ac: AbortController | null = null;
   const bs = async () => {
+    if (Deno.env.get("PREVENT_SERVER_RESTART") === "true") {
+      return;
+    }
     if (ac) {
       ac.abort();
       log.info(`Restart server...`);
@@ -188,7 +194,7 @@ if (import.meta.main) {
   await bs();
 }
 
-async function bootstrap(signal: AbortSignal, entry: string | undefined, forcePort?: number): Promise<void> {
+async function bootstrap(signal: AbortSignal, entry: string | undefined, fixedPort?: number): Promise<void> {
   // clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
   Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
@@ -211,14 +217,24 @@ async function bootstrap(signal: AbortSignal, entry: string | undefined, forcePo
     serve();
   }
 
-  const {
-    port: userPort,
-    hostname,
-    certFile,
-    keyFile,
-    handler,
-  } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
-  const port = forcePort || userPort || 8080;
+  const { devServer }: AlephConfig = Reflect.get(globalThis, "__ALEPH_CONFIG") || {};
+  const { port: userPort, hostname, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
+  const port = fixedPort || userPort || 8080;
+
+  if (typeof devServer?.watchFS === "function") {
+    const { watchFS } = devServer;
+    const e = createEmitter();
+    signal.addEventListener("abort", () => {
+      removeEmitter(e);
+    });
+    e.on("*", (kind, { specifier }) => {
+      if (kind.startsWith("modify:")) {
+        watchFS("modify", specifier);
+      } else if (kind === "create" || kind === "remove") {
+        watchFS(kind, specifier);
+      }
+    });
+  }
 
   try {
     await httpServe({

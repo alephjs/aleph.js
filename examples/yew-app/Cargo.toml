@@ -1,0 +1,13 @@
+[package]
+name = "yew-app"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# this is the development version of Yew
+yew = { git = "https://github.com/yewstack/yew/", features = ["ssr", "hydration"] }
+wasm-bindgen = { version = "0.2.80", features = ["strict-macro"] }
+wasm-bindgen-futures = "0.4.30"

@@ -14,6 +14,7 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 - React 18 Suspense SSR: https://aleph-suspense-ssr.deno.dev/
 - UnoCSS(tailwind): https://aleph-unocss.deno.dev/
 - Monaco Editor: https://aleph-monaco-editor.deno.dev/
+- Yew SSR: https://aleph-yew.deno.dev/
 
 > **Source code**: https://github.com/alephjs/aleph.js/tree/main/examples
 

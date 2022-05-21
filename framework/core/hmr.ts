@@ -10,6 +10,7 @@ class Module {
   private _isDeclined = false;
   private _isLocked = false;
   private _acceptCallbacks: CallableFunction[] = [];
+  private _declineDelay = 0;
 
   constructor(specifier: string) {
     this._specifier = specifier;
@@ -28,8 +29,11 @@ class Module {
     }
   }
 
-  decline(): void {
+  decline(delay?: number): void {
     this._isDeclined = true;
+    if (!Number.isNaN(Number(delay))) {
+      this._declineDelay = Math.max(Number(delay), 0);
+    }
     this.accept();
   }
 
@@ -52,6 +56,9 @@ class Module {
 
   async applyUpdate() {
     if (this._isDeclined) {
+      if (this._declineDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, this._declineDelay));
+      }
       location.reload();
       return;
     }
