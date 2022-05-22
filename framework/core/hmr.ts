@@ -1,5 +1,6 @@
 import util from "../../lib/util.ts";
 import events from "./events.ts";
+import "./transform_error.ts";
 
 // ESM Hot Module Replacement (ESM-HMR) Specification
 // https://github.com/withastro/esm-hmr
@@ -135,10 +136,10 @@ function connect() {
   ws.addEventListener("message", ({ data }: { data?: string }) => {
     if (data) {
       try {
-        const { type, specifier, routePattern } = JSON.parse(data);
+        const { type, specifier, ...rest } = JSON.parse(data);
         switch (type) {
           case "create": {
-            events.emit("hmr:create", { specifier, routePattern });
+            events.emit("hmr:create", { specifier, ...rest });
             break;
           }
           case "modify": {
@@ -154,6 +155,10 @@ function connect() {
               modules.delete(specifier);
             }
             events.emit("hmr:remove", { specifier });
+            break;
+          }
+          case "transform": {
+            events.emit("transform", { specifier, ...rest });
             break;
           }
           case "reload": {
