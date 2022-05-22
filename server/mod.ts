@@ -24,6 +24,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   fetch?: FetchHandler;
   ssr?: SSR;
   onError?: ErrorCallback;
+  port?: number;
 } & AlephConfig;
 
 export const serve = (options: ServerOptions = {}) => {
