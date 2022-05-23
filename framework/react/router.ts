@@ -51,18 +51,14 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
   }, [modules]);
 
   useEffect(() => {
-    // remove ssr head elements
-    const { head } = window.document;
-    Array.from(head.children).forEach((el: Element) => {
-      if (el.hasAttribute("ssr")) {
-        head.removeChild(el);
-      }
-    });
-
+    const { head, body } = window.document;
     const routeModules = getRouteModules();
-    const routeRecord = loadRoutesFromTag();
+    const routeRecord = loadRouteRecordFromTag();
+    const dataDefer = body.getAttribute("data-defer") ?? dataDeferProp;
+    const deployId = body.getAttribute("data-deployment-id");
+
+    // import route module
     const importModule = async ({ filename }: RouteMeta) => {
-      const deployId = document.body.getAttribute("data-deployment-id");
       let url = filename.slice(1);
       if (deployId) {
         url += `?v=${deployId}`;
@@ -72,8 +68,9 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
       routeModules[filename] = { defaultExport, withData };
       return { defaultExport, withData };
     };
-    const dataDefer = document.body.getAttribute("data-defer") ?? dataDeferProp;
-    const prefetchData = async (dataUrl: string) => {
+
+    // prefetch route data
+    const prefetchRouteData = async (dataUrl: string) => {
       const rd: RouteData = {};
       const fetchData = async () => {
         const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
@@ -116,8 +113,9 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
       }
       dataCache.set(dataUrl, rd);
     };
+
+    // prefetch module using `<link rel="modulepreload" href="...">`
     const onmoduleprefetch = (e: Record<string, unknown>) => {
-      const deployId = document.body.getAttribute("data-deployment-id");
       const pageUrl = new URL(e.href as string, location.href);
       const matches = matchRoutes(pageUrl, routeRecord);
       matches.map(([_, meta]) => {
@@ -134,14 +132,16 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
         }
       });
     };
+
+    // `popstate` event handler
     const onpopstate = async (e: Record<string, unknown>) => {
       const url = (e.url as URL | undefined) || new URL(window.location.href);
       const matches = matchRoutes(url, routeRecord);
-      const loadingBar = getLoadingBar();
+      const loadingBarEl = getLoadingBarEl();
       let loading: number | null = setTimeout(() => {
         loading = null;
-        loadingBar.style.opacity = "1";
-        loadingBar.style.width = "50%";
+        loadingBarEl.style.opacity = "1";
+        loadingBarEl.style.width = "50%";
       }, 300);
       const modules = await Promise.all(matches.map(async ([ret, meta]) => {
         const { filename } = meta;
@@ -159,7 +159,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
         }
         if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
           rmod.withData = true;
-          await prefetchData(dataUrl);
+          await prefetchRouteData(dataUrl);
         }
         return rmod;
       }));
@@ -168,24 +168,24 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
       setTimeout(() => {
         if (loading) {
           clearTimeout(loading);
-          loadingBar.remove();
+          loadingBarEl.remove();
         } else {
           const moveOutTime = 0.7;
           const fadeOutTime = 0.3;
           const t1 = setTimeout(() => {
-            loadingBar.style.opacity = "0";
+            loadingBarEl.style.opacity = "0";
           }, moveOutTime * 1000);
           const t2 = setTimeout(() => {
-            global.__loading_bar_cleanup = null;
-            loadingBar.remove();
+            global.__LOADING_BAR_CLEANUP = null;
+            loadingBarEl.remove();
           }, (moveOutTime + fadeOutTime) * 1000);
-          global.__loading_bar_cleanup = () => {
+          global.__LOADING_BAR_CLEANUP = () => {
             clearTimeout(t1);
             clearTimeout(t2);
           };
-          loadingBar.style.transition = `opacity ${fadeOutTime}s ease-out, width ${moveOutTime}s ease-in-out`;
+          loadingBarEl.style.transition = `opacity ${fadeOutTime}s ease-out, width ${moveOutTime}s ease-in-out`;
           setTimeout(() => {
-            loadingBar.style.width = "100%";
+            loadingBarEl.style.width = "100%";
           }, 0);
         }
       }, 0);
@@ -194,28 +194,27 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
       }
     };
 
-    addEventListener("popstate", onpopstate as unknown as EventListener);
-    events.on("popstate", onpopstate);
-    events.on("moduleprefetch", onmoduleprefetch);
-    events.emit("routerready", { type: "routerready" });
-
-    const oncreate = (e: Record<string, unknown>) => {
-      const route: Route = [
-        new URLPatternCompat(e.routePattern as URLPatternInput),
-        {
-          filename: e.specifier as string,
-          pattern: e.routePattern as URLPatternInput,
-        },
-      ];
-      const pathname = (e.routePattern as URLPatternInput).pathname.slice(1);
-      if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
-        routeRecord[pathname] = route;
+    // update route record when creating a new route file
+    const onhmrcreate = (e: Record<string, unknown>) => {
+      const pattern = e.routePattern as URLPatternInput | undefined;
+      if (pattern) {
+        const route: Route = [
+          new URLPatternCompat(pattern),
+          {
+            filename: e.specifier as string,
+            pattern,
+          },
+        ];
+        const pathname = pattern.pathname.slice(1);
+        if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
+          routeRecord[pathname] = route;
+        }
+        routeRecord.routes.push(route);
       }
-      routeRecord.routes.push(route);
     };
-    events.on("hmr:create", oncreate);
 
-    const onremove = (e: Record<string, unknown>) => {
+    // update route record when removing a route file
+    const onhmrremove = (e: Record<string, unknown>) => {
       const route = routeRecord.routes.find((v) => v[1].filename === e.specifier);
       const pathname = (route?.[1].pattern.pathname)?.slice(1);
       if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
@@ -224,14 +223,28 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
       routeRecord.routes = routeRecord.routes.filter((v) => v[1].filename != e.specifier);
       onpopstate({ type: "popstate" });
     };
-    events.on("hmr:remove", onremove);
 
+    addEventListener("popstate", onpopstate as unknown as EventListener);
+    events.on("popstate", onpopstate);
+    events.on("moduleprefetch", onmoduleprefetch);
+    events.on("hmr:create", onhmrcreate);
+    events.on("hmr:remove", onhmrremove);
+    events.emit("routerready", { type: "routerready" });
+
+    // remove ssr head elements
+    Array.from(head.children).forEach((el: Element) => {
+      if (el.hasAttribute("ssr")) {
+        head.removeChild(el);
+      }
+    });
+
+    // clean up
     return () => {
       removeEventListener("popstate", onpopstate as unknown as EventListener);
       events.off("popstate", onpopstate);
       events.off("moduleprefetch", onmoduleprefetch);
-      events.off("hmr:create", oncreate);
-      events.off("hmr:remove", onremove);
+      events.off("hmr:create", onhmrcreate);
+      events.off("hmr:remove", onhmrremove);
     };
   }, []);
 
@@ -325,7 +338,7 @@ export const useForwardProps = <T = Record<string, unknown>>(): T => {
   return props as T;
 };
 
-function loadRoutesFromTag(): RouteRecord {
+function loadRouteRecordFromTag(): RouteRecord {
   const el = window.document?.getElementById("routes-manifest");
   if (el) {
     try {
@@ -349,7 +362,7 @@ function loadRoutesFromTag(): RouteRecord {
         return { routes, _app, _404, _error };
       }
     } catch (e) {
-      throw new Error(`loadRoutesFromTag: ${e.message}`);
+      throw new Error(`loadRouteRecordFromTag: ${e.message}`);
     }
   }
   return { routes: [] };
@@ -392,10 +405,14 @@ function loadSSRModulesFromTag(): RouteModule[] {
   return [];
 }
 
-function getLoadingBar(): HTMLDivElement {
-  if (typeof global.__loading_bar_cleanup === "function") {
-    global.__loading_bar_cleanup();
-    global.__loading_bar_cleanup = null;
+function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
+  return global.__ROUTE_MODULES || (global.__ROUTE_MODULES = {});
+}
+
+function getLoadingBarEl(): HTMLDivElement {
+  if (typeof global.__LOADING_BAR_CLEANUP === "function") {
+    global.__LOADING_BAR_CLEANUP();
+    global.__LOADING_BAR_CLEANUP = null;
   }
   let bar = (document.getElementById("loading-bar") as HTMLDivElement | null);
   if (!bar) {
@@ -415,8 +432,4 @@ function getLoadingBar(): HTMLDivElement {
     transition: "opacity 0.6s ease-in, width 3s ease-in",
   });
   return bar;
-}
-
-function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
-  return global.__ROUTE_MODULES || (global.__ROUTE_MODULES = {});
 }
