@@ -67,8 +67,8 @@ export function getUnoGenerator(): UnoGenerator | null {
 }
 
 /** Get the deployment ID. */
-export function getDeploymentId(): string | null {
-  return Deno.env.get("DENO_DEPLOYMENT_ID") ?? null;
+export function getDeploymentId(): string | undefined {
+  return Deno.env.get("DENO_DEPLOYMENT_ID");
 }
 
 /**
