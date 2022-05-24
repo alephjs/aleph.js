@@ -1,4 +1,4 @@
-import type { Component, Ref, ShallowRef } from "vue";
+import type { App, Component, Ref, ShallowRef } from "vue";
 import { createSSRApp as vueCreateSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
 import type { Route, RouteMeta, RouteModule, RouteRecord } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
@@ -290,7 +290,7 @@ const createAppApi = (props?: RootProps) => {
   return errApp;
 };
 
-const createSSRApp = (createSSRAppApi: (props?: RootProps) => Component, props?: RootProps) => {
+const createSSRApp = (createSSRAppApi: (props?: RootProps) => App<Element>, props?: RootProps) => {
   if (createSSRAppApi === undefined) {
     throw new Error("[aleph/vue] createSSRApp without `App` component");
   }
