@@ -7,8 +7,8 @@ Deno.test("loaders/vue.ts: VueLoader", async () => {
   Deno.chdir(dir);
   await Deno.writeTextFile(
     join(dir, "test.vue"),
-    `
-    <script setup>
+    /* html */ `
+    <script setup lang="ts">
       import { ref } from "https://esm.sh/vue@3"
 
       const msg = ref("Hello World!")
@@ -73,8 +73,8 @@ Deno.test("loaders/vue.ts: VueLoader(hmr)", async () => {
   Deno.chdir(dir);
   await Deno.writeTextFile(
     join(dir, "test.vue"),
-    `
-    <script setup>
+    /* html */ `
+    <script setup lang="ts">
       import { ref } from "https://esm.sh/vue@3"
 
       const msg = ref("Hello World!")
@@ -105,8 +105,8 @@ Deno.test("loaders/vue.ts: VueLoader(ssr)", async () => {
   Deno.chdir(dir);
   await Deno.writeTextFile(
     join(dir, "test.vue"),
-    `
-    <script setup>
+    /* html */ `
+    <script setup lang="ts">
       import { ref } from "https://esm.sh/vue@3"
 
       const msg = ref("Hello World!")
