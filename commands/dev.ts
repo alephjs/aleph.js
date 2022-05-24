@@ -1,6 +1,6 @@
 import { basename, extname, relative, resolve } from "https://deno.land/std@0.136.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
-import { parseDeps } from "https://deno.land/x/aleph_compiler@0.5.3/mod.ts";
+import { parseDeps } from "https://deno.land/x/aleph_compiler@0.5.4/mod.ts";
 import { findFile, watchFs } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";

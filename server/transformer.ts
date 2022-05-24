@@ -1,6 +1,6 @@
 import MagicString from "https://esm.sh/magic-string@0.26.1";
-import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.5.3/mod.ts";
-import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.5.3/types.ts";
+import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.5.4/mod.ts";
+import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.5.4/types.ts";
 import { readCode } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -118,8 +118,7 @@ export default {
           alephPkgUri,
           importMap: JSON.stringify(importMap),
           graphVersions,
-          initialGraphVersion: clientDependencyGraph?.initialVersion.toString(16),
-          deploymentId: getDeploymentId() ?? undefined,
+          globalVersion: clientDependencyGraph?.globalVersion.toString(16),
           isDev,
         });
       }
