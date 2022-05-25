@@ -73,7 +73,7 @@ export async function build(serverEntry?: string) {
         const res = await fetch(`http://localhost:${modulesProxyPort}/${filename.slice(1)}`);
         const v = res.headers.get("X-Language");
         code = await res.text();
-        lang = v === "ts" || v === "tsx" || v === "js" || v === "jsx" ? l : undefined;
+        lang = v === "ts" || v === "tsx" || v === "js" || v === "jsx" ? v : undefined;
       } else {
         throw new Error(`Unsupported module type: ${ext}`);
       }
