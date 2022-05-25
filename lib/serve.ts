@@ -47,7 +47,7 @@ export async function serve(options: ServeInit) {
 
 export type ServeDirOptions = Omit<ServeInit, "handler"> & {
   workingDir?: string;
-  loader?: (req: Request) => Promise<{ content: string | Uint8Array; contentType?: string } | null | undefined>;
+  loader?: (req: Request) => Promise<{ content: string | Uint8Array; headers?: HeadersInit } | null | undefined>;
 };
 
 export async function serveDir(options: ServeDirOptions) {
@@ -83,12 +83,14 @@ export async function serveDir(options: ServeDirOptions) {
       if (options.loader) {
         const ret = await options.loader(req);
         if (ret) {
-          return new Response(ret.content, {
-            headers: {
-              "Content-Type": ret.contentType || getContentType(filepath),
-              "Last-Modified": stat.mtime?.toUTCString() || "",
-            },
-          });
+          const headers = new Headers(ret.headers);
+          if (!headers.has("Content-Type")) {
+            headers.set("Content-Type", getContentType(filepath));
+          }
+          if (stat.mtime) {
+            headers.set("Last-Modified", stat.mtime.toUTCString());
+          }
+          return new Response(ret.content, { headers });
         }
       }
 

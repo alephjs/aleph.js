@@ -1,7 +1,7 @@
 import { basename, dirname, extname, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.136.0/fs/ensure_dir.ts";
 import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.38/mod.js";
-import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.5.4/mod.ts";
+import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.5.5/mod.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
 import { parseHtmlLinks } from "./html.ts";
 import log from "../lib/log.ts";
@@ -65,15 +65,19 @@ export async function build(serverEntry?: string) {
     const { routes } = await initRoutes(config?.routes);
     routeFiles = await Promise.all(routes.map(async ([_, { filename }]) => {
       let code: string;
+      let lang: "ts" | "tsx" | "js" | "jsx" | undefined = undefined;
       const ext = extname(filename).slice(1);
       if (builtinModuleExts.includes(ext)) {
         code = await Deno.readTextFile(filename);
       } else if (modulesProxyPort) {
-        code = await fetch(`http://localhost:${modulesProxyPort}/${filename.slice(1)}`).then((res) => res.text());
+        const res = await fetch(`http://localhost:${modulesProxyPort}/${filename.slice(1)}`);
+        const v = res.headers.get("X-Language");
+        code = await res.text();
+        lang = v === "ts" || v === "tsx" || v === "js" || v === "jsx" ? l : undefined;
       } else {
         throw new Error(`Unsupported module type: ${ext}`);
       }
-      const exportNames = await parseExportNames(filename, code);
+      const exportNames = await parseExportNames(filename, code, { lang });
       return [filename, exportNames];
     }));
   }
