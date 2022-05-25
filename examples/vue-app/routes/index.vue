@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { Link, Head } from "aleph/vue"
 </script>
 
