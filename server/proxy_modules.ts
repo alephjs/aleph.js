@@ -63,7 +63,7 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, 
       if (loc) {
         let url = `"${importUrl}"`;
         if (!util.isLikelyHttpURL(specifier)) {
-          const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
+          const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.globalVersion;
           if (importUrl.includes("?")) {
             url = `"${importUrl}&v=${versionStr}"`;
           } else {
