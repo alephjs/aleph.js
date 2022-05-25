@@ -4,6 +4,7 @@
       "dom",
       "dom.iterable",
       "dom.asynciterable",
+      "dom.extras",
       "deno.ns"
     ],
     "types": [
