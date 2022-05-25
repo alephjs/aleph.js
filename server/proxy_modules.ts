@@ -51,10 +51,8 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, 
 
   const specifier = "." + pathname;
   const contentType = lang ? getContentType(`file.${lang}`) : undefined;
-  const unoGenerator = (isTemplateLanguage || lang === "jsx" || lang === "tsx" || pathname.endsWith(".tsx") ||
-      pathname.endsWith(".jsx"))
-    ? getUnoGenerator()
-    : null;
+  const isTpl = isTemplateLanguage || lang === "jsx" || lang === "tsx" || util.endsWithAny(pathname, ".tsx", ".jsx");
+  const unoGenerator = isTpl ? getUnoGenerator() : null;
   const [deps, atomicCSS] = await Promise.all([
     parseDeps(specifier, code, { importMap: JSON.stringify(env.importMap), lang }),
     unoGenerator ? unoGenerator.generate(code).then((ret) => ({ tokens: [...ret.matched] })) : undefined,
