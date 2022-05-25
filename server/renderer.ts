@@ -89,7 +89,7 @@ export default {
           },
         };
         const body = await render(ssrContext);
-        const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+        const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
         if (serverDependencyGraph) {
           const unocssTokens: ReadonlyArray<string>[] = [];
           const lookupModuleStyle = (mod: Module) => {

@@ -279,7 +279,7 @@ export const serve = (options: ServerOptions = {}) => {
                 if (res instanceof Response) {
                   if (res.status >= 300 && fromFetchApi) {
                     const err = await FetchError.fromResponse(res);
-                    return json({ ...err }, { status: err.status >= 400 ? err.status : 501, headers: ctx.headers });
+                    return json(err, { status: err.status >= 400 ? err.status : 501, headers: ctx.headers });
                   }
                   let headers: Headers | null = null;
                   ctx.headers.forEach((value, name) => {
@@ -333,8 +333,8 @@ export const serve = (options: ServerOptions = {}) => {
             if (err instanceof Error || typeof err === "string") {
               log.error(err);
             }
-            const status: number = util.isUint(err.status || err.code) ? err.status || err.code : 500;
-            return json({ ...err, message: err.message || String(err), status }, {
+            const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
+            return json({ ...err, message: err.message ?? String(err), status }, {
               status: status >= 400 ? status : 501,
               headers: ctx.headers,
             });
@@ -399,7 +399,7 @@ export const serve = (options: ServerOptions = {}) => {
 
   // inject global objects
   Reflect.set(globalThis, "__ALEPH_CONFIG", { build, routes, devServer });
-  Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
+  Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;
   if (Deno.env.get("ALEPH_CLI")) {

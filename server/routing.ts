@@ -23,7 +23,7 @@ export async function importRouteModule(filename: string) {
   if (revivedModules.has(filename)) {
     mod = revivedModules.get(filename)!;
   } else {
-    const graph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+    const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
     const version = graph?.get(filename)?.version || graph?.mark(filename, {}).version || Date.now().toString(16);
     const port = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
     mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version}`);

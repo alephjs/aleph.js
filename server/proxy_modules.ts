@@ -27,7 +27,7 @@ const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
       cssModules: pathname.endsWith(".module.css"),
     },
   );
-  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
   if (!serverDependencyGraph) {
     throw new Error("The `serverDependencyGraph` is not defined");
   }
@@ -39,7 +39,7 @@ const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
 };
 
 const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, env: ModuleLoaderEnv) => {
-  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
   if (!serverDependencyGraph) {
     throw new Error("The `serverDependencyGraph` is not defined");
   }
@@ -109,7 +109,7 @@ type ProxyModulesOptions = {
 
 /** serve app modules to support module loader that allows you import Non-JavaScript modules like `.css/.vue/.svelet/...` */
 export function proxyModules(port: number, options: ProxyModulesOptions) {
-  Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+  Reflect.set(globalThis, "__ALEPH_SERVER_DEP_GRAPH", new DependencyGraph());
   return new Promise<void>((resolve, reject) => {
     serveDir({
       port,
