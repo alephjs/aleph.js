@@ -8,7 +8,7 @@ Deno.test("loaders/vue.ts: VueLoader", async () => {
   await Deno.writeTextFile(
     join(dir, "test.vue"),
     `
-    <script setup lang="ts">
+    <script setup>
       import { ref } from "https://esm.sh/vue@3"
 
       const msg = ref("Hello World!")
@@ -28,7 +28,7 @@ Deno.test("loaders/vue.ts: VueLoader", async () => {
   );
   const loader = new VueLoader();
   const { lang, code, inlineCSS, isTemplateLanguage } = await loader.load("/test.vue", { isDev: false });
-  assertEquals(lang, "ts");
+  assertEquals(lang, "js");
   assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
   assert(code.includes(`setup(__props)`));
   assert(code.includes(`const msg = ref("Hello World!")`));
@@ -74,7 +74,7 @@ Deno.test("loaders/vue.ts: VueLoader(hmr)", async () => {
   await Deno.writeTextFile(
     join(dir, "test.vue"),
     `
-    <script setup lang="ts">
+    <script setup>
       import { ref } from "https://esm.sh/vue@3"
 
       const msg = ref("Hello World!")
@@ -106,7 +106,7 @@ Deno.test("loaders/vue.ts: VueLoader(ssr)", async () => {
   await Deno.writeTextFile(
     join(dir, "test.vue"),
     `
-    <script setup lang="ts">
+    <script setup>
       import { ref } from "https://esm.sh/vue@3"
 
       const msg = ref("Hello World!")
