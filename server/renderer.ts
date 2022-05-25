@@ -28,8 +28,11 @@ export type SSRFn = {
 // Options for the content-security-policy
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
 export type CSP = {
-  nonce?: boolean;
-  getPolicy: (url: URL, nonce?: string) => string | null;
+  nonce: true;
+  getPolicy: (url: URL, nonce: string) => string | null;
+} | {
+  nonce?: false;
+  getPolicy: (url: URL) => string | null;
 };
 
 export type SSR = {
