@@ -28,11 +28,8 @@ export type SSRFn = {
 // Options for the content-security-policy
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
 export type CSP = {
-  nonce: true;
-  getPolicy: (url: URL, nonce: string) => string | null;
-} | {
-  nonce?: false;
-  getPolicy: (url: URL) => string | null;
+  nonce?: boolean;
+  getPolicy: (url: URL, nonce?: string) => string | null;
 };
 
 export type SSR = {
@@ -153,7 +150,7 @@ export default {
         };
         if (CSP) {
           const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
-          const policy = CSP.getPolicy(url, nonce);
+          const policy = CSP.getPolicy(url, nonce!);
           if (policy) {
             headers.append("Content-Security-Policy", policy);
             if (policy.includes("nonce-" + nonce)) {
