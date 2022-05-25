@@ -10,6 +10,10 @@ export type URLPatternResult = {
   pathname: { input: string; groups: Record<string, string> };
 };
 
+/**
+ * A class uses the `URLPattern` class to parse and match URLs if the browser supports it,
+ * or fall back to use the `execPathname` function.
+ */
 export class URLPatternCompat {
   pattern: Record<string, unknown>;
 
@@ -51,9 +55,7 @@ export class URLPatternCompat {
 
   constructor(pattern: URLPatternInput) {
     if ("URLPattern" in globalThis) {
-      // deno-lint-ignore ban-ts-comment
-      // @ts-ignore
-      this.pattern = new URLPattern(pattern);
+      this.pattern = new URLPattern(pattern) as unknown as Record<string, unknown>;
     } else {
       this.pattern = pattern;
     }
@@ -73,7 +75,7 @@ export class URLPatternCompat {
     return false;
   }
 
-  exec(input: { host: string; pathname: string }): null | URLPatternResult {
+  exec(input: { host: string; pathname: string }): URLPatternResult | null {
     const { pattern } = this;
     if (typeof pattern.exec === "function") {
       return pattern.exec(input);
