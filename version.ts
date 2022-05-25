@@ -1,5 +1,5 @@
 /** `VERSION` managed by https://deno.land/x/publish */
-export const VERSION = "1.0.0-alpha.53";
+export const VERSION = "1.0.0-alpha.54";
 
 /** The flag indicates that the version is canary version. */
 export const isCanary = false;
