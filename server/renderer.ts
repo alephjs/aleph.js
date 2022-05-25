@@ -25,15 +25,22 @@ export type SSRFn = {
   (ssr: SSRContext): Promise<ReadableStream | string> | ReadableStream | string;
 };
 
+// Options for the content-security-policy
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+export type CSP = {
+  nonce?: boolean;
+  getPolicy: (url: URL, nonce?: string) => string | null;
+};
+
 export type SSR = {
+  cacheControl?: "private" | "public";
+  CSP?: CSP;
   dataDefer: true;
-  cacheControl?: "private" | "public";
-  csp?: string | string[];
-  render: SSRFn;
+  render: (ssr: SSRContext) => Promise<ReadableStream> | ReadableStream;
 } | {
-  dataDefer?: false;
   cacheControl?: "private" | "public";
-  csp?: string | string[];
+  CSP?: CSP;
+  dataDefer?: false;
   render: SSRFn;
 } | SSRFn;
 
@@ -42,6 +49,7 @@ export type SSRResult = {
   errorBoundaryHandlerFilename?: string;
   body: ReadableStream | string;
   deferedData: Record<string, unknown>;
+  nonce?: string;
 };
 
 export type RenderOptions = {
@@ -65,7 +73,7 @@ export default {
       const isFn = typeof ssr === "function";
       const dataDefer = isFn ? false : !!ssr.dataDefer;
       const cc = isFn ? "public" : ssr.cacheControl ?? "public";
-      const csp = isFn ? undefined : ssr.csp;
+      const CSP = isFn ? undefined : ssr.CSP;
       const render = isFn ? ssr : ssr.render;
       try {
         const [url, routeModules, deferedData, errorBoundaryHandler] = await initSSR(
@@ -134,16 +142,22 @@ export default {
         } else {
           headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
         }
-        if (csp) {
-          // todo: parse nonce
-          headers.append("Content-Security-Policy", [csp].flat().join("; "));
-        }
         ssrRes = {
           context: ssrContext,
           errorBoundaryHandlerFilename: errorBoundaryHandler?.filename,
           body,
           deferedData,
         };
+        if (CSP) {
+          const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
+          const policy = CSP.getPolicy(url, nonce);
+          if (policy) {
+            headers.append("Content-Security-Policy", policy);
+            if (policy.includes("nonce-" + nonce)) {
+              ssrRes.nonce = nonce;
+            }
+          }
+        }
       } catch (e) {
         if (e instanceof Response) {
           return e;
@@ -213,6 +227,7 @@ export default {
             errorBoundaryHandlerFilename,
             body,
             deferedData,
+            nonce,
           } = ssrRes;
           rewriter.on("head", {
             element(el: Element) {
@@ -230,6 +245,7 @@ export default {
                     dataDefered: defered,
                   };
                 });
+
                 // replace "/" to "\/" to prevent xss
                 const modulesJSON = JSON.stringify(ssrModules).replaceAll("/", "\\/");
                 el.append(
@@ -244,13 +260,15 @@ export default {
                 const kvs = routeModules.map(({ filename, data }, idx) =>
                   `${JSON.stringify(filename)}:{defaultExport:$${idx}${data !== undefined ? ",withData:true" : ""}}`
                 ).join(",");
-                el.append(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
-                  html: true,
-                });
+                const nonceAttr = nonce ? ` nonce="${nonce}"` : "";
+                el.append(
+                  `<script type="module"${nonceAttr}>${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`,
+                  { html: true },
+                );
 
                 if (errorBoundaryHandlerFilename) {
                   el.append(
-                    `<script type="module">import Handler from ${
+                    `<script type="module"${nonceAttr}>import Handler from ${
                       JSON.stringify(errorBoundaryHandlerFilename.slice(1))
                     };window.__ERROR_BOUNDARY_HANDLER=Handler</script>`,
                     { html: true },
@@ -308,6 +326,16 @@ export default {
               }
             },
           });
+          if (nonce) {
+            rewriter.on("script", {
+              element(el: Element) {
+                const typeAttr = el.getAttribute("type");
+                if ((!typeAttr || typeAttr === "module") && !el.getAttribute("src")) {
+                  el.setAttribute("nonce", nonce);
+                }
+              },
+            });
+          }
         }
 
         try {
