@@ -1,9 +1,19 @@
-<script>
-const store = {
+<script lang="ts">
+type TodoItem = {
+  id: number;
+  message: string;
+  completed: boolean;
+};
+
+type Store = {
+  todos: TodoItem[];
+};
+
+const store: Store = {
   todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
 };
 
-export const data = {
+export const data: Data<Store, Store> = {
   cacheTtl: 0, // no cache
   get: () => {
     return store;
@@ -42,18 +52,18 @@ export const data = {
 };
 </script>
 
-<script setup>
+<script setup lang="ts">
 import { Head, useData } from "aleph/vue"
 
 const { data, isMutating, mutation } = useData();
 
-async function onChange(todo) {
+async function onChange(todo: TodoItem) {
   const { id } = todo;
   const completed = !todo.completed;
   mutation.patch({ id, completed }, "replace")
 }
 
-async function onSubmit(e) {
+async function onSubmit(e: any) {
   e.preventDefault();
   const form = e.currentTarget;
   const fd = new FormData(form);
@@ -76,7 +86,7 @@ async function onSubmit(e) {
   }
 }
 
-function onClick(todo) {
+function onClick(todo: TodoItem) {
   mutation.delete({ id: todo.id }, "replace");
 }
 </script>
@@ -246,12 +256,12 @@ function onClick(todo) {
   color: #333;
 }
 
-.todos-app form input:focus{
+.todos-app form input:focus {
   background-color: #f9f9f9;
   outline: none;
 }
 
-.todos-app form input::placeholder{
+.todos-app form input::placeholder {
   font-style: italic;
   font-weight: 300;
   color: #aaa;
