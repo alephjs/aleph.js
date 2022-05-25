@@ -394,7 +394,7 @@ async function initSSR(
             if (res.headers.has("Location")) {
               throw res;
             }
-            throw new FetchError(500, {}, "Missing the `Location` header");
+            throw new FetchError(500, "Missing the `Location` header");
           }
           try {
             const data = await res.json();
@@ -403,7 +403,7 @@ async function initSSR(
             }
             return data;
           } catch (_e) {
-            throw new FetchError(500, {}, "Data must be valid JSON");
+            throw new FetchError(500, "Data must be valid JSON");
           }
         } else if (res === null || util.isPlainObject(res) || Array.isArray(res)) {
           if (dataDefer) {
@@ -411,7 +411,7 @@ async function initSSR(
           }
           return res;
         } else {
-          throw new FetchError(500, {}, "Data must be valid JSON");
+          throw new FetchError(500, "Data must be valid JSON");
         }
       };
       rmod.withData = true;

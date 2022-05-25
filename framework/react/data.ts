@@ -61,28 +61,25 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
     setIsMutating(method);
     const res = await fetcher;
     if (res.status >= 400) {
+      const err = await FetchError.fromResponse(res);
+      const details = err.details as { redirect?: { location: string } };
+      if (err.status === 501 && typeof details.redirect?.location === "string") {
+        location.href = details.redirect?.location;
+        return res;
+      }
+
       if (optimistic) {
         if (rollbackData !== undefined) {
           setData(rollbackData);
         }
         if (update.onFailure) {
-          update.onFailure(await FetchError.fromResponse(res));
+          update.onFailure(err);
         }
+        setIsMutating(false);
+        return res;
       }
-      setIsMutating(false);
-      return res;
-    }
 
-    if (res.status >= 300) {
-      const redirectUrl = res.headers.get("Location");
-      if (redirectUrl) {
-        location.href = new URL(redirectUrl, location.href).href;
-      }
-      if (optimistic && rollbackData !== undefined) {
-        setData(rollbackData);
-      }
-      setIsMutating(false);
-      return res;
+      throw err;
     }
 
     if (replace && res.ok) {
@@ -101,7 +98,7 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
             setData(rollbackData);
           }
           if (update.onFailure) {
-            update.onFailure(new FetchError(500, {}, "Data must be valid JSON"));
+            update.onFailure(new FetchError(500, "Data must be valid JSON"));
           }
         }
       }
@@ -112,7 +109,7 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
   }, [dataUrl]);
   const reload = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
+      const res = await fetch(dataUrl, { headers: [["Accept", "application/json"]], redirect: "manual", signal });
       if (res.type === "opaqueredirect") {
         throw new Error("opaque redirect");
       }
@@ -127,7 +124,7 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
         dataCache.set(dataUrl, { data, dataExpires });
         setData(data);
       } catch (_e) {
-        throw new FetchError(500, {}, "Data must be valid JSON");
+        throw new FetchError(500, "Data must be valid JSON");
       }
     } catch (error) {
       throw new Error(`Failed to reload data for ${dataUrl}: ${error.message}`);
@@ -190,9 +187,9 @@ export const useData = <T = unknown>(): Omit<DataContextProps<T>, "deferedData">
   return { data, ...rest };
 };
 
-function send(method: HttpMethod, href: string, data: unknown) {
+function send(method: HttpMethod, href: string, data: unknown): Promise<Response> {
   let body: BodyInit | undefined;
-  const headers = new Headers();
+  const headers = new Headers([["Accept", "application/json"]]);
   if (typeof data === "string") {
     body = data;
   } else if (typeof data === "number") {

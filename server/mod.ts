@@ -11,7 +11,7 @@ import { DependencyGraph } from "./graph.ts";
 import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig, regFullVersion } from "./helpers.ts";
 import { type HTMLRewriterHandlers, loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
-import { content, type CookieOptions, json, setCookieHeader } from "./response.ts";
+import { content, type CookieOptions, fixResponse, json, setCookieHeader } from "./response.ts";
 import { importRouteModule, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
@@ -258,13 +258,13 @@ export const serve = (options: ServerOptions = {}) => {
       for (const [pattern, { filename }] of routes.routes) {
         const ret = pattern.exec({ host, pathname });
         const accept = req.headers.get("Accept");
-        const fromFetchApi = accept === "application/json" || !accept?.includes("html");
+        const fromFetch = accept === "application/json" || !accept?.includes("html");
         if (ret) {
           try {
             const { method } = req;
             const mod = await importRouteModule(filename);
             const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
-            if (method !== "GET" || mod.default === undefined || fromFetchApi) {
+            if (method !== "GET" || mod.default === undefined || fromFetch) {
               Object.assign(ctx.params, ret.pathname.groups);
               const anyFetcher = dataConfig.any ?? dataConfig.ANY;
               if (typeof anyFetcher === "function") {
@@ -277,21 +277,7 @@ export const serve = (options: ServerOptions = {}) => {
               if (typeof fetcher === "function") {
                 const res = await fetcher(req, ctx);
                 if (res instanceof Response) {
-                  if (res.status >= 300 && fromFetchApi) {
-                    const err = await FetchError.fromResponse(res);
-                    return json(err, { status: err.status >= 400 ? err.status : 501, headers: ctx.headers });
-                  }
-                  let headers: Headers | null = null;
-                  ctx.headers.forEach((value, name) => {
-                    if (!headers) {
-                      headers = new Headers(res.headers);
-                    }
-                    headers.set(name, value);
-                  });
-                  if (headers) {
-                    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
-                  }
-                  return res;
+                  return fixResponse(res, ctx.headers, fromFetch);
                 }
                 if (
                   typeof res === "string" ||
@@ -312,30 +298,39 @@ export const serve = (options: ServerOptions = {}) => {
                 if (res === null) {
                   return new Response(null, { headers: ctx.headers });
                 }
-                return new Response("Invalid Reponse Type", { status: 500 });
+                throw new FetchError(500, "Invalid Reponse Type");
               }
               return new Response("Method Not Allowed", { status: 405 });
             }
           } catch (err) {
-            if (err instanceof TypeError) {
+            // javascript syntax error
+            if (err instanceof TypeError && !fromFetch) {
               return new Response(generateErrorHtml(err.stack ?? err.message), {
                 status: 500,
                 headers: [["Content-Type", "text/html"]],
               });
             }
+
+            // use the `onError` if available
             const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
             if (res instanceof Response) {
-              return res;
+              return fixResponse(res, ctx.headers, fromFetch);
             }
+
+            // user throw a response
             if (err instanceof Response) {
-              return err;
+              return fixResponse(err, ctx.headers, fromFetch);
             }
+
+            // prints the error stack
             if (err instanceof Error || typeof err === "string") {
               log.error(err);
             }
+
+            // return the error as a json
             const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
             return json({ ...err, message: err.message ?? String(err), status }, {
-              status: status >= 400 ? status : 501,
+              status,
               headers: ctx.headers,
             });
           }

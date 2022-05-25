@@ -62,28 +62,25 @@ const createDataProvider = () => {
     isMutating.value = method;
     const res = await fetcher;
     if (res.status >= 400) {
+      const err = await FetchError.fromResponse(res);
+      const details = err.details as { redirect?: { location: string } };
+      if (err.status === 501 && typeof details.redirect?.location === "string") {
+        location.href = details.redirect?.location;
+        return res;
+      }
+
       if (optimistic) {
         if (rollbackData !== undefined) {
           _data.value = rollbackData;
         }
         if (update.onFailure) {
-          update.onFailure(await FetchError.fromResponse(res));
+          update.onFailure(err);
         }
+        isMutating.value = false;
+        return res;
       }
-      isMutating.value = false;
-      return res;
-    }
 
-    if (res.status >= 300) {
-      const redirectUrl = res.headers.get("Location");
-      if (redirectUrl) {
-        location.href = new URL(redirectUrl, location.href).href;
-      }
-      if (optimistic && rollbackData !== undefined) {
-        _data.value = rollbackData;
-      }
-      isMutating.value = false;
-      return res;
+      throw err;
     }
 
     if (replace && res.ok) {
@@ -98,7 +95,7 @@ const createDataProvider = () => {
             _data.value = rollbackData;
           }
           if (update.onFailure) {
-            update.onFailure(new FetchError(500, {}, "Data must be valid JSON"));
+            update.onFailure(new FetchError(500, "Data must be valid JSON"));
           }
         }
       }
@@ -125,7 +122,7 @@ const createDataProvider = () => {
         dataCache.set(dataUrl.value, { data, dataExpires });
         _data.value = data;
       } catch (_e) {
-        throw new FetchError(500, {}, "Data must be valid JSON");
+        throw new FetchError(500, "Data must be valid JSON");
       }
     } catch (error) {
       throw new Error(`Failed to reload data for ${dataUrl.value}: ${error.message}`);

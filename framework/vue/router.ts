@@ -85,9 +85,9 @@ const createRouter = (props: RouterProps) => {
       }
       if (!res.ok) {
         const err = await FetchError.fromResponse(res);
-        if (err.status >= 300 && err.status < 400 && typeof err.details.location === "string") {
-          location.href = err.details.location;
-          location.reload();
+        const details = err.details as { redirect?: { location: string } };
+        if (err.status === 501 && typeof details.redirect?.location === "string") {
+          location.href = details.redirect?.location;
           return;
         }
         alert(`Fetch Data: ${err.message}`);
@@ -101,7 +101,7 @@ const createRouter = (props: RouterProps) => {
         rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
         return data;
       } catch (_e) {
-        throw new FetchError(500, {}, "Data must be valid JSON");
+        throw new FetchError(500, "Data must be valid JSON");
       }
     };
     rd.data = await fetchData();
