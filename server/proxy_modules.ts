@@ -45,14 +45,18 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, 
   }
 
   const { code, pathname, lang, inlineCSS, isTemplateLanguage } = input;
+  if (lang === "css") {
+    throw new Error("The `lang` can't be `css`");
+  }
+
   const specifier = "." + pathname;
   const contentType = lang ? getContentType(`file.${lang}`) : undefined;
-  const unoGenerator = isTemplateLanguage || lang === "jsx" || lang === "tsx" || pathname.endsWith(".tsx") ||
-      pathname.endsWith(".jsx")
+  const unoGenerator = (isTemplateLanguage || lang === "jsx" || lang === "tsx" || pathname.endsWith(".tsx") ||
+      pathname.endsWith(".jsx"))
     ? getUnoGenerator()
     : null;
   const [deps, atomicCSS] = await Promise.all([
-    parseDeps(specifier, code, { importMap: JSON.stringify(env.importMap) }),
+    parseDeps(specifier, code, { importMap: JSON.stringify(env.importMap), lang }),
     unoGenerator ? unoGenerator.generate(code).then((ret) => ({ tokens: [...ret.matched] })) : undefined,
   ]);
   serverDependencyGraph.mark(specifier, { deps, inlineCSS, atomicCSS });
@@ -95,7 +99,7 @@ function initLoader(moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) {
         if (ret instanceof Promise) {
           ret = await ret;
         }
-        return await esModuleLoader({ pathname, ...ret }, env);
+        return await esModuleLoader(Object.assign(ret, { pathname }), env);
       }
     }
   };
