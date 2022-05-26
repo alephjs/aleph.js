@@ -85,7 +85,7 @@ export async function build(serverEntry?: string) {
   const serverEntryCode = [
     `import { DependencyGraph } from "${alephPkgUri}/server/graph.ts";`,
     `import graph from "./server_dependency_graph.js";`,
-    `globalThis.serverDependencyGraph = new DependencyGraph(graph.modules);`,
+    `globalThis.__ALEPH_SERVER_DEP_GRAPH = new DependencyGraph(graph.modules);`,
     routeFiles.length > 0 && `import { revive } from "${alephPkgUri}/server/routing.ts";`,
     moduleLoaders.length > 0 &&
     `import { globToRegExp } from "https://deno.land/std@0.136.0/path/mod.ts";const moduleLoaders = []; globalThis["__ALEPH_MODULE_LOADERS"] = moduleLoaders;`,
