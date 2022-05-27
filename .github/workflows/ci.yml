@@ -63,6 +63,9 @@ jobs:
           - name: aleph-vue
             dir: examples/vue-app
 
+          - name: aleph-api
+            dir: examples/api-app
+
           - name: aleph-monaco-editor
             dir: examples/feature-apps/monaco-editor
 

@@ -11,6 +11,7 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 
 - React Hello-world: https://aleph-hello.deno.dev/
 - Vue Hello-world: https://aleph-vue.deno.dev/
+- REST API: https://aleph-api.deno.dev/
 - React 18 Suspense SSR: https://aleph-suspense-ssr.deno.dev/
 - UnoCSS(tailwind): https://aleph-unocss.deno.dev/
 - Monaco Editor: https://aleph-monaco-editor.deno.dev/
