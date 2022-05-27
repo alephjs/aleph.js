@@ -30,14 +30,14 @@ export type RouteRecord = {
   _error?: Route;
 };
 
+export type RouteMatch = [ret: URLPatternResult, route: RouteMeta];
+
 /** match routes against the given url */
-export function matchRoutes(
-  url: URL,
-  { routes, _app, _404 }: RouteRecord,
-): [ret: URLPatternResult, route: RouteMeta][] {
+export function matchRoutes(url: URL, record: RouteRecord): RouteMatch[] {
+  const { routes, _app, _404 } = record;
   let { pathname } = url;
   if (pathname !== "/") {
-    pathname = util.trimSuffix(url.pathname, "/");
+    pathname = util.trimSuffix(pathname, "/");
   }
   const matches: [ret: URLPatternResult, route: RouteMeta][] = [];
   if (routes.length > 0) {
