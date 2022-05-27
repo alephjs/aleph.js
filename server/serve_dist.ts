@@ -13,6 +13,14 @@ export default {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     const outputDir = config?.build?.outputDir ?? "dist";
     const { pathname, searchParams } = new URL(req.url);
+
+    switch (pathname) {
+      case "/server.js":
+      case "/server.js.map":
+      case "/server_dependency_graph.js":
+        return new Response("Not Found", { status: 404 });
+    }
+
     try {
       let filePath = `./${outputDir}${pathname}`;
       let ctype = "application/javascript; charset=utf-8";
@@ -33,7 +41,7 @@ export default {
       } else {
         const stat = await Deno.lstat(filePath);
         if (!stat.isFile) {
-          return new Response("File Not Found", { status: 404 });
+          return new Response("Not Found", { status: 404 });
         }
         const { mtime, size } = stat;
         if (mtime) {
@@ -54,7 +62,7 @@ export default {
       return new Response(readableStreamFromReader(file), { headers });
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) {
-        return new Response("File Not Found", { status: 404 });
+        return new Response("Not Found", { status: 404 });
       }
       log.error(err);
       return new Response("Internal Server Error", { status: 500 });
