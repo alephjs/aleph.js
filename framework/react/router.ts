@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from "react";
-import { createElement, StrictMode, useContext, useEffect, useMemo, useState } from "react";
+import { createElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import events from "../core/events.ts";
 import FetchError from "../core/fetch_error.ts";
 import { redirect } from "../core/redirect.ts";
@@ -10,35 +10,41 @@ import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./c
 import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
 
+// deno-lint-ignore no-explicit-any
+const global = window as any;
+
 export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
-  readonly errorBoundaryHandler?: CallableFunction;
   readonly dataDefer: boolean;
 };
 
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
   readonly dataDefer?: boolean;
+  readonly strictMode?: boolean;
   readonly createPortal?: RouterContextProps["createPortal"];
 };
 
-// deno-lint-ignore no-explicit-any
-const global = window as any;
-
 /** The `Router` component for react. */
-export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, createPortal }) => {
+export const Router: FC<RouterProps> = (props) => {
+  const { ssrContext, dataDefer: dataDeferProp, strictMode, createPortal } = props;
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
     const cache = new Map<string, RouteData>();
     modules.forEach(({ url, data, dataCacheTtl }) => {
-      cache.set(url.pathname + url.search, {
-        data,
-        dataCacheTtl,
-        dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
-      });
+      const dataUrl = url.pathname + url.search;
+      if (data instanceof Promise) {
+        cache.set(url.href, { data: prefetchRouteData(cache, dataUrl, true) });
+      } else {
+        cache.set(dataUrl, {
+          data,
+          dataCacheTtl,
+          dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+        });
+      }
     });
     return cache;
   }, []);
@@ -54,7 +60,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
     const { head, body } = window.document;
     const routeModules = getRouteModules();
     const routeRecord = loadRouteRecordFromTag();
-    const dataDefer = body.getAttribute("data-defer") ?? dataDeferProp;
+    const dataDefer = body.hasAttribute("data-defer") ?? dataDeferProp;
     const deployId = body.getAttribute("data-deployment-id");
 
     // import route module
@@ -67,51 +73,6 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
       const withData = Boolean(data ?? GET);
       routeModules[filename] = { defaultExport, withData };
       return { defaultExport, withData };
-    };
-
-    // prefetch route data
-    const prefetchRouteData = async (dataUrl: string) => {
-      const rd: RouteData = {};
-      const fetchData = async () => {
-        const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
-        if (res.type === "opaqueredirect") {
-          location.reload();
-          return;
-        }
-        if (!res.ok) {
-          const err = await FetchError.fromResponse(res);
-          const details = err.details as { redirect?: { location: string } };
-          if (err.status === 501 && typeof details.redirect?.location === "string") {
-            location.href = details.redirect?.location;
-            return;
-          }
-          // clean up data cache
-          setTimeout(() => dataCache.delete(dataUrl), 0);
-          if (dataDefer) {
-            throw err;
-          } else {
-            // todo: better notify UI
-            alert(`Fetch Data: ${err.message}`);
-            history.back();
-            return;
-          }
-        }
-        try {
-          const data = await res.json();
-          const cc = res.headers.get("Cache-Control");
-          rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-          rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
-          return data;
-        } catch (_e) {
-          throw new FetchError(500, "Data must be valid JSON");
-        }
-      };
-      if (dataDefer) {
-        rd.data = fetchData;
-      } else {
-        rd.data = await fetchData();
-      }
-      dataCache.set(dataUrl, rd);
     };
 
     // prefetch module using `<link rel="modulepreload" href="...">`
@@ -159,7 +120,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
         }
         if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
           rmod.withData = true;
-          await prefetchRouteData(dataUrl);
+          await prefetchRouteData(dataCache, dataUrl, dataDefer);
         }
         return rmod;
       }));
@@ -206,7 +167,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
           },
         ];
         const pathname = pattern.pathname.slice(1);
-        if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
+        if (pathname === "_app" || pathname === "_404") {
           routeRecord[pathname] = route;
         }
         routeRecord.routes.push(route);
@@ -217,7 +178,7 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
     const onhmrremove = (e: Record<string, unknown>) => {
       const route = routeRecord.routes.find((v) => v[1].filename === e.specifier);
       const pathname = (route?.[1].pattern.pathname)?.slice(1);
-      if (pathname === "_app" || pathname === "_404" || pathname === "_error") {
+      if (pathname === "_app" || pathname === "_404") {
         routeRecord[pathname] = undefined;
       }
       routeRecord.routes = routeRecord.routes.filter((v) => v[1].filename != e.specifier);
@@ -249,10 +210,10 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
   }, []);
 
   if (modules.length === 0) {
-    return createElement(Err, { status: 404, message: "page not found" });
+    return createElement(Err, { error: { status: 404, message: "page not found" }, fullscreen: true });
   }
 
-  return createElement(
+  const el = createElement(
     RouterContext.Provider,
     {
       value: {
@@ -265,52 +226,61 @@ export const Router: FC<RouterProps> = ({ ssrContext, dataDefer: dataDeferProp, 
     },
     createElement(RouteRoot, { modules, dataCache, ssrContext }),
   );
+  if (strictMode) {
+    return createElement(StrictMode, {}, el);
+  }
+  return el;
 };
 
-const RouteRoot: FC<{ modules: RouteModule[]; dataCache: Map<string, RouteData>; ssrContext?: SSRContext }> = (
-  { modules, dataCache, ssrContext },
-) => {
+type RouteRootProps = {
+  modules: RouteModule[];
+  dataCache: Map<string, RouteData>;
+  ssrContext?: SSRContext;
+};
+
+const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
   const { url, defaultExport, withData } = modules[0];
   const dataUrl = url.pathname + url.search;
-  const errorHandler: FC<{ error: Error }> = ssrContext?.errorBoundaryHandler ?? global.__ERROR_BOUNDARY_HANDLER ?? Err;
-  const el = typeof defaultExport === "function"
-    ? createElement(
+  let el: ReactNode;
+
+  if (typeof defaultExport === "function") {
+    el = createElement(
       defaultExport as FC,
       null,
       modules.length > 1 && createElement(
         RouteRoot,
         { modules: modules.slice(1), dataCache, ssrContext },
       ),
-    )
-    : createElement(Err, {
-      status: 400,
-      message: "missing default export as a valid React component",
-    });
-
-  return createElement(
-    ErrorBoundary,
-    { Handler: errorHandler },
-    withData
-      ? createElement(
-        DataProvider,
+    );
+    if (withData) {
+      el = createElement(
+        Suspense,
         {
-          dataCache,
-          dataUrl: dataUrl,
-          key: dataUrl,
+          fallback: null,
         },
-        el,
-      )
-      : el,
-  );
+        createElement(
+          DataProvider,
+          {
+            dataCache,
+            dataUrl: dataUrl,
+            key: dataUrl,
+          },
+          el,
+        ),
+      );
+    }
+  } else {
+    el = createElement(Err, {
+      error: { status: 500, message: "missing default export as a valid React component" },
+    });
+  }
+
+  return createElement(ErrorBoundary, { Handler: Err }, el);
 };
 
 /** The `App` component alias to the `Router` in `StrictMode` mode. */
-export const App: FC<RouterProps> = (props) => {
-  return createElement(
-    StrictMode,
-    null,
-    createElement(Router, props),
-  );
+export const App: FC<Omit<RouterProps, "strictMode">> = (props) => {
+  return createElement(Router, { ...props, strictMode: true });
 };
 
 export const useRouter = (): {
@@ -346,7 +316,6 @@ function loadRouteRecordFromTag(): RouteRecord {
       if (Array.isArray(manifest.routes)) {
         let _app: Route | undefined = undefined;
         let _404: Route | undefined = undefined;
-        let _error: Route | undefined = undefined;
         const routes = manifest.routes.map((meta: RouteMeta) => {
           const { pattern } = meta;
           const route: Route = [new URLPatternCompat(pattern), meta];
@@ -354,18 +323,48 @@ function loadRouteRecordFromTag(): RouteRecord {
             _app = route;
           } else if (pattern.pathname === "/_404") {
             _404 = route;
-          } else if (pattern.pathname === "/_error") {
-            _error = route;
           }
           return route;
         });
-        return { routes, _app, _404, _error };
+        return { routes, _app, _404 };
       }
     } catch (e) {
       throw new Error(`loadRouteRecordFromTag: ${e.message}`);
     }
   }
   return { routes: [] };
+}
+
+// prefetch route data
+async function prefetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, dataDefer: boolean) {
+  const rd: RouteData = {};
+  const fetchData = async () => {
+    const res = await fetch(dataUrl, { headers: { "Accept": "application/json" } });
+    if (!res.ok) {
+      const err = await FetchError.fromResponse(res);
+      const details = err.details as { redirect?: { location: string } };
+      if (err.status === 501 && typeof details.redirect?.location === "string") {
+        location.href = details.redirect?.location;
+        return;
+      }
+      return err;
+    }
+    try {
+      const data = await res.json();
+      const cc = res.headers.get("Cache-Control");
+      rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+      rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
+      return data;
+    } catch (_e) {
+      return new Error("Data must be valid JSON");
+    }
+  };
+  if (dataDefer) {
+    rd.data = fetchData;
+  } else {
+    rd.data = await fetchData();
+  }
+  dataCache.set(dataUrl, rd);
 }
 
 function loadSSRModulesFromTag(): RouteModule[] {
@@ -388,7 +387,13 @@ function loadSSRModulesFromTag(): RouteModule[] {
             }
             if (deferedData) {
               rest.data = deferedData[url];
+            } else {
+              rest.data = Promise.resolve(null);
             }
+          }
+          if (rest.error) {
+            rest.data = new FetchError(500, rest.error.message, { stack: rest.error.stack });
+            rest.error = undefined;
           }
           return {
             url: new URL(url, location.href),

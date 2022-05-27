@@ -16,7 +16,6 @@ export type SSRContext = {
   readonly headCollection: string[];
   readonly dataDefer: boolean;
   readonly signal: AbortSignal;
-  readonly errorBoundaryHandler?: CallableFunction;
   readonly bootstrapScripts?: string[];
   readonly onError?: (error: unknown) => void;
 };
@@ -48,7 +47,6 @@ export type SSRResult = {
   context: SSRContext;
   body: ReadableStream | string;
   deferedData: Record<string, unknown>;
-  errorBoundaryHandlerFilename?: string;
   nonce?: string;
 };
 
@@ -76,7 +74,7 @@ export default {
       const CSP = isFn ? undefined : ssr.CSP;
       const render = isFn ? ssr : ssr.render;
       try {
-        const [url, routeModules, deferedData, errorBoundaryHandler] = await initSSR(
+        const [url, routeModules, deferedData] = await initSSR(
           req,
           ctx,
           routes,
@@ -89,7 +87,6 @@ export default {
           routeModules,
           headCollection,
           dataDefer,
-          errorBoundaryHandler: errorBoundaryHandler?.default,
           signal: req.signal,
           bootstrapScripts: [bootstrapScript],
           onError: (_error: unknown) => {
@@ -144,7 +141,6 @@ export default {
         }
         ssrRes = {
           context: ssrContext,
-          errorBoundaryHandlerFilename: errorBoundaryHandler?.filename,
           body,
           deferedData,
         };
@@ -224,7 +220,6 @@ export default {
         if (ssrRes) {
           const {
             context: { routeModules, headCollection },
-            errorBoundaryHandlerFilename,
             body,
             deferedData,
             nonce,
@@ -240,7 +235,8 @@ export default {
                     params,
                     filename,
                     withData,
-                    data: defered ? undefined : data,
+                    error: data instanceof Error ? { message: data.message, stack: data.stack } : undefined,
+                    data: defered ? undefined : data instanceof Error ? undefined : data,
                     dataCacheTtl,
                     dataDefered: defered,
                   };
@@ -265,15 +261,6 @@ export default {
                   `<script type="module"${nonceAttr}>${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`,
                   { html: true },
                 );
-
-                if (errorBoundaryHandlerFilename) {
-                  el.append(
-                    `<script type="module"${nonceAttr}>import Handler from ${
-                      JSON.stringify(errorBoundaryHandlerFilename.slice(1))
-                    };window.__ERROR_BOUNDARY_HANDLER=Handler</script>`,
-                    { html: true },
-                  );
-                }
               }
             },
           });
@@ -366,24 +353,10 @@ async function initSSR(
   url: URL,
   routeModules: RouteModule[],
   deferedData: Record<string, unknown>,
-  errorBoundaryHandler: { filename: string; default: CallableFunction } | null,
 ]> {
   const url = new URL(req.url);
   const matches = matchRoutes(url, routes);
   const deferedData: Record<string, unknown> = {};
-
-  let errorBoundaryHandler: { filename: string; default: CallableFunction } | null = null;
-  // find error boundary handler
-  if (routes._error) {
-    const [_, meta] = routes._error;
-    const mod = await importRouteModule(meta.filename);
-    if (typeof mod.default === "function") {
-      errorBoundaryHandler = {
-        filename: meta.filename,
-        default: mod.default,
-      };
-    }
-  }
 
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
@@ -476,6 +449,5 @@ async function initSSR(
     url,
     modules.filter(({ defaultExport }) => defaultExport !== undefined),
     deferedData,
-    errorBoundaryHandler,
   ];
 }

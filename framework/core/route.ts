@@ -27,7 +27,6 @@ export type RouteRecord = {
   routes: Route[];
   _404?: Route;
   _app?: Route;
-  _error?: Route;
 };
 
 export type RouteMatch = [ret: URLPatternResult, route: RouteMeta];

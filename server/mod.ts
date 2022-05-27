@@ -35,7 +35,7 @@ export const serve = (options: ServerOptions = {}) => {
   const routesPromise = routes ? initRoutes(routes) : Promise.resolve({ routes: [] });
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const url = new URL(req.url);
-    const { host, pathname, searchParams } = url;
+    const { pathname, searchParams } = url;
 
     // close the hot-reloading websocket connection and tell the client to reload
     // this request occurs when the client try to connect to the hot-reloading websocket in production mode
@@ -353,7 +353,7 @@ export const serve = (options: ServerOptions = {}) => {
 
           // return the error as a json
           const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
-          return json({ ...err, message: err.message ?? String(err), status }, {
+          return json({ ...err, status, message: err.message ?? String(err), stack: err.stack }, {
             status,
             headers: ctx.headers,
           });

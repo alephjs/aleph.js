@@ -8,7 +8,6 @@ Deno.test("lib/helpers.ts: matchRoutes", async () => {
   const files = [
     "./routes/_404.tsx",
     "./routes/_app.tsx",
-    "./routes/_error.tsx",
     "./routes/blog.tsx",
     "./routes/docs.tsx",
     "./routes/docs/get-started.mdx",

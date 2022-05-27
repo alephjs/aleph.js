@@ -20,17 +20,14 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
   const [data, setData] = useState(() => {
     const cached = dataCache.get(dataUrl);
     if (cached) {
-      if (cached.data instanceof Error) {
-        throw cached.data;
-      }
       if (typeof cached.data === "function") {
         const res = cached.data();
         if (res instanceof Promise) {
           return res.then((data) => {
-            dataCache.set(dataUrl, data);
+            dataCache.set(dataUrl, { data });
             deferedData.current = data;
           }).catch((error) => {
-            dataCache.set(dataUrl, error);
+            dataCache.set(dataUrl, { data: error });
             deferedData.current = error;
           });
         }
@@ -175,6 +172,9 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
 
 export const useData = <T = unknown>(): Omit<DataContextProps<T>, "deferedData"> => {
   const { deferedData, data, ...rest } = useContext(DataContext) as DataContextProps<T>;
+  if (data instanceof Error) {
+    throw data;
+  }
   if (data instanceof Promise) {
     if (deferedData?.current instanceof Error) {
       throw deferedData.current;
