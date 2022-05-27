@@ -3,7 +3,6 @@ import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import FetchError from "../framework/core/fetch_error.ts";
 import type { RouteRecord } from "../framework/core/route.ts";
-import { matchRoutes } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
@@ -256,9 +255,8 @@ export const serve = (options: ServerOptions = {}) => {
     // request route api
     const routes: RouteRecord = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routesPromise;
     if (routes.routes.length > 0) {
-      const matches = matchRoutes(url, routes);
-      if (matches.length > 0) {
-        const [ret, { filename }] = matches.at(-1)!;
+      for (const [pattern, { filename }] of routes.routes) {
+        const ret = pattern.exec({ host, pathname });
         const accept = req.headers.get("Accept");
         const fromFetch = accept === "application/json" || !accept?.includes("html");
         if (ret) {
