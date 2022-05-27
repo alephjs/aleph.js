@@ -15,8 +15,8 @@ export type SSRContext = {
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
   readonly dataDefer: boolean;
-  readonly errorBoundaryHandler?: CallableFunction;
   readonly signal: AbortSignal;
+  readonly errorBoundaryHandler?: CallableFunction;
   readonly bootstrapScripts?: string[];
   readonly onError?: (error: unknown) => void;
 };
@@ -46,9 +46,9 @@ export type SSR = {
 
 export type SSRResult = {
   context: SSRContext;
-  errorBoundaryHandlerFilename?: string;
   body: ReadableStream | string;
   deferedData: Record<string, unknown>;
+  errorBoundaryHandlerFilename?: string;
   nonce?: string;
 };
 
@@ -362,17 +362,28 @@ async function initSSR(
   routes: RouteRecord,
   dataDefer: boolean,
   onError?: ErrorCallback,
-): Promise<
-  [
-    url: URL,
-    routeModules: RouteModule[],
-    deferedData: Record<string, unknown>,
-    errorBoundaryHandler: { filename: string; default: CallableFunction } | undefined,
-  ]
-> {
+): Promise<[
+  url: URL,
+  routeModules: RouteModule[],
+  deferedData: Record<string, unknown>,
+  errorBoundaryHandler: { filename: string; default: CallableFunction } | null,
+]> {
   const url = new URL(req.url);
   const matches = matchRoutes(url, routes);
   const deferedData: Record<string, unknown> = {};
+
+  let errorBoundaryHandler: { filename: string; default: CallableFunction } | null = null;
+  // find error boundary handler
+  if (routes._error) {
+    const [_, meta] = routes._error;
+    const mod = await importRouteModule(meta.filename);
+    if (typeof mod.default === "function") {
+      errorBoundaryHandler = {
+        filename: meta.filename,
+        default: mod.default,
+      };
+    }
+  }
 
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
@@ -446,34 +457,25 @@ async function initSSR(
       if (dataDefer) {
         rmod.data = fetchData;
       } else {
-        rmod.data = await fetchData();
+        try {
+          rmod.data = await fetchData();
+        } catch (error) {
+          if (error instanceof Error) {
+            rmod.data = error;
+          } else {
+            throw error;
+          }
+        }
       }
     }
 
     return rmod;
   }));
 
-  // find error boundary handler
-  if (routes._error) {
-    const [_, meta] = routes._error;
-    const mod = await importRouteModule(meta.filename);
-    if (typeof mod.default === "function") {
-      return [
-        url,
-        modules.filter(({ defaultExport }) => defaultExport !== undefined),
-        deferedData,
-        {
-          filename: meta.filename,
-          default: mod.default,
-        },
-      ];
-    }
-  }
-
   return [
     url,
     modules.filter(({ defaultExport }) => defaultExport !== undefined),
     deferedData,
-    undefined,
+    errorBoundaryHandler,
   ];
 }
