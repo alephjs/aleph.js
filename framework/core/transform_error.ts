@@ -46,8 +46,9 @@ events.on("transform", (e) => {
     console.log(e);
     const err = e.error as { message: string; stack: string; location: Array<number> };
     const code = formatCode(err.message, e.sourceCode as string, err.location[1], err.location[0]);
-    const stack = err.stack.split("\n").map((v) => v.trim()).reduce((res, cur) => res + "\n" + cur);
-    modal.innerHTML = errorTemplate(err.message, code, stack);
+    const stack = err.stack.split("\n").map((v) => v.trim());
+    const stackStr = stack.filter((v) => !v.includes("wasm://wasm")).reduce((res, cur) => res + "\n" + cur);
+    modal.innerHTML = errorTemplate(err.message, code, stackStr);
     modal.style.display = "block";
   } else {
     modal.style.display = "none";
