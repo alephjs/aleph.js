@@ -20,6 +20,7 @@ type FsEvents = {
     sourceCode?: string;
     error?: {
       message: string;
+      stack: string;
       location?: [number, number];
     };
   };
@@ -135,10 +136,11 @@ if (import.meta.main) {
             sourceCode: code,
             status: "failure",
             error: {
-              message: error.message,
-              location: error.message.split(`${specifier}:`)[1]?.split("\n")[0]?.split(":").map((s: string) =>
-                parseInt(s)
-              ),
+              message: error.message.replace("\\\\", "/"),
+              stack: error.stack.split(`${error.message}`)[1]?.slice(2),
+              location: error.message.split(`${specifier.replace("\\", "\\\\")}:`)[1]?.split("\n")[0]?.split(":").map((
+                s: string,
+              ) => parseInt(s)),
             },
           });
         });

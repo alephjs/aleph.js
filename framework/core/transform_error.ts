@@ -5,19 +5,25 @@ document.body.appendChild(modal);
 modal.className = "aleph--error-modal";
 modal.style.display = "none";
 
-// todo: better UI
-const errorTemplate = (message: string) => `
+const errorTemplate = (message: string, sourceCode: string, stack: string) => `
 <div class="error">
   <div class="box">
-    <div class="logo">
+  <!--<div class="logo">
       <svg width="72" height="72" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M52.9528 11.1C54.0959 11.1 55.1522 11.7097 55.7239 12.6995C68.5038 34.8259 81.2837 56.9524 94.0636 79.0788C94.642 80.0802 94.6355 81.316 94.0425 82.3088C93.0466 83.9762 92.028 85.6661 91.0325 87.3331C90.4529 88.3035 89.407 88.9 88.2767 88.9C62.7077 88.9 37.0519 88.9 11.4828 88.9C10.3207 88.9 9.25107 88.2693 8.67747 87.2586C7.75465 85.6326 6.81025 84.0065 5.88797 82.3805C5.33314 81.4023 5.34422 80.2041 5.90662 79.2302C18.6982 57.0794 31.4919 34.8415 44.3746 12.6907C44.9474 11.7058 46.0009 11.1 47.1402 11.1C49.0554 11.1 51.0005 11.1 52.9528 11.1Z" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linejoin="round"/>
         <path d="M28.2002 72.8H80.8002L45.8187 12.5494" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M71.4999 72.7L45.1999 27.2L10.6519 87.1991" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M49.8 35.3L23.5 80.8H93.9333" stroke="#f00" stroke-width="3.2" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-    </div>
-    <pre><code>${message}</code></pre>
+    </div> -->
+    ${
+  message !== "unreachable"
+    ? `<pre><div class="msg">${message}<div></pre>
+    <pre><code>${sourceCode}</code></pre>
+    <pre><div class="stack-info">${stack}</div></pre>
+    `
+    : `<div class="extend-box"> unreachable </div>`
+}
     <div class="actions">
     </div>
   </div>
@@ -37,13 +43,31 @@ const errorTemplate = (message: string) => `
 
 events.on("transform", (e) => {
   if (e.status === "failure") {
-    const err = e.error as { message: string; position: [line: number, column: number] };
-    modal.innerHTML = errorTemplate(err.message);
+    const err = e.error as { message: string; stack: string; location: Array<number> };
+    const code = formatCode(err.message, e.sourceCode as string, err.location[1], err.location[0]);
+    const stack = err.stack.split("\n").map((v) => v.trim());
+    const stackStr = stack.filter((v) => !v.includes("wasm://wasm")).reduce((res, cur) => res + "\n" + cur);
+    modal.innerHTML = errorTemplate(err.message, code, stackStr);
     modal.style.display = "block";
   } else {
     modal.style.display = "none";
   }
 });
+
+function formatCode(message: string, sourceCode: string, column: number, line: number): string {
+  if (message === "unreachable") {
+    return message;
+  }
+  let sourceCodeArr = sourceCode.split(/\r?\n/).map((val, index) => {
+    return 1 + index + " | " + val;
+  });
+  const indexLen = line.toString().length;
+  const mark = " ".repeat(indexLen * 2) + " | " + " ".repeat(column) + "^";
+  sourceCodeArr = sourceCodeArr.slice(line - 3, line + 2);
+  sourceCodeArr.splice(3, 0, mark);
+  const formatStr = sourceCodeArr.reduce((res, cur) => res + "\r\n" + cur);
+  return formatStr;
+}
 
 const styleEl = document.createElement("style");
 styleEl.appendChild(document.createTextNode(`
@@ -67,7 +91,7 @@ styleEl.appendChild(document.createTextNode(`
 .aleph--error-modal .error .box {
   box-sizing: border-box;
   position: relative;
-  max-width: 80%;
+  max-width: 60%;
   max-height: 90%;
   overflow: auto;
   padding: 24px 32px;
@@ -140,6 +164,29 @@ styleEl.appendChild(document.createTextNode(`
 }
 .aleph--error-modal .error .help-links a:hover {
   text-decoration: underline;
+}
+.aleph--error-modal .msg{
+  margin-bottom: 20px;
+  text-decoration-line: underline;
+  color: #b13939;
+  word-break:break-word;
+  white-space: pre-wrap;
+}
+.aleph--error-modal .stack-info{
+  margin-left: 20px;
+  margin-top: 28px;
+  color: #777;
+  line-height: 23px;
+  font-size: 15px;
+}
+.aleph--error-modal .extend-box{
+  width:450px;
+  height:200px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  color: #b13939;
+  font-size:20px;
 }
 `));
 document.head.appendChild(styleEl);
