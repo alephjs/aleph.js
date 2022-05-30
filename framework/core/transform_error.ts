@@ -43,7 +43,6 @@ const errorTemplate = (message: string, sourceCode: string, stack: string) => `
 
 events.on("transform", (e) => {
   if (e.status === "failure") {
-    console.log(e);
     const err = e.error as { message: string; stack: string; location: Array<number> };
     const code = formatCode(err.message, e.sourceCode as string, err.location[1], err.location[0]);
     const stack = err.stack.split("\n").map((v) => v.trim());
@@ -59,23 +58,15 @@ function formatCode(message: string, sourceCode: string, column: number, line: n
   if (message === "unreachable") {
     return message;
   }
-  let sourceCodeArr = sourceCode.split("\r\n").map((val, index) => {
+  let sourceCodeArr = sourceCode.split(/\r?\n/).map((val, index) => {
     return 1 + index + " | " + val;
   });
   const indexLen = line.toString().length;
-  const mark = getBlank(indexLen * 2) + " | " + getBlank(column) + "^";
+  const mark = " ".repeat(indexLen * 2)+ " | " + " ".repeat(column) + "^";
   sourceCodeArr = sourceCodeArr.slice(line - 3, line + 2);
   sourceCodeArr.splice(3, 0, mark);
   const formatStr = sourceCodeArr.reduce((res, cur) => res + "\r\n" + cur);
   return formatStr;
-}
-
-function getBlank(num: number) {
-  let blank = "";
-  for (let i = 0; i < num; i++) {
-    blank += "&nbsp";
-  }
-  return blank;
 }
 
 const styleEl = document.createElement("style");
