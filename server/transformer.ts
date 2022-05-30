@@ -1,6 +1,6 @@
 import MagicString from "https://esm.sh/magic-string@0.26.1";
-import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.5.0/mod.ts";
-import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.5.0/types.ts";
+import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.5.5/mod.ts";
+import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.5.5/types.ts";
 import { readCode } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -36,7 +36,7 @@ export default {
     const { isDev, loaded } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
-    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
+    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
 
     let sourceCode: string;
     let lang: string | undefined;
@@ -118,7 +118,7 @@ export default {
           alephPkgUri,
           importMap: JSON.stringify(importMap),
           graphVersions,
-          initialGraphVersion: clientDependencyGraph?.initialVersion.toString(16),
+          globalVersion: clientDependencyGraph?.globalVersion.toString(16),
           isDev,
         });
       }

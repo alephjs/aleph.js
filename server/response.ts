@@ -89,3 +89,23 @@ export function setCookieHeader(name: string, value: string, options?: CookieOpt
   }
   return cookie.join("; ");
 }
+
+export function fixResponse(res: Response, addtionHeaders: Headers, fixRedirect: boolean): Response {
+  if (res.status >= 300 && res.status < 400 && fixRedirect) {
+    return json({ redirect: { location: res.headers.get("Location"), status: res.status } }, {
+      status: 501,
+      headers: addtionHeaders,
+    });
+  }
+  let headers: Headers | null = null;
+  addtionHeaders.forEach((value, name) => {
+    if (!headers) {
+      headers = new Headers(res.headers);
+    }
+    headers.set(name, value);
+  });
+  if (headers) {
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+  }
+  return res;
+}

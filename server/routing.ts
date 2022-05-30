@@ -23,7 +23,7 @@ export async function importRouteModule(filename: string) {
   if (revivedModules.has(filename)) {
     mod = revivedModules.get(filename)!;
   } else {
-    const graph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+    const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
     const version = graph?.get(filename)?.version || graph?.mark(filename, {}).version || Date.now().toString(16);
     const port = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
     mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version}`);
@@ -61,7 +61,6 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cw
     const routes: Route[] = [];
     let _app: Route | undefined = undefined;
     let _404: Route | undefined = undefined;
-    let _error: Route | undefined = undefined;
     files.forEach((file) => {
       const filename = reg.prefix + file.slice(1);
       const pattern = reg.exec(filename);
@@ -75,8 +74,6 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cw
           _app = route;
         } else if (pattern.pathname === "/_404") {
           _404 = route;
-        } else if (pattern.pathname === "/_error") {
-          _error = route;
         }
       }
     });
@@ -96,7 +93,7 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cw
     }
 
     log.debug(`${routes.length} routes initiated`);
-    return { routes, _404, _app, _error };
+    return { routes, _404, _app };
   });
 }
 
@@ -151,7 +148,6 @@ function getRouteOrder([_, meta]: Route): number {
   switch (pattern.pathname) {
     case "/_404":
     case "/_app":
-    case "/_error":
       return 0;
     default:
       return filename.split("/").length + (pattern.pathname.split("/:").length - 1) * 0.01;

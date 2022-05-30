@@ -1,4 +1,4 @@
-import type { Component, Ref, ShallowRef } from "vue";
+import type { App, Component, Ref, ShallowRef } from "vue";
 import { createSSRApp as vueCreateSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
 import type { Route, RouteMeta, RouteModule, RouteRecord } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
@@ -78,21 +78,15 @@ const createRouter = (props: RouterProps) => {
   const prefetchData = async (dataUrl: string) => {
     const rd: RouteData = {};
     const fetchData = async () => {
-      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" }, redirect: "manual" });
-      if (res.type === "opaqueredirect") {
-        location.reload();
-        return;
-      }
+      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" } });
       if (!res.ok) {
         const err = await FetchError.fromResponse(res);
-        if (err.status >= 300 && err.status < 400 && typeof err.details.location === "string") {
-          location.href = err.details.location;
-          location.reload();
+        const details = err.details as { redirect?: { location: string } };
+        if (err.status === 501 && typeof details.redirect?.location === "string") {
+          location.href = details.redirect?.location;
           return;
         }
-        alert(`Fetch Data: ${err.message}`);
-        history.back();
-        return;
+        throw err;
       }
       try {
         const data = await res.json();
@@ -101,7 +95,7 @@ const createRouter = (props: RouterProps) => {
         rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
         return data;
       } catch (_e) {
-        throw new FetchError(500, {}, "Data must be valid JSON");
+        throw new FetchError(500, "Data must be valid JSON");
       }
     };
     rd.data = await fetchData();
@@ -290,7 +284,7 @@ const createAppApi = (props?: RootProps) => {
   return errApp;
 };
 
-const createSSRApp = (createSSRAppApi: (props?: RootProps) => Component, props?: RootProps) => {
+const createSSRApp = (createSSRAppApi: (props?: RootProps) => App<Element>, props?: RootProps) => {
   if (createSSRAppApi === undefined) {
     throw new Error("[aleph/vue] createSSRApp without `App` component");
   }
@@ -372,7 +366,6 @@ function loadRoutesFromTag(): RouteRecord {
       if (Array.isArray(manifest.routes)) {
         let _app: Route | undefined = undefined;
         let _404: Route | undefined = undefined;
-        let _error: Route | undefined = undefined;
         const routes = manifest.routes.map((meta: RouteMeta) => {
           const { pattern } = meta;
           const route: Route = [new URLPatternCompat(pattern), meta];
@@ -380,12 +373,10 @@ function loadRoutesFromTag(): RouteRecord {
             _app = route;
           } else if (pattern.pathname === "/_404") {
             _404 = route;
-          } else if (pattern.pathname === "/_error") {
-            _error = route;
           }
           return route;
         });
-        return { routes, _app, _404, _error };
+        return { routes, _app, _404 };
       }
     } catch (e) {
       throw new Error(`loadRoutesFromTag: ${e.message}`);

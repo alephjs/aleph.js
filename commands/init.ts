@@ -96,6 +96,7 @@ export default async function (nameArg: string | undefined, template = "react") 
         "dom",
         "dom.iterable",
         "dom.asynciterable",
+        "dom.extras",
         "deno.ns",
       ],
       "types": [

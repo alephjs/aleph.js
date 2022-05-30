@@ -1,5 +1,5 @@
 import MagicString from "https://esm.sh/magic-string@0.26.1";
-import { parseDeps } from "https://deno.land/x/aleph_compiler@0.5.0/mod.ts";
+import { parseDeps } from "https://deno.land/x/aleph_compiler@0.5.5/mod.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import { serveDir } from "../lib/serve.ts";
@@ -27,34 +27,40 @@ const cssModuleLoader = async (pathname: string, env: ModuleLoaderEnv) => {
       cssModules: pathname.endsWith(".module.css"),
     },
   );
-  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
   if (!serverDependencyGraph) {
     throw new Error("The `serverDependencyGraph` is not defined");
   }
   serverDependencyGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })), inlineCSS: code });
   return {
     content: `export default ${JSON.stringify(cssModulesExports)};`,
-    contentType: "application/javascript; charset=utf-8",
+    headers: [["Content-Type", "application/javascript; charset=utf-8"]],
   };
 };
 
 const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, env: ModuleLoaderEnv) => {
-  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
   if (!serverDependencyGraph) {
     throw new Error("The `serverDependencyGraph` is not defined");
   }
 
   const { code, pathname, lang, inlineCSS, isTemplateLanguage } = input;
+  if (lang === "css") {
+    throw new Error("The `lang` can't be `css`");
+  }
+
   const specifier = "." + pathname;
-  const contentType = lang ? getContentType(`file.${lang}`) : undefined;
-  const unoGenerator = isTemplateLanguage || lang === "jsx" || lang === "tsx" || pathname.endsWith(".tsx") ||
-      pathname.endsWith(".jsx")
-    ? getUnoGenerator()
-    : null;
+  const isTpl = isTemplateLanguage || lang === "jsx" || lang === "tsx" || util.endsWithAny(pathname, ".tsx", ".jsx");
+  const unoGenerator = isTpl ? getUnoGenerator() : null;
   const [deps, atomicCSS] = await Promise.all([
-    parseDeps(specifier, code, { importMap: JSON.stringify(env.importMap) }),
+    parseDeps(specifier, code, { importMap: JSON.stringify(env.importMap), lang }),
     unoGenerator ? unoGenerator.generate(code).then((ret) => ({ tokens: [...ret.matched] })) : undefined,
   ]);
+  const headers: HeadersInit = [];
+  if (lang) {
+    headers.push(["Content-Type", getContentType(`file.${lang}`)]);
+    headers.push(["X-Language", lang]);
+  }
   serverDependencyGraph.mark(specifier, { deps, inlineCSS, atomicCSS });
   if (deps.length) {
     const s = new MagicString(code);
@@ -63,7 +69,7 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, 
       if (loc) {
         let url = `"${importUrl}"`;
         if (!util.isLikelyHttpURL(specifier)) {
-          const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.initialVersion;
+          const versionStr = serverDependencyGraph.get(specifier)?.version || serverDependencyGraph.globalVersion;
           if (importUrl.includes("?")) {
             url = `"${importUrl}&v=${versionStr}"`;
           } else {
@@ -73,12 +79,9 @@ const esModuleLoader = async (input: { pathname: string } & ModuleLoaderOutput, 
         s.overwrite(loc.start - 1, loc.end - 1, url);
       }
     });
-    return { content: s.toString(), contentType };
+    return { content: s.toString(), headers };
   }
-  return {
-    content: code,
-    contentType,
-  };
+  return { content: code, headers };
 };
 
 function initLoader(moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) {
@@ -95,7 +98,7 @@ function initLoader(moduleLoaders: ModuleLoader[], env: ModuleLoaderEnv) {
         if (ret instanceof Promise) {
           ret = await ret;
         }
-        return await esModuleLoader({ pathname, ...ret }, env);
+        return await esModuleLoader(Object.assign(ret, { pathname }), env);
       }
     }
   };
@@ -109,7 +112,7 @@ type ProxyModulesOptions = {
 
 /** serve app modules to support module loader that allows you import Non-JavaScript modules like `.css/.vue/.svelet/...` */
 export function proxyModules(port: number, options: ProxyModulesOptions) {
-  Reflect.set(globalThis, "serverDependencyGraph", new DependencyGraph());
+  Reflect.set(globalThis, "__ALEPH_SERVER_DEP_GRAPH", new DependencyGraph());
   return new Promise<void>((resolve, reject) => {
     serveDir({
       port,

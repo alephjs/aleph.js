@@ -1,4 +1,4 @@
-import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.33.2";
+import type { UserConfig as UnoConfig } from "https://esm.sh/@unocss/core@0.34.1";
 
 export type AlephConfig = {
   /** The config for file-system based routing.  */

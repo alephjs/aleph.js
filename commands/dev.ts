@@ -1,6 +1,6 @@
 import { basename, extname, relative, resolve } from "https://deno.land/std@0.136.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
-import { parseDeps } from "https://deno.land/x/aleph_compiler@0.5.0/mod.ts";
+import { parseDeps } from "https://deno.land/x/aleph_compiler@0.5.5/mod.ts";
 import { findFile, watchFs } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -107,8 +107,8 @@ if (import.meta.main) {
   log.info(`Watching files for changes...`);
   watchFs(cwd, async (kind, path) => {
     const specifier = "./" + relative(cwd, path);
-    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
-    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
+    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
     if (kind === "remove") {
       clientDependencyGraph?.unmark(specifier);
       serverDependencyGraph?.unmark(specifier);

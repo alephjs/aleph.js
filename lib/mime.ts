@@ -1,4 +1,4 @@
-import util from "./util.ts";
+import util from "../lib/util.ts";
 
 // MIME types for web
 const mimeTypes: Record<string, string[]> = {
@@ -9,8 +9,11 @@ const mimeTypes: Record<string, string[]> = {
   "application/json": ["json", "jsonc", "map"],
   "application/json5": ["json5"],
   "application/pdf": ["pdf"],
-  "application/xml": ["xml"],
+  "application/xml": ["xml", "plist", "tmLanguage", "tmTheme"],
   "application/zip": ["zip"],
+  "application/gzip": ["gz"],
+  "application/tar": ["tar"],
+  "application/tar+gzip": ["tar.gz", "tgz"],
   // text
   "text/html": ["html", "htm"],
   "text/markdown": ["md", "markdown"],
@@ -25,7 +28,7 @@ const mimeTypes: Record<string, string[]> = {
   "text/sass": ["sass", "scss"],
   "text/stylus": ["stylus", "styl"],
   "text/csv": ["csv"],
-  "text/yaml": ["yaml"],
+  "text/yaml": ["yaml", "yml"],
   "text/plain": ["txt", "glsl"],
   // font
   "font/ttf": ["ttf"],
@@ -69,11 +72,10 @@ export function registerMimeType(ext: string, contentType: string) {
 }
 
 /** get the content type by file name */
-export function getContentType(filename: string, charset?: string): string {
-  const [_, ext] = util.splitBy(filename, ".", true);
-  const ctype = typesMap.get(ext);
-  if (ctype && charset) {
-    return `${ctype}; charset=${charset}`;
+export function getContentType(filename: string): string {
+  let [prefix, ext] = util.splitBy(filename, ".", true);
+  if (ext === "gz" && prefix.endsWith(".tar")) {
+    ext = "tar.gz";
   }
-  return ctype ?? "application/octet-stream";
+  return typesMap.get(ext) ?? "application/octet-stream";
 }

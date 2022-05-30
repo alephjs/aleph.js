@@ -1,6 +1,6 @@
 import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
-import { createGenerator, type UnoGenerator } from "https://esm.sh/@unocss/core@0.33.2";
+import { createGenerator, type UnoGenerator } from "https://esm.sh/@unocss/core@0.34.1";
 import { findFile } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -67,8 +67,8 @@ export function getUnoGenerator(): UnoGenerator | null {
 }
 
 /** Get the deployment ID. */
-export function getDeploymentId(): string | null {
-  return Deno.env.get("DENO_DEPLOYMENT_ID") ?? null;
+export function getDeploymentId(): string | undefined {
+  return Deno.env.get("DENO_DEPLOYMENT_ID");
 }
 
 /**

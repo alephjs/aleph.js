@@ -1,7 +1,7 @@
 import { basename, dirname, extname, join } from "https://deno.land/std@0.136.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.136.0/fs/ensure_dir.ts";
 import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.38/mod.js";
-import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.5.0/mod.ts";
+import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.5.5/mod.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
 import { parseHtmlLinks } from "./html.ts";
 import log from "../lib/log.ts";
@@ -65,15 +65,19 @@ export async function build(serverEntry?: string) {
     const { routes } = await initRoutes(config?.routes);
     routeFiles = await Promise.all(routes.map(async ([_, { filename }]) => {
       let code: string;
+      let lang: "ts" | "tsx" | "js" | "jsx" | undefined = undefined;
       const ext = extname(filename).slice(1);
       if (builtinModuleExts.includes(ext)) {
         code = await Deno.readTextFile(filename);
       } else if (modulesProxyPort) {
-        code = await fetch(`http://localhost:${modulesProxyPort}/${filename.slice(1)}`).then((res) => res.text());
+        const res = await fetch(`http://localhost:${modulesProxyPort}/${filename.slice(1)}`);
+        const v = res.headers.get("X-Language");
+        code = await res.text();
+        lang = v === "ts" || v === "tsx" || v === "js" || v === "jsx" ? v : undefined;
       } else {
         throw new Error(`Unsupported module type: ${ext}`);
       }
-      const exportNames = await parseExportNames(filename, code);
+      const exportNames = await parseExportNames(filename, code, { lang });
       return [filename, exportNames];
     }));
   }
@@ -81,7 +85,7 @@ export async function build(serverEntry?: string) {
   const serverEntryCode = [
     `import { DependencyGraph } from "${alephPkgUri}/server/graph.ts";`,
     `import graph from "./server_dependency_graph.js";`,
-    `globalThis.serverDependencyGraph = new DependencyGraph(graph.modules);`,
+    `globalThis.__ALEPH_SERVER_DEP_GRAPH = new DependencyGraph(graph.modules);`,
     routeFiles.length > 0 && `import { revive } from "${alephPkgUri}/server/routing.ts";`,
     moduleLoaders.length > 0 &&
     `import { globToRegExp } from "https://deno.land/std@0.136.0/path/mod.ts";const moduleLoaders = []; globalThis["__ALEPH_MODULE_LOADERS"] = moduleLoaders;`,
@@ -248,8 +252,8 @@ export async function build(serverEntry?: string) {
   });
 
   // get depndency graph
-  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
-  const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "clientDependencyGraph");
+  const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
+  const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
 
   // create server_dependency_graph.js
   if (serverDependencyGraph) {

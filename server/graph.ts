@@ -15,9 +15,9 @@ export type DependencyDescriptor = {
 
 export class DependencyGraph {
   #modules = new Map<string, Module>();
-  #initialVersion = Date.now();
+  #globalVersion = Date.now();
 
-  constructor(modules?: Module[], initialVersion?: number) {
+  constructor(modules?: Module[], globalVersion?: number) {
     if (modules) {
       modules.forEach((item) => {
         if (typeof item.specifier === "string" && typeof item.version === "number") {
@@ -25,13 +25,13 @@ export class DependencyGraph {
         }
       });
     }
-    if (initialVersion) {
-      this.#initialVersion = initialVersion;
+    if (globalVersion) {
+      this.#globalVersion = globalVersion;
     }
   }
 
-  get initialVersion(): number {
-    return this.#initialVersion;
+  get globalVersion(): number {
+    return this.#globalVersion;
   }
 
   get modules(): Module[] {
@@ -53,7 +53,7 @@ export class DependencyGraph {
 
     const mod: Module = {
       specifier,
-      version: this.#initialVersion,
+      version: this.#globalVersion,
       ...props,
     };
     this.#modules.set(specifier, mod);

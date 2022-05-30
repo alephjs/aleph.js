@@ -15,7 +15,6 @@ export type SSRContext = {
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
   readonly dataDefer: boolean;
-  readonly errorBoundaryHandler?: CallableFunction;
   readonly signal: AbortSignal;
   readonly bootstrapScripts?: string[];
   readonly onError?: (error: unknown) => void;
@@ -25,23 +24,30 @@ export type SSRFn = {
   (ssr: SSRContext): Promise<ReadableStream | string> | ReadableStream | string;
 };
 
+// Options for the content-security-policy
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+export type CSP = {
+  nonce?: boolean;
+  getPolicy: (url: URL, nonce?: string) => string | null;
+};
+
 export type SSR = {
+  cacheControl?: "private" | "public";
+  CSP?: CSP;
   dataDefer: true;
-  cacheControl?: "private" | "public";
-  csp?: string | string[];
-  render: SSRFn;
+  render: (ssr: SSRContext) => Promise<ReadableStream> | ReadableStream;
 } | {
-  dataDefer?: false;
   cacheControl?: "private" | "public";
-  csp?: string | string[];
+  CSP?: CSP;
+  dataDefer?: false;
   render: SSRFn;
 } | SSRFn;
 
 export type SSRResult = {
   context: SSRContext;
-  errorBoundaryHandlerFilename?: string;
   body: ReadableStream | string;
   deferedData: Record<string, unknown>;
+  nonce?: string;
 };
 
 export type RenderOptions = {
@@ -65,10 +71,10 @@ export default {
       const isFn = typeof ssr === "function";
       const dataDefer = isFn ? false : !!ssr.dataDefer;
       const cc = isFn ? "public" : ssr.cacheControl ?? "public";
-      const csp = isFn ? undefined : ssr.csp;
+      const CSP = isFn ? undefined : ssr.CSP;
       const render = isFn ? ssr : ssr.render;
       try {
-        const [url, routeModules, deferedData, errorBoundaryHandler] = await initSSR(
+        const [url, routeModules, deferedData] = await initSSR(
           req,
           ctx,
           routes,
@@ -81,7 +87,6 @@ export default {
           routeModules,
           headCollection,
           dataDefer,
-          errorBoundaryHandler: errorBoundaryHandler?.default,
           signal: req.signal,
           bootstrapScripts: [bootstrapScript],
           onError: (_error: unknown) => {
@@ -89,7 +94,7 @@ export default {
           },
         };
         const body = await render(ssrContext);
-        const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "serverDependencyGraph");
+        const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
         if (serverDependencyGraph) {
           const unocssTokens: ReadonlyArray<string>[] = [];
           const lookupModuleStyle = (mod: Module) => {
@@ -134,16 +139,21 @@ export default {
         } else {
           headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
         }
-        if (csp) {
-          // todo: parse nonce
-          headers.append("Content-Security-Policy", [csp].flat().join("; "));
-        }
         ssrRes = {
           context: ssrContext,
-          errorBoundaryHandlerFilename: errorBoundaryHandler?.filename,
           body,
           deferedData,
         };
+        if (CSP) {
+          const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
+          const policy = CSP.getPolicy(url, nonce!);
+          if (policy) {
+            headers.append("Content-Security-Policy", policy);
+            if (policy.includes("nonce-" + nonce)) {
+              ssrRes.nonce = nonce;
+            }
+          }
+        }
       } catch (e) {
         if (e instanceof Response) {
           return e;
@@ -210,9 +220,9 @@ export default {
         if (ssrRes) {
           const {
             context: { routeModules, headCollection },
-            errorBoundaryHandlerFilename,
             body,
             deferedData,
+            nonce,
           } = ssrRes;
           rewriter.on("head", {
             element(el: Element) {
@@ -225,11 +235,13 @@ export default {
                     params,
                     filename,
                     withData,
-                    data: defered ? undefined : data,
+                    error: data instanceof Error ? { message: data.message, stack: data.stack } : undefined,
+                    data: defered ? undefined : data instanceof Error ? undefined : data,
                     dataCacheTtl,
                     dataDefered: defered,
                   };
                 });
+
                 // replace "/" to "\/" to prevent xss
                 const modulesJSON = JSON.stringify(ssrModules).replaceAll("/", "\\/");
                 el.append(
@@ -244,18 +256,11 @@ export default {
                 const kvs = routeModules.map(({ filename, data }, idx) =>
                   `${JSON.stringify(filename)}:{defaultExport:$${idx}${data !== undefined ? ",withData:true" : ""}}`
                 ).join(",");
-                el.append(`<script type="module">${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`, {
-                  html: true,
-                });
-
-                if (errorBoundaryHandlerFilename) {
-                  el.append(
-                    `<script type="module">import Handler from ${
-                      JSON.stringify(errorBoundaryHandlerFilename.slice(1))
-                    };window.__ERROR_BOUNDARY_HANDLER=Handler</script>`,
-                    { html: true },
-                  );
-                }
+                const nonceAttr = nonce ? ` nonce="${nonce}"` : "";
+                el.append(
+                  `<script type="module"${nonceAttr}>${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`,
+                  { html: true },
+                );
               }
             },
           });
@@ -308,6 +313,16 @@ export default {
               }
             },
           });
+          if (nonce) {
+            rewriter.on("script", {
+              element(el: Element) {
+                const typeAttr = el.getAttribute("type");
+                if ((!typeAttr || typeAttr === "module") && !el.getAttribute("src")) {
+                  el.setAttribute("nonce", nonce);
+                }
+              },
+            });
+          }
         }
 
         try {
@@ -334,14 +349,11 @@ async function initSSR(
   routes: RouteRecord,
   dataDefer: boolean,
   onError?: ErrorCallback,
-): Promise<
-  [
-    url: URL,
-    routeModules: RouteModule[],
-    deferedData: Record<string, unknown>,
-    errorBoundaryHandler: { filename: string; default: CallableFunction } | undefined,
-  ]
-> {
+): Promise<[
+  url: URL,
+  routeModules: RouteModule[],
+  deferedData: Record<string, unknown>,
+]> {
   const url = new URL(req.url);
   const matches = matchRoutes(url, routes);
   const deferedData: Record<string, unknown> = {};
@@ -394,7 +406,7 @@ async function initSSR(
             if (res.headers.has("Location")) {
               throw res;
             }
-            throw new FetchError(500, {}, "Missing the `Location` header");
+            throw new FetchError(500, "Missing the `Location` header");
           }
           try {
             const data = await res.json();
@@ -403,7 +415,7 @@ async function initSSR(
             }
             return data;
           } catch (_e) {
-            throw new FetchError(500, {}, "Data must be valid JSON");
+            throw new FetchError(500, "Data must be valid JSON");
           }
         } else if (res === null || util.isPlainObject(res) || Array.isArray(res)) {
           if (dataDefer) {
@@ -411,41 +423,31 @@ async function initSSR(
           }
           return res;
         } else {
-          throw new FetchError(500, {}, "Data must be valid JSON");
+          throw new FetchError(500, "Data must be valid JSON");
         }
       };
       rmod.withData = true;
       if (dataDefer) {
         rmod.data = fetchData;
       } else {
-        rmod.data = await fetchData();
+        try {
+          rmod.data = await fetchData();
+        } catch (error) {
+          if (error instanceof Error) {
+            rmod.data = error;
+          } else {
+            throw error;
+          }
+        }
       }
     }
 
     return rmod;
   }));
 
-  // find error boundary handler
-  if (routes._error) {
-    const [_, meta] = routes._error;
-    const mod = await importRouteModule(meta.filename);
-    if (typeof mod.default === "function") {
-      return [
-        url,
-        modules.filter(({ defaultExport }) => defaultExport !== undefined),
-        deferedData,
-        {
-          filename: meta.filename,
-          default: mod.default,
-        },
-      ];
-    }
-  }
-
   return [
     url,
     modules.filter(({ defaultExport }) => defaultExport !== undefined),
     deferedData,
-    undefined,
   ];
 }

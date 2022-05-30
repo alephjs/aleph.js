@@ -2,7 +2,7 @@ import type { ConnInfo, ServeInit } from "https://deno.land/std@0.136.0/http/ser
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
 import FetchError from "../framework/core/fetch_error.ts";
-import type { RouteRecord } from "../framework/core/route.ts";
+import type { RouteMatch, RouteRecord } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
@@ -11,7 +11,7 @@ import { DependencyGraph } from "./graph.ts";
 import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig, regFullVersion } from "./helpers.ts";
 import { type HTMLRewriterHandlers, loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
-import { content, type CookieOptions, json, setCookieHeader } from "./response.ts";
+import { content, type CookieOptions, fixResponse, json, setCookieHeader } from "./response.ts";
 import { importRouteModule, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
@@ -35,7 +35,7 @@ export const serve = (options: ServerOptions = {}) => {
   const routesPromise = routes ? initRoutes(routes) : Promise.resolve({ routes: [] });
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const url = new URL(req.url);
-    const { host, pathname, searchParams } = url;
+    const { pathname, searchParams } = url;
 
     // close the hot-reloading websocket connection and tell the client to reload
     // this request occurs when the client try to connect to the hot-reloading websocket in production mode
@@ -255,90 +255,108 @@ export const serve = (options: ServerOptions = {}) => {
     // request route api
     const routes: RouteRecord = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routesPromise;
     if (routes.routes.length > 0) {
-      for (const [pattern, { filename }] of routes.routes) {
-        const ret = pattern.exec({ host, pathname });
-        const accept = req.headers.get("Accept");
-        const fromFetchApi = accept === "application/json" || !accept?.includes("html");
+      let pathnameInput = pathname;
+      if (pathnameInput !== "/") {
+        pathnameInput = util.trimSuffix(pathname, "/");
+      }
+      let matched: RouteMatch | null = null;
+      // find the direct match
+      for (const [pattern, meta] of routes.routes) {
+        const ret = pattern.exec({ host: url.host, pathname: pathnameInput });
         if (ret) {
-          try {
-            const { method } = req;
-            const mod = await importRouteModule(filename);
-            const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
-            if (method !== "GET" || mod.default === undefined || fromFetchApi) {
-              Object.assign(ctx.params, ret.pathname.groups);
-              const anyFetcher = dataConfig.any ?? dataConfig.ANY;
-              if (typeof anyFetcher === "function") {
-                const res = await anyFetcher(req, ctx);
-                if (res instanceof Response) {
-                  return res;
-                }
+          matched = [ret, meta];
+          break;
+        }
+      }
+      if (!matched) {
+        // find index route
+        for (const [pattern, meta] of routes.routes) {
+          if (meta.pattern.pathname.endsWith("/index")) {
+            const ret = pattern.exec({ host: url.host, pathname: pathnameInput + "/index" });
+            if (ret) {
+              matched = [ret, meta];
+              break;
+            }
+          }
+        }
+      }
+      if (matched) {
+        const { method } = req;
+        const [ret, { filename }] = matched;
+        const accept = req.headers.get("Accept");
+        const fromFetch = accept === "application/json" || !accept?.includes("html");
+        try {
+          const mod = await importRouteModule(filename);
+          const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
+          if (method !== "GET" || mod.default === undefined || fromFetch) {
+            Object.assign(ctx.params, ret.pathname.groups);
+            const anyFetcher = dataConfig.any ?? dataConfig.ANY;
+            if (typeof anyFetcher === "function") {
+              const res = await anyFetcher(req, ctx);
+              if (res instanceof Response) {
+                return res;
               }
-              const fetcher = dataConfig[method.toLowerCase()] ?? dataConfig[method];
-              if (typeof fetcher === "function") {
-                const res = await fetcher(req, ctx);
-                if (res instanceof Response) {
-                  if (res.status >= 300 && fromFetchApi) {
-                    const err = await FetchError.fromResponse(res);
-                    return json({ ...err }, { status: err.status >= 400 ? err.status : 501, headers: ctx.headers });
-                  }
-                  let headers: Headers | null = null;
-                  ctx.headers.forEach((value, name) => {
-                    if (!headers) {
-                      headers = new Headers(res.headers);
-                    }
-                    headers.set(name, value);
-                  });
-                  if (headers) {
-                    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
-                  }
-                  return res;
-                }
-                if (
-                  typeof res === "string" ||
-                  res instanceof ArrayBuffer ||
-                  res instanceof Uint8Array ||
-                  res instanceof ReadableStream
-                ) {
-                  return new Response(res, { headers: ctx.headers });
-                }
-                if (res instanceof Blob || res instanceof File) {
-                  ctx.headers.set("Content-Type", res.type);
-                  ctx.headers.set("Content-Length", res.size.toString());
-                  return new Response(res, { headers: ctx.headers });
-                }
-                if (util.isPlainObject(res) || Array.isArray(res)) {
-                  return json(res, { headers: ctx.headers });
-                }
-                if (res === null) {
-                  return new Response(null, { headers: ctx.headers });
-                }
-                return new Response("Invalid Reponse Type", { status: 500 });
+            }
+            const fetcher = dataConfig[method.toLowerCase()] ?? dataConfig[method];
+            if (typeof fetcher === "function") {
+              const res = await fetcher(req, ctx);
+              if (res instanceof Response) {
+                return fixResponse(res, ctx.headers, fromFetch);
               }
-              return new Response("Method Not Allowed", { status: 405 });
+              if (
+                typeof res === "string" ||
+                res instanceof ArrayBuffer ||
+                res instanceof Uint8Array ||
+                res instanceof ReadableStream
+              ) {
+                return new Response(res, { headers: ctx.headers });
+              }
+              if (res instanceof Blob || res instanceof File) {
+                ctx.headers.set("Content-Type", res.type);
+                ctx.headers.set("Content-Length", res.size.toString());
+                return new Response(res, { headers: ctx.headers });
+              }
+              if (util.isPlainObject(res) || Array.isArray(res)) {
+                return json(res, { headers: ctx.headers });
+              }
+              if (res === null) {
+                return new Response(null, { headers: ctx.headers });
+              }
+              throw new FetchError(500, "Invalid Reponse Type");
             }
-          } catch (err) {
-            if (err instanceof TypeError) {
-              return new Response(generateErrorHtml(err.stack ?? err.message), {
-                status: 500,
-                headers: [["Content-Type", "text/html"]],
-              });
-            }
-            const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
-            if (res instanceof Response) {
-              return res;
-            }
-            if (err instanceof Response) {
-              return err;
-            }
-            if (err instanceof Error || typeof err === "string") {
-              log.error(err);
-            }
-            const status: number = util.isUint(err.status || err.code) ? err.status || err.code : 500;
-            return json({ ...err, message: err.message || String(err), status }, {
-              status: status >= 400 ? status : 501,
-              headers: ctx.headers,
+            return new Response("Method Not Allowed", { status: 405 });
+          }
+        } catch (err) {
+          // javascript syntax error
+          if (err instanceof TypeError && !fromFetch) {
+            return new Response(generateErrorHtml(err.stack ?? err.message), {
+              status: 500,
+              headers: [["Content-Type", "text/html"]],
             });
           }
+
+          // use the `onError` if available
+          const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
+          if (res instanceof Response) {
+            return fixResponse(res, ctx.headers, fromFetch);
+          }
+
+          // user throw a response
+          if (err instanceof Response) {
+            return fixResponse(err, ctx.headers, fromFetch);
+          }
+
+          // prints the error stack
+          if (err instanceof Error || typeof err === "string") {
+            log.error(err);
+          }
+
+          // return the error as a json
+          const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
+          return json({ ...err, status, message: err.message ?? String(err), stack: err.stack }, {
+            status,
+            headers: ctx.headers,
+          });
         }
       }
     }
@@ -399,7 +417,7 @@ export const serve = (options: ServerOptions = {}) => {
 
   // inject global objects
   Reflect.set(globalThis, "__ALEPH_CONFIG", { build, routes, devServer });
-  Reflect.set(globalThis, "clientDependencyGraph", new DependencyGraph());
+  Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;
   if (Deno.env.get("ALEPH_CLI")) {
