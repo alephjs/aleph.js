@@ -62,7 +62,7 @@ function formatCode(message: string, sourceCode: string, column: number, line: n
     return 1 + index + " | " + val;
   });
   const indexLen = line.toString().length;
-  const mark = " ".repeat(indexLen * 2)+ " | " + " ".repeat(column) + "^";
+  const mark = " ".repeat(indexLen * 2) + " | " + " ".repeat(column) + "^";
   sourceCodeArr = sourceCodeArr.slice(line - 3, line + 2);
   sourceCodeArr.splice(3, 0, mark);
   const formatStr = sourceCodeArr.reduce((res, cur) => res + "\r\n" + cur);
