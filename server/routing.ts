@@ -88,7 +88,7 @@ export async function importRouteModule(filename: string, noProxy?: boolean) {
   if (revivedModules.has(filename)) {
     mod = revivedModules.get(filename)!;
   } else if (noProxy) {
-    mod = await import(join(Deno.cwd(), filename));
+    mod = await import(`file://${join(Deno.cwd(), filename)}`);
   } else {
     const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
     const version = graph?.get(filename)?.version || graph?.mark(filename, {}).version || Date.now().toString(16);
