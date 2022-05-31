@@ -1,18 +1,25 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.136.0/http/server.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
-import type { RouteMatch, RouteRecord } from "../framework/core/route.ts";
+import type { RouteRecord } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
 import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
-import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig, regFullVersion } from "./helpers.ts";
+import {
+  getDeploymentId,
+  globalIt,
+  initModuleLoaders,
+  loadImportMap,
+  loadJSXConfig,
+  regFullVersion,
+} from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
-import { content, fixResponse, json, setCookieHeader, toResponse } from "./response.ts";
-import { importRouteModule, initRoutes, revive } from "./routing.ts";
+import { content, fixResponse, json, setCookieHeader } from "./response.ts";
+import { fetchData, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
 
@@ -219,90 +226,44 @@ export const serve = (options: ServerOptions = {}) => {
     // request route api
     const routes: RouteRecord = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routesPromise;
     if (routes.routes.length > 0) {
-      let pathnameInput = pathname;
-      if (pathnameInput !== "/") {
-        pathnameInput = util.trimSuffix(pathname, "/");
-      }
-      let matched: RouteMatch | null = null;
-      // find the direct match
-      for (const [pattern, meta] of routes.routes) {
-        const ret = pattern.exec({ host: url.host, pathname: pathnameInput });
-        if (ret) {
-          matched = [ret, meta];
-          break;
+      const accept = req.headers.get("Accept");
+      const fromFetch = accept === "application/json" || !accept?.includes("html");
+      try {
+        const resp = await fetchData(routes.routes, url, req, ctx, fromFetch);
+        if (resp) {
+          return resp;
         }
-      }
-      if (!matched) {
-        // find index route
-        for (const [pattern, meta] of routes.routes) {
-          if (meta.pattern.pathname.endsWith("/index")) {
-            const ret = pattern.exec({ host: url.host, pathname: pathnameInput + "/index" });
-            if (ret) {
-              matched = [ret, meta];
-              break;
-            }
-          }
-        }
-      }
-      if (matched) {
-        const { method } = req;
-        const [ret, { filename }] = matched;
-        const accept = req.headers.get("Accept");
-        const fromFetch = accept === "application/json" || !accept?.includes("html");
-        try {
-          const mod = await importRouteModule(filename);
-          const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
-          if (method !== "GET" || mod.default === undefined || fromFetch) {
-            Object.assign(ctx.params, ret.pathname.groups);
-            const anyFetcher = dataConfig.any ?? dataConfig.ANY;
-            if (typeof anyFetcher === "function") {
-              const res = await anyFetcher(req, ctx);
-              if (res instanceof Response) {
-                return res;
-              }
-            }
-            const fetcher = dataConfig[method.toLowerCase()] ?? dataConfig[method];
-            if (typeof fetcher === "function") {
-              const res = await fetcher(req, ctx);
-              if (res instanceof Response) {
-                return fixResponse(res, ctx.headers, fromFetch);
-              }
-              return toResponse(res, ctx.headers);
-            }
-            return new Response("Method Not Allowed", { status: 405 });
-          }
-        } catch (err) {
-          // javascript syntax error
-          if (err instanceof TypeError && !fromFetch) {
-            return new Response(generateErrorHtml(err.stack ?? err.message), {
-              status: 500,
-              headers: [["Content-Type", "text/html"]],
-            });
-          }
-
-          // use the `onError` if available
-          const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
-          if (res instanceof Response) {
-            return fixResponse(res, ctx.headers, fromFetch);
-          }
-
-          // user throw a response
-          if (err instanceof Response) {
-            return fixResponse(err, ctx.headers, fromFetch);
-          }
-
-          // prints the error stack
-          if (err instanceof Error || typeof err === "string") {
-            log.error(err);
-          }
-
-          // return the error as a json
-          const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
-          return json({ ...err, status, message: err.message ?? String(err), stack: err.stack }, {
-            status,
-            headers: ctx.headers,
+      } catch (err) {
+        // javascript syntax error
+        if (err instanceof TypeError && !fromFetch) {
+          return new Response(generateErrorHtml(err.stack ?? err.message), {
+            status: 500,
+            headers: [["Content-Type", "text/html"]],
           });
         }
+
+        // use the `onError` if available
+        const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
+        if (res instanceof Response) {
+          return fixResponse(res, ctx.headers, fromFetch);
+        }
+
+        // user throw a response
+        if (err instanceof Response) {
+          return fixResponse(err, ctx.headers, fromFetch);
+        }
+
+        // prints the error stack
+        if (err instanceof Error || typeof err === "string") {
+          log.error(err);
+        }
+
+        // return the error as a json
+        const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
+        return json({ ...err, status, message: err.message ?? String(err), stack: err.stack }, {
+          status,
+          headers: ctx.headers,
+        });
       }
     }
 
@@ -313,46 +274,31 @@ export const serve = (options: ServerOptions = {}) => {
         return new Response("Not found", { status: 404 });
     }
 
-    // load the `index.html`
-    let indexHtml: Uint8Array | null | undefined = Reflect.get(globalThis, "__ALEPH_INDEX_HTML");
-    if (indexHtml === undefined) {
-      try {
-        indexHtml = await loadAndFixIndexHtml({
+    try {
+      const indexHtml = await globalIt("__ALEPH_INDEX_HTML", async () => {
+        return await loadAndFixIndexHtml({
           isDev,
           importMap: await importMapPromise,
           ssr: typeof ssr === "function" ? {} : ssr,
           hmrWebSocketUrl: options.devServer?.hmrWebSocketUrl,
         });
-      } catch (err) {
-        if (err instanceof Deno.errors.NotFound) {
-          indexHtml = null;
-        } else {
-          log.error("read index.html:", err);
-          return onError?.(err, { by: "fs", url: req.url }) ??
-            new Response(generateErrorHtml(err.stack ?? err.message), {
-              status: 500,
-              headers: [["Content-Type", "text/html"]],
-            });
-        }
-      }
+      });
+      return renderer.fetch(req, ctx, {
+        indexHtml,
+        routes,
+        customHTMLRewriter,
+        isDev,
+        ssr,
+        onError,
+      });
+    } catch (err) {
+      log.error("render page:", err);
+      return onError?.(err, { by: "fs", url: req.url }) ??
+        new Response(generateErrorHtml(err.stack ?? err.message), {
+          status: 500,
+          headers: [["Content-Type", "text/html"]],
+        });
     }
-    // cache `index.html` to memory
-    Reflect.set(globalThis, "__ALEPH_INDEX_HTML", indexHtml);
-
-    // no root `index.html` found
-    if (indexHtml === null) {
-      return new Response("Not Found", { status: 404 });
-    }
-
-    // render html
-    return renderer.fetch(req, ctx, {
-      indexHtml,
-      routes,
-      customHTMLRewriter,
-      isDev,
-      ssr,
-      onError,
-    });
   };
 
   // set log level if specified

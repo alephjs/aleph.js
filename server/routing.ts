@@ -1,14 +1,79 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
-import type { Route, RouteRecord } from "../framework/core/route.ts";
+import type { Route, RouteMatch, RouteRecord } from "../framework/core/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
 import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
 import { globalIt } from "./helpers.ts";
+import { fixResponse, toResponse } from "./response.ts";
 import type { AlephConfig, RoutesConfig } from "./types.ts";
 
 const revivedModules: Map<string, Record<string, unknown>> = new Map();
+
+export async function fetchData(
+  routes: Route[],
+  url: URL,
+  req: Request,
+  ctx: Record<string, unknown>,
+  fromFetch: boolean,
+  noProxy?: boolean,
+): Promise<Response | void> {
+  const { pathname, host } = url;
+  if (routes.length > 0) {
+    let pathnameInput = pathname;
+    if (pathnameInput !== "/") {
+      pathnameInput = util.trimSuffix(pathname, "/");
+    }
+    let matched: RouteMatch | null = null;
+    // find the direct match
+    for (const [pattern, meta] of routes) {
+      const ret = pattern.exec({ host, pathname: pathnameInput });
+      if (ret) {
+        matched = [ret, meta];
+        break;
+      }
+    }
+    if (!matched) {
+      // find index route
+      for (const [pattern, meta] of routes) {
+        if (meta.pattern.pathname.endsWith("/index")) {
+          const ret = pattern.exec({ host, pathname: pathnameInput + "/index" });
+          if (ret) {
+            matched = [ret, meta];
+            break;
+          }
+        }
+      }
+    }
+    if (matched) {
+      const { method } = req;
+      const [ret, { filename }] = matched;
+      const mod = await importRouteModule(filename, noProxy);
+      const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
+      if (method !== "GET" || mod.default === undefined || fromFetch) {
+        Object.assign(ctx.params, ret.pathname.groups);
+        const anyFetcher = dataConfig.any ?? dataConfig.ANY;
+        if (typeof anyFetcher === "function") {
+          const res = await anyFetcher(req, ctx);
+          if (res instanceof Response) {
+            return res;
+          }
+        }
+        const fetcher = dataConfig[method.toLowerCase()] ?? dataConfig[method];
+        if (typeof fetcher === "function") {
+          const res = await fetcher(req, ctx);
+          const headers = ctx.headers as unknown as Headers;
+          if (res instanceof Response) {
+            return fixResponse(res, headers, fromFetch);
+          }
+          return toResponse(res, headers);
+        }
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+    }
+  }
+}
 
 /** revive a route module. */
 export function revive(filename: string, module: Record<string, unknown>) {
@@ -18,10 +83,12 @@ export function revive(filename: string, module: Record<string, unknown>) {
 }
 
 /** import the route module. */
-export async function importRouteModule(filename: string) {
+export async function importRouteModule(filename: string, noProxy?: boolean) {
   let mod: Record<string, unknown>;
   if (revivedModules.has(filename)) {
     mod = revivedModules.get(filename)!;
+  } else if (noProxy) {
+    mod = await import(join(Deno.cwd(), filename));
   } else {
     const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
     const version = graph?.get(filename)?.version || graph?.mark(filename, {}).version || Date.now().toString(16);
@@ -100,8 +167,8 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cw
 /** convert route config to `RouteRegExp` */
 export function toRouteRegExp(config: string | RoutesConfig): RouteRegExp {
   const isObject = util.isPlainObject(config);
-  const prefix = "." + util.cleanPath(util.splitBy(isObject ? config.glob : config, "*")[0]);
-  const reg = globToRegExp("./" + util.trimPrefix(util.trimPrefix(isObject ? config.glob : config, "/"), "./"));
+  const prefix = util.trimSuffix(util.splitBy(isObject ? config.glob : config, "*")[0], "/");
+  const reg = globToRegExp("./" + util.trimPrefix(isObject ? config.glob : config, "./"));
 
   return {
     prefix,

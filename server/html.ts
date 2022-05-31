@@ -6,6 +6,16 @@ import util from "../lib/util.ts";
 import { applyImportMap, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import type { ImportMap } from "./types.ts";
 
+const defaultIndexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body></body>
+</html>
+`;
+
 // init lol-html wasm
 await initLolHtml(decodeLolHtmlWasm());
 
@@ -84,15 +94,24 @@ async function loadIndexHtml(): Promise<{ html: Uint8Array; hasSSRBody: boolean 
     },
   });
 
+  let html: Uint8Array;
   try {
-    rewriter.write(await Deno.readFile("index.html"));
+    html = await Deno.readFile("index.html");
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
+      html = util.utf8TextEncoder.encode(defaultIndexHtml);
+    } else {
+      throw err;
+    }
+  }
+
+  try {
+    rewriter.write(html);
     rewriter.end();
     return {
       html: concat(...chunks),
       hasSSRBody,
     };
-  } catch (err) {
-    throw err;
   } finally {
     rewriter.free();
   }

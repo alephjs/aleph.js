@@ -175,10 +175,16 @@ export default {
       if (deployId) {
         etag = `W/${btoa("./index.html").replace(/[^a-z0-9]/g, "")}-${deployId}`;
       } else {
-        const { mtime, size } = await Deno.lstat("./index.html");
-        if (mtime) {
-          etag = `W/${mtime.getTime().toString(16)}-${size.toString(16)}`;
-          headers.append("Last-Modified", new Date(mtime).toUTCString());
+        try {
+          const { mtime, size } = await Deno.lstat("./index.html");
+          if (mtime) {
+            etag = `W/${mtime.getTime().toString(16)}-${size.toString(16)}`;
+            headers.append("Last-Modified", new Date(mtime).toUTCString());
+          }
+        } catch (err) {
+          if (!(err instanceof Deno.errors.NotFound)) {
+            return new Response(generateErrorHtml(err.message), { headers });
+          }
         }
       }
       if (etag) {
@@ -323,6 +329,12 @@ export default {
               },
             });
           }
+        } else {
+          rewriter.on("body", {
+            element(el: Element) {
+              el.replace(`<body><p>Not Found</p></body>`, { html: true });
+            },
+          });
         }
 
         try {
