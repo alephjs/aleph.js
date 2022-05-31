@@ -1,17 +1,17 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.136.0/http/server.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.136.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.136.0/streams/conversion.ts";
-import FetchError from "../framework/core/fetch_error.ts";
 import type { RouteMatch, RouteRecord } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
+import { createContext } from "./context.ts";
 import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
 import { getDeploymentId, initModuleLoaders, loadImportMap, loadJSXConfig, regFullVersion } from "./helpers.ts";
-import { type HTMLRewriterHandlers, loadAndFixIndexHtml } from "./html.ts";
+import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
-import { content, type CookieOptions, fixResponse, json, setCookieHeader } from "./response.ts";
+import { content, fixResponse, json, setCookieHeader, toResponse } from "./response.ts";
 import { importRouteModule, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
@@ -52,47 +52,11 @@ export const serve = (options: ServerOptions = {}) => {
 
     const postMiddlewares: Middleware[] = [];
     const customHTMLRewriter: [string, HTMLRewriterHandlers][] = [];
-
-    // create the context object
-    const ctx = {
-      connInfo,
-      params: {},
-      headers: new Headers(),
-      cookies: {
-        _cookies: null as Map<string, string> | null,
-        get(name: string) {
-          if (this._cookies === null) {
-            this._cookies = new Map<string, string>();
-            const cookieHeader = req.headers.get("Cookie");
-            if (cookieHeader) {
-              for (const cookie of cookieHeader.split(";")) {
-                const [key, value] = util.splitBy(cookie, "=");
-                this._cookies.set(key.trim(), value);
-              }
-            }
-          }
-          return this._cookies.get(name);
-        },
-        set(name: string, value: string, options?: CookieOptions) {
-          this._cookies?.set(name, value);
-          ctx.headers.set("Set-Cookie", setCookieHeader(name, value, options));
-        },
-        delete(name: string, options?: CookieOptions) {
-          this._cookies?.delete(name);
-          ctx.headers.set("Set-Cookie", setCookieHeader(name, "", { ...options, expires: new Date(0) }));
-        },
-      },
-      htmlRewriter: {
-        on: (selector: string, handlers: HTMLRewriterHandlers) => {
-          customHTMLRewriter.push([selector, handlers]);
-        },
-      },
-    };
+    const ctx = createContext(req, { connInfo, customHTMLRewriter });
 
     // use eager middlewares
     if (Array.isArray(middlewares)) {
-      const len = middlewares.length;
-      for (let i = 0; i < len; i++) {
+      for (let i = 0, l = middlewares.length; i < l; i++) {
         const mw = middlewares[i];
         const handler = mw.fetch;
         if (typeof handler === "function") {
@@ -303,26 +267,7 @@ export const serve = (options: ServerOptions = {}) => {
               if (res instanceof Response) {
                 return fixResponse(res, ctx.headers, fromFetch);
               }
-              if (
-                typeof res === "string" ||
-                res instanceof ArrayBuffer ||
-                res instanceof Uint8Array ||
-                res instanceof ReadableStream
-              ) {
-                return new Response(res, { headers: ctx.headers });
-              }
-              if (res instanceof Blob || res instanceof File) {
-                ctx.headers.set("Content-Type", res.type);
-                ctx.headers.set("Content-Length", res.size.toString());
-                return new Response(res, { headers: ctx.headers });
-              }
-              if (util.isPlainObject(res) || Array.isArray(res)) {
-                return json(res, { headers: ctx.headers });
-              }
-              if (res === null) {
-                return new Response(null, { headers: ctx.headers });
-              }
-              throw new FetchError(500, "Invalid Reponse Type");
+              return toResponse(res, ctx.headers);
             }
             return new Response("Method Not Allowed", { status: 405 });
           }

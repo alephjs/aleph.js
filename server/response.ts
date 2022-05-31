@@ -1,3 +1,5 @@
+import util from "../lib/util.ts";
+
 export type CacheControlOptions = {
   maxAge?: number;
   sMaxAge?: number;
@@ -88,6 +90,29 @@ export function setCookieHeader(name: string, value: string, options?: CookieOpt
     }
   }
   return cookie.join("; ");
+}
+
+export function toResponse(v: unknown, headers: Headers): Response {
+  if (
+    typeof v === "string" ||
+    v instanceof ArrayBuffer ||
+    v instanceof Uint8Array ||
+    v instanceof ReadableStream
+  ) {
+    return new Response(v, { headers: headers });
+  }
+  if (v instanceof Blob || v instanceof File) {
+    headers.set("Content-Type", v.type);
+    headers.set("Content-Length", v.size.toString());
+    return new Response(v, { headers: headers });
+  }
+  if (util.isPlainObject(v) || Array.isArray(v)) {
+    return json(v, { headers });
+  }
+  if (v === null) {
+    return new Response(null, { headers });
+  }
+  throw new Error("Invalid response type: " + typeof v);
 }
 
 export function fixResponse(res: Response, addtionHeaders: Headers, fixRedirect: boolean): Response {

@@ -44,7 +44,7 @@ export interface Middleware {
   fetch(
     request: Request,
     context: Record<string, unknown>,
-  ): Promise<Response | CallableFunction | void> | Response | CallableFunction | void;
+  ): Promise<Response | (() => void) | void> | Response | (() => void) | void;
 }
 
 export type ImportMap = {
