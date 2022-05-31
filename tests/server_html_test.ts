@@ -1,7 +1,7 @@
 import { assertEquals } from "std/testing/asserts.ts";
 import { parseHtmlLinks } from "../server/html.ts";
 
-Deno.test("lib/html.ts: parseHtmlLinks", async () => {
+Deno.test("[unit] lib/html.ts: parseHtmlLinks", async () => {
   const html = `<!DOCTYPE html>
   <html lang="en">
 

@@ -3,7 +3,7 @@ import { dirname, join } from "std/path/mod.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import { initRoutes } from "../server/routing.ts";
 
-Deno.test("lib/helpers.ts: matchRoutes", async () => {
+Deno.test("[unit] server/routing.ts: matchRoutes", async () => {
   const tmpDir = await Deno.makeTempDir();
   const files = [
     "./routes/_404.tsx",
