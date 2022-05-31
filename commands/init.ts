@@ -11,14 +11,15 @@ import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 
 const templates = [
+  "api",
   "react",
   "vue",
+  "yew",
   // todo:
   // "preact",
   // "svelte",
   // "lit",
   // "vanilla",
-  // "api",
 ];
 const versions = {
   react: "18.1.0",
@@ -36,7 +37,11 @@ Options:
     -h, --help      ${" ".repeat(templates.join(",").length)}  Prints help message
 `;
 
-export default async function (nameArg: string | undefined, template = "react") {
+export default async function (nameArg?: string, template?: string) {
+  if (!template) {
+    // todo: template choose dialog
+    template = "react";
+  }
   if (!templates.includes(template)) {
     log.fatal(`Invalid template name ${red(template)}, must be one of [${blue(templates.join(","))}]`);
   }
@@ -51,10 +56,8 @@ export default async function (nameArg: string | undefined, template = "react") 
   }
 
   // check dir is clean
-  if (!await isFolderEmpty(Deno.cwd(), name)) {
-    if (!confirm("Continue?")) {
-      Deno.exit(1);
-    }
+  if (!(await isFolderEmpty(Deno.cwd(), name)) && !confirm("Continue?")) {
+    Deno.exit(1);
   }
 
   // download template
@@ -249,21 +252,19 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
     "routes",
     "src",
     "style",
-    "app.tsx",
+    "test",
+    "tests",
+    "utils",
+    "app.*",
     "deno.json",
     "deno.jsonc",
     "import_map.json",
     "import-map.json",
     "LICENSE",
-    "main.js",
-    "main.jsx",
-    "main.ts",
-    "main.tsx",
+    "main.*",
+    "mod.*",
     "README.md",
-    "server.js",
-    "server.jsx",
-    "server.ts",
-    "server.tsx",
+    "server.*",
     "tsconfig.json",
   ];
 
@@ -272,8 +273,12 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
 
   if (await existsDir(join(root, name))) {
     for await (const { name: file, isDirectory } of Deno.readDir(join(root, name))) {
-      // Support IntelliJ IDEA-based editors
-      if (validFiles.includes(file) || /\.iml$/.test(file)) {
+      if (
+        validFiles.includes(file) ||
+        validFiles.some((name) => name.endsWith(".*") && file.startsWith(name.slice(0, -2))) ||
+        // Support IntelliJ IDEA-based editors
+        /\.iml$/.test(file)
+      ) {
         if (isDirectory) {
           conflictDirs.push(blue(file) + "/");
         } else {
