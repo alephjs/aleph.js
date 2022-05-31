@@ -1,8 +1,8 @@
 import { assertEquals } from "std/testing/asserts.ts";
-import { mockAPI, mockFormData } from "aleph/tests/mock.ts";
+import MockServer, { mockFormData } from "aleph/server/mock.ts";
 
 Deno.test("[integration] examples/api-app", async (t) => {
-  const api = mockAPI({
+  const api = new MockServer({
     routes: "./examples/api-app/routes/**/*.ts",
   });
 
