@@ -289,15 +289,22 @@ export const serve = (options: ServerOptions = {}) => {
         customHTMLRewriter,
         isDev,
         ssr,
-        onError,
       });
     } catch (err) {
-      log.error("render page:", err);
-      return onError?.(err, { by: "fs", url: req.url }) ??
-        new Response(generateErrorHtml(err.stack ?? err.message), {
-          status: 500,
-          headers: [["Content-Type", "text/html"]],
-        });
+      if (err instanceof Response) {
+        return err;
+      }
+      let message: string;
+      if (err instanceof Error) {
+        message = err.stack as string;
+        log.error("SSR", err);
+      } else {
+        message = err?.toString?.() || String(err);
+      }
+      const cc = ssr && typeof ssr !== "function" ? ssr.cacheControl : "public";
+      ctx.headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
+      ctx.headers.append("Content-Type", "text/html; charset=utf-8");
+      return new Response(generateErrorHtml(message, "SSR"), { headers: ctx.headers });
     }
   };
 

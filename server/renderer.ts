@@ -1,9 +1,7 @@
 import FetchError from "../framework/core/fetch_error.ts";
 import type { RouteModule, RouteRecord } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
-import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
 import { builtinModuleExts, getDeploymentId, getUnoGenerator } from "./helpers.ts";
 import type { Element, HTMLRewriterHandlers } from "./html.ts";
@@ -56,7 +54,6 @@ export type RenderOptions = {
   customHTMLRewriter: [string, HTMLRewriterHandlers][];
   isDev: boolean;
   ssr?: SSR;
-  onError?: ErrorCallback;
 };
 
 /** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
@@ -64,110 +61,93 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* st
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routes, customHTMLRewriter, isDev, ssr, onError } = options;
+    const { indexHtml, routes, customHTMLRewriter, isDev, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (typeof ssr === "function" || typeof ssr?.render === "function") {
       const isFn = typeof ssr === "function";
       const dataDefer = isFn ? false : !!ssr.dataDefer;
-      const cc = isFn ? "public" : ssr.cacheControl ?? "public";
+      const cc = !isFn ? ssr.cacheControl : "public";
       const CSP = isFn ? undefined : ssr.CSP;
       const render = isFn ? ssr : ssr.render;
-      try {
-        const [url, routeModules, deferedData] = await initSSR(
-          req,
-          ctx,
-          routes,
-          dataDefer,
-          onError,
-        );
-        const headCollection: string[] = [];
-        const ssrContext: SSRContext = {
-          url,
-          routeModules,
-          headCollection,
-          dataDefer,
-          signal: req.signal,
-          bootstrapScripts: [bootstrapScript],
-          onError: (_error: unknown) => {
-            // todo: handle suspense ssr error
-          },
+      const [url, routeModules, deferedData] = await initSSR(
+        req,
+        ctx,
+        routes,
+        dataDefer,
+      );
+      const headCollection: string[] = [];
+      const ssrContext: SSRContext = {
+        url,
+        routeModules,
+        headCollection,
+        dataDefer,
+        signal: req.signal,
+        bootstrapScripts: [bootstrapScript],
+        onError: (_error: unknown) => {
+          // todo: handle suspense ssr error
+        },
+      };
+      const body = await render(ssrContext);
+      const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
+      if (serverDependencyGraph) {
+        const unocssTokens: ReadonlyArray<string>[] = [];
+        const lookupModuleStyle = (mod: Module) => {
+          const { specifier, atomicCSS, inlineCSS } = mod;
+          if (atomicCSS) {
+            unocssTokens.push(atomicCSS.tokens);
+          }
+          if (inlineCSS) {
+            headCollection.push(`<style data-module-id="${specifier}">${inlineCSS}</style>`);
+          }
         };
-        const body = await render(ssrContext);
-        const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
-        if (serverDependencyGraph) {
-          const unocssTokens: ReadonlyArray<string>[] = [];
-          const lookupModuleStyle = (mod: Module) => {
-            const { specifier, atomicCSS, inlineCSS } = mod;
-            if (atomicCSS) {
-              unocssTokens.push(atomicCSS.tokens);
-            }
-            if (inlineCSS) {
-              headCollection.push(`<style data-module-id="${specifier}">${inlineCSS}</style>`);
-            }
-          };
-          for (const { filename } of routeModules) {
-            serverDependencyGraph.shallowWalk(filename, lookupModuleStyle);
+        for (const { filename } of routeModules) {
+          serverDependencyGraph.shallowWalk(filename, lookupModuleStyle);
+        }
+        for (const serverEntry of builtinModuleExts.map((ext) => `./server.${ext}`)) {
+          if (serverDependencyGraph.get(serverEntry)) {
+            serverDependencyGraph.shallowWalk(serverEntry, lookupModuleStyle);
+            break;
           }
-          for (const serverEntry of builtinModuleExts.map((ext) => `./server.${ext}`)) {
-            if (serverDependencyGraph.get(serverEntry)) {
-              serverDependencyGraph.shallowWalk(serverEntry, lookupModuleStyle);
-              break;
-            }
-          }
-          if (unocssTokens.length > 0) {
-            const unoGenerator = getUnoGenerator();
-            if (unoGenerator) {
-              const start = performance.now();
-              const { css } = await unoGenerator.generate(new Set(unocssTokens.flat()), {
-                minify: !isDev,
-              });
-              if (css) {
-                const buildTime = performance.now() - start;
-                headCollection.push(
-                  `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
-                );
-              }
+        }
+        if (unocssTokens.length > 0) {
+          const unoGenerator = getUnoGenerator();
+          if (unoGenerator) {
+            const start = performance.now();
+            const { css } = await unoGenerator.generate(new Set(unocssTokens.flat()), {
+              minify: !isDev,
+            });
+            if (css) {
+              const buildTime = performance.now() - start;
+              headCollection.push(
+                `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
+              );
             }
           }
         }
-        if (
-          routeModules.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)
-        ) {
-          const ttls = routeModules.map(({ dataCacheTtl }) => Number(dataCacheTtl));
-          headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
-        } else {
-          headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
-        }
-        ssrRes = {
-          context: ssrContext,
-          body,
-          deferedData,
-        };
-        if (CSP) {
-          const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
-          const policy = CSP.getPolicy(url, nonce!);
-          if (policy) {
-            headers.append("Content-Security-Policy", policy);
-            if (policy.includes("nonce-" + nonce)) {
-              ssrRes.nonce = nonce;
-            }
-          }
-        }
-      } catch (e) {
-        if (e instanceof Response) {
-          return e;
-        }
-        let message: string;
-        if (e instanceof Error) {
-          message = e.stack as string;
-          log.error("SSR", e);
-        } else {
-          message = e?.toString?.() || String(e);
-        }
+      }
+      if (
+        routeModules.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)
+      ) {
+        const ttls = routeModules.map(({ dataCacheTtl }) => Number(dataCacheTtl));
+        headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
+      } else {
         headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
-        headers.append("Content-Type", "text/html; charset=utf-8");
-        return new Response(generateErrorHtml(message, "SSR"), { headers });
+      }
+      ssrRes = {
+        context: ssrContext,
+        body,
+        deferedData,
+      };
+      if (CSP) {
+        const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
+        const policy = CSP.getPolicy(url, nonce!);
+        if (policy) {
+          headers.append("Content-Security-Policy", policy);
+          if (policy.includes("nonce-" + nonce)) {
+            ssrRes.nonce = nonce;
+          }
+        }
       }
     } else {
       const deployId = getDeploymentId();
@@ -183,7 +163,7 @@ export default {
           }
         } catch (err) {
           if (!(err instanceof Deno.errors.NotFound)) {
-            return new Response(generateErrorHtml(err.message), { headers });
+            throw err;
           }
         }
       }
@@ -360,7 +340,6 @@ async function initSSR(
   ctx: Record<string, unknown>,
   routes: RouteRecord,
   dataDefer: boolean,
-  onError?: ErrorCallback,
 ): Promise<[
   url: URL,
   routeModules: RouteModule[],
@@ -390,25 +369,17 @@ async function initSSR(
     if (typeof fetcher === "function") {
       const fetchData = async () => {
         let res: unknown;
-        try {
-          // check the `any` method of data, throw the response object if it returns one
-          const anyFetcher = dataConfig.any ?? dataConfig.ANY;
-          if (typeof anyFetcher === "function") {
-            const res = await anyFetcher(req, ctx);
-            if (res instanceof Response) {
-              throw res;
-            }
-          }
-          res = fetcher(req, ctx);
-          if (res instanceof Promise) {
-            res = await res;
-          }
-        } catch (error) {
-          res = onError?.(error, { by: "ssr", url: req.url, context: ctx });
+        // check the `any` method of data, throw the response object if it returns one
+        const anyFetcher = dataConfig.any ?? dataConfig.ANY;
+        if (typeof anyFetcher === "function") {
+          const res = await anyFetcher(req, ctx);
           if (res instanceof Response) {
             throw res;
           }
-          throw error;
+        }
+        res = fetcher(req, ctx);
+        if (res instanceof Promise) {
+          res = await res;
         }
         if (res instanceof Response) {
           if (res.status >= 400) {
