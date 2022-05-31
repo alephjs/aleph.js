@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    "types": [
+      "./types.d.ts"
+    ],
     "jsx": "react-jsx",
     "jsxImportSource": "https://esm.sh/react@18.1.0"
   },
