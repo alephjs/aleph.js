@@ -49,9 +49,9 @@ export type SSRResult = {
 };
 
 export type RenderOptions = {
-  routes: RouteRecord;
   indexHtml: Uint8Array;
-  customHTMLRewriter: [string, HTMLRewriterHandlers][];
+  routeRecord: RouteRecord;
+  customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
   isDev: boolean;
   ssr?: SSR;
 };
@@ -61,7 +61,7 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* st
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routes, customHTMLRewriter, isDev, ssr } = options;
+    const { indexHtml, routeRecord, customHTMLRewriter, isDev, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (typeof ssr === "function" || typeof ssr?.render === "function") {
@@ -73,7 +73,7 @@ export default {
       const [url, routeModules, deferedData] = await initSSR(
         req,
         ctx,
-        routes,
+        routeRecord,
         dataDefer,
       );
       const headCollection: string[] = [];
@@ -194,8 +194,9 @@ export default {
         // inject the roures manifest
         rewriter.on("head", {
           element(el: Element) {
-            if (routes.routes.length > 0) {
-              const json = JSON.stringify({ routes: routes.routes.map(([_, meta]) => meta) });
+            const { routes } = routeRecord;
+            if (routes.length > 0) {
+              const json = JSON.stringify({ routes: routes.map(([_, meta]) => meta) });
               el.append(`<script id="routes-manifest" type="application/json">${json}</script>`, {
                 html: true,
               });
@@ -338,7 +339,7 @@ export default {
 async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
-  routes: RouteRecord,
+  routeRecord: RouteRecord,
   dataDefer: boolean,
 ): Promise<[
   url: URL,
@@ -346,7 +347,7 @@ async function initSSR(
   deferedData: Record<string, unknown>,
 ]> {
   const url = new URL(req.url);
-  const matches = matchRoutes(url, routes);
+  const matches = matchRoutes(url, routeRecord);
   const deferedData: Record<string, unknown> = {};
 
   // import module and fetch data for each matched route

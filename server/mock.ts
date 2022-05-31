@@ -1,6 +1,8 @@
 import { createContext } from "./context.ts";
+import { globalIt, loadImportMap } from "./helpers.ts";
+import { loadAndFixIndexHtml } from "./html.ts";
+import renderer, { type SSR } from "./renderer.ts";
 import { fetchData, initRoutes } from "./routing.ts";
-import type { SSR } from "./renderer.ts";
 import type { Middleware, RoutesConfig } from "./types.ts";
 
 type MockServerOptions = {
@@ -13,17 +15,19 @@ type MockServerOptions = {
  *
  * ```ts
  * import { assertEquals } from "std/testing/asserts.ts";
- * import Mock from "aleph/tests/mock.ts";
+ * import { MockServer } from "aleph/server/mock.ts";
  *
  * Deno.test(async () => {
- *    const api = new Mock({ routes: "./routes/**\/*.ts" });
- *    const res = api.fetch("/users")
+ *    const api = new MockServer({
+ *      routes: "./routes/**\/*.ts"
+ *    });
+ *    const res = await api.fetch("/users")
  *    assertEquals(res.status, 200);
- *    assertEquals((await res.json()).length, 200);
+ *    assertEquals((await res.json()).length, 50);
  * })
  * ```
  */
-export default class MockServer {
+export class MockServer {
   #options: MockServerOptions;
 
   constructor({ routes, middlewares }: MockServerOptions) {
@@ -31,10 +35,11 @@ export default class MockServer {
   }
 
   async fetch(input: string, init?: RequestInit) {
-    const { middlewares, routes } = this.#options;
+    const { middlewares, routes, ssr } = this.#options;
     const url = new URL(input, "http://localhost/");
     const req = new Request(url.href, init);
-    const ctx = createContext(req);
+    const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
+    const ctx = createContext(req, { customHTMLRewriter });
 
     // use middlewares
     if (middlewares) {
@@ -60,8 +65,30 @@ export default class MockServer {
       }
     }
 
-    const res = await fetchData((await initRoutes(routes)).routes, url, req, ctx, true, true);
-    return res ?? new Response("Method Not Allowed", { status: 405 });
+    const [routeRecord, importMap] = await globalIt(
+      Deno.cwd() + JSON.stringify(routes),
+      () => {
+        return Promise.all([initRoutes(routes), loadImportMap()]);
+      },
+    );
+
+    const res = await fetchData(routeRecord.routes, url, req, ctx, true, true);
+    if (res) {
+      return res;
+    }
+
+    const indexHtml = await loadAndFixIndexHtml({
+      importMap,
+      ssr: typeof ssr === "function" ? {} : ssr,
+      isDev: false,
+    });
+    return renderer.fetch(req, ctx, {
+      indexHtml,
+      routeRecord,
+      customHTMLRewriter,
+      isDev: false,
+      ssr,
+    });
   }
 }
 

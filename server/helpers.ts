@@ -223,8 +223,8 @@ export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
   return jsxConfig;
 }
 
-/** Load the import maps from the working directory. */
-export async function loadImportMap(): Promise<ImportMap> {
+/** Load the import maps from the json file. */
+export async function loadImportMap(filename?: string): Promise<ImportMap> {
   const importMap: ImportMap = { __filename: "", imports: {}, scopes: {} };
 
   if (Deno.env.get("ALEPH_DEV")) {
@@ -245,7 +245,7 @@ export async function loadImportMap(): Promise<ImportMap> {
     });
   }
 
-  const importMapFile = await findFile(
+  const importMapFile = filename ?? await findFile(
     ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`),
   );
   if (importMapFile) {

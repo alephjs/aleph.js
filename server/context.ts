@@ -5,7 +5,7 @@ import type { HTMLRewriterHandlers } from "./html.ts";
 
 type Options = {
   connInfo?: ConnInfo;
-  customHTMLRewriter?: [string, HTMLRewriterHandlers][];
+  customHTMLRewriter?: [selector: string, handlers: HTMLRewriterHandlers][];
 };
 
 export function createContext(req: Request, options?: Options): typeof ctx {

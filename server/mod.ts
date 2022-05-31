@@ -39,7 +39,9 @@ export const serve = (options: ServerOptions = {}) => {
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
   const moduleLoadersPromise = importMapPromise.then(initModuleLoaders);
-  const routesPromise = routes ? initRoutes(routes) : Promise.resolve({ routes: [] });
+  const routeRecordPromise = routes ? initRoutes(routes) : Promise.resolve({ routes: [] });
+
+  // server handler
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const url = new URL(req.url);
     const { pathname, searchParams } = url;
@@ -58,7 +60,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     const postMiddlewares: Middleware[] = [];
-    const customHTMLRewriter: [string, HTMLRewriterHandlers][] = [];
+    const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
     const ctx = createContext(req, { connInfo, customHTMLRewriter });
 
     // use eager middlewares
@@ -224,12 +226,12 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request route api
-    const routes: RouteRecord = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routesPromise;
-    if (routes.routes.length > 0) {
+    const routeRecord: RouteRecord = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routeRecordPromise;
+    if (routeRecord.routes.length > 0) {
       const accept = req.headers.get("Accept");
       const fromFetch = accept === "application/json" || !accept?.includes("html");
       try {
-        const resp = await fetchData(routes.routes, url, req, ctx, fromFetch);
+        const resp = await fetchData(routeRecord.routes, url, req, ctx, fromFetch);
         if (resp) {
           return resp;
         }
@@ -285,7 +287,7 @@ export const serve = (options: ServerOptions = {}) => {
       });
       return renderer.fetch(req, ctx, {
         indexHtml,
-        routes,
+        routeRecord,
         customHTMLRewriter,
         isDev,
         ssr,
