@@ -1,12 +1,6 @@
 import { createContext } from "../server/context.ts";
-import { fixResponse, toResponse } from "../server/response.ts";
-import type { Middleware } from "../server/types.ts";
-
-let _mockMiddlewares: Middleware[] = [];
-
-export function mockMiddlewares(middlewares: Middleware[]) {
-  _mockMiddlewares = middlewares;
-}
+import { fetchData, initRoutes } from "../server/routing.ts";
+import type { Middleware, RoutesConfig } from "../server/types.ts";
 
 export function mockFormData(init?: Record<string, string | Blob | [filename: string, content: Blob]>): FormData {
   const data = new FormData();
@@ -26,56 +20,52 @@ export function mockFormData(init?: Record<string, string | Blob | [filename: st
  *
  * ```ts
  * import { assertEquals } from "std/testing/asserts.ts";
- * import { mockAPIRequest, mockMiddlewares } from "aleph/tests/mock.ts";
- * import * as usersAPI from "./routes/api/users.ts";
- *
- * mockMiddlewares([ ... ]);
+ * import { mockAPI } from "aleph/tests/mock.ts";
  *
  * Deno.test(async () => {
- *    const res = await mockAPIRequest(usersAPI, "GET", "/users");
+ *    const api = await mockAPI({ routes: "./routes/**\/*.ts" });
+ *    const res = api.fetch("/users")
  *    assertEquals(res.status, 200);
  *    assertEquals((await res.json()).length, 200);
  * })
  * ```
  */
-export async function mockAPIRequest(
-  route: Record<string, unknown>,
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
-  url: string,
-  body?: RequestInit,
-): Promise<Response> {
-  const req = new Request(new URL(url, "http://localhost/").href, { method, ...body });
-  const ctx = createContext(req);
+export function mockAPI({ routes, middlewares }: {
+  routes: string | RoutesConfig;
+  middlewares?: Middleware[];
+}) {
+  return {
+    fetch: async (input: string, init?: RequestInit) => {
+      const url = new URL(input, "http://localhost/");
+      const req = new Request(url.href, init);
+      const ctx = createContext(req);
 
-  // use mock middlewares
-  for (let i = 0, l = _mockMiddlewares.length; i < l; i++) {
-    const mw = _mockMiddlewares[i];
-    const handler = mw.fetch;
-    if (typeof handler === "function") {
-      try {
-        let res = handler(req, ctx);
-        if (res instanceof Promise) {
-          res = await res;
+      // use   middlewares
+      if (middlewares) {
+        for (let i = 0, l = middlewares.length; i < l; i++) {
+          const mw = middlewares[i];
+          const handler = mw.fetch;
+          if (typeof handler === "function") {
+            try {
+              let res = handler(req, ctx);
+              if (res instanceof Promise) {
+                res = await res;
+              }
+              if (res instanceof Response) {
+                return res;
+              }
+              if (typeof res === "function") {
+                setTimeout(res, 0);
+              }
+            } catch (err) {
+              throw new Error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
+            }
+          }
         }
-        if (res instanceof Response) {
-          return res;
-        }
-        if (typeof res === "function") {
-          setTimeout(res, 0);
-        }
-      } catch (err) {
-        throw new Error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
       }
-    }
-  }
 
-  const fetcher = route[req.method] ?? (route.data as Record<string, unknown> | undefined)?.[req.method.toLowerCase()];
-  if (typeof fetcher === "function") {
-    const res = await fetcher(req, ctx);
-    if (res instanceof Response) {
-      return fixResponse(res, ctx.headers, true);
-    }
-    return toResponse(res, ctx.headers);
-  }
-  return new Response("Method Not Allowed", { status: 405 });
+      const res = await fetchData((await initRoutes(routes)).routes, url, req, ctx, true, true);
+      return res ?? new Response("Method Not Allowed", { status: 405 });
+    },
+  };
 }
