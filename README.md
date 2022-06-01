@@ -24,7 +24,7 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 Initialize a new project, you can pick a start template with `--template` flag, available templates: `[react, vue]`
 
 ```bash
-deno run -A https://deno.land/x/aleph@1.0.0-alpha.46/cli.ts init --template react
+deno run -A https://deno.land/x/aleph@1.0.0-alpha.62/cli.ts init --template react
 ```
 
 after `init`, you can run the app with deno tasks:
