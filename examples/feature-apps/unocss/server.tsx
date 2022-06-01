@@ -6,15 +6,13 @@ import { renderToString } from "react-dom/server";
 
 serve({
   routes: "./routes/**/*.tsx",
-  build: {
-    unocss: {
-      presets: [
-        presetUno(),
-        presetIcons({
-          cdn: "https://esm.sh/",
-        }),
-      ],
-    },
+  unocss: {
+    presets: [
+      presetUno(),
+      presetIcons({
+        cdn: "https://esm.sh/",
+      }),
+    ],
   },
   ssr: (ctx) => renderToString(<App ssrContext={ctx} />),
 });
