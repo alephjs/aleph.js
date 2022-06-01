@@ -1,5 +1,5 @@
 import FetchError from "../framework/core/fetch_error.ts";
-import type { RouteModule, RouteRecord } from "../framework/core/route.ts";
+import type { RouteModule, RouteTable } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
@@ -50,7 +50,7 @@ export type SSRResult = {
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
-  routeRecord: RouteRecord;
+  routeTable: RouteTable;
   customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
   isDev: boolean;
   ssr?: SSR;
@@ -61,7 +61,7 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* st
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routeRecord, customHTMLRewriter, isDev, ssr } = options;
+    const { indexHtml, routeTable, customHTMLRewriter, isDev, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (typeof ssr === "function" || typeof ssr?.render === "function") {
@@ -73,7 +73,7 @@ export default {
       const [url, routeModules, deferedData] = await initSSR(
         req,
         ctx,
-        routeRecord,
+        routeTable,
         dataDefer,
       );
       const headCollection: string[] = [];
@@ -194,7 +194,7 @@ export default {
         // inject the roures manifest
         rewriter.on("head", {
           element(el: Element) {
-            const { routes } = routeRecord;
+            const { routes } = routeTable;
             if (routes.length > 0) {
               const json = JSON.stringify({ routes: routes.map(([_, meta]) => meta) });
               el.append(`<script id="routes-manifest" type="application/json">${json}</script>`, {
@@ -339,7 +339,7 @@ export default {
 async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
-  routeRecord: RouteRecord,
+  routeTable: RouteTable,
   dataDefer: boolean,
 ): Promise<[
   url: URL,
@@ -347,7 +347,7 @@ async function initSSR(
   deferedData: Record<string, unknown>,
 ]> {
   const url = new URL(req.url);
-  const matches = matchRoutes(url, routeRecord);
+  const matches = matchRoutes(url, routeTable);
   const deferedData: Record<string, unknown> = {};
 
   // import module and fetch data for each matched route

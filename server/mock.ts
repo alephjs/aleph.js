@@ -22,9 +22,9 @@ type MockServerOptions = {
  *    const api = new MockServer({
  *      routes: "./routes/**\/*.ts"
  *    });
- *    const res = await api.fetch("/users")
+ *    const res = await api.fetch("/users?page=1&limit=10");
  *    assertEquals(res.status, 200);
- *    assertEquals((await res.json()).length, 50);
+ *    assertEquals((await res.json()).length, 10);
  * })
  * ```
  */
@@ -66,26 +66,23 @@ export class MockServer {
       }
     }
 
-    const [routeRecord, importMap] = await globalIt(
-      Deno.cwd() + JSON.stringify(routes),
-      () => {
-        return Promise.all([initRoutes(routes), loadImportMap()]);
-      },
-    );
-
-    const res = await fetchData(routeRecord.routes, url, req, ctx, true, true);
+    const cwd = Deno.cwd();
+    const routeTable = await globalIt(`mockRoutes:${cwd}${JSON.stringify(routes)}`, () => initRoutes(routes));
+    const res = await fetchData(routeTable.routes, url, req, ctx, true, true);
     if (res) {
       return res;
     }
 
-    const indexHtml = await loadAndFixIndexHtml({
-      importMap,
-      ssr: typeof ssr === "function" ? {} : ssr,
-      isDev: false,
-    });
+    const importMap = await globalIt(`mockImportMap:${cwd}`, () => loadImportMap());
+    const indexHtml = await globalIt(`mockIndexHtml:${cwd}`, () =>
+      loadAndFixIndexHtml({
+        importMap,
+        ssr: typeof ssr === "function" ? {} : ssr,
+        isDev: false,
+      }));
     return renderer.fetch(req, ctx, {
       indexHtml,
-      routeRecord,
+      routeTable,
       customHTMLRewriter,
       isDev: false,
       ssr,

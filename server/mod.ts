@@ -1,7 +1,7 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.140.0/http/server.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.140.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.140.0/streams/conversion.ts";
-import type { RouteRecord } from "../framework/core/route.ts";
+import type { RouteTable } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
@@ -39,7 +39,7 @@ export const serve = (options: ServerOptions = {}) => {
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
   const moduleLoadersPromise = importMapPromise.then(initModuleLoaders);
-  const routeRecordPromise = routes ? initRoutes(routes) : Promise.resolve({ routes: [] });
+  const routeTablePromise = routes ? initRoutes(routes) : Promise.resolve({ routes: [] });
 
   // server handler
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
@@ -226,12 +226,12 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request route api
-    const routeRecord: RouteRecord = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routeRecordPromise;
-    if (routeRecord.routes.length > 0) {
+    const routeTable: RouteTable = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routeTablePromise;
+    if (routeTable.routes.length > 0) {
       const accept = req.headers.get("Accept");
       const fromFetch = accept === "application/json" || !accept?.includes("html");
       try {
-        const resp = await fetchData(routeRecord.routes, url, req, ctx, fromFetch);
+        const resp = await fetchData(routeTable.routes, url, req, ctx, fromFetch);
         if (resp) {
           return resp;
         }
@@ -287,7 +287,7 @@ export const serve = (options: ServerOptions = {}) => {
       });
       return renderer.fetch(req, ctx, {
         indexHtml,
-        routeRecord,
+        routeTable,
         customHTMLRewriter,
         isDev,
         ssr,
