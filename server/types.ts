@@ -5,6 +5,8 @@ export type AlephConfig = {
   routes?: RoutesConfig | string;
   /** The build options for `build` command. */
   build?: BuildOptions;
+  /** The config for UnoCSS. */
+  unocss?: UnoConfig;
   /** The config for dev server. */
   devServer?: {
     watchFS?: (kind: "create" | "remove" | "modify", specifier: string) => void;
@@ -20,12 +22,10 @@ export type BuildPlatform = "deno" | "cloudflare" | "vercel";
 export type BuildOptions = {
   /** The supported platform. default is "deno" */
   platform?: BuildPlatform;
-  /** The directory for build output files. default is "dist" */
-  outputDir?: string;
   /** The build target passes to esbuild. default is "es2020" */
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
-  /** The config for atomic css powered by unocss. */
-  unocss?: UnoConfig;
+  /** The directory for build output files. default is "dist" */
+  outputDir?: string;
 };
 
 export type RoutesConfig = {

@@ -34,7 +34,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 } & AlephConfig;
 
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
+  const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
   const importMapPromise = loadImportMap();
   const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
@@ -316,7 +316,7 @@ export const serve = (options: ServerOptions = {}) => {
   }
 
   // inject global objects
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { build, routes, devServer });
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { routes, unocss, build, devServer });
   Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
 
   const { hostname, port = 8080, certFile, keyFile, signal } = options;

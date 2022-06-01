@@ -59,8 +59,8 @@ export function getUnoGenerator(): UnoGenerator | null {
     return null;
   }
   return globalItSync("__UNO_GENERATOR", () => {
-    if (config?.build?.unocss?.presets) {
-      return createGenerator(config.build.unocss);
+    if (config?.unocss?.presets) {
+      return createGenerator(config.unocss);
     }
     return null;
   });
