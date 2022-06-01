@@ -9,6 +9,7 @@ type MockServerOptions = {
   routes: string | RoutesConfig;
   middlewares?: Middleware[];
   ssr?: SSR;
+  origin?: string;
 };
 
 /** The MockServer class to create a minimal server for integration testing.
@@ -35,8 +36,8 @@ export class MockServer {
   }
 
   async fetch(input: string, init?: RequestInit) {
-    const { middlewares, routes, ssr } = this.#options;
-    const url = new URL(input, "http://localhost/");
+    const { middlewares, routes, ssr, origin } = this.#options;
+    const url = new URL(input, origin ?? "http://localhost/");
     const req = new Request(url.href, init);
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
     const ctx = createContext(req, { customHTMLRewriter });
