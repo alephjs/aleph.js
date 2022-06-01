@@ -5,7 +5,6 @@ import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
-import { globalIt } from "./helpers.ts";
 import { fixResponse, toResponse } from "./response.ts";
 import type { AlephConfig, RoutesConfig } from "./types.ts";
 
@@ -122,46 +121,44 @@ type RouteRegExp = {
 
 /** initialize routes from routes config */
 export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cwd = Deno.cwd()): Promise<RouteTable> {
-  return await globalIt("__ALEPH_ROUTES", async () => {
-    const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
-    const files = await getFiles(join(cwd, reg.prefix));
-    const routes: Route[] = [];
-    let _app: Route | undefined = undefined;
-    let _404: Route | undefined = undefined;
-    files.forEach((file) => {
-      const filename = reg.prefix + file.slice(1);
-      const pattern = reg.exec(filename);
-      if (pattern) {
-        const route: Route = [
-          new URLPatternCompat(pattern),
-          { pattern, filename },
-        ];
-        routes.push(route);
-        if (pattern.pathname === "/_app") {
-          _app = route;
-        } else if (pattern.pathname === "/_404") {
-          _404 = route;
-        }
+  const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
+  const files = await getFiles(join(cwd, reg.prefix));
+  const routes: Route[] = [];
+  let _app: Route | undefined = undefined;
+  let _404: Route | undefined = undefined;
+  files.forEach((file) => {
+    const filename = reg.prefix + file.slice(1);
+    const pattern = reg.exec(filename);
+    if (pattern) {
+      const route: Route = [
+        new URLPatternCompat(pattern),
+        { pattern, filename },
+      ];
+      routes.push(route);
+      if (pattern.pathname === "/_app") {
+        _app = route;
+      } else if (pattern.pathname === "/_404") {
+        _404 = route;
+      }
+    }
+  });
+  if (routes.length > 0) {
+    // sort routes by length of pathname
+    routes.sort((a, b) => getRouteOrder(a) - getRouteOrder(b));
+    // check nesting routes
+    routes.forEach(([_, meta]) => {
+      const { pattern: { pathname } } = meta;
+      const nesting = pathname === "/_app" || (pathname !== "/" && !pathname.endsWith("/index") &&
+        routes.findIndex(([_, { pattern: { pathname: p } }]) => p !== pathname && p.startsWith(pathname + "/")) !==
+          -1);
+      if (nesting) {
+        meta.nesting = true;
       }
     });
-    if (routes.length > 0) {
-      // sort routes by length of pathname
-      routes.sort((a, b) => getRouteOrder(a) - getRouteOrder(b));
-      // check nesting routes
-      routes.forEach(([_, meta]) => {
-        const { pattern: { pathname } } = meta;
-        const nesting = pathname === "/_app" || (pathname !== "/" && !pathname.endsWith("/index") &&
-          routes.findIndex(([_, { pattern: { pathname: p } }]) => p !== pathname && p.startsWith(pathname + "/")) !==
-            -1);
-        if (nesting) {
-          meta.nesting = true;
-        }
-      });
-    }
+  }
 
-    log.debug(`${routes.length} routes initiated`);
-    return { routes, _404, _app };
-  });
+  log.debug(`${routes.length} routes initiated`);
+  return { routes, _404, _app };
 }
 
 /** convert route config to `RouteRegExp` */

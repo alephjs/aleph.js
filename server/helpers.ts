@@ -110,16 +110,17 @@ export function restoreUrl(pathname: string): string {
 }
 
 /** init loaders in `CLI` mode, or use prebuild loaders */
-export async function initModuleLoaders(importMap: ImportMap): Promise<ModuleLoader[]> {
-  const loaders: ModuleLoader[] = Reflect.get(globalThis, "__ALEPH_MODULE_LOADERS") || [];
+export async function initModuleLoaders(importMap?: ImportMap): Promise<ModuleLoader[]> {
+  const loaders: ModuleLoader[] = [];
   if (Deno.env.get("ALEPH_CLI")) {
-    for (const key in importMap.imports) {
+    const { imports, __filename } = importMap ?? await loadImportMap();
+    for (const key in imports) {
       if (/^\*\.{?(\w+, ?)*\w+}?$/i.test(key)) {
-        let src = importMap.imports[key];
+        let src = imports[key];
         if (src.endsWith("!loader")) {
           src = util.trimSuffix(src, "!loader");
           if (src.startsWith("./") || src.startsWith("../")) {
-            src = "file://" + join(dirname(importMap.__filename), src);
+            src = "file://" + join(dirname(__filename), src);
           }
           let { default: loader } = await import(src);
           if (typeof loader === "function") {

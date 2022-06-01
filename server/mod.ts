@@ -36,10 +36,6 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 export const serve = (options: ServerOptions = {}) => {
   const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
-  const importMapPromise = loadImportMap();
-  const jsxConfigPromise = importMapPromise.then(loadJSXConfig);
-  const moduleLoadersPromise = importMapPromise.then(initModuleLoaders);
-  const routeTablePromise = routes ? initRoutes(routes) : Promise.resolve({ routes: [] });
 
   // server handler
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
@@ -99,10 +95,8 @@ export const serve = (options: ServerOptions = {}) => {
     // transform client modules
     if (clientModuleTransformer.test(pathname)) {
       try {
-        const [jsxConfig, importMap] = await Promise.all([
-          jsxConfigPromise,
-          importMapPromise,
-        ]);
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
         return await clientModuleTransformer.fetch(req, {
           importMap,
           jsxConfig,
@@ -122,14 +116,12 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // use loader to load modules
-    const moduleLoaders = await moduleLoadersPromise;
+    const moduleLoaders = await globalIt("__ALEPH_MODULE_LOADERS", initModuleLoaders);
     const loader = moduleLoaders.find((loader) => loader.test(pathname));
     if (loader) {
       try {
-        const [jsxConfig, importMap] = await Promise.all([
-          jsxConfigPromise,
-          importMapPromise,
-        ]);
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
         const loaded = await loader.load(pathname, { isDev, importMap });
         return await clientModuleTransformer.fetch(req, {
           loaded,
@@ -226,7 +218,10 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request route api
-    const routeTable: RouteTable = Reflect.get(globalThis, "__ALEPH_ROUTES") || await routeTablePromise;
+    const routeTable: RouteTable = await globalIt(
+      "__ALEPH_ROUTES",
+      () => routes ? initRoutes(routes) : Promise.resolve({ routes: [] }),
+    );
     if (routeTable.routes.length > 0) {
       const accept = req.headers.get("Accept");
       const fromFetch = accept === "application/json" || !accept?.includes("html");
@@ -277,14 +272,14 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     try {
-      const indexHtml = await globalIt("__ALEPH_INDEX_HTML", async () => {
-        return await loadAndFixIndexHtml({
+      const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
+      const indexHtml = await globalIt("__ALEPH_INDEX_HTML", () =>
+        loadAndFixIndexHtml({
           isDev,
-          importMap: await importMapPromise,
+          importMap,
           ssr: typeof ssr === "function" ? {} : ssr,
           hmrWebSocketUrl: options.devServer?.hmrWebSocketUrl,
-        });
-      });
+        }));
       return renderer.fetch(req, ctx, {
         indexHtml,
         routeTable,

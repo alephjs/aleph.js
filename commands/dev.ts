@@ -206,10 +206,11 @@ if (import.meta.main) {
         if (specifier) {
           Reflect.deleteProperty(globalThis, "__ALEPH_ROUTES");
         }
-        const { routes } = await initRoutes(reg);
+        const routeTable = await initRoutes(reg);
+        Reflect.set(globalThis, "__ALEPH_ROUTES", routeTable);
         if (reg.generate) {
-          await generate(routes);
-          log.debug(`${routes.length} routes generate`);
+          await generate(routeTable.routes);
+          log.debug(`${routeTable.routes.length} routes generate`);
         }
       }
     }
