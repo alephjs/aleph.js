@@ -1,10 +1,13 @@
 import { concat } from "https://deno.land/std@0.136.0/bytes/mod.ts";
 import type { Comment, DocumentEnd, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
-import decodeLolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
+import lolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
 import util from "../lib/util.ts";
 import { applyImportMap, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import type { ImportMap } from "./types.ts";
+
+// init `lol-html` wasm
+await initLolHtml(lolHtmlWasm());
 
 const defaultIndexHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -15,9 +18,6 @@ const defaultIndexHtml = `<!DOCTYPE html>
 <body></body>
 </html>
 `;
-
-// init lol-html wasm
-await initLolHtml(decodeLolHtmlWasm());
 
 export type HTMLRewriterHandlers = {
   element?: (element: Element) => void;
