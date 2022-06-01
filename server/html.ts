@@ -1,4 +1,4 @@
-import { concat } from "https://deno.land/std@0.136.0/bytes/mod.ts";
+import { concat } from "https://deno.land/std@0.140.0/bytes/mod.ts";
 import type { Comment, DocumentEnd, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import lolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";

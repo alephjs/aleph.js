@@ -1,4 +1,4 @@
-import { extname, globToRegExp, join } from "https://deno.land/std@0.136.0/path/mod.ts";
+import { extname, globToRegExp, join } from "https://deno.land/std@0.140.0/path/mod.ts";
 import type { Route, RouteMatch, RouteRecord } from "../framework/core/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
 import { getFiles } from "../lib/fs.ts";
