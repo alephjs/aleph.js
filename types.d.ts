@@ -71,7 +71,7 @@ declare interface Middleware {
   fetch(
     request: Request,
     context: Context,
-  ): Promise<Response | CallableFunction | void> | Response | CallableFunction | void;
+  ): Promise<Response | (() => void) | void> | Response | (() => void) | void;
 }
 
 declare interface ImportMeta {
