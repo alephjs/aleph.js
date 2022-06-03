@@ -1,6 +1,6 @@
 import { basename, extname, relative, resolve } from "https://deno.land/std@0.140.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
-import { parseDeps } from "https://deno.land/x/aleph_compiler@0.6.1/mod.ts";
+import { parseDeps, transformCSS } from "https://deno.land/x/aleph_compiler@0.6.1/mod.ts";
 import { findFile, watchFs } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -119,34 +119,44 @@ if (import.meta.main) {
     if (specifier === "./index.html") {
       Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
     }
-    if (builtinModuleExts.includes(extname(path).slice(1))) {
-      const code = await Deno.readTextFile(specifier);
-      try {
-        await parseDeps(specifier, code);
-        emitters.forEach((e) => {
-          e.emit("transform", {
-            specifier,
-            status: "success",
-          });
-        });
-      } catch (error) {
-        emitters.forEach((e) => {
-          e.emit("transform", {
-            specifier,
-            sourceCode: code,
-            status: "failure",
-            error: {
-              message: error.message.replace("\\\\", "/"),
-              stack: error.stack.split(`${error.message}`)[1]?.slice(2),
-              location: error.message.split(`${specifier.replace("\\", "\\\\")}:`)[1]?.split("\n")[0]?.split(":").map((
-                s: string,
-              ) => parseInt(s)),
-            },
-          });
-        });
-      }
-    }
+
     if (kind === "modify") {
+      if (clientDependencyGraph?.get(specifier)) {
+        const code = await Deno.readTextFile(specifier);
+        try {
+          if (builtinModuleExts.includes(extname(path).slice(1))) {
+            await parseDeps(specifier, code);
+          } else if (path.endsWith(".css")) {
+            await transformCSS(specifier, code, {
+              drafts: {
+                nesting: true,
+                customMedia: true,
+              },
+            });
+          }
+          emitters.forEach((e) => {
+            e.emit("transform", {
+              specifier,
+              status: "success",
+            });
+          });
+        } catch (error) {
+          emitters.forEach((e) => {
+            e.emit("transform", {
+              specifier,
+              sourceCode: code,
+              status: "failure",
+              error: {
+                message: error.message.replace("\\\\", "/"),
+                stack: error.stack.split(`${error.message}`)[1]?.slice(2),
+                location: error.message.split(`${specifier.replace("\\", "\\\\")}:`)[1]?.split("\n")[0]?.split(":")
+                  .map((s: string) => parseInt(s)),
+              },
+            });
+          });
+          return;
+        }
+      }
       emitters.forEach((e) => {
         e.emit(`modify:${specifier}`, { specifier });
         if (e.all.has(`hotUpdate:${specifier}`)) {
