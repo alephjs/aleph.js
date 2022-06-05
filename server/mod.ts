@@ -5,7 +5,7 @@ import type { RouteTable } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
-import { createContext } from "./context.ts";
+import { createContext, type SessionOptions } from "./context.ts";
 import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
 import {
@@ -27,6 +27,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
   logLevel?: LevelName;
+  session?: SessionOptions;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: SSR;

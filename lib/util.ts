@@ -68,6 +68,17 @@ export default {
     const bytes = new Uint8Array(buffer);
     return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
   },
+  async hmacSign(data: string, secret: string, hash = "SHA-256") {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      this.utf8TextEncoder.encode(secret),
+      { name: "HMAC", hash: { name: hash } },
+      false,
+      ["sign", "verify"],
+    );
+    const signature = await crypto.subtle.sign("HMAC", key, this.utf8TextEncoder.encode(data));
+    return this.toHex(signature);
+  },
   computeHash(algorithm: AlgorithmIdentifier, data: string | Uint8Array): Promise<string> {
     return crypto.subtle.digest(
       algorithm,
