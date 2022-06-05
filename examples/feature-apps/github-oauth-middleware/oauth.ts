@@ -1,13 +1,19 @@
-export type GithubOauthConfig = {
-  clientId?: string;
-  clientSecret?: string;
-};
-
 export type GithubUser = {
   id: number;
   login: string;
   avatar_url: string;
   name: string;
+};
+
+declare global {
+  interface Context {
+    user: GithubUser | undefined;
+  }
+}
+
+export type GithubOauthConfig = {
+  clientId?: string;
+  clientSecret?: string;
 };
 
 export class GithubOauth implements Middleware {
@@ -21,7 +27,7 @@ export class GithubOauth implements Middleware {
 
   async fetch(req: Request, ctx: Context) {
     const { pathname, searchParams } = new URL(req.url);
-    const session = await ctx.getSession();
+    const session = await ctx.getSession<{ user: GithubUser }>();
 
     if (pathname === "/logout") {
       const cookie = await session.end();
