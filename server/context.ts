@@ -62,9 +62,7 @@ export function createContext(req: Request, options?: ContextOptions): typeof ct
 
       const session = new SessionImpl<StoreType>(
         sid,
-        options?.session ?? {
-          storage: new MemorySessionStorage(),
-        },
+        options?.session,
       );
       await session.read();
       ctx._session = session as SessionImpl<Record<string, unknown>>;
@@ -118,7 +116,7 @@ export interface SessionCookieOptions {
 }
 
 export interface SessionOptions {
-  storage: SessionStorage;
+  storage?: SessionStorage;
   cookie?: SessionCookieOptions;
   secret?: string;
   maxAge?: number;
@@ -128,10 +126,12 @@ export class SessionImpl<StoreType extends Record<string, unknown>> {
   #id: string;
   #options: SessionOptions;
   #store: StoreType | undefined;
+  #storage: SessionStorage;
 
-  constructor(id: string, options: SessionOptions) {
+  constructor(id: string, options: SessionOptions = {}) {
     this.#id = id;
     this.#options = options;
+    this.#storage = options.storage ?? defaultSessionStorage;
   }
 
   get id(): string {
@@ -143,7 +143,7 @@ export class SessionImpl<StoreType extends Record<string, unknown>> {
   }
 
   async read(): Promise<void> {
-    this.#store = (await this.#options.storage.get(this.#id)) as StoreType | undefined;
+    this.#store = (await this.#storage.get(this.#id)) as StoreType | undefined;
   }
 
   async update(store: StoreType | ((prev: StoreType | undefined) => StoreType)): Promise<string> {
@@ -158,7 +158,7 @@ export class SessionImpl<StoreType extends Record<string, unknown>> {
       nextStore = store;
     }
 
-    await this.#options.storage.set(this.#id, nextStore, Date.now() + 1000 * (this.#options.maxAge ?? 1800));
+    await this.#storage.set(this.#id, nextStore, Date.now() + 1000 * (this.#options.maxAge ?? 1800));
     this.#store = nextStore;
     return setCookieHeader(
       this.#options.cookie?.name ?? "session",
@@ -171,7 +171,7 @@ export class SessionImpl<StoreType extends Record<string, unknown>> {
   }
 
   async end(): Promise<string> {
-    await this.#options.storage.delete(this.#id);
+    await this.#storage.delete(this.#id);
     this.#store = undefined;
     return setCookieHeader(
       this.#options.cookie?.name ?? "session",
@@ -183,3 +183,5 @@ export class SessionImpl<StoreType extends Record<string, unknown>> {
     );
   }
 }
+
+const defaultSessionStorage = new MemorySessionStorage();
