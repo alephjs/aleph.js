@@ -75,6 +75,9 @@ jobs:
           - name: aleph-suspense-ssr
             dir: examples/feature-apps/suspense-ssr
 
+          - name: aleph-github-oauth
+            dir: examples/feature-apps/github-oauth-middleware
+
     steps:
       - name: Clone repository
         uses: actions/checkout@v2
