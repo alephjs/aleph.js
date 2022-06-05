@@ -34,7 +34,7 @@ interface HTMLRewriter {
 
 interface Session<T> {
   store: T | undefined;
-  update(store: T | ((store: T | undefined) => T)): promise<string>;
+  update(store: T | ((store: T | undefined) => T)): Promise<string>;
   end(): Promise<string>;
 }
 
@@ -44,7 +44,7 @@ declare interface Context extends Record<string, unknown> {
   readonly headers: Headers;
   readonly cookies: Cookies;
   readonly htmlRewriter: HTMLRewriter;
-  getSession<T extends Record<stirng, unknown> = Record<stirng, unknown>>(): Promise<Session<T>>;
+  getSession<T extends Record<string, unknown> = Record<string, unknown>>(): Promise<Session<T>>;
 }
 
 declare type ResponseLike =
