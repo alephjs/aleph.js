@@ -16,6 +16,7 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 - UnoCSS(tailwind): https://aleph-unocss.deno.dev/
 - Monaco Editor: https://aleph-monaco-editor.deno.dev/
 - Yew SSR: https://aleph-yew.deno.dev/
+- Github OAuth Middleware: https://aleph-github-oauth.deno.dev/
 
 > **Source code**: https://github.com/alephjs/aleph.js/tree/main/examples
 
