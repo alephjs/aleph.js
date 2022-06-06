@@ -134,6 +134,7 @@ if (import.meta.main) {
               },
             });
           }
+          // todo: check loaders
           emitters.forEach((e) => {
             e.emit("transform", {
               specifier,
@@ -141,6 +142,7 @@ if (import.meta.main) {
             });
           });
         } catch (error) {
+          log.error(error);
           emitters.forEach((e) => {
             e.emit("transform", {
               specifier,

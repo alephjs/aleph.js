@@ -58,11 +58,10 @@ function formatCode(message: string, sourceCode: string, column: number, line: n
   if (message === "unreachable") {
     return message;
   }
-  let sourceCodeArr = sourceCode.split(/\r?\n/).map((val, index) => {
-    return 1 + index + " | " + val;
+  let sourceCodeArr = sourceCode.replaceAll("<", "&lt;").replaceAll(">", "&gt;").split(/\r?\n/).map((val, index) => {
+    return String(1 + index).padStart(4, " ") + " | " + val;
   });
-  const indexLen = line.toString().length;
-  const mark = " ".repeat(indexLen * 2) + " | " + " ".repeat(column) + "^";
+  const mark = " ".repeat(4) + " | " + " ".repeat(column) + "^";
   sourceCodeArr = sourceCodeArr.slice(line - 3, line + 2);
   sourceCodeArr.splice(3, 0, mark);
   const formatStr = sourceCodeArr.reduce((res, cur) => res + "\r\n" + cur);
@@ -113,6 +112,7 @@ styleEl.appendChild(document.createTextNode(`
   line-height: 1.4;
 }
 .aleph--error-modal .error code {
+  font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
   font-size: 14px;
   color: rgba(255, 0, 0, 1);
 }
@@ -165,7 +165,7 @@ styleEl.appendChild(document.createTextNode(`
 .aleph--error-modal .error .help-links a:hover {
   text-decoration: underline;
 }
-.aleph--error-modal .msg{
+.aleph--error-modal .msg {
   margin-bottom: 20px;
   text-decoration-line: underline;
   color: #b13939;
