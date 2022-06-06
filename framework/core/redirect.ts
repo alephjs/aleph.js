@@ -20,13 +20,17 @@ export function redirect(url: string, replace?: boolean) {
     return;
   }
 
-  if (util.isLikelyHttpURL(url) || url.startsWith("file://") || url.startsWith("mailto:") || url.startsWith("data:")) {
+  if (url.startsWith("file://") || url.startsWith("mailto:") || url.startsWith("data:")) {
     location.href = url;
     return;
   }
 
   const to = new URL(url, location.href);
   if (to.href === location.href) {
+    return;
+  }
+  if (to.host !== location.host) {
+    location.href = url;
     return;
   }
 
