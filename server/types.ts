@@ -2,7 +2,7 @@ import type { UserConfig as UnoConfig } from "../lib/@unocss/core.ts";
 
 export type AlephConfig = {
   /** The config for file-system based routing.  */
-  routes?: RoutesConfig | string;
+  routes?: string;
   /** The build options for `build` command. */
   build?: BuildOptions;
   /** The config for UnoCSS. */
@@ -26,12 +26,6 @@ export type BuildOptions = {
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
   /** The directory for build output files. default is "dist" */
   outputDir?: string;
-};
-
-export type RoutesConfig = {
-  glob: string;
-  generate?: boolean;
-  host?: boolean;
 };
 
 export type FetchHandler = {

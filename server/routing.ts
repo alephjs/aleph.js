@@ -6,7 +6,7 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
 import { fixResponse, toResponse } from "./response.ts";
-import type { AlephConfig, RoutesConfig } from "./types.ts";
+import type { AlephConfig } from "./types.ts";
 
 const revivedModules: Map<string, Record<string, unknown>> = new Map();
 
@@ -120,7 +120,7 @@ type RouteRegExp = {
 };
 
 /** initialize routes from routes config */
-export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cwd = Deno.cwd()): Promise<RouteTable> {
+export async function initRoutes(config: string | RouteRegExp, cwd = Deno.cwd()): Promise<RouteTable> {
   const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
   const files = await getFiles(join(cwd, reg.prefix));
   const routes: Route[] = [];
@@ -162,14 +162,13 @@ export async function initRoutes(config: string | RoutesConfig | RouteRegExp, cw
 }
 
 /** convert route config to `RouteRegExp` */
-export function toRouteRegExp(config: string | RoutesConfig): RouteRegExp {
-  const isObject = util.isPlainObject(config);
-  const prefix = util.trimSuffix(util.splitBy(isObject ? config.glob : config, "*")[0], "/");
-  const reg = globToRegExp("./" + util.trimPrefix(isObject ? config.glob : config, "./"));
+export function toRouteRegExp(config: string): RouteRegExp {
+  const prefix = util.trimSuffix(util.splitBy(config, "*")[0], "/");
+  const reg = globToRegExp("./" + util.trimPrefix(config, "./"));
 
   return {
     prefix,
-    generate: isObject ? config.generate : undefined,
+    generate: Reflect.has(globalThis, "__ALEPH_ROUTES_GENERATE"),
     test: (s: string) => reg.test(s),
     exec: (filename: string): URLPatternInput | null => {
       if (reg.test(filename)) {
@@ -189,7 +188,7 @@ export function toRouteRegExp(config: string | RoutesConfig): RouteRegExp {
           return part;
         });
         let host: string | undefined = undefined;
-        if (isObject && config.host && parts.length > 1 && parts[0].startsWith("@")) {
+        if (parts.length > 1 && /^@[a-z0-9\.\-]+\.[a-z0-9]+$/.test(parts[0])) {
           host = parts.shift()!.slice(1);
         }
         const basename = parts.pop()!;
