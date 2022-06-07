@@ -3,7 +3,15 @@ import { mockFormData, MockServer } from "aleph/server/mock.ts";
 
 Deno.test("[integration] examples/api-app", async (t) => {
   const api = new MockServer({
-    routes: "./examples/api-app/routes/**/*.ts",
+    cwd: "./examples/api-app/",
+    routes: "./routes/**/*.ts",
+    origin: "https://api.example.com",
+  });
+
+  await t.step("API GET /", async () => {
+    const res = await api.fetch("/");
+    assertEquals(res.status, 200);
+    assertEquals((await res.json()).users_url, "https://api.example.com/users");
   });
 
   await t.step("API GET /users", async () => {
