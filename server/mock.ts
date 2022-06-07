@@ -1,14 +1,16 @@
+import { join, resolve } from "https://deno.land/std@0.140.0/path/mod.ts";
 import { createContext } from "./context.ts";
 import { globalIt, loadImportMap } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
 import { fetchData, initRoutes } from "./routing.ts";
-import type { Middleware, RoutesConfig } from "./types.ts";
+import type { Middleware } from "./types.ts";
 
 type MockServerOptions = {
-  routes: string | RoutesConfig;
+  routes: string;
   middlewares?: Middleware[];
   ssr?: SSR;
+  cwd?: string;
   origin?: string;
 };
 
@@ -31,12 +33,12 @@ type MockServerOptions = {
 export class MockServer {
   #options: MockServerOptions;
 
-  constructor({ routes, middlewares }: MockServerOptions) {
-    this.#options = { routes, middlewares };
+  constructor(options: MockServerOptions) {
+    this.#options = options;
   }
 
   async fetch(input: string, init?: RequestInit) {
-    const { middlewares, routes, ssr, origin } = this.#options;
+    const { routes, middlewares, ssr, origin } = this.#options;
     const url = new URL(input, origin ?? "http://localhost/");
     const req = new Request(url.href, init);
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
@@ -66,25 +68,38 @@ export class MockServer {
       }
     }
 
-    const cwd = Deno.cwd();
-    const routeTable = await globalIt(`mockRoutes:${cwd}${JSON.stringify(routes)}`, () => initRoutes(routes));
-    const res = await fetchData(routeTable.routes, url, req, ctx, true, true);
+    const cwd = resolve(this.#options.cwd ?? Deno.cwd());
+    const routeTable = await globalIt(
+      `mockRoutes:${cwd}${JSON.stringify(routes)}`,
+      () => initRoutes(this.#options.cwd ? "./" + join(this.#options.cwd, routes) : routes),
+    );
+    const res = await fetchData(
+      routeTable.routes,
+      url,
+      req,
+      ctx,
+      req.headers.get("Accept") === "application/json",
+      true,
+    );
     if (res) {
       return res;
     }
 
-    const importMap = await globalIt(`mockImportMap:${cwd}`, () => loadImportMap());
+    const importMap = await globalIt(`mockImportMap:${cwd}`, () => loadImportMap(cwd));
     const indexHtml = await globalIt(`mockIndexHtml:${cwd}`, () =>
       loadAndFixIndexHtml({
         importMap,
         ssr: typeof ssr === "function" ? {} : ssr,
         isDev: false,
+        cwd,
       }));
+
     return renderer.fetch(req, ctx, {
       indexHtml,
       routeTable,
       customHTMLRewriter,
       isDev: false,
+      noProxy: true,
       ssr,
     });
   }

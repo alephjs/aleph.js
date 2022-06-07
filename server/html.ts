@@ -1,4 +1,5 @@
 import { concat } from "https://deno.land/std@0.140.0/bytes/mod.ts";
+import { join } from "https://deno.land/std@0.140.0/path/mod.ts";
 import type { Comment, DocumentEnd, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import lolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
@@ -30,6 +31,7 @@ type LoadOptions = {
   importMap: ImportMap;
   ssr?: { dataDefer?: boolean };
   hmrWebSocketUrl?: string;
+  cwd?: string;
 };
 
 // load and fix the `index.html`
@@ -40,11 +42,11 @@ type LoadOptions = {
 // - check the `<ssr-body>` element if the ssr is enabled
 // - add `data-defer` attribute to `<body>` if possible
 export async function loadAndFixIndexHtml(options: LoadOptions): Promise<Uint8Array> {
-  const { html, hasSSRBody } = await loadIndexHtml();
+  const { html, hasSSRBody } = await loadIndexHtml(options.cwd);
   return fixIndexHtml(html, hasSSRBody, options);
 }
 
-async function loadIndexHtml(): Promise<{ html: Uint8Array; hasSSRBody: boolean }> {
+async function loadIndexHtml(cwd = Deno.cwd()): Promise<{ html: Uint8Array; hasSSRBody: boolean }> {
   const chunks: Uint8Array[] = [];
   let hasHead = false;
   let hasBody = false;
@@ -96,7 +98,7 @@ async function loadIndexHtml(): Promise<{ html: Uint8Array; hasSSRBody: boolean 
 
   let html: Uint8Array;
   try {
-    html = await Deno.readFile("index.html");
+    html = await Deno.readFile(join(cwd, "index.html"));
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) {
       html = util.utf8TextEncoder.encode(defaultIndexHtml);

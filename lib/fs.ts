@@ -30,8 +30,7 @@ export async function existsFile(path: string): Promise<boolean> {
 }
 
 /* find file in the directory */
-export async function findFile(filenames: string[]): Promise<string | undefined> {
-  const cwd = Deno.cwd();
+export async function findFile(filenames: string[], cwd = Deno.cwd()): Promise<string | undefined> {
   for (const filename of filenames) {
     const fullPath = join(cwd, filename);
     if (await existsFile(fullPath)) {

@@ -53,6 +53,7 @@ export type RenderOptions = {
   routeTable: RouteTable;
   customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
   isDev: boolean;
+  noProxy?: boolean;
   ssr?: SSR;
 };
 
@@ -70,12 +71,7 @@ export default {
       const cc = !isFn ? ssr.cacheControl : "public";
       const CSP = isFn ? undefined : ssr.CSP;
       const render = isFn ? ssr : ssr.render;
-      const [url, routeModules, deferedData] = await initSSR(
-        req,
-        ctx,
-        routeTable,
-        dataDefer,
-      );
+      const [url, routeModules, deferedData] = await initSSR(req, ctx, routeTable, dataDefer, options.noProxy);
       const headCollection: string[] = [];
       const ssrContext: SSRContext = {
         url,
@@ -126,9 +122,7 @@ export default {
           }
         }
       }
-      if (
-        routeModules.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)
-      ) {
+      if (routeModules.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)) {
         const ttls = routeModules.map(({ dataCacheTtl }) => Number(dataCacheTtl));
         headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
       } else {
@@ -341,6 +335,7 @@ async function initSSR(
   ctx: Record<string, unknown>,
   routeTable: RouteTable,
   dataDefer: boolean,
+  noProxy?: boolean,
 ): Promise<[
   url: URL,
   routeModules: RouteModule[],
@@ -352,7 +347,7 @@ async function initSSR(
 
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
-    const mod = await importRouteModule(filename);
+    const mod = await importRouteModule(filename, noProxy);
     const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),
