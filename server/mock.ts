@@ -3,7 +3,7 @@ import { createContext } from "./context.ts";
 import { globalIt, loadImportMap } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
-import { fetchData, initRoutes } from "./routing.ts";
+import { fetchRouteData, initRoutes } from "./routing.ts";
 import type { Middleware } from "./types.ts";
 
 type MockServerOptions = {
@@ -73,12 +73,14 @@ export class MockServer {
       `mockRoutes:${cwd}${JSON.stringify(routes)}`,
       () => initRoutes(this.#options.cwd ? "./" + join(this.#options.cwd, routes) : routes),
     );
-    const res = await fetchData(
+    const reqData = req.method === "GET" &&
+      (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
+    const res = await fetchRouteData(
       routeTable.routes,
       url,
       req,
       ctx,
-      req.headers.get("Accept") === "application/json",
+      reqData,
       true,
     );
     if (res) {

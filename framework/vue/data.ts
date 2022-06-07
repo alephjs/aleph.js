@@ -107,7 +107,10 @@ const createDataProvider = () => {
 
   const reload = async (signal?: AbortSignal) => {
     try {
-      const res = await fetch(dataUrl.value, { headers: { "Accept": "application/json" }, signal });
+      const res = await fetch(dataUrl.value + (dataUrl.value.includes("?") ? "&" : "?") + "_data_", {
+        headers: { "Accept": "application/json" },
+        signal,
+      });
 
       if (!res.ok) {
         const err = await FetchError.fromResponse(res);

@@ -19,7 +19,7 @@ import {
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
 import { content, fixResponse, json, setCookieHeader } from "./response.ts";
-import { fetchData, initRoutes, revive } from "./routing.ts";
+import { fetchRouteData, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
 
@@ -224,15 +224,16 @@ export const serve = (options: ServerOptions = {}) => {
       () => routes ? initRoutes(routes) : Promise.resolve({ routes: [] }),
     );
     if (routeTable.routes.length > 0) {
-      const acceptJson = req.headers.get("Accept") === "application/json";
+      const reqData = req.method === "GET" &&
+        (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       try {
-        const resp = await fetchData(routeTable.routes, url, req, ctx, acceptJson);
+        const resp = await fetchRouteData(routeTable.routes, url, req, ctx, reqData);
         if (resp) {
           return resp;
         }
       } catch (err) {
         // javascript syntax error
-        if (err instanceof TypeError && !acceptJson) {
+        if (err instanceof TypeError && !reqData) {
           return new Response(generateErrorHtml(err.stack ?? err.message), {
             status: 500,
             headers: [["Content-Type", "text/html"]],
@@ -242,12 +243,12 @@ export const serve = (options: ServerOptions = {}) => {
         // use the `onError` if available
         const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
         if (res instanceof Response) {
-          return fixResponse(res, ctx.headers, acceptJson);
+          return fixResponse(res, ctx.headers, reqData);
         }
 
         // user throw a response
         if (err instanceof Response) {
-          return fixResponse(err, ctx.headers, acceptJson);
+          return fixResponse(err, ctx.headers, reqData);
         }
 
         // prints the error stack

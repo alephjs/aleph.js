@@ -78,7 +78,9 @@ const createRouter = (props: RouterProps) => {
   const prefetchData = async (dataUrl: string) => {
     const rd: RouteData = {};
     const fetchData = async () => {
-      const res = await fetch(dataUrl, { headers: { "Accept": "application/json" } });
+      const res = await fetch(dataUrl + (dataUrl.includes("?") ? "&" : "?") + "_data_", {
+        headers: { "Accept": "application/json" },
+      });
       if (!res.ok) {
         const err = await FetchError.fromResponse(res);
         const details = err.details as { redirect?: { location: string } };

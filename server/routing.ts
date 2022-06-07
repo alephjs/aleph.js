@@ -10,12 +10,12 @@ import type { AlephConfig } from "./types.ts";
 
 const revivedModules: Map<string, Record<string, unknown>> = new Map();
 
-export async function fetchData(
+export async function fetchRouteData(
   routes: Route[],
   url: URL,
   req: Request,
   ctx: Record<string, unknown>,
-  acceptJson: boolean,
+  reqData: boolean,
   noProxy?: boolean,
 ): Promise<Response | void> {
   const { pathname, host } = url;
@@ -50,7 +50,7 @@ export async function fetchData(
       const [ret, { filename }] = matched;
       const mod = await importRouteModule(filename, noProxy);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
-      if (method !== "GET" || mod.default === undefined || acceptJson) {
+      if (method !== "GET" || mod.default === undefined || reqData) {
         Object.assign(ctx.params, ret.pathname.groups);
         const anyFetcher = dataConfig.any ?? dataConfig.ANY;
         if (typeof anyFetcher === "function") {
@@ -63,8 +63,10 @@ export async function fetchData(
         if (typeof fetcher === "function") {
           const res = await fetcher(req, ctx);
           const headers = ctx.headers as unknown as Headers;
+          // todo: set cache for "GET" with `cacheTtl` option
+          headers.set("cache-control", "no-cache, no-store, must-revalidate");
           if (res instanceof Response) {
-            return fixResponse(res, headers, acceptJson);
+            return fixResponse(res, headers, reqData);
           }
           return toResponse(res, headers);
         }
