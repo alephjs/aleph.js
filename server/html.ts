@@ -16,7 +16,7 @@ const defaultIndexHtml = `<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body></body>
+<body><h2>Not Found</h2></body>
 </html>
 `;
 

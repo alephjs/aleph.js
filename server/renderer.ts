@@ -46,6 +46,7 @@ export type SSRResult = {
   body: ReadableStream | string;
   deferedData: Record<string, unknown>;
   nonce?: string;
+  is404?: boolean;
 };
 
 export type RenderOptions = {
@@ -132,6 +133,8 @@ export default {
         context: ssrContext,
         body,
         deferedData,
+        is404: routeModules.length === 0 || routeModules.at(-1)?.url.pathname ===
+            "/_404",
       };
       if (CSP) {
         const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
@@ -304,12 +307,6 @@ export default {
               },
             });
           }
-        } else {
-          rewriter.on("body", {
-            element(el: Element) {
-              el.replace(`<body><p>Not Found</p></body>`, { html: true });
-            },
-          });
         }
 
         try {
@@ -325,7 +322,7 @@ export default {
     });
 
     headers.set("Content-Type", "text/html; charset=utf-8");
-    return new Response(stream, { headers });
+    return new Response(stream, { headers, status: ssrRes?.is404 ? 404 : 200 });
   },
 };
 
