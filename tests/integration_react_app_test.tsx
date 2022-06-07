@@ -41,7 +41,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
   await t.step("API GET /404", async () => {
     const res = await api.fetch("/404");
     const html = await res.text();
-    assertEquals(res.status, 200);
+    assertEquals(res.status, 404);
     assertEquals(res.headers.get("Content-Type"), "text/html; charset=utf-8");
     assert(html.includes(`<h2>Ooooooops, nothing here!</h2>`));
   });

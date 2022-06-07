@@ -3,7 +3,7 @@ import { mockFormData, MockServer } from "aleph/server/mock.ts";
 
 Deno.test("[integration] examples/api-app", async (t) => {
   const api = new MockServer({
-    cwd: "./examples/api-app/",
+    cwd: "./examples/api-app",
     routes: "./routes/**/*.ts",
     origin: "https://api.example.com",
   });
