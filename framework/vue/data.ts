@@ -107,13 +107,18 @@ const createDataProvider = () => {
 
   const reload = async (signal?: AbortSignal) => {
     try {
-      const res = await fetch(dataUrl.value, { headers: { "Accept": "application/json" }, signal, redirect: "manual" });
-      if (res.type === "opaqueredirect") {
-        throw new Error("opaque redirect");
-      }
+      const res = await fetch(dataUrl.value, { headers: { "Accept": "application/json" }, signal });
+
       if (!res.ok) {
-        throw await FetchError.fromResponse(res);
+        const err = await FetchError.fromResponse(res);
+        const details = err.details as { redirect?: { location: string } };
+        if (err.status === 501 && typeof details.redirect?.location === "string") {
+          location.href = details.redirect?.location;
+          await new Promise(() => {});
+        }
+        throw err;
       }
+
       try {
         const data = await res.json();
         const cc = res.headers.get("Cache-Control");
@@ -169,7 +174,7 @@ export const useData = () => {
 
 function send(method: HttpMethod, href: string, data: unknown) {
   let body: BodyInit | undefined;
-  const headers = new Headers();
+  const headers = new Headers([["Accept", "application/json"]]);
   if (typeof data === "string") {
     body = data;
   } else if (typeof data === "number") {
@@ -189,7 +194,7 @@ function send(method: HttpMethod, href: string, data: unknown) {
       headers.append("Content-Type", "application/json; charset=utf-8");
     }
   }
-  return fetch(href, { method, body, headers, redirect: "manual" });
+  return fetch(href, { method, body, headers });
 }
 
 function shallowClone<T>(obj: T): T {

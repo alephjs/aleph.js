@@ -15,7 +15,7 @@ export async function fetchData(
   url: URL,
   req: Request,
   ctx: Record<string, unknown>,
-  fromFetch: boolean,
+  acceptJson: boolean,
   noProxy?: boolean,
 ): Promise<Response | void> {
   const { pathname, host } = url;
@@ -50,7 +50,7 @@ export async function fetchData(
       const [ret, { filename }] = matched;
       const mod = await importRouteModule(filename, noProxy);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
-      if (method !== "GET" || mod.default === undefined || fromFetch) {
+      if (method !== "GET" || mod.default === undefined || acceptJson) {
         Object.assign(ctx.params, ret.pathname.groups);
         const anyFetcher = dataConfig.any ?? dataConfig.ANY;
         if (typeof anyFetcher === "function") {
@@ -64,7 +64,7 @@ export async function fetchData(
           const res = await fetcher(req, ctx);
           const headers = ctx.headers as unknown as Headers;
           if (res instanceof Response) {
-            return fixResponse(res, headers, fromFetch);
+            return fixResponse(res, headers, acceptJson);
           }
           return toResponse(res, headers);
         }

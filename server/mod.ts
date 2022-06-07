@@ -224,16 +224,15 @@ export const serve = (options: ServerOptions = {}) => {
       () => routes ? initRoutes(routes) : Promise.resolve({ routes: [] }),
     );
     if (routeTable.routes.length > 0) {
-      const accept = req.headers.get("Accept");
-      const fromFetch = accept === "application/json" || !accept?.includes("html");
+      const acceptJson = req.headers.get("Accept") === "application/json";
       try {
-        const resp = await fetchData(routeTable.routes, url, req, ctx, fromFetch);
+        const resp = await fetchData(routeTable.routes, url, req, ctx, acceptJson);
         if (resp) {
           return resp;
         }
       } catch (err) {
         // javascript syntax error
-        if (err instanceof TypeError && !fromFetch) {
+        if (err instanceof TypeError && !acceptJson) {
           return new Response(generateErrorHtml(err.stack ?? err.message), {
             status: 500,
             headers: [["Content-Type", "text/html"]],
@@ -243,12 +242,12 @@ export const serve = (options: ServerOptions = {}) => {
         // use the `onError` if available
         const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
         if (res instanceof Response) {
-          return fixResponse(res, ctx.headers, fromFetch);
+          return fixResponse(res, ctx.headers, acceptJson);
         }
 
         // user throw a response
         if (err instanceof Response) {
-          return fixResponse(err, ctx.headers, fromFetch);
+          return fixResponse(err, ctx.headers, acceptJson);
         }
 
         // prints the error stack
