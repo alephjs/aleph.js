@@ -1,5 +1,5 @@
-import { basename, dirname, extname, join } from "https://deno.land/std@0.140.0/path/mod.ts";
-import { ensureDir } from "https://deno.land/std@0.140.0/fs/ensure_dir.ts";
+import { basename, dirname, extname, join } from "https://deno.land/std@0.142.0/path/mod.ts";
+import { ensureDir } from "https://deno.land/std@0.142.0/fs/ensure_dir.ts";
 import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.42/mod.js";
 import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.6.1/mod.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
@@ -88,7 +88,7 @@ export async function build(serverEntry?: string) {
     `globalThis.__ALEPH_SERVER_DEP_GRAPH = new DependencyGraph(graph.modules);`,
     routeFiles.length > 0 && `import { revive } from "${alephPkgUri}/server/routing.ts";`,
     moduleLoaders.length > 0 &&
-    `import { globToRegExp } from "https://deno.land/std@0.140.0/path/mod.ts";const moduleLoaders = []; globalThis["__ALEPH_MODULE_LOADERS"] = moduleLoaders;`,
+    `import { globToRegExp } from "https://deno.land/std@0.142.0/path/mod.ts";const moduleLoaders = []; globalThis["__ALEPH_MODULE_LOADERS"] = moduleLoaders;`,
     moduleLoaders.length > 0 &&
     moduleLoaders.map((loader) => {
       const meta = Reflect.get(loader, "meta");

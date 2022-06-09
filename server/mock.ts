@@ -1,4 +1,4 @@
-import { join, resolve } from "https://deno.land/std@0.140.0/path/mod.ts";
+import { join, resolve } from "https://deno.land/std@0.142.0/path/mod.ts";
 import { createContext } from "./context.ts";
 import { globalIt, loadImportMap } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";

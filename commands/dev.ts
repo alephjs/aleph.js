@@ -1,4 +1,4 @@
-import { basename, extname, relative, resolve } from "https://deno.land/std@0.140.0/path/mod.ts";
+import { basename, extname, relative, resolve } from "https://deno.land/std@0.142.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { parseDeps, transformCSS } from "https://deno.land/x/aleph_compiler@0.6.1/mod.ts";
 import { findFile, watchFs } from "../lib/fs.ts";

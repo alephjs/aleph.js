@@ -1,7 +1,7 @@
-import { parse } from "https://deno.land/std@0.140.0/flags/mod.ts";
-import { readLines } from "https://deno.land/std@0.140.0/io/mod.ts";
-import { writeAll } from "https://deno.land/std@0.140.0/streams/conversion.ts";
-import { basename, resolve } from "https://deno.land/std@0.140.0/path/mod.ts";
+import { parse } from "https://deno.land/std@0.142.0/flags/mod.ts";
+import { readLines } from "https://deno.land/std@0.142.0/io/mod.ts";
+import { writeAll } from "https://deno.land/std@0.142.0/streams/conversion.ts";
+import { basename, resolve } from "https://deno.land/std@0.142.0/path/mod.ts";
 import { parseImportMap } from "./server/helpers.ts";
 import { findFile } from "./lib/fs.ts";
 import log, { bold, dim, stripColor } from "./lib/log.ts";
