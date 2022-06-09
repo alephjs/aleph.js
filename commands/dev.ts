@@ -297,7 +297,7 @@ async function bootstrap(signal: AbortSignal, entry: string | undefined, fixedPo
       keyFile,
       signal,
       onListenSuccess: (port) => log.info(`Server ready on http://localhost:${port}`),
-      handler: (req: Request) => {
+      handler: (req, connInfo) => {
         const { pathname } = new URL(req.url);
 
         // handle HMR sockets
@@ -305,7 +305,7 @@ async function bootstrap(signal: AbortSignal, entry: string | undefined, fixedPo
           return handleHMRSocket(req);
         }
 
-        return handler?.(req);
+        return handler?.(req, connInfo);
       },
     });
   } catch (error) {
