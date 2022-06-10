@@ -1,4 +1,4 @@
-import { setCookieHeader } from "./response.ts";
+import { setCookieHeader } from "./helpers.ts";
 
 export interface SessionStorage {
   get(sid: string): Promise<unknown | undefined>;

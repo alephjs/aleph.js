@@ -71,6 +71,87 @@ export function getDeploymentId(): string | undefined {
   return Deno.env.get("DENO_DEPLOYMENT_ID");
 }
 
+export type CookieOptions = {
+  expires?: number | Date;
+  maxAge?: number;
+  domain?: string;
+  path?: string;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "lax" | "strict" | "none";
+};
+
+export function setCookieHeader(name: string, value: string, options?: CookieOptions): string {
+  const cookie = [`${name}=${value}`];
+  if (options) {
+    if (options.expires) {
+      cookie.push(`Expires=${new Date(options.expires).toUTCString()}`);
+    }
+    if (options.maxAge) {
+      cookie.push(`Max-Age=${options.maxAge}`);
+    }
+    if (options.domain) {
+      cookie.push(`Domain=${options.domain}`);
+    }
+    if (options.path) {
+      cookie.push(`Path=${options.path}`);
+    }
+    if (options.httpOnly) {
+      cookie.push("HttpOnly");
+    }
+    if (options.secure) {
+      cookie.push("Secure");
+    }
+    if (options.sameSite) {
+      cookie.push(`SameSite=${options.sameSite}`);
+    }
+  }
+  return cookie.join("; ");
+}
+
+export function toResponse(v: unknown, headers: Headers): Response {
+  if (
+    typeof v === "string" ||
+    v instanceof ArrayBuffer ||
+    v instanceof Uint8Array ||
+    v instanceof ReadableStream
+  ) {
+    return new Response(v, { headers: headers });
+  }
+  if (v instanceof Blob || v instanceof File) {
+    headers.set("Content-Type", v.type);
+    headers.set("Content-Length", v.size.toString());
+    return new Response(v, { headers: headers });
+  }
+  if (util.isPlainObject(v) || Array.isArray(v)) {
+    return Response.json(v, { headers });
+  }
+  if (v === null) {
+    return new Response(null, { headers });
+  }
+  throw new Error("Invalid response type: " + typeof v);
+}
+
+export function fixResponse(res: Response, addtionHeaders: Headers, fixRedirect: boolean): Response {
+  if (res.status >= 300 && res.status < 400 && fixRedirect) {
+    return Response.json({ redirect: { location: res.headers.get("Location"), status: res.status } }, {
+      status: 501,
+      headers: addtionHeaders,
+    });
+  }
+  let headers: Headers | null = null;
+  addtionHeaders.forEach((value, name) => {
+    if (!headers) {
+      headers = new Headers(res.headers);
+    }
+    headers.set(name, value);
+  });
+  if (headers) {
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+  }
+  return res;
+}
+
 /**
  * fix remote url to local path.
  * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`

@@ -7,18 +7,8 @@ import util from "../lib/util.ts";
 import { applyImportMap, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import type { ImportMap } from "./types.ts";
 
-// init `lol-html` wasm
+// init `lol-html` Wasm
 await initLolHtml(lolHtmlWasm());
-
-const defaultIndexHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body><h2>Not Found</h2></body>
-</html>
-`;
 
 export type HTMLRewriterHandlers = {
   element?: (element: Element) => void;
@@ -101,7 +91,15 @@ async function loadIndexHtml(cwd = Deno.cwd()): Promise<{ html: Uint8Array; hasS
     html = await Deno.readFile(join(cwd, "index.html"));
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) {
-      html = util.utf8TextEncoder.encode(defaultIndexHtml);
+      html = util.utf8TextEncoder.encode(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body><h2>Not Found</h2></body>
+</html>
+`);
     } else {
       throw err;
     }

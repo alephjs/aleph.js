@@ -10,16 +10,17 @@ import type { SessionOptions } from "./session.ts";
 import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
 import {
+  fixResponse,
   getDeploymentId,
   globalIt,
   initModuleLoaders,
   loadImportMap,
   loadJSXConfig,
   regFullVersion,
+  setCookieHeader,
 } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
-import { content, fixResponse, setCookieHeader } from "./response.ts";
 import { fetchRouteData, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
@@ -335,4 +336,4 @@ export const serve = (options: ServerOptions = {}) => {
   }
 };
 
-export { content, revive, setCookieHeader };
+export { revive, setCookieHeader };
