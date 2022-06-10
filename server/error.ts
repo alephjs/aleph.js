@@ -4,14 +4,12 @@ export type ErrorCallback = {
   (
     error: unknown,
     cause: {
-      by: "route-api" | "ssr" | "transplie" | "fs" | "middleware";
+      by: "route-data-fetch" | "ssr" | "transplie" | "fs" | "middleware";
       url: string;
       context?: Record<string, unknown>;
     },
   ): Response | void;
 };
-
-const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
 
 export const generateErrorHtml = (message: string, type?: string): string => {
   const formatMessage = message.split("\n").map((line, i) => {
@@ -31,6 +29,7 @@ export const generateErrorHtml = (message: string, type?: string): string => {
   return errorTemplate(formatMessage, type);
 };
 
+const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
 const errorTemplate = (message: string, type?: string) => `
 <!DOCTYPE html>
 <html lang="en">

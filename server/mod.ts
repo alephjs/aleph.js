@@ -79,12 +79,15 @@ export const serve = (options: ServerOptions = {}) => {
                 setTimeout(res, 0);
               }
             } catch (err) {
-              log.error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
-              return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
-                new Response(generateErrorHtml(err.stack ?? err.message), {
-                  status: 500,
-                  headers: [["Content-Type", "text/html"]],
-                });
+              const res = onError?.(err, { by: "middleware", url: req.url, context: ctx });
+              if (res instanceof Response) {
+                return res;
+              }
+              log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
+              return new Response(generateErrorHtml(err.stack ?? err.message), {
+                status: 500,
+                headers: [["Content-Type", "text/html"]],
+              });
             }
           } else {
             postMiddlewares.push(mw);
@@ -204,12 +207,15 @@ export const serve = (options: ServerOptions = {}) => {
           setTimeout(res, 0);
         }
       } catch (err) {
-        log.error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
-        return onError?.(err, { by: "middleware", url: req.url, context: ctx }) ??
-          new Response(generateErrorHtml(err.stack ?? err.message), {
-            status: 500,
-            headers: [["Content-Type", "text/html"]],
-          });
+        const res = onError?.(err, { by: "middleware", url: req.url, context: ctx });
+        if (res instanceof Response) {
+          return res;
+        }
+        log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
+        return new Response(generateErrorHtml(err.stack ?? err.message), {
+          status: 500,
+          headers: [["Content-Type", "text/html"]],
+        });
       }
     }
 
@@ -241,7 +247,7 @@ export const serve = (options: ServerOptions = {}) => {
         }
 
         // use the `onError` if available
-        const res = onError?.(err, { by: "route-api", url: req.url, context: ctx });
+        const res = onError?.(err, { by: "route-data-fetch", url: req.url, context: ctx });
         if (res instanceof Response) {
           return fixResponse(res, ctx.headers, reqData);
         }
