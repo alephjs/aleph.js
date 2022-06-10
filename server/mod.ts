@@ -5,7 +5,8 @@ import type { RouteTable } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
-import { createContext, type SessionOptions } from "./context.ts";
+import { createContext } from "./context.ts";
+import type { SessionOptions } from "./session.ts";
 import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
 import {
@@ -18,7 +19,7 @@ import {
 } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
-import { content, fixResponse, json, setCookieHeader } from "./response.ts";
+import { content, fixResponse, setCookieHeader } from "./response.ts";
 import { fetchRouteData, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
@@ -264,7 +265,7 @@ export const serve = (options: ServerOptions = {}) => {
 
         // return the error as a json
         const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
-        return json({ ...err, status, message: err.message ?? String(err), stack: err.stack }, {
+        return Response.json({ ...err, status, message: err.message ?? String(err), stack: err.stack }, {
           status,
           headers: ctx.headers,
         });
@@ -334,4 +335,4 @@ export const serve = (options: ServerOptions = {}) => {
   }
 };
 
-export { content, json, revive, setCookieHeader };
+export { content, revive, setCookieHeader };

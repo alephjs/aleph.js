@@ -48,12 +48,6 @@ export function content(
   return new Response(body, { ...init, headers });
 }
 
-export function json(data: unknown, init?: ResponseInit): Response {
-  const headers = new Headers(init?.headers);
-  headers.append("content-type", "application/json; charset=utf-8");
-  return new Response(JSON.stringify(data), { ...init, headers });
-}
-
 export type CookieOptions = {
   expires?: number | Date;
   maxAge?: number;
@@ -107,7 +101,7 @@ export function toResponse(v: unknown, headers: Headers): Response {
     return new Response(v, { headers: headers });
   }
   if (util.isPlainObject(v) || Array.isArray(v)) {
-    return json(v, { headers });
+    return Response.json(v, { headers });
   }
   if (v === null) {
     return new Response(null, { headers });
@@ -117,7 +111,7 @@ export function toResponse(v: unknown, headers: Headers): Response {
 
 export function fixResponse(res: Response, addtionHeaders: Headers, fixRedirect: boolean): Response {
   if (res.status >= 300 && res.status < 400 && fixRedirect) {
-    return json({ redirect: { location: res.headers.get("Location"), status: res.status } }, {
+    return Response.json({ redirect: { location: res.headers.get("Location"), status: res.status } }, {
       status: 501,
       headers: addtionHeaders,
     });

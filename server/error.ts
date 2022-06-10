@@ -11,25 +11,6 @@ export type ErrorCallback = {
   ): Response | void;
 };
 
-export const generateErrorHtml = (message: string, type?: string): string => {
-  const formatMessage = message.split("\n").map((line, i) => {
-    const ret = line.match(regStackLoc);
-    if (ret) {
-      const url = new URL(ret[1]);
-      line = line.replace(ret[0], `.${url.pathname}${ret[2]}`);
-    }
-    if (i === 0) {
-      if (type) {
-        return `<strong>${type} ${line}</strong>`;
-      }
-      return `<strong>${line}</strong>`;
-    }
-    return line;
-  }).join("\n");
-  return errorTemplate(formatMessage, type);
-};
-
-const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
 const errorTemplate = (message: string, type?: string) => `
 <!DOCTYPE html>
 <html lang="en">
@@ -145,3 +126,22 @@ const errorTemplate = (message: string, type?: string) => `
   </body>
 </html>
 `;
+const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
+
+export const generateErrorHtml = (message: string, type?: string): string => {
+  const formatMessage = message.split("\n").map((line, i) => {
+    const ret = line.match(regStackLoc);
+    if (ret) {
+      const url = new URL(ret[1]);
+      line = line.replace(ret[0], `.${url.pathname}${ret[2]}`);
+    }
+    if (i === 0) {
+      if (type) {
+        return `<strong>${type} ${line}</strong>`;
+      }
+      return `<strong>${line}</strong>`;
+    }
+    return line;
+  }).join("\n");
+  return errorTemplate(formatMessage, type);
+};
