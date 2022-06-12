@@ -69,6 +69,7 @@ function formatCode(message: string, sourceCode: string, column: number, line: n
 }
 
 const styleEl = document.createElement("style");
+document.head.appendChild(styleEl);
 styleEl.appendChild(document.createTextNode(`
 .aleph--error-modal {
   position: fixed;
@@ -189,4 +190,3 @@ styleEl.appendChild(document.createTextNode(`
   font-size:20px;
 }
 `));
-document.head.appendChild(styleEl);
