@@ -30,7 +30,7 @@ Initialize a new project, you can pick a start template with `--template` flag, 
 `[react, vue, api, yew]`
 
 ```bash
-deno run -A https://deno.land/x/aleph@1.0.0-alpha.66/cli.ts init --template react
+deno run -A https://deno.land/x/aleph@1.0.0-alpha.68/cli.ts init --template react
 ```
 
 after `init`, you can run the app with deno tasks:
@@ -48,6 +48,8 @@ deno task start
 # build the app for severless deployment
 deno task build
 ```
+
+## Documentation
 
 > The new docs site is working in progress: https://aleph.deno.dev
 > ([PR](https://github.com/alephjs/alephjs.org/pull/58)). You can join the Aleph.js
