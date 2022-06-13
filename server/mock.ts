@@ -16,6 +16,11 @@ type MockServerOptions = {
 
 /** The MockServer class to create a minimal server for integration testing.
  *
+ * Limits:
+ * - importing css is _NOT_ allowed
+ * - custom loader is _NOT_ supported, like `import './foo.vue'`
+ *
+ * @example
  * ```ts
  * import { assertEquals } from "std/testing/asserts.ts";
  * import { MockServer } from "aleph/server/mock.ts";
