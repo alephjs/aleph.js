@@ -38,6 +38,14 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assert(html.includes(`<header style=`));
   });
 
+  await t.step("API GET /todos?_data_", async () => {
+    const res = await api.fetch("/todos?_data_");
+    const data = await res.json();
+    assertEquals(res.status, 200);
+    assertEquals(res.headers.get("Content-Type"), "application/json");
+    assertEquals(data, { todos: [] });
+  });
+
   await t.step("API GET /404", async () => {
     const res = await api.fetch("/404");
     const html = await res.text();
