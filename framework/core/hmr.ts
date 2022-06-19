@@ -137,7 +137,15 @@ function connect() {
       try {
         const { type, specifier, ...rest } = JSON.parse(data);
         if (specifier) {
-          document.querySelector(`div.transform-error[data-specifier=${JSON.stringify(specifier)}]`)?.remove();
+          for (const node of document.body.children) {
+            if (
+              node.classList.contains("transform-error") &&
+              node.getAttribute("data-specifier") === specifier
+            ) {
+              node.remove();
+              break;
+            }
+          }
         }
         switch (type) {
           case "create": {
