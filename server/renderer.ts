@@ -355,7 +355,7 @@ async function initSSR(
     };
 
     // assign route params to context
-    Object.assign(ctx.params, ret.pathname.groups);
+    Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
 
     // check the `get` method of data, if `suspense` is enabled then return a promise instead
     const fetcher = dataConfig.get ?? dataConfig.GET;

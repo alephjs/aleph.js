@@ -51,7 +51,7 @@ export async function fetchRouteData(
       const mod = await importRouteModule(filename, noProxy);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
       if (method !== "GET" || mod.default === undefined || reqData) {
-        Object.assign(ctx.params, ret.pathname.groups);
+        Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
         const anyFetcher = dataConfig.any ?? dataConfig.ANY;
         if (typeof anyFetcher === "function") {
           const res = await anyFetcher(req, ctx);
