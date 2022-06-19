@@ -213,7 +213,8 @@ export async function initModuleLoaders(importMap?: ImportMap): Promise<ModuleLo
             const Loader = {
               meta: { src, glob },
               test: (pathname: string) => reg.test(pathname),
-              load: (pathname: string, env: Record<string, unknown>) => loader.load(pathname, env),
+              load: (specifier: string, content: string, env: Record<string, unknown>) =>
+                loader.load(specifier, content, env),
             };
             loaders.push(Loader);
           }

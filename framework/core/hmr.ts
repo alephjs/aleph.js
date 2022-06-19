@@ -3,7 +3,6 @@
 
 import util from "../../lib/util.ts";
 import events from "./events.ts";
-import "./transform_error.ts";
 
 class Module {
   private _specifier: string;
@@ -137,6 +136,9 @@ function connect() {
     if (data) {
       try {
         const { type, specifier, ...rest } = JSON.parse(data);
+        if (specifier) {
+          document.querySelector(`div.transform-error[data-specifier=${JSON.stringify(specifier)}]`)?.remove();
+        }
         switch (type) {
           case "create": {
             events.emit("hmr:create", { specifier, ...rest });
@@ -155,10 +157,6 @@ function connect() {
               modules.delete(specifier);
             }
             events.emit("hmr:remove", { specifier });
-            break;
-          }
-          case "transform": {
-            events.emit("transform", { specifier, ...rest });
             break;
           }
           case "reload": {

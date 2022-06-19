@@ -1,6 +1,5 @@
-import { basename, extname, relative, resolve } from "https://deno.land/std@0.142.0/path/mod.ts";
+import { basename, relative, resolve } from "https://deno.land/std@0.142.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
-import { parseDeps, transformCSS } from "https://deno.land/x/aleph_compiler@0.6.1/mod.ts";
 import { findFile, watchFs } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -36,7 +35,8 @@ const removeEmitter = (e: Emitter<FsEvents>) => {
   e.all.clear();
   emitters.delete(e);
 };
-const handleHMRSocket = (req: Request): Response => {
+
+export function handleHMRSocket(req: Request): Response {
   const { socket, response } = Deno.upgradeWebSocket(req, {});
   const emitter = createEmitter();
   const send = (message: Record<string, unknown>) => {
@@ -63,9 +63,6 @@ const handleHMRSocket = (req: Request): Response => {
       emitter.off(`hotUpdate:${specifier}`);
       send({ type: "remove", specifier });
     });
-    emitter.on("transform", ({ specifier, sourceCode, status, error }) => {
-      send({ type: "transform", specifier, sourceCode, status, error });
-    });
   });
   socket.addEventListener("message", (e) => {
     if (util.isFilledString(e.data)) {
@@ -86,7 +83,7 @@ const handleHMRSocket = (req: Request): Response => {
     removeEmitter(emitter);
   });
   return response;
-};
+}
 
 if (import.meta.main) {
   // add envs
@@ -105,7 +102,7 @@ if (import.meta.main) {
   await proxyModules(6060, { importMap, moduleLoaders });
 
   log.info(`Watching files for changes...`);
-  watchFs(cwd, async (kind, path) => {
+  watchFs(cwd, (kind, path) => {
     const specifier = "./" + relative(cwd, path).replaceAll("\\", "/");
     const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
@@ -121,44 +118,6 @@ if (import.meta.main) {
     }
 
     if (kind === "modify") {
-      if (clientDependencyGraph?.get(specifier)) {
-        const code = await Deno.readTextFile(specifier);
-        try {
-          if (builtinModuleExts.includes(extname(path).slice(1))) {
-            await parseDeps(specifier, code);
-          } else if (path.endsWith(".css")) {
-            await transformCSS(specifier, code, {
-              drafts: {
-                nesting: true,
-                customMedia: true,
-              },
-            });
-          }
-          // todo: check loaders
-          emitters.forEach((e) => {
-            e.emit("transform", {
-              specifier,
-              status: "success",
-            });
-          });
-        } catch (error) {
-          log.error(error);
-          emitters.forEach((e) => {
-            e.emit("transform", {
-              specifier,
-              sourceCode: code,
-              status: "failure",
-              error: {
-                message: error.message.replace("\\\\", "/"),
-                stack: error.stack.split(`${error.message}`)[1]?.slice(2),
-                location: error.message.split(`${specifier.replace("\\", "\\\\")}:`)[1]?.split("\n")[0]?.split(":")
-                  .map((s: string) => parseInt(s)),
-              },
-            });
-          });
-          return;
-        }
-      }
       emitters.forEach((e) => {
         e.emit(`modify:${specifier}`, { specifier });
         if (e.all.has(`hotUpdate:${specifier}`)) {

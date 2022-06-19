@@ -1,34 +1,28 @@
-import { join } from "std/path/mod.ts";
 import { assert, assertEquals } from "std/testing/asserts.ts";
 import VueLoader from "../loaders/vue.ts";
 
 Deno.test("[unit] loaders/vue.ts", async (t) => {
   await t.step("VueLoader", async () => {
-    const dir = await Deno.makeTempDir();
-    Deno.chdir(dir);
-    await Deno.writeTextFile(
-      join(dir, "test.vue"),
-      `
-      <script setup>
-        import { ref } from "https://esm.sh/vue@3"
+    const testVue = `
+    <script setup>
+      import { ref } from "https://esm.sh/vue@3"
 
-        const msg = ref("Hello World!")
-      </script>
+      const msg = ref("Hello World!")
+    </script>
 
-      <template>
-        <h1>{{ msg }}</h1>
-        <input v-model="msg">
-      </template>
+    <template>
+      <h1>{{ msg }}</h1>
+      <input v-model="msg">
+    </template>
 
-      <style scoped>
-        h1 {
-          font-size: 30px;
-        }
-      </style>
-    `,
-    );
+    <style scoped>
+      h1 {
+        font-size: 30px;
+      }
+    </style>
+  `;
     const loader = new VueLoader();
-    const { lang, code, inlineCSS, isTemplateLanguage } = await loader.load("/test.vue", { isDev: false });
+    const { lang, code, inlineCSS, isTemplateLanguage } = await loader.load("/test.vue", testVue, { isDev: false });
     assertEquals(lang, "js");
     assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
     assert(code.includes(`setup(__props)`));
@@ -44,22 +38,17 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
   });
 
   await t.step("VueLoader(ts)", async () => {
-    const dir = await Deno.makeTempDir();
-    Deno.chdir(dir);
-    await Deno.writeTextFile(
-      join(dir, "test.vue"),
-      `
-      <script setup lang="ts">
-      let x: string | number = 1
-      </script>
+    const testVue = `
+    <script setup lang="ts">
+    let x: string | number = 1
+    </script>
 
-      <template>
-        <p>{{ (x as number).toFixed(2) }}</p>
-      </template>
-    `,
-    );
+    <template>
+      <p>{{ (x as number).toFixed(2) }}</p>
+    </template>
+  `;
     const loader = new VueLoader();
-    const { lang, code, isTemplateLanguage } = await loader.load("/test.vue", { isDev: false });
+    const { lang, code, isTemplateLanguage } = await loader.load("/test.vue", testVue, { isDev: false });
     assertEquals(lang, "ts");
     assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
     assert(code.includes(`setup(__props)`));
@@ -70,11 +59,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
   });
 
   await t.step("VueLoader(hmr)", async () => {
-    const dir = await Deno.makeTempDir();
-    Deno.chdir(dir);
-    await Deno.writeTextFile(
-      join(dir, "test.vue"),
-      `
+    const testVue = `
       <script setup>
         import { ref } from "https://esm.sh/vue@3"
 
@@ -91,10 +76,9 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
           font-size: 30px;
         }
       </style>
-    `,
-    );
+    `;
     const loader = new VueLoader();
-    const { code } = await loader.load("/test.vue", { isDev: true });
+    const { code } = await loader.load("/test.vue", testVue, { isDev: true });
     assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
     assert(code.includes(`__sfc__.__hmrId = "`));
     assert(code.includes(`__sfc__.__scriptHash = "`));
@@ -102,11 +86,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
   });
 
   await t.step("VueLoader(ssr)", async () => {
-    const dir = await Deno.makeTempDir();
-    Deno.chdir(dir);
-    await Deno.writeTextFile(
-      join(dir, "test.vue"),
-      `
+    const testVue = `
       <script setup>
         import { ref } from "https://esm.sh/vue@3"
 
@@ -123,10 +103,9 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
           font-size: 30px;
         }
       </style>
-    `,
-    );
+    `;
     const loader = new VueLoader();
-    const { code, inlineCSS } = await loader.load("/test.vue", { ssr: true });
+    const { code, inlineCSS } = await loader.load("/test.vue", testVue, { ssr: true });
     assert(code.includes(`ssrInterpolate as _ssrInterpolate } from "https://esm.sh/@vue/server-renderer"`));
     assert(code.includes(`__ssrInlineRender: true,`));
     assert(code.includes(`setup(__props)`));

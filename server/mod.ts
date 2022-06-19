@@ -1,16 +1,17 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.142.0/http/server.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.142.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.142.0/streams/conversion.ts";
+import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
 import type { RouteTable } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
 import type { SessionOptions } from "./session.ts";
-import { type ErrorCallback, generateErrorHtml } from "./error.ts";
 import { DependencyGraph } from "./graph.ts";
 import {
   fixResponse,
+  getAlephPkgUri,
   getDeploymentId,
   globalIt,
   initModuleLoaders,
@@ -18,6 +19,7 @@ import {
   loadJSXConfig,
   regFullVersion,
   setCookieHeader,
+  toLocalPath,
 } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
@@ -35,6 +37,17 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   ssr?: SSR;
   onError?: ErrorCallback;
 } & AlephConfig;
+
+export type ErrorCallback = {
+  (
+    error: unknown,
+    cause: {
+      by: "route-data-fetch" | "ssr" | "transplie" | "fs" | "middleware";
+      url: string;
+      context?: Record<string, unknown>;
+    },
+  ): Response | void;
+};
 
 export const serve = (options: ServerOptions = {}) => {
   const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
@@ -110,6 +123,15 @@ export const serve = (options: ServerOptions = {}) => {
           isDev,
         });
       } catch (err) {
+        if (err instanceof TransformError) {
+          const alephPkgUri = toLocalPath(getAlephPkgUri());
+          return new Response(
+            `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
+              JSON.stringify(err)
+            });`,
+            { headers: [["Content-Type", "application/javascript"]] },
+          );
+        }
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
           return onError?.(err, { by: "transplie", url: req.url }) ??
@@ -128,15 +150,23 @@ export const serve = (options: ServerOptions = {}) => {
       try {
         const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
         const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
-        const loaded = await loader.load(pathname, { isDev, importMap });
         return await clientModuleTransformer.fetch(req, {
-          loaded,
+          loader: loader,
           importMap,
           jsxConfig,
           buildTarget: build?.target,
           isDev,
         });
       } catch (err) {
+        if (err instanceof TransformError) {
+          const alephPkgUri = toLocalPath(getAlephPkgUri());
+          return new Response(
+            `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
+              JSON.stringify(err)
+            });`,
+            { headers: [["Content-Type", "application/javascript"]] },
+          );
+        }
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
           return onError?.(err, { by: "transplie", url: req.url }) ??

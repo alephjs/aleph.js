@@ -56,7 +56,7 @@ export type JSXConfig = {
 
 export type ModuleLoader = {
   test(pathname: string): boolean;
-  load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
+  load(specifier: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
 };
 
 export type ModuleLoaderEnv = {

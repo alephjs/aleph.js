@@ -28,8 +28,7 @@ export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
     this.#options = { ...options };
   }
 
-  async load(pathname: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
-    const content = await Deno.readTextFile(`.${pathname}`);
+  async load(pathname: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
     const filename = "." + pathname;
     const id = (await util.computeHash("SHA-256", filename)).slice(0, 8);
     const { descriptor } = parse(content, { filename });
