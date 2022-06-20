@@ -31,7 +31,9 @@ if (import.meta.main) {
   if (buildScript) {
     log.info(`Running ${blue(basename(buildScript))}...`);
     const { default: build } = await import(`file://${resolve(buildScript)}`);
-    await build();
+    if (typeof build === "function") {
+      await build();
+    }
   }
 
   if (serverEntry) {
