@@ -1,4 +1,4 @@
-import { join } from "https://deno.land/std@0.142.0/path/mod.ts";
+import { join } from "https://deno.land/std@0.144.0/path/mod.ts";
 import { existsDir, existsFile } from "./fs.ts";
 import log from "./log.ts";
 import util from "./util.ts";

@@ -1,4 +1,4 @@
-import { basename, relative, resolve } from "https://deno.land/std@0.142.0/path/mod.ts";
+import { basename, relative, resolve } from "https://deno.land/std@0.144.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { findFile, watchFs } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";

@@ -1,5 +1,5 @@
-import { transformCSS } from "https://deno.land/x/aleph_compiler@0.6.1/mod.ts";
-import type { Targets } from "https://deno.land/x/aleph_compiler@0.6.1/types.ts";
+import { transformCSS } from "https://deno.land/x/aleph_compiler@0.6.3/mod.ts";
+import type { Targets } from "https://deno.land/x/aleph_compiler@0.6.3/types.ts";
 import { readCode } from "../lib/fs.ts";
 import util from "../lib/util.ts";
 import { getAlephPkgUri, toLocalPath } from "./helpers.ts";

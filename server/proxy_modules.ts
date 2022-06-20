@@ -1,5 +1,5 @@
 import MagicString from "https://esm.sh/magic-string@0.26.2";
-import { parseDeps } from "https://deno.land/x/aleph_compiler@0.6.1/mod.ts";
+import { parseDeps } from "https://deno.land/x/aleph_compiler@0.6.3/mod.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import { serveDir } from "../lib/serve.ts";

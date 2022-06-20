@@ -12,7 +12,7 @@ export type URLPatternResult = {
 
 /**
  * A class uses the `URLPattern` class to parse and match URLs if the browser supports it,
- * or fall back to use the `execPathname` function.
+ * or fallback to use the `execPathname` function.
  */
 export class URLPatternCompat {
   pattern: Record<string, unknown>;

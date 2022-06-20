@@ -1,4 +1,4 @@
-import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.142.0/path/mod.ts";
+import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.144.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
 import { findFile } from "../lib/fs.ts";
