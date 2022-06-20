@@ -1,6 +1,6 @@
 import type { FC, PropsWithChildren } from "react";
 import { createElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import FetchError from "../core/fetch_error.ts";
+import { FetchError } from "../core/error.ts";
 import type { DataContextProps, HttpMethod, UpdateStrategy } from "./context.ts";
 import { DataContext } from "./context.ts";
 

@@ -1,7 +1,7 @@
 import type { FC, ReactNode } from "react";
 import { createElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import events from "../core/events.ts";
-import FetchError from "../core/fetch_error.ts";
+import { FetchError } from "../core/error.ts";
 import { redirect } from "../core/redirect.ts";
 import type { Route, RouteMeta, RouteModule, RouteTable } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";

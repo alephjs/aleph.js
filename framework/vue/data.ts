@@ -1,5 +1,5 @@
 import { inject, onBeforeUnmount, Ref, ref, toRaw, watch } from "vue";
-import FetchError from "../core/fetch_error.ts";
+import { FetchError } from "../core/error.ts";
 import type { SSRContext } from "../../server/renderer.ts";
 import { HttpMethod, UpdateStrategy } from "./context.ts";
 
