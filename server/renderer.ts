@@ -7,7 +7,6 @@ import { builtinModuleExts, getDeploymentId, getUnoGenerator } from "./helpers.t
 import type { Element, HTMLRewriterHandlers } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
-import type { AlephConfig } from "./types.ts";
 
 export type SSRContext = {
   readonly url: URL;
