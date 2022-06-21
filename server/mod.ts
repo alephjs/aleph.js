@@ -112,7 +112,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // transform client modules
-    if (clientModuleTransformer.test(pathname)) {
+    if (!searchParams.has("raw") && clientModuleTransformer.test(pathname)) {
       try {
         const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
         const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
@@ -124,12 +124,18 @@ export const serve = (options: ServerOptions = {}) => {
         });
       } catch (err) {
         if (err instanceof TransformError) {
+          log.error(err.message);
           const alephPkgUri = toLocalPath(getAlephPkgUri());
           return new Response(
             `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
               JSON.stringify(err)
             });`,
-            { headers: [["Content-Type", "application/javascript"]] },
+            {
+              headers: [
+                ["Content-Type", "application/javascript"],
+                ["X-Transform-Error", "true"],
+              ],
+            },
           );
         }
         if (!(err instanceof Deno.errors.NotFound)) {
@@ -145,7 +151,7 @@ export const serve = (options: ServerOptions = {}) => {
 
     // use loader to load modules
     const moduleLoaders = await globalIt("__ALEPH_MODULE_LOADERS", initModuleLoaders);
-    const loader = moduleLoaders.find((loader) => loader.test(pathname));
+    const loader = searchParams.has("raw") ? null : moduleLoaders.find((loader) => loader.test(pathname));
     if (loader) {
       try {
         const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
@@ -159,12 +165,18 @@ export const serve = (options: ServerOptions = {}) => {
         });
       } catch (err) {
         if (err instanceof TransformError) {
+          log.error(err.message);
           const alephPkgUri = toLocalPath(getAlephPkgUri());
           return new Response(
             `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
               JSON.stringify(err)
             });`,
-            { headers: [["Content-Type", "application/javascript"]] },
+            {
+              headers: [
+                ["Content-Type", "application/javascript"],
+                ["X-Transform-Error", "true"],
+              ],
+            },
           );
         }
         if (!(err instanceof Deno.errors.NotFound)) {

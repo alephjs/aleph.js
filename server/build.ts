@@ -304,6 +304,9 @@ export async function build(serverEntry?: string) {
           serverHandler(req),
           Deno.open(savePath, { write: true, create: true }),
         ]);
+        if (res.headers.has("X-Transform-Error")) {
+          throw new Error("Transform Error");
+        }
         await res.body?.pipeTo(file.writable);
         if (!isCSS) {
           clientDependencyGraph?.get(specifier)?.deps?.forEach(({ specifier, dynamic }) => {
