@@ -1,6 +1,6 @@
 import type { App, Component, Ref, ShallowRef } from "vue";
 import { createSSRApp as vueCreateSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
-import type { Route, RouteMeta, RouteModule, RouteTable } from "../core/route.ts";
+import type { Route, RouteConfig, RouteMeta, RouteModule } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import events from "../core/events.ts";
 import { FetchError } from "../core/error.ts";
@@ -360,7 +360,7 @@ function getLoadingBar(): HTMLDivElement {
   return bar;
 }
 
-function loadRoutesFromTag(): RouteTable {
+function loadRoutesFromTag(): RouteConfig {
   const el = window.document?.getElementById("routes-manifest");
   if (el) {
     try {

@@ -3,7 +3,7 @@ import { createElement, StrictMode, Suspense, useContext, useEffect, useMemo, us
 import events from "../core/events.ts";
 import { FetchError } from "../core/error.ts";
 import { redirect } from "../core/redirect.ts";
-import type { Route, RouteMeta, RouteModule, RouteTable } from "../core/route.ts";
+import type { Route, RouteConfig, RouteMeta, RouteModule } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import { URLPatternCompat, URLPatternInput } from "../core/url_pattern.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
@@ -59,7 +59,7 @@ export const Router: FC<RouterProps> = (props) => {
   useEffect(() => {
     const { head, body } = window.document;
     const routeModules = getRouteModules();
-    const routeTable = loadRouteTableFromTag();
+    const routeConfig = loadRouteConfigFromTag();
     const dataDefer = body.hasAttribute("data-defer") ?? dataDeferProp;
     const deployId = body.getAttribute("data-deployment-id");
 
@@ -78,7 +78,7 @@ export const Router: FC<RouterProps> = (props) => {
     // prefetch module using `<link rel="modulepreload" href="...">`
     const onmoduleprefetch = (e: Record<string, unknown>) => {
       const pageUrl = new URL(e.href as string, location.href);
-      const matches = matchRoutes(pageUrl, routeTable);
+      const matches = matchRoutes(pageUrl, routeConfig);
       matches.map(([_, meta]) => {
         const { filename } = meta;
         if (!(filename in routeModules)) {
@@ -97,7 +97,7 @@ export const Router: FC<RouterProps> = (props) => {
     // `popstate` event handler
     const onpopstate = async (e: Record<string, unknown>) => {
       const url = (e.url as URL | undefined) || new URL(window.location.href);
-      const matches = matchRoutes(url, routeTable);
+      const matches = matchRoutes(url, routeConfig);
       const loadingBarEl = getLoadingBarEl();
       let loading: number | null = setTimeout(() => {
         loading = null;
@@ -168,20 +168,20 @@ export const Router: FC<RouterProps> = (props) => {
         ];
         const pathname = pattern.pathname.slice(1);
         if (pathname === "_app" || pathname === "_404") {
-          routeTable[pathname] = route;
+          routeConfig[pathname] = route;
         }
-        routeTable.routes.push(route);
+        routeConfig.routes.push(route);
       }
     };
 
     // update route record when removing a route file
     const onhmrremove = (e: Record<string, unknown>) => {
-      const route = routeTable.routes.find((v) => v[1].filename === e.specifier);
+      const route = routeConfig.routes.find((v) => v[1].filename === e.specifier);
       const pathname = (route?.[1].pattern.pathname)?.slice(1);
       if (pathname === "_app" || pathname === "_404") {
-        routeTable[pathname] = undefined;
+        routeConfig[pathname] = undefined;
       }
-      routeTable.routes = routeTable.routes.filter((v) => v[1].filename != e.specifier);
+      routeConfig.routes = routeConfig.routes.filter((v) => v[1].filename != e.specifier);
       onpopstate({ type: "popstate" });
     };
 
@@ -308,7 +308,7 @@ export const useForwardProps = <T = Record<string, unknown>>(): T => {
   return props as T;
 };
 
-function loadRouteTableFromTag(): RouteTable {
+function loadRouteConfigFromTag(): RouteConfig {
   const el = window.document?.getElementById("routes-manifest");
   if (el) {
     try {
@@ -329,7 +329,7 @@ function loadRouteTableFromTag(): RouteTable {
         return { routes, _app, _404 };
       }
     } catch (e) {
-      throw new Error(`loadRouteTableFromTag: ${e.message}`);
+      throw new Error(`loadRouteConfigFromTag: ${e.message}`);
     }
   }
   return { routes: [] };

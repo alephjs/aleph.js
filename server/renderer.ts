@@ -1,5 +1,5 @@
 import { FetchError } from "../framework/core/error.ts";
-import type { RouteModule, RouteTable } from "../framework/core/route.ts";
+import type { RouteConfig, RouteModule } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
@@ -7,6 +7,7 @@ import { builtinModuleExts, getDeploymentId, getUnoGenerator } from "./helpers.t
 import type { Element, HTMLRewriterHandlers } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
+import type { AlephConfig } from "./types.ts";
 
 export type SSRContext = {
   readonly url: URL;
@@ -51,7 +52,7 @@ export type SSRResult = {
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
-  routeTable: RouteTable;
+  routeConfig: RouteConfig | null;
   customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
   isDev: boolean;
   noProxy?: boolean;
@@ -63,7 +64,7 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* st
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routeTable, customHTMLRewriter, isDev, ssr } = options;
+    const { indexHtml, routeConfig, customHTMLRewriter, isDev, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (typeof ssr === "function" || typeof ssr?.render === "function") {
@@ -72,7 +73,7 @@ export default {
       const cc = !isFn ? ssr.cacheControl : "public";
       const CSP = isFn ? undefined : ssr.CSP;
       const render = isFn ? ssr : ssr.render;
-      const [url, routeModules, deferedData] = await initSSR(req, ctx, routeTable, dataDefer, options.noProxy);
+      const [url, routeModules, deferedData] = await initSSR(req, ctx, routeConfig, dataDefer, options.noProxy);
       const headCollection: string[] = [];
       const ssrContext: SSRContext = {
         url,
@@ -133,8 +134,8 @@ export default {
         context: ssrContext,
         body,
         deferedData,
-        is404: routeModules.length === 0 || routeModules.at(-1)?.url.pathname ===
-            "/_404",
+        is404: routeConfig !== null && (routeModules.length === 0 || routeModules.at(-1)?.url.pathname ===
+            "/_404"),
       };
       if (CSP) {
         const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
@@ -191,9 +192,8 @@ export default {
         // inject the roures manifest
         rewriter.on("head", {
           element(el: Element) {
-            const { routes } = routeTable;
-            if (routes.length > 0) {
-              const json = JSON.stringify({ routes: routes.map(([_, meta]) => meta) });
+            if (routeConfig && routeConfig.routes.length > 0) {
+              const json = JSON.stringify({ routes: routeConfig.routes.map(([_, meta]) => meta) });
               el.append(`<script id="routes-manifest" type="application/json">${json}</script>`, {
                 html: true,
               });
@@ -330,7 +330,7 @@ export default {
 async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
-  routeTable: RouteTable,
+  routeConfig: RouteConfig | null,
   dataDefer: boolean,
   noProxy?: boolean,
 ): Promise<[
@@ -339,7 +339,11 @@ async function initSSR(
   deferedData: Record<string, unknown>,
 ]> {
   const url = new URL(req.url);
-  const matches = matchRoutes(url, routeTable);
+  if (!routeConfig) {
+    return [url, [], {}];
+  }
+
+  const matches = matchRoutes(url, routeConfig);
   const deferedData: Record<string, unknown> = {};
 
   // import module and fetch data for each matched route

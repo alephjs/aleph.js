@@ -1,5 +1,5 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.144.0/path/mod.ts";
-import type { Route, RouteMatch, RouteTable } from "../framework/core/route.ts";
+import type { Route, RouteConfig, RouteMatch } from "../framework/core/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
 import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
@@ -101,7 +101,7 @@ export async function importRouteModule(filename: string, noProxy?: boolean) {
 
 /* check if the filename is a route */
 export function isRouteFile(filename: string): boolean {
-  const currentRoutes: RouteTable | undefined = Reflect.get(globalThis, "__ALEPH_ROUTES");
+  const currentRoutes: RouteConfig | undefined = Reflect.get(globalThis, "__ALEPH_ROUTES");
   const index = currentRoutes?.routes.findIndex(([_, meta]) => meta.filename === filename);
   if (index !== undefined && index !== -1) {
     return true;
@@ -122,7 +122,7 @@ type RouteRegExp = {
 };
 
 /** initialize routes from routes config */
-export async function initRoutes(config: string | RouteRegExp, cwd = Deno.cwd()): Promise<RouteTable> {
+export async function initRoutes(config: string | RouteRegExp, cwd = Deno.cwd()): Promise<RouteConfig> {
   const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
   const files = await getFiles(join(cwd, reg.prefix));
   const routes: Route[] = [];

@@ -74,14 +74,14 @@ export class MockServer {
     }
 
     const cwd = resolve(this.#options.cwd ?? Deno.cwd());
-    const routeTable = await globalIt(
+    const routeConfig = await globalIt(
       `mockRoutes:${cwd}${JSON.stringify(routes)}`,
       () => initRoutes(this.#options.cwd ? "./" + join(this.#options.cwd, routes) : routes),
     );
     const reqData = req.method === "GET" &&
       (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
     const res = await fetchRouteData(
-      routeTable.routes,
+      routeConfig.routes,
       url,
       req,
       ctx,
@@ -103,7 +103,7 @@ export class MockServer {
 
     return renderer.fetch(req, ctx, {
       indexHtml,
-      routeTable,
+      routeConfig,
       customHTMLRewriter,
       isDev: false,
       noProxy: true,

@@ -2,7 +2,7 @@ import type { ConnInfo, ServeInit } from "https://deno.land/std@0.144.0/http/ser
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.144.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.144.0/streams/conversion.ts";
 import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
-import type { RouteTable } from "../framework/core/route.ts";
+import type { RouteConfig } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
@@ -269,15 +269,15 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // request route api
-    const routeTable: RouteTable = await globalIt(
+    const routeConfig: RouteConfig | null = await globalIt(
       "__ALEPH_ROUTES",
-      () => routes ? initRoutes(routes) : Promise.resolve({ routes: [] }),
+      () => routes ? initRoutes(routes) : Promise.resolve(null),
     );
-    if (routeTable.routes.length > 0) {
+    if (routeConfig && routeConfig.routes.length > 0) {
       const reqData = req.method === "GET" &&
         (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       try {
-        const resp = await fetchRouteData(routeTable.routes, url, req, ctx, reqData);
+        const resp = await fetchRouteData(routeConfig.routes, url, req, ctx, reqData);
         if (resp) {
           return resp;
         }
@@ -333,7 +333,7 @@ export const serve = (options: ServerOptions = {}) => {
         }));
       return renderer.fetch(req, ctx, {
         indexHtml,
-        routeTable,
+        routeConfig,
         customHTMLRewriter,
         isDev,
         ssr,
