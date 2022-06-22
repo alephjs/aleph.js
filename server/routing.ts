@@ -101,8 +101,8 @@ export async function importRouteModule(filename: string, noProxy?: boolean) {
 
 /* check if the filename is a route */
 export function isRouteFile(filename: string): boolean {
-  const currentRoutes: RouteConfig | undefined = Reflect.get(globalThis, "__ALEPH_ROUTES");
-  const index = currentRoutes?.routes.findIndex(([_, meta]) => meta.filename === filename);
+  const routeConfig: RouteConfig | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTE_CONFIG");
+  const index = routeConfig?.routes.findIndex(([_, meta]) => meta.filename === filename);
   if (index !== undefined && index !== -1) {
     return true;
   }
@@ -116,7 +116,6 @@ export function isRouteFile(filename: string): boolean {
 
 type RouteRegExp = {
   prefix: string;
-  generate?: boolean;
   test(filename: string): boolean;
   exec(filename: string): URLPatternInput | null;
 };
@@ -170,7 +169,6 @@ export function toRouteRegExp(config: string): RouteRegExp {
 
   return {
     prefix,
-    generate: Reflect.has(globalThis, "__ALEPH_ROUTES_GENERATE"),
     test: (s: string) => reg.test(s),
     exec: (filename: string): URLPatternInput | null => {
       if (reg.test(filename)) {

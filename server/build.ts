@@ -1,9 +1,9 @@
+// @deno-types="https://deno.land/x/esbuild@v0.14.47/mod.d.ts"
+import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.47/mod.js";
 import { basename, dirname, extname, join } from "https://deno.land/std@0.144.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.144.0/fs/ensure_dir.ts";
-import { build as esbuild, type Loader, stop } from "https://deno.land/x/esbuild@v0.14.47/mod.js";
 import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.6.4/mod.ts";
 import { existsDir, existsFile } from "../lib/fs.ts";
-import { parseHtmlLinks } from "./html.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
@@ -16,6 +16,7 @@ import {
   restoreUrl,
   toLocalPath,
 } from "./helpers.ts";
+import { parseHtmlLinks } from "./html.ts";
 import { initRoutes } from "./routing.ts";
 import type { AlephConfig, BuildPlatform } from "./types.ts";
 

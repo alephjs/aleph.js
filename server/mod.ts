@@ -270,7 +270,7 @@ export const serve = (options: ServerOptions = {}) => {
 
     // request route api
     const routeConfig: RouteConfig | null = await globalIt(
-      "__ALEPH_ROUTES",
+      "__ALEPH_ROUTE_CONFIG",
       () => routes ? initRoutes(routes) : Promise.resolve(null),
     );
     if (routeConfig && routeConfig.routes.length > 0) {

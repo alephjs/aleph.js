@@ -7,7 +7,6 @@ import { serve as httpServe } from "../lib/serve.ts";
 import { builtinModuleExts, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
 import { serve } from "../server/mod.ts";
 import { initRoutes, toRouteRegExp } from "../server/routing.ts";
-import { generate } from "../server/generate.ts";
 import type { DependencyGraph } from "../server/graph.ts";
 import { proxyModules } from "../server/proxy_modules.ts";
 import type { AlephConfig } from "../server/types.ts";
@@ -170,27 +169,21 @@ if (import.meta.main) {
   };
 
   // update routes when fs change
-  const updateRoutes = async ({ specifier }: { specifier?: string }) => {
+  const updateRoutes = async ({ specifier }: { specifier: string }) => {
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
     const rc = config?.routes;
     if (rc) {
       const reg = toRouteRegExp(rc);
-      if (!specifier || reg.test(specifier)) {
-        if (specifier) {
-          Reflect.deleteProperty(globalThis, "__ALEPH_ROUTES");
-        }
+      if (reg.test(specifier)) {
         const routeConfig = await initRoutes(reg);
-        Reflect.set(globalThis, "__ALEPH_ROUTES", routeConfig);
-        if (reg.generate) {
-          await generate(routeConfig.routes);
-          log.debug(`${routeConfig.routes.length} routes generate`);
-        }
+        Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
       }
+    } else {
+      Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
     }
   };
   emitter.on("create", updateRoutes);
   emitter.on("remove", updateRoutes);
-  updateRoutes({});
 
   if (serverEntry) {
     emitter.on(`hotUpdate:./${basename(serverEntry)}`, bs);
