@@ -17,8 +17,8 @@ type MockServerOptions = {
 /** The MockServer class to create a minimal server for integration testing.
  *
  * Limits:
- * - importing css is _NOT_ allowed
- * - custom loader is _NOT_ supported, like `import './foo.vue'`
+ * - importing css is _NOT_ allowed: `import "./style.css"`
+ * - custom loader is _NOT_ supported, like `import "./component.vue"`
  *
  * @example
  * ```ts
