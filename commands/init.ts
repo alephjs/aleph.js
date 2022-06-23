@@ -117,7 +117,6 @@ export default async function (nameArg?: string, template?: string) {
   };
   const gitignore = [
     ".DS_Store",
-    "Thumbs.db",
     "dist/",
   ];
   switch (template) {

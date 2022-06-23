@@ -7,6 +7,7 @@ pub fn main() {
     yew::Renderer::<app::App>::new().hydrate();
 }
 
+// todo: support router
 #[wasm_bindgen]
 pub async fn ssr() -> Result<JsValue, JsValue> {
     let html = yew::ServerRenderer::<app::App>::new().render().await;
