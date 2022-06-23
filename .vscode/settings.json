@@ -1,19 +1,7 @@
 {
   "files.eol": "\n",
   "files.trimTrailingWhitespace": true,
-  "[typescript]": {
-    "editor.defaultFormatter": "denoland.vscode-deno",
-    "editor.formatOnSave": true
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "denoland.vscode-deno",
-    "editor.formatOnSave": true
-  },
-  "[json]": {
-    "editor.defaultFormatter": "denoland.vscode-deno",
-    "editor.formatOnSave": true
-  },
-  "[markdown]": {
+  "[typescript][typescriptreact][json][markdown]": {
     "editor.defaultFormatter": "denoland.vscode-deno",
     "editor.formatOnSave": true
   },
