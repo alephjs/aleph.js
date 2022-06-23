@@ -7,7 +7,6 @@ import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/mime.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
-import type { SessionOptions } from "./session.ts";
 import { DependencyGraph } from "./graph.ts";
 import {
   fixResponse,
@@ -25,6 +24,8 @@ import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
 import { fetchRouteData, initRoutes, revive } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
+import { createFsEmitter, removeFsEmitter } from "./watch_fs.ts";
+import type { SessionOptions } from "./session.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
 
 export type ServerOptions = Omit<ServeInit, "onError"> & {
@@ -50,7 +51,7 @@ export type ErrorCallback = {
 };
 
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
+  const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError, signal } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
   // server handler
@@ -58,17 +59,22 @@ export const serve = (options: ServerOptions = {}) => {
     const url = new URL(req.url);
     const { pathname, searchParams } = url;
 
-    // close the hot-reloading websocket connection and tell the client to reload
-    // this request occurs when the client try to connect to the hot-reloading websocket in production mode
     if (pathname === "/-/hmr") {
-      const { socket, response } = Deno.upgradeWebSocket(req, {});
-      socket.addEventListener("open", () => {
-        socket.send(JSON.stringify({ type: "reload" }));
-        setTimeout(() => {
-          socket.close();
-        }, 50);
-      });
-      return response;
+      if (isDev) {
+        const { handleHMRSocket } = await globalIt("__ALEPH_SERVER_DEV", () => import("./dev.ts"));
+        return handleHMRSocket(req);
+      } else {
+        // close the hot-reloading websocket connection and tell the client to reload
+        // this request occurs when the client try to connect to the hot-reloading websocket in production mode
+        const { socket, response } = Deno.upgradeWebSocket(req, {});
+        socket.addEventListener("open", () => {
+          socket.send(JSON.stringify({ type: "reload" }));
+          setTimeout(() => {
+            socket.close();
+          }, 50);
+        });
+        return response;
+      }
     }
 
     const postMiddlewares: Middleware[] = [];
@@ -275,7 +281,7 @@ export const serve = (options: ServerOptions = {}) => {
     );
     if (routeConfig && routeConfig.routes.length > 0) {
       const reqData = req.method === "GET" &&
-        (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
+        (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       try {
         const resp = await fetchRouteData(routeConfig.routes, url, req, ctx, reqData);
         if (resp) {
@@ -356,6 +362,22 @@ export const serve = (options: ServerOptions = {}) => {
     }
   };
 
+  // apply `watchFS` handler of `devServer`
+  if (typeof devServer?.watchFS === "function") {
+    const { watchFS } = devServer;
+    const e = createFsEmitter();
+    e.on("*", (kind, { specifier }) => {
+      if (kind.startsWith("modify:")) {
+        watchFS("modify", specifier);
+      } else if (kind === "create" || kind === "remove") {
+        watchFS(kind, specifier);
+      }
+    });
+    signal?.addEventListener("abort", () => {
+      removeFsEmitter(e);
+    });
+  }
+
   // set log level if specified
   if (logLevel) {
     log.setLevel(logLevel);
@@ -365,7 +387,7 @@ export const serve = (options: ServerOptions = {}) => {
   Reflect.set(globalThis, "__ALEPH_CONFIG", { routes, unocss, build, devServer });
   Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
 
-  const { hostname, port = 8080, certFile, keyFile, signal } = options;
+  const { hostname, port = 8080, certFile, keyFile } = options;
   if (Deno.env.get("ALEPH_CLI")) {
     Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
   } else {

@@ -1,88 +1,11 @@
-import { basename, relative, resolve } from "https://deno.land/std@0.144.0/path/mod.ts";
-import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
-import { findFile, watchFs } from "../lib/fs.ts";
+import { basename, resolve } from "https://deno.land/std@0.144.0/path/mod.ts";
+import { findFile } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";
-import util from "../lib/util.ts";
 import { serve as httpServe } from "../lib/serve.ts";
 import { builtinModuleExts, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
 import { serve } from "../server/mod.ts";
-import { initRoutes, toRouteRegExp } from "../server/routing.ts";
-import type { DependencyGraph } from "../server/graph.ts";
 import { proxyModules } from "../server/proxy_modules.ts";
-import type { AlephConfig } from "../server/types.ts";
-
-type FsEvents = {
-  [key in "create" | "remove" | "transform" | `modify:${string}` | `hotUpdate:${string}`]: {
-    specifier: string;
-    status?: "success" | "failure";
-    sourceCode?: string;
-    error?: {
-      message: string;
-      stack: string;
-      location?: [number, number];
-    };
-  };
-};
-
-const emitters = new Set<Emitter<FsEvents>>();
-const createEmitter = () => {
-  const e = mitt<FsEvents>();
-  emitters.add(e);
-  return e;
-};
-const removeEmitter = (e: Emitter<FsEvents>) => {
-  e.all.clear();
-  emitters.delete(e);
-};
-
-export function handleHMRSocket(req: Request): Response {
-  const { socket, response } = Deno.upgradeWebSocket(req, {});
-  const emitter = createEmitter();
-  const send = (message: Record<string, unknown>) => {
-    try {
-      socket.send(JSON.stringify(message));
-    } catch (err) {
-      log.warn("socket.send:", err.message);
-    }
-  };
-  socket.addEventListener("open", () => {
-    emitter.on("create", ({ specifier }) => {
-      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-      if (config && config.routes) {
-        const reg = toRouteRegExp(config.routes);
-        const routePattern = reg.exec(specifier);
-        if (routePattern) {
-          send({ type: "create", specifier, routePattern });
-          return;
-        }
-      }
-      send({ type: "create", specifier });
-    });
-    emitter.on("remove", ({ specifier }) => {
-      emitter.off(`hotUpdate:${specifier}`);
-      send({ type: "remove", specifier });
-    });
-  });
-  socket.addEventListener("message", (e) => {
-    if (util.isFilledString(e.data)) {
-      try {
-        const { type, specifier } = JSON.parse(e.data);
-        if (type === "hotAccept" && util.isFilledString(specifier)) {
-          emitter.on(
-            `hotUpdate:${specifier}`,
-            () => send({ type: "modify", specifier }),
-          );
-        }
-      } catch (_e) {
-        log.error("invlid socket message:", e.data);
-      }
-    }
-  });
-  socket.addEventListener("close", () => {
-    removeEmitter(emitter);
-  });
-  return response;
-}
+import { createFsEmitter, watchFS } from "../server/watch_fs.ts";
 
 if (import.meta.main) {
   // add envs
@@ -95,51 +18,9 @@ if (import.meta.main) {
   }
 
   // serve app modules
-  const cwd = Deno.cwd();
   const importMap = await loadImportMap();
   const moduleLoaders = await initModuleLoaders(importMap);
   await proxyModules(6060, { importMap, moduleLoaders });
-
-  log.info(`Watching files for changes...`);
-  watchFs(cwd, (kind, path) => {
-    const specifier = "./" + relative(cwd, path).replaceAll("\\", "/");
-    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
-    const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
-    if (kind === "remove") {
-      clientDependencyGraph?.unmark(specifier);
-      serverDependencyGraph?.unmark(specifier);
-    } else {
-      clientDependencyGraph?.update(specifier);
-      serverDependencyGraph?.update(specifier);
-    }
-    if (specifier === "./index.html") {
-      Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
-    }
-
-    if (kind === "modify") {
-      emitters.forEach((e) => {
-        e.emit(`modify:${specifier}`, { specifier });
-        if (e.all.has(`hotUpdate:${specifier}`)) {
-          e.emit(`hotUpdate:${specifier}`, { specifier });
-        } else if (specifier !== "./routes.gen.ts") {
-          clientDependencyGraph?.lookup(specifier, (specifier) => {
-            if (e.all.has(`hotUpdate:${specifier}`)) {
-              e.emit(`hotUpdate:${specifier}`, { specifier });
-              return false;
-            }
-          });
-          serverDependencyGraph?.lookup(specifier, (specifier) => {
-            if (e.all.has(`hotUpdate:${specifier}`)) {
-              e.emit(`hotUpdate:${specifier}`, { specifier });
-              return false;
-            }
-          });
-        }
-      });
-    }
-  });
-
-  const emitter = createEmitter();
   const [denoConfigFile, importMapFile, serverEntry, buildScript] = await Promise.all([
     findFile(["deno.jsonc", "deno.json", "tsconfig.json"]),
     findFile(["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`)),
@@ -156,10 +37,7 @@ if (import.meta.main) {
   }
 
   let ac: AbortController | null = null;
-  const bs = async () => {
-    if (Deno.env.get("PREVENT_SERVER_RESTART") === "true") {
-      return;
-    }
+  const start = async () => {
     if (ac) {
       ac.abort();
       log.info(`Restart server...`);
@@ -168,37 +46,23 @@ if (import.meta.main) {
     await bootstrap(ac.signal, serverEntry);
   };
 
-  // update routes when fs change
-  const updateRoutes = async ({ specifier }: { specifier: string }) => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    const rc = config?.routes;
-    if (rc) {
-      const reg = toRouteRegExp(rc);
-      if (reg.test(specifier)) {
-        const routeConfig = await initRoutes(reg);
-        Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
-      }
-    } else {
-      Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
-    }
-  };
-  emitter.on("create", updateRoutes);
-  emitter.on("remove", updateRoutes);
-
   if (serverEntry) {
-    emitter.on(`hotUpdate:./${basename(serverEntry)}`, bs);
+    const emitter = createFsEmitter();
+    emitter.on(`hotUpdate:./${basename(serverEntry)}`, start);
     if (denoConfigFile) {
-      emitter.on(`modify:./${basename(denoConfigFile)}`, bs);
+      emitter.on(`modify:./${basename(denoConfigFile)}`, start);
     }
     if (importMapFile) {
       emitter.on(`modify:./${basename(importMapFile)}`, async () => {
         // update import maps for `proxyModules`
         Object.assign(importMap, await loadImportMap());
-        bs();
+        start();
       });
     }
   }
-  await bs();
+
+  watchFS();
+  await start();
 }
 
 async function bootstrap(signal: AbortSignal, entry: string | undefined, fixedPort?: number): Promise<void> {
@@ -224,25 +88,8 @@ async function bootstrap(signal: AbortSignal, entry: string | undefined, fixedPo
     serve();
   }
 
-  const { devServer }: AlephConfig = Reflect.get(globalThis, "__ALEPH_CONFIG") || {};
   const { port: userPort, hostname, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
   const port = fixedPort || userPort || 8080;
-
-  if (typeof devServer?.watchFS === "function") {
-    const { watchFS } = devServer;
-    const e = createEmitter();
-    signal.addEventListener("abort", () => {
-      removeEmitter(e);
-    });
-    e.on("*", (kind, { specifier }) => {
-      if (kind.startsWith("modify:")) {
-        watchFS("modify", specifier);
-      } else if (kind === "create" || kind === "remove") {
-        watchFS(kind, specifier);
-      }
-    });
-  }
-
   try {
     await httpServe({
       port,
@@ -251,16 +98,7 @@ async function bootstrap(signal: AbortSignal, entry: string | undefined, fixedPo
       keyFile,
       signal,
       onListenSuccess: (port) => log.info(`Server ready on http://localhost:${port}`),
-      handler: (req, connInfo) => {
-        const { pathname } = new URL(req.url);
-
-        // handle HMR sockets
-        if (pathname === "/-/hmr") {
-          return handleHMRSocket(req);
-        }
-
-        return handler?.(req, connInfo);
-      },
+      handler,
     });
   } catch (error) {
     if (error instanceof Deno.errors.AddrInUse) {
