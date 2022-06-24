@@ -1,8 +1,7 @@
 import { basename, resolve } from "https://deno.land/std@0.144.0/path/mod.ts";
-import { findFile } from "../lib/fs.ts";
 import log, { blue, bold } from "../lib/log.ts";
 import { build } from "../server/build.ts";
-import { builtinModuleExts, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
+import { builtinModuleExts, findFile, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
 import { serve } from "../server/mod.ts";
 import { proxyModules } from "../server/proxy_modules.ts";
 

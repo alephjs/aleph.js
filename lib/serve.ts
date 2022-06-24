@@ -1,7 +1,7 @@
 import { readableStreamFromReader } from "https://deno.land/std@0.144.0/streams/conversion.ts";
 import { basename, join } from "https://deno.land/std@0.144.0/path/mod.ts";
 import { Server, type ServerInit } from "https://deno.land/std@0.144.0/http/server.ts";
-import { getContentType } from "./mime.ts";
+import { getContentType } from "./media_type.ts";
 
 export type ServeInit = ServerInit & {
   certFile?: string;

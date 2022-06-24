@@ -4,7 +4,7 @@ import { readableStreamFromReader } from "https://deno.land/std@0.144.0/streams/
 import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
 import type { RouteConfig } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
-import { getContentType } from "../lib/mime.ts";
+import { getContentType } from "../lib/media_type.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
 import { DependencyGraph } from "./graph.ts";

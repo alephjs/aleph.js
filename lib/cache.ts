@@ -1,5 +1,4 @@
 import { join } from "https://deno.land/std@0.144.0/path/mod.ts";
-import { existsDir, existsFile } from "./fs.ts";
 import log from "./log.ts";
 import util from "./util.ts";
 
@@ -112,6 +111,32 @@ export default async function cache(
   }
 
   return finalRes;
+}
+
+/* check whether or not the given path exists as a directory. */
+async function existsDir(path: string): Promise<boolean> {
+  try {
+    const stat = await Deno.lstat(path);
+    return stat.isDirectory;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+/* check whether or not the given path exists as regular file. */
+async function existsFile(path: string): Promise<boolean> {
+  try {
+    const stat = await Deno.lstat(path);
+    return stat.isFile;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
+      return false;
+    }
+    throw err;
+  }
 }
 
 function isExpired(meta: Meta) {

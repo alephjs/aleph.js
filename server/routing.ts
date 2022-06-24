@@ -1,11 +1,10 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.144.0/path/mod.ts";
 import type { Route, RouteConfig, RouteMatch } from "../framework/core/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
-import { getFiles } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
-import { fixResponse, toResponse } from "./helpers.ts";
+import { fixResponse, getFiles, toResponse } from "./helpers.ts";
 import type { AlephConfig } from "./types.ts";
 
 const revivedModules: Map<string, Record<string, unknown>> = new Map();

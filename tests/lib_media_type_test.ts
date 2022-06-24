@@ -1,5 +1,5 @@
 import { assertEquals } from "std/testing/asserts.ts";
-import { getContentType } from "../lib/mime.ts";
+import { getContentType } from "../lib/media_type.ts";
 
 Deno.test("[unit] lib/mime.ts: getContentType", () => {
   assertEquals(getContentType("/mod.ts"), "application/typescript");

@@ -1,10 +1,7 @@
+import { join, relative } from "https://deno.land/std@0.144.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
-import { relative } from "https://deno.land/std@0.144.0/path/mod.ts";
-import { watchFs } from "../lib/fs.ts";
-import log from "../lib/log.ts";
-import { initRoutes, toRouteRegExp } from "./routing.ts";
+import { getFiles } from "./helpers.ts";
 import type { DependencyGraph } from "./graph.ts";
-import type { AlephConfig } from "./types.ts";
 
 type FsEvents = {
   [key in "create" | "remove" | "transform" | `modify:${string}` | `hotUpdate:${string}`]: {
@@ -19,7 +16,7 @@ type FsEvents = {
   };
 };
 
-const emitters = new Set<Emitter<FsEvents>>();
+export const emitters = new Set<Emitter<FsEvents>>();
 
 export function createFsEmitter() {
   const e = mitt<FsEvents>();
@@ -32,28 +29,22 @@ export function removeFsEmitter(e: Emitter<FsEvents>) {
   emitters.delete(e);
 }
 
-export function watchFS(cwd = Deno.cwd()) {
-  log.info(`Watching files for changes...`);
-
-  // update routes when fs change
-  const emitter = createFsEmitter();
-  const updateRoutes = async ({ specifier }: { specifier: string }) => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    const rc = config?.routes;
-    if (rc) {
-      const reg = toRouteRegExp(rc);
-      if (reg.test(specifier)) {
-        const routeConfig = await initRoutes(reg);
-        Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
-      }
-    } else {
-      Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
+/* watch the directory and its subdirectories */
+export async function watchFs(cwd = Deno.cwd()) {
+  const timers = new Map();
+  const debounce = (id: string, callback: () => void, delay: number) => {
+    if (timers.has(id)) {
+      clearTimeout(timers.get(id)!);
     }
+    timers.set(
+      id,
+      setTimeout(() => {
+        timers.delete(id);
+        callback();
+      }, delay),
+    );
   };
-  emitter.on("create", updateRoutes);
-  emitter.on("remove", updateRoutes);
-
-  watchFs(cwd, (kind, path) => {
+  const listener = (kind: "create" | "remove" | "modify", path: string) => {
     const specifier = "./" + relative(cwd, path).replaceAll("\\", "/");
     const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
@@ -89,5 +80,39 @@ export function watchFS(cwd = Deno.cwd()) {
         }
       });
     }
-  });
+  };
+  const w = Deno.watchFs(cwd, { recursive: true });
+  const ignoreReg = /[\/\\](\.git(hub)?|\.vscode|vendor|node_modules|dist|output|target)[\/\\]/;
+  const ignore = (path: string) => ignoreReg.test(path) || path.endsWith(".DS_Store");
+  const allFiles = new Set<string>(
+    (await getFiles(cwd)).map((name) => join(cwd, name)).filter((path) => !ignore(path)),
+  );
+  for await (const { kind, paths } of w) {
+    if (kind !== "create" && kind !== "remove" && kind !== "modify") {
+      continue;
+    }
+    for (const path of paths) {
+      if (ignore(path)) {
+        continue;
+      }
+      debounce(kind + path, async () => {
+        try {
+          await Deno.lstat(path);
+          if (!allFiles.has(path)) {
+            allFiles.add(path);
+            listener("create", path);
+          } else {
+            listener("modify", path);
+          }
+        } catch (error) {
+          if (error instanceof Deno.errors.NotFound) {
+            allFiles.delete(path);
+            listener("remove", path);
+          } else {
+            console.warn("watchFs:", error);
+          }
+        }
+      }, 100);
+    }
+  }
 }

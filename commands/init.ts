@@ -5,9 +5,9 @@ import { blue, cyan, dim, green, red } from "https://deno.land/std@0.144.0/fmt/c
 import { ensureDir } from "https://deno.land/std@0.144.0/fs/ensure_dir.ts";
 import { basename, dirname, join } from "https://deno.land/std@0.144.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
-import { existsDir } from "../lib/fs.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
+import { existsDir } from "../server/helpers.ts";
 import { isCanary, VERSION } from "../version.ts";
 
 const templates = [

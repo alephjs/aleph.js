@@ -2,8 +2,8 @@ import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.6.4/mod.t
 import type { Route } from "../framework/core/route.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { toRouteRegExp } from "./routing.ts";
-import { createFsEmitter, removeFsEmitter } from "./watch_fs.ts";
+import { initRoutes, toRouteRegExp } from "./routing.ts";
+import { createFsEmitter, removeFsEmitter, watchFs } from "./watch_fs.ts";
 import type { AlephConfig } from "./types.ts";
 
 export function handleHMRSocket(req: Request): Response {
@@ -53,6 +53,30 @@ export function handleHMRSocket(req: Request): Response {
     removeFsEmitter(emitter);
   });
   return response;
+}
+
+export function watchFS(cwd = Deno.cwd()) {
+  log.info(`Watching files for changes...`);
+
+  // update routes when fs change
+  const emitter = createFsEmitter();
+  const updateRoutes = async ({ specifier }: { specifier: string }) => {
+    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+    const rc = config?.routes;
+    if (rc) {
+      const reg = toRouteRegExp(rc);
+      if (reg.test(specifier)) {
+        const routeConfig = await initRoutes(reg);
+        Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
+      }
+    } else {
+      Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
+    }
+  };
+  emitter.on("create", updateRoutes);
+  emitter.on("remove", updateRoutes);
+
+  watchFs(cwd);
 }
 
 /** generate the `routes.gen.ts` follow the routes config */

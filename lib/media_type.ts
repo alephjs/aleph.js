@@ -66,8 +66,8 @@ const typesMap = Object.entries(mimeTypes).reduce((map, [contentType, exts]) => 
   return map;
 }, new Map<string, string>());
 
-/** register a new mime type */
-export function registerMimeType(ext: string, contentType: string) {
+/** register a new type */
+export function registerType(ext: string, contentType: string) {
   typesMap.set(util.trimPrefix(ext, "."), contentType);
 }
 

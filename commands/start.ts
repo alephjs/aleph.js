@@ -1,9 +1,8 @@
 import { basename, join, resolve } from "https://deno.land/std@0.144.0/path/mod.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.144.0/http/server.ts";
-import { findFile } from "../lib/fs.ts";
 import log, { blue } from "../lib/log.ts";
 import { build } from "../server/build.ts";
-import { builtinModuleExts, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
+import { builtinModuleExts, findFile, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
 import { serve } from "../server/mod.ts";
 import { proxyModules } from "../server/proxy_modules.ts";
 import type { AlephConfig } from "../server/types.ts";
