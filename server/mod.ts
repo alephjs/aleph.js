@@ -43,13 +43,14 @@ export type ErrorCallback = {
   (
     error: unknown,
     cause: {
-      by: "route-data-fetch" | "ssr" | "transplie" | "fs" | "middleware";
+      by: "route-data-fetch" | "ssr" | "transform" | "fs" | "middleware";
       url: string;
       context?: Record<string, unknown>;
     },
   ): Response | void;
 };
 
+/** Start the Aleph.js server. */
 export const serve = (options: ServerOptions = {}) => {
   const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError, signal } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
@@ -64,8 +65,7 @@ export const serve = (options: ServerOptions = {}) => {
         const { handleHMRSocket } = await globalIt("__ALEPH_SERVER_DEV", () => import("./dev.ts"));
         return handleHMRSocket(req);
       } else {
-        // close the hot-reloading websocket connection and tell the client to reload
-        // this request occurs when the client try to connect to the hot-reloading websocket in production mode
+        // close the hot-reloading websocket and tell the client to reload the page
         const { socket, response } = Deno.upgradeWebSocket(req, {});
         socket.addEventListener("open", () => {
           socket.send(JSON.stringify({ type: "reload" }));
@@ -146,7 +146,7 @@ export const serve = (options: ServerOptions = {}) => {
         }
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, { by: "transplie", url: req.url }) ??
+          return onError?.(err, { by: "transform", url: req.url }) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
@@ -187,7 +187,7 @@ export const serve = (options: ServerOptions = {}) => {
         }
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, { by: "transplie", url: req.url }) ??
+          return onError?.(err, { by: "transform", url: req.url }) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html"]],
