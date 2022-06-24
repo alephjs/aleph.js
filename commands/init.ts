@@ -8,6 +8,8 @@ import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { existsDir } from "../server/helpers.ts";
+
+// todo: get version from deno.land
 import { isCanary, VERSION } from "../version.ts";
 
 const templates = [
@@ -25,6 +27,33 @@ const versions = {
   react: "18.1.0",
   vue: "3.2.33",
 };
+const deployCI = `name: Deploy
+on: [push]
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Needed for auth with Deno Deploy
+      contents: read # Needed to clone the repository
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v1
+
+      - name: Build App
+        run: deno task build
+
+      - name: Deploy to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          project: PROJECT_NAME # todo: change this to your project name in https://dash.deno.com
+          entrypoint: dist/server.js
+`;
 
 export const helpMessage = `
 Usage:
@@ -37,7 +66,7 @@ Options:
     -h, --help      ${" ".repeat(templates.join(",").length)}  Prints help message
 `;
 
-export default async function (nameArg?: string, template?: string) {
+export default async function init(nameArg?: string, template?: string) {
   if (!template) {
     // todo: template choose dialog
     template = "react";
@@ -116,7 +145,6 @@ export default async function (nameArg?: string, template?: string) {
     "lint": {},
   };
   const gitignore = [
-    ".DS_Store",
     "dist/",
   ];
   switch (template) {
@@ -153,37 +181,8 @@ export default async function (nameArg?: string, template?: string) {
   if (confirm("Add Github Action script for Deno Deploy™️?")) {
     const ciFile = join(workingDir, ".github/workflows/deploy.yml");
     await ensureDir(dirname(ciFile));
-    await Deno.writeTextFile(
-      ciFile,
-      `name: Deploy
-on: [push]
-
-jobs:
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write # Needed for auth with Deno Deploy
-      contents: read # Needed to clone the repository
-
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-
-      - name: Install Deno
-        uses: denoland/setup-deno@v1
-
-      - name: Build App
-        run: deno task build
-
-      - name: Deploy to Deno Deploy
-        uses: denoland/deployctl@v1
-        with:
-          project: PROJECT_NAME # todo: change this to your project name in https://dash.deno.com
-          entrypoint: dist/server.js
-`,
-    );
-    console.log(`Please update ${blue(".github/workflows/deploy.yml")} with your project name.`);
+    await Deno.writeTextFile(ciFile, deployCI);
+    console.log(`${blue(".github/workflows/deploy.yml")} created, pelase update the project name in deploy.yml.`);
   }
 
   // todo: remove this step when deno-vsc support auto enable mode
@@ -197,10 +196,6 @@ jobs:
       "deno.enable": true,
       "deno.lint": true,
       "deno.config": "./deno.json",
-      "deno.suggest.imports.hosts": {
-        "https://deno.land": true,
-        "https://esm.sh": false,
-      },
     };
     await ensureDir(join(workingDir, ".vscode"));
     await Promise.all([
@@ -228,6 +223,10 @@ jobs:
     "",
   ].join("\n"));
   Deno.exit(0);
+}
+
+if (import.meta.main) {
+  init();
 }
 
 async function isFolderEmpty(root: string, name: string): Promise<boolean> {

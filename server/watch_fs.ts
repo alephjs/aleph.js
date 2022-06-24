@@ -55,10 +55,10 @@ export async function watchFs(cwd = Deno.cwd()) {
       clientDependencyGraph?.update(specifier);
       serverDependencyGraph?.update(specifier);
     }
+    // delete global cached index html
     if (specifier === "./index.html") {
       Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
     }
-
     if (kind === "modify") {
       emitters.forEach((e) => {
         e.emit(`modify:${specifier}`, { specifier });
@@ -81,13 +81,12 @@ export async function watchFs(cwd = Deno.cwd()) {
       });
     }
   };
-  const w = Deno.watchFs(cwd, { recursive: true });
-  const ignoreReg = /[\/\\](\.git(hub)?|\.vscode|vendor|node_modules|dist|output|target)[\/\\]/;
-  const ignore = (path: string) => ignoreReg.test(path) || path.endsWith(".DS_Store");
+  const reIgnore = /[\/\\](\.git(hub)?|\.vscode|vendor|node_modules|dist|out(put)?|target)[\/\\]/;
+  const ignore = (path: string) => reIgnore.test(path) || path.endsWith(".DS_Store");
   const allFiles = new Set<string>(
     (await getFiles(cwd)).map((name) => join(cwd, name)).filter((path) => !ignore(path)),
   );
-  for await (const { kind, paths } of w) {
+  for await (const { kind, paths } of Deno.watchFs(cwd, { recursive: true })) {
     if (kind !== "create" && kind !== "remove" && kind !== "modify") {
       continue;
     }
