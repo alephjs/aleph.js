@@ -4,16 +4,7 @@ import { getFiles } from "./helpers.ts";
 import type { DependencyGraph } from "./graph.ts";
 
 type FsEvents = {
-  [key in "create" | "remove" | "transform" | `modify:${string}` | `hotUpdate:${string}`]: {
-    specifier: string;
-    status?: "success" | "failure";
-    sourceCode?: string;
-    error?: {
-      message: string;
-      stack: string;
-      location?: [number, number];
-    };
-  };
+  [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: { specifier: string };
 };
 
 export const emitters = new Set<Emitter<FsEvents>>();
