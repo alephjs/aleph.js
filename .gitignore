@@ -1,6 +1,4 @@
 .DS_Store
-.env
-.env.*
 examples/**/dist/
 examples/**/pkg/
 examples/**/target/
