@@ -5,7 +5,7 @@
   <a href="https://twitter.com/intent/follow?screen_name=alephjs"><img src="https://img.shields.io/twitter/follow/alephjs?style=social" alt="Twitter"></a>
 </p>
 
-> ⚠️ WE ARE CURRENTLY REWRITING THIS FRAMEWORK, MANY THINGS ARE STILL SUBJECT TO CHANGE AT ANY TIME.
+> ⚠️ Not yet 1.0. Many things are subject to change. Documentation is lacking in many places. Try it out and give us feedback!
 
 Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new architecture:
 
