@@ -36,8 +36,8 @@ export default async function cache(
   if (!options?.forceRefresh && !isLocalhost) {
     if (modulesCacheDir) {
       if (await existsFile(contentFilepath) && await existsFile(metaFilepath)) {
-        const reload = Deno.env.get("ALEPH_RELOAD_FLAG");
-        if (!reload || reloaded.has(url)) {
+        const shouldReload = Deno.env.get("ALEPH_RELOAD_FLAG");
+        if (!shouldReload || reloaded.has(url)) {
           const [content, metaJSON] = await Promise.all([
             Deno.readFile(contentFilepath),
             Deno.readTextFile(metaFilepath),

@@ -81,7 +81,7 @@ export function watchFS(cwd = Deno.cwd()) {
 
 /** generate the `routes.gen.ts` follow the routes config */
 export async function generate(routes: Route[]) {
-  const routeFiles: [fiilename: string, exportNames: string[]][] = await Promise.all(
+  const routeFiles: [filename: string, exportNames: string[]][] = await Promise.all(
     routes.map(async ([_, { filename }]) => {
       const code = await Deno.readTextFile(filename);
       const exportNames = await parseExportNames(filename, code);
