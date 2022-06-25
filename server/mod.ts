@@ -29,6 +29,7 @@ import type { SessionOptions } from "./session.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
 
 export type ServerOptions = Omit<ServeInit, "onError"> & {
+  cwd?: string;
   certFile?: string;
   keyFile?: string;
   logLevel?: LevelName;
@@ -36,10 +37,10 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: SSR;
-  onError?: ErrorCallback;
+  onError?: ErrorHandler;
 } & AlephConfig;
 
-export type ErrorCallback = {
+export type ErrorHandler = {
   (
     error: unknown,
     cause: {
@@ -52,7 +53,7 @@ export type ErrorCallback = {
 
 /** Start the Aleph.js server. */
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError, signal } = options;
+  const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError, signal, cwd } = options;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
   // server handler
@@ -120,8 +121,8 @@ export const serve = (options: ServerOptions = {}) => {
     // transform client modules
     if (!searchParams.has("raw") && clientModuleTransformer.test(pathname)) {
       try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(cwd));
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap, cwd));
         return await clientModuleTransformer.fetch(req, {
           importMap,
           jsxConfig,
@@ -156,14 +157,14 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // use loader to load modules
-    const moduleLoaders = await globalIt("__ALEPH_MODULE_LOADERS", initModuleLoaders);
+    const moduleLoaders = await globalIt("__ALEPH_MODULE_LOADERS", () => initModuleLoaders(undefined, cwd));
     const loader = searchParams.has("raw") ? null : moduleLoaders.find((loader) => loader.test(pathname));
     if (loader) {
       try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(cwd));
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap, cwd));
         return await clientModuleTransformer.fetch(req, {
-          loader: loader,
+          loader,
           importMap,
           jsxConfig,
           buildTarget: build?.target,
@@ -277,7 +278,7 @@ export const serve = (options: ServerOptions = {}) => {
     // request route api
     const routeConfig: RouteConfig | null = await globalIt(
       "__ALEPH_ROUTE_CONFIG",
-      () => routes ? initRoutes(routes) : Promise.resolve(null),
+      () => routes ? initRoutes(routes, cwd) : Promise.resolve(null),
     );
     if (routeConfig && routeConfig.routes.length > 0) {
       const reqData = req.method === "GET" &&
@@ -329,7 +330,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     try {
-      const importMap = await globalIt("__ALEPH_IMPORT_MAP", loadImportMap);
+      const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(cwd));
       const indexHtml = await globalIt("__ALEPH_INDEX_HTML", () =>
         loadAndFixIndexHtml({
           isDev,

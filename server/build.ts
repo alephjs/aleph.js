@@ -36,16 +36,15 @@ const supportedPlatforms: Record<BuildPlatform, string> = {
  *
  * after build, you need to bootstrap the server from `./dist/server.js`
  */
-export async function build(serverEntry?: string) {
-  const workingDir = Deno.cwd();
+export async function build(serverEntry: string | undefined, cwd = Deno.cwd()) {
   const alephPkgUri = getAlephPkgUri();
-  const importMap = await loadImportMap();
-  const jsxCofig = await loadJSXConfig(importMap);
-  const moduleLoaders = await initModuleLoaders(importMap);
+  const importMap = await loadImportMap(cwd);
+  const jsxCofig = await loadJSXConfig(importMap, cwd);
+  const moduleLoaders = await initModuleLoaders(importMap, cwd);
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   const platform = config?.build?.platform ?? "deno";
   const target = config?.build?.target ?? "es2020";
-  const outputDir = join(workingDir, config?.build?.outputDir ?? "dist");
+  const outputDir = join(cwd, config?.build?.outputDir ?? "dist");
   const modulesProxyPort = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
 
   if (platform === "cloudflare" || platform === "vercel") {
@@ -268,8 +267,8 @@ export async function build(serverEntry?: string) {
 
   // look up client modules
   let tasks = routeFiles.map(([filename]) => filename);
-  if (await existsFile(join(workingDir, "index.html"))) {
-    const html = await Deno.readFile(join(workingDir, "index.html"));
+  if (await existsFile(join(cwd, "index.html"))) {
+    const html = await Deno.readFile(join(cwd, "index.html"));
     const links = await parseHtmlLinks(html);
     for (const src of links) {
       const url = new URL(src, "http://localhost/");

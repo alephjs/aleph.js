@@ -192,10 +192,10 @@ export function restoreUrl(pathname: string): string {
 }
 
 /** init loaders in `CLI` mode, or use prebuild loaders */
-export async function initModuleLoaders(importMap?: ImportMap): Promise<ModuleLoader[]> {
+export async function initModuleLoaders(importMap?: ImportMap, cwd?: string): Promise<ModuleLoader[]> {
   const loaders: ModuleLoader[] = [];
   if (Deno.env.get("ALEPH_CLI")) {
-    const { imports, __filename } = importMap ?? await loadImportMap();
+    const { imports, __filename } = importMap ?? await loadImportMap(cwd);
     for (const key in imports) {
       if (/^\*\.{?(\w+, ?)*\w+}?$/i.test(key)) {
         let src = imports[key];
@@ -286,9 +286,7 @@ export async function getFiles(
 }
 
 /* read source code from fs/cdn/cache */
-export async function readCode(
-  specifier: string,
-): Promise<[code: string, contentType: string]> {
+export async function readCode(specifier: string): Promise<[code: string, contentType: string]> {
   if (util.isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
     if (url.hostname === "esm.sh" && !url.searchParams.has("target")) {
@@ -306,9 +304,9 @@ export async function readCode(
 }
 
 /** Load the JSX config base the given import maps and the existing deno config. */
-export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
+export async function loadJSXConfig(importMap: ImportMap, cwd?: string): Promise<JSXConfig> {
   const jsxConfig: JSXConfig = {};
-  const denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"]);
+  const denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"], cwd);
 
   if (denoConfigFile) {
     try {
