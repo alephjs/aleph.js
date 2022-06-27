@@ -1,7 +1,7 @@
 import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.144.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
-import cache from "../lib/cache.ts";
+import { cacheFetch } from "./cache.ts";
 import { getContentType } from "../lib/media_type.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -13,9 +13,9 @@ export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
 /** Stores and returns the `fn` output in the `globalThis` object */
 export async function globalIt<T>(name: string, fn: () => Promise<T>): Promise<T> {
-  const cache: T | undefined = Reflect.get(globalThis, name);
-  if (cache !== undefined) {
-    return cache;
+  const v: T | undefined = Reflect.get(globalThis, name);
+  if (v !== undefined) {
+    return v;
   }
   const ret = await fn();
   if (ret !== undefined) {
@@ -26,9 +26,9 @@ export async function globalIt<T>(name: string, fn: () => Promise<T>): Promise<T
 
 /** Stores and returns the `fn` output in the `globalThis` object synchronously. */
 export function globalItSync<T>(name: string, fn: () => T): T {
-  const cache: T | undefined = Reflect.get(globalThis, name);
-  if (cache !== undefined) {
-    return cache;
+  const v: T | undefined = Reflect.get(globalThis, name);
+  if (v !== undefined) {
+    return v;
   }
   const ret = fn();
   if (ret !== undefined) {
@@ -192,10 +192,10 @@ export function restoreUrl(pathname: string): string {
 }
 
 /** init loaders in `CLI` mode, or use prebuild loaders */
-export async function initModuleLoaders(importMap?: ImportMap, cwd?: string): Promise<ModuleLoader[]> {
+export async function initModuleLoaders(importMap?: ImportMap): Promise<ModuleLoader[]> {
   const loaders: ModuleLoader[] = [];
   if (Deno.env.get("ALEPH_CLI")) {
-    const { imports, __filename } = importMap ?? await loadImportMap(cwd);
+    const { imports, __filename } = importMap ?? await loadImportMap();
     for (const key in imports) {
       if (/^\*\.{?(\w+, ?)*\w+}?$/i.test(key)) {
         let src = imports[key];
@@ -286,13 +286,13 @@ export async function getFiles(
 }
 
 /* read source code from fs/cdn/cache */
-export async function readCode(specifier: string): Promise<[code: string, contentType: string]> {
+export async function readCode(specifier: string, cwd = Deno.cwd()): Promise<[code: string, contentType: string]> {
   if (util.isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
     if (url.hostname === "esm.sh" && !url.searchParams.has("target")) {
       url.searchParams.set("target", "esnext");
     }
-    const res = await cache(url.href);
+    const res = await cacheFetch(url.href);
     if (res.status >= 400) {
       throw new Error(`fetch ${url.href}: ${res.status} - ${res.statusText}`);
     }
@@ -300,13 +300,13 @@ export async function readCode(specifier: string): Promise<[code: string, conten
   }
 
   specifier = util.splitBy(specifier, "?")[0];
-  return [await Deno.readTextFile(specifier), getContentType(specifier)];
+  return [await Deno.readTextFile(join(cwd, specifier)), getContentType(specifier)];
 }
 
 /** Load the JSX config base the given import maps and the existing deno config. */
-export async function loadJSXConfig(importMap: ImportMap, cwd?: string): Promise<JSXConfig> {
+export async function loadJSXConfig(importMap: ImportMap): Promise<JSXConfig> {
   const jsxConfig: JSXConfig = {};
-  const denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"], cwd);
+  const denoConfigFile = await findFile(["deno.jsonc", "deno.json", "tsconfig.json"]);
 
   if (denoConfigFile) {
     try {
@@ -324,7 +324,7 @@ export async function loadJSXConfig(importMap: ImportMap, cwd?: string): Promise
     } catch (error) {
       log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
     }
-  } else if (Deno.env.get("ALEPH_DEV")) {
+  } else if (Deno.env.get("ALEPH_DEV_ROOT")) {
     const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
     const { compilerOptions } = await parseJSONFile(jsonFile);
     const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
@@ -385,11 +385,11 @@ export async function loadJSXConfig(importMap: ImportMap, cwd?: string): Promise
 }
 
 /** Load the import maps from the json file. */
-export async function loadImportMap(cwd?: string): Promise<ImportMap> {
+export async function loadImportMap(): Promise<ImportMap> {
   const importMap: ImportMap = { __filename: "", imports: {}, scopes: {} };
 
   if (Deno.env.get("ALEPH_DEV")) {
-    const alephPkgUri = Deno.env.get("ALEPH_PKG_URI") || `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
+    const alephPkgUri = `http://localhost:${Deno.env.get("ALEPH_DEV_PORT")}`;
     const importMapFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "import_map.json");
     const { __filename, imports, scopes } = await parseImportMap(importMapFile);
     Object.assign(importMap, {
@@ -406,10 +406,7 @@ export async function loadImportMap(cwd?: string): Promise<ImportMap> {
     });
   }
 
-  const importMapFile = await findFile(
-    ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`),
-    cwd,
-  );
+  const importMapFile = await findFile(["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`));
   if (importMapFile) {
     try {
       const { __filename, imports, scopes } = await parseImportMap(importMapFile);
@@ -422,19 +419,6 @@ export async function loadImportMap(cwd?: string): Promise<ImportMap> {
   }
 
   return importMap;
-}
-
-export function applyImportMap(specifier: string, importMap: ImportMap): string {
-  if (specifier in importMap.imports) {
-    return importMap.imports[specifier];
-  }
-  for (const key in importMap.imports) {
-    if (key.endsWith("/") && specifier.startsWith(key)) {
-      return importMap.imports[key] + specifier.slice(key.length);
-    }
-  }
-  // todo: support scopes
-  return specifier;
 }
 
 export async function parseJSONFile(jsonFile: string): Promise<Record<string, unknown>> {

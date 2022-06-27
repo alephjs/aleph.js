@@ -1,6 +1,7 @@
-import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.6.4/mod.ts";
-import type { Route } from "../framework/core/route.ts";
-import log from "../lib/log.ts";
+import { join } from "https://deno.land/std@0.144.0/path/mod.ts";
+import { parseDeps, parseExportNames } from "https://deno.land/x/aleph_compiler@0.6.4/mod.ts";
+import type { RouteConfig } from "../framework/core/route.ts";
+import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
 import { createFsEmitter, removeFsEmitter, watchFs } from "./watch_fs.ts";
@@ -55,19 +56,20 @@ export function handleHMRSocket(req: Request): Response {
   return response;
 }
 
-export function watchFS(cwd = Deno.cwd()) {
-  log.info(`Watching files for changes...`);
-
-  // update routes when fs change
+export function watchFS(appDir?: string) {
+  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   const emitter = createFsEmitter();
+
+  // update global route config when fs changess
   const updateRoutes = async ({ specifier }: { specifier: string }) => {
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    const rc = config?.routes;
-    if (rc) {
-      const reg = toRouteRegExp(rc);
+    if (config?.routes) {
+      const reg = toRouteRegExp(config.routes);
       if (reg.test(specifier)) {
-        const routeConfig = await initRoutes(reg);
+        const routeConfig = await initRoutes(reg, appDir);
         Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
+        if (!Deno.env.get("ALEPH_CLI")) {
+          generateRoutesModule(routeConfig, appDir).catch((error) => log.error(error));
+        }
       }
     } else {
       Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
@@ -76,13 +78,56 @@ export function watchFS(cwd = Deno.cwd()) {
   emitter.on("create", updateRoutes);
   emitter.on("remove", updateRoutes);
 
-  watchFs(cwd);
+  if (config?.routes) {
+    initRoutes(config.routes, appDir).then((routeConfig) => {
+      Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
+      if (!Deno.env.get("ALEPH_CLI")) {
+        generateRoutesModule(routeConfig, appDir).catch((error) => log.error(error));
+      }
+    });
+  }
+
+  // apply user `watchFS` handler
+  if (typeof config?.devServer?.watchFS === "function") {
+    const { watchFS } = config.devServer;
+    emitter.on("*", (kind, { specifier }) => {
+      if (kind.startsWith("modify:")) {
+        watchFS("modify", specifier);
+      } else if (kind === "create" || kind === "remove") {
+        watchFS(kind, specifier);
+      }
+    });
+  }
+
+  log.info(`Watching files for changes...`);
+  watchFs(appDir);
 }
 
-/** generate the `routes.gen.ts` follow the routes config */
-export async function generate(routes: Route[]) {
+/** generate the `routes.gen.ts` module follows the routes config */
+async function generateRoutesModule(routeConfig: RouteConfig, appDir?: string) {
+  const genFile = appDir ? join(appDir, "routes.gen.ts") : "routes.gen.ts";
+
+  try {
+    const sourceCode = await Deno.readTextFile(genFile);
+    const deps = await parseDeps("./routes.gen.ts", sourceCode);
+    if (
+      routeConfig.routes.every((route) =>
+        deps.findIndex(({ specifier }) => {
+          const filename = appDir ? "." + util.trimPrefix(route[1].filename, appDir) : route[1].filename;
+          return specifier === filename;
+        }) >= 0
+      )
+    ) {
+      return;
+    }
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) {
+      throw error;
+    }
+  }
+
   const routeFiles: [filename: string, exportNames: string[]][] = await Promise.all(
-    routes.map(async ([_, { filename }]) => {
+    routeConfig.routes.map(async ([_, { filename }]) => {
       const code = await Deno.readTextFile(filename);
       const exportNames = await parseExportNames(filename, code);
       return [filename, exportNames];
@@ -93,37 +138,44 @@ export async function generate(routes: Route[]) {
   const revives: string[] = [];
 
   routeFiles.forEach(([filename, exportNames], idx) => {
-    if (exportNames.length === 0) {
-      return [];
+    const hasDefaultExport = exportNames.includes("default");
+    const hasNameExports = exportNames.filter((name) => name !== "default").length > 0;
+    const importUrl = JSON.stringify(appDir ? "." + util.trimPrefix(filename, appDir) : filename);
+    if (hasDefaultExport) {
+      imports.push(`import d${idx} from ${importUrl};`);
     }
-    imports.push(
-      `import { ${exportNames.map((name, i) => `${name} as ${"$".repeat(i + 1)}${idx}`).join(", ")} } from ${
-        JSON.stringify(filename)
-      };`,
-    );
-    revives.push(
-      `revive(${JSON.stringify(filename)}, { ${
-        exportNames.map((name, i) => `${name}: ${"$".repeat(i + 1)}${idx}`).join(", ")
-      } });`,
-    );
+    if (hasNameExports) {
+      imports.push(`import * as m${idx} from ${importUrl};`);
+    }
+    if (hasDefaultExport && hasNameExports) {
+      revives.push(`  ${JSON.stringify(filename)}: { ...m${idx}, default: d${idx} },`);
+    } else if (hasDefaultExport) {
+      revives.push(`  ${JSON.stringify(filename)}: { default: d${idx} },`);
+    } else if (hasNameExports) {
+      revives.push(`  ${JSON.stringify(filename)}: m${idx},`);
+    }
   });
 
-  if (imports.length) {
-    const code = [
-      "/*! Generated by Aleph.js, do **NOT** change and ensure the file is **NOT** in the `.gitignore`. */",
-      "",
-      `import { revive } from "aleph/server";`,
-      ...imports,
-      "",
-      ...revives,
-    ].join("\n");
-    await Deno.writeTextFile("routes.gen.ts", code);
-
-    const serverEntry = Deno.env.get("ALEPH_SERVER_ENTRY");
-    if (serverEntry) {
-      const code = await Deno.readTextFile(serverEntry);
-      if (!code.includes(`import "./routes.gen.ts"`)) {
-        await Deno.writeTextFile(serverEntry, `import "./routes.gen.ts"\n${code}`);
+  if (revives.length > 0) {
+    await Deno.writeTextFile(
+      genFile,
+      [
+        "/*! Generated by Aleph.js, do NOT change and NO git-ignore. */",
+        "",
+        ...imports,
+        "",
+        "export default {",
+        ...revives,
+        "}",
+      ].join("\n"),
+    );
+    log.debug(`${blue("routes.gen.ts")} generated`);
+  } else {
+    try {
+      await Deno.remove(genFile);
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) {
+        throw error;
       }
     }
   }

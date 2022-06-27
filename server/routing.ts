@@ -15,7 +15,6 @@ export async function fetchRouteData(
   req: Request,
   ctx: Record<string, unknown>,
   reqData: boolean,
-  noProxy?: boolean,
 ): Promise<Response | void> {
   const { pathname, host } = url;
   if (routes.length > 0) {
@@ -47,7 +46,7 @@ export async function fetchRouteData(
     if (matched) {
       const { method } = req;
       const [ret, { filename }] = matched;
-      const mod = await importRouteModule(filename, noProxy);
+      const mod = await importRouteModule(filename);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
       if (method !== "GET" || mod.default === undefined || reqData) {
         Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
@@ -77,23 +76,31 @@ export async function fetchRouteData(
 
 /** revive a route module. */
 export function revive(filename: string, module: Record<string, unknown>) {
-  if (Deno.env.get("ALEPH_ENV") !== "development") {
-    revivedModules.set(filename, module);
-  }
+  revivedModules.set(filename, module);
 }
 
 /** import the route module. */
-export async function importRouteModule(filename: string, noProxy?: boolean) {
+export async function importRouteModule(filename: string, cwd = Deno.cwd()) {
+  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   let mod: Record<string, unknown>;
   if (revivedModules.has(filename)) {
     mod = revivedModules.get(filename)!;
-  } else if (noProxy) {
-    mod = await import(`file://${join(Deno.cwd(), filename)}`);
+  } else if (
+    Deno.env.get("ALEPH_ENV") !== "development" && (config?.routesModules && filename in config.routesModules)
+  ) {
+    mod = config.routesModules[filename];
+    console.log(mod);
   } else {
-    const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
-    const version = graph?.get(filename)?.version || graph?.mark(filename, {}).version || Date.now().toString(16);
     const port = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
-    mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version}`);
+    if (port) {
+      const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
+      const version = graph?.get(filename)?.version ?? graph?.mark(filename, {}).version;
+      mod = await import(`http://localhost:${port}${filename.slice(1)}?v=${version ?? "0"}`);
+    } else {
+      const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
+      const version = graph?.get(filename)?.version ?? graph?.mark(filename, {}).version;
+      mod = await import(`file://${join(cwd, filename)}${version ? "#" + version.toString(16) : ""}`);
+    }
   }
   return mod;
 }
@@ -120,9 +127,9 @@ type RouteRegExp = {
 };
 
 /** initialize routes from routes config */
-export async function initRoutes(config: string | RouteRegExp, cwd = Deno.cwd()): Promise<RouteConfig> {
-  const reg = isRouteRegExp(config) ? config : toRouteRegExp(config);
-  const files = await getFiles(join(cwd, reg.prefix));
+export async function initRoutes(config: string | RouteRegExp, appDir?: string, cwd?: string): Promise<RouteConfig> {
+  const reg = isRouteRegExp(config) ? config : toRouteRegExp(appDir ? "./" + join(appDir, config) : config);
+  const files = await getFiles(join(cwd ?? Deno.cwd(), reg.prefix));
   const routes: Route[] = [];
   let _app: Route | undefined = undefined;
   let _404: Route | undefined = undefined;
@@ -157,7 +164,7 @@ export async function initRoutes(config: string | RouteRegExp, cwd = Deno.cwd())
     });
   }
 
-  log.debug(`${routes.length} routes initiated`);
+  log.debug(`${routes.length} routes found`);
   return { routes, _404, _app };
 }
 

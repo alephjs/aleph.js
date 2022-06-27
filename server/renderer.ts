@@ -53,8 +53,7 @@ export type RenderOptions = {
   indexHtml: Uint8Array;
   routeConfig: RouteConfig | null;
   customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
-  isDev: boolean;
-  noProxy?: boolean;
+  isDev?: boolean;
   ssr?: SSR;
 };
 
@@ -72,7 +71,7 @@ export default {
       const cc = !isFn ? ssr.cacheControl : "public";
       const CSP = isFn ? undefined : ssr.CSP;
       const render = isFn ? ssr : ssr.render;
-      const [url, routeModules, deferedData] = await initSSR(req, ctx, routeConfig, dataDefer, options.noProxy);
+      const [url, routeModules, deferedData] = await initSSR(req, ctx, routeConfig, dataDefer);
       const headCollection: string[] = [];
       const ssrContext: SSRContext = {
         url,
@@ -136,7 +135,7 @@ export default {
         is404: routeConfig !== null && (routeModules.length === 0 || routeModules.at(-1)?.url.pathname ===
             "/_404"),
       };
-      if (CSP) {
+      if (!isDev && CSP) {
         const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
         const policy = CSP.getPolicy(url, nonce!);
         if (policy) {
@@ -331,7 +330,6 @@ async function initSSR(
   ctx: Record<string, unknown>,
   routeConfig: RouteConfig | null,
   dataDefer: boolean,
-  noProxy?: boolean,
 ): Promise<[
   url: URL,
   routeModules: RouteModule[],
@@ -347,7 +345,7 @@ async function initSSR(
 
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
-    const mod = await importRouteModule(filename, noProxy);
+    const mod = await importRouteModule(filename);
     const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),

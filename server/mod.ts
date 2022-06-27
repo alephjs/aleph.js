@@ -17,19 +17,17 @@ import {
   loadImportMap,
   loadJSXConfig,
   regFullVersion,
-  setCookieHeader,
   toLocalPath,
 } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer, { type SSR } from "./renderer.ts";
-import { fetchRouteData, initRoutes, revive } from "./routing.ts";
+import { fetchRouteData, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
-import { createFsEmitter, removeFsEmitter } from "./watch_fs.ts";
 import type { SessionOptions } from "./session.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
 
 export type ServerOptions = Omit<ServeInit, "onError"> & {
-  cwd?: string;
+  appDir?: string;
   certFile?: string;
   keyFile?: string;
   logLevel?: LevelName;
@@ -53,7 +51,9 @@ export type ErrorHandler = {
 
 /** Start the Aleph.js server. */
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, unocss, build, devServer, middlewares, fetch, ssr, logLevel, onError, signal, cwd } = options;
+  const { routes, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
+  const maybeAppDir = options.appDir ?? Deno.env.get("APP_DIR");
+  const appDir = maybeAppDir ? "." + util.cleanPath(maybeAppDir) : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
   // server handler
@@ -121,8 +121,8 @@ export const serve = (options: ServerOptions = {}) => {
     // transform client modules
     if (!searchParams.has("raw") && clientModuleTransformer.test(pathname)) {
       try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(cwd));
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap, cwd));
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap());
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
         return await clientModuleTransformer.fetch(req, {
           importMap,
           jsxConfig,
@@ -157,12 +157,12 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // use loader to load modules
-    const moduleLoaders = await globalIt("__ALEPH_MODULE_LOADERS", () => initModuleLoaders(undefined, cwd));
+    const moduleLoaders = await globalIt("__ALEPH_MODULE_LOADERS", () => initModuleLoaders());
     const loader = searchParams.has("raw") ? null : moduleLoaders.find((loader) => loader.test(pathname));
     if (loader) {
       try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(cwd));
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap, cwd));
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap());
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
         return await clientModuleTransformer.fetch(req, {
           loader,
           importMap,
@@ -278,7 +278,7 @@ export const serve = (options: ServerOptions = {}) => {
     // request route api
     const routeConfig: RouteConfig | null = await globalIt(
       "__ALEPH_ROUTE_CONFIG",
-      () => routes ? initRoutes(routes, cwd) : Promise.resolve(null),
+      () => routes ? initRoutes(routes, appDir) : Promise.resolve(null),
     );
     if (routeConfig && routeConfig.routes.length > 0) {
       const reqData = req.method === "GET" &&
@@ -330,11 +330,10 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     try {
-      const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(cwd));
       const indexHtml = await globalIt("__ALEPH_INDEX_HTML", () =>
         loadAndFixIndexHtml({
+          appDir,
           isDev,
-          importMap,
           ssr: typeof ssr === "function" ? {} : ssr,
           hmrWebSocketUrl: options.devServer?.hmrWebSocketUrl,
         }));
@@ -363,32 +362,24 @@ export const serve = (options: ServerOptions = {}) => {
     }
   };
 
-  // apply `watchFS` handler of `devServer`
-  if (typeof devServer?.watchFS === "function") {
-    const { watchFS } = devServer;
-    const e = createFsEmitter();
-    e.on("*", (kind, { specifier }) => {
-      if (kind.startsWith("modify:")) {
-        watchFS("modify", specifier);
-      } else if (kind === "create" || kind === "remove") {
-        watchFS(kind, specifier);
-      }
-    });
-    signal?.addEventListener("abort", () => {
-      removeFsEmitter(e);
-    });
-  }
-
   // set log level if specified
   if (logLevel) {
     log.setLevel(logLevel);
   }
 
   // inject global objects
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { routes, unocss, build, devServer });
+  const { routesModules, caches, unocss } = options;
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { routes, routesModules, caches, unocss, build, devServer });
   Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
 
-  const { hostname, port = 8080, certFile, keyFile } = options;
+  // apply `watchFS` handler of `devServer`
+  if (isDev) {
+    globalIt("__ALEPH_SERVER_DEV", () => import("./dev.ts")).then(({ watchFS }) => {
+      watchFS(appDir);
+    });
+  }
+
+  const { hostname, port = 8080, certFile, keyFile, signal } = options;
   if (Deno.env.get("ALEPH_CLI")) {
     Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
   } else {
@@ -400,5 +391,3 @@ export const serve = (options: ServerOptions = {}) => {
     log.info(`Server ready on http://localhost:${port}`);
   }
 };
-
-export { revive, setCookieHeader };

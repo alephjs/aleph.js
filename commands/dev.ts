@@ -1,7 +1,6 @@
 import { basename, resolve } from "https://deno.land/std@0.144.0/path/mod.ts";
 import log, { blue } from "../lib/log.ts";
 import { serve as httpServe } from "../lib/serve.ts";
-import { watchFS } from "../server/dev.ts";
 import { builtinModuleExts, findFile, initModuleLoaders, loadImportMap } from "../server/helpers.ts";
 import { serve } from "../server/mod.ts";
 import { proxyModules } from "../server/proxy_modules.ts";
@@ -61,7 +60,6 @@ if (import.meta.main) {
     }
   }
 
-  watchFS();
   await start();
 }
 

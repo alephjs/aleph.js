@@ -4,8 +4,7 @@ import type { Comment, DocumentEnd, Element, TextChunk } from "https://deno.land
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import lolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
 import util from "../lib/util.ts";
-import { applyImportMap, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
-import type { ImportMap } from "./types.ts";
+import { getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 
 const defaultIndexHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -27,26 +26,26 @@ export type HTMLRewriterHandlers = {
 };
 
 type LoadOptions = {
-  isDev: boolean;
-  importMap: ImportMap;
+  isDev?: boolean;
   ssr?: { dataDefer?: boolean };
   hmrWebSocketUrl?: string;
-  cwd?: string;
+  appDir?: string;
 };
 
 // load and fix the `index.html`
 // - fix relative url to absolute url of `src` and `href`
 // - add `./framework/core/hmr.ts` when in `development` mode
 // - add `./framework/core/nomodule.ts`
-// - check the `<head>` and `<body>` elements
+// - ensure the `<head>` and `<body>` exists
 // - check the `<ssr-body>` element if the ssr is enabled
 // - add `data-defer` attribute to `<body>` if possible
+// - todo: apply unocss
 export async function loadAndFixIndexHtml(options: LoadOptions): Promise<Uint8Array> {
-  const { html, hasSSRBody } = await loadIndexHtml(options.cwd);
+  const { html, hasSSRBody } = await loadIndexHtml(options.appDir);
   return fixIndexHtml(html, hasSSRBody, options);
 }
 
-async function loadIndexHtml(cwd = Deno.cwd()): Promise<{ html: Uint8Array; hasSSRBody: boolean }> {
+async function loadIndexHtml(appDir?: string): Promise<{ html: Uint8Array; hasSSRBody: boolean }> {
   const chunks: Uint8Array[] = [];
   let hasHead = false;
   let hasBody = false;
@@ -98,7 +97,7 @@ async function loadIndexHtml(cwd = Deno.cwd()): Promise<{ html: Uint8Array; hasS
 
   let html: Uint8Array;
   try {
-    html = await Deno.readFile(join(cwd, "index.html"));
+    html = await Deno.readFile(appDir ? join(appDir, "index.html") : "index.html");
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) {
       html = util.utf8TextEncoder.encode(defaultIndexHtml);
@@ -120,7 +119,7 @@ async function loadIndexHtml(cwd = Deno.cwd()): Promise<{ html: Uint8Array; hasS
 }
 
 function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOptions): Uint8Array {
-  const { isDev, importMap, ssr, hmrWebSocketUrl } = options;
+  const { isDev, ssr, hmrWebSocketUrl, appDir } = options;
   const alephPkgUri = getAlephPkgUri();
   const chunks: Uint8Array[] = [];
   const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
@@ -130,10 +129,9 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
     element: (el: Element) => {
       let href = el.getAttribute("href");
       if (href) {
-        href = applyImportMap(href, importMap);
         const isHttpUrl = util.isLikelyHttpURL(href);
         if (!isHttpUrl) {
-          href = util.cleanPath(href);
+          href = util.cleanPath(appDir ? join(appDir, href) : href);
           if (deployId) {
             href += (href.includes("?") ? "&v=" : "?v=") + deployId;
           }
@@ -160,9 +158,8 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
     element: (el: Element) => {
       let src = el.getAttribute("src");
       if (src) {
-        src = applyImportMap(src, importMap);
         if (!util.isLikelyHttpURL(src)) {
-          src = util.cleanPath(src);
+          src = util.cleanPath(appDir ? join(appDir, src) : src);
           if (deployId) {
             src += (src.includes("?") ? "&v=" : "?v=") + deployId;
           }
@@ -188,6 +185,12 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
           `<script type="module">import hot from "${
             toLocalPath(alephPkgUri)
           }/framework/core/hmr.ts";hot("./index.html").decline();</script>`,
+          { html: true },
+        );
+      }
+      if (appDir) {
+        el.append(
+          `<base href="${util.cleanPath(appDir)}/">`,
           { html: true },
         );
       }

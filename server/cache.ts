@@ -1,8 +1,9 @@
 import { join } from "https://deno.land/std@0.144.0/path/mod.ts";
-import log from "./log.ts";
-import util from "./util.ts";
+import log from "../lib/log.ts";
+import util from "../lib/util.ts";
+import { existsDir, existsFile } from "./helpers.ts";
 
-type Meta = {
+type CacheMeta = {
   url: string;
   headers: Record<string, string>;
   now: {
@@ -11,26 +12,26 @@ type Meta = {
   };
 };
 
-const memoryCache = new Map<string, [content: Uint8Array, meta: Meta]>();
+const memoryCache = new Map<string, [content: Uint8Array, meta: CacheMeta]>();
 const reloaded = new Set<string>();
 
 /** fetch and cache remote contents */
-export default async function cache(
+export async function cacheFetch(
   url: string,
   options?: { forceRefresh?: boolean; retryTimes?: number; userAgent?: string },
 ): Promise<Response> {
   const { protocol, hostname, port, pathname, search } = new URL(url);
   const isLocalhost = ["localhost", "0.0.0.0", "127.0.0.1"].includes(hostname);
   const modulesCacheDir = Deno.env.get("MODULES_CACHE_DIR");
-  const hashname = isLocalhost ? "" : await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
+  const cacheKey = isLocalhost ? "" : await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
 
   let cacheDir = "";
   let metaFilepath = "";
   let contentFilepath = "";
   if (modulesCacheDir) {
     cacheDir = join(modulesCacheDir, util.trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
-    contentFilepath = join(cacheDir, hashname);
-    metaFilepath = join(cacheDir, hashname + ".metadata.json");
+    contentFilepath = join(cacheDir, cacheKey);
+    metaFilepath = join(cacheDir, cacheKey + ".metadata.json");
   }
 
   if (!options?.forceRefresh && !isLocalhost) {
@@ -54,8 +55,8 @@ export default async function cache(
           reloaded.add(url);
         }
       }
-    } else if (memoryCache.has(hashname)) {
-      const [content, meta] = memoryCache.get(hashname)!;
+    } else if (memoryCache.has(cacheKey)) {
+      const [content, meta] = memoryCache.get(cacheKey)!;
       if (!isExpired(meta)) {
         return new Response(content, { headers: { ...meta.headers, "cache-hit": "true" } });
       }
@@ -82,7 +83,7 @@ export default async function cache(
     if (res.ok && !isLocalhost) {
       const buffer = await res.arrayBuffer();
       const content = new Uint8Array(buffer);
-      const meta: Meta = {
+      const meta: CacheMeta = {
         url,
         headers: {},
         now: {
@@ -102,7 +103,7 @@ export default async function cache(
           Deno.writeTextFile(metaFilepath, JSON.stringify(meta, undefined, 2)),
         ]);
       } else {
-        memoryCache.set(hashname, [content, meta]);
+        memoryCache.set(cacheKey, [content, meta]);
       }
       return new Response(content, { headers: res.headers });
     }
@@ -113,33 +114,7 @@ export default async function cache(
   return finalRes;
 }
 
-/* check whether or not the given path exists as a directory. */
-async function existsDir(path: string): Promise<boolean> {
-  try {
-    const stat = await Deno.lstat(path);
-    return stat.isDirectory;
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) {
-      return false;
-    }
-    throw err;
-  }
-}
-
-/* check whether or not the given path exists as regular file. */
-async function existsFile(path: string): Promise<boolean> {
-  try {
-    const stat = await Deno.lstat(path);
-    return stat.isFile;
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) {
-      return false;
-    }
-    throw err;
-  }
-}
-
-function isExpired(meta: Meta) {
+function isExpired(meta: CacheMeta) {
   const cc = meta.headers["cache-control"];
   const dataCacheTtl = cc && cc.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
   if (dataCacheTtl) {

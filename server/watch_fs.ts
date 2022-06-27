@@ -21,7 +21,8 @@ export function removeFsEmitter(e: Emitter<FsEvents>) {
 }
 
 /* watch the directory and its subdirectories */
-export async function watchFs(cwd = Deno.cwd()) {
+export async function watchFs(appDir?: string) {
+  const dir = appDir ? join(Deno.cwd(), appDir) : Deno.cwd();
   const timers = new Map();
   const debounce = (id: string, callback: () => void, delay: number) => {
     if (timers.has(id)) {
@@ -36,7 +37,7 @@ export async function watchFs(cwd = Deno.cwd()) {
     );
   };
   const listener = (kind: "create" | "remove" | "modify", path: string) => {
-    const specifier = "./" + relative(cwd, path).replaceAll("\\", "/");
+    const specifier = "./" + relative(Deno.cwd(), path).replaceAll("\\", "/");
     const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
     const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
     if (kind === "remove") {
@@ -75,9 +76,9 @@ export async function watchFs(cwd = Deno.cwd()) {
   const reIgnore = /[\/\\](\.git(hub)?|\.vscode|vendor|node_modules|dist|out(put)?|target)[\/\\]/;
   const ignore = (path: string) => reIgnore.test(path) || path.endsWith(".DS_Store");
   const allFiles = new Set<string>(
-    (await getFiles(cwd)).map((name) => join(cwd, name)).filter((path) => !ignore(path)),
+    (await getFiles(dir)).map((name) => join(dir, name)).filter((path) => !ignore(path)),
   );
-  for await (const { kind, paths } of Deno.watchFs(cwd, { recursive: true })) {
+  for await (const { kind, paths } of Deno.watchFs(dir, { recursive: true })) {
     if (kind !== "create" && kind !== "remove" && kind !== "modify") {
       continue;
     }
