@@ -1,6 +1,6 @@
 import { SEP } from "std/path/separator.ts";
 import { assert, assertEquals } from "std/testing/asserts.ts";
-import { applyImportMap, existsDir, existsFile, restoreUrl, toLocalPath } from "../server/helpers.ts";
+import { existsDir, existsFile, restoreUrl, toLocalPath } from "../server/helpers.ts";
 
 Deno.test("server/helper.ts", async (t) => {
   await t.step(`lib/fs.ts: existsDir`, async () => {
@@ -38,22 +38,6 @@ Deno.test("server/helper.ts", async (t) => {
     assertEquals(restoreUrl("/-/deno.land/x/aleph@0.1.0"), "https://deno.land/x/aleph@0.1.0");
     assertEquals(restoreUrl("/-/http_foo.com/bar?lang=us-en"), "http://foo.com/bar?lang=us-en");
     assertEquals(restoreUrl("/-/http_foo.com_8080/bar"), "http://foo.com:8080/bar");
-  });
-
-  await t.step("applyImportMap", () => {
-    const importMap = {
-      __filename: "",
-      imports: {
-        "aleph": "https://deno.land/x/aleph/mod.ts",
-        "aleph/": "https://deno.land/x/aleph/",
-      },
-      scopes: {},
-    };
-    assertEquals(applyImportMap("aleph", importMap), "https://deno.land/x/aleph/mod.ts");
-    assertEquals(
-      applyImportMap("aleph/framework/react/mod.ts", importMap),
-      "https://deno.land/x/aleph/framework/react/mod.ts",
-    );
   });
 });
 

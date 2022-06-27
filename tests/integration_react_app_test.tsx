@@ -5,7 +5,7 @@ import { renderToReadableStream } from "react-dom/server";
 
 Deno.test("[integration] examples/react-app", async (t) => {
   const api = new MockServer({
-    cwd: "./examples/react-app",
+    appDir: "./examples/react-app",
     routes: "./routes/**/*.{tsx,ts}",
     ssr: {
       dataDefer: false,
@@ -23,7 +23,10 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assert(html.includes(`<meta name="description" content="The Fullstack Framework in Deno." ssr>`));
     assert(html.includes(`<h1>The Fullstack Framework in Deno.</h1>`));
     assert(html.includes(`<a role="button" href="/todos" aria-current="page">Todos App Demo</a>`));
-    assert(html.includes(`<script type="module" src="/main.tsx"></script>`));
+    assert(html.includes(`<base href="/examples/react-app/">`));
+    assert(html.includes(`<link rel="icon" href="/examples/react-app/assets/logo.svg">`));
+    assert(html.includes(`<link rel="stylesheet" href="/examples/react-app/style/app.css">`));
+    assert(html.includes(`<script type="module" src="/examples/react-app/main.tsx"></script>`));
     assert(html.includes(`<script id="routes-manifest" type="application/json">`));
     assert(html.includes(`<script id="ssr-modules" type="application/json">`));
   });

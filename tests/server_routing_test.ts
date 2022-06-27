@@ -29,7 +29,7 @@ Deno.test("[unit] server/routing.ts: matchRoutes", async () => {
   ];
   await Promise.all(files.map((file) => Deno.mkdir(join(tmpDir, dirname(file)), { recursive: true })));
   await Promise.all(files.map((file) => Deno.writeTextFile(join(tmpDir, file), "")));
-  const routes = await initRoutes("./routes/**/*.{tsx,mdx}", tmpDir);
+  const routes = await initRoutes("./routes/**/*.{tsx,mdx}", undefined, tmpDir);
   assertEquals(routes.routes.length, files.length - 1);
   assertEquals(routes.routes.filter(([_, meta]) => meta.nesting).length, 5);
 
