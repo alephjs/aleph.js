@@ -29,9 +29,11 @@ export type TransformerOptions = {
 
 export default {
   test: (pathname: string) => {
-    return pathname.startsWith("/-/") ||
+    return (
+      pathname.startsWith("/-/") ||
       (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) && !pathname.endsWith(".d.ts")) ||
-      pathname.endsWith(".css");
+      pathname.endsWith(".css")
+    );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
     const { isDev, loader } = options;

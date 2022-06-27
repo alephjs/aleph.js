@@ -234,6 +234,9 @@ function fixLine(line: string): string | null {
   if (l.startsWith(`Download http://localhost:`)) {
     return null;
   }
+  if (l.startsWith(`Warning the configuration file `)) {
+    return null;
+  }
   const ret = l.match(regStackLoc);
   if (ret) {
     const url = new URL(ret[1]);

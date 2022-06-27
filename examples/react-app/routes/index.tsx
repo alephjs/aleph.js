@@ -8,7 +8,7 @@ export default function Index() {
         <meta name="description" content="The Fullstack Framework in Deno." />
       </Head>
       <p className="logo">
-        <img src="/assets/logo.svg" width="75" height="75" title="Aleph.js" />
+        <img src="./assets/logo.svg" width="75" height="75" title="Aleph.js" />
       </p>
       <h1>
         The Fullstack Framework in Deno.
