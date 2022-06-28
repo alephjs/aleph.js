@@ -89,7 +89,6 @@ export async function importRouteModule(filename: string, cwd = Deno.cwd()) {
     Deno.env.get("ALEPH_ENV") !== "development" && (config?.routesModules && filename in config.routesModules)
   ) {
     mod = config.routesModules[filename];
-    console.log(mod);
   } else {
     const port = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
     if (port) {
