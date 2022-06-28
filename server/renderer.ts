@@ -116,6 +116,7 @@ export default {
             if (css) {
               const buildTime = performance.now() - start;
               headCollection.push(
+                `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.1/tailwind.css">`,
                 `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
               );
             }
