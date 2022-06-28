@@ -10,15 +10,19 @@ import util from "../lib/util.ts";
 import { generateRoutesModule } from "../server/dev.ts";
 import { existsDir } from "../server/helpers.ts";
 import { initRoutes } from "../server/routing.ts";
+import { isCanary } from "../version.ts";
 
-// todo: get version from deno.land
-import { isCanary, VERSION } from "../version.ts";
+type TemplateMeta = {
+  entry: string;
+  cli?: boolean;
+  unocss?: boolean;
+};
 
-const templates = {
-  "api": { cli: false, entry: "server.ts" },
-  "react": { cli: false, entry: "server.tsx" },
-  "vue": { cli: true, entry: "server.ts" },
-  "yew": { cli: true, entry: "server.ts" },
+const templates: Record<string, TemplateMeta> = {
+  "api": { entry: "server.ts" },
+  "react": { entry: "server.tsx", unocss: true },
+  "vue": { entry: "server.ts", cli: true, unocss: true },
+  "yew": { entry: "server.ts", cli: true },
   // todo:
   // "preact",
   // "svelte",
@@ -74,53 +78,88 @@ export default async function init(nameArg?: string, template?: string) {
     // todo: template choose dialog
     template = "react";
   }
-
   if (!(template in templates)) {
     log.fatal(`Invalid template name ${red(template)}, must be one of [${blue(Object.keys(templates).join(","))}]`);
   }
 
+  // get and check the project name
   const name = nameArg || (prompt("Project Name:") || "").trim();
   if (name === "") {
+    await init(nameArg, template);
     return;
   }
   if (!/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) {
     log.fatal(`Invalid project name: ${red(name)}`);
   }
 
-  // check dir is clean
+  // check the dir is clean
   if (!(await isFolderEmpty(Deno.cwd(), name)) && !confirm("Continue?")) {
     Deno.exit(1);
   }
 
   // download template
   console.log("Downloading template, this might take a moment...");
+  const pkgName = isCanary ? "aleph_canary" : "aleph";
+  const res = await fetch(`https://cdn.deno.land/${pkgName}/meta/versions.json`);
+  if (res.status !== 200) {
+    console.error(await res.text());
+    Deno.exit(1);
+  }
+  const { latest: VERSION } = await res.json();
   const repo = isCanary ? "ije/aleph-canary" : "alephjs/aleph.js";
   const resp = await fetch(`https://codeload.github.com/${repo}/tar.gz/refs/tags/${VERSION}`);
+  if (resp.status !== 200) {
+    console.error(await resp.text());
+    Deno.exit(1);
+  }
   const gzData = await readAll(new Buffer(await resp.arrayBuffer()));
   const tarData = gunzip(gzData);
   const entryList = new Untar(new Buffer(tarData));
   const workingDir = join(Deno.cwd(), name);
 
+  // write template files
   for await (const entry of entryList) {
     const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app/`;
     if (entry.fileName.startsWith(prefix)) {
-      const fp = join(workingDir, util.trimPrefix(entry.fileName, prefix));
-      if (entry.type === "directory") {
-        await ensureDir(fp);
-        continue;
+      const name = util.trimPrefix(entry.fileName, prefix);
+      if (name !== "README.md") {
+        const fp = join(workingDir, name);
+        if (entry.type === "directory") {
+          await ensureDir(fp);
+          continue;
+        }
+        const file = await Deno.open(fp, { write: true, create: true });
+        await copy(entry, file);
       }
-      const file = await Deno.open(fp, { write: true, create: true });
-      await copy(entry, file);
     }
   }
 
-  const { cli: cliMode, entry } = templates[template as unknown as keyof typeof templates];
-  const pkgName = isCanary ? "aleph_canary" : "aleph";
+  const { entry, cli: cliMode, unocss } = templates[template];
+
+  // generate `routes.gen.ts` module
+  if (!cliMode) {
+    const entryCode = await Deno.readTextFile(join(workingDir, entry));
+    await Deno.writeTextFile(
+      join(workingDir, entry),
+      entryCode
+        .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routesModules,`)
+        .replace(
+          /(\s*)serve\({/,
+          `$1// pre-import route modules for serverless env that doesn't support the dynamic imports,\n// this module will be updated automaticlly in develoment mode.\nimport routesModules from "./routes.gen.ts";\n\nserve({`,
+        ),
+    );
+    const m = entryCode.match(/(\s+)routes: "(.+)"/);
+    if (m) {
+      const routeConfig = await initRoutes(m[2], undefined, workingDir);
+      await generateRoutesModule(routeConfig, undefined, workingDir);
+    }
+  }
+
   const alephPkgUri = `https://deno.land/x/${pkgName}@${VERSION}`;
   const importMap = {
     imports: {
       "~/": "./",
-      "@unocss/": `${alephPkgUri}/lib/@unocss/`,
+      "std/": "https://deno.land/std@0.144.0/",
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
     },
@@ -157,23 +196,6 @@ export default async function init(nameArg?: string, template?: string) {
   const gitignore = [
     "dist/",
   ];
-  if (!cliMode) {
-    const entryCode = await Deno.readTextFile(join(workingDir, entry));
-    await Deno.writeTextFile(
-      join(workingDir, entry),
-      entryCode
-        .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routesModules,`)
-        .replace(
-          /(\s*)serve\({/,
-          `$1// pre-import route modules for serverless env that doesn't support the dynamic imports,\n// this module will be updated automaticlly in develoment mode.\nimport routesModules from "./routes.gen.ts";\n\nserve({`,
-        ),
-    );
-    const m = entryCode.match(/(\s+)routes: "(.+)"/);
-    if (m) {
-      const routeConfig = await initRoutes(m[2], undefined, workingDir);
-      await generateRoutesModule(routeConfig, undefined, workingDir);
-    }
-  }
   switch (template) {
     case "react": {
       Object.assign(importMap.imports, {
@@ -198,14 +220,39 @@ export default async function init(nameArg?: string, template?: string) {
       break;
     }
   }
+
+  if (unocss && confirm("Enable UnoCSS(atomic CSS)?")) {
+    Object.assign(importMap.imports, {
+      "@unocss/": `${alephPkgUri}/lib/@unocss/`,
+    });
+    const entryCode = await Deno.readTextFile(join(workingDir, entry));
+    await Deno.writeTextFile(
+      join(workingDir, entry),
+      `import presetUno from "@unocss/preset-uno.ts";\n` + entryCode.replace(
+        /(\s+)ssr: {/,
+        [
+          `$1unocss: {`,
+          `    // Options for UnoCSS (atomic CSS)`,
+          `    // please check https://alephjs.org/docs/unocss `,
+          `    presets: [`,
+          `      presetUno(),`,
+          `    ],`,
+          `    theme: {},`,
+          `  },`,
+          `  ssr: {`,
+        ].join("\n"),
+      ),
+    );
+  }
+
   await ensureDir(workingDir);
   await Promise.all([
-    gitignore.length > 0 ? Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")) : Promise.resolve(),
+    Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")),
     Deno.writeTextFile(join(workingDir, "deno.json"), JSON.stringify(denoConfig, undefined, 2)),
     Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
 
-  if (cliMode && confirm("Add Github Action script for Deno Deploy™️?")) {
+  if (cliMode && confirm("Deploy to Deno Deploy?")) {
     const ciFile = join(workingDir, ".github/workflows/deploy.yml");
     await ensureDir(dirname(ciFile));
     await Deno.writeTextFile(ciFile, deployCI);
