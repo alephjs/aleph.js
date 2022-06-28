@@ -7,22 +7,25 @@ import { basename, dirname, join } from "https://deno.land/std@0.144.0/path/mod.
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
+import { generateRoutesModule } from "../server/dev.ts";
 import { existsDir } from "../server/helpers.ts";
+import { initRoutes } from "../server/routing.ts";
 
 // todo: get version from deno.land
 import { isCanary, VERSION } from "../version.ts";
 
-const templates = [
-  "api",
-  "react",
-  "vue",
-  "yew",
+const templates = {
+  "api": { cli: false, entry: "server.ts" },
+  "react": { cli: false, entry: "server.tsx" },
+  "vue": { cli: true, entry: "server.ts" },
+  "yew": { cli: true, entry: "server.ts" },
   // todo:
   // "preact",
   // "svelte",
   // "lit",
   // "vanilla",
-];
+};
+
 const versions = {
   react: "18.1.0",
   vue: "3.2.33",
@@ -62,8 +65,8 @@ Usage:
 <name> represents the name of new app.
 
 Options:
-    -t, --template [${templates.join(",")}] Specify a template for the created project
-    -h, --help      ${" ".repeat(templates.join(",").length)}  Prints help message
+    -t, --template [${Object.keys(templates).join(",")}] Specify a template for the created project
+    -h, --help      ${" ".repeat(Object.keys(templates).join(",").length)}  Prints help message
 `;
 
 export default async function init(nameArg?: string, template?: string) {
@@ -71,15 +74,15 @@ export default async function init(nameArg?: string, template?: string) {
     // todo: template choose dialog
     template = "react";
   }
-  if (!templates.includes(template)) {
-    log.fatal(`Invalid template name ${red(template)}, must be one of [${blue(templates.join(","))}]`);
+
+  if (!(template in templates)) {
+    log.fatal(`Invalid template name ${red(template)}, must be one of [${blue(Object.keys(templates).join(","))}]`);
   }
 
   const name = nameArg || (prompt("Project Name:") || "").trim();
   if (name === "") {
     return;
   }
-
   if (!/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) {
     log.fatal(`Invalid project name: ${red(name)}`);
   }
@@ -111,6 +114,7 @@ export default async function init(nameArg?: string, template?: string) {
     }
   }
 
+  const { cli: cliMode, entry } = templates[template as unknown as keyof typeof templates];
   const pkgName = isCanary ? "aleph_canary" : "aleph";
   const alephPkgUri = `https://deno.land/x/${pkgName}@${VERSION}`;
   const importMap = {
@@ -136,17 +140,40 @@ export default async function init(nameArg?: string, template?: string) {
       ],
     },
     "importMap": "import_map.json",
-    "tasks": {
-      "dev": `deno run -A ${alephPkgUri}/cli.ts dev`,
-      "start": `deno run -A ${alephPkgUri}/cli.ts start`,
-      "build": `deno run -A ${alephPkgUri}/cli.ts build`,
-    },
+    "tasks": cliMode
+      ? {
+        "dev": `deno run -A ${alephPkgUri}/cli.ts dev`,
+        "start": `deno run -A ${alephPkgUri}/cli.ts start`,
+        "build": `deno run -A ${alephPkgUri}/cli.ts build`,
+      }
+      : {
+        "dev": `ALEPH_ENV=development deno run -A ${entry}`,
+        "start": `deno run -A ${entry}`,
+        "build": `deno run -A ${alephPkgUri}/cli.ts build`,
+      },
     "fmt": {},
     "lint": {},
   };
   const gitignore = [
     "dist/",
   ];
+  if (!cliMode) {
+    const entryCode = await Deno.readTextFile(join(workingDir, entry));
+    await Deno.writeTextFile(
+      join(workingDir, entry),
+      entryCode
+        .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routesModules,`)
+        .replace(
+          /(\s*)serve\({/,
+          `$1// pre-import route modules for serverless env that doesn't support the dynamic imports,\n// this module will be updated automaticlly in develoment mode.\nimport routesModules from "./routes.gen.ts";\n\nserve({`,
+        ),
+    );
+    const m = entryCode.match(/(\s+)routes: "(.+)"/);
+    if (m) {
+      const routeConfig = await initRoutes(m[2], undefined, workingDir);
+      await generateRoutesModule(routeConfig, undefined, workingDir);
+    }
+  }
   switch (template) {
     case "react": {
       Object.assign(importMap.imports, {
@@ -173,12 +200,12 @@ export default async function init(nameArg?: string, template?: string) {
   }
   await ensureDir(workingDir);
   await Promise.all([
-    Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")),
+    gitignore.length > 0 ? Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")) : Promise.resolve(),
     Deno.writeTextFile(join(workingDir, "deno.json"), JSON.stringify(denoConfig, undefined, 2)),
     Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
 
-  if (confirm("Add Github Action script for Deno Deploy™️?")) {
+  if (cliMode && confirm("Add Github Action script for Deno Deploy™️?")) {
     const ciFile = join(workingDir, ".github/workflows/deploy.yml");
     await ensureDir(dirname(ciFile));
     await Deno.writeTextFile(ciFile, deployCI);
@@ -210,18 +237,20 @@ export default async function init(nameArg?: string, template?: string) {
     ]);
   }
 
-  console.log([
-    "",
-    green("Aleph.js is ready to go!"),
-    `${dim("▲")} cd ${name}`,
-    `${dim("▲")} deno task dev    ${dim("# start the app in `development` mode")}`,
-    `${dim("▲")} deno task start  ${dim("# start the app in `production` mode")}`,
-    `${dim("▲")} deno task build  ${dim("# build the app into a worker for serverless platforms like Deno Deploy")}`,
-    "",
-    `Docs: ${cyan("https://alephjs.org/docs")}`,
-    `Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}`,
-    "",
-  ].join("\n"));
+  console.log(
+    [
+      " ",
+      green("Aleph.js is ready to go!"),
+      `${dim("▲")} cd ${name}`,
+      `${dim("▲")} deno task dev    ${dim("# start the app in `development` mode")}`,
+      `${dim("▲")} deno task start  ${dim("# start the app in `production` mode")}`,
+      `${dim("▲")} deno task build  ${dim("# build & optimize the app for serverless platform")}`,
+      " ",
+      `Docs: ${cyan("https://alephjs.org/docs")}`,
+      `Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}`,
+      " ",
+    ].filter(Boolean).join("\n"),
+  );
   Deno.exit(0);
 }
 

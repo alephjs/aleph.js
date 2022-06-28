@@ -104,8 +104,8 @@ export function watchFS(appDir?: string) {
 }
 
 /** generate the `routes.gen.ts` module follows the routes config */
-async function generateRoutesModule(routeConfig: RouteConfig, appDir?: string) {
-  const genFile = appDir ? join(appDir, "routes.gen.ts") : "routes.gen.ts";
+export async function generateRoutesModule(routeConfig: RouteConfig, appDir?: string, cwd = Deno.cwd()) {
+  const genFile = join(cwd, appDir ? join(appDir, "routes.gen.ts") : "routes.gen.ts");
 
   try {
     const sourceCode = await Deno.readTextFile(genFile);
@@ -128,7 +128,7 @@ async function generateRoutesModule(routeConfig: RouteConfig, appDir?: string) {
 
   const routeFiles: [filename: string, exportNames: string[]][] = await Promise.all(
     routeConfig.routes.map(async ([_, { filename }]) => {
-      const code = await Deno.readTextFile(filename);
+      const code = await Deno.readTextFile(join(cwd, filename));
       const exportNames = await parseExportNames(filename, code);
       return [filename, exportNames];
     }),
