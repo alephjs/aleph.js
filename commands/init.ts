@@ -139,18 +139,18 @@ export default async function init(nameArg?: string, template?: string) {
   // generate `routes.gen.ts` module
   if (!cliMode) {
     const entryCode = await Deno.readTextFile(join(workingDir, entry));
-    await Deno.writeTextFile(
-      join(workingDir, entry),
-      entryCode
-        .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routesModules,`)
-        .replace(
-          /(\s*)serve\({/,
-          `$1// pre-import route modules for serverless env that doesn't support the dynamic imports,\n// this module will be updated automaticlly in develoment mode.\nimport routesModules from "./routes.gen.ts";\n\nserve({`,
-        ),
-    );
     const m = entryCode.match(/(\s+)routes: "(.+)"/);
     if (m) {
       const routeConfig = await initRoutes(m[2], undefined, workingDir);
+      await Deno.writeTextFile(
+        join(workingDir, entry),
+        entryCode
+          .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routeModules,`)
+          .replace(
+            /(\s*)serve\({/,
+            `$1// pre-import route modules for serverless env that doesn't support the dynamic imports.\nimport routeModules from "${routeConfig.prefix}/_export.ts";\n\nserve({`,
+          ),
+      );
       await generateRoutesModule(routeConfig, undefined, workingDir);
     }
   }
@@ -188,14 +188,14 @@ export default async function init(nameArg?: string, template?: string) {
       : {
         "dev": `ALEPH_ENV=development deno run -A ${entry}`,
         "start": `deno run -A ${entry}`,
-        "build": `deno run -A ${alephPkgUri}/cli.ts build`,
       },
     "fmt": {},
     "lint": {},
   };
-  const gitignore = [
-    "dist/",
-  ];
+  const gitignore = [];
+  if (cliMode) {
+    gitignore.push("dist/");
+  }
   switch (template) {
     case "react": {
       Object.assign(importMap.imports, {
@@ -247,7 +247,7 @@ export default async function init(nameArg?: string, template?: string) {
 
   await ensureDir(workingDir);
   await Promise.all([
-    Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")),
+    gitignore.length > 0 ? Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")) : Promise.resolve(),
     Deno.writeTextFile(join(workingDir, "deno.json"), JSON.stringify(denoConfig, undefined, 2)),
     Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
@@ -291,6 +291,7 @@ export default async function init(nameArg?: string, template?: string) {
       `${dim("▲")} cd ${name}`,
       `${dim("▲")} deno task dev    ${dim("# start the app in `development` mode")}`,
       `${dim("▲")} deno task start  ${dim("# start the app in `production` mode")}`,
+      cliMode &&
       `${dim("▲")} deno task build  ${dim("# build & optimize the app for serverless platform")}`,
       " ",
       `Docs: ${cyan("https://alephjs.org/docs")}`,

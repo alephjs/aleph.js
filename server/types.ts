@@ -4,7 +4,7 @@ export type AlephConfig = {
   /** The config for file-system based routing.  */
   routes?: string;
   /** The pre-imported modules of FS routing,  */
-  routesModules?: Record<string, Record<string, unknown>>;
+  routeModules?: Record<string, Record<string, unknown>>;
   /** The build options for `build` command. */
   build?: BuildOptions;
   /** The config for UnoCSS. */

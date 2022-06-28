@@ -1,5 +1,5 @@
 import { extname, globToRegExp, join } from "https://deno.land/std@0.144.0/path/mod.ts";
-import type { Route, RouteConfig, RouteMatch } from "../framework/core/route.ts";
+import type { Route, RouteConfig, RouteMatch, RouteMeta } from "../framework/core/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -45,8 +45,8 @@ export async function fetchRouteData(
     }
     if (matched) {
       const { method } = req;
-      const [ret, { filename }] = matched;
-      const mod = await importRouteModule(filename);
+      const [ret, meta] = matched;
+      const mod = await importRouteModule(meta);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
       if (method !== "GET" || mod.default === undefined || reqData) {
         Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
@@ -80,15 +80,16 @@ export function revive(filename: string, module: Record<string, unknown>) {
 }
 
 /** import the route module. */
-export async function importRouteModule(filename: string, cwd = Deno.cwd()) {
+export async function importRouteModule({ filename, pattern }: RouteMeta, cwd = Deno.cwd()) {
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   let mod: Record<string, unknown>;
+  console.log(filename, pattern, config?.routeModules);
   if (revivedModules.has(filename)) {
     mod = revivedModules.get(filename)!;
   } else if (
-    Deno.env.get("ALEPH_ENV") !== "development" && (config?.routesModules && filename in config.routesModules)
+    Deno.env.get("ALEPH_ENV") !== "development" && (config?.routeModules && pattern.pathname in config.routeModules)
   ) {
-    mod = config.routesModules[filename];
+    mod = config.routeModules[pattern.pathname];
   } else {
     const port = Deno.env.get("ALEPH_MODULES_PROXY_PORT");
     if (port) {
@@ -135,7 +136,7 @@ export async function initRoutes(config: string | RouteRegExp, appDir?: string, 
   files.forEach((file) => {
     const filename = reg.prefix + file.slice(1);
     const pattern = reg.exec(filename);
-    if (pattern) {
+    if (pattern && pattern.pathname !== "/_export") {
       const route: Route = [
         new URLPatternCompat(pattern),
         { pattern, filename },
@@ -164,7 +165,7 @@ export async function initRoutes(config: string | RouteRegExp, appDir?: string, 
   }
 
   log.debug(`${routes.length} routes found`);
-  return { routes, _404, _app };
+  return { routes, prefix: reg.prefix, _404, _app };
 }
 
 /** convert route config to `RouteRegExp` */

@@ -345,13 +345,13 @@ async function initSSR(
   const deferedData: Record<string, unknown> = {};
 
   // import module and fetch data for each matched route
-  const modules = await Promise.all(matches.map(async ([ret, { filename }]) => {
-    const mod = await importRouteModule(filename);
+  const modules = await Promise.all(matches.map(async ([ret, meta]) => {
+    const mod = await importRouteModule(meta);
     const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),
       params: ret.pathname.groups,
-      filename: filename,
+      filename: meta.filename,
       defaultExport: mod.default,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
     };

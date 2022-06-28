@@ -368,8 +368,8 @@ export const serve = (options: ServerOptions = {}) => {
   }
 
   // inject global objects
-  const { routesModules, caches, unocss } = options;
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { routes, routesModules, caches, unocss, build, devServer });
+  const { routeModules, caches, unocss } = options;
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { routes, routeModules, caches, unocss, build, devServer });
   Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
 
   // apply `watchFS` handler of `devServer`
