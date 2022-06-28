@@ -83,7 +83,6 @@ export function revive(filename: string, module: Record<string, unknown>) {
 export async function importRouteModule({ filename, pattern }: RouteMeta, cwd = Deno.cwd()) {
   const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
   let mod: Record<string, unknown>;
-  console.log(filename, pattern, config?.routeModules);
   if (revivedModules.has(filename)) {
     mod = revivedModules.get(filename)!;
   } else if (
