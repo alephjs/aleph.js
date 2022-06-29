@@ -137,7 +137,7 @@ export async function initRoutes(config: string | RouteRegExp, appDir?: string, 
   files.forEach((file) => {
     const filename = reg.prefix + file.slice(1);
     const pattern = reg.exec(filename);
-    if (pattern && pattern.pathname !== "/_export") {
+    if (pattern && pattern.pathname !== "/_export" && !pattern.pathname.endsWith("_test")) {
       const route: Route = [
         new URLPatternCompat(pattern),
         { pattern, filename },
