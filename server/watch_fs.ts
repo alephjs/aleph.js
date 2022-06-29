@@ -1,4 +1,4 @@
-import { join, relative } from "https://deno.land/std@0.144.0/path/mod.ts";
+import { join, relative } from "https://deno.land/std@0.145.0/path/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import { getFiles } from "./helpers.ts";
 import type { DependencyGraph } from "./graph.ts";

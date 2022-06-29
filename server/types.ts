@@ -70,7 +70,6 @@ export type ModuleLoaderOutput = {
   code: string;
   inlineCSS?: string;
   lang?: "js" | "jsx" | "ts" | "tsx" | "css";
-  isTemplateLanguage?: boolean;
   map?: string;
 };
 

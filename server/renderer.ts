@@ -1,10 +1,10 @@
-import { join } from "https://deno.land/std@0.144.0/path/mod.ts";
+import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { FetchError } from "../framework/core/error.ts";
 import type { RouteConfig, RouteModule } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
-import { builtinModuleExts, getDeploymentId, getFiles, getUnoGenerator, globalIt } from "./helpers.ts";
+import { builtinModuleExts, getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
 import type { Element, HTMLRewriterHandlers } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
@@ -89,12 +89,8 @@ export default {
       const body = await render(ssrContext);
       const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
       if (serverDependencyGraph) {
-        const unocssTokens: ReadonlyArray<string>[] = [];
         const lookupModuleStyle = (mod: Module) => {
-          const { specifier, atomicCSS, inlineCSS } = mod;
-          if (atomicCSS) {
-            unocssTokens.push(atomicCSS.tokens);
-          }
+          const { specifier, inlineCSS } = mod;
           if (inlineCSS) {
             headCollection.push(`<style data-module-id="${specifier}">${inlineCSS}</style>`);
           }
@@ -108,33 +104,23 @@ export default {
             break;
           }
         }
-        if (unocssTokens.length > 0) {
-          const unoGenerator = getUnoGenerator();
-          if (unoGenerator) {
-            const start = performance.now();
-            const { css } = await unoGenerator.generate(new Set(unocssTokens.flat()), {
-              minify: !isDev,
-            });
-            if (css) {
-              const buildTime = performance.now() - start;
-              headCollection.push(
-                `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.1/tailwind.css">`,
-                `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
-              );
-            }
-          }
-        }
-      } else {
-        const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-        const test: RegExp = config?.unocss?.test ?? /\.(jsx|tsx)$/;
-        const files = await getFiles(config?.appDir ? join(Deno.cwd(), config.appDir) : Deno.cwd());
-        const templateFiles = files.filter((name) => test.test(name));
+      }
+
+      // build unocss
+      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+      if (config?.unocss?.presets) {
+        const test: RegExp = config.unocss.test ?? /\.(jsx|tsx)$/;
+        const dir = config?.appDir ? join(Deno.cwd(), config.appDir) : Deno.cwd();
+        const files = await getFiles(dir);
+        const inputSources = await Promise.all(
+          files.filter((name) => test.test(name)).map((name) => Deno.readTextFile(join(dir, name))),
+        );
         const unoGenerator = getUnoGenerator();
         if (unoGenerator) {
           const start = performance.now();
           let css = Reflect.get(globalThis, "__ALEPH_GLOBAL_UNOCSS");
           if (!css) {
-            const ret = await unoGenerator.generate(templateFiles.join("\n"), {
+            const ret = await unoGenerator.generate(inputSources.join("\n"), {
               minify: !isDev,
             });
             css = ret.css;
@@ -151,6 +137,7 @@ export default {
           }
         }
       }
+
       if (routeModules.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)) {
         const ttls = routeModules.map(({ dataCacheTtl }) => Number(dataCacheTtl));
         headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
@@ -220,7 +207,10 @@ export default {
         rewriter.on("head", {
           element(el: Element) {
             if (routeConfig && routeConfig.routes.length > 0) {
-              const json = JSON.stringify({ routes: routeConfig.routes.map(([_, meta]) => meta) });
+              const json = JSON.stringify({
+                routes: routeConfig.routes.map(([_, meta]) => meta),
+                prefix: routeConfig.prefix,
+              });
               el.append(`<script id="routes-manifest" type="application/json">${json}</script>`, {
                 html: true,
               });

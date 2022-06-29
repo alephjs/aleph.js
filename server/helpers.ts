@@ -1,4 +1,4 @@
-import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.144.0/path/mod.ts";
+import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
 import { cacheFetch } from "./cache.ts";
@@ -38,6 +38,11 @@ export function globalItSync<T>(name: string, fn: () => T): T {
 }
 
 /* Get Aleph.js package URI. */
+export function getAlephConfig(): AlephConfig | undefined {
+  return Reflect.get(globalThis, "__ALEPH_CONFIG");
+}
+
+/* Get the module URI of Aleph.js */
 export function getAlephPkgUri(): string {
   return globalItSync("__ALEPH_PKG_URI", () => {
     const uriFromEnv = Deno.env.get("ALEPH_PKG_URI");
@@ -55,7 +60,7 @@ export function getAlephPkgUri(): string {
 
 /** Get the UnoCSS generator, return `null` if the presets are empty. */
 export function getUnoGenerator(): UnoGenerator | null {
-  const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+  const config = getAlephConfig();
   if (config === undefined) {
     return null;
   }
@@ -286,11 +291,11 @@ export async function getFiles(
 }
 
 /* read source code from fs/cdn/cache */
-export async function readCode(specifier: string, cwd = Deno.cwd()): Promise<[code: string, contentType: string]> {
+export async function readCode(specifier: string, target?: string): Promise<[code: string, contentType: string]> {
   if (util.isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
     if (url.hostname === "esm.sh" && !url.searchParams.has("target")) {
-      url.searchParams.set("target", "esnext");
+      url.searchParams.set("target", target ?? "esnext");
     }
     const res = await cacheFetch(url.href);
     if (res.status >= 400) {
@@ -300,7 +305,7 @@ export async function readCode(specifier: string, cwd = Deno.cwd()): Promise<[co
   }
 
   specifier = util.splitBy(specifier, "?")[0];
-  return [await Deno.readTextFile(join(cwd, specifier)), getContentType(specifier)];
+  return [await Deno.readTextFile(specifier), getContentType(specifier)];
 }
 
 /** Load the JSX config base the given import maps and the existing deno config. */

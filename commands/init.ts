@@ -1,9 +1,9 @@
-import { Untar } from "https://deno.land/std@0.144.0/archive/tar.ts";
-import { Buffer } from "https://deno.land/std@0.144.0/io/buffer.ts";
-import { copy, readAll } from "https://deno.land/std@0.144.0/streams/conversion.ts";
-import { blue, cyan, dim, green, red } from "https://deno.land/std@0.144.0/fmt/colors.ts";
-import { ensureDir } from "https://deno.land/std@0.144.0/fs/ensure_dir.ts";
-import { basename, dirname, join } from "https://deno.land/std@0.144.0/path/mod.ts";
+import { Untar } from "https://deno.land/std@0.145.0/archive/tar.ts";
+import { Buffer } from "https://deno.land/std@0.145.0/io/buffer.ts";
+import { copy, readAll } from "https://deno.land/std@0.145.0/streams/conversion.ts";
+import { blue, cyan, dim, green, red } from "https://deno.land/std@0.145.0/fmt/colors.ts";
+import { ensureDir } from "https://deno.land/std@0.145.0/fs/ensure_dir.ts";
+import { basename, dirname, join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -151,7 +151,7 @@ export default async function init(nameArg?: string, template?: string) {
             `$1// pre-import route modules for serverless env that doesn't support the dynamic imports.\nimport routeModules from "${routeConfig.prefix}/_export.ts";\n\nserve({`,
           ),
       );
-      await generateRoutesModule(routeConfig, undefined, workingDir);
+      await generateRoutesModule(routeConfig, workingDir);
     }
   }
 
@@ -159,7 +159,7 @@ export default async function init(nameArg?: string, template?: string) {
   const importMap = {
     imports: {
       "~/": "./",
-      "std/": "https://deno.land/std@0.144.0/",
+      "std/": "https://deno.land/std@0.145.0/",
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
     },

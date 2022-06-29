@@ -1,12 +1,12 @@
 import MagicString from "https://esm.sh/magic-string@0.26.2";
-import { parseDeps } from "https://deno.land/x/aleph_compiler@0.6.4/mod.ts";
+import { parseDeps } from "https://deno.land/x/aleph_compiler@0.6.6/mod.ts";
 import log from "../lib/log.ts";
 import { getContentType } from "../lib/media_type.ts";
 import { serveDir } from "../lib/serve.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
 import { DependencyGraph } from "./graph.ts";
-import { builtinModuleExts, getUnoGenerator } from "./helpers.ts";
+import { builtinModuleExts } from "./helpers.ts";
 import type { ImportMap, ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "./types.ts";
 
 const cssModuleLoader = async (specifier: string, env: ModuleLoaderEnv) => {
@@ -43,23 +43,18 @@ const esModuleLoader = async (input: { specifier: string } & ModuleLoaderOutput,
     throw new Error("The `serverDependencyGraph` is not defined");
   }
 
-  const { code, specifier, lang, inlineCSS, isTemplateLanguage } = input;
+  const { code, specifier, lang, inlineCSS } = input;
   if (lang === "css") {
     throw new Error("The `lang` can't be `css`");
   }
 
-  const isTpl = isTemplateLanguage || lang === "jsx" || lang === "tsx" || util.endsWithAny(specifier, ".tsx", ".jsx");
-  const unoGenerator = isTpl ? getUnoGenerator() : null;
-  const [deps, atomicCSS] = await Promise.all([
-    parseDeps(specifier, code, { importMap: JSON.stringify(env.importMap), lang }),
-    unoGenerator ? unoGenerator.generate(code).then((ret) => ({ tokens: [...ret.matched] })) : undefined,
-  ]);
+  const deps = await parseDeps(specifier, code, { importMap: JSON.stringify(env.importMap), lang });
   const headers: HeadersInit = [];
   if (lang) {
     headers.push(["Content-Type", getContentType(`file.${lang}`)]);
     headers.push(["X-Language", lang]);
   }
-  serverDependencyGraph.mark(specifier, { deps, inlineCSS, atomicCSS });
+  serverDependencyGraph.mark(specifier, { deps, inlineCSS });
   if (deps.length) {
     const s = new MagicString(code);
     deps.forEach((dep) => {

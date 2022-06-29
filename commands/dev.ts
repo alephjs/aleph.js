@@ -1,4 +1,4 @@
-import { basename, resolve } from "https://deno.land/std@0.144.0/path/mod.ts";
+import { basename, resolve } from "https://deno.land/std@0.145.0/path/mod.ts";
 import log, { blue } from "../lib/log.ts";
 import { serve as httpServe } from "../lib/serve.ts";
 import { builtinModuleExts, findFile, initModuleLoaders, loadImportMap } from "../server/helpers.ts";

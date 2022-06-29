@@ -133,7 +133,6 @@ export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
       code: output.join("\n"),
       lang: isTS ? "ts" : "js",
       inlineCSS: css || undefined,
-      isTemplateLanguage: true,
     };
   }
 }

@@ -1,12 +1,13 @@
 import MagicString from "https://esm.sh/magic-string@0.26.2";
-import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.6.4/mod.ts";
-import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.6.4/types.ts";
+import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.6.6/mod.ts";
+import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.6.6/types.ts";
 import { TransformError } from "../framework/core/error.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle_css.ts";
 import {
   builtinModuleExts,
+  getAlephConfig,
   getAlephPkgUri,
   getDeploymentId,
   getUnoGenerator,
@@ -36,7 +37,7 @@ export default {
     );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { isDev, loader } = options;
+    const { isDev, loader, buildTarget } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
@@ -49,23 +50,20 @@ export default {
 
     let resBody = "";
     let resType = "application/javascript";
-    let [sourceCode, codeType] = await readCode(specifier);
+    let [sourceCode, codeType] = await readCode(specifier, buildTarget);
 
     try {
       let lang: string | undefined;
       let inlineCSS: string | undefined;
       let isCSS: boolean;
-      let uno: boolean;
       if (loader) {
         const loaded = await loader.load(specifier, sourceCode, { importMap: options.importMap, isDev });
         sourceCode = loaded.code;
         lang = loaded.lang;
         inlineCSS = loaded.inlineCSS;
         isCSS = loaded.lang === "css";
-        uno = Boolean(loaded.isTemplateLanguage || loaded.lang === "jsx" || loaded.lang === "tsx");
       } else {
         isCSS = codeType.startsWith("text/css");
-        uno = pathname.endsWith(".jsx") || pathname.endsWith(".tsx");
       }
       if (isCSS) {
         const asJsModule = searchParams.has("module");
@@ -90,7 +88,7 @@ export default {
         }
       } else {
         const alephPkgUri = getAlephPkgUri();
-        const { jsxConfig, importMap, buildTarget } = options;
+        const { jsxConfig, importMap } = options;
         let ret: TransformResult;
         if (/^https?:\/\/((cdn\.)?esm\.sh|unpkg\.com)\//.test(specifier)) {
           // don't transform modules imported from esm.sh
@@ -118,17 +116,20 @@ export default {
             ...jsxConfig,
             lang: lang as TransformOptions["lang"],
             stripDataExport: isRouteFile(specifier),
-            target: buildTarget ?? (isDev ? "es2022" : "es2020"),
+            target: buildTarget ?? "es2022",
             alephPkgUri,
             importMap: JSON.stringify(importMap),
             graphVersions,
             globalVersion: clientDependencyGraph?.globalVersion.toString(16),
+            sourceMap: isDev,
+            minify: isDev ? undefined : { compress: true },
             isDev,
           });
         }
         let { code, map, deps } = ret;
         let hasInlineCSS = false;
-        if (uno) {
+        const config = getAlephConfig();
+        if (config?.unocss?.presets && (config.unocss.test ?? /.(jsx|tsx)$/).test(pathname)) {
           try {
             const unoGenerator = getUnoGenerator();
             if (unoGenerator) {

@@ -1,5 +1,5 @@
-import { join } from "https://deno.land/std@0.144.0/path/mod.ts";
-import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.6.4/mod.ts";
+import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
+import { parseExportNames } from "https://deno.land/x/aleph_compiler@0.6.6/mod.ts";
 import type { RouteConfig } from "../framework/core/route.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
@@ -68,7 +68,7 @@ export function watchFS(appDir?: string) {
         const routeConfig = await initRoutes(reg, appDir);
         Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
         if (!Deno.env.get("ALEPH_CLI")) {
-          generateRoutesModule(routeConfig, appDir).catch((error) => log.error(error));
+          generateRoutesModule(routeConfig).catch((error) => log.error(error));
         }
       }
     } else {
@@ -82,7 +82,7 @@ export function watchFS(appDir?: string) {
     initRoutes(config.routes, appDir).then((routeConfig) => {
       Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
       if (!Deno.env.get("ALEPH_CLI")) {
-        generateRoutesModule(routeConfig, appDir).catch((error) => log.error(error));
+        generateRoutesModule(routeConfig).catch((error) => log.error(error));
       }
     });
   }
@@ -104,7 +104,7 @@ export function watchFS(appDir?: string) {
 }
 
 /** generate the `_export.ts` module follows the routes config */
-export async function generateRoutesModule(routeConfig: RouteConfig, appDir?: string, cwd = Deno.cwd()) {
+export async function generateRoutesModule(routeConfig: RouteConfig, cwd = Deno.cwd()) {
   const genFile = join(cwd, routeConfig.prefix, "_export.ts");
 
   const routeFiles: [filename: string, pattern: string, exportNames: string[]][] = await Promise.all(

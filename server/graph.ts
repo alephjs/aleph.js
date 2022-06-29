@@ -3,9 +3,6 @@ export type Module = {
   readonly version: number;
   readonly deps?: ReadonlyArray<DependencyDescriptor>;
   readonly inlineCSS?: string;
-  readonly atomicCSS?: {
-    readonly tokens: ReadonlyArray<string>;
-  };
 };
 
 export type DependencyDescriptor = {

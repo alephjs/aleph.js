@@ -22,7 +22,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     </style>
   `;
     const loader = new VueLoader();
-    const { lang, code, inlineCSS, isTemplateLanguage } = await loader.load("/test.vue", testVue, { isDev: false });
+    const { lang, code, inlineCSS } = await loader.load("/test.vue", testVue, { isDev: false });
     assertEquals(lang, "js");
     assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
     assert(code.includes(`setup(__props)`));
@@ -34,7 +34,6 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     assert(code.includes(`__sfc__.__scopeId = "data-v-`));
     assert(inlineCSS?.includes("h1[data-v-"));
     assert(inlineCSS?.includes("font-size: 30px;"));
-    assert(isTemplateLanguage);
   });
 
   await t.step("VueLoader(ts)", async () => {
@@ -48,14 +47,13 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     </template>
   `;
     const loader = new VueLoader();
-    const { lang, code, isTemplateLanguage } = await loader.load("/test.vue", testVue, { isDev: false });
+    const { lang, code } = await loader.load("/test.vue", testVue, { isDev: false });
     assertEquals(lang, "ts");
     assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
     assert(code.includes(`setup(__props)`));
     assert(code.includes(`let x: string | number = 1`));
     assert(code.includes(`_createElementBlock("p"`));
     assert(code.includes(`__sfc__.__file = "./test.vue"`));
-    assert(isTemplateLanguage);
   });
 
   await t.step("VueLoader(hmr)", async () => {

@@ -1,4 +1,4 @@
-import { extname, globToRegExp, join } from "https://deno.land/std@0.144.0/path/mod.ts";
+import { extname, globToRegExp, join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import type { Route, RouteConfig, RouteMatch, RouteMeta } from "../framework/core/route.ts";
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
 import log from "../lib/log.ts";
@@ -98,6 +98,8 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, cwd = 
     } else {
       const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
       const version = graph?.get(filename)?.version ?? graph?.mark(filename, {}).version;
+
+      console.log(`file://${join(cwd, filename)}${version ? "#" + version.toString(16) : ""}`);
       mod = await import(`file://${join(cwd, filename)}${version ? "#" + version.toString(16) : ""}`);
     }
   }

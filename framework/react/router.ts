@@ -326,13 +326,13 @@ function loadRouteConfigFromTag(): RouteConfig {
           }
           return route;
         });
-        return { routes, _app, _404 };
+        return { routes, prefix: manifest.prefix, _app, _404 };
       }
     } catch (e) {
       throw new Error(`loadRouteConfigFromTag: ${e.message}`);
     }
   }
-  return { routes: [] };
+  return { routes: [], prefix: "" };
 }
 
 // prefetch route data

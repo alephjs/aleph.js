@@ -1,6 +1,6 @@
-import type { ConnInfo, ServeInit } from "https://deno.land/std@0.144.0/http/server.ts";
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.144.0/http/server.ts";
-import { readableStreamFromReader } from "https://deno.land/std@0.144.0/streams/conversion.ts";
+import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/server.ts";
+import { serve as stdServe, serveTls } from "https://deno.land/std@0.145.0/http/server.ts";
+import { readableStreamFromReader } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
 import type { RouteConfig } from "../framework/core/route.ts";
 import log, { LevelName } from "../lib/log.ts";
