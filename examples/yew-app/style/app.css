@@ -9,6 +9,10 @@
   height: calc(100vh - 2 * 80px);
 }
 
+.index .logo {
+  display: flex;
+}
+
 .index h1 {
   margin: 0;
   line-height: 1.4;

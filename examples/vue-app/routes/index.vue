@@ -41,6 +41,10 @@ import { Link, Head } from "aleph/vue"
 </template>
 
 <style>
+.index .logo {
+  display: flex;
+}
+
 .index h1 {
   margin: 0;
   line-height: 1.4;
