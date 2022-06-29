@@ -1,6 +1,7 @@
 import type { UserConfig as UnoConfig } from "../lib/@unocss/core.ts";
 
 export type AlephConfig = {
+  appDir?: string;
   /** The config for file-system based routing.  */
   routes?: string;
   /** The pre-imported modules of FS routing,  */
@@ -8,7 +9,7 @@ export type AlephConfig = {
   /** The build options for `build` command. */
   build?: BuildOptions;
   /** The config for UnoCSS. */
-  unocss?: UnoConfig;
+  unocss?: UnoConfig & { test?: RegExp };
   /* The cache storage for transformer/ssr */
   caches?: CacheStorage;
   /** The config for dev server. */

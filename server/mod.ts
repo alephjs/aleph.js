@@ -27,7 +27,6 @@ import type { SessionOptions } from "./session.ts";
 import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
 
 export type ServerOptions = Omit<ServeInit, "onError"> & {
-  appDir?: string;
   certFile?: string;
   keyFile?: string;
   logLevel?: LevelName;
@@ -369,7 +368,7 @@ export const serve = (options: ServerOptions = {}) => {
 
   // inject global objects
   const { routeModules, caches, unocss } = options;
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { routes, routeModules, caches, unocss, build, devServer });
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { appDir, routes, routeModules, caches, unocss, build, devServer });
   Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
 
   // apply `watchFS` handler of `devServer`

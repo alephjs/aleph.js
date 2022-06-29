@@ -1,12 +1,14 @@
+import { join } from "https://deno.land/std@0.144.0/path/mod.ts";
 import { FetchError } from "../framework/core/error.ts";
 import type { RouteConfig, RouteModule } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
-import { builtinModuleExts, getDeploymentId, getUnoGenerator } from "./helpers.ts";
+import { builtinModuleExts, getDeploymentId, getFiles, getUnoGenerator, globalIt } from "./helpers.ts";
 import type { Element, HTMLRewriterHandlers } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
+import type { AlephConfig } from "./types.ts";
 
 export type SSRContext = {
   readonly url: URL;
@@ -120,6 +122,32 @@ export default {
                 `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
               );
             }
+          }
+        }
+      } else {
+        const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+        const test: RegExp = config?.unocss?.test ?? /\.(jsx|tsx)$/;
+        const files = await getFiles(config?.appDir ? join(Deno.cwd(), config.appDir) : Deno.cwd());
+        const templateFiles = files.filter((name) => test.test(name));
+        const unoGenerator = getUnoGenerator();
+        if (unoGenerator) {
+          const start = performance.now();
+          let css = Reflect.get(globalThis, "__ALEPH_GLOBAL_UNOCSS");
+          if (!css) {
+            const ret = await unoGenerator.generate(templateFiles.join("\n"), {
+              minify: !isDev,
+            });
+            css = ret.css;
+            if (!isDev) {
+              Reflect.set(globalThis, "__ALEPH_GLOBAL_UNOCSS", css);
+            }
+          }
+          if (css) {
+            const buildTime = performance.now() - start;
+            headCollection.push(
+              `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.1/tailwind.css">`,
+              `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
+            );
           }
         }
       }
