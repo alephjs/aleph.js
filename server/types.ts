@@ -10,8 +10,6 @@ export type AlephConfig = {
   build?: BuildOptions;
   /** The config for UnoCSS. */
   unocss?: UnoConfig & { test?: RegExp };
-  /* The cache storage for transformer/ssr */
-  caches?: CacheStorage;
   /** The config for dev server. */
   devServer?: {
     /** The handler for fs watch event */

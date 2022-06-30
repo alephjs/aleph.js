@@ -248,7 +248,7 @@ export async function build(serverEntry: string | undefined) {
     }],
   });
 
-  // get depndency graph
+  // get dependency graph
   const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
   const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
 

@@ -1,7 +1,7 @@
 // react-refresh
 // @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
 
-import runtime from "https://esm.sh/react-refresh@0.13.0/runtime";
+import runtime from "https://esm.sh/react-refresh@0.14.0/runtime";
 import util from "../../lib/util.ts";
 
 const refresh = util.debounce(runtime.performReactRefresh, 30);

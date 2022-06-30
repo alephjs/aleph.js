@@ -129,6 +129,7 @@ export default {
         let { code, map, deps } = ret;
         let hasInlineCSS = false;
         const config = getAlephConfig();
+        const styleTs = `${alephPkgUri}/framework/core/style.ts`;
         if (config?.unocss?.presets && (config.unocss.test ?? /.(jsx|tsx)$/).test(pathname)) {
           try {
             const unoGenerator = getUnoGenerator();
@@ -136,9 +137,9 @@ export default {
               const { css } = await unoGenerator.generate(sourceCode, { id: specifier, minify: !isDev });
 
               if (css) {
-                code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${
-                  toLocalPath(alephPkgUri)
-                }/framework/core/style.ts";\n__applyUnoCSS(${JSON.stringify(specifier)}, ${JSON.stringify(css)});\n`;
+                code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
+                  JSON.stringify(specifier)
+                }, ${JSON.stringify(css)});\n`;
                 hasInlineCSS = true;
               }
             }
@@ -147,13 +148,13 @@ export default {
           }
         }
         if (inlineCSS) {
-          code += `\nimport { applyCSS as __applyCSS } from "${
-            toLocalPath(alephPkgUri)
-          }/framework/core/style.ts";\n__applyCSS(${JSON.stringify(specifier)}, ${JSON.stringify(inlineCSS)});\n`;
+          code += `\nimport { applyCSS as __applyCSS } from "${toLocalPath(styleTs)}";\n__applyCSS(${
+            JSON.stringify(specifier)
+          }, ${JSON.stringify(inlineCSS)});\n`;
           hasInlineCSS = true;
         }
         if (hasInlineCSS) {
-          deps = [...(deps || []), { specifier: alephPkgUri + "/framework/core/style.ts" }] as typeof deps;
+          deps = [...(deps || []), { specifier: styleTs }] as typeof deps;
         }
         clientDependencyGraph?.mark(specifier, { deps });
         if (map) {

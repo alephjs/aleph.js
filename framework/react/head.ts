@@ -83,10 +83,6 @@ function parse(
           walk(props.children);
           break;
 
-        // case InlineStyle:
-        //   forwardNodes.push(createElement(InlineStyle, props));
-        //   break;
-
         // ingore `script` and `no-script` tag
 
         case "base":

@@ -10,8 +10,8 @@ type ContextOptions = {
   session?: SessionOptions;
 };
 
+/** create a context object */
 export function createContext(req: Request, options?: ContextOptions): typeof ctx {
-  // create the context object
   const ctx = {
     connInfo: options?.connInfo,
     params: {},

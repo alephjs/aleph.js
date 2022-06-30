@@ -378,13 +378,13 @@ function loadRoutesFromTag(): RouteConfig {
           }
           return route;
         });
-        return { routes, _app, _404 };
+        return { routes, prefix: manifest.prefix, _app, _404 };
       }
     } catch (e) {
       throw new Error(`loadRoutesFromTag: ${e.message}`);
     }
   }
-  return { routes: [] };
+  return { routes: [], prefix: "" };
 }
 
 const useRouter = () => {
