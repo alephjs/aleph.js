@@ -86,7 +86,11 @@ export default {
           // todo: handle suspense ssr error
         },
       };
-      const body = await render(ssrContext);
+
+      let body = await render(ssrContext);
+      if (typeof body !== "string" && !(body instanceof ReadableStream)) {
+        body = "";
+      }
 
       // find inline css
       const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");

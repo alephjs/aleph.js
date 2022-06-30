@@ -1,6 +1,6 @@
 import { concat } from "https://deno.land/std@0.145.0/bytes/mod.ts";
 import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
-import type { Comment, DocumentEnd, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
+import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
 import lolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
 import util from "../lib/util.ts";
@@ -36,7 +36,6 @@ type LoadOptions = {
 // - fix relative url to absolute url of `src` and `href`
 // - add `./framework/core/hmr.ts` when in `development` mode
 // - add `./framework/core/nomodule.ts`
-// - ensure the `<head>` and `<body>` exists
 // - check the `<ssr-body>` element if the ssr is enabled
 // - add `data-defer` attribute to `<body>` if possible
 // - todo: apply unocss
@@ -47,17 +46,9 @@ export async function loadAndFixIndexHtml(options: LoadOptions): Promise<Uint8Ar
 
 async function loadIndexHtml(appDir?: string): Promise<{ html: Uint8Array; hasSSRBody: boolean }> {
   const chunks: Uint8Array[] = [];
-  let hasHead = false;
-  let hasBody = false;
   let hasSSRBody = false;
   const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
 
-  rewriter.on("head", {
-    element: () => hasHead = true,
-  });
-  rewriter.on("body", {
-    element: () => hasBody = true,
-  });
   rewriter.on("ssr-body", {
     element: () => hasSSRBody = true,
   });
@@ -81,16 +72,6 @@ async function loadIndexHtml(appDir?: string): Promise<{ html: Uint8Array; hasSS
           c.replace("<ssr-body></ssr-body>", { html: true });
           hasSSRBody = true;
         }
-      }
-    },
-  });
-  rewriter.onDocument({
-    end: (end: DocumentEnd) => {
-      if (!hasHead) {
-        end.append(`<head></head>`, { html: true });
-      }
-      if (!hasBody) {
-        end.append(`<body></body>`, { html: true });
       }
     },
   });
