@@ -8,6 +8,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # this is the development version of Yew
-yew = { git = "https://github.com/yewstack/yew/", features = ["ssr", "hydration"] }
-wasm-bindgen = { version = "0.2.80", features = ["strict-macro"] }
-wasm-bindgen-futures = "0.4.30"
+yew = { git = "https://github.com/yewstack/yew.git", features = ["ssr", "hydration"] }
+yew-router = { git = "https://github.com/yewstack/yew.git" }
+wasm-bindgen = { version = "0.2.81", features = ["strict-macro"] }
+wasm-bindgen-futures = "0.4.31"
+web-sys = "0.3.58"
+url = "2.2.2"

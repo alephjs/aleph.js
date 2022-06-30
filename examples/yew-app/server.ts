@@ -13,6 +13,6 @@ serve({
     },
   },
   ssr: {
-    render: (_ctx) => ssr(),
+    render: (ctx) => ssr(ctx.url.href),
   },
 });

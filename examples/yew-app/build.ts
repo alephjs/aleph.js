@@ -14,3 +14,7 @@ export default async function build() {
   p.close();
   isBuilding = false;
 }
+
+if (import.meta.main) {
+  build();
+}

@@ -1,47 +1,58 @@
+use url::Url;
 use yew::prelude::*;
+use yew_router::history::{AnyHistory, History, MemoryHistory};
+use yew_router::prelude::*;
+
+use crate::routes::index::Index;
+use crate::routes::todos::Todos; 
+use crate::components::header::Header; 
+use crate::shared::Route;
 
 #[function_component]
-pub fn App() -> Html {
-    let counter = use_state(|| 0);
-    let onclick = {
-        let counter = counter.clone();
-        move |_| {
-            let value = *counter + 1;
-            counter.set(value);
-        }
-    };
+pub fn NotFound() -> Html {
+  html! {
+    <div class="screen e404">
+      <h2>
+        {"Ooooooops, nothing here!"}
+      </h2>
+      <p>
+        <Link<Route> to={Route::Home}>{"Go back to the homepage"}</Link<Route>>
+      </p>
+    </div>
+  }
+}
 
+fn switch(routes: Route) -> Html {
+  match routes {
+    Route::Home => html! { <Index /> },
+    Route::Todos => html! { <Todos /> },
+    Route::NotFound => html! { <NotFound/> },
+  }
+}
+
+#[derive(Properties, PartialEq, Default)]
+pub struct AppProps {
+  pub ssr_url: Option<String>,
+}
+
+#[function_component]
+pub fn App(props: &AppProps) -> Html {
+  if let Some(url) = &props.ssr_url {
+    let history = AnyHistory::from(MemoryHistory::new());
+    let url = Url::parse(url).unwrap();
+    history.push(url.path());
     html! {
-      <div class="index screen">
-        <p class="logo">
-          <img src="/assets/logo.svg" width="70" height="70" title="Aleph.js" />
-          <img src="/assets/yew.png" width="70" height="70" title="Yew" />
-        </p>
-        <h1>{"The Fullstack Framework in Deno."}</h1>
-        <p>
-          <strong>{"Aleph.js"}</strong>
-          {" gives you the best developer experience for building web applications"}
-          <br />
-          {"with modern toolings."} <label>{"Yew SSR experimental version"}</label>{"."}
-        </p>
-        <div class="external-links">
-          <a href="https://alephjs.org/docs/get-started" target="_blank">
-            {"Get Started"}
-          </a>
-          <a href="https://alephjs.org/docs" target="_blank">
-            {"Docs"}
-          </a>
-          <a href="https://github.com/alephjs/aleph.js" target="_blank">
-            {"Github"}
-          </a>
-        </div>
-        <nav>
-          <button onclick={onclick}>
-            {"Counter:"}
-            <strong>{ *counter }</strong>
-            <small>{"Click to add 1"}</small>
-          </button>
-        </nav>
-      </div>
+      <Router history={history}>
+        <Header/>
+        <Switch<Route> render={switch} />
+     </Router>
     }
+  } else {
+    html! {
+      <BrowserRouter>
+        <Header/>
+        <Switch<Route> render={switch} />
+      </BrowserRouter>
+    }
+  }
 }
