@@ -4,7 +4,7 @@ import type { RouteConfig, RouteModule } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
 import type { DependencyGraph, Module } from "./graph.ts";
-import { builtinModuleExts, getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
+import { getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
 import type { Element, HTMLRewriterHandlers } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
@@ -27,8 +27,8 @@ export type SSRFn = {
 // Options for the content-security-policy
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
 export type CSP = {
-  nonce?: boolean;
   getPolicy: (url: URL, nonce?: string) => string | null;
+  nonce?: boolean;
 };
 
 export type SSR = {
@@ -87,6 +87,8 @@ export default {
         },
       };
       const body = await render(ssrContext);
+
+      // find inline css
       const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
       if (serverDependencyGraph) {
         const lookupModuleStyle = (mod: Module) => {
@@ -97,12 +99,6 @@ export default {
         };
         for (const { filename } of routeModules) {
           serverDependencyGraph.shallowWalk(filename, lookupModuleStyle);
-        }
-        for (const serverEntry of builtinModuleExts.map((ext) => `./server.${ext}`)) {
-          if (serverDependencyGraph.get(serverEntry)) {
-            serverDependencyGraph.shallowWalk(serverEntry, lookupModuleStyle);
-            break;
-          }
         }
       }
 
