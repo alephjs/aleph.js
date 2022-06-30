@@ -9,8 +9,8 @@
     "react": "https://esm.sh/react@18.1.0",
     "react-dom": "https://esm.sh/react-dom@18.1.0",
     "react-dom/": "https://esm.sh/react-dom@18.1.0/",
-    "vue": "https://esm.sh/vue@3.2.33",
-    "vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.33",
+    "vue": "https://esm.sh/vue@3.2.37",
+    "vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.37",
     "*.vue": "./loaders/vue.ts!loader"
   }
 }

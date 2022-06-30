@@ -32,7 +32,7 @@ const templates: Record<string, TemplateMeta> = {
 
 const versions = {
   react: "18.1.0",
-  vue: "3.2.33",
+  vue: "3.2.37",
 };
 const deployCI = `name: Deploy
 on: [push]

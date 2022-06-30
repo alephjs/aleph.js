@@ -3,14 +3,14 @@ import type {
   SFCAsyncStyleCompileOptions,
   SFCScriptCompileOptions,
   SFCTemplateCompileOptions,
-} from "https://esm.sh/@vue/compiler-sfc@3.2.33";
+} from "https://esm.sh/@vue/compiler-sfc@3.2.37";
 import {
   compileScript,
   compileStyleAsync,
   compileTemplate,
   parse,
   rewriteDefault,
-} from "https://esm.sh/@vue/compiler-sfc@3.2.33";
+} from "https://esm.sh/@vue/compiler-sfc@3.2.37";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../server/types.ts";
