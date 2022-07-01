@@ -1,5 +1,8 @@
 import { serve } from "aleph/server";
 
 serve({
-  routes: "./routes/**/*.ts",
+  routes: {
+    baseUrl: import.meta.url,
+    match: "./routes/**/*.ts",
+  },
 });

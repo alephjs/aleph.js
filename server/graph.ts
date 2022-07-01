@@ -2,7 +2,6 @@ export type Module = {
   readonly specifier: string;
   readonly version: number;
   readonly deps?: ReadonlyArray<DependencyDescriptor>;
-  readonly inlineCSS?: string;
 };
 
 export type DependencyDescriptor = {

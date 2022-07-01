@@ -3,12 +3,11 @@ import { FetchError } from "../framework/core/error.ts";
 import type { RouteConfig, RouteModule } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
-import type { DependencyGraph, Module } from "./graph.ts";
 import { getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
-import type { Element, HTMLRewriterHandlers } from "./html.ts";
+import type { Element } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
-import type { AlephConfig } from "./types.ts";
+import type { AlephConfig, HTMLRewriterHandlers } from "./types.ts";
 
 export type SSRContext = {
   readonly url: URL;
@@ -92,25 +91,11 @@ export default {
         body = "";
       }
 
-      // find inline css
-      const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
-      if (serverDependencyGraph) {
-        const lookupModuleStyle = (mod: Module) => {
-          const { specifier, inlineCSS } = mod;
-          if (inlineCSS) {
-            headCollection.push(`<style data-module-id="${specifier}">${inlineCSS}</style>`);
-          }
-        };
-        for (const { filename } of routeModules) {
-          serverDependencyGraph.shallowWalk(filename, lookupModuleStyle);
-        }
-      }
-
       // build unocss
       const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-      if (config?.unocss?.presets) {
-        const test: RegExp = config.unocss.test ?? /\.(jsx|tsx)$/;
-        const dir = config?.appDir ? join(Deno.cwd(), config.appDir) : Deno.cwd();
+      if (config?.unocss && Array.isArray(config.unocss.presets)) {
+        const test: RegExp = config.unocss.test instanceof RegExp ? config.unocss.test : /\.(jsx|tsx)$/;
+        const dir = config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd();
         const files = await getFiles(dir);
         const inputSources = await Promise.all(
           files.filter((name) => test.test(name)).map((name) => Deno.readTextFile(join(dir, name))),

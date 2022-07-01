@@ -1,3 +1,4 @@
+import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/server.ts";
 import { serve as stdServe, serveTls } from "https://deno.land/std@0.145.0/http/server.ts";
 import { readableStreamFromReader } from "https://deno.land/std@0.145.0/streams/conversion.ts";
@@ -23,7 +24,7 @@ import renderer, { type SSR } from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { SessionOptions } from "./session.ts";
-import type { AlephConfig, FetchHandler, Middleware, ModuleLoader } from "./types.ts";
+import type { AlephConfig, FetchHandler, HTMLRewriterHandlers, Middleware, ModuleLoader } from "./types.ts";
 
 export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
@@ -50,9 +51,8 @@ export type ErrorHandler = {
 
 /** Start the Aleph.js server. */
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, devServer, middlewares, loaders, fetch, ssr, onError } = options;
-  const maybeAppDir = options.appDir ?? Deno.env.get("APP_DIR");
-  const appDir = maybeAppDir ? "." + util.cleanPath(maybeAppDir) : undefined;
+  const { baseUrl, routes, middlewares, loaders, fetch, ssr, onError } = options;
+  const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
   // server handler
@@ -120,8 +120,8 @@ export const serve = (options: ServerOptions = {}) => {
     // transform client modules
     if (!searchParams.has("raw") && clientModuleTransformer.test(pathname)) {
       try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap());
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
         return await clientModuleTransformer.fetch(req, {
           importMap,
           jsxConfig,
@@ -159,8 +159,8 @@ export const serve = (options: ServerOptions = {}) => {
     const loader = loaders?.find((loader) => loader.test(pathname));
     if (loader) {
       try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap());
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
         return await clientModuleTransformer.fetch(req, {
           loader,
           importMap,
@@ -199,7 +199,7 @@ export const serve = (options: ServerOptions = {}) => {
     const contentType = getContentType(pathname);
     if (!pathname.startsWith("/.") && contentType !== "application/octet-stream") {
       try {
-        let filePath = `.${pathname}`;
+        let filePath = appDir ? join(appDir, pathname) : `.${pathname}`;
         let stat = await Deno.lstat(filePath);
         if (stat.isDirectory && pathname !== "/") {
           filePath = `${util.trimSuffix(filePath, "/")}/index.html`;
@@ -328,13 +328,15 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     try {
-      const indexHtml = await globalIt("__ALEPH_INDEX_HTML", () =>
-        loadAndFixIndexHtml({
-          appDir,
-          isDev,
-          ssr: typeof ssr === "function" ? {} : ssr,
-          hmrWebSocketUrl: devServer?.hmrWebSocketUrl,
-        }));
+      const indexHtml = await globalIt(
+        "__ALEPH_INDEX_HTML",
+        () =>
+          loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
+            ssr: typeof ssr === "function" ? {} : ssr,
+            hmrWebSocketUrl: Deno.env.get("ALEPH_HMR_WS_URL"),
+            isDev,
+          }),
+      );
       return renderer.fetch(req, ctx, {
         indexHtml,
         routeConfig,
@@ -366,16 +368,13 @@ export const serve = (options: ServerOptions = {}) => {
   }
 
   // inject global objects
-  const { routeModules, unocss, build } = options;
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { appDir, loaders, routes, routeModules, unocss, build, devServer });
-  Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
+  const { build, routeModules, unocss } = options;
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { baseUrl, build, routes, routeModules, unocss });
+  Reflect.set(globalThis, "__ALEPH_DEP_GRAPH", new DependencyGraph());
 
   const { hostname, port = 3000, certFile, keyFile, signal } = options;
   if (isDev) {
     Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
-    globalIt("__ALEPH_SERVER_DEV_MODULE", () => import("./dev.ts")).then(({ watchFS }) => {
-      watchFS(appDir);
-    });
   } else {
     if (certFile && keyFile) {
       serveTls(handler, { hostname, port, certFile, keyFile, signal });

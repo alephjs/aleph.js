@@ -9,8 +9,11 @@ export default async function build() {
     cmd: ["wasm-pack", "build", "--target", "web"],
     stdout: "inherit",
     stderr: "inherit",
+    cwd: new URL(".", import.meta.url).pathname,
   });
   await p.status();
   p.close();
   isBuilding = false;
 }
+
+if (import.meta.main) build();

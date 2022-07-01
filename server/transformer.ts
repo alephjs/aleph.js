@@ -40,7 +40,7 @@ export default {
     const { isDev, loader, buildTarget } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
-    const clientDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_CLIENT_DEP_GRAPH");
+    const depGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_DEP_GRAPH");
 
     const deployId = getDeploymentId();
     const etag = deployId ? `W/${deployId}` : null;
@@ -50,7 +50,7 @@ export default {
 
     let resBody = "";
     let resType = "application/javascript";
-    let [sourceCode, codeType] = await readCode(specifier, buildTarget);
+    let [sourceCode, codeType] = await readCode(specifier);
 
     try {
       let lang: string | undefined;
@@ -81,7 +81,7 @@ export default {
           asJsModule,
           hmr: isDev,
         });
-        clientDependencyGraph?.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
+        depGraph?.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
         resBody = code;
         if (!asJsModule) {
           resType = "text/css";
@@ -106,7 +106,7 @@ export default {
             ret = { code: sourceCode, deps };
           }
         } else {
-          const graphVersions = clientDependencyGraph?.modules.filter((mod) =>
+          const graphVersions = depGraph?.modules.filter((mod) =>
             !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
           ).reduce((acc, { specifier, version }) => {
             acc[specifier] = version.toString(16);
@@ -120,7 +120,7 @@ export default {
             alephPkgUri,
             importMap: JSON.stringify(importMap),
             graphVersions,
-            globalVersion: clientDependencyGraph?.globalVersion.toString(16),
+            globalVersion: depGraph?.globalVersion.toString(16),
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
             isDev,
@@ -130,21 +130,24 @@ export default {
         let hasInlineCSS = false;
         const config = getAlephConfig();
         const styleTs = `${alephPkgUri}/framework/core/style.ts`;
-        if (config?.unocss?.presets && (config.unocss.test ?? /.(jsx|tsx)$/).test(pathname)) {
-          try {
-            const unoGenerator = getUnoGenerator();
-            if (unoGenerator) {
-              const { css } = await unoGenerator.generate(sourceCode, { id: specifier, minify: !isDev });
+        if (isDev && config?.unocss) {
+          const { presets, test } = config.unocss;
+          if (Array.isArray(presets) && (test instanceof RegExp ? test : /\.(jsx|tsx)$/).test(pathname)) {
+            try {
+              const unoGenerator = getUnoGenerator();
+              if (unoGenerator) {
+                const { css } = await unoGenerator.generate(sourceCode, { id: specifier, minify: !isDev });
 
-              if (css) {
-                code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
-                  JSON.stringify(specifier)
-                }, ${JSON.stringify(css)});\n`;
-                hasInlineCSS = true;
+                if (css) {
+                  code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
+                    JSON.stringify(specifier)
+                  }, ${JSON.stringify(css)});\n`;
+                  hasInlineCSS = true;
+                }
               }
+            } catch (e) {
+              log.warn("[UnoCSS]", e);
             }
-          } catch (e) {
-            log.warn("[UnoCSS]", e);
           }
         }
         if (inlineCSS) {
@@ -156,7 +159,7 @@ export default {
         if (hasInlineCSS) {
           deps = [...(deps || []), { specifier: styleTs }] as typeof deps;
         }
-        clientDependencyGraph?.mark(specifier, { deps });
+        depGraph?.mark(specifier, { deps });
         if (map) {
           try {
             const m = JSON.parse(map);

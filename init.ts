@@ -78,7 +78,7 @@ export default async function init(nameArg?: string, template?: string) {
   const gzData = await readAll(new Buffer(await resp.arrayBuffer()));
   const tarData = gunzip(gzData);
   const entryList = new Untar(new Buffer(tarData));
-  const workingDir = join(Deno.cwd(), name);
+  const appDir = join(Deno.cwd(), name);
 
   // write template files
   for await (const entry of entryList) {
@@ -86,7 +86,7 @@ export default async function init(nameArg?: string, template?: string) {
     if (entry.fileName.startsWith(prefix)) {
       const name = util.trimPrefix(entry.fileName, prefix);
       if (name !== "README.md") {
-        const fp = join(workingDir, name);
+        const fp = join(appDir, name);
         if (entry.type === "directory") {
           await ensureDir(fp);
           continue;
@@ -101,12 +101,12 @@ export default async function init(nameArg?: string, template?: string) {
 
   // generate `routes/_export.ts` module
   if (routes) {
-    const entryCode = await Deno.readTextFile(join(workingDir, entry));
+    const entryCode = await Deno.readTextFile(join(appDir, entry));
     const m = entryCode.match(/(\s+)routes: "(.+)"/);
     if (m) {
-      const routeConfig = await initRoutes(m[2], undefined, workingDir);
+      const routeConfig = await initRoutes(m[2], appDir);
       await Deno.writeTextFile(
-        join(workingDir, entry),
+        join(appDir, entry),
         entryCode
           .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routeModules,`)
           .replace(
@@ -114,7 +114,7 @@ export default async function init(nameArg?: string, template?: string) {
             `$1// pre-import route modules for serverless env that doesn't support the dynamic imports.\nimport routeModules from "${routeConfig.prefix}/_export.ts";\n\nserve({`,
           ),
       );
-      await generateRoutesExportModule(routeConfig, workingDir);
+      await generateRoutesExportModule(routeConfig, appDir);
     }
   }
 
@@ -178,9 +178,9 @@ export default async function init(nameArg?: string, template?: string) {
     Object.assign(importMap.imports, {
       "@unocss/": `${alephPkgUri}/lib/@unocss/`,
     });
-    const entryCode = await Deno.readTextFile(join(workingDir, entry));
+    const entryCode = await Deno.readTextFile(join(appDir, entry));
     await Deno.writeTextFile(
-      join(workingDir, entry),
+      join(appDir, entry),
       `import presetUno from "@unocss/preset-uno.ts";\n` + entryCode.replace(
         /(\s+)ssr: {/,
         [
@@ -198,10 +198,10 @@ export default async function init(nameArg?: string, template?: string) {
     );
   }
 
-  await ensureDir(workingDir);
+  await ensureDir(appDir);
   await Promise.all([
-    Deno.writeTextFile(join(workingDir, "deno.json"), JSON.stringify(denoConfig, undefined, 2)),
-    Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
+    Deno.writeTextFile(join(appDir, "deno.json"), JSON.stringify(denoConfig, undefined, 2)),
+    Deno.writeTextFile(join(appDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
 
   // todo: remove this step when deno-vsc support auto enable mode
@@ -216,14 +216,14 @@ export default async function init(nameArg?: string, template?: string) {
       "deno.lint": true,
       "deno.config": "./deno.json",
     };
-    await ensureDir(join(workingDir, ".vscode"));
+    await ensureDir(join(appDir, ".vscode"));
     await Promise.all([
       Deno.writeTextFile(
-        join(workingDir, ".vscode", "extensions.json"),
+        join(appDir, ".vscode", "extensions.json"),
         JSON.stringify(extensions, undefined, 2),
       ),
       Deno.writeTextFile(
-        join(workingDir, ".vscode", "settings.json"),
+        join(appDir, ".vscode", "settings.json"),
         JSON.stringify(settigns, undefined, 2),
       ),
     ]);

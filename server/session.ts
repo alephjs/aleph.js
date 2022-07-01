@@ -1,4 +1,5 @@
 import { setCookieHeader } from "./helpers.ts";
+import type { Session } from "./types.ts";
 
 export interface SessionStorage {
   get(sid: string): Promise<unknown | undefined>;
@@ -46,7 +47,7 @@ export interface SessionOptions {
   maxAge?: number;
 }
 
-export class SessionImpl<StoreType extends Record<string, unknown>> {
+export class SessionImpl<StoreType extends Record<string, unknown>> implements Session<StoreType> {
   #id: string;
   #options: SessionOptions;
   #store: StoreType | undefined;

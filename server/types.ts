@@ -1,47 +1,77 @@
+import type { ConnInfo } from "https://deno.land/std@0.145.0/http/server.ts";
+import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import type { UserConfig as UnoConfig } from "../lib/@unocss/core.ts";
 
 export type AlephConfig = {
-  appDir?: string;
-  /** The config for file-system based routing.  */
-  routes?: string;
-  /** The pre-imported modules of FS routing,  */
-  routeModules?: Record<string, Record<string, unknown>>;
-  /** The build options for `build` command. */
+  /** The base url of the server. */
+  baseUrl?: string;
+  /** The build options for compiler. */
   build?: BuildOptions;
+  /** The glob for the file-system based routing.  */
+  routes?: string;
+  /** The pre-imported modules of routing,  */
+  routeModules?: Record<string, Record<string, unknown>>;
   /** The config for UnoCSS. */
   unocss?: UnoConfig & { test?: RegExp };
-  /** The config for dev server. */
-  devServer?: {
-    /** The handler for fs watch event */
-    watchFS?: (kind: "create" | "remove" | "modify", specifier: string) => void;
-    /** The url for HMR web socket. This is useful for dev server proxy mode. */
-    hmrWebSocketUrl?: string;
-  };
 };
 
-/** The build platform.  */
-export type BuildPlatform = "deno" | "cloudflare" | "vercel";
-
-/** The build options for `build` command. */
+/** The build options for compiler. */
 export type BuildOptions = {
-  /** The supported platform. default is "deno" */
-  platform?: BuildPlatform;
   /** The build target passes to esbuild. default is "es2020" */
   target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
-  /** The directory for build output files. default is "dist" */
-  outputDir?: string;
 };
 
 export interface FetchHandler {
   (request: Request, context: Record<string, unknown>): Promise<Response> | Response;
 }
 
+export type CookieOptions = {
+  expires?: number | Date;
+  maxAge?: number;
+  domain?: string;
+  path?: string;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "lax" | "strict" | "none";
+};
+
+export interface Cookies {
+  get(key: string): string | undefined;
+  set(key: string, value: string, options?: CookieOptions): void;
+  delete(key: string, options?: CookieOptions): void;
+}
+
+export interface Session<T> {
+  store: T | undefined;
+  update(store: T | ((store: T | undefined) => T)): Promise<string>;
+  end(): Promise<string>;
+}
+
+export interface HTMLRewriterHandlers {
+  element?: (element: Element) => void;
+  comments?: (comment: Comment) => void;
+  text?: (text: TextChunk) => void;
+}
+
+export interface HTMLRewriter {
+  on: (selector: string, handlers: HTMLRewriterHandlers) => void;
+}
+
+export interface Context extends Record<string, unknown> {
+  readonly connInfo?: ConnInfo;
+  readonly params: Record<string, string>;
+  readonly headers: Headers;
+  readonly cookies: Cookies;
+  readonly htmlRewriter: HTMLRewriter;
+  getSession<T extends Record<string, unknown> = Record<string, unknown>>(): Promise<Session<T>>;
+}
+
 export interface Middleware {
-  name?: string;
-  eager?: boolean;
+  readonly name?: string;
+  readonly eager?: boolean;
   fetch(
     request: Request,
-    context: Record<string, unknown>,
+    context: Context,
   ): Promise<Response | (() => void) | void> | Response | (() => void) | void;
 }
 

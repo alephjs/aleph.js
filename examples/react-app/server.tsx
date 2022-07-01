@@ -3,6 +3,7 @@ import { serve } from "aleph/server";
 import { renderToReadableStream } from "react-dom/server";
 
 serve({
+  baseUrl: import.meta.url,
   routes: "./routes/**/*.{tsx,ts}",
   ssr: {
     // when set `dataDefer` to `true`, the router will loading data as defer
