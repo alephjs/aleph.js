@@ -1,4 +1,5 @@
 // support jsx on deno deploy
+
 /** @jsxImportSource https://esm.sh/react@18.1.0 */
 
 import { App } from "aleph/react";
