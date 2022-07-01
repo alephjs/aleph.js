@@ -19,30 +19,14 @@ You will need [Deno](https://deno.land/) 1.20+.
 6. Make a [pull request](https://github.com/alephjs/aleph.js/pulls).
 7. Merge to master branch by our maintainers.
 
-### react-app
+### Run The Examples
 
 ```bash
 # run the example app in development mode
-deno task dev examples/react-app
+deno run -A examples/${APP}/dev.ts
 
 # run the example app in production mode
-deno task start examples/react-app
-
-# build the example app into a worker for serverless platform
-deno task build examples/react-app
-```
-
-### vue-app
-
-```bash
-# run the example app in development mode
-deno task dev examples/vue-app
-
-# run the example app in production mode
-deno task start examples/vue-app
-
-# build the example app into a worker for serverless platform
-deno task build examples/vue-app
+deno run -A examples/${APP}/server.ts
 ```
 
 ## Testing
@@ -50,20 +34,20 @@ deno task build examples/vue-app
 You can run all tests with the following command:
 
 ```bash
-deno task test
+deno test -A
 ```
 
 ## Project Structure
 
-- **/commands** commands of Aleph.js CLI
 - **/examples** examples to get started
 - **/framework**
   - **core** framework core
   - **react** framework in React
   - **vue** framework in Vue.js
-- **/lib** shared lib
+- **/lib** shared libraries
 - **/loaders** builtin loaders
 - **/server** server of Aleph.js
+- **/tests** testing
 
 ## Code Style We Followed
 
