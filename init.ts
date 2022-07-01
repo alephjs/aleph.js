@@ -9,7 +9,7 @@ import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import log from "./lib/log.ts";
 import util from "./lib/util.ts";
 import { generateRoutesExportModule } from "./server/dev.ts";
-import { existsDir } from "./server/helpers.ts";
+import { existsDir, existsFile, getFiles } from "./server/helpers.ts";
 import { initRoutes } from "./server/routing.ts";
 import { isCanary } from "./version.ts";
 
@@ -56,7 +56,7 @@ export default async function init(nameArg?: string, template?: string) {
   }
 
   // check the dir is clean
-  if (!(await isFolderEmpty(Deno.cwd(), name)) && !confirm("Continue?")) {
+  if (!(await isFolderEmpty(Deno.cwd(), name)) && !confirm(`Folder ${blue(name)} already exists, continue?`)) {
     Deno.exit(1);
   }
 
@@ -125,6 +125,7 @@ export default async function init(nameArg?: string, template?: string) {
       "std/": "https://deno.land/std@0.145.0/",
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
+      "aleph/dev": `${alephPkgUri}/server/dev.ts`,
     },
     scopes: {},
   };
@@ -168,7 +169,6 @@ export default async function init(nameArg?: string, template?: string) {
         "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
         "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
-        "*.vue": `${alephPkgUri}/loaders/vue.ts!loader`,
       });
       break;
     }
@@ -243,78 +243,19 @@ export default async function init(nameArg?: string, template?: string) {
   Deno.exit(0);
 }
 
+async function isFolderEmpty(root: string, name: string): Promise<boolean> {
+  const dir = join(root, name);
+  if (await existsFile(dir)) {
+    throw new Error(`Folder ${name} already exists as a file.`);
+  }
+  if (await existsDir(dir)) {
+    const files = await getFiles(dir);
+    return files.length === 0 || files.every((file) => [".DS_Store"].includes(file));
+  }
+  return false;
+}
+
 if (import.meta.main) {
   const { _: args, ...options } = parse(Deno.args);
   await init(args[0], options?.template);
-}
-
-async function isFolderEmpty(root: string, name: string): Promise<boolean> {
-  const validFiles = [
-    ".git",
-    ".gitattributes",
-    ".gitignore",
-    ".gitlab-ci.yml",
-    ".github",
-    ".hg",
-    ".hgcheck",
-    ".hgignore",
-    ".idea",
-    ".travis.yml",
-    "assets",
-    "components",
-    "docs",
-    "lib",
-    "pages",
-    "public",
-    "routes",
-    "src",
-    "style",
-    "test",
-    "tests",
-    "utils",
-    "app.*",
-    "deno.json",
-    "deno.jsonc",
-    "import_map.json",
-    "import-map.json",
-    "LICENSE",
-    "main.*",
-    "mod.*",
-    "README.md",
-    "server.*",
-    "tsconfig.json",
-  ];
-
-  const conflictDirs = [];
-  const conflictFiles = [];
-
-  if (await existsDir(join(root, name))) {
-    for await (const { name: file, isDirectory } of Deno.readDir(join(root, name))) {
-      if (
-        validFiles.includes(file) ||
-        validFiles.some((name) => name.endsWith(".*") && file.startsWith(name.slice(0, -2))) ||
-        // Support IntelliJ IDEA-based editors
-        /\.iml$/.test(file)
-      ) {
-        if (isDirectory) {
-          conflictDirs.push(blue(file) + "/");
-        } else {
-          conflictFiles.push(file);
-        }
-      }
-    }
-  }
-
-  if (conflictFiles.length > 0 || conflictDirs.length > 0) {
-    console.log([
-      `The directory ${green(name)} contains files that could conflict:`,
-      "",
-      ...conflictFiles.filter((name) => name.endsWith("/")).sort().map((name) => dim("- ") + name),
-      ...conflictFiles.sort().map((name) => dim("- ") + name),
-      "",
-    ].join("\n"));
-    return false;
-  }
-
-  return true;
 }
