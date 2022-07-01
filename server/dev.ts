@@ -221,14 +221,15 @@ export async function generateRoutesExportModule(routeConfig: RouteConfig, appDi
     await Deno.writeTextFile(
       genFile,
       [
-        "// Exports route modules for serverless env that doesn't support the dynamic imports.",
+        "// Imports route modules for serverless env that doesn't support the dynamic import.",
         "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
         "",
         ...imports,
         "",
         "export default {",
         ...revives,
-        "}",
+        "};",
+        "",
       ].join("\n"),
     );
     log.debug(`${blue("routes.gen.ts")} generated`);

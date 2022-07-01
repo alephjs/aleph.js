@@ -1,4 +1,4 @@
-// Exports route modules for serverless env that doesn't support the dynamic imports.
+// Imports route modules for serverless env that doesn't support the dynamic import.
 // This module will be updated automaticlly in develoment mode, do NOT edit it manually.
 
 import * as $0 from "./_404.tsx";
@@ -11,4 +11,4 @@ export default {
   "/_app": $1,
   "/": $2,
   "/todos": $3,
-}
+};
