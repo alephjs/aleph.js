@@ -1,3 +1,5 @@
+/** @jsxImportSource https://esm.sh/react@18.1.0 */
+
 import { App } from "aleph/react";
 import { serve } from "aleph/server";
 import { renderToReadableStream } from "react-dom/server";
