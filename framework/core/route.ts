@@ -26,6 +26,7 @@ export type Route = readonly [
 export type RouteConfig = {
   routes: Route[];
   prefix: string;
+  appDir?: string;
   _404?: Route;
   _app?: Route;
 };

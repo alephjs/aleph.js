@@ -33,7 +33,7 @@ export default class VueSFCLoader implements ModuleLoader {
   }
 
   async load(pathname: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
-    const filename = "." + pathname;
+    const filename = "." + util.cleanPath(pathname);
     const id = (await util.computeHash("SHA-256", filename)).slice(0, 8);
     const { descriptor } = parse(content, { filename });
     const scriptLang = (descriptor.script && descriptor.script.lang) ||

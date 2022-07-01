@@ -282,7 +282,7 @@ export const serve = (options: ServerOptions = {}) => {
       const reqData = req.method === "GET" &&
         (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       try {
-        const resp = await fetchRouteData(routeConfig.routes, url, req, ctx, reqData);
+        const resp = await fetchRouteData(req, ctx, routeConfig, reqData);
         if (resp) {
           return resp;
         }

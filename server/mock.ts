@@ -33,20 +33,17 @@ type MockServerOptions = {
  */
 export class MockServer {
   #options: MockServerOptions;
-  #routeConfig: Promise<RouteConfig>;
-  #indexHtml: Promise<Uint8Array>;
+  #routeConfig: RouteConfig | null;
+  #indexHtml: Uint8Array | null;
 
   constructor(options: MockServerOptions) {
-    const { appDir, routes, ssr } = options;
     this.#options = options;
-    this.#routeConfig = initRoutes(routes, appDir);
-    this.#indexHtml = loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
-      ssr: typeof ssr === "function" ? {} : ssr,
-    });
+    this.#routeConfig = null;
+    this.#indexHtml = null;
   }
 
   async fetch(input: string, init?: RequestInit) {
-    const { middlewares, ssr, origin } = this.#options;
+    const { middlewares, ssr, origin, routes, appDir } = this.#options;
     const url = new URL(input, origin ?? "http://localhost/");
     const req = new Request(url.href, init);
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
@@ -76,16 +73,25 @@ export class MockServer {
       }
     }
 
+    if (!this.#routeConfig) {
+      this.#routeConfig = await initRoutes(routes, appDir);
+    }
+    if (!this.#indexHtml) {
+      this.#indexHtml = await loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
+        ssr: typeof ssr === "function" ? {} : ssr,
+      });
+    }
+
     const reqData = req.method === "GET" &&
       (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
-    const res = await fetchRouteData((await this.#routeConfig).routes, url, req, ctx, reqData);
+    const res = await fetchRouteData(req, ctx, this.#routeConfig, reqData);
     if (res) {
       return res;
     }
 
     return renderer.fetch(req, ctx, {
-      indexHtml: await this.#indexHtml,
-      routeConfig: await this.#routeConfig,
+      indexHtml: this.#indexHtml,
+      routeConfig: this.#routeConfig,
       customHTMLRewriter,
       isDev: false,
       ssr,

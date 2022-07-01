@@ -22,7 +22,8 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     </style>
   `;
     const loader = new VueLoader();
-    const { lang, code, inlineCSS } = await loader.load("/test.vue", testVue, { isDev: false });
+    const { lang, code, inlineCSS } = await loader.load("test.vue", testVue, { isDev: false });
+    assert(loader.test("test.vue"));
     assertEquals(lang, "js");
     assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
     assert(code.includes(`setup(__props)`));
@@ -47,7 +48,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     </template>
   `;
     const loader = new VueLoader();
-    const { lang, code } = await loader.load("/test.vue", testVue, { isDev: false });
+    const { lang, code } = await loader.load("test.vue", testVue, { isDev: false });
     assertEquals(lang, "ts");
     assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
     assert(code.includes(`setup(__props)`));
@@ -103,7 +104,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
       </style>
     `;
     const loader = new VueLoader();
-    const { code, inlineCSS } = await loader.load("/test.vue", testVue, { ssr: true });
+    const { code, inlineCSS } = await loader.load("test.vue", testVue, { ssr: true });
     assert(code.includes(`ssrInterpolate as _ssrInterpolate } from "https://esm.sh/@vue/server-renderer"`));
     assert(code.includes(`__ssrInlineRender: true,`));
     assert(code.includes(`setup(__props)`));
