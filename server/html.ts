@@ -216,7 +216,7 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
   return new Promise((resolve, reject) => {
     try {
       const links: string[] = [];
-      const rewriter = new HTMLRewriter("utf8", (_chunk: Uint8Array) => {});
+      const rewriter = new HTMLRewriter("utf8", () => {});
       rewriter.on("link", {
         element(el: Element) {
           const href = el.getAttribute("href");

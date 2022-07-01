@@ -1,4 +1,4 @@
-import { basename, dirname, globToRegExp, join } from "https://deno.land/std@0.145.0/path/mod.ts";
+import { basename, join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
 import { cacheFetch } from "./cache.ts";
@@ -6,7 +6,7 @@ import { getContentType } from "../lib/media_type.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
-import type { AlephConfig, ImportMap, JSXConfig, ModuleLoader } from "./types.ts";
+import type { AlephConfig, ImportMap, JSXConfig } from "./types.ts";
 
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
@@ -37,11 +37,6 @@ export function globalItSync<T>(name: string, fn: () => T): T {
   return ret;
 }
 
-/* Get Aleph.js package URI. */
-export function getAlephConfig(): AlephConfig | undefined {
-  return Reflect.get(globalThis, "__ALEPH_CONFIG");
-}
-
 /* Get the module URI of Aleph.js */
 export function getAlephPkgUri(): string {
   return globalItSync("__ALEPH_PKG_URI", () => {
@@ -56,6 +51,11 @@ export function getAlephPkgUri(): string {
     const version = Deno.env.get("ALEPH_VERSION") || VERSION;
     return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${version}`;
   });
+}
+
+/* Get Aleph.js package URI. */
+export function getAlephConfig(): AlephConfig | undefined {
+  return Reflect.get(globalThis, "__ALEPH_CONFIG");
 }
 
 /** Get the UnoCSS generator, return `null` if the presets are empty. */
@@ -194,41 +194,6 @@ export function restoreUrl(pathname: string): string {
   }
   const [host, port] = h.split("_");
   return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
-}
-
-/** init loaders in `CLI` mode, or use prebuild loaders */
-export async function initModuleLoaders(importMap?: ImportMap): Promise<ModuleLoader[]> {
-  const loaders: ModuleLoader[] = [];
-  if (Deno.env.get("ALEPH_CLI")) {
-    const { imports, __filename } = importMap ?? await loadImportMap();
-    for (const key in imports) {
-      if (/^\*\.{?(\w+, ?)*\w+}?$/i.test(key)) {
-        let src = imports[key];
-        if (src.endsWith("!loader")) {
-          src = util.trimSuffix(src, "!loader");
-          if (src.startsWith("./") || src.startsWith("../")) {
-            src = "file://" + join(dirname(__filename), src);
-          }
-          let { default: loader } = await import(src);
-          if (typeof loader === "function") {
-            loader = new loader();
-          }
-          if (loader !== null && typeof loader === "object" && typeof loader.load === "function") {
-            const glob = "/**/" + key;
-            const reg = globToRegExp(glob);
-            const Loader = {
-              meta: { src, glob },
-              test: (pathname: string) => reg.test(pathname),
-              load: (specifier: string, content: string, env: Record<string, unknown>) =>
-                loader.load(specifier, content, env),
-            };
-            loaders.push(Loader);
-          }
-        }
-      }
-    }
-  }
-  return loaders;
 }
 
 /* check whether or not the given path exists as a directory. */

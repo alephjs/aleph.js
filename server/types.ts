@@ -60,6 +60,7 @@ export type JSXConfig = {
 
 export type ModuleLoaderEnv = {
   importMap?: ImportMap;
+  jsxConfig?: JSXConfig;
   isDev?: boolean;
   ssr?: boolean;
 };

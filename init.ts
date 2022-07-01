@@ -1,28 +1,29 @@
 import { Untar } from "https://deno.land/std@0.145.0/archive/tar.ts";
+import { parse } from "https://deno.land/std@0.145.0/flags/mod.ts";
 import { Buffer } from "https://deno.land/std@0.145.0/io/buffer.ts";
 import { copy, readAll } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 import { blue, cyan, dim, green, red } from "https://deno.land/std@0.145.0/fmt/colors.ts";
 import { ensureDir } from "https://deno.land/std@0.145.0/fs/ensure_dir.ts";
-import { basename, dirname, join } from "https://deno.land/std@0.145.0/path/mod.ts";
+import { basename, join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
-import { generateRoutesModule } from "../server/dev.ts";
-import { existsDir } from "../server/helpers.ts";
-import { initRoutes } from "../server/routing.ts";
-import { isCanary } from "../version.ts";
+import log from "./lib/log.ts";
+import util from "./lib/util.ts";
+import { generateRoutesExportModule } from "./server/dev.ts";
+import { existsDir } from "./server/helpers.ts";
+import { initRoutes } from "./server/routing.ts";
+import { isCanary } from "./version.ts";
 
 type TemplateMeta = {
   entry: string;
-  cli?: boolean;
-  unocss?: boolean;
+  routes?: boolean;
+  unocss?: string;
 };
 
 const templates: Record<string, TemplateMeta> = {
-  "api": { entry: "server.ts" },
-  "react": { entry: "server.tsx", unocss: true },
-  "vue": { entry: "server.ts", cli: true, unocss: true },
-  "yew": { entry: "server.ts", cli: true },
+  "api": { entry: "server.ts", routes: true },
+  "react": { entry: "server.tsx", unocss: "/\.(tsx|jsx)$/", routes: true },
+  "vue": { entry: "server.ts", unocss: "/\.vue$/", routes: true },
+  "yew": { entry: "server.ts", unocss: "/\.rs$/" },
   // todo:
   // "preact",
   // "svelte",
@@ -34,44 +35,6 @@ const versions = {
   react: "18.1.0",
   vue: "3.2.37",
 };
-const deployCI = `name: Deploy
-on: [push]
-
-jobs:
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write # Needed for auth with Deno Deploy
-      contents: read # Needed to clone the repository
-
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-
-      - name: Install Deno
-        uses: denoland/setup-deno@v1
-
-      - name: Build App
-        run: deno task build
-
-      - name: Deploy to Deno Deploy
-        uses: denoland/deployctl@v1
-        with:
-          project: PROJECT_NAME # todo: change this to your project name in https://dash.deno.com
-          entrypoint: dist/server.js
-`;
-
-export const helpMessage = `
-Usage:
-    deno run -A https://deno.land/x/aleph/cli.ts init <name> [...options]
-
-<name> represents the name of new app.
-
-Options:
-    -t, --template [${Object.keys(templates).join(",")}] Specify a template for the created project
-    -h, --help      ${" ".repeat(Object.keys(templates).join(",").length)}  Prints help message
-`;
 
 export default async function init(nameArg?: string, template?: string) {
   if (!template) {
@@ -134,10 +97,10 @@ export default async function init(nameArg?: string, template?: string) {
     }
   }
 
-  const { entry, cli: cliMode, unocss } = templates[template];
+  const { entry, routes, unocss } = templates[template];
 
-  // generate `routes.gen.ts` module
-  if (!cliMode) {
+  // generate `routes/_export.ts` module
+  if (routes) {
     const entryCode = await Deno.readTextFile(join(workingDir, entry));
     const m = entryCode.match(/(\s+)routes: "(.+)"/);
     if (m) {
@@ -151,7 +114,7 @@ export default async function init(nameArg?: string, template?: string) {
             `$1// pre-import route modules for serverless env that doesn't support the dynamic imports.\nimport routeModules from "${routeConfig.prefix}/_export.ts";\n\nserve({`,
           ),
       );
-      await generateRoutesModule(routeConfig, workingDir);
+      await generateRoutesExportModule(routeConfig, workingDir);
     }
   }
 
@@ -179,23 +142,13 @@ export default async function init(nameArg?: string, template?: string) {
       ],
     },
     "importMap": "import_map.json",
-    "tasks": cliMode
-      ? {
-        "dev": `deno run -A ${alephPkgUri}/cli.ts dev`,
-        "start": `deno run -A ${alephPkgUri}/cli.ts start`,
-        "build": `deno run -A ${alephPkgUri}/cli.ts build`,
-      }
-      : {
-        "dev": `ALEPH_ENV=development deno run -A ${entry}`,
-        "start": `deno run -A ${entry}`,
-      },
+    "tasks": {
+      "dev": `ALEPH_ENV=development deno run -A ${entry}`,
+      "start": `deno run -A ${entry}`,
+    },
     "fmt": {},
     "lint": {},
   };
-  const gitignore = [];
-  if (cliMode) {
-    gitignore.push("dist/");
-  }
   switch (template) {
     case "react": {
       Object.assign(importMap.imports, {
@@ -221,7 +174,7 @@ export default async function init(nameArg?: string, template?: string) {
     }
   }
 
-  if (unocss && confirm("Enable UnoCSS(atomic CSS)?")) {
+  if (unocss && confirm("Enable UnoCSS (Atomic CSS)?")) {
     Object.assign(importMap.imports, {
       "@unocss/": `${alephPkgUri}/lib/@unocss/`,
     });
@@ -232,8 +185,8 @@ export default async function init(nameArg?: string, template?: string) {
         /(\s+)ssr: {/,
         [
           `$1unocss: {`,
-          `    // Options for UnoCSS (atomic CSS)`,
-          `    // please check https://alephjs.org/docs/unocss `,
+          `    // Options for UnoCSS (Atomic CSS)`,
+          `    test: ${unocss},`,
           `    presets: [`,
           `      presetUno(),`,
           `    ],`,
@@ -247,17 +200,9 @@ export default async function init(nameArg?: string, template?: string) {
 
   await ensureDir(workingDir);
   await Promise.all([
-    gitignore.length > 0 ? Deno.writeTextFile(join(workingDir, ".gitignore"), gitignore.join("\n")) : Promise.resolve(),
     Deno.writeTextFile(join(workingDir, "deno.json"), JSON.stringify(denoConfig, undefined, 2)),
     Deno.writeTextFile(join(workingDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
-
-  if (cliMode && confirm("Deploy to Deno Deploy?")) {
-    const ciFile = join(workingDir, ".github/workflows/deploy.yml");
-    await ensureDir(dirname(ciFile));
-    await Deno.writeTextFile(ciFile, deployCI);
-    console.log(`${blue(".github/workflows/deploy.yml")} created, pelase update the project name in deploy.yml.`);
-  }
 
   // todo: remove this step when deno-vsc support auto enable mode
   if (confirm("Using VS Code?")) {
@@ -284,26 +229,23 @@ export default async function init(nameArg?: string, template?: string) {
     ]);
   }
 
-  console.log(
-    [
-      " ",
-      green("Aleph.js is ready to go!"),
-      `${dim("▲")} cd ${name}`,
-      `${dim("▲")} deno task dev    ${dim("# start the app in `development` mode")}`,
-      `${dim("▲")} deno task start  ${dim("# start the app in `production` mode")}`,
-      cliMode &&
-      `${dim("▲")} deno task build  ${dim("# build & optimize the app for serverless platform")}`,
-      " ",
-      `Docs: ${cyan("https://alephjs.org/docs")}`,
-      `Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}`,
-      " ",
-    ].filter(Boolean).join("\n"),
-  );
+  console.log([
+    "",
+    green("Aleph.js is ready to go!"),
+    `${dim("$")} cd ${name}`,
+    `${dim("$")} deno task dev    ${dim("# start the app in `development` mode")}`,
+    `${dim("$")} deno task start  ${dim("# start the app in `production` mode")}`,
+    "",
+    `Docs: ${cyan("https://alephjs.org/docs")}`,
+    `Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}`,
+    "",
+  ].join("\n"));
   Deno.exit(0);
 }
 
 if (import.meta.main) {
-  init();
+  const { _: args, ...options } = parse(Deno.args);
+  await init(args[0], options?.template);
 }
 
 async function isFolderEmpty(root: string, name: string): Promise<boolean> {

@@ -13,7 +13,6 @@ import {
   getAlephPkgUri,
   getDeploymentId,
   globalIt,
-  initModuleLoaders,
   loadImportMap,
   loadJSXConfig,
   regFullVersion,
@@ -24,7 +23,7 @@ import renderer, { type SSR } from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { SessionOptions } from "./session.ts";
-import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
+import type { AlephConfig, FetchHandler, Middleware, ModuleLoader } from "./types.ts";
 
 export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
@@ -32,6 +31,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   logLevel?: LevelName;
   session?: SessionOptions;
   middlewares?: Middleware[];
+  loaders?: ModuleLoader[];
   fetch?: FetchHandler;
   ssr?: SSR;
   onError?: ErrorHandler;
@@ -50,7 +50,7 @@ export type ErrorHandler = {
 
 /** Start the Aleph.js server. */
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
+  const { routes, build, devServer, middlewares, loaders, fetch, ssr, logLevel, onError } = options;
   const maybeAppDir = options.appDir ?? Deno.env.get("APP_DIR");
   const appDir = maybeAppDir ? "." + util.cleanPath(maybeAppDir) : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
@@ -156,8 +156,7 @@ export const serve = (options: ServerOptions = {}) => {
     }
 
     // use loader to load modules
-    const moduleLoaders = await globalIt("__ALEPH_MODULE_LOADERS", () => initModuleLoaders());
-    const loader = searchParams.has("raw") ? null : moduleLoaders.find((loader) => loader.test(pathname));
+    const loader = loaders?.find((loader) => loader.test(pathname));
     if (loader) {
       try {
         const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap());

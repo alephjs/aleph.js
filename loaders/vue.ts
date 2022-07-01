@@ -21,11 +21,15 @@ type Options = {
   style?: Partial<SFCAsyncStyleCompileOptions>;
 };
 
-export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
+export default class VueSFCLoader implements ModuleLoader {
   #options: Options;
 
   constructor(options?: Options) {
     this.#options = { ...options };
+  }
+
+  test(pathname: string): boolean {
+    return pathname.endsWith(".vue");
   }
 
   async load(pathname: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {

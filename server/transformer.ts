@@ -4,7 +4,7 @@ import type { TransformOptions, TransformResult } from "https://deno.land/x/alep
 import { TransformError } from "../framework/core/error.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { bundleCSS } from "./bundle_css.ts";
+import { bundleCSS } from "./bundle.ts";
 import {
   builtinModuleExts,
   getAlephConfig,
@@ -21,10 +21,10 @@ import { DependencyGraph } from "./graph.ts";
 import type { ImportMap, JSXConfig, ModuleLoader } from "./types.ts";
 
 export type TransformerOptions = {
-  buildTarget?: TransformOptions["target"];
   importMap: ImportMap;
+  jsxConfig: JSXConfig;
   isDev: boolean;
-  jsxConfig?: JSXConfig;
+  buildTarget?: TransformOptions["target"];
   loader?: ModuleLoader;
 };
 
@@ -57,7 +57,7 @@ export default {
       let inlineCSS: string | undefined;
       let isCSS: boolean;
       if (loader) {
-        const loaded = await loader.load(specifier, sourceCode, { importMap: options.importMap, isDev });
+        const loaded = await loader.load(specifier, sourceCode, options);
         sourceCode = loaded.code;
         lang = loaded.lang;
         inlineCSS = loaded.inlineCSS;
