@@ -50,7 +50,7 @@ export type ErrorHandler = {
 
 /** Start the Aleph.js server. */
 export const serve = (options: ServerOptions = {}) => {
-  const { routes, build, devServer, middlewares, loaders, fetch, ssr, logLevel, onError } = options;
+  const { routes, devServer, middlewares, loaders, fetch, ssr, onError } = options;
   const maybeAppDir = options.appDir ?? Deno.env.get("APP_DIR");
   const appDir = maybeAppDir ? "." + util.cleanPath(maybeAppDir) : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
@@ -62,7 +62,7 @@ export const serve = (options: ServerOptions = {}) => {
 
     if (pathname === "/-/hmr") {
       if (isDev) {
-        const { handleHMRSocket } = await globalIt("__ALEPH_SERVER_DEV", () => import("./dev.ts"));
+        const { handleHMRSocket } = await globalIt("__ALEPH_SERVER_DEV_MODULE", () => import("./dev.ts"));
         return handleHMRSocket(req);
       } else {
         // close the hot-reloading websocket and tell the client to reload the page
@@ -125,7 +125,7 @@ export const serve = (options: ServerOptions = {}) => {
         return await clientModuleTransformer.fetch(req, {
           importMap,
           jsxConfig,
-          buildTarget: build?.target,
+          buildTarget: options.build?.target,
           isDev,
         });
       } catch (err) {
@@ -165,7 +165,7 @@ export const serve = (options: ServerOptions = {}) => {
           loader,
           importMap,
           jsxConfig,
-          buildTarget: build?.target,
+          buildTarget: options.build?.target,
           isDev,
         });
       } catch (err) {
@@ -333,7 +333,7 @@ export const serve = (options: ServerOptions = {}) => {
           appDir,
           isDev,
           ssr: typeof ssr === "function" ? {} : ssr,
-          hmrWebSocketUrl: options.devServer?.hmrWebSocketUrl,
+          hmrWebSocketUrl: devServer?.hmrWebSocketUrl,
         }));
       return renderer.fetch(req, ctx, {
         indexHtml,
@@ -361,25 +361,21 @@ export const serve = (options: ServerOptions = {}) => {
   };
 
   // set log level if specified
-  if (logLevel) {
-    log.setLevel(logLevel);
+  if (options.logLevel) {
+    log.setLevel(options.logLevel);
   }
 
   // inject global objects
-  const { routeModules, unocss } = options;
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { appDir, routes, routeModules, unocss, build, devServer });
+  const { routeModules, unocss, build } = options;
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { appDir, loaders, routes, routeModules, unocss, build, devServer });
   Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
 
-  // apply `watchFS` handler of `devServer`
+  const { hostname, port = 3000, certFile, keyFile, signal } = options;
   if (isDev) {
-    globalIt("__ALEPH_SERVER_DEV", () => import("./dev.ts")).then(({ watchFS }) => {
+    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
+    globalIt("__ALEPH_SERVER_DEV_MODULE", () => import("./dev.ts")).then(({ watchFS }) => {
       watchFS(appDir);
     });
-  }
-
-  const { hostname, port = 8080, certFile, keyFile, signal } = options;
-  if (Deno.env.get("ALEPH_CLI")) {
-    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
   } else {
     if (certFile && keyFile) {
       serveTls(handler, { hostname, port, certFile, keyFile, signal });

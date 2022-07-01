@@ -58,7 +58,7 @@ async function bootstrap(signal: AbortSignal, entry: string, fixedPort?: number)
   }
 
   const { port: portOption, hostname, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER") || {};
-  const port = fixedPort || portOption || 8080;
+  const port = fixedPort || portOption || 3000;
   try {
     if (certFile && keyFile) {
       await serveTls(handler, {
@@ -147,9 +147,7 @@ export function watchFS(appDir?: string) {
       if (reg.test(specifier)) {
         const routeConfig = await initRoutes(reg, appDir);
         Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
-        if (!Deno.env.get("ALEPH_CLI")) {
-          generateRoutesExportModule(routeConfig).catch((error) => log.error(error));
-        }
+        generateRoutesExportModule(routeConfig).catch((error) => log.error(error));
       }
     } else {
       Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
@@ -161,9 +159,7 @@ export function watchFS(appDir?: string) {
   if (config?.routes) {
     initRoutes(config.routes, appDir).then((routeConfig) => {
       Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
-      if (!Deno.env.get("ALEPH_CLI")) {
-        generateRoutesExportModule(routeConfig).catch((error) => log.error(error));
-      }
+      generateRoutesExportModule(routeConfig).catch((error) => log.error(error));
     });
   }
 
