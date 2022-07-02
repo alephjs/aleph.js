@@ -1,4 +1,4 @@
-import dev, { createFsEmitter } from "aleph/server/dev.ts";
+import dev, { createFsEmitter } from "aleph/dev";
 
 async function build() {
   if (Reflect.get(globalThis, "isBuilding")) return;
@@ -14,6 +14,7 @@ async function build() {
   await p.status();
   p.close();
   await Deno.remove(`${cwd}/pkg/.gitignore`);
+
   Reflect.set(globalThis, "isBuilding", false);
 }
 
