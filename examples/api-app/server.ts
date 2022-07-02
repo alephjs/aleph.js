@@ -1,8 +1,8 @@
 import { serve } from "aleph/server";
+import routeModules from "./routes/_export.ts";
 
 serve({
-  routes: {
-    baseUrl: import.meta.url,
-    match: "./routes/**/*.ts",
-  },
+  baseUrl: import.meta.url,
+  routes: "./routes/**/*.ts",
+  routeModules,
 });
