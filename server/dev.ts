@@ -1,5 +1,5 @@
 import { basename, join, relative } from "https://deno.land/std@0.145.0/path/mod.ts";
-import { serve, serveTls } from "https://deno.land/std@0.145.0/http/mod.ts";
+import { type ConnInfo, serve, serveTls } from "https://deno.land/std@0.145.0/http/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import type { RouteConfig } from "../framework/core/route.ts";
 import log, { blue } from "../lib/log.ts";
@@ -113,25 +113,26 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
     generateRoutesExportModule(routeConfig, appDir).catch((error) => log.error(error));
   }
 
-  const { port: portOption, hostname, certFile, keyFile, handler } = Reflect.get(globalThis, "__ALEPH_SERVER");
-  const port = __port || portOption || 3000;
+  const server = Reflect.get(globalThis, "__ALEPH_SERVER");
+  const { hostname, certFile, keyFile } = server;
+  const useTls = certFile && keyFile;
+  const port = __port ?? server.port ?? 3000;
+  const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
+    const { pathname } = new URL(req.url);
+    if (pathname === "/-/hmr") {
+      return handleHMRSocket(req);
+    }
+    return await server.handler(req, connInfo);
+  };
+  const onListen = ({ port }: { port: number }) => {
+    log.info(`Server ready on http${useTls ? "s" : ""}://localhost:${port}`);
+  };
+
   try {
-    if (certFile && keyFile) {
-      await serveTls(handler, {
-        port,
-        hostname,
-        certFile,
-        keyFile,
-        signal,
-        onListen: ({ port }) => log.info(`Server ready on https://localhost:${port}`),
-      });
+    if (useTls) {
+      await serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
     } else {
-      await serve(handler, {
-        port,
-        hostname,
-        signal,
-        onListen: ({ port }) => log.info(`Server ready on http://localhost:${port}`),
-      });
+      await serve(handler, { hostname, port, signal, onListen });
     }
   } catch (error) {
     if (error instanceof Deno.errors.AddrInUse) {
@@ -143,7 +144,7 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   }
 }
 
-export function handleHMRSocket(req: Request): Response {
+function handleHMRSocket(req: Request): Response {
   const { socket, response } = Deno.upgradeWebSocket(req, {});
   const emitter = createFsEmitter();
   const send = (message: Record<string, unknown>) => {

@@ -57,24 +57,18 @@ export const serve = (options: ServerOptions = {}) => {
 
   // server handler
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
-    const url = new URL(req.url);
-    const { pathname, searchParams } = url;
+    const { pathname, searchParams } = new URL(req.url);
 
+    // close the hot-reloading websocket and tell the client to reload the page
     if (pathname === "/-/hmr") {
-      if (isDev) {
-        const { handleHMRSocket } = await globalIt("__ALEPH_SERVER_DEV_MODULE", () => import("./dev.ts"));
-        return handleHMRSocket(req);
-      } else {
-        // close the hot-reloading websocket and tell the client to reload the page
-        const { socket, response } = Deno.upgradeWebSocket(req, {});
-        socket.addEventListener("open", () => {
-          socket.send(JSON.stringify({ type: "reload" }));
-          setTimeout(() => {
-            socket.close();
-          }, 50);
-        });
-        return response;
-      }
+      const { socket, response } = Deno.upgradeWebSocket(req, {});
+      socket.addEventListener("open", () => {
+        socket.send(JSON.stringify({ type: "reload" }));
+        setTimeout(() => {
+          socket.close();
+        }, 50);
+      });
+      return response;
     }
 
     const postMiddlewares: Middleware[] = [];
@@ -376,11 +370,16 @@ export const serve = (options: ServerOptions = {}) => {
   if (isDev) {
     Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
   } else {
-    if (certFile && keyFile) {
-      serveTls(handler, { hostname, port, certFile, keyFile, signal });
+    const useTls = certFile && keyFile;
+    const onListen = ({ port }: { port: number }) => {
+      if (!getDeploymentId()) {
+        log.info(`Server ready on http${useTls ? "s" : ""}://localhost:${port}`);
+      }
+    };
+    if (useTls) {
+      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
     } else {
-      stdServe(handler, { hostname, port, signal });
+      stdServe(handler, { hostname, port, signal, onListen });
     }
-    log.info(`Server ready on http://localhost:${port}`);
   }
 };
