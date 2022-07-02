@@ -24,7 +24,14 @@ import renderer, { type SSR } from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
 import type { SessionOptions } from "./session.ts";
-import type { AlephConfig, FetchHandler, HTMLRewriterHandlers, Middleware, ModuleLoader } from "./types.ts";
+import type {
+  AlephConfig,
+  ErrorHandler,
+  FetchHandler,
+  HTMLRewriterHandlers,
+  Middleware,
+  ModuleLoader,
+} from "./types.ts";
 
 export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
@@ -32,22 +39,10 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   logLevel?: LevelName;
   session?: SessionOptions;
   middlewares?: Middleware[];
-  loaders?: ModuleLoader[];
   fetch?: FetchHandler;
   ssr?: SSR;
   onError?: ErrorHandler;
 } & AlephConfig;
-
-export type ErrorHandler = {
-  (
-    error: unknown,
-    cause: {
-      by: "route-data-fetch" | "ssr" | "transform" | "fs" | "middleware";
-      url: string;
-      context?: Record<string, unknown>;
-    },
-  ): Response | void;
-};
 
 /** Start the Aleph.js server. */
 export const serve = (options: ServerOptions = {}) => {
@@ -61,7 +56,7 @@ export const serve = (options: ServerOptions = {}) => {
 
     // close the hot-reloading websocket and tell the client to reload the page
     if (pathname === "/-/hmr") {
-      const { socket, response } = Deno.upgradeWebSocket(req, {});
+      const { socket, response } = Deno.upgradeWebSocket(req);
       socket.addEventListener("open", () => {
         socket.send(JSON.stringify({ type: "reload" }));
         setTimeout(() => {
@@ -111,62 +106,26 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    // transform client modules
-    if (!searchParams.has("raw") && clientModuleTransformer.test(pathname)) {
+    // transform modules
+    let loader: ModuleLoader | undefined;
+    if (
+      !searchParams.has("raw") &&
+      (clientModuleTransformer.test(pathname) || (loader = loaders?.find((l) => l.test(pathname))))
+    ) {
       try {
         const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
         const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
         return await clientModuleTransformer.fetch(req, {
-          importMap,
-          jsxConfig,
           buildTarget: options.build?.target,
           isDev,
-        });
-      } catch (err) {
-        if (err instanceof TransformError) {
-          if (err.message !== "unreachable") {
-            log.error(err.message);
-            const alephPkgUri = toLocalPath(getAlephPkgUri());
-            return new Response(
-              `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
-                JSON.stringify(err)
-              });export default null;`,
-              {
-                headers: [
-                  ["Content-Type", "application/javascript"],
-                  ["X-Transform-Error", "true"],
-                ],
-              },
-            );
-          }
-        } else if (!(err instanceof Deno.errors.NotFound)) {
-          log.error(err);
-          return onError?.(err, { by: "transform", url: req.url }) ??
-            new Response(generateErrorHtml(err.stack ?? err.message), {
-              status: 500,
-              headers: [["Content-Type", "text/html"]],
-            });
-        }
-      }
-    }
-
-    // use loader to load modules
-    const loader = loaders?.find((loader) => loader.test(pathname));
-    if (loader) {
-      try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
-        return await clientModuleTransformer.fetch(req, {
+          importMap,
+          jsxConfig,
           loader,
-          importMap,
-          jsxConfig,
-          buildTarget: options.build?.target,
-          isDev,
         });
       } catch (err) {
         if (err instanceof TransformError) {
           if (err.message !== "unreachable") {
-            log.error(err.message);
+            log.error(err);
             const alephPkgUri = toLocalPath(getAlephPkgUri());
             return new Response(
               `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
@@ -323,6 +282,7 @@ export const serve = (options: ServerOptions = {}) => {
         return new Response("Not found", { status: 404 });
     }
 
+    // render html
     try {
       const indexHtml = await globalIt(
         "__ALEPH_INDEX_HTML",
@@ -365,23 +325,24 @@ export const serve = (options: ServerOptions = {}) => {
 
   // inject global objects
   const { build, routeModules, unocss } = options;
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { baseUrl, build, routes, routeModules, unocss });
+  Reflect.set(globalThis, "__ALEPH_CONFIG", { baseUrl, build, routes, routeModules, unocss, loaders });
   Reflect.set(globalThis, "__ALEPH_DEP_GRAPH", new DependencyGraph());
 
-  const { hostname, port = 3000, certFile, keyFile, signal } = options;
+  const { hostname, port = 3000, certFile, keyFile, signal, onListen } = options;
   if (isDev) {
-    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
+    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal, onListen });
   } else {
     const useTls = certFile && keyFile;
-    const onListen = ({ port }: { port: number }) => {
+    const onlisten = (arg: { port: number; hostname: string }) => {
       if (!getDeploymentId()) {
-        log.info(`Server ready on http${useTls ? "s" : ""}://localhost:${port}`);
+        log.info(`Server ready on ${useTls ? "https" : "http"}://localhost:${port}`);
       }
+      onListen?.(arg);
     };
     if (useTls) {
-      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
+      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen: onlisten });
     } else {
-      stdServe(handler, { hostname, port, signal, onListen });
+      stdServe(handler, { hostname, port, signal, onListen: onlisten });
     }
   }
 };

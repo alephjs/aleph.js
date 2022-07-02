@@ -13,6 +13,8 @@ export type AlephConfig = {
   routeModules?: Record<string, Record<string, unknown>>;
   /** The config for UnoCSS. */
   unocss?: UnoConfig & { test?: RegExp };
+  /** The module loaders. */
+  loaders?: ModuleLoader[];
 };
 
 /** The build options for compiler. */
@@ -98,7 +100,7 @@ export type ModuleLoaderEnv = {
 export type ModuleLoaderOutput = {
   code: string;
   inlineCSS?: string;
-  lang?: "js" | "jsx" | "ts" | "tsx" | "css";
+  lang?: "js" | "jsx" | "ts" | "tsx";
   map?: string;
 };
 
@@ -106,5 +108,16 @@ export interface ModuleLoader {
   test(pathname: string): boolean;
   load(specifier: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
 }
+
+export type ErrorHandler = {
+  (
+    error: unknown,
+    cause: {
+      by: "route-data-fetch" | "ssr" | "transform" | "fs" | "middleware";
+      url: string;
+      context?: Record<string, unknown>;
+    },
+  ): Response | void;
+};
 
 export { UnoConfig };

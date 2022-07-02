@@ -10,6 +10,7 @@ export type RouteModule = {
   withData?: boolean;
   data?: unknown;
   dataCacheTtl?: number;
+  inlineCSS?: string;
 };
 
 export type RouteMeta = {

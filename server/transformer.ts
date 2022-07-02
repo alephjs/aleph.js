@@ -21,10 +21,10 @@ import { DependencyGraph } from "./graph.ts";
 import type { ImportMap, JSXConfig, ModuleLoader } from "./types.ts";
 
 export type TransformerOptions = {
+  buildTarget?: TransformOptions["target"];
+  isDev: boolean;
   importMap: ImportMap;
   jsxConfig: JSXConfig;
-  isDev: boolean;
-  buildTarget?: TransformOptions["target"];
   loader?: ModuleLoader;
 };
 
@@ -37,7 +37,7 @@ export default {
     );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { isDev, loader, buildTarget } = options;
+    const { isDev, buildTarget, loader } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const depGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_DEP_GRAPH");
@@ -50,7 +50,7 @@ export default {
 
     let resBody = "";
     let resType = "application/javascript";
-    let [sourceCode, codeType] = await readCode(specifier);
+    let [sourceCode, sourceCodeMediaType] = await readCode(specifier);
 
     try {
       let lang: string | undefined;
@@ -61,9 +61,9 @@ export default {
         sourceCode = loaded.code;
         lang = loaded.lang;
         inlineCSS = loaded.inlineCSS;
-        isCSS = loaded.lang === "css";
+        isCSS = false;
       } else {
-        isCSS = codeType.startsWith("text/css");
+        isCSS = sourceCodeMediaType.startsWith("text/css");
       }
       if (isCSS) {
         const asJsModule = searchParams.has("module");

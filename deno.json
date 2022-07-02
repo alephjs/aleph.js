@@ -22,7 +22,8 @@
       "exclude": [
         ".vscode",
         "CODE_OF_CONDUCT.md",
-        "examples/yew-app/pkg"
+        "examples/yew-app/pkg",
+        "examples/yew-app/target"
       ]
     }
   },

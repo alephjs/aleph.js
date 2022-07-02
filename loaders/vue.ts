@@ -35,7 +35,7 @@ export default class VueSFCLoader implements ModuleLoader {
   async load(pathname: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
     const filename = "." + util.cleanPath(pathname);
     const id = (await util.computeHash("SHA-256", filename)).slice(0, 8);
-    const { descriptor } = parse(content, { filename });
+    const { descriptor } = parse(content, { filename, sourceMap: env.isDev });
     const scriptLang = (descriptor.script && descriptor.script.lang) ||
       (descriptor.scriptSetup && descriptor.scriptSetup.lang);
     const isTS = scriptLang === "ts";
@@ -72,7 +72,6 @@ export default class VueSFCLoader implements ModuleLoader {
       id,
       templateOptions,
     });
-
     const mainScript = rewriteDefault(compiledScript.content, "__sfc__", expressionPlugins);
     const output = [mainScript];
     if (env.isDev && !env.ssr && descriptor.template) {

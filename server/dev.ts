@@ -1,38 +1,52 @@
-import { basename, join, relative } from "https://deno.land/std@0.145.0/path/mod.ts";
+// @deno-types="https://deno.land/x/esbuild@v0.14.47/mod.d.ts"
+import { build as esbuild, type Loader } from "https://deno.land/x/esbuild@v0.14.47/mod.js";
+import { basename, dirname, join, relative } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { type ConnInfo, serve, serveTls } from "https://deno.land/std@0.145.0/http/mod.ts";
 import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import type { RouteConfig } from "../framework/core/route.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { builtinModuleExts, findFile, getAlephConfig, getFiles } from "./helpers.ts";
+import {
+  builtinModuleExts,
+  findFile,
+  getAlephConfig,
+  getFiles,
+  globalIt,
+  loadImportMap,
+  loadJSXConfig,
+} from "./helpers.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
 import type { DependencyGraph } from "./graph.ts";
-import type { AlephConfig } from "./types.ts";
+import type { AlephConfig, ModuleLoader } from "./types.ts";
 
-export type FsEvents = {
+type WatchFsEvents = {
   [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: { specifier: string };
 };
 
-export const emitters = new Set<Emitter<FsEvents>>();
+const watchFsEmitters = new Set<Emitter<WatchFsEvents>>();
 
-export function createFsEmitter() {
-  const e = mitt<FsEvents>();
-  emitters.add(e);
+/** create a `watchFs` emitter. */
+export function createWatchFsEmitter() {
+  const e = mitt<WatchFsEvents>();
+  watchFsEmitters.add(e);
   return e;
 }
 
-export function removeFsEmitter(e: Emitter<FsEvents>) {
+/** remove the emitter. */
+export function removeWatchFsEmitter(e: Emitter<WatchFsEvents>) {
   e.all.clear();
-  emitters.delete(e);
+  watchFsEmitters.delete(e);
 }
 
 /** The options for dev server. */
 export type DevOptions = {
+  /** The base URL. */
   baseUrl?: string;
   /** The url for the HMR web socket. This is useful for dev server proxy mode. */
   hmrWebSocketUrl?: string;
 };
 
+/** start the dev server */
 export default async function dev(options?: DevOptions) {
   const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : Deno.cwd();
   const serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
@@ -46,6 +60,11 @@ export default async function dev(options?: DevOptions) {
     Deno.env.set("ALEPH_HMR_WS_URL", options?.hmrWebSocketUrl);
   }
 
+  // set log level to debug when debug aleph.js itself.
+  if (import.meta.url.startsWith("file:")) {
+    log.setLevel("debug");
+  }
+
   let ac: AbortController | null = null;
   const start = async () => {
     if (ac) {
@@ -56,26 +75,37 @@ export default async function dev(options?: DevOptions) {
     await bootstrap(ac.signal, serverEntry, appDir);
   };
 
-  const emitter = createFsEmitter();
+  const emitter = createWatchFsEmitter();
   emitter.on(`modify:./${basename(serverEntry)}`, start);
   // todo: watch server deps
 
   // update global route config when fs changess
-  const updateRoutes = async ({ specifier }: { specifier: string }) => {
+  emitter.on("*", async (kind, { specifier }) => {
     const config = getAlephConfig();
     if (config?.routes) {
-      const reg = toRouteRegExp(config.routes);
-      if (reg.test(specifier)) {
-        const routeConfig = await initRoutes(config.routes, appDir);
-        Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
-        generateRoutesExportModule(routeConfig, appDir).catch((error) => log.error(error));
+      if (kind === "create" || kind === "remove") {
+        const reg = toRouteRegExp(config.routes);
+        if (reg.test(specifier)) {
+          const routeConfig = await initRoutes(config.routes, appDir);
+          Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
+          generateRoutesExportModule({
+            routeConfig,
+            loaders: config.loaders,
+          }).catch((err) => log.error(err));
+        }
+      } else if (config.loaders?.some((l) => l.test(specifier))) {
+        const routeConfig: RouteConfig | undefined = Reflect.get(globalThis, "__ALEPH_ROUTE_CONFIG");
+        if (routeConfig) {
+          generateRoutesExportModule({
+            routeConfig,
+            loaders: config.loaders,
+          }).catch((err) => log.error(err));
+        }
       }
     } else {
       Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
     }
-  };
-  emitter.on("create", updateRoutes);
-  emitter.on("remove", updateRoutes);
+  });
 
   log.info("Watching for file changes...");
   watchFs(appDir);
@@ -110,7 +140,12 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   if (config?.routes) {
     const routeConfig = await initRoutes(config.routes, appDir);
     Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
-    generateRoutesExportModule(routeConfig, appDir).catch((error) => log.error(error));
+    generateRoutesExportModule({
+      routeConfig,
+      loaders: config.loaders,
+    }).catch((err) => log.error(err));
+  } else {
+    Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
   }
 
   const server = Reflect.get(globalThis, "__ALEPH_SERVER");
@@ -120,12 +155,57 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const { pathname } = new URL(req.url);
     if (pathname === "/-/hmr") {
-      return handleHMRSocket(req);
+      const { socket, response } = Deno.upgradeWebSocket(req);
+      const emitter = createWatchFsEmitter();
+      const send = (message: Record<string, unknown>) => {
+        try {
+          socket.send(JSON.stringify(message));
+        } catch (err) {
+          log.warn("socket.send:", err.message);
+        }
+      };
+      socket.addEventListener("close", () => {
+        removeWatchFsEmitter(emitter);
+      });
+      socket.addEventListener("open", () => {
+        emitter.on("create", ({ specifier }) => {
+          const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+          if (config && config.routes) {
+            const reg = toRouteRegExp(config.routes);
+            const routePattern = reg.exec(specifier);
+            if (routePattern) {
+              send({ type: "create", specifier, routePattern });
+              return;
+            }
+          }
+          send({ type: "create", specifier });
+        });
+        emitter.on("remove", ({ specifier }) => {
+          emitter.off(`hotUpdate:${specifier}`);
+          send({ type: "remove", specifier });
+        });
+      });
+      socket.addEventListener("message", (e) => {
+        if (util.isFilledString(e.data)) {
+          try {
+            const { type, specifier } = JSON.parse(e.data);
+            if (type === "hotAccept" && util.isFilledString(specifier)) {
+              emitter.on(`hotUpdate:${specifier}`, () => {
+                send({ type: "modify", specifier });
+              });
+            }
+          } catch (_e) {
+            log.error("invlid socket message:", e.data);
+          }
+        }
+      });
+      return response;
     }
     return await server.handler(req, connInfo);
   };
-  const onListen = ({ port }: { port: number }) => {
+  const onListen = (arg: { hostname: string; port: number }) => {
     log.info(`Server ready on http${useTls ? "s" : ""}://localhost:${port}`);
+    server.onListen?.(arg);
   };
 
   try {
@@ -144,97 +224,19 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   }
 }
 
-function handleHMRSocket(req: Request): Response {
-  const { socket, response } = Deno.upgradeWebSocket(req, {});
-  const emitter = createFsEmitter();
-  const send = (message: Record<string, unknown>) => {
-    try {
-      socket.send(JSON.stringify(message));
-    } catch (err) {
-      log.warn("socket.send:", err.message);
-    }
-  };
-  socket.addEventListener("open", () => {
-    emitter.on("create", ({ specifier }) => {
-      const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-      if (config && config.routes) {
-        const reg = toRouteRegExp(config.routes);
-        const routePattern = reg.exec(specifier);
-        if (routePattern) {
-          send({ type: "create", specifier, routePattern });
-          return;
-        }
-      }
-      send({ type: "create", specifier });
-    });
-    emitter.on("remove", ({ specifier }) => {
-      emitter.off(`hotUpdate:${specifier}`);
-      send({ type: "remove", specifier });
-    });
-  });
-  socket.addEventListener("message", (e) => {
-    if (util.isFilledString(e.data)) {
-      try {
-        const { type, specifier } = JSON.parse(e.data);
-        if (type === "hotAccept" && util.isFilledString(specifier)) {
-          emitter.on(`hotUpdate:${specifier}`, () => {
-            send({ type: "modify", specifier });
-          });
-        }
-      } catch (_e) {
-        log.error("invlid socket message:", e.data);
-      }
-    }
-  });
-  socket.addEventListener("close", () => {
-    removeFsEmitter(emitter);
-  });
-  return response;
-}
+/** The generate options for `generateRoutesExportModule`. */
+export type GenerateOptions = {
+  routeConfig: RouteConfig;
+  loaders?: ModuleLoader[];
+};
 
-/** generate the `routes/_export.ts` module by given the routes config */
-export async function generateRoutesExportModule(routeConfig: RouteConfig, appDir: string) {
+/** generate the `routes/_export.ts` module by given the routes config. */
+export async function generateRoutesExportModule(options: GenerateOptions) {
+  const { routeConfig, loaders } = options;
+  const appDir = routeConfig.appDir ?? Deno.cwd();
   const genFile = join(appDir, routeConfig.prefix, "_export.ts");
 
-  const routeFiles: [filename: string, pattern: string, hasExportKeyword: boolean][] = await Promise.all(
-    routeConfig.routes.map(async ([_, { filename, pattern }]) => {
-      const code = await Deno.readTextFile(join(appDir, filename));
-      return [
-        filename,
-        pattern.pathname,
-        /export\s+(default|const|let|var|function|class)/.test(code),
-      ];
-    }),
-  );
-
-  const imports: string[] = [];
-  const revives: string[] = [];
-
-  routeFiles.forEach(([filename, pattern, hasExportKeyword], idx) => {
-    if (hasExportKeyword) {
-      const importUrl = JSON.stringify("." + util.trimPrefix(filename, routeConfig.prefix));
-      imports.push(`import * as $${idx} from ${importUrl};`);
-      revives.push(`  ${JSON.stringify(pattern)}: $${idx},`);
-    }
-  });
-
-  if (revives.length > 0) {
-    await Deno.writeTextFile(
-      genFile,
-      [
-        "// Imports route modules for serverless env that doesn't support the dynamic import.",
-        "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
-        "",
-        ...imports,
-        "",
-        "export default {",
-        ...revives,
-        "};",
-        "",
-      ].join("\n"),
-    );
-    log.debug(`${blue("routes.gen.ts")} generated`);
-  } else {
+  if (routeConfig.routes.length == 0) {
     try {
       await Deno.remove(genFile);
     } catch (error) {
@@ -242,11 +244,92 @@ export async function generateRoutesExportModule(routeConfig: RouteConfig, appDi
         throw error;
       }
     }
+    return;
   }
+
+  const start = performance.now();
+  const comments = [
+    "// Imports route modules for serverless env that doesn't support the dynamic import.",
+    "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
+  ];
+  const imports: string[] = [];
+  const revives: string[] = [];
+
+  routeConfig.routes.forEach(([_, { filename, pattern }], idx) => {
+    const importUrl = JSON.stringify("." + util.trimPrefix(filename, routeConfig.prefix));
+    imports.push(`import * as $${idx} from ${importUrl};`);
+    revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
+  });
+
+  const code = [
+    ...comments,
+    "",
+    ...imports,
+    "",
+    "export default {",
+    ...revives,
+    "};",
+    "",
+  ].join("\n");
+  if (routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)))) {
+    await esbuild({
+      stdin: {
+        resolveDir: appDir,
+        sourcefile: join(routeConfig.prefix, "_export.ts"),
+        contents: code,
+      },
+      outfile: genFile,
+      platform: "browser",
+      format: "esm",
+      target: ["esnext"],
+      allowOverwrite: true,
+      bundle: true,
+      minify: true,
+      treeShaking: true,
+      sourcemap: false,
+      banner: {
+        js: [
+          ...comments,
+          "// deno-fmt-ignore-file",
+          "// deno-lint-ignore-file",
+          "// @ts-nocheck",
+        ].join("\n"),
+      },
+      plugins: [{
+        name: "bundle-non-standard-modules",
+        setup(build) {
+          build.onResolve({ filter: /.*/ }, (args) => {
+            if (loaders?.some((l) => l.test(args.path))) {
+              return { path: args.path, namespace: "loader" };
+            }
+            return { path: args.path, external: true };
+          });
+          build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
+            const filepath = join(dirname(genFile), args.path);
+            const code = await Deno.readTextFile(filepath);
+            const loader = loaders?.find((l) => l.test(args.path));
+            if (loader) {
+              const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
+              const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
+              const ret = await loader.load(relative(appDir, filepath), code, { importMap, jsxConfig, ssr: true });
+              return {
+                contents: ret.code + (ret.inlineCSS ? `\n;export const CSS=` + JSON.stringify(ret.inlineCSS) : ""),
+                loader: ret.lang as unknown as Loader,
+              };
+            }
+            throw new Error(`Loader not found for ${args.path}`);
+          });
+        },
+      }],
+    });
+  } else {
+    await Deno.writeTextFile(genFile, code);
+  }
+  log.debug(`${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`);
 }
 
 /* watch the directory and its subdirectories */
-export async function watchFs(rootDir = Deno.cwd()) {
+async function watchFs(rootDir: string) {
   const timers = new Map();
   const debounce = (id: string, callback: () => void, delay: number) => {
     if (timers.has(id)) {
@@ -273,7 +356,7 @@ export async function watchFs(rootDir = Deno.cwd()) {
       Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
     }
     if (kind === "modify") {
-      emitters.forEach((e) => {
+      watchFsEmitters.forEach((e) => {
         e.emit(`modify:${specifier}`, { specifier });
         if (e.all.has(`hotUpdate:${specifier}`)) {
           e.emit(`hotUpdate:${specifier}`, { specifier });

@@ -91,6 +91,15 @@ export default {
         body = "";
       }
 
+      // inline css
+      routeModules.forEach(({ filename, inlineCSS }) => {
+        if (inlineCSS) {
+          headCollection.push(
+            `<style data-module-id=${JSON.stringify(filename)} ssr>${inlineCSS}</style>`,
+          );
+        }
+      });
+
       // build unocss
       const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
       if (config?.unocss && Array.isArray(config.unocss.presets)) {
@@ -357,6 +366,7 @@ async function initSSR(
       filename: meta.filename,
       defaultExport: mod.default,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
+      inlineCSS: (mod.CSS as string | undefined),
     };
 
     // assign route params to context

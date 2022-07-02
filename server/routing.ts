@@ -6,6 +6,24 @@ import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
 import { fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
 
+/** import the route module. */
+export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
+  const config = getAlephConfig();
+  let mod: Record<string, unknown>;
+  if (
+    Deno.env.get("ALEPH_ENV") !== "development" &&
+    (config?.routeModules && pattern.pathname in config.routeModules)
+  ) {
+    mod = config.routeModules[pattern.pathname];
+  } else {
+    const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_DEP_GRAPH");
+    const version = graph?.get(filename)?.version ?? graph?.mark(filename, {}).version;
+    const root = appDir ?? (config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd());
+    mod = await import(`file://${join(root, filename)}${version ? "#" + version.toString(16) : ""}`);
+  }
+  return mod;
+}
+
 export async function fetchRouteData(
   req: Request,
   ctx: Record<string, unknown>,
@@ -68,24 +86,6 @@ export async function fetchRouteData(
       }
     }
   }
-}
-
-/** import the route module. */
-export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
-  const config = getAlephConfig();
-  let mod: Record<string, unknown>;
-  if (
-    Deno.env.get("ALEPH_ENV") !== "development" &&
-    (config?.routeModules && pattern.pathname in config.routeModules)
-  ) {
-    mod = config.routeModules[pattern.pathname];
-  } else {
-    const graph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_DEP_GRAPH");
-    const version = graph?.get(filename)?.version ?? graph?.mark(filename, {}).version;
-    const root = appDir ?? (config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd());
-    mod = await import(`file://${join(root, filename)}${version ? "#" + version.toString(16) : ""}`);
-  }
-  return mod;
 }
 
 /* check if the filename is a route */

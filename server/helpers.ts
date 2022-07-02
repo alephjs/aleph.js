@@ -47,8 +47,7 @@ export function getAlephPkgUri(): string {
     if (import.meta.url.startsWith("file://")) {
       return "https://aleph";
     }
-    const version = Deno.env.get("ALEPH_VERSION") || VERSION;
-    return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${version}`;
+    return `https://deno.land/x/${isCanary ? "aleph_canary" : "aleph"}@${VERSION}`;
   });
 }
 
