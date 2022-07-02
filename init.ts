@@ -15,15 +15,14 @@ import { isCanary } from "./version.ts";
 
 type TemplateMeta = {
   entry: string;
-  routes?: boolean;
-  unocss?: string;
+  unocss?: boolean;
 };
 
 const templates: Record<string, TemplateMeta> = {
-  "api": { entry: "server.ts", routes: true },
-  "react": { entry: "server.tsx", unocss: "/\.(tsx|jsx)$/", routes: true },
-  "vue": { entry: "server.ts", unocss: "/\.vue$/", routes: true },
-  "yew": { entry: "server.ts", unocss: "/\.rs$/" },
+  "api": { entry: "server.ts" },
+  "react": { entry: "server.tsx" },
+  "vue": { entry: "server.ts" },
+  "yew": { entry: "server.ts" },
   // todo:
   // "preact",
   // "svelte",
@@ -79,10 +78,12 @@ export default async function init(nameArg?: string, template?: string) {
   const tarData = gunzip(gzData);
   const entryList = new Untar(new Buffer(tarData));
   const appDir = join(Deno.cwd(), name);
+  const { entry, unocss } = templates[template];
+  const uno = unocss && confirm("Enable UnoCSS (Atomic CSS)?");
 
   // write template files
   for await (const entry of entryList) {
-    const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app/`;
+    const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app${uno ? "-unocss" : ""}/`;
     if (entry.fileName.startsWith(prefix)) {
       const name = util.trimPrefix(entry.fileName, prefix);
       if (name !== "README.md") {
@@ -97,25 +98,21 @@ export default async function init(nameArg?: string, template?: string) {
     }
   }
 
-  const { entry, routes, unocss } = templates[template];
-
   // generate `routes/_export.ts` module
-  if (routes) {
-    const entryCode = await Deno.readTextFile(join(appDir, entry));
-    const m = entryCode.match(/(\s+)routes: "(.+)"/);
-    if (m) {
-      const routeConfig = await initRoutes(m[2], appDir);
-      await Deno.writeTextFile(
-        join(appDir, entry),
-        entryCode
-          .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routeModules,`)
-          .replace(
-            /(\s*)serve\({/,
-            `$1// pre-import route modules for serverless env that doesn't support the dynamic imports.\nimport routeModules from "${routeConfig.prefix}/_export.ts";\n\nserve({`,
-          ),
-      );
-      await generateRoutesExportModule(routeConfig, appDir);
-    }
+  const entryCode = await Deno.readTextFile(join(appDir, entry));
+  const m = entryCode.match(/(\s+)routes: "(.+)"/);
+  if (m) {
+    const routeConfig = await initRoutes(m[2], appDir);
+    await Deno.writeTextFile(
+      join(appDir, entry),
+      entryCode
+        .replace(
+          /(\s*)serve\({/,
+          `$1// pre-import route modules for serverless env that doesn't support the dynamic imports.\nimport routeModules from "${routeConfig.prefix}/_export.ts";\n\nserve({`,
+        )
+        .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routeModules,`),
+    );
+    await generateRoutesExportModule(routeConfig, appDir);
   }
 
   const alephPkgUri = `https://deno.land/x/${pkgName}@${VERSION}`;
@@ -144,7 +141,7 @@ export default async function init(nameArg?: string, template?: string) {
     },
     "importMap": "import_map.json",
     "tasks": {
-      "dev": `ALEPH_ENV=development deno run -A ${entry}`,
+      "dev": `deno run -A dev.ts`,
       "start": `deno run -A ${entry}`,
     },
     "fmt": {},
@@ -172,30 +169,6 @@ export default async function init(nameArg?: string, template?: string) {
       });
       break;
     }
-  }
-
-  if (unocss && confirm("Enable UnoCSS (Atomic CSS)?")) {
-    Object.assign(importMap.imports, {
-      "@unocss/": `${alephPkgUri}/lib/@unocss/`,
-    });
-    const entryCode = await Deno.readTextFile(join(appDir, entry));
-    await Deno.writeTextFile(
-      join(appDir, entry),
-      `import presetUno from "@unocss/preset-uno.ts";\n` + entryCode.replace(
-        /(\s+)ssr: {/,
-        [
-          `$1unocss: {`,
-          `    // Options for UnoCSS (Atomic CSS)`,
-          `    test: ${unocss},`,
-          `    presets: [`,
-          `      presetUno(),`,
-          `    ],`,
-          `    theme: {},`,
-          `  },`,
-          `  ssr: {`,
-        ].join("\n"),
-      ),
-    );
   }
 
   await ensureDir(appDir);
