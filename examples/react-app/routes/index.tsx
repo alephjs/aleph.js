@@ -1,3 +1,5 @@
+/** @jsxImportSource https://esm.sh/react@18.1.0 */
+
 import { Head, Link } from "aleph/react";
 
 const externalLinks = [
