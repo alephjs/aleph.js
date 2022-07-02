@@ -124,7 +124,7 @@ export const serve = (options: ServerOptions = {}) => {
         });
       } catch (err) {
         if (err instanceof TransformError) {
-          if (!(err.message === "unreachable" && (pathname.endsWith(".js") || pathname.endsWith(".mjs")))) {
+          if (err.message !== "unreachable") {
             log.error(err.message);
             const alephPkgUri = toLocalPath(getAlephPkgUri());
             return new Response(
@@ -165,21 +165,22 @@ export const serve = (options: ServerOptions = {}) => {
         });
       } catch (err) {
         if (err instanceof TransformError) {
-          log.error(err.message);
-          const alephPkgUri = toLocalPath(getAlephPkgUri());
-          return new Response(
-            `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
-              JSON.stringify(err)
-            });export default null;`,
-            {
-              headers: [
-                ["Content-Type", "application/javascript"],
-                ["X-Transform-Error", "true"],
-              ],
-            },
-          );
-        }
-        if (!(err instanceof Deno.errors.NotFound)) {
+          if (err.message !== "unreachable") {
+            log.error(err.message);
+            const alephPkgUri = toLocalPath(getAlephPkgUri());
+            return new Response(
+              `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
+                JSON.stringify(err)
+              });export default null;`,
+              {
+                headers: [
+                  ["Content-Type", "application/javascript"],
+                  ["X-Transform-Error", "true"],
+                ],
+              },
+            );
+          }
+        } else if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
           return onError?.(err, { by: "transform", url: req.url }) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
