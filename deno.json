@@ -22,10 +22,15 @@
       "exclude": [
         ".vscode",
         "CODE_OF_CONDUCT.md",
-        "examples/yew-app/pkg",
-        "examples/yew-app/target"
+        "examples/yew-app/pkg"
       ]
     }
   },
-  "lint": {}
+  "lint": {
+    "files": {
+      "exclude": [
+        "examples/yew-app/pkg"
+      ]
+    }
+  }
 }
