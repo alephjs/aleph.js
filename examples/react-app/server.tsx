@@ -1,5 +1,5 @@
-// support jsx on deno deploy
-/** @jsx react-jsx */
+// Copyright 2022 the Deno authors. All rights reserved. MIT license.
+
 /** @jsxImportSource https://esm.sh/react@18.1.0 */
 
 import { App } from "aleph/react";
