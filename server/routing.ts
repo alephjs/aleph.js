@@ -6,8 +6,6 @@ import util from "../lib/util.ts";
 import type { DependencyGraph } from "./graph.ts";
 import { fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
 
-const revivedModules: Map<string, Record<string, unknown>> = new Map();
-
 export async function fetchRouteData(
   req: Request,
   ctx: Record<string, unknown>,
@@ -72,19 +70,13 @@ export async function fetchRouteData(
   }
 }
 
-/** revive a route module. */
-export function revive(filename: string, module: Record<string, unknown>) {
-  revivedModules.set(filename, module);
-}
-
 /** import the route module. */
 export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
   const config = getAlephConfig();
   let mod: Record<string, unknown>;
-  if (revivedModules.has(filename)) {
-    mod = revivedModules.get(filename)!;
-  } else if (
-    Deno.env.get("ALEPH_ENV") !== "development" && (config?.routeModules && pattern.pathname in config.routeModules)
+  if (
+    Deno.env.get("ALEPH_ENV") !== "development" &&
+    (config?.routeModules && pattern.pathname in config.routeModules)
   ) {
     mod = config.routeModules[pattern.pathname];
   } else {
