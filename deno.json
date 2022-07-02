@@ -19,7 +19,12 @@
       "lineWidth": 120
     },
     "files": {
-      "exclude": ["CODE_OF_CONDUCT.md", ".vscode"]
+      "exclude": [
+        ".vscode",
+        "CODE_OF_CONDUCT.md",
+        "examples/yew-app/pkg",
+        "examples/yew-app/target"
+      ]
     }
   },
   "lint": {}
