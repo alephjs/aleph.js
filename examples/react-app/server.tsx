@@ -5,6 +5,8 @@
 import { App } from "aleph/react";
 import { serve } from "aleph/server";
 import { renderToReadableStream } from "react-dom/server";
+
+// pre-import route modules for serverless env that doesn't support the dynamic imports.
 import routeModules from "./routes/_export.ts";
 
 serve({
