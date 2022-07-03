@@ -361,7 +361,11 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
       if (file.path === genFile) {
         await Deno.writeTextFile(
           genFile,
-          file.text.replace("__DEP_GRAPH__:null,", `__DEP_GRAPH__:${JSON.stringify(depGraph.modules)},`),
+          file.text.replace(
+            "__DEP_GRAPH__:null,",
+            // deno-lint-ignore no-unused-vars
+            `__DEP_GRAPH__:${JSON.stringify(depGraph.modules.map(({ version, ...module }) => module))},`,
+          ),
         );
       }
     }));
