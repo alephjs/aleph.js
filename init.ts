@@ -1,11 +1,12 @@
 import { Untar } from "https://deno.land/std@0.145.0/archive/tar.ts";
 import { parse } from "https://deno.land/std@0.145.0/flags/mod.ts";
+import { blue, cyan, dim, green, red } from "https://deno.land/std@0.145.0/fmt/colors.ts";
 import { ensureDir } from "https://deno.land/std@0.145.0/fs/ensure_dir.ts";
 import { Buffer } from "https://deno.land/std@0.145.0/io/buffer.ts";
 import { basename, join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { copy, readAll } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
-import log, { blue, cyan, dim, green, red } from "./lib/log.ts";
+import log from "./lib/log.ts";
 import util from "./lib/util.ts";
 import { type GenerateOptions, generateRoutesExportModule } from "./server/dev.ts";
 import { existsDir, existsFile, getFiles } from "./server/helpers.ts";
@@ -145,7 +146,7 @@ export default async function init(nameArg?: string, template?: string) {
     },
     "importMap": "import_map.json",
     "tasks": {
-      "dev": `deno run -A dev.ts`,
+      "dev": `deno run -A -q dev.ts`,
       "start": `deno run -A ${entry}`,
     },
     "fmt": {},
