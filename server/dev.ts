@@ -1,20 +1,6 @@
-import { parse } from "https://deno.land/std@0.145.0/flags/mod.ts";
-import { readLines } from "https://deno.land/std@0.145.0/io/mod.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import {
-  basename,
-  blue,
-  dirname,
-  esbuild,
-  join,
-  mitt,
-  relative,
-  serve,
-  serveTls,
-  stripColor,
-  writeAll,
-} from "./deps.ts";
+import { basename, blue, dirname, esbuild, join, mitt, relative, serve, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
@@ -55,37 +41,8 @@ export type DevOptions = {
   hmrWebSocketUrl?: string;
 };
 
-/** Start the dev server. */
-export default async function dev({ baseUrl, hmrWebSocketUrl }: DevOptions = {}) {
-  const p = Deno.run({
-    cmd: [
-      Deno.execPath(),
-      "run",
-      "-A",
-      "--location=http://localhost",
-      import.meta.url,
-      ...(baseUrl ? ["--base-url", baseUrl] : []),
-      ...(hmrWebSocketUrl ? ["--hmr-ws-url", hmrWebSocketUrl] : []),
-    ],
-    stdout: "piped",
-    stderr: "piped",
-  });
-  pipe(p.stdout, Deno.stdout);
-  pipe(p.stderr, Deno.stderr);
-  const { code } = await p.status();
-  Deno.exit(code);
-}
-
-if (import.meta.main) {
-  const options = parse(Deno.args);
-  await main({
-    baseUrl: options["base-url"],
-    hmrWebSocketUrl: options["hmr-ws-url"],
-  });
-}
-
 /** Watch for file changes and listen the dev server. */
-async function main(options?: DevOptions) {
+export default async function dev(options?: DevOptions) {
   const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : Deno.cwd();
   const serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
   if (!serverEntry) {
@@ -430,29 +387,4 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
     await Deno.writeTextFile(genFile, code);
   }
   log.debug(`${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`);
-}
-
-async function pipe(reader: Deno.Reader, writer: Deno.Writer) {
-  for await (const line of readLines(reader)) {
-    const newLine = fixLine(line);
-    if (newLine !== null) {
-      await writeAll(writer, util.utf8TextEncoder.encode(newLine + "\n"));
-    }
-  }
-}
-
-function fixLine(line: string): string | null {
-  const l = stripColor(line);
-  if (l.startsWith(`Download http://localhost:`)) {
-    return null;
-  }
-  if (l.startsWith(`Warning the configuration file `)) {
-    return null;
-  }
-  const ret = l.match(/(https?:\/\/localhost:\d+\/.+)(:\d+:\d+)/);
-  if (ret) {
-    const url = new URL(ret[1]);
-    return l.replace(ret[0], `.${url.pathname}${ret[2]}`);
-  }
-  return line;
 }
