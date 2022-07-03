@@ -1,5 +1,7 @@
 import { TransformError } from "../framework/core/error.ts";
-import { log, MagicString, parseDeps, transform, util } from "./deps.ts";
+import log from "../lib/log.ts";
+import util from "../lib/util.ts";
+import { MagicString, parseDeps, transform } from "./deps.ts";
 import { bundleCSS } from "./bundle.ts";
 import {
   builtinModuleExts,
@@ -85,8 +87,8 @@ export default {
         const alephPkgUri = getAlephPkgUri();
         const { jsxConfig, importMap } = options;
         let ret: TransformResult;
-        if (/^https?:\/\/((cdn\.)?esm\.sh|unpkg\.com)\//.test(specifier)) {
-          // don't transform modules imported from esm.sh
+        if (/^https?:\/\/((cdn\.)?esm\.sh|unpkg\.com|cdn\.skypack\.dev|www\.gstatic\.com)\//.test(specifier)) {
+          // don't transform modules imported from remote CDN
           const deps = await parseDeps(specifier, sourceCode, { importMap: JSON.stringify(importMap) });
           if (deps.length > 0) {
             const s = new MagicString(sourceCode);

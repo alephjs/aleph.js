@@ -10,10 +10,4 @@ export { default as lolHtmlWasm } from "https://deno.land/x/lol_html@0.0.3/wasm.
 // @deno-types="https://deno.land/x/esbuild@v0.14.47/mod.d.ts"
 export { build as esbuild } from "https://deno.land/x/esbuild@v0.14.47/mod.js";
 export { default as mitt } from "https://esm.sh/mitt@3.0.0";
-export { default as MagicString } from "https://esm.sh/magic-string@0.26.2";
-
-export { generateErrorHtml, TransformError } from "../framework/core/error.ts";
-export { URLPatternCompat } from "../framework/core/url_pattern.ts";
-export { default as log } from "../lib/log.ts";
-export { getContentType } from "../lib/media_type.ts";
-export { default as util } from "../lib/util.ts";
+export { default as MagicString } from "https://esm.sh/magic-string@0.26.2?target=esnext";

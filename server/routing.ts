@@ -1,7 +1,10 @@
-import { extname, globToRegExp, join, log, resolve, URLPatternCompat, util } from "./deps.ts";
+import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
+import log from "../lib/log.ts";
+import util from "../lib/util.ts";
+import { extname, globToRegExp, join, resolve } from "./deps.ts";
 import graph from "./graph.ts";
 import { fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
-import type { Route, RouteConfig, RouteMatch, RouteMeta, URLPatternInput } from "./types.ts";
+import type { Route, RouteConfig, RouteMatch, RouteMeta } from "./types.ts";
 
 /** import the route module. */
 export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {

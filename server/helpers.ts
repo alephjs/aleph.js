@@ -1,8 +1,10 @@
-import { basename, getContentType, join, JSONC, log, util } from "./deps.ts";
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
-import { cacheFetch } from "./cache.ts";
-
+import log from "../lib/log.ts";
+import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
+import { basename, join, JSONC } from "./deps.ts";
+import { cacheFetch } from "./cache.ts";
+import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
 export const regFullVersion = /@\d+\.\d+\.\d+/;
@@ -218,7 +220,57 @@ export async function findFile(filenames: string[], cwd = Deno.cwd()): Promise<s
   return void 0;
 }
 
-// get files in the directory
+/** Watch the directory and its subdirectories. */
+export async function watchFs(rootDir: string, listener: (kind: "create" | "remove" | "modify", path: string) => void) {
+  const timers = new Map();
+  const debounce = (id: string, callback: () => void, delay: number) => {
+    if (timers.has(id)) {
+      clearTimeout(timers.get(id)!);
+    }
+    timers.set(
+      id,
+      setTimeout(() => {
+        timers.delete(id);
+        callback();
+      }, delay),
+    );
+  };
+  const reIgnore = /[\/\\](\.git(hub)?|\.vscode|vendor|node_modules|dist|out(put)?|target)[\/\\]/;
+  const ignore = (path: string) => reIgnore.test(path) || path.endsWith(".DS_Store");
+  const allFiles = new Set<string>(
+    (await getFiles(rootDir)).map((name) => join(rootDir, name)).filter((path) => !ignore(path)),
+  );
+  for await (const { kind, paths } of Deno.watchFs(rootDir, { recursive: true })) {
+    if (kind !== "create" && kind !== "remove" && kind !== "modify") {
+      continue;
+    }
+    for (const path of paths) {
+      if (ignore(path)) {
+        continue;
+      }
+      debounce(kind + path, async () => {
+        try {
+          await Deno.lstat(path);
+          if (!allFiles.has(path)) {
+            allFiles.add(path);
+            listener("create", path);
+          } else {
+            listener("modify", path);
+          }
+        } catch (error) {
+          if (error instanceof Deno.errors.NotFound) {
+            allFiles.delete(path);
+            listener("remove", path);
+          } else {
+            console.warn("watchFs:", error);
+          }
+        }
+      }, 100);
+    }
+  }
+}
+
+/** get files in the directory. */
 export async function getFiles(
   dir: string,
   filter?: (filename: string) => boolean,

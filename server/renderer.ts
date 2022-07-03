@@ -1,11 +1,12 @@
 import { FetchError } from "../framework/core/error.ts";
 import { matchRoutes } from "../framework/core/route.ts";
-import { join, util } from "./deps.ts";
+import util from "../lib/util.ts";
+import { HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
-import type { Element } from "./html.ts";
-import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
+import type { Element } from "./types.ts";
+
 import type {
   AlephConfig,
   HTMLRewriterHandlers,
@@ -90,7 +91,7 @@ export default {
           if (css) {
             const buildTime = performance.now() - start;
             headCollection.push(
-              `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.1/tailwind.css">`,
+              `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.2/tailwind.css">`,
               `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
             );
           }

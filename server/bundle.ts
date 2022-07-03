@@ -1,4 +1,5 @@
-import { transformCSS, util } from "./deps.ts";
+import util from "../lib/util.ts";
+import { transformCSS } from "./deps.ts";
 import { getAlephPkgUri, readCode, toLocalPath } from "./helpers.ts";
 import type { Targets } from "./types.ts";
 

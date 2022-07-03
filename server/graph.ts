@@ -105,11 +105,7 @@ export class DependencyGraph {
     });
   }
 
-  #shallowWalk(
-    specifier: string,
-    callback: (mod: Module) => void,
-    recorder: Set<string>,
-  ) {
+  #shallowWalk(specifier: string, callback: (mod: Module) => void, recorder: Set<string>) {
     if (this.#modules.has(specifier)) {
       const mod = this.#modules.get(specifier)!;
       callback(mod);

@@ -1,13 +1,15 @@
-import { basename, blue, dirname, esbuild, join, log, mitt, relative, serve, serveTls, util } from "./deps.ts";
+import log from "../lib/log.ts";
+import util from "../lib/util.ts";
+import { basename, blue, dirname, esbuild, join, mitt, relative, serve, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
   findFile,
   getAlephConfig,
-  getFiles,
   globalIt,
   loadImportMap,
   loadJSXConfig,
+  watchFs,
 } from "./helpers.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
 import type { AlephConfig, ConnInfo, Emitter, ModuleLoader, RouteConfig } from "./types.ts";
@@ -378,54 +380,4 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
     await Deno.writeTextFile(genFile, code);
   }
   log.debug(`${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`);
-}
-
-/** Watch the directory and its subdirectories. */
-async function watchFs(rootDir: string, listener: (kind: "create" | "remove" | "modify", path: string) => void) {
-  const timers = new Map();
-  const debounce = (id: string, callback: () => void, delay: number) => {
-    if (timers.has(id)) {
-      clearTimeout(timers.get(id)!);
-    }
-    timers.set(
-      id,
-      setTimeout(() => {
-        timers.delete(id);
-        callback();
-      }, delay),
-    );
-  };
-  const reIgnore = /[\/\\](\.git(hub)?|\.vscode|vendor|node_modules|dist|out(put)?|target)[\/\\]/;
-  const ignore = (path: string) => reIgnore.test(path) || path.endsWith(".DS_Store");
-  const allFiles = new Set<string>(
-    (await getFiles(rootDir)).map((name) => join(rootDir, name)).filter((path) => !ignore(path)),
-  );
-  for await (const { kind, paths } of Deno.watchFs(rootDir, { recursive: true })) {
-    if (kind !== "create" && kind !== "remove" && kind !== "modify") {
-      continue;
-    }
-    for (const path of paths) {
-      if (ignore(path)) {
-        continue;
-      }
-      debounce(kind + path, async () => {
-        try {
-          await Deno.lstat(path);
-          if (!allFiles.has(path)) {
-            allFiles.add(path);
-            listener("create", path);
-          } else {
-            listener("modify", path);
-          }
-        } catch (error) {
-          if (error instanceof Deno.errors.NotFound) {
-            allFiles.delete(path);
-            listener("remove", path);
-          } else {
-            console.warn("watchFs:", error);
-          }
-        }
-      }, 100);
-    }
-  }
 }

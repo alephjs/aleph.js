@@ -1,4 +1,6 @@
-import { join, log, util } from "./deps.ts";
+import log from "../lib/log.ts";
+import util from "../lib/util.ts";
+import { join } from "./deps.ts";
 import { existsDir, existsFile } from "./helpers.ts";
 
 type CacheMeta = {

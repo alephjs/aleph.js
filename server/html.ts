@@ -1,4 +1,5 @@
-import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm, util } from "./deps.ts";
+import util from "../lib/util.ts";
+import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm } from "./deps.ts";
 import { getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import type { Comment, Element } from "./types.ts";
 
@@ -232,5 +233,3 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
     }
   });
 }
-
-export { Element, HTMLRewriter };
