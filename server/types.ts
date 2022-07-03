@@ -2,7 +2,7 @@ import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/ser
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import type { UserConfig as UnoConfig } from "../lib/@unocss/core.ts";
 import type { RouteModule } from "../framework/core/route.ts";
-export type { Targets, TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.6.7/types.ts";
+export type { Targets, TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.6.8/types.ts";
 export type { Emitter } from "https://esm.sh/mitt@3.0.0";
 export type { Route, RouteConfig, RouteMatch, RouteMeta } from "../framework/core/route.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
