@@ -168,7 +168,7 @@ export function toRouteRegExp(glob: string): RouteRegExp {
   const reg = globToRegExp("./" + util.trimPrefix(glob, "./"));
   return {
     prefix,
-    test: (s: string) => reg.test(s),
+    test: (s: string) => s !== prefix + "/_export.ts" && reg.test(s),
     exec: (filename: string): URLPatternInput | null => {
       if (reg.test(filename)) {
         const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
