@@ -18,14 +18,14 @@ type WatchFsEvents = {
 
 const watchFsEmitters = new Set<Emitter<WatchFsEvents>>();
 
-/** create a `watchFs` emitter. */
+/** Create a `watchFs` emitter. */
 export function createWatchFsEmitter() {
   const e = mitt<WatchFsEvents>();
   watchFsEmitters.add(e);
   return e;
 }
 
-/** remove the emitter. */
+/** Remove the emitter. */
 export function removeWatchFsEmitter(e: Emitter<WatchFsEvents>) {
   e.all.clear();
   watchFsEmitters.delete(e);
@@ -39,7 +39,7 @@ export type DevOptions = {
   hmrWebSocketUrl?: string;
 };
 
-/** start the dev server */
+/** Watch for file changes and start the dev server. */
 export default async function dev(options?: DevOptions) {
   const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : Deno.cwd();
   const serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
@@ -101,11 +101,38 @@ export default async function dev(options?: DevOptions) {
   });
 
   log.info("Watching for file changes...");
-  watchFs(appDir);
+  watchFs(appDir, (kind: "create" | "remove" | "modify", path: string) => {
+    const specifier = "./" + relative(appDir, path).replaceAll("\\", "/");
+    // delete global cached index html
+    if (specifier === "./index.html") {
+      Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
+    }
+    if (kind === "remove") {
+      depGraph.unmark(specifier);
+    } else {
+      depGraph.update(specifier);
+    }
+    if (kind === "modify") {
+      watchFsEmitters.forEach((e) => {
+        e.emit(`modify:${specifier}`, { specifier });
+        if (e.all.has(`hotUpdate:${specifier}`)) {
+          e.emit(`hotUpdate:${specifier}`, { specifier });
+        } else if (specifier !== "./routes/_export.ts") {
+          depGraph.lookup(specifier, (specifier) => {
+            if (e.all.has(`hotUpdate:${specifier}`)) {
+              e.emit(`hotUpdate:${specifier}`, { specifier });
+              return false;
+            }
+          });
+        }
+      });
+    }
+  });
 
   await start();
 }
 
+// bootstrap the dev server, handle the hot reloading ws connection.
 async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __port?: number) {
   // clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
@@ -219,7 +246,7 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   }
 }
 
-/** The generate options for `generateRoutesExportModule`. */
+/** The options for generating the `routes/_export.ts` module. */
 export type GenerateOptions = {
   routeConfig: RouteConfig;
   loaders?: ModuleLoader[];
@@ -353,8 +380,8 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
   log.debug(`${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`);
 }
 
-/* watch the directory and its subdirectories */
-async function watchFs(rootDir: string) {
+/** Watch the directory and its subdirectories. */
+async function watchFs(rootDir: string, listener: (kind: "create" | "remove" | "modify", path: string) => void) {
   const timers = new Map();
   const debounce = (id: string, callback: () => void, delay: number) => {
     if (timers.has(id)) {
@@ -367,33 +394,6 @@ async function watchFs(rootDir: string) {
         callback();
       }, delay),
     );
-  };
-  const listener = (kind: "create" | "remove" | "modify", path: string) => {
-    const specifier = "./" + relative(rootDir, path).replaceAll("\\", "/");
-    if (kind === "remove") {
-      depGraph.unmark(specifier);
-    } else {
-      depGraph.update(specifier);
-    }
-    // delete global cached index html
-    if (specifier === "./index.html") {
-      Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
-    }
-    if (kind === "modify") {
-      watchFsEmitters.forEach((e) => {
-        e.emit(`modify:${specifier}`, { specifier });
-        if (e.all.has(`hotUpdate:${specifier}`)) {
-          e.emit(`hotUpdate:${specifier}`, { specifier });
-        } else if (specifier !== "./routes/_export.ts") {
-          depGraph.lookup(specifier, (specifier) => {
-            if (e.all.has(`hotUpdate:${specifier}`)) {
-              e.emit(`hotUpdate:${specifier}`, { specifier });
-              return false;
-            }
-          });
-        }
-      });
-    }
   };
   const reIgnore = /[\/\\](\.git(hub)?|\.vscode|vendor|node_modules|dist|out(put)?|target)[\/\\]/;
   const ignore = (path: string) => reIgnore.test(path) || path.endsWith(".DS_Store");

@@ -54,9 +54,23 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const { baseUrl, routes, middlewares, loaders, fetch, ssr, onError } = options;
+  const { baseUrl, build, fetch, middlewares, loaders, onError, routes, routeModules, ssr, unocss } = options;
   const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
+
+  // set the log level if specified
+  if (options.logLevel) {
+    log.setLevel(options.logLevel);
+  }
+
+  // inject config to global
+  const config: AlephConfig = { baseUrl, build, routes, routeModules, unocss, loaders };
+  Reflect.set(globalThis, "__ALEPH_CONFIG", config);
+  if (!isDev && routeModules && Array.isArray(routeModules.__DEP_GRAPH__)) {
+    routeModules.__DEP_GRAPH__.forEach((module) => {
+      depGraph.mark(module.specifier, module);
+    });
+  }
 
   // server handler
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
@@ -326,37 +340,30 @@ export function serve(options: ServerOptions = {}) {
     }
   };
 
-  // set log level if specified
-  if (options.logLevel) {
-    log.setLevel(options.logLevel);
-  }
-
-  // inject config to global
-  const { build, routeModules, unocss } = options;
-  const config: AlephConfig = { baseUrl, build, routes, routeModules, unocss, loaders };
-  Reflect.set(globalThis, "__ALEPH_CONFIG", config);
-  if (!isDev && routeModules && Array.isArray(routeModules.__DEP_GRAPH__)) {
-    routeModules.__DEP_GRAPH__.forEach((module) => {
-      depGraph.mark(module.specifier, module);
-    });
-  }
-
   // start the server
-  const { hostname, port = 3000, certFile, keyFile, signal, onListen } = options;
+  const { hostname, port = 3000, certFile, keyFile, signal } = options;
   if (isDev) {
-    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal, onListen });
+    Reflect.set(globalThis, "__ALEPH_SERVER", {
+      handler,
+      hostname,
+      port,
+      certFile,
+      keyFile,
+      signal,
+      onListen: options.onListen,
+    });
   } else {
     const useTls = certFile && keyFile;
-    const onlisten = (arg: { port: number; hostname: string }) => {
+    const onListen = (arg: { port: number; hostname: string }) => {
       if (!getDeploymentId()) {
         log.info(`Server ready on ${useTls ? "https" : "http"}://localhost:${port}`);
       }
-      onListen?.(arg);
+      options.onListen?.(arg);
     };
     if (useTls) {
-      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen: onlisten });
+      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
     } else {
-      stdServe(handler, { hostname, port, signal, onListen: onlisten });
+      stdServe(handler, { hostname, port, signal, onListen });
     }
   }
 }
