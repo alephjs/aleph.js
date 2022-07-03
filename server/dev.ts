@@ -128,13 +128,15 @@ export default async function dev(options?: DevOptions) {
           });
         }
       });
+    } else {
+      emitter.emit(kind, { specifier });
     }
   });
 
   await start();
 }
 
-// bootstrap the dev server, handle the hot reloading ws connection.
+/** Bootstrap the dev server, handle the HMR socket connection. */
 async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __port?: number) {
   // clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
