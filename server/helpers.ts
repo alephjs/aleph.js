@@ -2,8 +2,8 @@ import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
-import { basename, join, JSONC } from "./deps.ts";
 import { cacheFetch } from "./cache.ts";
+import { basename, join, JSONC } from "./deps.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
@@ -300,8 +300,11 @@ export async function readCode(specifier: string): Promise<[code: string, conten
     if (url.host === "aleph") {
       return [await Deno.readTextFile("." + url.pathname), getContentType(url.pathname)];
     }
-    if (url.hostname === "esm.sh" && !url.searchParams.has("target")) {
-      url.searchParams.set("target", config?.build?.target ?? "es2022");
+    if (url.hostname === "esm.sh") {
+      const target = config?.build?.target ?? "es2022";
+      if (!url.pathname.includes(`/${target}/`) && !url.searchParams.has("target")) {
+        url.searchParams.set("target", target);
+      }
     }
     const res = await cacheFetch(url.href);
     if (res.status >= 400) {

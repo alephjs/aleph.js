@@ -1,8 +1,9 @@
 import { TransformError } from "../framework/core/error.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { MagicString, parseDeps, transform } from "./deps.ts";
 import { bundleCSS } from "./bundle.ts";
+import { MagicString, parseDeps, transform } from "./deps.ts";
+import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
   getAlephConfig,
@@ -14,9 +15,16 @@ import {
   restoreUrl,
   toLocalPath,
 } from "./helpers.ts";
+import { getContentType } from "./media_type.ts";
 import { isRouteFile } from "./routing.ts";
-import depGraph from "./graph.ts";
-import type { ImportMap, JSXConfig, ModuleLoader, TransformOptions, TransformResult } from "./types.ts";
+import type {
+  ImportMap,
+  JSXConfig,
+  ModuleLoader,
+  ModuleLoaderOutput,
+  TransformOptions,
+  TransformResult,
+} from "./types.ts";
 
 export type TransformerOptions = {
   buildTarget?: TransformOptions["target"];
@@ -35,9 +43,10 @@ export default {
     );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { isDev, buildTarget, loader } = options;
+    const { isDev, buildTarget, loader, jsxConfig, importMap } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
+    const ssr = searchParams.has("ssr");
 
     const deployId = getDeploymentId();
     const etag = deployId ? `W/${deployId}` : null;
@@ -45,26 +54,59 @@ export default {
       return new Response(null, { status: 304 });
     }
 
+    let [source, sourceContentType] = await readCode(specifier);
+    let lang: ModuleLoaderOutput["lang"];
+    let inlineCSS: string | undefined;
+    let isCSS = false;
+    if (loader) {
+      const loaded = await loader.load(
+        specifier,
+        source,
+        ssr ? { jsxConfig, importMap, ssr: true } : options,
+      );
+      source = loaded.code;
+      lang = loaded.lang;
+      inlineCSS = loaded.inlineCSS;
+    } else {
+      isCSS = sourceContentType.startsWith("text/css");
+    }
+
+    // transform module for SSR
+    if (ssr) {
+      let contentType = sourceContentType;
+      if (lang) {
+        contentType = getContentType(`file.${lang}`);
+      }
+      const deps = await parseDeps(specifier, source, { importMap: JSON.stringify(importMap), lang });
+      depGraph.mark(specifier, { deps, inlineCSS });
+      if (deps.length) {
+        const s = new MagicString(source);
+        deps.forEach((dep) => {
+          const { specifier, importUrl, loc } = dep;
+          if (!util.isLikelyHttpURL(specifier) && loc) {
+            let url: string;
+            const importUrlPrefix = importUrl + (importUrl.includes("?") ? "&" : "?");
+            const version = depGraph.get(specifier)?.version;
+            if (version) {
+              url = `"${importUrlPrefix}ssr&v=${version.toString(36)}"`;
+            } else {
+              url = `"${importUrlPrefix}ssr"`;
+            }
+            s.overwrite(loc.start - 1, loc.end - 1, url);
+          }
+        });
+        return new Response(s.toString(), { headers: [["Content-Type", contentType]] });
+      }
+      return new Response(source, { headers: [["Content-Type", contentType]] });
+    }
+
     let resBody = "";
     let resType = "application/javascript";
-    let [sourceCode, sourceCodeMediaType] = await readCode(specifier);
 
     try {
-      let lang: string | undefined;
-      let inlineCSS: string | undefined;
-      let isCSS: boolean;
-      if (loader) {
-        const loaded = await loader.load(specifier, sourceCode, options);
-        sourceCode = loaded.code;
-        lang = loaded.lang;
-        inlineCSS = loaded.inlineCSS;
-        isCSS = false;
-      } else {
-        isCSS = sourceCodeMediaType.startsWith("text/css");
-      }
       if (isCSS) {
         const asJsModule = searchParams.has("module");
-        const { code, deps } = await bundleCSS(specifier, sourceCode, {
+        const { code, deps } = await bundleCSS(specifier, source, {
           // todo: support borwserslist
           targets: {
             android: 95,
@@ -84,48 +126,55 @@ export default {
           resType = "text/css";
         }
       } else {
+        const config = getAlephConfig();
         const alephPkgUri = getAlephPkgUri();
-        const { jsxConfig, importMap } = options;
-        let ret: TransformResult;
-        if (/^https?:\/\/((cdn\.)?esm\.sh|unpkg\.com|cdn\.skypack\.dev|www\.gstatic\.com)\//.test(specifier)) {
-          // don't transform modules imported from remote CDN
-          const deps = await parseDeps(specifier, sourceCode, { importMap: JSON.stringify(importMap) });
+        let code: string;
+        let map: string | undefined;
+        let deps: TransformResult["deps"];
+        let hasInlineCSS = false;
+        if (
+          util.isLikelyHttpURL(specifier) && !specifier.startsWith("https://aleph/") &&
+          sourceContentType.startsWith("application/javascript")
+        ) {
+          // don't transform js modules imported from remote CDN
+          deps = await parseDeps(specifier, source, { importMap: JSON.stringify(importMap), lang: "js" });
           if (deps.length > 0) {
-            const s = new MagicString(sourceCode);
+            const s = new MagicString(source);
             deps.forEach((dep) => {
               const { importUrl, loc } = dep;
               if (loc) {
                 s.overwrite(loc.start - 1, loc.end - 1, `"${toLocalPath(importUrl)}"`);
               }
             });
-            ret = { code: s.toString(), deps };
+            code = s.toString();
           } else {
-            ret = { code: sourceCode, deps };
+            code = source;
           }
         } else {
-          const graphVersions = depGraph.modules.filter((mod) =>
-            !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
-          ).reduce((acc, { specifier, version }) => {
-            acc[specifier] = version.toString(16);
-            return acc;
-          }, {} as Record<string, string>);
-          ret = await transform(specifier, sourceCode, {
+          const graphVersions = Object.fromEntries(
+            depGraph.modules.filter((mod) => (
+              !util.isLikelyHttpURL(specifier) &&
+              !util.isLikelyHttpURL(mod.specifier) &&
+              mod.specifier !== specifier
+            )).map(({ specifier, version }) => [specifier, version.toString(36)]),
+          );
+          const ret = await transform(specifier, source, {
             ...jsxConfig,
-            lang: lang as TransformOptions["lang"],
-            stripDataExport: isRouteFile(specifier),
-            target: buildTarget ?? "es2022",
             alephPkgUri,
+            lang: lang as TransformOptions["lang"],
+            target: buildTarget ?? "es2022",
             importMap: JSON.stringify(importMap),
             graphVersions,
-            globalVersion: depGraph.globalVersion.toString(16),
+            globalVersion: depGraph.globalVersion.toString(36),
+            stripDataExport: isRouteFile(specifier),
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
             isDev,
           });
+          code = ret.code;
+          map = ret.map;
+          deps = ret.deps;
         }
-        let { code, map, deps } = ret;
-        let hasInlineCSS = false;
-        const config = getAlephConfig();
         const styleTs = `${alephPkgUri}/framework/core/style.ts`;
         if (isDev && config?.unocss) {
           const { presets, test } = config.unocss;
@@ -133,8 +182,7 @@ export default {
             try {
               const unoGenerator = getUnoGenerator();
               if (unoGenerator) {
-                const { css } = await unoGenerator.generate(sourceCode, { id: specifier, minify: !isDev });
-
+                const { css } = await unoGenerator.generate(source, { id: specifier, minify: !isDev });
                 if (css) {
                   code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
                     JSON.stringify(specifier)
@@ -163,7 +211,7 @@ export default {
             if (!util.isLikelyHttpURL(specifier)) {
               m.sources = [`file://source/${util.trimPrefix(specifier, ".")}`];
             }
-            m.sourcesContent = [sourceCode];
+            m.sourcesContent = [source];
             resBody = code +
               `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}\n`;
           } catch (e) {
@@ -175,7 +223,7 @@ export default {
         }
       }
     } catch (error) {
-      throw new TransformError(specifier, sourceCode, error.message, error.stack);
+      throw new TransformError(specifier, source, error.message, error.stack);
     }
 
     const headers = new Headers([["Content-Type", `${resType}; charset=utf-8`]]);
