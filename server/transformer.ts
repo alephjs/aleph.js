@@ -26,6 +26,8 @@ import type {
   TransformResult,
 } from "./types.ts";
 
+const cache = new Map<string, [content: string, headers: Headers]>();
+
 export type TransformerOptions = {
   buildTarget?: TransformOptions["target"];
   isDev: boolean;
@@ -98,6 +100,15 @@ export default {
         return new Response(s.toString(), { headers: [["Content-Type", contentType]] });
       }
       return new Response(source, { headers: [["Content-Type", contentType]] });
+    }
+
+    // check cached module
+    const cacheKey = pathname + search;
+    if (!isDev && cache.has(cacheKey)) {
+      const [content, cachedHeaders] = cache.get(cacheKey)!;
+      const headers = new Headers(cachedHeaders);
+      headers.set("Cache-Hit", "true");
+      return new Response(content, { headers });
     }
 
     let resBody = "";
@@ -241,6 +252,9 @@ export default {
     }
     if (searchParams.get("v") || (pathname.startsWith("/-/") && regFullVersion.test(pathname))) {
       headers.append("Cache-Control", "public, max-age=31536000, immutable");
+    }
+    if (!isDev) {
+      cache.set(cacheKey, [resBody, headers]);
     }
     return new Response(resBody, { headers });
   },
