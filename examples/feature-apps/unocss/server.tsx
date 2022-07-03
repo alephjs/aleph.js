@@ -5,6 +5,7 @@ import { serve } from "aleph/server";
 import { renderToString } from "react-dom/server";
 
 serve({
+  baseUrl: import.meta.url,
   routes: "./routes/**/*.tsx",
   unocss: {
     presets: [
