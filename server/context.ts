@@ -1,8 +1,7 @@
-import type { ConnInfo } from "https://deno.land/std@0.145.0/http/server.ts";
 import util from "../lib/util.ts";
-import { type CookieOptions, setCookieHeader } from "./helpers.ts";
-import type { HTMLRewriterHandlers } from "./html.ts";
-import { SessionImpl, type SessionOptions } from "./session.ts";
+import { setCookieHeader } from "./helpers.ts";
+import { SessionImpl } from "./session.ts";
+import type { ConnInfo, Context, CookieOptions, HTMLRewriterHandlers, Session, SessionOptions } from "./types.ts";
 
 type ContextOptions = {
   connInfo?: ConnInfo;
@@ -11,39 +10,41 @@ type ContextOptions = {
 };
 
 /** create a context object */
-export function createContext(req: Request, options?: ContextOptions): typeof ctx {
-  const ctx = {
+export function createContext(req: Request, options?: ContextOptions): Context {
+  let cookies: Map<string, string> | null = null;
+  let session: Session<Record<string, unknown>> | null = null;
+  const ctx: Context = {
     connInfo: options?.connInfo,
     params: {},
     headers: new Headers(),
     cookies: {
-      _cookies: null as Map<string, string> | null,
       get(name: string) {
-        if (this._cookies === null) {
-          this._cookies = new Map<string, string>();
+        if (cookies === null) {
+          cookies = new Map<string, string>();
           const cookieHeader = req.headers.get("Cookie");
           if (cookieHeader) {
             for (const cookie of cookieHeader.split(";")) {
               const [key, value] = util.splitBy(cookie, "=");
-              this._cookies.set(key.trim(), value);
+              cookies.set(key.trim(), value);
             }
           }
         }
-        return this._cookies.get(name);
+        return cookies.get(name);
       },
       set(name: string, value: string, options?: CookieOptions) {
-        this._cookies?.set(name, value);
+        cookies?.set(name, value);
         ctx.headers.set("Set-Cookie", setCookieHeader(name, value, options));
       },
       delete(name: string, options?: CookieOptions) {
-        this._cookies?.delete(name);
+        cookies?.delete(name);
         ctx.headers.set("Set-Cookie", setCookieHeader(name, "", { ...options, expires: new Date(0) }));
       },
     },
-    _session: null as SessionImpl<Record<string, unknown>> | null,
-    getSession: async function <StoreType extends Record<string, unknown> = Record<string, unknown>>() {
-      if (ctx._session !== null) {
-        return ctx._session;
+    // deno-lint-ignore ban-ts-comment
+    // @ts-ignore
+    async getSession(): Promise<Session<Record<string, unknown>>> {
+      if (session !== null) {
+        return session;
       }
 
       const cookieName = options?.session?.cookie?.name ?? "session";
@@ -61,12 +62,12 @@ export function createContext(req: Request, options?: ContextOptions): typeof ct
         }
       }
 
-      const session = new SessionImpl<StoreType>(
+      const sessionImpl = new SessionImpl<Record<string, unknown>>(
         sid,
         options?.session,
       );
-      await session.read();
-      ctx._session = session as SessionImpl<Record<string, unknown>>;
+      await sessionImpl.read();
+      session = sessionImpl;
       return session;
     },
     htmlRewriter: {

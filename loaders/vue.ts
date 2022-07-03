@@ -3,14 +3,14 @@ import type {
   SFCAsyncStyleCompileOptions,
   SFCScriptCompileOptions,
   SFCTemplateCompileOptions,
-} from "https://esm.sh/@vue/compiler-sfc@3.2.37";
+} from "https://esm.sh/@vue/compiler-sfc@3.2.37?target=esnext";
 import {
   compileScript,
   compileStyleAsync,
   compileTemplate,
   parse,
   rewriteDefault,
-} from "https://esm.sh/@vue/compiler-sfc@3.2.37";
+} from "https://esm.sh/@vue/compiler-sfc@3.2.37?target=esnext";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../server/types.ts";
@@ -21,17 +21,21 @@ type Options = {
   style?: Partial<SFCAsyncStyleCompileOptions>;
 };
 
-export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
+export default class VueSFCLoader implements ModuleLoader {
   #options: Options;
 
   constructor(options?: Options) {
     this.#options = { ...options };
   }
 
+  test(pathname: string): boolean {
+    return pathname.endsWith(".vue");
+  }
+
   async load(pathname: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
-    const filename = "." + pathname;
+    const filename = "." + util.cleanPath(pathname);
     const id = (await util.computeHash("SHA-256", filename)).slice(0, 8);
-    const { descriptor } = parse(content, { filename });
+    const { descriptor } = parse(content, { filename, sourceMap: env.isDev });
     const scriptLang = (descriptor.script && descriptor.script.lang) ||
       (descriptor.scriptSetup && descriptor.scriptSetup.lang);
     const isTS = scriptLang === "ts";
@@ -68,7 +72,6 @@ export default class VueSFCLoader implements Pick<ModuleLoader, "load"> {
       id,
       templateOptions,
     });
-
     const mainScript = rewriteDefault(compiledScript.content, "__sfc__", expressionPlugins);
     const output = [mainScript];
     if (env.isDev && !env.ssr && descriptor.template) {

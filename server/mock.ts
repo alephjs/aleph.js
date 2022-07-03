@@ -1,10 +1,9 @@
-import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
-import { globalIt } from "./helpers.ts";
+import { join } from "./deps.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
-import renderer, { type SSR } from "./renderer.ts";
+import renderer from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
-import type { Middleware } from "./types.ts";
+import type { HTMLRewriterHandlers, Middleware, RouteConfig, SSR } from "./types.ts";
 
 type MockServerOptions = {
   appDir?: string;
@@ -15,10 +14,6 @@ type MockServerOptions = {
 };
 
 /** The MockServer class to create a minimal server for integration testing.
- *
- * Limits:
- * - importing css is _NOT_ allowed: `import "./style.css"`
- * - custom loader is _NOT_ supported, like `import "./component.vue"`
  *
  * @example
  * ```ts
@@ -37,13 +32,17 @@ type MockServerOptions = {
  */
 export class MockServer {
   #options: MockServerOptions;
+  #routeConfig: RouteConfig | null;
+  #indexHtml: Uint8Array | null;
 
   constructor(options: MockServerOptions) {
     this.#options = options;
+    this.#routeConfig = null;
+    this.#indexHtml = null;
   }
 
   async fetch(input: string, init?: RequestInit) {
-    const { routes, middlewares, ssr, origin } = this.#options;
+    const { middlewares, ssr, origin, routes, appDir } = this.#options;
     const url = new URL(input, origin ?? "http://localhost/");
     const req = new Request(url.href, init);
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
@@ -73,28 +72,25 @@ export class MockServer {
       }
     }
 
-    const appDir = this.#options.appDir ? "." + util.cleanPath(this.#options.appDir) : undefined;
-    const routeConfig = await globalIt(
-      `mockRoutes:${appDir}${JSON.stringify(routes)}`,
-      () => initRoutes(routes, appDir),
-    );
+    if (!this.#routeConfig) {
+      this.#routeConfig = await initRoutes(routes, appDir);
+    }
+    if (!this.#indexHtml) {
+      this.#indexHtml = await loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
+        ssr: typeof ssr === "function" ? {} : ssr,
+      });
+    }
+
     const reqData = req.method === "GET" &&
       (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
-    const res = await fetchRouteData(routeConfig.routes, url, req, ctx, reqData);
+    const res = await fetchRouteData(req, ctx, this.#routeConfig, reqData);
     if (res) {
       return res;
     }
 
-    const indexHtml = await globalIt(`mockIndexHtml:${appDir}`, () =>
-      loadAndFixIndexHtml({
-        ssr: typeof ssr === "function" ? {} : ssr,
-        isDev: false,
-        appDir,
-      }));
-
     return renderer.fetch(req, ctx, {
-      indexHtml,
-      routeConfig,
+      indexHtml: this.#indexHtml,
+      routeConfig: this.#routeConfig,
       customHTMLRewriter,
       isDev: false,
       ssr,

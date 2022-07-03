@@ -1,31 +1,39 @@
-import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/server.ts";
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.145.0/http/server.ts";
-import { readableStreamFromReader } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
-import type { RouteConfig } from "../framework/core/route.ts";
-import log, { LevelName } from "../lib/log.ts";
-import { getContentType } from "../lib/media_type.ts";
+import log, { type LevelName } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
-import { DependencyGraph } from "./graph.ts";
+import { join, readableStreamFromReader, serve as stdServe, serveTls } from "./deps.ts";
+import depGraph from "./graph.ts";
 import {
   fixResponse,
   getAlephPkgUri,
   getDeploymentId,
   globalIt,
-  initModuleLoaders,
   loadImportMap,
   loadJSXConfig,
   regFullVersion,
   toLocalPath,
 } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
-import renderer, { type SSR } from "./renderer.ts";
+import { getContentType } from "./media_type.ts";
+import renderer from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
-import type { SessionOptions } from "./session.ts";
-import type { AlephConfig, FetchHandler, Middleware } from "./types.ts";
+import type {
+  AlephConfig,
+  ConnInfo,
+  ErrorHandler,
+  FetchHandler,
+  HTMLRewriterHandlers,
+  Middleware,
+  ModuleLoader,
+  RouteConfig,
+  ServeInit,
+  SessionOptions,
+  SSR,
+} from "./types.ts";
 
+/** The options for the Aleph.js server.  */
 export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
@@ -37,44 +45,40 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   onError?: ErrorHandler;
 } & AlephConfig;
 
-export type ErrorHandler = {
-  (
-    error: unknown,
-    cause: {
-      by: "route-data-fetch" | "ssr" | "transform" | "fs" | "middleware";
-      url: string;
-      context?: Record<string, unknown>;
-    },
-  ): Response | void;
-};
-
 /** Start the Aleph.js server. */
-export const serve = (options: ServerOptions = {}) => {
-  const { routes, build, devServer, middlewares, fetch, ssr, logLevel, onError } = options;
-  const maybeAppDir = options.appDir ?? Deno.env.get("APP_DIR");
-  const appDir = maybeAppDir ? "." + util.cleanPath(maybeAppDir) : undefined;
+export function serve(options: ServerOptions = {}) {
+  const { baseUrl, build, fetch, middlewares, loaders, onError, routes, routeModules, ssr, unocss } = options;
+  const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
+
+  // set the log level if specified
+  if (options.logLevel) {
+    log.setLevel(options.logLevel);
+  }
+
+  // inject config to global
+  const config: AlephConfig = { baseUrl, build, routes, routeModules, unocss, loaders };
+  Reflect.set(globalThis, "__ALEPH_CONFIG", config);
+  if (!isDev && routeModules && Array.isArray(routeModules.__DEP_GRAPH__)) {
+    routeModules.__DEP_GRAPH__.forEach((module) => {
+      depGraph.mark(module.specifier, module);
+    });
+  }
 
   // server handler
   const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
-    const url = new URL(req.url);
-    const { pathname, searchParams } = url;
+    const { pathname, searchParams } = new URL(req.url);
 
+    // close the hot-reloading websocket and tell the client to reload the page
     if (pathname === "/-/hmr") {
-      if (isDev) {
-        const { handleHMRSocket } = await globalIt("__ALEPH_SERVER_DEV", () => import("./dev.ts"));
-        return handleHMRSocket(req);
-      } else {
-        // close the hot-reloading websocket and tell the client to reload the page
-        const { socket, response } = Deno.upgradeWebSocket(req, {});
-        socket.addEventListener("open", () => {
-          socket.send(JSON.stringify({ type: "reload" }));
-          setTimeout(() => {
-            socket.close();
-          }, 50);
-        });
-        return response;
-      }
+      const { socket, response } = Deno.upgradeWebSocket(req);
+      socket.addEventListener("open", () => {
+        socket.send(JSON.stringify({ type: "reload" }));
+        setTimeout(() => {
+          socket.close();
+        }, 50);
+      });
+      return response;
     }
 
     const postMiddlewares: Middleware[] = [];
@@ -117,66 +121,31 @@ export const serve = (options: ServerOptions = {}) => {
       }
     }
 
-    // transform client modules
-    if (!searchParams.has("raw") && clientModuleTransformer.test(pathname)) {
+    // transform modules
+    let loader: ModuleLoader | undefined;
+    if (
+      !searchParams.has("raw") &&
+      (clientModuleTransformer.test(pathname) || (loader = loaders?.find((l) => l.test(pathname))))
+    ) {
       try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap());
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
+        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
+        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
         return await clientModuleTransformer.fetch(req, {
+          buildTarget: options.build?.target,
+          isDev,
           importMap,
           jsxConfig,
-          buildTarget: build?.target,
-          isDev,
-        });
-      } catch (err) {
-        if (err instanceof TransformError) {
-          log.error(err.message);
-          const alephPkgUri = toLocalPath(getAlephPkgUri());
-          return new Response(
-            `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
-              JSON.stringify(err)
-            });`,
-            {
-              headers: [
-                ["Content-Type", "application/javascript"],
-                ["X-Transform-Error", "true"],
-              ],
-            },
-          );
-        }
-        if (!(err instanceof Deno.errors.NotFound)) {
-          log.error(err);
-          return onError?.(err, { by: "transform", url: req.url }) ??
-            new Response(generateErrorHtml(err.stack ?? err.message), {
-              status: 500,
-              headers: [["Content-Type", "text/html"]],
-            });
-        }
-      }
-    }
-
-    // use loader to load modules
-    const moduleLoaders = await globalIt("__ALEPH_MODULE_LOADERS", () => initModuleLoaders());
-    const loader = searchParams.has("raw") ? null : moduleLoaders.find((loader) => loader.test(pathname));
-    if (loader) {
-      try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap());
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(importMap));
-        return await clientModuleTransformer.fetch(req, {
           loader,
-          importMap,
-          jsxConfig,
-          buildTarget: build?.target,
-          isDev,
         });
       } catch (err) {
+        console.log(err);
         if (err instanceof TransformError) {
-          log.error(err.message);
+          log.error(err);
           const alephPkgUri = toLocalPath(getAlephPkgUri());
           return new Response(
             `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
               JSON.stringify(err)
-            });`,
+            });export default null;`,
             {
               headers: [
                 ["Content-Type", "application/javascript"],
@@ -184,8 +153,7 @@ export const serve = (options: ServerOptions = {}) => {
               ],
             },
           );
-        }
-        if (!(err instanceof Deno.errors.NotFound)) {
+        } else if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
           return onError?.(err, { by: "transform", url: req.url }) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
@@ -200,7 +168,7 @@ export const serve = (options: ServerOptions = {}) => {
     const contentType = getContentType(pathname);
     if (!pathname.startsWith("/.") && contentType !== "application/octet-stream") {
       try {
-        let filePath = `.${pathname}`;
+        let filePath = appDir ? join(appDir, pathname) : `.${pathname}`;
         let stat = await Deno.lstat(filePath);
         if (stat.isDirectory && pathname !== "/") {
           filePath = `${util.trimSuffix(filePath, "/")}/index.html`;
@@ -283,7 +251,7 @@ export const serve = (options: ServerOptions = {}) => {
       const reqData = req.method === "GET" &&
         (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       try {
-        const resp = await fetchRouteData(routeConfig.routes, url, req, ctx, reqData);
+        const resp = await fetchRouteData(req, ctx, routeConfig, reqData);
         if (resp) {
           return resp;
         }
@@ -328,14 +296,17 @@ export const serve = (options: ServerOptions = {}) => {
         return new Response("Not found", { status: 404 });
     }
 
+    // render html
     try {
-      const indexHtml = await globalIt("__ALEPH_INDEX_HTML", () =>
-        loadAndFixIndexHtml({
-          appDir,
-          isDev,
-          ssr: typeof ssr === "function" ? {} : ssr,
-          hmrWebSocketUrl: options.devServer?.hmrWebSocketUrl,
-        }));
+      const indexHtml = await globalIt(
+        "__ALEPH_INDEX_HTML",
+        () =>
+          loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
+            ssr: typeof ssr === "function" ? {} : ssr,
+            hmrWebSocketUrl: Deno.env.get("ALEPH_HMR_WS_URL"),
+            isDev,
+          }),
+      );
       return renderer.fetch(req, ctx, {
         indexHtml,
         routeConfig,
@@ -361,32 +332,30 @@ export const serve = (options: ServerOptions = {}) => {
     }
   };
 
-  // set log level if specified
-  if (logLevel) {
-    log.setLevel(logLevel);
-  }
-
-  // inject global objects
-  const { routeModules, unocss } = options;
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { appDir, routes, routeModules, unocss, build, devServer });
-  Reflect.set(globalThis, "__ALEPH_CLIENT_DEP_GRAPH", new DependencyGraph());
-
-  // apply `watchFS` handler of `devServer`
+  // start the server
+  const { hostname, port = 3000, certFile, keyFile, signal } = options;
   if (isDev) {
-    globalIt("__ALEPH_SERVER_DEV", () => import("./dev.ts")).then(({ watchFS }) => {
-      watchFS(appDir);
+    Reflect.set(globalThis, "__ALEPH_SERVER", {
+      handler,
+      hostname,
+      port,
+      certFile,
+      keyFile,
+      signal,
+      onListen: options.onListen,
     });
-  }
-
-  const { hostname, port = 8080, certFile, keyFile, signal } = options;
-  if (Deno.env.get("ALEPH_CLI")) {
-    Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal });
   } else {
-    if (certFile && keyFile) {
-      serveTls(handler, { hostname, port, certFile, keyFile, signal });
+    const useTls = certFile && keyFile;
+    const onListen = (arg: { port: number; hostname: string }) => {
+      if (!getDeploymentId()) {
+        log.info(`Server ready on ${useTls ? "https" : "http"}://localhost:${port}`);
+      }
+      options.onListen?.(arg);
+    };
+    if (useTls) {
+      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
     } else {
-      stdServe(handler, { hostname, port, signal });
+      stdServe(handler, { hostname, port, signal, onListen });
     }
-    log.info(`Server ready on http://localhost:${port}`);
   }
-};
+}

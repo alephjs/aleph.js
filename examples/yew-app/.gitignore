@@ -1,0 +1,4 @@
+target/
+pkg/*
+!pkg/yew_app.js
+!pkg/yew_app_bg.wasm

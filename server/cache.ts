@@ -1,6 +1,6 @@
-import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
+import { green, join } from "./deps.ts";
 import { existsDir, existsFile } from "./helpers.ts";
 
 type CacheMeta = {
@@ -14,6 +14,20 @@ type CacheMeta = {
 
 const memoryCache = new Map<string, [content: Uint8Array, meta: CacheMeta]>();
 const reloaded = new Set<string>();
+
+if (typeof Deno.run === "function") {
+  const p = Deno.run({
+    cmd: [Deno.execPath(), "info", "--json"],
+    stdout: "piped",
+    stderr: "null",
+  });
+  const output = util.utf8TextDecoder.decode(await p.output());
+  const { modulesCache } = JSON.parse(output);
+  if (util.isFilledString(modulesCache)) {
+    Deno.env.set("MODULES_CACHE_DIR", modulesCache);
+  }
+  p.close();
+}
 
 /** fetch and cache remote contents */
 export async function cacheFetch(
@@ -68,7 +82,7 @@ export async function cacheFetch(
   for (let i = 0; i < retryTimes; i++) {
     if (i === 0) {
       if (!isLocalhost) {
-        log.debug("Download", url);
+        log.debug(green("Download"), url);
       }
     } else {
       log.warn(`Download ${url} failed, retrying...`);

@@ -1,7 +1,7 @@
-import { transformCSS } from "https://deno.land/x/aleph_compiler@0.6.6/mod.ts";
-import type { Targets } from "https://deno.land/x/aleph_compiler@0.6.6/types.ts";
 import util from "../lib/util.ts";
+import { transformCSS } from "./deps.ts";
 import { getAlephPkgUri, readCode, toLocalPath } from "./helpers.ts";
+import type { Targets } from "./types.ts";
 
 export type BundleCSSOptions = {
   targets?: Targets;

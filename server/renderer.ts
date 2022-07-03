@@ -1,55 +1,21 @@
-import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { FetchError } from "../framework/core/error.ts";
-import type { RouteConfig, RouteModule } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
-import type { DependencyGraph, Module } from "./graph.ts";
+import { HTMLRewriter, join } from "./deps.ts";
+import depGraph from "./graph.ts";
 import { getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
-import type { Element, HTMLRewriterHandlers } from "./html.ts";
-import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
-import type { AlephConfig } from "./types.ts";
+import type { Element } from "./types.ts";
 
-export type SSRContext = {
-  readonly url: URL;
-  readonly routeModules: RouteModule[];
-  readonly headCollection: string[];
-  readonly dataDefer: boolean;
-  readonly signal: AbortSignal;
-  readonly bootstrapScripts?: string[];
-  readonly onError?: (error: unknown) => void;
-};
-
-export type SSRFn = {
-  (ssr: SSRContext): Promise<ReadableStream | string> | ReadableStream | string;
-};
-
-// Options for the content-security-policy
-// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
-export type CSP = {
-  getPolicy: (url: URL, nonce?: string) => string | null;
-  nonce?: boolean;
-};
-
-export type SSR = {
-  cacheControl?: "private" | "public";
-  CSP?: CSP;
-  dataDefer: true;
-  render: (ssr: SSRContext) => Promise<ReadableStream> | ReadableStream;
-} | {
-  cacheControl?: "private" | "public";
-  CSP?: CSP;
-  dataDefer?: false;
-  render: SSRFn;
-} | SSRFn;
-
-export type SSRResult = {
-  context: SSRContext;
-  body: ReadableStream | string;
-  deferedData: Record<string, unknown>;
-  nonce?: string;
-  is404?: boolean;
-};
+import type {
+  AlephConfig,
+  HTMLRewriterHandlers,
+  RouteConfig,
+  RouteModule,
+  SSR,
+  SSRContext,
+  SSRResult,
+} from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
@@ -93,24 +59,18 @@ export default {
       }
 
       // find inline css
-      const serverDependencyGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_SERVER_DEP_GRAPH");
-      if (serverDependencyGraph) {
-        const lookupModuleStyle = (mod: Module) => {
-          const { specifier, inlineCSS } = mod;
-          if (inlineCSS) {
-            headCollection.push(`<style data-module-id="${specifier}">${inlineCSS}</style>`);
-          }
-        };
-        for (const { filename } of routeModules) {
-          serverDependencyGraph.shallowWalk(filename, lookupModuleStyle);
+      depGraph.shallowWalk(routeModules.map(({ filename }) => filename), (mod) => {
+        const { specifier, inlineCSS } = mod;
+        if (inlineCSS) {
+          headCollection.push(`<style data-module-id="${specifier}" ssr>${inlineCSS}</style>`);
         }
-      }
+      });
 
       // build unocss
       const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-      if (config?.unocss?.presets) {
-        const test: RegExp = config.unocss.test ?? /\.(jsx|tsx)$/;
-        const dir = config?.appDir ? join(Deno.cwd(), config.appDir) : Deno.cwd();
+      if (config?.unocss && Array.isArray(config.unocss.presets)) {
+        const test: RegExp = config.unocss.test instanceof RegExp ? config.unocss.test : /\.(jsx|tsx)$/;
+        const dir = config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd();
         const files = await getFiles(dir);
         const inputSources = await Promise.all(
           files.filter((name) => test.test(name)).map((name) => Deno.readTextFile(join(dir, name))),
@@ -131,7 +91,7 @@ export default {
           if (css) {
             const buildTime = performance.now() - start;
             headCollection.push(
-              `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.1/tailwind.css">`,
+              `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.2/tailwind.css">`,
               `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
             );
           }
@@ -364,7 +324,7 @@ async function initSSR(
 
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, meta]) => {
-    const mod = await importRouteModule(meta);
+    const mod = await importRouteModule(meta, routeConfig.appDir);
     const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),

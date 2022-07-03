@@ -5,6 +5,7 @@ import { renderToReadableStream } from "react-dom/server";
 import { GithubOauth } from "./oauth.ts";
 
 serve({
+  baseUrl: import.meta.url,
   routes: "./routes/**/*.{tsx,ts}",
   unocss: {
     presets: [

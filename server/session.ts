@@ -1,10 +1,5 @@
 import { setCookieHeader } from "./helpers.ts";
-
-export interface SessionStorage {
-  get(sid: string): Promise<unknown | undefined>;
-  set(sid: string, data: unknown, expires: number): Promise<void>;
-  delete(sid: string): Promise<void>;
-}
+import type { Session, SessionOptions, SessionStorage } from "./types.ts";
 
 export class MemorySessionStorage implements SessionStorage {
   #store: Map<string, [unknown, number]> = new Map();
@@ -31,22 +26,7 @@ export class MemorySessionStorage implements SessionStorage {
 
 const defaultSessionStorage = new MemorySessionStorage();
 
-export interface SessionCookieOptions {
-  name?: string;
-  domain?: string;
-  path?: string;
-  secure?: boolean;
-  sameSite?: "lax" | "strict" | "none";
-}
-
-export interface SessionOptions {
-  storage?: SessionStorage;
-  cookie?: SessionCookieOptions;
-  secret?: string;
-  maxAge?: number;
-}
-
-export class SessionImpl<StoreType extends Record<string, unknown>> {
+export class SessionImpl<StoreType extends Record<string, unknown>> implements Session<StoreType> {
   #id: string;
   #options: SessionOptions;
   #store: StoreType | undefined;

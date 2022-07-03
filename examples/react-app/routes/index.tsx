@@ -1,3 +1,6 @@
+// support jsx on deno deploy
+/** @jsxImportSource https://esm.sh/react@18.1.0 */
+
 import { Head, Link } from "aleph/react";
 
 const externalLinks = [
@@ -25,7 +28,7 @@ export default function Index() {
       </p>
       <div className="external-links">
         {externalLinks.map(([text, href]) => (
-          <a href={href} target="_blank">
+          <a href={href} target="_blank" key={href}>
             {text}
             <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path

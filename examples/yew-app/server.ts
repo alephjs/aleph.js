@@ -1,17 +1,11 @@
 import { serve } from "aleph/server";
 import init, { ssr } from "./pkg/yew_app.js";
-import build from "./build.ts";
 
-await init(await Deno.readFile("./pkg/yew_app_bg.wasm"));
+const wasmUrl = new URL("./pkg/yew_app_bg.wasm", import.meta.url);
+await init(await Deno.readFile(wasmUrl));
 
 serve({
-  devServer: {
-    watchFS: (_kind, specifier) => {
-      if (specifier.startsWith("./src/") && specifier.endsWith(".rs")) {
-        build();
-      }
-    },
-  },
+  baseUrl: import.meta.url,
   ssr: {
     render: (ctx) => ssr(ctx.url.href),
   },

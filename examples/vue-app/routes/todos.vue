@@ -93,6 +93,7 @@ function onClick(todo: TodoItem) {
 
 <template>
   <div className="todos-app">
+
     <Head>
       <title>Todos</title>
       <meta name="description" content="A todos app powered by Aleph.js" />

@@ -157,7 +157,7 @@ const helperLinks = `
   <a href="https://discord.com/channels/775256646821085215/775259756041601044" target="_blank">Discord Help Channel</a>
 </div>
 `;
-const regStackLoc = /(http:\/\/localhost:60\d{2}\/.+)(:\d+:\d+)/;
+const regStackLoc = /(https?:\/\/localhost:\d+\/.+)(:\d+:\d+)/;
 
 function formatMessage(message: string, type?: string) {
   return message.split("\n").map((line, i) => {
