@@ -6,6 +6,7 @@ import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
 import type { RouteConfig } from "../framework/core/route.ts";
 import log, { blue } from "../lib/log.ts";
 import util from "../lib/util.ts";
+import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
   findFile,
@@ -16,7 +17,6 @@ import {
   loadJSXConfig,
 } from "./helpers.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
-import type { DependencyGraph } from "./graph.ts";
 import type { AlephConfig, ModuleLoader } from "./types.ts";
 
 type WatchFsEvents = {
@@ -117,6 +117,8 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   // clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
   Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
+  Reflect.deleteProperty(globalThis, "__ALEPH_IMPORT_MAP");
+  Reflect.deleteProperty(globalThis, "__ALEPH_JSX_CONFIG");
   Reflect.deleteProperty(globalThis, "__UNO_GENERATOR");
 
   if (Deno.env.get("ALEPH_SERVER_ENTRY") !== entry) {
@@ -261,32 +263,28 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
     revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
   });
 
-  const code = [
-    ...comments,
-    "",
-    ...imports,
-    "",
-    "export default {",
-    ...revives,
-    "};",
-    "",
-  ].join("\n");
   if (routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)))) {
-    await esbuild({
+    const input = [
+      ...imports,
+      "export default {",
+      "__DEP_GRAPH__:null,",
+      ...revives,
+      "}",
+    ].join("\n");
+    const output = await esbuild({
       stdin: {
-        resolveDir: appDir,
-        sourcefile: join(routeConfig.prefix, "_export.ts"),
-        contents: code,
+        sourcefile: genFile,
+        contents: input,
       },
       outfile: genFile,
       platform: "browser",
       format: "esm",
       target: ["esnext"],
-      allowOverwrite: true,
       bundle: true,
       minify: true,
       treeShaking: true,
       sourcemap: false,
+      write: false,
       banner: {
         js: [
           ...comments,
@@ -299,22 +297,37 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
         name: "bundle-non-standard-modules",
         setup(build) {
           build.onResolve({ filter: /.*/ }, (args) => {
-            if (loaders?.some((l) => l.test(args.path))) {
+            if (args.path.startsWith(".") && loaders?.some((l) => l.test(args.path))) {
+              const dir = dirname(genFile);
+              const specifier = "./" + relative(appDir, join(dir, args.path));
+              depGraph.mark(specifier, {});
+              if (args.importer.startsWith(".")) {
+                const importer = "./" + relative(appDir, join(dir, args.importer));
+                depGraph.mark(importer, { deps: [{ specifier }] });
+              }
               return { path: args.path, namespace: "loader" };
             }
             return { path: args.path, external: true };
           });
           build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
-            const filepath = join(dirname(genFile), args.path);
-            const code = await Deno.readTextFile(filepath);
             const loader = loaders?.find((l) => l.test(args.path));
             if (loader) {
+              const fullpath = join(dirname(genFile), args.path);
+              const specifier = "./" + relative(appDir, fullpath);
               const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
               const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
-              const ret = await loader.load(relative(appDir, filepath), code, { importMap, jsxConfig, ssr: true });
+              const source = await Deno.readTextFile(fullpath);
+              const { code, lang, inlineCSS } = await loader.load(specifier, source, {
+                importMap,
+                jsxConfig,
+                ssr: true,
+              });
+              if (inlineCSS) {
+                depGraph.mark(specifier, { inlineCSS });
+              }
               return {
-                contents: ret.code + (ret.inlineCSS ? `\n;export const CSS=` + JSON.stringify(ret.inlineCSS) : ""),
-                loader: ret.lang as unknown as Loader,
+                contents: code,
+                loader: lang as unknown as Loader,
               };
             }
             throw new Error(`Loader not found for ${args.path}`);
@@ -322,7 +335,26 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
         },
       }],
     });
+    await Promise.all(output.outputFiles.map(async (file) => {
+      if (file.path === genFile) {
+        await Deno.writeTextFile(
+          genFile,
+          file.text.replace("__DEP_GRAPH__:null,", `__DEP_GRAPH__:${JSON.stringify({ modules: depGraph.modules })},`),
+        );
+      }
+    }));
   } else {
+    const empty = "";
+    const code = [
+      ...comments,
+      empty,
+      ...imports,
+      empty,
+      "export default {",
+      ...revives,
+      "};",
+      empty,
+    ].join("\n");
     await Deno.writeTextFile(genFile, code);
   }
   log.debug(`${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`);
@@ -345,11 +377,10 @@ async function watchFs(rootDir: string) {
   };
   const listener = (kind: "create" | "remove" | "modify", path: string) => {
     const specifier = "./" + relative(rootDir, path).replaceAll("\\", "/");
-    const depGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_DEP_GRAPH");
     if (kind === "remove") {
-      depGraph?.unmark(specifier);
+      depGraph.unmark(specifier);
     } else {
-      depGraph?.update(specifier);
+      depGraph.update(specifier);
     }
     // delete global cached index html
     if (specifier === "./index.html") {
@@ -361,7 +392,7 @@ async function watchFs(rootDir: string) {
         if (e.all.has(`hotUpdate:${specifier}`)) {
           e.emit(`hotUpdate:${specifier}`, { specifier });
         } else if (specifier !== "./routes/_export.ts") {
-          depGraph?.lookup(specifier, (specifier) => {
+          depGraph.lookup(specifier, (specifier) => {
             if (e.all.has(`hotUpdate:${specifier}`)) {
               e.emit(`hotUpdate:${specifier}`, { specifier });
               return false;

@@ -2,6 +2,7 @@ export type Module = {
   readonly specifier: string;
   readonly version: number;
   readonly deps?: ReadonlyArray<DependencyDescriptor>;
+  readonly inlineCSS?: string;
 };
 
 export type DependencyDescriptor = {
@@ -97,22 +98,25 @@ export class DependencyGraph {
     }
   }
 
-  shallowWalk(specifier: string, callback: (mod: Module) => void) {
-    this.#shallowWalk(specifier, callback);
+  shallowWalk(specifier: string | string[], callback: (mod: Module) => void) {
+    const recorder = new Set<string>();
+    [specifier].flat().forEach((spec) => {
+      this.#shallowWalk(spec, callback, recorder);
+    });
   }
 
   #shallowWalk(
     specifier: string,
     callback: (mod: Module) => void,
-    _set = new Set<string>(),
+    recorder: Set<string>,
   ) {
     if (this.#modules.has(specifier)) {
       const mod = this.#modules.get(specifier)!;
       callback(mod);
-      _set.add(specifier);
+      recorder.add(specifier);
       mod.deps?.forEach((dep) => {
-        if (!_set.has(dep.specifier)) {
-          this.#shallowWalk(dep.specifier, callback, _set);
+        if (!recorder.has(dep.specifier)) {
+          this.#shallowWalk(dep.specifier, callback, recorder);
         }
       });
     }
@@ -140,3 +144,5 @@ export class DependencyGraph {
     }
   }
 }
+
+export default new DependencyGraph();

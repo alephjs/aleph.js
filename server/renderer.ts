@@ -3,6 +3,7 @@ import { FetchError } from "../framework/core/error.ts";
 import type { RouteConfig, RouteModule } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
+import depGraph from "./graph.ts";
 import { getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
 import type { Element } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
@@ -91,12 +92,11 @@ export default {
         body = "";
       }
 
-      // inline css
-      routeModules.forEach(({ filename, inlineCSS }) => {
+      // find inline css
+      depGraph.shallowWalk(routeModules.map(({ filename }) => filename), (mod) => {
+        const { specifier, inlineCSS } = mod;
         if (inlineCSS) {
-          headCollection.push(
-            `<style data-module-id=${JSON.stringify(filename)} ssr>${inlineCSS}</style>`,
-          );
+          headCollection.push(`<style data-module-id="${specifier}" ssr>${inlineCSS}</style>`);
         }
       });
 
@@ -366,7 +366,6 @@ async function initSSR(
       filename: meta.filename,
       defaultExport: mod.default,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
-      inlineCSS: (mod.CSS as string | undefined),
     };
 
     // assign route params to context

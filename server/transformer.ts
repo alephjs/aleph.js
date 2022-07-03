@@ -17,7 +17,7 @@ import {
   toLocalPath,
 } from "./helpers.ts";
 import { isRouteFile } from "./routing.ts";
-import { DependencyGraph } from "./graph.ts";
+import depGraph from "./graph.ts";
 import type { ImportMap, JSXConfig, ModuleLoader } from "./types.ts";
 
 export type TransformerOptions = {
@@ -40,7 +40,6 @@ export default {
     const { isDev, buildTarget, loader } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
-    const depGraph: DependencyGraph | undefined = Reflect.get(globalThis, "__ALEPH_DEP_GRAPH");
 
     const deployId = getDeploymentId();
     const etag = deployId ? `W/${deployId}` : null;
@@ -81,7 +80,7 @@ export default {
           asJsModule,
           hmr: isDev,
         });
-        depGraph?.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
+        depGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
         resBody = code;
         if (!asJsModule) {
           resType = "text/css";
@@ -106,7 +105,7 @@ export default {
             ret = { code: sourceCode, deps };
           }
         } else {
-          const graphVersions = depGraph?.modules.filter((mod) =>
+          const graphVersions = depGraph.modules.filter((mod) =>
             !util.isLikelyHttpURL(specifier) && !util.isLikelyHttpURL(mod.specifier) && mod.specifier !== specifier
           ).reduce((acc, { specifier, version }) => {
             acc[specifier] = version.toString(16);
@@ -120,7 +119,7 @@ export default {
             alephPkgUri,
             importMap: JSON.stringify(importMap),
             graphVersions,
-            globalVersion: depGraph?.globalVersion.toString(16),
+            globalVersion: depGraph.globalVersion.toString(16),
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
             isDev,
@@ -159,7 +158,7 @@ export default {
         if (hasInlineCSS) {
           deps = [...(deps || []), { specifier: styleTs }] as typeof deps;
         }
-        depGraph?.mark(specifier, { deps });
+        depGraph.mark(specifier, { deps });
         if (map) {
           try {
             const m = JSON.parse(map);

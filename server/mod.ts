@@ -8,7 +8,7 @@ import log, { LevelName } from "../lib/log.ts";
 import { getContentType } from "../lib/media_type.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
-import { DependencyGraph } from "./graph.ts";
+import depGraph from "./graph.ts";
 import {
   fixResponse,
   getAlephPkgUri,
@@ -326,7 +326,11 @@ export const serve = (options: ServerOptions = {}) => {
   // inject global objects
   const { build, routeModules, unocss } = options;
   Reflect.set(globalThis, "__ALEPH_CONFIG", { baseUrl, build, routes, routeModules, unocss, loaders });
-  Reflect.set(globalThis, "__ALEPH_DEP_GRAPH", new DependencyGraph());
+  if (!isDev && routeModules && Array.isArray(routeModules.__DEP_GRAPH__?.modules)) {
+    routeModules.__DEP_GRAPH__.modules.forEach((module) => {
+      depGraph.mark(module.specifier, module);
+    });
+  }
 
   const { hostname, port = 3000, certFile, keyFile, signal, onListen } = options;
   if (isDev) {
