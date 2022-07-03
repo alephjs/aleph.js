@@ -1,7 +1,7 @@
-export * from "https://deno.land/std@0.145.0/fmt/colors.ts";
-export * from "https://deno.land/std@0.145.0/path/mod.ts";
 export { concat as concatBytes } from "https://deno.land/std@0.145.0/bytes/mod.ts";
+export * from "https://deno.land/std@0.145.0/fmt/colors.ts";
 export { serve, serveTls } from "https://deno.land/std@0.145.0/http/server.ts";
+export * from "https://deno.land/std@0.145.0/path/mod.ts";
 export { readableStreamFromReader } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 export { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 export * from "https://deno.land/x/aleph_compiler@0.6.6/mod.ts";
