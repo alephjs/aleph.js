@@ -1,8 +1,7 @@
-import type { ConnInfo } from "https://deno.land/std@0.145.0/http/server.ts";
-import util from "../lib/util.ts";
+import { util } from "./deps.ts";
 import { setCookieHeader } from "./helpers.ts";
-import { SessionImpl, type SessionOptions } from "./session.ts";
-import type { Context, CookieOptions, HTMLRewriterHandlers, Session } from "./types.ts";
+import { SessionImpl } from "./session.ts";
+import type { ConnInfo, Context, CookieOptions, HTMLRewriterHandlers, Session, SessionOptions } from "./types.ts";
 
 type ContextOptions = {
   connInfo?: ConnInfo;

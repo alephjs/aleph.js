@@ -1,10 +1,7 @@
-import { basename, join } from "https://deno.land/std@0.145.0/path/mod.ts";
-import { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
+import { basename, getContentType, join, JSONC, log, util } from "./deps.ts";
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
 import { cacheFetch } from "./cache.ts";
-import { getContentType } from "../lib/media_type.ts";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+
 import { isCanary, VERSION } from "../version.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 

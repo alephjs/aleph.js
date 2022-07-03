@@ -1,11 +1,4 @@
-// @deno-types="https://deno.land/x/esbuild@v0.14.47/mod.d.ts"
-import { build as esbuild, type Loader } from "https://deno.land/x/esbuild@v0.14.47/mod.js";
-import { basename, dirname, join, relative } from "https://deno.land/std@0.145.0/path/mod.ts";
-import { type ConnInfo, serve, serveTls } from "https://deno.land/std@0.145.0/http/mod.ts";
-import mitt, { Emitter } from "https://esm.sh/mitt@3.0.0";
-import type { RouteConfig } from "../framework/core/route.ts";
-import log, { blue } from "../lib/log.ts";
-import util from "../lib/util.ts";
+import { basename, blue, dirname, esbuild, join, log, mitt, relative, serve, serveTls, util } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
@@ -17,7 +10,7 @@ import {
   loadJSXConfig,
 } from "./helpers.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
-import type { AlephConfig, ModuleLoader } from "./types.ts";
+import type { AlephConfig, ConnInfo, Emitter, ModuleLoader, RouteConfig } from "./types.ts";
 
 type WatchFsEvents = {
   [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: { specifier: string };
@@ -327,7 +320,7 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
               }
               return {
                 contents: code,
-                loader: lang as unknown as Loader,
+                loader: lang,
               };
             }
             throw new Error(`Loader not found for ${args.path}`);
@@ -339,7 +332,7 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
       if (file.path === genFile) {
         await Deno.writeTextFile(
           genFile,
-          file.text.replace("__DEP_GRAPH__:null,", `__DEP_GRAPH__:${JSON.stringify({ modules: depGraph.modules })},`),
+          file.text.replace("__DEP_GRAPH__:null,", `__DEP_GRAPH__:${JSON.stringify(depGraph.modules)},`),
         );
       }
     }));

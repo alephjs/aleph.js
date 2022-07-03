@@ -1,13 +1,15 @@
-import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
-import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/server.ts";
-import { serve as stdServe, serveTls } from "https://deno.land/std@0.145.0/http/server.ts";
-import { readableStreamFromReader } from "https://deno.land/std@0.145.0/streams/conversion.ts";
-import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
-import type { RouteConfig } from "../framework/core/route.ts";
-import log, { LevelName } from "../lib/log.ts";
-import { getContentType } from "../lib/media_type.ts";
-import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
+import {
+  generateErrorHtml,
+  getContentType,
+  join,
+  log,
+  readableStreamFromReader,
+  serve as stdServe,
+  serveTls,
+  TransformError,
+  util,
+} from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   fixResponse,
@@ -20,23 +22,29 @@ import {
   toLocalPath,
 } from "./helpers.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
-import renderer, { type SSR } from "./renderer.ts";
+import renderer from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
 import clientModuleTransformer from "./transformer.ts";
-import type { SessionOptions } from "./session.ts";
 import type {
   AlephConfig,
+  ConnInfo,
   ErrorHandler,
   FetchHandler,
   HTMLRewriterHandlers,
+  LogLevelName,
   Middleware,
   ModuleLoader,
+  RouteConfig,
+  ServeInit,
+  SessionOptions,
+  SSR,
 } from "./types.ts";
 
+/** The options for the Aleph.js server.  */
 export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
-  logLevel?: LevelName;
+  logLevel?: LogLevelName;
   session?: SessionOptions;
   middlewares?: Middleware[];
   fetch?: FetchHandler;
@@ -45,7 +53,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 } & AlephConfig;
 
 /** Start the Aleph.js server. */
-export const serve = (options: ServerOptions = {}) => {
+export function serve(options: ServerOptions = {}) {
   const { baseUrl, routes, middlewares, loaders, fetch, ssr, onError } = options;
   const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
@@ -323,15 +331,17 @@ export const serve = (options: ServerOptions = {}) => {
     log.setLevel(options.logLevel);
   }
 
-  // inject global objects
+  // inject config to global
   const { build, routeModules, unocss } = options;
-  Reflect.set(globalThis, "__ALEPH_CONFIG", { baseUrl, build, routes, routeModules, unocss, loaders });
-  if (!isDev && routeModules && Array.isArray(routeModules.__DEP_GRAPH__?.modules)) {
-    routeModules.__DEP_GRAPH__.modules.forEach((module) => {
+  const config: AlephConfig = { baseUrl, build, routes, routeModules, unocss, loaders };
+  Reflect.set(globalThis, "__ALEPH_CONFIG", config);
+  if (!isDev && routeModules && Array.isArray(routeModules.__DEP_GRAPH__)) {
+    routeModules.__DEP_GRAPH__.forEach((module) => {
       depGraph.mark(module.specifier, module);
     });
   }
 
+  // start the server
   const { hostname, port = 3000, certFile, keyFile, signal, onListen } = options;
   if (isDev) {
     Reflect.set(globalThis, "__ALEPH_SERVER", { hostname, port, certFile, keyFile, handler, signal, onListen });
@@ -349,4 +359,4 @@ export const serve = (options: ServerOptions = {}) => {
       stdServe(handler, { hostname, port, signal, onListen: onlisten });
     }
   }
-};
+}

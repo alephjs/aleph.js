@@ -1,9 +1,5 @@
-import MagicString from "https://esm.sh/magic-string@0.26.2";
-import { parseDeps, transform } from "https://deno.land/x/aleph_compiler@0.6.6/mod.ts";
-import type { TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.6.6/types.ts";
 import { TransformError } from "../framework/core/error.ts";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+import { log, MagicString, parseDeps, transform, util } from "./deps.ts";
 import { bundleCSS } from "./bundle.ts";
 import {
   builtinModuleExts,
@@ -18,7 +14,7 @@ import {
 } from "./helpers.ts";
 import { isRouteFile } from "./routing.ts";
 import depGraph from "./graph.ts";
-import type { ImportMap, JSXConfig, ModuleLoader } from "./types.ts";
+import type { ImportMap, JSXConfig, ModuleLoader, TransformOptions, TransformResult } from "./types.ts";
 
 export type TransformerOptions = {
   buildTarget?: TransformOptions["target"];

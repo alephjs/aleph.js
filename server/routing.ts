@@ -1,10 +1,7 @@
-import { extname, globToRegExp, join, resolve } from "https://deno.land/std@0.145.0/path/mod.ts";
-import type { Route, RouteConfig, RouteMatch, RouteMeta } from "../framework/core/route.ts";
-import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+import { extname, globToRegExp, join, log, resolve, URLPatternCompat, util } from "./deps.ts";
 import graph from "./graph.ts";
 import { fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
+import type { Route, RouteConfig, RouteMatch, RouteMeta, URLPatternInput } from "./types.ts";
 
 /** import the route module. */
 export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
@@ -16,7 +13,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   ) {
     mod = config.routeModules[pattern.pathname];
   } else {
-    const version = graph.get(filename)?.version ?? graph.mark(filename, {}).version;
+    const version = graph.get(filename)?.version;
     const root = appDir ?? (config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd());
     mod = await import(`file://${join(root, filename)}${version ? "#" + version.toString(16) : ""}`);
   }

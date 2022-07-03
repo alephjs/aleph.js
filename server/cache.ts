@@ -1,6 +1,4 @@
-import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+import { join, log, util } from "./deps.ts";
 import { existsDir, existsFile } from "./helpers.ts";
 
 type CacheMeta = {

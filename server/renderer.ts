@@ -1,55 +1,20 @@
-import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { FetchError } from "../framework/core/error.ts";
-import type { RouteConfig, RouteModule } from "../framework/core/route.ts";
 import { matchRoutes } from "../framework/core/route.ts";
-import util from "../lib/util.ts";
+import { join, util } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
 import type { Element } from "./html.ts";
 import { HTMLRewriter } from "./html.ts";
 import { importRouteModule } from "./routing.ts";
-import type { AlephConfig, HTMLRewriterHandlers } from "./types.ts";
-
-export type SSRContext = {
-  readonly url: URL;
-  readonly routeModules: RouteModule[];
-  readonly headCollection: string[];
-  readonly dataDefer: boolean;
-  readonly signal: AbortSignal;
-  readonly bootstrapScripts?: string[];
-  readonly onError?: (error: unknown) => void;
-};
-
-export type SSRFn = {
-  (ssr: SSRContext): Promise<ReadableStream | string> | ReadableStream | string;
-};
-
-// Options for the content-security-policy
-// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
-export type CSP = {
-  getPolicy: (url: URL, nonce?: string) => string | null;
-  nonce?: boolean;
-};
-
-export type SSR = {
-  cacheControl?: "private" | "public";
-  CSP?: CSP;
-  dataDefer: true;
-  render: (ssr: SSRContext) => Promise<ReadableStream> | ReadableStream;
-} | {
-  cacheControl?: "private" | "public";
-  CSP?: CSP;
-  dataDefer?: false;
-  render: SSRFn;
-} | SSRFn;
-
-export type SSRResult = {
-  context: SSRContext;
-  body: ReadableStream | string;
-  deferedData: Record<string, unknown>;
-  nonce?: string;
-  is404?: boolean;
-};
+import type {
+  AlephConfig,
+  HTMLRewriterHandlers,
+  RouteConfig,
+  RouteModule,
+  SSR,
+  SSRContext,
+  SSRResult,
+} from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;

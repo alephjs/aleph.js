@@ -1,9 +1,6 @@
-import { concat } from "https://deno.land/std@0.145.0/bytes/mod.ts";
-import type { Comment, Element } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
-import initLolHtml, { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.3/mod.js";
-import lolHtmlWasm from "https://deno.land/x/lol_html@0.0.3/wasm.js";
-import util from "../lib/util.ts";
+import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm, util } from "./deps.ts";
 import { getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
+import type { Comment, Element } from "./types.ts";
 
 // init `lol-html` Wasm
 await initLolHtml(lolHtmlWasm());
@@ -17,9 +14,6 @@ const defaultIndexHtml = `<!DOCTYPE html>
 <body><h2>Not Found</h2></body>
 </html>
 `;
-
-// init `lol-html` Wasm
-await initLolHtml(lolHtmlWasm());
 
 type LoadOptions = {
   isDev?: boolean;
@@ -86,7 +80,7 @@ async function loadIndexHtml(filepath: string): Promise<{ html: Uint8Array; hasS
     rewriter.write(html);
     rewriter.end();
     return {
-      html: concat(...chunks),
+      html: concatBytes(...chunks),
       hasSSRBody,
     };
   } finally {
@@ -193,7 +187,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, options: LoadOption
   try {
     rewriter.write(html);
     rewriter.end();
-    return concat(...chunks);
+    return concatBytes(...chunks);
   } catch (err) {
     throw err;
   } finally {

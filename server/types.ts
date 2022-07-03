@@ -1,6 +1,14 @@
-import type { ConnInfo } from "https://deno.land/std@0.145.0/http/server.ts";
+import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/server.ts";
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import type { UserConfig as UnoConfig } from "../lib/@unocss/core.ts";
+import type { RouteModule } from "../framework/core/route.ts";
+
+export type { Targets, TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.6.6/types.ts";
+export type { Emitter } from "https://esm.sh/mitt@3.0.0";
+export type { URLPatternInput } from "../framework/core/url_pattern.ts";
+export type { Route, RouteConfig, RouteMatch, RouteMeta } from "../framework/core/route.ts";
+export type { LevelName as LogLevelName } from "../lib/log.ts";
+export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk, UnoConfig };
 
 export type AlephConfig = {
   /** The base url of the server. */
@@ -41,6 +49,27 @@ export interface Cookies {
   get(key: string): string | undefined;
   set(key: string, value: string, options?: CookieOptions): void;
   delete(key: string, options?: CookieOptions): void;
+}
+
+export interface SessionStorage {
+  get(sid: string): Promise<unknown | undefined>;
+  set(sid: string, data: unknown, expires: number): Promise<void>;
+  delete(sid: string): Promise<void>;
+}
+
+export interface SessionCookieOptions {
+  name?: string;
+  domain?: string;
+  path?: string;
+  secure?: boolean;
+  sameSite?: "lax" | "strict" | "none";
+}
+
+export interface SessionOptions {
+  storage?: SessionStorage;
+  cookie?: SessionCookieOptions;
+  secret?: string;
+  maxAge?: number;
 }
 
 export interface Session<T> {
@@ -109,6 +138,47 @@ export interface ModuleLoader {
   load(specifier: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
 }
 
+export type SSRContext = {
+  readonly url: URL;
+  readonly routeModules: RouteModule[];
+  readonly headCollection: string[];
+  readonly dataDefer: boolean;
+  readonly signal: AbortSignal;
+  readonly bootstrapScripts?: string[];
+  readonly onError?: (error: unknown) => void;
+};
+
+export type SSRFn = {
+  (ssr: SSRContext): Promise<ReadableStream | string> | ReadableStream | string;
+};
+
+// Options for the content-security-policy
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+export type CSP = {
+  getPolicy: (url: URL, nonce?: string) => string | null;
+  nonce?: boolean;
+};
+
+export type SSR = {
+  cacheControl?: "private" | "public";
+  CSP?: CSP;
+  dataDefer: true;
+  render: (ssr: SSRContext) => Promise<ReadableStream> | ReadableStream;
+} | {
+  cacheControl?: "private" | "public";
+  CSP?: CSP;
+  dataDefer?: false;
+  render: SSRFn;
+} | SSRFn;
+
+export type SSRResult = {
+  context: SSRContext;
+  body: ReadableStream | string;
+  deferedData: Record<string, unknown>;
+  nonce?: string;
+  is404?: boolean;
+};
+
 export type ErrorHandler = {
   (
     error: unknown,
@@ -119,5 +189,3 @@ export type ErrorHandler = {
     },
   ): Response | void;
 };
-
-export { UnoConfig };

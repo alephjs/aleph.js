@@ -1,10 +1,9 @@
-import { join } from "https://deno.land/std@0.145.0/path/mod.ts";
 import { createContext } from "./context.ts";
+import { join } from "./deps.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
-import renderer, { type SSR } from "./renderer.ts";
+import renderer from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
-import type { HTMLRewriterHandlers, Middleware } from "./types.ts";
-import type { RouteConfig } from "../framework/core/route.ts";
+import type { HTMLRewriterHandlers, Middleware, RouteConfig, SSR } from "./types.ts";
 
 type MockServerOptions = {
   appDir?: string;
