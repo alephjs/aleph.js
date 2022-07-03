@@ -138,22 +138,21 @@ export function serve(options: ServerOptions = {}) {
           loader,
         });
       } catch (err) {
+        console.log(err);
         if (err instanceof TransformError) {
-          if (err.message !== "unreachable") {
-            log.error(err);
-            const alephPkgUri = toLocalPath(getAlephPkgUri());
-            return new Response(
-              `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
-                JSON.stringify(err)
-              });export default null;`,
-              {
-                headers: [
-                  ["Content-Type", "application/javascript"],
-                  ["X-Transform-Error", "true"],
-                ],
-              },
-            );
-          }
+          log.error(err);
+          const alephPkgUri = toLocalPath(getAlephPkgUri());
+          return new Response(
+            `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
+              JSON.stringify(err)
+            });export default null;`,
+            {
+              headers: [
+                ["Content-Type", "application/javascript"],
+                ["X-Transform-Error", "true"],
+              ],
+            },
+          );
         } else if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
           return onError?.(err, { by: "transform", url: req.url }) ??

@@ -133,8 +133,12 @@ export default {
         let deps: TransformResult["deps"];
         let hasInlineCSS = false;
         if (
-          util.isLikelyHttpURL(specifier) && !specifier.startsWith("https://aleph/") &&
-          sourceContentType.startsWith("application/javascript")
+          util.isLikelyHttpURL(specifier) &&
+          !specifier.startsWith("https://aleph/") &&
+          (
+            /^https?:\/\/(cdn\.)?esm\.sh\//i.test(specifier) ||
+            /^(text|application)\/javascript/i.test(sourceContentType)
+          )
         ) {
           // don't transform js modules imported from remote CDN
           deps = await parseDeps(specifier, source, { importMap: JSON.stringify(importMap), lang: "js" });
@@ -223,7 +227,12 @@ export default {
         }
       }
     } catch (error) {
-      throw new TransformError(specifier, source, error.message, error.stack);
+      if (error.message === "unreachable") {
+        resBody = source;
+        resType = sourceContentType;
+      } else {
+        throw new TransformError(specifier, source, error.message, error.stack);
+      }
     }
 
     const headers = new Headers([["Content-Type", `${resType}; charset=utf-8`]]);
