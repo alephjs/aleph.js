@@ -1,7 +1,7 @@
 import util from "../lib/util.ts";
+import type { Targets } from "./deps.ts";
 import { transformCSS } from "./deps.ts";
 import { getAlephPkgUri, readCode, toLocalPath } from "./helpers.ts";
-import type { Targets } from "./types.ts";
 
 export type BundleCSSOptions = {
   targets?: Targets;

@@ -10,7 +10,8 @@ export default {
   isFilledString(a: unknown): a is string {
     return typeof a === "string" && a.length > 0;
   },
-  isFilledArray(a: unknown): a is Array<unknown> {
+  // deno-lint-ignore no-explicit-any
+  isFilledArray(a: unknown): a is Array<any> {
     return Array.isArray(a) && a.length > 0;
   },
   isPlainObject<T = Record<string, unknown>>(a: unknown): a is T {
@@ -79,8 +80,8 @@ export default {
     const signature = await crypto.subtle.sign("HMAC", key, this.utf8TextEncoder.encode(data));
     return this.toHex(signature);
   },
-  computeHash(algorithm: AlgorithmIdentifier, data: string | Uint8Array): Promise<string> {
-    return crypto.subtle.digest(
+  async computeHash(algorithm: AlgorithmIdentifier, data: string | Uint8Array): Promise<string> {
+    return await crypto.subtle.digest(
       algorithm,
       typeof data === "string" ? this.utf8TextEncoder.encode(data) : data,
     ).then((sum) => this.toHex(sum));

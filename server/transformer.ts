@@ -2,6 +2,7 @@ import { TransformError } from "../framework/core/error.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle.ts";
+import type { TransformOptions, TransformResult } from "./deps.ts";
 import { MagicString, parseDeps, transform } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
@@ -17,14 +18,7 @@ import {
 } from "./helpers.ts";
 import { getContentType } from "./media_type.ts";
 import { isRouteFile } from "./routing.ts";
-import type {
-  ImportMap,
-  JSXConfig,
-  ModuleLoader,
-  ModuleLoaderOutput,
-  TransformOptions,
-  TransformResult,
-} from "./types.ts";
+import type { ImportMap, JSXConfig, ModuleLoader, ModuleLoaderOutput } from "./types.ts";
 
 const cache = new Map<string, [content: string, headers: Headers]>();
 

@@ -59,8 +59,8 @@ export function serve(options: ServerOptions = {}) {
   // inject config to global
   const config: AlephConfig = { baseUrl, build, routes, routeModules, unocss, loaders };
   Reflect.set(globalThis, "__ALEPH_CONFIG", config);
-  if (!isDev && routeModules && Array.isArray(routeModules.__DEP_GRAPH__)) {
-    routeModules.__DEP_GRAPH__.forEach((module) => {
+  if (!isDev && routeModules && util.isFilledArray(routeModules.depGraph?.modules)) {
+    routeModules.depGraph.modules.forEach((module) => {
       depGraph.mark(module.specifier, module);
     });
   }
