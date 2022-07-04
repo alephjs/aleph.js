@@ -8,9 +8,7 @@ import { copy, readAll } from "https://deno.land/std@0.145.0/streams/conversion.
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import log from "./lib/log.ts";
 import util from "./lib/util.ts";
-import { type GenerateOptions, generateRoutesExportModule } from "./server/dev.ts";
 import { existsDir, existsFile, getFiles } from "./server/helpers.ts";
-import { initRoutes } from "./server/routing.ts";
 import { isCanary } from "./version.ts";
 
 type TemplateMeta = {
@@ -98,39 +96,7 @@ export default async function init(nameArg?: string, template?: string) {
     }
   }
 
-  // generate `routes/_export.ts` module
-  const entryCode = await Deno.readTextFile(join(appDir, entry));
-  const m = entryCode.match(/(\s+)routes: "(.+)"/);
-  if (m) {
-    const routeConfig = await initRoutes(m[2], appDir);
-    await Deno.writeTextFile(
-      join(appDir, entry),
-      entryCode
-        .replace(
-          /(\s*)serve\({/,
-          `$1// pre-import route modules for serverless env that doesn't support the dynamic imports.\nimport routeModules from "${routeConfig.prefix}/_export.ts";\n\nserve({`,
-        )
-        .replace(/(\s+)routes: "(.+)/, `$1routes: "$2$1routeModules,`),
-    );
-    const genOptions: GenerateOptions = { routeConfig };
-    if (template === "vue") {
-      const { default: VueLoader } = await import("./loaders/vue.ts");
-      genOptions.loaders = [new VueLoader()];
-    }
-    await generateRoutesExportModule(genOptions);
-  }
-
   const alephPkgUri = `https://deno.land/x/${pkgName}@${VERSION}`;
-  const importMap = {
-    imports: {
-      "~/": "./",
-      "std/": "https://deno.land/std@0.145.0/",
-      "aleph/": `${alephPkgUri}/`,
-      "aleph/server": `${alephPkgUri}/server/mod.ts`,
-      "aleph/dev": `${alephPkgUri}/server/dev.ts`,
-    },
-    scopes: {},
-  };
   const denoConfig = {
     "compilerOptions": {
       "lib": [
@@ -152,17 +118,27 @@ export default async function init(nameArg?: string, template?: string) {
     "fmt": {},
     "lint": {},
   };
+  const importMap = {
+    imports: {
+      "~/": "./",
+      "std/": "https://deno.land/std@0.145.0/",
+      "aleph/": `${alephPkgUri}/`,
+      "aleph/server": `${alephPkgUri}/server/mod.ts`,
+      "aleph/dev": `${alephPkgUri}/server/dev.ts`,
+    },
+    scopes: {},
+  };
   switch (template) {
     case "react": {
+      Object.assign(denoConfig.compilerOptions, {
+        "jsx": "react-jsx",
+        "jsxImportSource": `https://esm.sh/react@${versions.react}`,
+      });
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
         "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/react-dom@${versions.react}/`,
-      });
-      Object.assign(denoConfig.compilerOptions, {
-        "jsx": "react-jsx",
-        "jsxImportSource": `https://esm.sh/react@${versions.react}`,
       });
       break;
     }
@@ -182,29 +158,17 @@ export default async function init(nameArg?: string, template?: string) {
     Deno.writeTextFile(join(appDir, "import_map.json"), JSON.stringify(importMap, undefined, 2)),
   ]);
 
-  // todo: remove this step when deno-vsc support auto enable mode
-  if (confirm("Using VS Code?")) {
-    const extensions = {
-      "recommendations": [
-        "denoland.vscode-deno",
-      ],
-    };
+  if (confirm("Initialize VS Code workspace configuration?")) {
     const settigns = {
       "deno.enable": true,
       "deno.lint": true,
       "deno.config": "./deno.json",
     };
     await ensureDir(join(appDir, ".vscode"));
-    await Promise.all([
-      Deno.writeTextFile(
-        join(appDir, ".vscode", "extensions.json"),
-        JSON.stringify(extensions, undefined, 2),
-      ),
-      Deno.writeTextFile(
-        join(appDir, ".vscode", "settings.json"),
-        JSON.stringify(settigns, undefined, 2),
-      ),
-    ]);
+    await Deno.writeTextFile(
+      join(appDir, ".vscode", "settings.json"),
+      JSON.stringify(settigns, undefined, 2),
+    );
   }
 
   console.log([
