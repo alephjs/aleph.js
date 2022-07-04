@@ -429,7 +429,10 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
             "aleph/server": `${alephPkgUri}/server/mod.ts`,
             "aleph/dev": `${alephPkgUri}/server/dev.ts`,
             "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
+            "aleph/react-ssr": `${alephPkgUri}/framework/react/ssr.ts`,
+            "aleph/react-client": `${alephPkgUri}/framework/react/client.ts`,
             "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
+            "aleph/vue-ssr": `${alephPkgUri}/framework/vue/ssr.ts`,
           });
         }
       }

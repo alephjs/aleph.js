@@ -1,14 +1,15 @@
 import { serve } from "aleph/server";
-import ssr from "aleph/vue-ssr";
-import VueLoader from "aleph/vue-loader";
+import render from "aleph/react-ssr";
 
 // pre-import route modules
 import routeModules from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  routes: "./routes/**/*.{vue,ts}",
+  routes: "./routes/**/*.tsx",
   routeModules,
-  loaders: [new VueLoader()],
-  ssr,
+  ssr: {
+    dataDefer: true,
+    render,
+  },
 });

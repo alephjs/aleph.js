@@ -5,7 +5,7 @@ import { matchRoutes } from "../core/route.ts";
 import events from "../core/events.ts";
 import { FetchError } from "../core/error.ts";
 import { URLPatternCompat } from "../core/url_pattern.ts";
-import type { SSRContext } from "../../server/renderer.ts";
+import type { SSRContext } from "../../server/types.ts";
 import { RouterContext } from "./context.ts";
 import { Link } from "./link.ts";
 import { Head } from "./head.ts";

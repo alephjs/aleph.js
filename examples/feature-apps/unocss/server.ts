@@ -1,12 +1,15 @@
 import presetUno from "@unocss/preset-uno.ts";
 import presetIcons from "@unocss/preset-icons.ts";
-import { App } from "aleph/react";
 import { serve } from "aleph/server";
-import { renderToString } from "react-dom/server";
+import ssr from "aleph/react-ssr";
+
+// pre-import route modules
+import routeModules from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
   routes: "./routes/**/*.tsx",
+  routeModules,
   unocss: {
     presets: [
       presetUno(),
@@ -15,5 +18,5 @@ serve({
       }),
     ],
   },
-  ssr: (ctx) => renderToString(<App ssrContext={ctx} />),
+  ssr,
 });

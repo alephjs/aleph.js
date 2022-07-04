@@ -10,22 +10,17 @@ import { basename, blue, cyan, dim, green, join, red } from "./server/deps.ts";
 import { existsDir, existsFile, getFiles } from "./server/helpers.ts";
 import { isCanary } from "./version.ts";
 
-type TemplateMeta = {
-  entry: string;
-  unocss?: boolean;
-};
-
-const templates: Record<string, TemplateMeta> = {
-  "api": { entry: "server.ts" },
-  "react": { entry: "server.tsx" },
-  "vue": { entry: "server.ts" },
-  "yew": { entry: "server.ts" },
+const templates = [
+  "api",
+  "react",
+  "vue",
+  "yew",
   // todo:
   // "preact",
   // "svelte",
   // "lit",
   // "vanilla",
-};
+];
 
 const versions = {
   react: "18.1.0",
@@ -37,9 +32,9 @@ export default async function init(nameArg?: string, template?: string) {
     // todo: template choose dialog
     template = "react";
   }
-  if (!(template in templates)) {
+  if (!(templates.includes(template))) {
     log.fatal(
-      `Invalid template name ${red(template)}, must be one of [${blue(Object.keys(templates).join(","))}]`,
+      `Invalid template name ${red(template)}, must be one of [${blue(templates.join(","))}]`,
     );
   }
 
@@ -84,23 +79,18 @@ export default async function init(nameArg?: string, template?: string) {
   const tarData = gunzip(gzData);
   const entryList = new Untar(new Buffer(tarData));
   const appDir = join(Deno.cwd(), name);
-  const { entry, unocss } = templates[template];
-  const uno = unocss && confirm("Enable UnoCSS (Atomic CSS)?");
+  const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app/`;
 
   // write template files
   for await (const entry of entryList) {
-    const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app${uno ? "-unocss" : ""}/`;
-    if (entry.fileName.startsWith(prefix)) {
-      const name = util.trimPrefix(entry.fileName, prefix);
-      if (name !== "README.md") {
-        const fp = join(appDir, name);
-        if (entry.type === "directory") {
-          await ensureDir(fp);
-          continue;
-        }
-        const file = await Deno.open(fp, { write: true, create: true });
-        await copy(entry, file);
+    if (entry.fileName.startsWith(prefix) && !entry.fileName.endsWith("/README.md")) {
+      const fp = join(appDir, util.trimPrefix(entry.fileName, prefix));
+      if (entry.type === "directory") {
+        await ensureDir(fp);
+        continue;
       }
+      const file = await Deno.open(fp, { write: true, create: true });
+      await copy(entry, file);
     }
   }
 
@@ -121,7 +111,7 @@ export default async function init(nameArg?: string, template?: string) {
     "importMap": "import_map.json",
     "tasks": {
       "dev": `deno run -A -q dev.ts`,
-      "start": `deno run -A ${entry}`,
+      "start": `deno run -A server.ts`,
     },
     "fmt": {},
     "lint": {},
@@ -144,6 +134,7 @@ export default async function init(nameArg?: string, template?: string) {
       });
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
+        "aleph/react-ssr": `${alephPkgUri}/framework/react/ssr.ts`,
         "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/react-dom@${versions.react}/`,
@@ -153,6 +144,7 @@ export default async function init(nameArg?: string, template?: string) {
     case "vue": {
       Object.assign(importMap.imports, {
         "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
+        "aleph/vue-ssr": `${alephPkgUri}/framework/vue/ssr.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
         "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
       });

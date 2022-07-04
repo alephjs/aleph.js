@@ -1,12 +1,15 @@
 import presetUno from "@unocss/preset-uno.ts";
-import { App } from "aleph/react";
 import { serve } from "aleph/server";
-import { renderToReadableStream } from "react-dom/server";
+import ssr from "aleph/react-ssr";
 import { GithubOauth } from "./oauth.ts";
+
+// pre-import route modules
+import routeModules from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
   routes: "./routes/**/*.{tsx,ts}",
+  routeModules,
   unocss: {
     presets: [
       presetUno(),
@@ -18,10 +21,5 @@ serve({
       clientSecret: Deno.env.get("GITHUB_OAUTH_CLIENT_SECRET"),
     }),
   ],
-  ssr: {
-    // when set `dataDefer` to `true`, the router will loading data as defer
-    // please check https://alephjs.org/docs/react/router/data-defer
-    dataDefer: false,
-    render: (ctx) => renderToReadableStream(<App ssrContext={ctx} />, ctx),
-  },
+  ssr,
 });

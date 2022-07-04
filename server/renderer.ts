@@ -89,7 +89,7 @@ export default {
             }
           }
           if (css) {
-            const buildTime = performance.now() - start;
+            const buildTime = (performance.now() - start).toFixed(2);
             headCollection.push(
               `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.2/tailwind.css">`,
               `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
@@ -113,7 +113,7 @@ export default {
       };
       if (!isDev && CSP) {
         const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
-        const policy = CSP.getPolicy(url, nonce!);
+        const policy = CSP.getPolicy(url, nonce);
         if (policy) {
           headers.append("Content-Security-Policy", policy);
           if (policy.includes("nonce-" + nonce)) {

@@ -138,7 +138,7 @@ export default async function dev(options?: DevOptions) {
   if (m) {
     const reg = toRouteRegExp(m[2]);
     const exportTs = join(appDir, reg.prefix, "_export.ts");
-    if (!(await existsFile(exportTs))) {
+    if (entryCode.includes(`from "${reg.prefix}/_exports.ts"`) && !(await existsFile(exportTs))) {
       await Deno.writeTextFile(exportTs, "export default {}");
     }
   }
