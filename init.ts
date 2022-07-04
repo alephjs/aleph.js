@@ -18,6 +18,7 @@ const templates = [
   // todo:
   // "preact",
   // "svelte",
+  // "solid.js",
   // "lit",
   // "vanilla",
 ];
@@ -181,11 +182,11 @@ export default async function init(nameArg?: string, template?: string) {
     "",
     green("Aleph.js is ready to go!"),
     `${dim("$")} cd ${name}`,
-    `${dim("$")} deno task dev    ${dim("# start the app in `development` mode")}`,
-    `${dim("$")} deno task start  ${dim("# start the app in `production` mode")}`,
+    `${dim("$")} deno task dev    ${dim("# Start the app in `development` mode")}`,
+    `${dim("$")} deno task start  ${dim("# Start the app in `production` mode")}`,
     "",
     `Docs: ${cyan("https://alephjs.org/docs")}`,
-    `Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}`,
+    `Bugs: ${cyan("https://github.com/alephjs/aleph.js/issues")}`,
     "",
   ].join("\n"));
   Deno.exit(0);
