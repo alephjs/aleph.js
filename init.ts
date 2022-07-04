@@ -135,6 +135,7 @@ export default async function init(nameArg?: string, template?: string) {
       });
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
+        "aleph/react-client": `${alephPkgUri}/framework/react/client.ts`,
         "aleph/react-ssr": `${alephPkgUri}/framework/react/ssr.ts`,
         "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/react-dom@${versions.react}`,
