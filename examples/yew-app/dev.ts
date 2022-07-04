@@ -2,11 +2,8 @@ import dev, { createWatchFsEmitter } from "aleph/dev";
 import { build } from "./build.ts";
 
 const emitter = createWatchFsEmitter();
-emitter.on("*", (_kind, { specifier }) => {
-  if (
-    (specifier.startsWith("./src/") && specifier.endsWith(".rs")) ||
-    specifier === "./Cargo.toml"
-  ) {
+emitter.on("*", (kind, { specifier }) => {
+  if (kind.startsWith("modify:") && specifier.endsWith(".rs")) {
     build();
   }
 });
