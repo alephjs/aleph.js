@@ -31,7 +31,7 @@ Initialize a new project, you can pick a start template with `--template` flag, 
 `[react, vue, api, yew]`
 
 ```bash
-deno run -A https://deno.land/x/aleph@1.0.0-alpha.79/init.ts --template react
+deno run -A https://deno.land/x/aleph@1.0.0-alpha.80/init.ts --template react
 ```
 
 after `init`, you can run the app with deno tasks:
