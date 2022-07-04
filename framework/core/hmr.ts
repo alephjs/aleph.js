@@ -29,10 +29,11 @@ class Module {
     }
   }
 
-  decline(delay?: number): void {
+  decline(options?: { delay?: number }): void {
     this._isDeclined = true;
-    if (!Number.isNaN(Number(delay))) {
-      this._declineDelay = Math.max(Number(delay), 0);
+    const delay = Number(options?.delay);
+    if (!Number.isNaN(delay)) {
+      this._declineDelay = Math.max(delay, 0);
     }
     this.accept();
   }
@@ -68,7 +69,6 @@ class Module {
       this._acceptCallbacks.forEach((cb) => cb(module));
     } catch (err) {
       console.error(err);
-      // todo: ui feedback
     }
   }
 }
@@ -110,6 +110,11 @@ function connect() {
         ping(callback); // retry
       });
     }, 500);
+  };
+  const colors = {
+    modify: "#056CF0",
+    create: "#20B44B",
+    remove: "#F00C08",
   };
 
   ws.addEventListener("open", () => {
@@ -171,7 +176,12 @@ function connect() {
             location.reload();
           }
         }
-        console.log("%c[HMR]", "color:#999", `${type} ${JSON.stringify(specifier)}`);
+        console.log(
+          `%c[HMR] %c${type}`,
+          "color:#999",
+          `color:${colors[type as keyof typeof colors]}`,
+          `${JSON.stringify(specifier)}`,
+        );
       } catch (err) {
         console.warn(err);
       }
