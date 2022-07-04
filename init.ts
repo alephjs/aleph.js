@@ -210,7 +210,7 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
     return files.length === 0 ||
       files.every((file) => [".DS_Store"].includes(file));
   }
-  return false;
+  return true;
 }
 
 if (import.meta.main) {
