@@ -1,7 +1,7 @@
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { BuildResult, Emitter } from "./deps.ts";
-import { basename, blue, dirname, esbuild, join, mitt, relative, serve, serveTls } from "./deps.ts";
+import { basename, blue, esbuild, join, mitt, relative, serve, serveTls } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
 import {
   builtinModuleExts,
@@ -290,7 +290,8 @@ export type GenerateOptions = {
 async function generateRoutesExportModule(options: GenerateOptions) {
   const { routeConfig, loaders } = options;
   const appDir = routeConfig.appDir ?? Deno.cwd();
-  const genFile = join(appDir, routeConfig.prefix, "_export.ts");
+  const routesDir = join(appDir, routeConfig.prefix);
+  const genFile = join(routesDir, "_export.ts");
   const useLoader = routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
 
   if (routeConfig.routes.length == 0) {
@@ -387,12 +388,10 @@ async function generateRoutesExportModule(options: GenerateOptions) {
               args.path.startsWith(".") &&
               loaders?.some((l) => l.test(args.path))
             ) {
-              const dir = dirname(genFile);
-              const specifier = "./" + relative(appDir, join(dir, args.path));
+              const specifier = "./" + relative(appDir, join(routesDir, args.path));
               depGraph.mark(specifier, {});
               if (args.importer.startsWith(".")) {
-                const importer = "./" +
-                  relative(appDir, join(dir, args.importer));
+                const importer = "./" + relative(appDir, join(routesDir, args.importer));
                 depGraph.mark(importer, { deps: [{ specifier }] });
               }
               return { path: args.path, namespace: "loader" };
@@ -402,7 +401,7 @@ async function generateRoutesExportModule(options: GenerateOptions) {
           build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
             const loader = loaders?.find((l) => l.test(args.path));
             if (loader) {
-              const fullpath = join(dirname(genFile), args.path);
+              const fullpath = join(routesDir, args.path);
               const specifier = "./" + relative(appDir, fullpath);
               const importMap = await globalIt(
                 "__ALEPH_IMPORT_MAP",
