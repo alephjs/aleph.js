@@ -74,7 +74,7 @@ export default async function dev(options?: DevOptions) {
 
   const emitter = createWatchFsEmitter();
   emitter.on(`modify:./${basename(serverEntry)}`, start);
-  // todo: watch server deps
+  // todo: watch server deps to restart the server
 
   // update global route config when fs changess
   emitter.on("*", async (kind, { specifier }) => {
