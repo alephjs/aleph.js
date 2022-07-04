@@ -1,17 +1,7 @@
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { BuildResult, Emitter } from "./deps.ts";
-import {
-  basename,
-  blue,
-  dirname,
-  esbuild,
-  join,
-  mitt,
-  relative,
-  serve,
-  serveTls,
-} from "./deps.ts";
+import { basename, blue, dirname, esbuild, join, mitt, relative, serve, serveTls } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
 import {
   builtinModuleExts,
@@ -24,12 +14,7 @@ import {
   watchFs,
 } from "./helpers.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
-import type {
-  AlephConfig,
-  ConnInfo,
-  ModuleLoader,
-  RouteConfig,
-} from "./types.ts";
+import type { AlephConfig, ConnInfo, ModuleLoader, RouteConfig } from "./types.ts";
 
 type WatchFsEvents = {
   [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: {
@@ -62,9 +47,7 @@ export type DevOptions = {
 
 /** Watch for file changes and listen the dev server. */
 export default async function dev(options?: DevOptions) {
-  const appDir = options?.baseUrl
-    ? new URL(".", options.baseUrl).pathname
-    : Deno.cwd();
+  const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : Deno.cwd();
   const serverEntry = await findFile(
     builtinModuleExts.map((ext) => `server.${ext}`),
     appDir,
@@ -308,9 +291,7 @@ async function generateRoutesExportModule(options: GenerateOptions) {
   const { routeConfig, loaders } = options;
   const appDir = routeConfig.appDir ?? Deno.cwd();
   const genFile = join(appDir, routeConfig.prefix, "_export.ts");
-  const useLoader = routeConfig.routes.some(([_, { filename }]) =>
-    loaders?.some((l) => l.test(filename))
-  );
+  const useLoader = routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
 
   if (routeConfig.routes.length == 0) {
     try {
@@ -367,13 +348,7 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             file.text.replace(
               "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
               // deno-lint-ignore no-unused-vars
-              `depGraph:${
-                JSON.stringify({
-                  modules: depGraph.modules.map(({ version, ...module }) =>
-                    module
-                  ),
-                })
-              }`,
+              `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
             ),
           );
         }
@@ -462,11 +437,7 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             return {
               contents: `export default ${
                 // deno-lint-ignore no-unused-vars
-                JSON.stringify({
-                  modules: depGraph.modules.map(({ version, ...module }) =>
-                    module
-                  ),
-                })
+                JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })
               };`,
               loader: "js",
             };
@@ -497,8 +468,6 @@ async function generateRoutesExportModule(options: GenerateOptions) {
     await Deno.writeTextFile(genFile, code);
   }
   log.debug(
-    `${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${
-      Math.round(performance.now() - start)
-    }ms`,
+    `${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`,
   );
 }

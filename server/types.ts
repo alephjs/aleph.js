@@ -1,20 +1,8 @@
-import type {
-  ConnInfo,
-  ServeInit,
-} from "https://deno.land/std@0.145.0/http/server.ts";
-import type {
-  Comment,
-  Element,
-  TextChunk,
-} from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
+import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/server.ts";
+import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import type { UserConfig as UnoConfig } from "../lib/@unocss/core.ts";
 import type { RouteModule } from "../framework/core/route.ts";
-export type {
-  Route,
-  RouteConfig,
-  RouteMatch,
-  RouteMeta,
-} from "../framework/core/route.ts";
+export type { Route, RouteConfig, RouteMatch, RouteMeta } from "../framework/core/route.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
 
 export type AlephConfig = {

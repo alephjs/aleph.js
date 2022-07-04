@@ -2,12 +2,7 @@ import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
 import log, { type LevelName } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
-import {
-  join,
-  readableStreamFromReader,
-  serve as stdServe,
-  serveTls,
-} from "./deps.ts";
+import { join, readableStreamFromReader, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   fixResponse,
@@ -64,9 +59,7 @@ export function serve(options: ServerOptions = {}) {
     ssr,
     unocss,
   } = options;
-  const appDir = options?.baseUrl
-    ? new URL(".", options.baseUrl).pathname
-    : undefined;
+  const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
   // set the log level if specified
@@ -339,9 +332,7 @@ export function serve(options: ServerOptions = {}) {
         }
 
         // return the error as a json
-        const status: number = util.isUint(err.status ?? err.code)
-          ? err.status ?? err.code
-          : 500;
+        const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
         return Response.json({
           ...err,
           status,

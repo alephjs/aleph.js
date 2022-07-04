@@ -40,9 +40,7 @@ export async function bundleCSS(
       },
     },
   );
-  const deps = dependencies?.filter((dep) =>
-    dep.type === "import" && !dep.media
-  ).map((dep) => {
+  const deps = dependencies?.filter((dep) => dep.type === "import" && !dep.media).map((dep) => {
     let url = dep.url;
     if (util.isLikelyHttpURL(specifier)) {
       if (!util.isLikelyHttpURL(url)) {

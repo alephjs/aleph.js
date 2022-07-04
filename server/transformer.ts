@@ -18,12 +18,7 @@ import {
 } from "./helpers.ts";
 import { getContentType } from "./media_type.ts";
 import { isRouteFile } from "./routing.ts";
-import type {
-  ImportMap,
-  JSXConfig,
-  ModuleLoader,
-  ModuleLoaderOutput,
-} from "./types.ts";
+import type { ImportMap, JSXConfig, ModuleLoader, ModuleLoaderOutput } from "./types.ts";
 
 const cache = new Map<string, [content: string, headers: Headers]>();
 
@@ -50,9 +45,7 @@ export default {
   ): Promise<Response> => {
     const { isDev, buildTarget, loader, jsxConfig, importMap } = options;
     const { pathname, searchParams, search } = new URL(req.url);
-    const specifier = pathname.startsWith("/-/")
-      ? restoreUrl(pathname + search)
-      : `.${pathname}`;
+    const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const ssr = searchParams.has("ssr");
 
     const deployId = getDeploymentId();
@@ -227,11 +220,9 @@ export default {
                   minify: !isDev,
                 });
                 if (css) {
-                  code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${
-                    toLocalPath(styleTs)
-                  }";\n__applyUnoCSS(${JSON.stringify(specifier)}, ${
-                    JSON.stringify(css)
-                  });\n`;
+                  code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
+                    JSON.stringify(specifier)
+                  }, ${JSON.stringify(css)});\n`;
                   hasInlineCSS = true;
                 }
               }
@@ -241,11 +232,9 @@ export default {
           }
         }
         if (inlineCSS) {
-          code += `\nimport { applyCSS as __applyCSS } from "${
-            toLocalPath(styleTs)
-          }";\n__applyCSS(${JSON.stringify(specifier)}, ${
-            JSON.stringify(inlineCSS)
-          });\n`;
+          code += `\nimport { applyCSS as __applyCSS } from "${toLocalPath(styleTs)}";\n__applyCSS(${
+            JSON.stringify(specifier)
+          }, ${JSON.stringify(inlineCSS)});\n`;
           hasInlineCSS = true;
         }
         if (hasInlineCSS) {
@@ -260,9 +249,7 @@ export default {
             }
             m.sourcesContent = [source];
             resBody = code +
-              `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${
-                btoa(JSON.stringify(m))
-              }\n`;
+              `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}\n`;
           } catch (e) {
             log.debug(`[dev] Failed to add source map for '${specifier}'`, e);
             resBody = code;
