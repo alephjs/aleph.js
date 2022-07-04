@@ -1,19 +1,10 @@
 import { Untar } from "https://deno.land/std@0.145.0/archive/tar.ts";
 import { parse } from "https://deno.land/std@0.145.0/flags/mod.ts";
-import {
-  blue,
-  cyan,
-  dim,
-  green,
-  red,
-} from "https://deno.land/std@0.145.0/fmt/colors.ts";
+import { blue, cyan, dim, green, red } from "https://deno.land/std@0.145.0/fmt/colors.ts";
 import { ensureDir } from "https://deno.land/std@0.145.0/fs/ensure_dir.ts";
 import { Buffer } from "https://deno.land/std@0.145.0/io/buffer.ts";
 import { basename, join } from "https://deno.land/std@0.145.0/path/mod.ts";
-import {
-  copy,
-  readAll,
-} from "https://deno.land/std@0.145.0/streams/conversion.ts";
+import { copy, readAll } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import log from "./lib/log.ts";
 import util from "./lib/util.ts";
@@ -49,9 +40,7 @@ export default async function init(nameArg?: string, template?: string) {
   }
   if (!(template in templates)) {
     log.fatal(
-      `Invalid template name ${red(template)}, must be one of [${
-        blue(Object.keys(templates).join(","))
-      }]`,
+      `Invalid template name ${red(template)}, must be one of [${blue(Object.keys(templates).join(","))}]`,
     );
   }
 
@@ -101,9 +90,7 @@ export default async function init(nameArg?: string, template?: string) {
 
   // write template files
   for await (const entry of entryList) {
-    const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app${
-      uno ? "-unocss" : ""
-    }/`;
+    const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app${uno ? "-unocss" : ""}/`;
     if (entry.fileName.startsWith(prefix)) {
       const name = util.trimPrefix(entry.fileName, prefix);
       if (name !== "README.md") {
@@ -168,8 +155,7 @@ export default async function init(nameArg?: string, template?: string) {
       Object.assign(importMap.imports, {
         "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
-        "vue/server-renderer":
-          `https://esm.sh/@vue/server-renderer@${versions.vue}`,
+        "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
       });
       break;
     }
@@ -204,12 +190,8 @@ export default async function init(nameArg?: string, template?: string) {
     "",
     green("Aleph.js is ready to go!"),
     `${dim("$")} cd ${name}`,
-    `${dim("$")} deno task dev    ${
-      dim("# start the app in `development` mode")
-    }`,
-    `${dim("$")} deno task start  ${
-      dim("# start the app in `production` mode")
-    }`,
+    `${dim("$")} deno task dev    ${dim("# start the app in `development` mode")}`,
+    `${dim("$")} deno task start  ${dim("# start the app in `production` mode")}`,
     "",
     `Docs: ${cyan("https://alephjs.org/docs")}`,
     `Bugs: ${cyan("https://alephjs.org.com/alephjs/aleph.js/issues")}`,
