@@ -148,12 +148,7 @@ export default async function dev(options?: DevOptions) {
 }
 
 /** Bootstrap the dev server, handle the HMR socket connection. */
-async function bootstrap(
-  signal: AbortSignal,
-  entry: string,
-  appDir: string,
-  __port?: number,
-) {
+async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __port?: number) {
   // clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_CONFIG");
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
@@ -261,14 +256,7 @@ async function bootstrap(
 
   try {
     if (useTls) {
-      await serveTls(handler, {
-        hostname,
-        port,
-        certFile,
-        keyFile,
-        signal,
-        onListen,
-      });
+      await serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
     } else {
       await serve(handler, { hostname, port, signal, onListen });
     }
