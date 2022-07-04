@@ -18,7 +18,12 @@ import {
 } from "./helpers.ts";
 import { getContentType } from "./media_type.ts";
 import { isRouteFile } from "./routing.ts";
-import type { ImportMap, JSXConfig, ModuleLoader, ModuleLoaderOutput } from "./types.ts";
+import type {
+  ImportMap,
+  JSXConfig,
+  ModuleLoader,
+  ModuleLoaderOutput,
+} from "./types.ts";
 
 const cache = new Map<string, [content: string, headers: Headers]>();
 
@@ -34,14 +39,20 @@ export default {
   test: (pathname: string) => {
     return (
       pathname.startsWith("/-/") ||
-      (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) && !pathname.endsWith(".d.ts")) ||
+      (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) &&
+        !pathname.endsWith(".d.ts")) ||
       pathname.endsWith(".css")
     );
   },
-  fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
+  fetch: async (
+    req: Request,
+    options: TransformerOptions,
+  ): Promise<Response> => {
     const { isDev, buildTarget, loader, jsxConfig, importMap } = options;
     const { pathname, searchParams, search } = new URL(req.url);
-    const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
+    const specifier = pathname.startsWith("/-/")
+      ? restoreUrl(pathname + search)
+      : `.${pathname}`;
     const ssr = searchParams.has("ssr");
 
     const deployId = getDeploymentId();
@@ -73,7 +84,10 @@ export default {
       if (lang) {
         contentType = getContentType(`file.${lang}`);
       }
-      const deps = await parseDeps(specifier, source, { importMap: JSON.stringify(importMap), lang });
+      const deps = await parseDeps(specifier, source, {
+        importMap: JSON.stringify(importMap),
+        lang,
+      });
       depGraph.mark(specifier, { deps, inlineCSS });
       if (deps.length) {
         const s = new MagicString(source);
@@ -81,7 +95,8 @@ export default {
           const { specifier, importUrl, loc } = dep;
           if (!util.isLikelyHttpURL(specifier) && loc) {
             let url: string;
-            const importUrlPrefix = importUrl + (importUrl.includes("?") ? "&" : "?");
+            const importUrlPrefix = importUrl +
+              (importUrl.includes("?") ? "&" : "?");
             const version = depGraph.get(specifier)?.version;
             if (version) {
               url = `"${importUrlPrefix}ssr&v=${version.toString(36)}"`;
@@ -91,7 +106,9 @@ export default {
             s.overwrite(loc.start - 1, loc.end - 1, url);
           }
         });
-        return new Response(s.toString(), { headers: [["Content-Type", contentType]] });
+        return new Response(s.toString(), {
+          headers: [["Content-Type", contentType]],
+        });
       }
       return new Response(source, { headers: [["Content-Type", contentType]] });
     }
@@ -125,7 +142,9 @@ export default {
           asJsModule,
           hmr: isDev,
         });
-        depGraph.mark(specifier, { deps: deps?.map((specifier) => ({ specifier })) });
+        depGraph.mark(specifier, {
+          deps: deps?.map((specifier) => ({ specifier })),
+        });
         resBody = code;
         if (!asJsModule) {
           resType = "text/css";
@@ -146,13 +165,20 @@ export default {
           )
         ) {
           // don't transform js modules imported from remote CDN
-          deps = await parseDeps(specifier, source, { importMap: JSON.stringify(importMap), lang: "js" });
+          deps = await parseDeps(specifier, source, {
+            importMap: JSON.stringify(importMap),
+            lang: "js",
+          });
           if (deps.length > 0) {
             const s = new MagicString(source);
             deps.forEach((dep) => {
               const { importUrl, loc } = dep;
               if (loc) {
-                s.overwrite(loc.start - 1, loc.end - 1, `"${toLocalPath(importUrl)}"`);
+                s.overwrite(
+                  loc.start - 1,
+                  loc.end - 1,
+                  `"${toLocalPath(importUrl)}"`,
+                );
               }
             });
             code = s.toString();
@@ -165,7 +191,9 @@ export default {
               !util.isLikelyHttpURL(specifier) &&
               !util.isLikelyHttpURL(mod.specifier) &&
               mod.specifier !== specifier
-            )).map(({ specifier, version }) => [specifier, version.toString(36)]),
+            )).map((
+              { specifier, version },
+            ) => [specifier, version.toString(36)]),
           );
           const ret = await transform(specifier, source, {
             ...jsxConfig,
@@ -187,15 +215,23 @@ export default {
         const styleTs = `${alephPkgUri}/framework/core/style.ts`;
         if (isDev && config?.unocss) {
           const { presets, test } = config.unocss;
-          if (Array.isArray(presets) && (test instanceof RegExp ? test : /\.(jsx|tsx)$/).test(pathname)) {
+          if (
+            Array.isArray(presets) &&
+            (test instanceof RegExp ? test : /\.(jsx|tsx)$/).test(pathname)
+          ) {
             try {
               const unoGenerator = getUnoGenerator();
               if (unoGenerator) {
-                const { css } = await unoGenerator.generate(source, { id: specifier, minify: !isDev });
+                const { css } = await unoGenerator.generate(source, {
+                  id: specifier,
+                  minify: !isDev,
+                });
                 if (css) {
-                  code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
-                    JSON.stringify(specifier)
-                  }, ${JSON.stringify(css)});\n`;
+                  code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${
+                    toLocalPath(styleTs)
+                  }";\n__applyUnoCSS(${JSON.stringify(specifier)}, ${
+                    JSON.stringify(css)
+                  });\n`;
                   hasInlineCSS = true;
                 }
               }
@@ -205,9 +241,11 @@ export default {
           }
         }
         if (inlineCSS) {
-          code += `\nimport { applyCSS as __applyCSS } from "${toLocalPath(styleTs)}";\n__applyCSS(${
-            JSON.stringify(specifier)
-          }, ${JSON.stringify(inlineCSS)});\n`;
+          code += `\nimport { applyCSS as __applyCSS } from "${
+            toLocalPath(styleTs)
+          }";\n__applyCSS(${JSON.stringify(specifier)}, ${
+            JSON.stringify(inlineCSS)
+          });\n`;
           hasInlineCSS = true;
         }
         if (hasInlineCSS) {
@@ -222,7 +260,9 @@ export default {
             }
             m.sourcesContent = [source];
             resBody = code +
-              `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}\n`;
+              `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${
+                btoa(JSON.stringify(m))
+              }\n`;
           } catch (e) {
             log.debug(`[dev] Failed to add source map for '${specifier}'`, e);
             resBody = code;
@@ -240,11 +280,17 @@ export default {
       }
     }
 
-    const headers = new Headers([["Content-Type", `${resType}; charset=utf-8`]]);
+    const headers = new Headers([[
+      "Content-Type",
+      `${resType}; charset=utf-8`,
+    ]]);
     if (etag) {
       headers.set("ETag", etag);
     }
-    if (searchParams.get("v") || (pathname.startsWith("/-/") && regFullVersion.test(pathname))) {
+    if (
+      searchParams.get("v") ||
+      (pathname.startsWith("/-/") && regFullVersion.test(pathname))
+    ) {
       headers.append("Cache-Control", "public, max-age=31536000, immutable");
     }
     if (!isDev) {

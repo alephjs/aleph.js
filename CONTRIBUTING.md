@@ -1,6 +1,7 @@
 # Contributing to Aleph.js
 
-Welcome, and thank you for taking time in contributing to Aleph.js! You can contribute to Aleph.js in different ways:
+Welcome, and thank you for taking time in contributing to Aleph.js! You can
+contribute to Aleph.js in different ways:
 
 - Submit new features
 - Report and fix bugs
@@ -67,4 +68,5 @@ deno fmt **/*.{ts,tsx}
 
 ## Code of Conduct
 
-All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+All contributors are expected to follow our
+[Code of Conduct](CODE_OF_CONDUCT.md).

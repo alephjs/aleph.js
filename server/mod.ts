@@ -2,7 +2,12 @@ import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
 import log, { type LevelName } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
-import { join, readableStreamFromReader, serve as stdServe, serveTls } from "./deps.ts";
+import {
+  join,
+  readableStreamFromReader,
+  serve as stdServe,
+  serveTls,
+} from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   fixResponse,
@@ -47,8 +52,21 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const { baseUrl, build, fetch, middlewares, loaders, onError, routes, routeModules, ssr, unocss } = options;
-  const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : undefined;
+  const {
+    baseUrl,
+    build,
+    fetch,
+    middlewares,
+    loaders,
+    onError,
+    routes,
+    routeModules,
+    ssr,
+    unocss,
+  } = options;
+  const appDir = options?.baseUrl
+    ? new URL(".", options.baseUrl).pathname
+    : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
   // set the log level if specified
@@ -57,16 +75,28 @@ export function serve(options: ServerOptions = {}) {
   }
 
   // inject config to global
-  const config: AlephConfig = { baseUrl, build, routes, routeModules, unocss, loaders };
+  const config: AlephConfig = {
+    baseUrl,
+    build,
+    routes,
+    routeModules,
+    unocss,
+    loaders,
+  };
   Reflect.set(globalThis, "__ALEPH_CONFIG", config);
-  if (!isDev && routeModules && util.isFilledArray(routeModules.depGraph?.modules)) {
+  if (
+    !isDev && routeModules && util.isFilledArray(routeModules.depGraph?.modules)
+  ) {
     routeModules.depGraph.modules.forEach((module) => {
       depGraph.mark(module.specifier, module);
     });
   }
 
   // server handler
-  const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
+  const handler = async (
+    req: Request,
+    connInfo: ConnInfo,
+  ): Promise<Response> => {
     const { pathname, searchParams } = new URL(req.url);
 
     // close the hot-reloading websocket and tell the client to reload the page
@@ -82,7 +112,10 @@ export function serve(options: ServerOptions = {}) {
     }
 
     const postMiddlewares: Middleware[] = [];
-    const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
+    const customHTMLRewriter: [
+      selector: string,
+      handlers: HTMLRewriterHandlers,
+    ][] = [];
     const ctx = createContext(req, { connInfo, customHTMLRewriter });
 
     // use eager middlewares
@@ -104,7 +137,11 @@ export function serve(options: ServerOptions = {}) {
                 setTimeout(res, 0);
               }
             } catch (err) {
-              const res = onError?.(err, { by: "middleware", url: req.url, context: ctx });
+              const res = onError?.(err, {
+                by: "middleware",
+                url: req.url,
+                context: ctx,
+              });
               if (res instanceof Response) {
                 return res;
               }
@@ -125,11 +162,18 @@ export function serve(options: ServerOptions = {}) {
     let loader: ModuleLoader | undefined;
     if (
       !searchParams.has("raw") &&
-      (clientModuleTransformer.test(pathname) || (loader = loaders?.find((l) => l.test(pathname))))
+      (clientModuleTransformer.test(pathname) ||
+        (loader = loaders?.find((l) => l.test(pathname))))
     ) {
       try {
-        const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
-        const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
+        const importMap = await globalIt(
+          "__ALEPH_IMPORT_MAP",
+          () => loadImportMap(appDir),
+        );
+        const jsxConfig = await globalIt(
+          "__ALEPH_JSX_CONFIG",
+          () => loadJSXConfig(appDir),
+        );
         return await clientModuleTransformer.fetch(req, {
           buildTarget: options.build?.target,
           isDev,
@@ -166,7 +210,9 @@ export function serve(options: ServerOptions = {}) {
 
     // serve static files
     const contentType = getContentType(pathname);
-    if (!pathname.startsWith("/.") && contentType !== "application/octet-stream") {
+    if (
+      !pathname.startsWith("/.") && contentType !== "application/octet-stream"
+    ) {
       try {
         let filePath = appDir ? join(appDir, pathname) : `.${pathname}`;
         let stat = await Deno.lstat(filePath);
@@ -194,7 +240,10 @@ export function serve(options: ServerOptions = {}) {
             headers.append("ETag", etag);
           }
           if (searchParams.get("v") || regFullVersion.test(pathname)) {
-            headers.append("Cache-Control", "public, max-age=31536000, immutable");
+            headers.append(
+              "Cache-Control",
+              "public, max-age=31536000, immutable",
+            );
           }
           const file = await Deno.open(filePath, { read: true });
           return new Response(readableStreamFromReader(file), { headers });
@@ -225,7 +274,11 @@ export function serve(options: ServerOptions = {}) {
           setTimeout(res, 0);
         }
       } catch (err) {
-        const res = onError?.(err, { by: "middleware", url: req.url, context: ctx });
+        const res = onError?.(err, {
+          by: "middleware",
+          url: req.url,
+          context: ctx,
+        });
         if (res instanceof Response) {
           return res;
         }
@@ -249,7 +302,8 @@ export function serve(options: ServerOptions = {}) {
     );
     if (routeConfig && routeConfig.routes.length > 0) {
       const reqData = req.method === "GET" &&
-        (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
+        (searchParams.has("_data_") ||
+          req.headers.get("Accept") === "application/json");
       try {
         const resp = await fetchRouteData(req, ctx, routeConfig, reqData);
         if (resp) {
@@ -265,7 +319,11 @@ export function serve(options: ServerOptions = {}) {
         }
 
         // use the `onError` if available
-        const res = onError?.(err, { by: "route-data-fetch", url: req.url, context: ctx });
+        const res = onError?.(err, {
+          by: "route-data-fetch",
+          url: req.url,
+          context: ctx,
+        });
         if (res instanceof Response) {
           return fixResponse(res, ctx.headers, reqData);
         }
@@ -281,8 +339,15 @@ export function serve(options: ServerOptions = {}) {
         }
 
         // return the error as a json
-        const status: number = util.isUint(err.status ?? err.code) ? err.status ?? err.code : 500;
-        return Response.json({ ...err, status, message: err.message ?? String(err), stack: err.stack }, {
+        const status: number = util.isUint(err.status ?? err.code)
+          ? err.status ?? err.code
+          : 500;
+        return Response.json({
+          ...err,
+          status,
+          message: err.message ?? String(err),
+          stack: err.stack,
+        }, {
           status,
           headers: ctx.headers,
         });
@@ -328,7 +393,9 @@ export function serve(options: ServerOptions = {}) {
       const cc = ssr && typeof ssr !== "function" ? ssr.cacheControl : "public";
       ctx.headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
       ctx.headers.append("Content-Type", "text/html; charset=utf-8");
-      return new Response(generateErrorHtml(message, "SSR"), { headers: ctx.headers });
+      return new Response(generateErrorHtml(message, "SSR"), {
+        headers: ctx.headers,
+      });
     }
   };
 
@@ -348,12 +415,21 @@ export function serve(options: ServerOptions = {}) {
     const useTls = certFile && keyFile;
     const onListen = (arg: { port: number; hostname: string }) => {
       if (!getDeploymentId()) {
-        log.info(`Server ready on ${useTls ? "https" : "http"}://localhost:${port}`);
+        log.info(
+          `Server ready on ${useTls ? "https" : "http"}://localhost:${port}`,
+        );
       }
       options.onListen?.(arg);
     };
     if (useTls) {
-      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
+      serveTls(handler, {
+        hostname,
+        port,
+        certFile,
+        keyFile,
+        signal,
+        onListen,
+      });
     } else {
       stdServe(handler, { hostname, port, signal, onListen });
     }

@@ -1,7 +1,17 @@
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { BuildResult, Emitter } from "./deps.ts";
-import { basename, blue, dirname, esbuild, join, mitt, relative, serve, serveTls } from "./deps.ts";
+import {
+  basename,
+  blue,
+  dirname,
+  esbuild,
+  join,
+  mitt,
+  relative,
+  serve,
+  serveTls,
+} from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
 import {
   builtinModuleExts,
@@ -14,10 +24,17 @@ import {
   watchFs,
 } from "./helpers.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
-import type { AlephConfig, ConnInfo, ModuleLoader, RouteConfig } from "./types.ts";
+import type {
+  AlephConfig,
+  ConnInfo,
+  ModuleLoader,
+  RouteConfig,
+} from "./types.ts";
 
 type WatchFsEvents = {
-  [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: { specifier: string };
+  [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: {
+    specifier: string;
+  };
 };
 
 const watchFsEmitters = new Set<Emitter<WatchFsEvents>>();
@@ -45,8 +62,13 @@ export type DevOptions = {
 
 /** Watch for file changes and listen the dev server. */
 export default async function dev(options?: DevOptions) {
-  const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : Deno.cwd();
-  const serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
+  const appDir = options?.baseUrl
+    ? new URL(".", options.baseUrl).pathname
+    : Deno.cwd();
+  const serverEntry = await findFile(
+    builtinModuleExts.map((ext) => `server.${ext}`),
+    appDir,
+  );
   if (!serverEntry) {
     log.error(`Could not find the server entry file.`);
     Deno.exit(1);
@@ -142,7 +164,12 @@ export default async function dev(options?: DevOptions) {
 }
 
 /** Bootstrap the dev server, handle the HMR socket connection. */
-async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __port?: number) {
+async function bootstrap(
+  signal: AbortSignal,
+  entry: string,
+  appDir: string,
+  __port?: number,
+) {
   // clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_CONFIG");
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
@@ -184,7 +211,10 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   const { hostname, certFile, keyFile } = server;
   const useTls = certFile && keyFile;
   const port = __port ?? server.port ?? 3000;
-  const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
+  const handler = async (
+    req: Request,
+    connInfo: ConnInfo,
+  ): Promise<Response> => {
     const { pathname } = new URL(req.url);
     if (pathname === "/-/hmr") {
       const { socket, response } = Deno.upgradeWebSocket(req);
@@ -201,7 +231,10 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
       });
       socket.addEventListener("open", () => {
         emitter.on("create", ({ specifier }) => {
-          const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+          const config: AlephConfig | undefined = Reflect.get(
+            globalThis,
+            "__ALEPH_CONFIG",
+          );
           if (config && config.routes) {
             const reg = toRouteRegExp(config.routes);
             const routePattern = reg.exec(specifier);
@@ -243,7 +276,14 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
 
   try {
     if (useTls) {
-      await serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
+      await serveTls(handler, {
+        hostname,
+        port,
+        certFile,
+        keyFile,
+        signal,
+        onListen,
+      });
     } else {
       await serve(handler, { hostname, port, signal, onListen });
     }
@@ -268,7 +308,9 @@ async function generateRoutesExportModule(options: GenerateOptions) {
   const { routeConfig, loaders } = options;
   const appDir = routeConfig.appDir ?? Deno.cwd();
   const genFile = join(appDir, routeConfig.prefix, "_export.ts");
-  const useLoader = routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
+  const useLoader = routeConfig.routes.some(([_, { filename }]) =>
+    loaders?.some((l) => l.test(filename))
+  );
 
   if (routeConfig.routes.length == 0) {
     try {
@@ -290,13 +332,18 @@ async function generateRoutesExportModule(options: GenerateOptions) {
   const revives: string[] = [];
 
   routeConfig.routes.forEach(([_, { filename, pattern }], idx) => {
-    const importUrl = JSON.stringify("." + util.trimPrefix(filename, routeConfig.prefix));
+    const importUrl = JSON.stringify(
+      "." + util.trimPrefix(filename, routeConfig.prefix),
+    );
     imports.push(`import * as $${idx} from ${importUrl};`);
     revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
   });
 
   // stop previous esbuild watcher
-  const preResult: BuildResult | undefined = Reflect.get(globalThis, "__ALEPH_PREV_ESBUILD_RES");
+  const preResult: BuildResult | undefined = Reflect.get(
+    globalThis,
+    "__ALEPH_PREV_ESBUILD_RES",
+  );
   if (preResult) {
     Reflect.deleteProperty(globalThis, "__ALEPH_PREV_ESBUILD_RES");
     preResult.stop?.();
@@ -320,7 +367,13 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             file.text.replace(
               "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
               // deno-lint-ignore no-unused-vars
-              `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
+              `depGraph:${
+                JSON.stringify({
+                  modules: depGraph.modules.map(({ version, ...module }) =>
+                    module
+                  ),
+                })
+              }`,
             ),
           );
         }
@@ -355,12 +408,16 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             if (args.path === "dep-graph") {
               return { path: args.path, namespace: "dep-graph" };
             }
-            if (args.path.startsWith(".") && loaders?.some((l) => l.test(args.path))) {
+            if (
+              args.path.startsWith(".") &&
+              loaders?.some((l) => l.test(args.path))
+            ) {
               const dir = dirname(genFile);
               const specifier = "./" + relative(appDir, join(dir, args.path));
               depGraph.mark(specifier, {});
               if (args.importer.startsWith(".")) {
-                const importer = "./" + relative(appDir, join(dir, args.importer));
+                const importer = "./" +
+                  relative(appDir, join(dir, args.importer));
                 depGraph.mark(importer, { deps: [{ specifier }] });
               }
               return { path: args.path, namespace: "loader" };
@@ -372,14 +429,24 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             if (loader) {
               const fullpath = join(dirname(genFile), args.path);
               const specifier = "./" + relative(appDir, fullpath);
-              const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
-              const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
+              const importMap = await globalIt(
+                "__ALEPH_IMPORT_MAP",
+                () => loadImportMap(appDir),
+              );
+              const jsxConfig = await globalIt(
+                "__ALEPH_JSX_CONFIG",
+                () => loadJSXConfig(appDir),
+              );
               const source = await Deno.readTextFile(fullpath);
-              const { code, lang, inlineCSS } = await loader.load(specifier, source, {
-                importMap,
-                jsxConfig,
-                ssr: true,
-              });
+              const { code, lang, inlineCSS } = await loader.load(
+                specifier,
+                source,
+                {
+                  importMap,
+                  jsxConfig,
+                  ssr: true,
+                },
+              );
               if (inlineCSS) {
                 depGraph.mark(specifier, { inlineCSS });
               }
@@ -395,7 +462,11 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             return {
               contents: `export default ${
                 // deno-lint-ignore no-unused-vars
-                JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })
+                JSON.stringify({
+                  modules: depGraph.modules.map(({ version, ...module }) =>
+                    module
+                  ),
+                })
               };`,
               loader: "js",
             };
@@ -425,5 +496,9 @@ async function generateRoutesExportModule(options: GenerateOptions) {
     ].join("\n");
     await Deno.writeTextFile(genFile, code);
   }
-  log.debug(`${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`);
+  log.debug(
+    `${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${
+      Math.round(performance.now() - start)
+    }ms`,
+  );
 }
