@@ -63,7 +63,7 @@ export default {
       const loaded = await loader.load(
         specifier,
         sourceRaw,
-        ssr ? { jsxConfig, importMap, ssr: true } : { ...options, isDev },
+        ssr ? { jsxConfig, importMap, ssr: true, sourceMap: true } : { jsxConfig, importMap, isDev, sourceMap: isDev },
       );
       source = loaded.code;
       lang = loaded.lang;
