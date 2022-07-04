@@ -23,15 +23,17 @@ You will need [Deno](https://deno.land/) 1.20+.
 
 ```bash
 # run the example app in development mode
-deno run -A examples/${APP}/dev.ts
+deno run -A examples/*/dev.ts
 
 # run the example app in production mode
-deno run -A examples/${APP}/server.ts
+deno run -A examples/*/server.{ts|tsx}
 ```
+
+**Examples**: https://github.com/alephjs/aleph.js/tree/main/examples
 
 ## Testing
 
-You can run all tests with the following command:
+You can run all the testings by the following command:
 
 ```bash
 deno test -A
@@ -46,13 +48,13 @@ deno test -A
   - **vue** framework in Vue.js
 - **/lib** shared libraries
 - **/loaders** builtin loaders
-- **/server** server of Aleph.js
-- **/tests** testing
+- **/server** server core of Aleph.js
+- **/tests** unit/integration testings
 
 ## Code Style We Followed
 
 - Double quote for string
-- Semicolons is good
+- Ends with semicolon
 - 2 spaces indent
 - Types everything
 - Order the imports
