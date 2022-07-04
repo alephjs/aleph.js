@@ -8,9 +8,8 @@ import {
   existsFile,
   findFile,
   getAlephConfig,
-  globalIt,
-  loadImportMap,
-  loadJSXConfig,
+  getImportMap,
+  getJSXConfig,
   watchFs,
 } from "./helpers.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
@@ -84,20 +83,22 @@ export default async function dev(options?: DevOptions) {
   // update global route config when fs changess
   emitter.on("*", async (kind, { specifier }) => {
     const config = getAlephConfig();
-    if (config?.routes) {
-      if (kind === "create" || kind === "remove") {
-        const reg = toRouteRegExp(config.routes);
-        if (reg.test(specifier)) {
-          const routeConfig = await initRoutes(config.routes, appDir);
-          Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
-          generateRoutesExportModule({
-            routeConfig,
-            loaders: config.loaders,
-          }).catch((err) => log.error(err));
+    if (config) {
+      if (config.routes) {
+        if (kind === "create" || kind === "remove") {
+          const reg = toRouteRegExp(config.routes);
+          if (reg.test(specifier)) {
+            const routeConfig = await initRoutes(config.routes, appDir);
+            Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
+            generateRoutesExportModule({
+              routeConfig,
+              loaders: config.loaders,
+            }).catch((err) => log.error(err));
+          }
         }
+      } else {
+        Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
       }
-    } else {
-      Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", null);
     }
   });
 
@@ -156,6 +157,7 @@ async function bootstrap(
   // clean globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_CONFIG");
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
+  Reflect.deleteProperty(globalThis, "__ALEPH_ROUTE_CONFIG");
   Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
   Reflect.deleteProperty(globalThis, "__ALEPH_IMPORT_MAP");
   Reflect.deleteProperty(globalThis, "__ALEPH_JSX_CONFIG");
@@ -403,14 +405,8 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             if (loader) {
               const fullpath = join(routesDir, args.path);
               const specifier = "./" + relative(appDir, fullpath);
-              const importMap = await globalIt(
-                "__ALEPH_IMPORT_MAP",
-                () => loadImportMap(appDir),
-              );
-              const jsxConfig = await globalIt(
-                "__ALEPH_JSX_CONFIG",
-                () => loadJSXConfig(appDir),
-              );
+              const importMap = await getImportMap(appDir);
+              const jsxConfig = await getJSXConfig(appDir);
               const source = await Deno.readTextFile(fullpath);
               const { code, lang, inlineCSS } = await loader.load(
                 specifier,

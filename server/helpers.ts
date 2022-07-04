@@ -55,6 +55,16 @@ export function getAlephConfig(): AlephConfig | undefined {
   return Reflect.get(globalThis, "__ALEPH_CONFIG");
 }
 
+/** Get the import maps. */
+export async function getImportMap(appDir?: string): Promise<ImportMap> {
+  return await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
+}
+
+/** Get the jsx config. */
+export async function getJSXConfig(appDir?: string): Promise<JSXConfig> {
+  return await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
+}
+
 /** Get the UnoCSS generator, return `null` if the presets are empty. */
 export function getUnoGenerator(): UnoGenerator | null {
   const config = getAlephConfig();
@@ -332,7 +342,7 @@ async function findConfigFile(filenames: string[], appDir?: string): Promise<str
 /** Load the JSX config base the given import maps and the existing deno config. */
 export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
   const jsxConfig: JSXConfig = {};
-  const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
+  const importMap = await getImportMap(appDir);
   const denoConfigFile = await findConfigFile(["deno.jsonc", "deno.json", "tsconfig.json"], appDir);
   if (denoConfigFile) {
     try {

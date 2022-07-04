@@ -24,7 +24,6 @@ const cache = new Map<string, [content: string, headers: Headers]>();
 
 export type TransformerOptions = {
   buildTarget?: TransformOptions["target"];
-  isDev: boolean;
   importMap: ImportMap;
   jsxConfig: JSXConfig;
   loader?: ModuleLoader;
@@ -43,10 +42,11 @@ export default {
     req: Request,
     options: TransformerOptions,
   ): Promise<Response> => {
-    const { isDev, buildTarget, loader, jsxConfig, importMap } = options;
+    const { buildTarget, loader, jsxConfig, importMap } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const ssr = searchParams.has("ssr");
+    const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
     const deployId = getDeploymentId();
     const etag = deployId ? `W/${deployId}` : null;

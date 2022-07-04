@@ -8,9 +8,9 @@ import {
   fixResponse,
   getAlephPkgUri,
   getDeploymentId,
+  getImportMap,
+  getJSXConfig,
   globalIt,
-  loadImportMap,
-  loadJSXConfig,
   regFullVersion,
   toLocalPath,
 } from "./helpers.ts";
@@ -67,19 +67,12 @@ export function serve(options: ServerOptions = {}) {
     log.setLevel(options.logLevel);
   }
 
-  // inject config to global
-  const config: AlephConfig = {
-    baseUrl,
-    build,
-    routes,
-    routeModules,
-    unocss,
-    loaders,
-  };
+  // inject the config to global
+  const config: AlephConfig = { baseUrl, build, routes, routeModules, unocss, loaders };
   Reflect.set(globalThis, "__ALEPH_CONFIG", config);
-  if (
-    !isDev && routeModules && util.isFilledArray(routeModules.depGraph?.modules)
-  ) {
+
+  // restore the dependency graph from the re-import route modules
+  if (!isDev && routeModules && util.isFilledArray(routeModules.depGraph?.modules)) {
     routeModules.depGraph.modules.forEach((module) => {
       depGraph.mark(module.specifier, module);
     });
@@ -159,17 +152,10 @@ export function serve(options: ServerOptions = {}) {
         (loader = loaders?.find((l) => l.test(pathname))))
     ) {
       try {
-        const importMap = await globalIt(
-          "__ALEPH_IMPORT_MAP",
-          () => loadImportMap(appDir),
-        );
-        const jsxConfig = await globalIt(
-          "__ALEPH_JSX_CONFIG",
-          () => loadJSXConfig(appDir),
-        );
+        const importMap = await getImportMap(appDir);
+        const jsxConfig = await getJSXConfig(appDir);
         return await clientModuleTransformer.fetch(req, {
           buildTarget: options.build?.target,
-          isDev,
           importMap,
           jsxConfig,
           loader,
@@ -367,7 +353,6 @@ export function serve(options: ServerOptions = {}) {
         indexHtml,
         routeConfig,
         customHTMLRewriter,
-        isDev,
         ssr,
       });
     } catch (err) {
@@ -413,14 +398,7 @@ export function serve(options: ServerOptions = {}) {
       options.onListen?.(arg);
     };
     if (useTls) {
-      serveTls(handler, {
-        hostname,
-        port,
-        certFile,
-        keyFile,
-        signal,
-        onListen,
-      });
+      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
     } else {
       stdServe(handler, { hostname, port, signal, onListen });
     }

@@ -21,7 +21,6 @@ export type RenderOptions = {
   indexHtml: Uint8Array;
   routeConfig: RouteConfig | null;
   customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
-  isDev?: boolean;
   ssr?: SSR;
 };
 
@@ -30,10 +29,11 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* st
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routeConfig, customHTMLRewriter, isDev, ssr } = options;
+    const { indexHtml, routeConfig, customHTMLRewriter, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (typeof ssr === "function" || typeof ssr?.render === "function") {
+      const isDev = Deno.env.get("ALEPH_ENV") === "development";
       const isFn = typeof ssr === "function";
       const dataDefer = isFn ? false : !!ssr.dataDefer;
       const cc = !isFn ? ssr.cacheControl : "public";
