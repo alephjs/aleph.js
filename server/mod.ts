@@ -2,7 +2,7 @@ import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
 import log, { type LevelName } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
-import { join, readableStreamFromReader, serve as stdServe, serveTls } from "./deps.ts";
+import { join, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   fixResponse,
@@ -239,7 +239,7 @@ export function serve(options: ServerOptions = {}) {
             );
           }
           const file = await Deno.open(filePath, { read: true });
-          return new Response(readableStreamFromReader(file), { headers });
+          return new Response(file.readable, { headers });
         }
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
