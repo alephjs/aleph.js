@@ -198,6 +198,10 @@ export default {
             graphVersions,
             globalVersion: depGraph.globalVersion.toString(36),
             stripDataExport: isRouteFile(specifier),
+            reactRefresh: (
+              jsxConfig.jsxPragma === "React.createElement" ||
+              jsxConfig.jsxImportSource?.startsWith("https://esm.sh/react@")
+            ),
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
             isDev,
