@@ -92,7 +92,6 @@ export class MockServer {
       indexHtml: this.#indexHtml,
       routeConfig: this.#routeConfig,
       customHTMLRewriter,
-      isDev: false,
       ssr,
     });
   }
