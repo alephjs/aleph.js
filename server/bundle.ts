@@ -1,7 +1,7 @@
 import util from "../lib/util.ts";
+import type { Targets } from "./deps.ts";
 import { transformCSS } from "./deps.ts";
 import { getAlephPkgUri, readCode, toLocalPath } from "./helpers.ts";
-import type { Targets } from "./types.ts";
 
 export type BundleCSSOptions = {
   targets?: Targets;
@@ -28,14 +28,18 @@ export async function bundleCSS(
   options: BundleCSSOptions,
   tracing = new Set<string>(),
 ): Promise<BundleCSSResult> {
-  let { code: css, dependencies, exports } = await transformCSS(specifier, sourceCode, {
-    ...options,
-    analyzeDependencies: true,
-    drafts: {
-      nesting: true,
-      customMedia: true,
+  let { code: css, dependencies, exports } = await transformCSS(
+    specifier,
+    sourceCode,
+    {
+      ...options,
+      analyzeDependencies: true,
+      drafts: {
+        nesting: true,
+        customMedia: true,
+      },
     },
-  });
+  );
   const deps = dependencies?.filter((dep) => dep.type === "import" && !dep.media).map((dep) => {
     let url = dep.url;
     if (util.isLikelyHttpURL(specifier)) {
@@ -84,8 +88,10 @@ export async function bundleCSS(
     const alephPkgPath = toLocalPath(getAlephPkgUri());
     return {
       code: [
-        options.hmr && `import createHotContext from "${alephPkgPath}/framework/core/hmr.ts";`,
-        options.hmr && `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
+        options.hmr &&
+        `import createHotContext from "${alephPkgPath}/framework/core/hmr.ts";`,
+        options.hmr &&
+        `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
         `import { applyCSS } from "${alephPkgPath}/framework/core/style.ts";`,
         `export const css = ${JSON.stringify(css)};`,
         `export default ${JSON.stringify(cssModulesExports)};`,

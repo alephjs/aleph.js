@@ -2,8 +2,6 @@ import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/ser
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.3/types.d.ts";
 import type { UserConfig as UnoConfig } from "../lib/@unocss/core.ts";
 import type { RouteModule } from "../framework/core/route.ts";
-export type { Targets, TransformOptions, TransformResult } from "https://deno.land/x/aleph_compiler@0.6.8/types.ts";
-export type { Emitter } from "https://esm.sh/mitt@3.0.0";
 export type { Route, RouteConfig, RouteMatch, RouteMeta } from "../framework/core/route.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
 
@@ -25,11 +23,22 @@ export type AlephConfig = {
 /** The build options for compiler. */
 export type BuildOptions = {
   /** The build target passes to esbuild. default is "es2020" */
-  target?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
+  target?:
+    | "es2015"
+    | "es2016"
+    | "es2017"
+    | "es2018"
+    | "es2019"
+    | "es2020"
+    | "es2021"
+    | "es2022";
 };
 
 export interface FetchHandler {
-  (request: Request, context: Record<string, unknown>): Promise<Response> | Response;
+  (
+    request: Request,
+    context: Record<string, unknown>,
+  ): Promise<Response> | Response;
 }
 
 export type CookieOptions = {
@@ -91,7 +100,9 @@ export interface Context extends Record<string, unknown> {
   readonly headers: Headers;
   readonly cookies: Cookies;
   readonly htmlRewriter: HTMLRewriter;
-  getSession<T extends Record<string, unknown> = Record<string, unknown>>(): Promise<Session<T>>;
+  getSession<
+    T extends Record<string, unknown> = Record<string, unknown>,
+  >(): Promise<Session<T>>;
 }
 
 export interface Middleware {
@@ -132,7 +143,11 @@ export type ModuleLoaderOutput = {
 
 export interface ModuleLoader {
   test(pathname: string): boolean;
-  load(specifier: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
+  load(
+    specifier: string,
+    content: string,
+    env: ModuleLoaderEnv,
+  ): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
 }
 
 export type SSRContext = {

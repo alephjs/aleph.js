@@ -1,9 +1,11 @@
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
+import type { BuildResult, Emitter } from "./deps.ts";
 import { basename, blue, dirname, esbuild, join, mitt, relative, serve, serveTls } from "./deps.ts";
-import depGraph from "./graph.ts";
+import depGraph, { DependencyGraph } from "./graph.ts";
 import {
   builtinModuleExts,
+  existsFile,
   findFile,
   getAlephConfig,
   globalIt,
@@ -12,10 +14,12 @@ import {
   watchFs,
 } from "./helpers.ts";
 import { initRoutes, toRouteRegExp } from "./routing.ts";
-import type { AlephConfig, ConnInfo, Emitter, ModuleLoader, RouteConfig } from "./types.ts";
+import type { AlephConfig, ConnInfo, ModuleLoader, RouteConfig } from "./types.ts";
 
 type WatchFsEvents = {
-  [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: { specifier: string };
+  [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: {
+    specifier: string;
+  };
 };
 
 const watchFsEmitters = new Set<Emitter<WatchFsEvents>>();
@@ -44,7 +48,10 @@ export type DevOptions = {
 /** Watch for file changes and listen the dev server. */
 export default async function dev(options?: DevOptions) {
   const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : Deno.cwd();
-  const serverEntry = await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
+  const serverEntry = await findFile(
+    builtinModuleExts.map((ext) => `server.${ext}`),
+    appDir,
+  );
   if (!serverEntry) {
     log.error(`Could not find the server entry file.`);
     Deno.exit(1);
@@ -72,7 +79,7 @@ export default async function dev(options?: DevOptions) {
 
   const emitter = createWatchFsEmitter();
   emitter.on(`modify:./${basename(serverEntry)}`, start);
-  // todo: watch server deps
+  // todo: watch server deps to restart the server
 
   // update global route config when fs changess
   emitter.on("*", async (kind, { specifier }) => {
@@ -83,14 +90,6 @@ export default async function dev(options?: DevOptions) {
         if (reg.test(specifier)) {
           const routeConfig = await initRoutes(config.routes, appDir);
           Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
-          generateRoutesExportModule({
-            routeConfig,
-            loaders: config.loaders,
-          }).catch((err) => log.error(err));
-        }
-      } else if (config.loaders?.some((l) => l.test(specifier))) {
-        const routeConfig: RouteConfig | undefined = Reflect.get(globalThis, "__ALEPH_ROUTE_CONFIG");
-        if (routeConfig) {
           generateRoutesExportModule({
             routeConfig,
             loaders: config.loaders,
@@ -133,12 +132,29 @@ export default async function dev(options?: DevOptions) {
     }
   });
 
+  // generate empty `routes/_export.ts` if not exists
+  const entryCode = await Deno.readTextFile(serverEntry);
+  const m = entryCode.match(/(\s+)routes:\s*['"`](.+)['"`]/);
+  if (m) {
+    const reg = toRouteRegExp(m[2]);
+    const exportTs = join(appDir, reg.prefix, "_export.ts");
+    if (!(await existsFile(exportTs))) {
+      await Deno.writeTextFile(exportTs, "export default {}");
+    }
+  }
+
   await start();
 }
 
 /** Bootstrap the dev server, handle the HMR socket connection. */
-async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __port?: number) {
+async function bootstrap(
+  signal: AbortSignal,
+  entry: string,
+  appDir: string,
+  __port?: number,
+) {
   // clean globally cached objects
+  Reflect.deleteProperty(globalThis, "__ALEPH_CONFIG");
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
   Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
   Reflect.deleteProperty(globalThis, "__ALEPH_IMPORT_MAP");
@@ -178,7 +194,10 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   const { hostname, certFile, keyFile } = server;
   const useTls = certFile && keyFile;
   const port = __port ?? server.port ?? 3000;
-  const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
+  const handler = async (
+    req: Request,
+    connInfo: ConnInfo,
+  ): Promise<Response> => {
     const { pathname } = new URL(req.url);
     if (pathname === "/-/hmr") {
       const { socket, response } = Deno.upgradeWebSocket(req);
@@ -195,7 +214,10 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
       });
       socket.addEventListener("open", () => {
         emitter.on("create", ({ specifier }) => {
-          const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+          const config: AlephConfig | undefined = Reflect.get(
+            globalThis,
+            "__ALEPH_CONFIG",
+          );
           if (config && config.routes) {
             const reg = toRouteRegExp(config.routes);
             const routePattern = reg.exec(specifier);
@@ -237,7 +259,14 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
 
   try {
     if (useTls) {
-      await serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
+      await serveTls(handler, {
+        hostname,
+        port,
+        certFile,
+        keyFile,
+        signal,
+        onListen,
+      });
     } else {
       await serve(handler, { hostname, port, signal, onListen });
     }
@@ -258,10 +287,11 @@ export type GenerateOptions = {
 };
 
 /** generate the `routes/_export.ts` module by given the routes config. */
-export async function generateRoutesExportModule(options: GenerateOptions) {
+async function generateRoutesExportModule(options: GenerateOptions) {
   const { routeConfig, loaders } = options;
   const appDir = routeConfig.appDir ?? Deno.cwd();
   const genFile = join(appDir, routeConfig.prefix, "_export.ts");
+  const useLoader = routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
 
   if (routeConfig.routes.length == 0) {
     try {
@@ -283,20 +313,48 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
   const revives: string[] = [];
 
   routeConfig.routes.forEach(([_, { filename, pattern }], idx) => {
-    const importUrl = JSON.stringify("." + util.trimPrefix(filename, routeConfig.prefix));
+    const importUrl = JSON.stringify(
+      "." + util.trimPrefix(filename, routeConfig.prefix),
+    );
     imports.push(`import * as $${idx} from ${importUrl};`);
     revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
   });
 
-  if (routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)))) {
+  // stop previous esbuild watcher
+  const preResult: BuildResult | undefined = Reflect.get(
+    globalThis,
+    "__ALEPH_PREV_ESBUILD_RES",
+  );
+  if (preResult) {
+    Reflect.deleteProperty(globalThis, "__ALEPH_PREV_ESBUILD_RES");
+    preResult.stop?.();
+  }
+
+  if (useLoader) {
     const input = [
       ...imports,
       "export default {",
-      "__DEP_GRAPH__:null,",
       ...revives,
+      "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null,",
       "}",
     ].join("\n");
-    const output = await esbuild({
+    const depGraph = new DependencyGraph();
+    const write = async (build: BuildResult) => {
+      await Promise.all(build.outputFiles!.map(async (file) => {
+        if (file.path === genFile) {
+          log.debug(`writing ${blue(`${routeConfig.prefix}/_export.ts`)}...`);
+          await Deno.writeTextFile(
+            genFile,
+            file.text.replace(
+              "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
+              // deno-lint-ignore no-unused-vars
+              `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
+            ),
+          );
+        }
+      }));
+    };
+    const result = await esbuild({
       stdin: {
         sourcefile: genFile,
         contents: input,
@@ -308,7 +366,7 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
       bundle: true,
       minify: true,
       treeShaking: true,
-      sourcemap: false,
+      sourcemap: "inline",
       write: false,
       banner: {
         js: [
@@ -322,12 +380,19 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
         name: "bundle-non-standard-modules",
         setup(build) {
           build.onResolve({ filter: /.*/ }, (args) => {
-            if (args.path.startsWith(".") && loaders?.some((l) => l.test(args.path))) {
+            if (args.path === "dep-graph") {
+              return { path: args.path, namespace: "dep-graph" };
+            }
+            if (
+              args.path.startsWith(".") &&
+              loaders?.some((l) => l.test(args.path))
+            ) {
               const dir = dirname(genFile);
               const specifier = "./" + relative(appDir, join(dir, args.path));
               depGraph.mark(specifier, {});
               if (args.importer.startsWith(".")) {
-                const importer = "./" + relative(appDir, join(dir, args.importer));
+                const importer = "./" +
+                  relative(appDir, join(dir, args.importer));
                 depGraph.mark(importer, { deps: [{ specifier }] });
               }
               return { path: args.path, namespace: "loader" };
@@ -339,39 +404,55 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
             if (loader) {
               const fullpath = join(dirname(genFile), args.path);
               const specifier = "./" + relative(appDir, fullpath);
-              const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
-              const jsxConfig = await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
+              const importMap = await globalIt(
+                "__ALEPH_IMPORT_MAP",
+                () => loadImportMap(appDir),
+              );
+              const jsxConfig = await globalIt(
+                "__ALEPH_JSX_CONFIG",
+                () => loadJSXConfig(appDir),
+              );
               const source = await Deno.readTextFile(fullpath);
-              const { code, lang, inlineCSS } = await loader.load(specifier, source, {
-                importMap,
-                jsxConfig,
-                ssr: true,
-              });
+              const { code, lang, inlineCSS } = await loader.load(
+                specifier,
+                source,
+                {
+                  importMap,
+                  jsxConfig,
+                  ssr: true,
+                },
+              );
               if (inlineCSS) {
                 depGraph.mark(specifier, { inlineCSS });
               }
               return {
                 contents: code,
                 loader: lang,
+                watchFiles: [fullpath],
               };
             }
             throw new Error(`Loader not found for ${args.path}`);
           });
+          build.onLoad({ filter: /.*/, namespace: "dep-graph" }, () => {
+            return {
+              contents: `export default ${
+                // deno-lint-ignore no-unused-vars
+                JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })
+              };`,
+              loader: "js",
+            };
+          });
         },
       }],
+      watch: {
+        onRebuild(error, result) {
+          if (error) log.warn("[esbuild] watch build failed:", error);
+          else write(result!);
+        },
+      },
     });
-    await Promise.all(output.outputFiles.map(async (file) => {
-      if (file.path === genFile) {
-        await Deno.writeTextFile(
-          genFile,
-          file.text.replace(
-            "__DEP_GRAPH__:null,",
-            // deno-lint-ignore no-unused-vars
-            `__DEP_GRAPH__:${JSON.stringify(depGraph.modules.map(({ version, ...module }) => module))},`,
-          ),
-        );
-      }
-    }));
+    Reflect.set(globalThis, "__ALEPH_PREV_ESBUILD_RES", result);
+    await write(result);
   } else {
     const empty = "";
     const code = [
@@ -386,5 +467,7 @@ export async function generateRoutesExportModule(options: GenerateOptions) {
     ].join("\n");
     await Deno.writeTextFile(genFile, code);
   }
-  log.debug(`${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`);
+  log.debug(
+    `${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`,
+  );
 }
