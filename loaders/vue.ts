@@ -110,25 +110,26 @@ export default class VueSFCLoader implements ModuleLoader {
     output.push(`export default __sfc__`);
 
     const css = (await Promise.all(descriptor.styles.map(async (style) => {
-      const styleResult = await compileStyleAsync({
+      const result = await compileStyleAsync({
         ...this.#options.style,
         source: style.content,
         filename,
         id,
         scoped: style.scoped,
         modules: false,
+        inMap: compiledScript.map,
       });
-      if (styleResult.errors.length) {
+      if (result.errors.length) {
         // postcss uses pathToFileURL which isn't polyfilled in the browser
         // ignore these errors for now
-        const msg = styleResult.errors[0].message;
+        const msg = result.errors[0].message;
         if (!msg.includes("pathToFileURL")) {
           log.warn(`VueSFCLoader: ${msg}`);
         }
         // proceed even if css compile errors
         return "";
       } else {
-        return styleResult.code;
+        return result.code;
       }
     }))).join("\n");
 
@@ -136,6 +137,7 @@ export default class VueSFCLoader implements ModuleLoader {
       code: output.join("\n"),
       lang: isTS ? "ts" : "js",
       inlineCSS: css || undefined,
+      map: compiledScript.map?.toString(),
     };
   }
 }

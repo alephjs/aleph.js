@@ -54,14 +54,15 @@ export default {
       return new Response(null, { status: 304 });
     }
 
-    let [source, sourceContentType] = await readCode(specifier);
+    const [sourceRaw, sourceContentType] = await readCode(specifier);
+    let source = sourceRaw;
     let lang: ModuleLoaderOutput["lang"];
     let inlineCSS: string | undefined;
     let isCSS = false;
     if (loader) {
       const loaded = await loader.load(
         specifier,
-        source,
+        sourceRaw,
         ssr ? { jsxConfig, importMap, ssr: true } : { ...options, isDev },
       );
       source = loaded.code;
@@ -245,8 +246,9 @@ export default {
           try {
             const m = JSON.parse(map);
             if (!util.isLikelyHttpURL(specifier)) {
-              m.sources = [`file://source/${util.trimPrefix(specifier, ".")}`];
+              m.sources = [`file://source${util.trimPrefix(specifier, ".")}`];
             }
+            // todo: merge loader map
             m.sourcesContent = [source];
             resBody = code +
               `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(JSON.stringify(m))}\n`;
