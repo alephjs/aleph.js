@@ -121,16 +121,16 @@ export type ImportMap = {
 };
 
 export type JSXConfig = {
-  jsxRuntime?: "react" | "preact";
+  jsxPragma?: string;
+  jsxPragmaFrag?: string;
   jsxImportSource?: string;
-  jsxRuntimeVersion?: string;
-  jsxRuntimeCdnVersion?: string;
 };
 
 export type ModuleLoaderEnv = {
   importMap?: ImportMap;
   jsxConfig?: JSXConfig;
   isDev?: boolean;
+  sourceMap?: boolean;
   ssr?: boolean;
 };
 

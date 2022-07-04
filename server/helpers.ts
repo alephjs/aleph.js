@@ -342,81 +342,31 @@ async function findConfigFile(filenames: string[], appDir?: string): Promise<str
 /** Load the JSX config base the given import maps and the existing deno config. */
 export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
   const jsxConfig: JSXConfig = {};
-  const importMap = await getImportMap(appDir);
   const denoConfigFile = await findConfigFile(["deno.jsonc", "deno.json", "tsconfig.json"], appDir);
   if (denoConfigFile) {
     try {
       const { compilerOptions } = await parseJSONFile(denoConfigFile);
-      const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
+      const { jsx, jsxFactory, jsxFragmentFactory, jsxImportSource } = (compilerOptions || {}) as Record<
+        string,
+        unknown
+      >;
       if (
         (jsx === undefined || jsx === "react-jsx" || jsx === "react-jsxdev") &&
         util.isFilledString(jsxImportSource)
       ) {
         jsxConfig.jsxImportSource = jsxImportSource;
-        jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
-      } else if (jsx === undefined || jsx === "react") {
-        jsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
+      } else {
+        if (typeof jsxFactory === "string") {
+          jsxConfig.jsxPragma = jsxFactory;
+        }
+        if (typeof jsxFragmentFactory === "string") {
+          jsxConfig.jsxPragmaFrag = jsxFragmentFactory;
+        }
       }
     } catch (error) {
       log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
     }
-  } else if (Deno.env.get("ALEPH_DEV_ROOT")) {
-    const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
-    const { compilerOptions } = await parseJSONFile(jsonFile);
-    const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
-    if (
-      (jsx === undefined || jsx === "react-jsx" || jsx === "react-jsxdev") &&
-      util.isFilledString(jsxImportSource)
-    ) {
-      jsxConfig.jsxImportSource = jsxImportSource;
-      jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
-    } else if (jsx === undefined || jsx === "react") {
-      jsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
-    }
   }
-
-  let fuzzRuntimeUrl: string | null = null;
-
-  for (const url of Object.values(importMap.imports)) {
-    let m = url.match(/^https?:\/\/esm\.sh\/(p?react)@(\d+\.\d+\.\d+(-[a-z\d.]+)*)(\?|$)/);
-    if (!m) {
-      m = url.match(/^https?:\/\/esm\.sh\/(p?react)@.+/);
-    }
-    if (m) {
-      const { searchParams } = new URL(url);
-      if (searchParams.has("pin")) {
-        jsxConfig.jsxRuntimeCdnVersion = util.trimPrefix(searchParams.get("pin")!, "v");
-      }
-      if (!jsxConfig.jsxRuntime) {
-        jsxConfig.jsxRuntime = m[1] as "react" | "preact";
-      }
-      if (m[2]) {
-        jsxConfig.jsxRuntimeVersion = m[2];
-        if (jsxConfig.jsxImportSource) {
-          jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${m[2]}`;
-        }
-      } else {
-        fuzzRuntimeUrl = url;
-      }
-      break;
-    }
-  }
-
-  // get acctual react version from esm.sh
-  if (fuzzRuntimeUrl) {
-    log.info(`Checking ${jsxConfig.jsxRuntime} version...`);
-    const text = await fetch(fuzzRuntimeUrl).then((resp) => resp.text());
-    const m = text.match(/https?:\/\/cdn\.esm\.sh\/(v\d+)\/p?react@(\d+\.\d+\.\d+(-[a-z\d.]+)*)\//);
-    if (m) {
-      jsxConfig.jsxRuntimeCdnVersion = m[1].slice(1);
-      jsxConfig.jsxRuntimeVersion = m[2];
-      if (jsxConfig.jsxImportSource) {
-        jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${m[2]}`;
-      }
-      log.info(`${jsxConfig.jsxRuntime}@${jsxConfig.jsxRuntimeVersion} is used`);
-    }
-  }
-
   return jsxConfig;
 }
 
