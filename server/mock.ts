@@ -7,10 +7,10 @@ import type { HTMLRewriterHandlers, Middleware, RouteConfig, SSR } from "./types
 
 type MockServerOptions = {
   appDir?: string;
-  routes: string;
+  origin?: string;
+  routeGlob: string;
   middlewares?: Middleware[];
   ssr?: SSR;
-  origin?: string;
 };
 
 /** The MockServer class to create a minimal server for integration testing.
@@ -42,7 +42,7 @@ export class MockServer {
   }
 
   async fetch(input: string, init?: RequestInit) {
-    const { middlewares, ssr, origin, routes, appDir } = this.#options;
+    const { middlewares, ssr, origin, routeGlob, appDir } = this.#options;
     const url = new URL(input, origin ?? "http://localhost/");
     const req = new Request(url.href, init);
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
@@ -73,7 +73,7 @@ export class MockServer {
     }
 
     if (!this.#routeConfig) {
-      this.#routeConfig = await initRoutes(routes, appDir);
+      this.#routeConfig = await initRoutes(routeGlob, appDir);
     }
     if (!this.#indexHtml) {
       this.#indexHtml = await loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
@@ -81,11 +81,14 @@ export class MockServer {
       });
     }
 
-    const reqData = req.method === "GET" &&
-      (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
+    const reqData = req.method === "GET" && url.searchParams.has("_data_");
     const res = await fetchRouteData(req, ctx, this.#routeConfig, reqData);
     if (res) {
       return res;
+    }
+
+    if (!this.#indexHtml) {
+      return new Response("Not found", { status: 404 });
     }
 
     return renderer.fetch(req, ctx, {

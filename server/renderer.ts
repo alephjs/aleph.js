@@ -179,12 +179,9 @@ export default {
         });
 
         if (ssrRes) {
-          const {
-            context: { routeModules, headCollection },
-            body,
-            deferedData,
-            nonce,
-          } = ssrRes;
+          const { context, body, deferedData, nonce } = ssrRes;
+          const { routeModules, headCollection } = context;
+
           rewriter.on("head", {
             element(el: Element) {
               headCollection.forEach((h) => util.isFilledString(h) && el.append(h, { html: true }));
@@ -225,6 +222,7 @@ export default {
               }
             },
           });
+
           rewriter.on("ssr-body", {
             element(el: Element) {
               if (typeof body === "string") {
@@ -274,6 +272,7 @@ export default {
               }
             },
           });
+
           if (nonce) {
             rewriter.on("script", {
               element(el: Element) {

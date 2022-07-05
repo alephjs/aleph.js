@@ -106,11 +106,7 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
   }, [dataUrl]);
   const reload = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch(dataUrl + (dataUrl.includes("?") ? "&" : "?") + "_data_", {
-        headers: [["Accept", "application/json"]],
-        signal,
-      });
-
+      const res = await fetch(dataUrl + (dataUrl.includes("?") ? "&" : "?") + "_data_", { signal });
       if (!res.ok) {
         const err = await FetchError.fromResponse(res);
         const details = err.details as { redirect?: { location: string } };
@@ -120,7 +116,6 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
         }
         throw err;
       }
-
       try {
         const data = await res.json();
         const cc = res.headers.get("Cache-Control");

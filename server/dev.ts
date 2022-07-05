@@ -2,7 +2,6 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { BuildResult, Emitter } from "./deps.ts";
 import { basename, blue, esbuild, fromFileUrl, join, mitt, relative, serve, serveTls } from "./deps.ts";
-
 import depGraph, { DependencyGraph } from "./graph.ts";
 import {
   builtinModuleExts,

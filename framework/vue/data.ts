@@ -1,6 +1,6 @@
 import { inject, onBeforeUnmount, Ref, ref, toRaw, watch } from "vue";
 import { FetchError } from "../core/error.ts";
-import type { SSRContext } from "../../server/renderer.ts";
+import type { SSRContext } from "../../server/types.ts";
 import { HttpMethod, UpdateStrategy } from "./context.ts";
 
 export type RouteData = {
@@ -107,10 +107,7 @@ const createDataProvider = () => {
 
   const reload = async (signal?: AbortSignal) => {
     try {
-      const res = await fetch(dataUrl.value + (dataUrl.value.includes("?") ? "&" : "?") + "_data_", {
-        headers: { "Accept": "application/json" },
-        signal,
-      });
+      const res = await fetch(dataUrl.value + (dataUrl.value.includes("?") ? "&" : "?") + "_data_", { signal });
 
       if (!res.ok) {
         const err = await FetchError.fromResponse(res);

@@ -278,9 +278,7 @@ export function serve(options: ServerOptions = {}) {
       () => routeGlob ? initRoutes(routeGlob, appDir) : Promise.resolve(null),
     );
     if (routeConfig && routeConfig.routes.length > 0) {
-      const reqData = req.method === "GET" &&
-        (searchParams.has("_data_") ||
-          req.headers.get("Accept") === "application/json");
+      const reqData = req.method === "GET" && searchParams.has("_data_");
       try {
         const resp = await fetchRouteData(req, ctx, routeConfig, reqData);
         if (resp) {
@@ -343,10 +341,12 @@ export function serve(options: ServerOptions = {}) {
         () =>
           loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
             ssr: typeof ssr === "function" ? {} : ssr,
-            hmrWebSocketUrl: Deno.env.get("ALEPH_HMR_WS_URL"),
-            isDev,
+            hmr: isDev ? { url: Deno.env.get("ALEPH_HMR_WS_URL") } : undefined,
           }),
       );
+      if (!indexHtml) {
+        return new Response("Not found", { status: 404 });
+      }
       return renderer.fetch(req, ctx, {
         indexHtml,
         routeConfig,
