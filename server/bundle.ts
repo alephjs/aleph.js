@@ -1,6 +1,6 @@
 import util from "../lib/util.ts";
 import type { Targets } from "./deps.ts";
-import { fromFileUrl,transformCSS } from "./deps.ts";
+import { fromFileUrl, transformCSS } from "./deps.ts";
 import { fetchCode, getAlephPkgUri, toLocalPath } from "./helpers.ts";
 
 export type BundleCSSOptions = {
