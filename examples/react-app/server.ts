@@ -1,7 +1,7 @@
 import { serve } from "aleph/server";
 import ssr from "aleph/react-ssr";
 
-// pre-import route modules
+// pre-import routes
 import routes from "./routes/_export.ts";
 
 serve({

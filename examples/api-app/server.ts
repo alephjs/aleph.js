@@ -1,6 +1,6 @@
 import { serve } from "aleph/server";
 
-// pre-import route modules
+// pre-import routes
 import routes from "./routes/_export.ts";
 
 serve({

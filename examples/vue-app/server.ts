@@ -2,7 +2,7 @@ import { serve } from "aleph/server";
 import ssr from "aleph/vue-ssr";
 import VueLoader from "aleph/vue-loader";
 
-// pre-import route modules
+// pre-import routes
 import routes from "./routes/_export.ts";
 
 serve({
