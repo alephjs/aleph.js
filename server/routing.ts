@@ -20,7 +20,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
     const devPort = Deno.env.get("ALEPH_DEV_SERVER_PORT");
     let url: string;
     if (devPort) {
-      url = `http://localhost:${devPort}${filename.slice(1)}?ssr${version ? "&v=" + version.toString(36) : ""}`;
+      url = `http://localhost:${devPort}${filename.slice(1)}?ssr&v=${(version ?? graph.globalVersion).toString(36)}`;
     } else {
       const root = appDir ?? (config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd());
       url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;

@@ -7,11 +7,11 @@ import { MagicString, parseDeps, transform } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
+  fetchCode,
   getAlephConfig,
   getAlephPkgUri,
   getDeploymentId,
   getUnoGenerator,
-  readCode,
   regFullVersion,
   restoreUrl,
   toLocalPath,
@@ -23,7 +23,6 @@ import type { ImportMap, JSXConfig, ModuleLoader, ModuleLoaderOutput } from "./t
 const cache = new Map<string, [content: string, headers: Headers]>();
 
 export type TransformerOptions = {
-  buildTarget?: TransformOptions["target"];
   importMap: ImportMap;
   jsxConfig: JSXConfig;
   loader?: ModuleLoader;
@@ -38,15 +37,13 @@ export default {
       pathname.endsWith(".css")
     );
   },
-  fetch: async (
-    req: Request,
-    options: TransformerOptions,
-  ): Promise<Response> => {
-    const { buildTarget, loader, jsxConfig, importMap } = options;
+  fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
+    const { loader, jsxConfig, importMap } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const ssr = searchParams.has("ssr");
     const isDev = Deno.env.get("ALEPH_ENV") === "development";
+    const target = isDev ? "es2022" : "es2018";
 
     const deployId = getDeploymentId();
     const etag = deployId ? `W/${deployId}` : null;
@@ -54,7 +51,7 @@ export default {
       return new Response(null, { status: 304 });
     }
 
-    const [sourceRaw, sourceContentType] = await readCode(specifier);
+    const [sourceRaw, sourceContentType] = await fetchCode(specifier, target);
     let source = sourceRaw;
     let lang: ModuleLoaderOutput["lang"];
     let inlineCSS: string | undefined;
@@ -88,15 +85,9 @@ export default {
         deps.forEach((dep) => {
           const { specifier, importUrl, loc } = dep;
           if (!util.isLikelyHttpURL(specifier) && loc) {
-            let url: string;
-            const importUrlPrefix = importUrl +
-              (importUrl.includes("?") ? "&" : "?");
-            const version = depGraph.get(specifier)?.version;
-            if (version) {
-              url = `"${importUrlPrefix}ssr&v=${version.toString(36)}"`;
-            } else {
-              url = `"${importUrlPrefix}ssr"`;
-            }
+            const sep = importUrl.includes("?") ? "&" : "?";
+            const version = depGraph.get(specifier)?.version ?? depGraph.globalVersion;
+            const url = `"${importUrl}${sep}ssr&v=${version.toString(36)}"`;
             s.overwrite(loc.start - 1, loc.end - 1, url);
           }
         });
@@ -193,7 +184,7 @@ export default {
             ...jsxConfig,
             alephPkgUri,
             lang: lang as TransformOptions["lang"],
-            target: buildTarget ?? "es2022",
+            target,
             importMap: JSON.stringify(importMap),
             graphVersions,
             globalVersion: depGraph.globalVersion.toString(36),
@@ -273,10 +264,7 @@ export default {
       }
     }
 
-    const headers = new Headers([[
-      "Content-Type",
-      `${resType}; charset=utf-8`,
-    ]]);
+    const headers = new Headers([["Content-Type", `${resType}; charset=utf-8`]]);
     if (etag) {
       headers.set("ETag", etag);
     }

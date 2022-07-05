@@ -357,7 +357,8 @@ async function generateRoutesExportModule(options: GenerateOptions) {
       bundle: true,
       minify: true,
       treeShaking: true,
-      sourcemap: "inline",
+      // todo: enable sourcemap
+      sourcemap: false,
       write: false,
       banner: {
         js: [
@@ -393,18 +394,16 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             if (loader) {
               const fullpath = join(routesDir, args.path);
               const specifier = "./" + relative(appDir, fullpath);
-              const importMap = await getImportMap(appDir);
-              const jsxConfig = await getJSXConfig(appDir);
-              const source = await Deno.readTextFile(fullpath);
-              const { code, lang, inlineCSS } = await loader.load(
-                specifier,
-                source,
-                {
-                  importMap,
-                  jsxConfig,
-                  ssr: true,
-                },
-              );
+              const [importMap, jsxConfig, source] = await Promise.all([
+                getImportMap(appDir),
+                getJSXConfig(appDir),
+                Deno.readTextFile(fullpath),
+              ]);
+              const { code, lang, inlineCSS } = await loader.load(specifier, source, {
+                importMap,
+                jsxConfig,
+                ssr: true,
+              });
               if (inlineCSS) {
                 depGraph.mark(specifier, { inlineCSS });
               }

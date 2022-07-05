@@ -3,7 +3,7 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { basename, join, JSONC } from "./deps.ts";
+import { basename, join, JSONC, type TransformOptions } from "./deps.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
@@ -302,8 +302,11 @@ export async function getFiles(
   return list;
 }
 
-/* read source code from fs/cdn/cache */
-export async function readCode(specifier: string): Promise<[code: string, contentType: string]> {
+/* fetch source code from fs/cdn/cache */
+export async function fetchCode(
+  specifier: string,
+  target?: TransformOptions["target"],
+): Promise<[code: string, contentType: string]> {
   const config = getAlephConfig();
   if (util.isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
@@ -311,8 +314,7 @@ export async function readCode(specifier: string): Promise<[code: string, conten
       return [await Deno.readTextFile("." + url.pathname), getContentType(url.pathname)];
     }
     if (url.hostname === "esm.sh") {
-      const target = config?.build?.target ?? "es2022";
-      if (!url.pathname.includes(`/${target}/`) && !url.searchParams.has("target")) {
+      if (target && !url.pathname.includes(`/${target}/`) && !url.searchParams.has("target")) {
         url.searchParams.set("target", target);
       }
     }
@@ -384,15 +386,15 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
         const alephPkgUri = getAlephPkgUri();
         if (alephPkgUri === "https://aleph") {
           Object.assign(imports, {
-            "@unocss/": `${alephPkgUri}/lib/@unocss/`,
-            "aleph/": `${alephPkgUri}/`,
-            "aleph/server": `${alephPkgUri}/server/mod.ts`,
-            "aleph/dev": `${alephPkgUri}/server/dev.ts`,
-            "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
-            "aleph/react-ssr": `${alephPkgUri}/framework/react/ssr.ts`,
-            "aleph/react-client": `${alephPkgUri}/framework/react/client.ts`,
-            "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
-            "aleph/vue-ssr": `${alephPkgUri}/framework/vue/ssr.ts`,
+            "@unocss/": "https://aleph/lib/@unocss/",
+            "aleph/": "https://aleph/",
+            "aleph/server": "https://aleph/server/mod.ts",
+            "aleph/dev": "https://aleph/server/dev.ts",
+            "aleph/react": "https://aleph/framework/react/mod.ts",
+            "aleph/react-ssr": "https://aleph/framework/react/ssr.ts",
+            "aleph/react-client": "https://aleph/framework/react/client.ts",
+            "aleph/vue": "https://aleph/framework/vue/mod.ts",
+            "aleph/vue-ssr": "https://aleph/framework/vue/ssr.ts",
           });
         }
       }

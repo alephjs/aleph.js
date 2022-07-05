@@ -1,7 +1,7 @@
 import util from "../lib/util.ts";
 import type { Targets } from "./deps.ts";
 import { transformCSS } from "./deps.ts";
-import { getAlephPkgUri, readCode, toLocalPath } from "./helpers.ts";
+import { fetchCode, getAlephPkgUri, toLocalPath } from "./helpers.ts";
 
 export type BundleCSSOptions = {
   targets?: Targets;
@@ -64,7 +64,7 @@ export async function bundleCSS(
         return "";
       }
       tracing.add(url);
-      const [css] = await readCode(url);
+      const [css] = await fetchCode(url);
       const { code, deps: subDeps } = await bundleCSS(
         url,
         css,
