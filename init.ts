@@ -119,6 +119,7 @@ export default async function init(nameArg?: string, template?: string) {
     imports: {
       "~/": "./",
       "std/": "https://deno.land/std@0.145.0/",
+      "@unocss/": "${alephPkgUri}/lib/@unocss/",
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
       "aleph/dev": `${alephPkgUri}/server/dev.ts`,
