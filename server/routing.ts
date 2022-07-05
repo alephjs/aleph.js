@@ -1,7 +1,7 @@
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { extname, globToRegExp, join, resolve } from "./deps.ts";
+import { extname, fromFileUrl, globToRegExp, join, resolve } from "./deps.ts";
 import graph from "./graph.ts";
 import { fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
 import type { Route, RouteConfig, RouteMatch, RouteMeta } from "./types.ts";
@@ -22,7 +22,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
     if (devPort) {
       url = `http://localhost:${devPort}${filename.slice(1)}?ssr&v=${(version ?? graph.globalVersion).toString(36)}`;
     } else {
-      const root = appDir ?? (config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd());
+      const root = appDir ?? (config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
       url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
     }
     mod = await import(url);

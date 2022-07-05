@@ -3,7 +3,8 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { basename, join, JSONC, type TransformOptions } from "./deps.ts";
+import { basename, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
+
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
@@ -325,8 +326,8 @@ export async function fetchCode(
     return [await res.text(), res.headers.get("Content-Type") || getContentType(url.pathname)];
   }
 
-  const root = config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd();
-  const filepath = new URL("file://" + join(root, specifier)).pathname;
+  const root = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
+  const filepath = fromFileUrl(new URL("file://" + join(root, specifier)));
   return [await Deno.readTextFile(filepath), getContentType(filepath)];
 }
 

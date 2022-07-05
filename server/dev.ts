@@ -1,7 +1,8 @@
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { BuildResult, Emitter } from "./deps.ts";
-import { basename, blue, esbuild, join, mitt, relative, serve, serveTls } from "./deps.ts";
+import { basename, blue, esbuild, fromFileUrl, join, mitt, relative, serve, serveTls } from "./deps.ts";
+
 import depGraph, { DependencyGraph } from "./graph.ts";
 import {
   builtinModuleExts,
@@ -46,7 +47,7 @@ export type DevOptions = {
 
 /** Watch for file changes and listen the dev server. */
 export default async function dev(options?: DevOptions) {
-  const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : Deno.cwd();
+  const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : Deno.cwd();
   const serverEntry = await findFile(
     builtinModuleExts.map((ext) => `server.${ext}`),
     appDir,

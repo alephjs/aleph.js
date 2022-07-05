@@ -1,6 +1,6 @@
 import util from "../lib/util.ts";
 import type { Targets } from "./deps.ts";
-import { transformCSS } from "./deps.ts";
+import { fromFileUrl,transformCSS } from "./deps.ts";
 import { fetchCode, getAlephPkgUri, toLocalPath } from "./helpers.ts";
 
 export type BundleCSSOptions = {
@@ -47,7 +47,7 @@ export async function bundleCSS(
         url = new URL(url, specifier).toString();
       }
     } else {
-      url = "." + new URL(url, `file://${specifier.slice(1)}`).pathname;
+      url = "." + fromFileUrl(new URL(url, `file://${specifier.slice(1)}`));
     }
     return url;
   });

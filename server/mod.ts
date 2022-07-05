@@ -2,7 +2,7 @@ import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
 import log, { type LevelName } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
-import { join, serve as stdServe, serveTls } from "./deps.ts";
+import { fromFileUrl, join, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   fixResponse,
@@ -58,7 +58,7 @@ export function serve(options: ServerOptions = {}) {
     unocss,
     onError,
   } = options;
-  const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : undefined;
+  const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
   // set the log level if specified

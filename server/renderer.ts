@@ -1,7 +1,7 @@
 import { FetchError } from "../framework/core/error.ts";
 import { matchRoutes } from "../framework/core/route.ts";
 import util from "../lib/util.ts";
-import { HTMLRewriter, join } from "./deps.ts";
+import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
 import { importRouteModule } from "./routing.ts";
@@ -70,7 +70,7 @@ export default {
       const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
       if (config?.unocss && Array.isArray(config.unocss.presets)) {
         const test: RegExp = config.unocss.test instanceof RegExp ? config.unocss.test : /\.(jsx|tsx)$/;
-        const dir = config?.baseUrl ? new URL(".", config.baseUrl).pathname : Deno.cwd();
+        const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
         const files = await getFiles(dir);
         const inputSources = await Promise.all(
           files.filter((name) => test.test(name)).map((name) => Deno.readTextFile(join(dir, name))),
