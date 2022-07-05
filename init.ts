@@ -24,7 +24,7 @@ const templates = [
 ];
 
 const versions = {
-  react: "18.1.0",
+  react: "18.2.0",
   vue: "3.2.37",
 };
 
@@ -111,11 +111,9 @@ export default async function init(nameArg?: string, template?: string) {
     },
     "importMap": "import_map.json",
     "tasks": {
-      "dev": `deno run -A -q dev.ts`,
-      "start": `deno run -A server.ts`,
+      "dev": "deno run -A -q dev.ts",
+      "start": "deno run -A server.ts",
     },
-    "fmt": {},
-    "lint": {},
   };
   const importMap = {
     imports: {
@@ -147,6 +145,7 @@ export default async function init(nameArg?: string, template?: string) {
       Object.assign(importMap.imports, {
         "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
         "aleph/vue-ssr": `${alephPkgUri}/framework/vue/ssr.ts`,
+        "aleph/vue-loader": `${alephPkgUri}/loaders/vue.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
         "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
       });
