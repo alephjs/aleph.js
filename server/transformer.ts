@@ -43,7 +43,7 @@ export default {
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const ssr = searchParams.has("ssr");
     const isDev = Deno.env.get("ALEPH_ENV") === "development";
-    const target = isDev ? "es2022" : "es2018";
+    const target = isDev ? "es2022" : "es2018"; // todo: get target from user-agent header
 
     const deployId = getDeploymentId();
     const etag = deployId ? `W/${deployId}` : null;
@@ -98,7 +98,7 @@ export default {
       return new Response(source, { headers: [["Content-Type", contentType]] });
     }
 
-    // check cached module
+    // check cache
     const cacheKey = pathname + search;
     if (!isDev && cache.has(cacheKey)) {
       const [content, cachedHeaders] = cache.get(cacheKey)!;
@@ -114,7 +114,7 @@ export default {
       if (isCSS) {
         const asJsModule = searchParams.has("module");
         const { code, deps } = await bundleCSS(specifier, source, {
-          // todo: support borwserslist
+          // todo: use target from user-agent header
           targets: {
             android: 95,
             chrome: 95,

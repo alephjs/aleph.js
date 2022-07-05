@@ -327,8 +327,7 @@ export async function fetchCode(
   }
 
   const root = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
-  const filepath = fromFileUrl(new URL("file://" + join(root, specifier)));
-  return [await Deno.readTextFile(filepath), getContentType(filepath)];
+  return [await Deno.readTextFile(join(root, specifier)), getContentType(specifier)];
 }
 
 async function findConfigFile(filenames: string[], appDir?: string): Promise<string | undefined> {
