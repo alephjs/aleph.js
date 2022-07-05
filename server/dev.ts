@@ -84,11 +84,11 @@ export default async function dev(options?: DevOptions) {
   emitter.on("*", async (kind, { specifier }) => {
     const config = getAlephConfig();
     if (config) {
-      if (config.routes) {
+      if (config.routeGlob) {
         if (kind === "create" || kind === "remove") {
-          const reg = toRouteRegExp(config.routes);
+          const reg = toRouteRegExp(config.routeGlob);
           if (reg.test(specifier)) {
-            const routeConfig = await initRoutes(config.routes, appDir);
+            const routeConfig = await initRoutes(config.routeGlob, appDir);
             Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
             generateRoutesExportModule({
               routeConfig,
@@ -176,8 +176,8 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   }
 
   const config = getAlephConfig();
-  if (config?.routes) {
-    const routeConfig = await initRoutes(config.routes, appDir);
+  if (config?.routeGlob) {
+    const routeConfig = await initRoutes(config.routeGlob, appDir);
     Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
     generateRoutesExportModule({
       routeConfig,
@@ -215,8 +215,8 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
             globalThis,
             "__ALEPH_CONFIG",
           );
-          if (config && config.routes) {
-            const reg = toRouteRegExp(config.routes);
+          if (config?.routeGlob) {
+            const reg = toRouteRegExp(config.routeGlob);
             const routePattern = reg.exec(specifier);
             if (routePattern) {
               send({ type: "create", specifier, routePattern });

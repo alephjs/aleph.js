@@ -4,12 +4,12 @@ import ssr from "aleph/react-ssr";
 import { GithubOauth } from "./oauth.ts";
 
 // pre-import route modules
-import routeModules from "./routes/_export.ts";
+import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  routes: "./routes/**/*.{tsx,ts}",
-  routeModules,
+  routeGlob: "./routes/**/*.{tsx,ts}",
+  routes,
   unocss: {
     presets: [
       presetUno(),

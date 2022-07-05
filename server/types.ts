@@ -9,9 +9,9 @@ export type AlephConfig = {
   /** The base url of the server. */
   baseUrl?: string;
   /** The glob for the file-system based routing.  */
-  routes?: string;
-  /** The pre-imported modules of routing,  */
-  routeModules?: Record<string, Record<string, unknown>>;
+  routeGlob?: string;
+  /** The pre-built routes.  */
+  routes?: Record<string, Record<string, unknown>>;
   /** The config for UnoCSS. */
   unocss?: UnoConfig & { test?: RegExp };
   /** The module loaders. */

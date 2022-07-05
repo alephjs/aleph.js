@@ -22,7 +22,7 @@ type MockServerOptions = {
  *
  * Deno.test(async () => {
  *    const api = new MockServer({
- *      routes: "./routes/**\/*.ts"
+ *      routeGlob: "./routes/**\/*.ts"
  *    });
  *    const res = await api.fetch("/users?page=1&limit=10");
  *    assertEquals(res.status, 200);

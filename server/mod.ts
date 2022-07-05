@@ -49,15 +49,14 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 export function serve(options: ServerOptions = {}) {
   const {
     baseUrl,
-    build,
     fetch,
     middlewares,
     loaders,
-    onError,
+    routeGlob,
     routes,
-    routeModules,
     ssr,
     unocss,
+    onError,
   } = options;
   const appDir = options?.baseUrl ? new URL(".", options.baseUrl).pathname : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
@@ -68,12 +67,12 @@ export function serve(options: ServerOptions = {}) {
   }
 
   // inject the config to global
-  const config: AlephConfig = { baseUrl, build, routes, routeModules, unocss, loaders };
+  const config: AlephConfig = { baseUrl, routeGlob, routes, unocss, loaders };
   Reflect.set(globalThis, "__ALEPH_CONFIG", config);
 
   // restore the dependency graph from the re-import route modules
-  if (!isDev && routeModules && util.isFilledArray(routeModules.depGraph?.modules)) {
-    routeModules.depGraph.modules.forEach((module) => {
+  if (!isDev && routes && util.isFilledArray(routes.depGraph?.modules)) {
+    routes.depGraph.modules.forEach((module) => {
       depGraph.mark(module.specifier, module);
     });
   }
@@ -155,7 +154,6 @@ export function serve(options: ServerOptions = {}) {
         const importMap = await getImportMap(appDir);
         const jsxConfig = await getJSXConfig(appDir);
         return await clientModuleTransformer.fetch(req, {
-          buildTarget: options.build?.target,
           importMap,
           jsxConfig,
           loader,
@@ -277,7 +275,7 @@ export function serve(options: ServerOptions = {}) {
     // request route api
     const routeConfig: RouteConfig | null = await globalIt(
       "__ALEPH_ROUTE_CONFIG",
-      () => routes ? initRoutes(routes, appDir) : Promise.resolve(null),
+      () => routeGlob ? initRoutes(routeGlob, appDir) : Promise.resolve(null),
     );
     if (routeConfig && routeConfig.routes.length > 0) {
       const reqData = req.method === "GET" &&
