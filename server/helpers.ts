@@ -3,7 +3,8 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { basename, fromFileUrl, join, JSONC } from "./deps.ts";
+import { basename, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
+
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
@@ -53,6 +54,16 @@ export function getAlephPkgUri(): string {
 /* Get Aleph.js package URI. */
 export function getAlephConfig(): AlephConfig | undefined {
   return Reflect.get(globalThis, "__ALEPH_CONFIG");
+}
+
+/** Get the import maps. */
+export async function getImportMap(appDir?: string): Promise<ImportMap> {
+  return await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
+}
+
+/** Get the jsx config. */
+export async function getJSXConfig(appDir?: string): Promise<JSXConfig> {
+  return await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
 }
 
 /** Get the UnoCSS generator, return `null` if the presets are empty. */
@@ -292,8 +303,11 @@ export async function getFiles(
   return list;
 }
 
-/* read source code from fs/cdn/cache */
-export async function readCode(specifier: string): Promise<[code: string, contentType: string]> {
+/* fetch source code from fs/cdn/cache */
+export async function fetchCode(
+  specifier: string,
+  target?: TransformOptions["target"],
+): Promise<[code: string, contentType: string]> {
   const config = getAlephConfig();
   if (util.isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
@@ -301,8 +315,7 @@ export async function readCode(specifier: string): Promise<[code: string, conten
       return [await Deno.readTextFile("." + url.pathname), getContentType(url.pathname)];
     }
     if (url.hostname === "esm.sh") {
-      const target = config?.build?.target ?? "es2022";
-      if (!url.pathname.includes(`/${target}/`) && !url.searchParams.has("target")) {
+      if (target && !url.pathname.includes(`/${target}/`) && !url.searchParams.has("target")) {
         url.searchParams.set("target", target);
       }
     }
@@ -332,81 +345,31 @@ async function findConfigFile(filenames: string[], appDir?: string): Promise<str
 /** Load the JSX config base the given import maps and the existing deno config. */
 export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
   const jsxConfig: JSXConfig = {};
-  const importMap = await globalIt("__ALEPH_IMPORT_MAP", () => loadImportMap(appDir));
   const denoConfigFile = await findConfigFile(["deno.jsonc", "deno.json", "tsconfig.json"], appDir);
   if (denoConfigFile) {
     try {
       const { compilerOptions } = await parseJSONFile(denoConfigFile);
-      const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
+      const { jsx, jsxFactory, jsxFragmentFactory, jsxImportSource } = (compilerOptions || {}) as Record<
+        string,
+        unknown
+      >;
       if (
         (jsx === undefined || jsx === "react-jsx" || jsx === "react-jsxdev") &&
         util.isFilledString(jsxImportSource)
       ) {
         jsxConfig.jsxImportSource = jsxImportSource;
-        jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
-      } else if (jsx === undefined || jsx === "react") {
-        jsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
+      } else {
+        if (typeof jsxFactory === "string") {
+          jsxConfig.jsxPragma = jsxFactory;
+        }
+        if (typeof jsxFragmentFactory === "string") {
+          jsxConfig.jsxPragmaFrag = jsxFragmentFactory;
+        }
       }
     } catch (error) {
       log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
     }
-  } else if (Deno.env.get("ALEPH_DEV_ROOT")) {
-    const jsonFile = join(Deno.env.get("ALEPH_DEV_ROOT")!, "deno.json");
-    const { compilerOptions } = await parseJSONFile(jsonFile);
-    const { jsx, jsxImportSource, jsxFactory } = (compilerOptions || {}) as Record<string, unknown>;
-    if (
-      (jsx === undefined || jsx === "react-jsx" || jsx === "react-jsxdev") &&
-      util.isFilledString(jsxImportSource)
-    ) {
-      jsxConfig.jsxImportSource = jsxImportSource;
-      jsxConfig.jsxRuntime = jsxImportSource.includes("preact") ? "preact" : "react";
-    } else if (jsx === undefined || jsx === "react") {
-      jsxConfig.jsxRuntime = jsxFactory === "h" ? "preact" : "react";
-    }
   }
-
-  let fuzzRuntimeUrl: string | null = null;
-
-  for (const url of Object.values(importMap.imports)) {
-    let m = url.match(/^https?:\/\/esm\.sh\/(p?react)@(\d+\.\d+\.\d+(-[a-z\d.]+)*)(\?|$)/);
-    if (!m) {
-      m = url.match(/^https?:\/\/esm\.sh\/(p?react)@.+/);
-    }
-    if (m) {
-      const { searchParams } = new URL(url);
-      if (searchParams.has("pin")) {
-        jsxConfig.jsxRuntimeCdnVersion = util.trimPrefix(searchParams.get("pin")!, "v");
-      }
-      if (!jsxConfig.jsxRuntime) {
-        jsxConfig.jsxRuntime = m[1] as "react" | "preact";
-      }
-      if (m[2]) {
-        jsxConfig.jsxRuntimeVersion = m[2];
-        if (jsxConfig.jsxImportSource) {
-          jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${m[2]}`;
-        }
-      } else {
-        fuzzRuntimeUrl = url;
-      }
-      break;
-    }
-  }
-
-  // get acctual react version from esm.sh
-  if (fuzzRuntimeUrl) {
-    log.info(`Checking ${jsxConfig.jsxRuntime} version...`);
-    const text = await fetch(fuzzRuntimeUrl).then((resp) => resp.text());
-    const m = text.match(/https?:\/\/cdn\.esm\.sh\/(v\d+)\/p?react@(\d+\.\d+\.\d+(-[a-z\d.]+)*)\//);
-    if (m) {
-      jsxConfig.jsxRuntimeCdnVersion = m[1].slice(1);
-      jsxConfig.jsxRuntimeVersion = m[2];
-      if (jsxConfig.jsxImportSource) {
-        jsxConfig.jsxImportSource = `https://esm.sh/${jsxConfig.jsxRuntime}@${m[2]}`;
-      }
-      log.info(`${jsxConfig.jsxRuntime}@${jsxConfig.jsxRuntimeVersion} is used`);
-    }
-  }
-
   return jsxConfig;
 }
 
@@ -424,12 +387,15 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
         const alephPkgUri = getAlephPkgUri();
         if (alephPkgUri === "https://aleph") {
           Object.assign(imports, {
-            "@unocss/": `${alephPkgUri}/lib/@unocss/`,
-            "aleph/": `${alephPkgUri}/`,
-            "aleph/server": `${alephPkgUri}/server/mod.ts`,
-            "aleph/dev": `${alephPkgUri}/server/dev.ts`,
-            "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
-            "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
+            "@unocss/": "https://aleph/lib/@unocss/",
+            "aleph/": "https://aleph/",
+            "aleph/server": "https://aleph/server/mod.ts",
+            "aleph/dev": "https://aleph/server/dev.ts",
+            "aleph/react": "https://aleph/framework/react/mod.ts",
+            "aleph/react-ssr": "https://aleph/framework/react/ssr.ts",
+            "aleph/react-client": "https://aleph/framework/react/client.ts",
+            "aleph/vue": "https://aleph/framework/vue/mod.ts",
+            "aleph/vue-ssr": "https://aleph/framework/vue/ssr.ts",
           });
         }
       }

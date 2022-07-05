@@ -21,7 +21,6 @@ export type RenderOptions = {
   indexHtml: Uint8Array;
   routeConfig: RouteConfig | null;
   customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
-  isDev?: boolean;
   ssr?: SSR;
 };
 
@@ -30,10 +29,11 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* st
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routeConfig, customHTMLRewriter, isDev, ssr } = options;
+    const { indexHtml, routeConfig, customHTMLRewriter, ssr } = options;
     const headers = new Headers(ctx.headers as Headers);
     let ssrRes: SSRResult | null = null;
     if (typeof ssr === "function" || typeof ssr?.render === "function") {
+      const isDev = Deno.env.get("ALEPH_ENV") === "development";
       const isFn = typeof ssr === "function";
       const dataDefer = isFn ? false : !!ssr.dataDefer;
       const cc = !isFn ? ssr.cacheControl : "public";
@@ -89,7 +89,7 @@ export default {
             }
           }
           if (css) {
-            const buildTime = performance.now() - start;
+            const buildTime = (performance.now() - start).toFixed(2);
             headCollection.push(
               `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.41.2/tailwind.css">`,
               `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
@@ -113,7 +113,7 @@ export default {
       };
       if (!isDev && CSP) {
         const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
-        const policy = CSP.getPolicy(url, nonce!);
+        const policy = CSP.getPolicy(url, nonce);
         if (policy) {
           headers.append("Content-Security-Policy", policy);
           if (policy.includes("nonce-" + nonce)) {

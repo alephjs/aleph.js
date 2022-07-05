@@ -30,8 +30,8 @@ declare function loaderImport(url: string, options?: Record<string, unknown>): P
 
 declare interface ImportMeta {
   readonly hot?: {
-    watchFile: (filename: string, callback: () => void) => () => void;
-    accept: (callback?: (module: unknown) => void) => void;
-    decline: (delay?: number) => void;
+    accept<T = unknown>(callback?: (module: T) => void): void;
+    decline(options?: { delay?: number }): void;
+    watchFile(filename: string, callback: () => void): () => void;
   };
 }

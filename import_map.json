@@ -6,11 +6,14 @@
     "aleph/server": "./server/mod.ts",
     "aleph/dev": "./server/dev.ts",
     "aleph/react": "./framework/react/mod.ts",
+    "aleph/react-client": "./framework/react/client.ts",
+    "aleph/react-ssr": "./framework/react/ssr.ts",
     "aleph/vue": "./framework/vue/mod.ts",
+    "aleph/vue-ssr": "./framework/vue/ssr.ts",
     "aleph/vue-loader": "./loaders/vue.ts",
-    "react": "https://esm.sh/react@18.1.0",
-    "react-dom": "https://esm.sh/react-dom@18.1.0",
-    "react-dom/": "https://esm.sh/react-dom@18.1.0/",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
     "vue": "https://esm.sh/vue@3.2.37",
     "vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.37"
   }

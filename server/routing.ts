@@ -12,15 +12,15 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   let mod: Record<string, unknown>;
   if (
     Deno.env.get("ALEPH_ENV") !== "development" &&
-    (config?.routeModules && pattern.pathname in config.routeModules)
+    (config?.routes && pattern.pathname in config.routes)
   ) {
-    mod = config.routeModules[pattern.pathname];
+    mod = config.routes[pattern.pathname];
   } else {
     const version = graph.get(filename)?.version;
     const devPort = Deno.env.get("ALEPH_DEV_SERVER_PORT");
     let url: string;
     if (devPort) {
-      url = `http://localhost:${devPort}${filename.slice(1)}?ssr${version ? "&v=" + version.toString(36) : ""}`;
+      url = `http://localhost:${devPort}${filename.slice(1)}?ssr&v=${(version ?? graph.globalVersion).toString(36)}`;
     } else {
       const root = appDir ?? (config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
       url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
@@ -102,8 +102,8 @@ export function isRouteFile(filename: string): boolean {
     return true;
   }
   const config = getAlephConfig();
-  if (config && config.routes) {
-    const reg = toRouteRegExp(config.routes);
+  if (config?.routeGlob) {
+    const reg = toRouteRegExp(config.routeGlob);
     return reg.test(filename);
   }
   return false;

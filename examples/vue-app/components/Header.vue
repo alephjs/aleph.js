@@ -4,7 +4,7 @@ import { Link } from "aleph/vue";
 
 <template>
   <header>
-    <div class="header-wrapper">
+    <div>
       <h1>
         <Link to="/">
         <svg viewBox="0 0 60 12.09" fill="currentColor">
@@ -54,7 +54,7 @@ import { Link } from "aleph/vue";
   </header>
 </template>
 
-<style>
+<style scoped>
 header {
   width: 100%;
   height: 80px;
@@ -62,7 +62,7 @@ header {
   top: 0;
 }
 
-header .header-wrapper {
+header > div {
   margin: 0 auto;
   width: 90%;
   max-width: 900px;
@@ -72,35 +72,35 @@ header .header-wrapper {
   justify-content: space-between;
 }
 
-header h1 a {
+h1 a {
   color: #333;
 }
 
-header h1 svg {
+h1 a svg {
   width: auto;
   height: 16px;
 }
 
-header nav {
+nav {
   display: flex;
   align-items: center;
   gap: 20px
 }
 
-header nav a {
+nav a {
   color: #454545;
 }
 
-header nav a svg {
+nav a svg {
   width: 20px;
   height: 20px;
 }
 
-header a svg {
+a svg {
   display: inline-flex;
 }
 
-header a:hover {
+a:hover {
   color: #000 !important;
 }
 </style>

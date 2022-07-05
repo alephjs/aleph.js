@@ -23,10 +23,10 @@ You will need [Deno](https://deno.land/) 1.20+.
 
 ```bash
 # run the example app in development mode
-deno run -A examples/*/dev.ts
+deno run -A examples/$APP/dev.ts
 
 # run the example app in production mode
-deno run -A examples/*/server.{ts|tsx}
+deno run -A examples/$APP/server.ts
 ```
 
 **Examples**: https://github.com/alephjs/aleph.js/tree/main/examples

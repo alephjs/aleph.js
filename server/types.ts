@@ -8,30 +8,14 @@ export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
 export type AlephConfig = {
   /** The base url of the server. */
   baseUrl?: string;
-  /** The build options for compiler. */
-  build?: BuildOptions;
   /** The glob for the file-system based routing.  */
-  routes?: string;
-  /** The pre-imported modules of routing,  */
-  routeModules?: Record<string, Record<string, unknown>>;
+  routeGlob?: string;
+  /** The pre-built routes.  */
+  routes?: Record<string, Record<string, unknown>>;
   /** The config for UnoCSS. */
   unocss?: UnoConfig & { test?: RegExp };
   /** The module loaders. */
   loaders?: ModuleLoader[];
-};
-
-/** The build options for compiler. */
-export type BuildOptions = {
-  /** The build target passes to esbuild. default is "es2020" */
-  target?:
-    | "es2015"
-    | "es2016"
-    | "es2017"
-    | "es2018"
-    | "es2019"
-    | "es2020"
-    | "es2021"
-    | "es2022";
 };
 
 export interface FetchHandler {
@@ -121,16 +105,16 @@ export type ImportMap = {
 };
 
 export type JSXConfig = {
-  jsxRuntime?: "react" | "preact";
+  jsxPragma?: string;
+  jsxPragmaFrag?: string;
   jsxImportSource?: string;
-  jsxRuntimeVersion?: string;
-  jsxRuntimeCdnVersion?: string;
 };
 
 export type ModuleLoaderEnv = {
   importMap?: ImportMap;
   jsxConfig?: JSXConfig;
   isDev?: boolean;
+  sourceMap?: boolean;
   ssr?: boolean;
 };
 

@@ -8,9 +8,9 @@ import {
   fixResponse,
   getAlephPkgUri,
   getDeploymentId,
+  getImportMap,
+  getJSXConfig,
   globalIt,
-  loadImportMap,
-  loadJSXConfig,
   regFullVersion,
   toLocalPath,
 } from "./helpers.ts";
@@ -49,15 +49,14 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 export function serve(options: ServerOptions = {}) {
   const {
     baseUrl,
-    build,
     fetch,
     middlewares,
     loaders,
-    onError,
+    routeGlob,
     routes,
-    routeModules,
     ssr,
     unocss,
+    onError,
   } = options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
@@ -67,20 +66,13 @@ export function serve(options: ServerOptions = {}) {
     log.setLevel(options.logLevel);
   }
 
-  // inject config to global
-  const config: AlephConfig = {
-    baseUrl,
-    build,
-    routes,
-    routeModules,
-    unocss,
-    loaders,
-  };
+  // inject the config to global
+  const config: AlephConfig = { baseUrl, routeGlob, routes, unocss, loaders };
   Reflect.set(globalThis, "__ALEPH_CONFIG", config);
-  if (
-    !isDev && routeModules && util.isFilledArray(routeModules.depGraph?.modules)
-  ) {
-    routeModules.depGraph.modules.forEach((module) => {
+
+  // restore the dependency graph from the re-import route modules
+  if (!isDev && routes && util.isFilledArray(routes.depGraph?.modules)) {
+    routes.depGraph.modules.forEach((module) => {
       depGraph.mark(module.specifier, module);
     });
   }
@@ -159,17 +151,9 @@ export function serve(options: ServerOptions = {}) {
         (loader = loaders?.find((l) => l.test(pathname))))
     ) {
       try {
-        const importMap = await globalIt(
-          "__ALEPH_IMPORT_MAP",
-          () => loadImportMap(appDir),
-        );
-        const jsxConfig = await globalIt(
-          "__ALEPH_JSX_CONFIG",
-          () => loadJSXConfig(appDir),
-        );
+        const importMap = await getImportMap(appDir);
+        const jsxConfig = await getJSXConfig(appDir);
         return await clientModuleTransformer.fetch(req, {
-          buildTarget: options.build?.target,
-          isDev,
           importMap,
           jsxConfig,
           loader,
@@ -291,7 +275,7 @@ export function serve(options: ServerOptions = {}) {
     // request route api
     const routeConfig: RouteConfig | null = await globalIt(
       "__ALEPH_ROUTE_CONFIG",
-      () => routes ? initRoutes(routes, appDir) : Promise.resolve(null),
+      () => routeGlob ? initRoutes(routeGlob, appDir) : Promise.resolve(null),
     );
     if (routeConfig && routeConfig.routes.length > 0) {
       const reqData = req.method === "GET" &&
@@ -367,7 +351,6 @@ export function serve(options: ServerOptions = {}) {
         indexHtml,
         routeConfig,
         customHTMLRewriter,
-        isDev,
         ssr,
       });
     } catch (err) {
@@ -413,14 +396,7 @@ export function serve(options: ServerOptions = {}) {
       options.onListen?.(arg);
     };
     if (useTls) {
-      serveTls(handler, {
-        hostname,
-        port,
-        certFile,
-        keyFile,
-        signal,
-        onListen,
-      });
+      serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
     } else {
       stdServe(handler, { hostname, port, signal, onListen });
     }
