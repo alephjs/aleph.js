@@ -16,12 +16,13 @@ import { initRoutes, toRouteRegExp } from "./routing.ts";
 import type { AlephConfig, ConnInfo, ModuleLoader, RouteConfig } from "./types.ts";
 
 type WatchFsEvents = {
-  [key in "create" | "remove" | `modify:${string}` | `hotUpdate:${string}`]: {
+  [key in "create" | "remove" | "modify" | `modify:${string}` | `hotUpdate:${string}`]: {
     specifier: string;
   };
 };
 
 const watchFsEmitters = new Set<Emitter<WatchFsEvents>>();
+const defaultEmitter = createWatchFsEmitter();
 
 /** Create a `watchFs` emitter. */
 export function createWatchFsEmitter() {
@@ -76,12 +77,11 @@ export default async function dev(options?: DevOptions) {
     await bootstrap(ac.signal, serverEntry, appDir);
   };
 
-  const emitter = createWatchFsEmitter();
-  emitter.on(`modify:./${basename(serverEntry)}`, start);
+  defaultEmitter.on(`modify:./${basename(serverEntry)}`, start);
   // todo: watch server deps to restart the server
 
   // update global route config when fs changess
-  emitter.on("*", async (kind, { specifier }) => {
+  defaultEmitter.on("*", async (kind, { specifier }) => {
     const config = getAlephConfig();
     if (config) {
       if (config.routeGlob) {
@@ -116,6 +116,7 @@ export default async function dev(options?: DevOptions) {
     }
     if (kind === "modify") {
       watchFsEmitters.forEach((e) => {
+        e.emit("modify", { specifier });
         e.emit(`modify:${specifier}`, { specifier });
         if (e.all.has(`hotUpdate:${specifier}`)) {
           e.emit(`hotUpdate:${specifier}`, { specifier });
@@ -129,7 +130,7 @@ export default async function dev(options?: DevOptions) {
         }
       });
     } else {
-      emitter.emit(kind, { specifier });
+      watchFsEmitters.forEach((e) => e.emit(kind, { specifier }));
     }
   });
 

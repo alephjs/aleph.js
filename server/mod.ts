@@ -334,19 +334,43 @@ export function serve(options: ServerOptions = {}) {
         return new Response("Not found", { status: 404 });
     }
 
-    // render html
-    try {
-      const indexHtml = await globalIt(
-        "__ALEPH_INDEX_HTML",
-        () =>
-          loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
-            ssr: typeof ssr === "function" ? {} : ssr,
-            hmr: isDev ? { url: Deno.env.get("ALEPH_HMR_WS_URL") } : undefined,
-          }),
-      );
-      if (!indexHtml) {
-        return new Response("Not found", { status: 404 });
+    const indexHtml = await globalIt(
+      "__ALEPH_INDEX_HTML",
+      () =>
+        loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
+          ssr: typeof ssr === "function" ? {} : ssr,
+          hmr: isDev ? { url: Deno.env.get("ALEPH_HMR_WS_URL") } : undefined,
+        }),
+    );
+    if (!indexHtml) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    if (!ssr) {
+      const deployId = getDeploymentId();
+      let etag: string | undefined;
+      if (deployId) {
+        etag = `W/${btoa("./index.html").replace(/[^a-z0-9]/g, "")}-${deployId}`;
+      } else {
+        const { mtime, size } = await Deno.lstat("./index.html");
+        if (mtime) {
+          etag = `W/${mtime.getTime().toString(16)}-${size.toString(16)}`;
+          ctx.headers.set("Last-Modified", new Date(mtime).toUTCString());
+        }
       }
+      if (etag) {
+        if (req.headers.get("If-None-Match") === etag) {
+          return new Response(null, { status: 304 });
+        }
+        ctx.headers.set("ETag", etag);
+      }
+      ctx.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+      ctx.headers.set("Content-Type", "text/html; charset=utf-8");
+      return new Response(indexHtml, { headers: ctx.headers });
+    }
+
+    // SSR
+    try {
       return renderer.fetch(req, ctx, {
         indexHtml,
         routeConfig,

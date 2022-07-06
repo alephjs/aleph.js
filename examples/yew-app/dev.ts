@@ -2,8 +2,8 @@ import dev, { createWatchFsEmitter } from "aleph/dev";
 import { build } from "./build.ts";
 
 const emitter = createWatchFsEmitter();
-emitter.on("*", (kind, { specifier }) => {
-  if (kind.startsWith("modify:") && specifier.endsWith(".rs")) {
+emitter.on("modify", ({ specifier }) => {
+  if (specifier.endsWith(".rs")) {
     build();
   }
 });
