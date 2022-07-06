@@ -21,10 +21,10 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assert(html.includes(`<header style=`));
     assert(html.includes(`<title ssr>Aleph.js</title>`));
     assert(html.includes(`<meta name="description" content="The Fullstack Framework in Deno." ssr>`));
-    assert(html.includes(`<h1>The Fullstack Framework in Deno.</h1>`));
-    assert(html.includes(`<a role="button" href="/todos" aria-current="page">Todos App Demo</a>`));
+    assert(html.includes(`The Fullstack Framework in Deno.</h1>`));
+    assert(html.includes(` href="/todos" `));
+    assert(html.includes(`>Todos App Demo</a>`));
     assert(html.includes(`<link rel="icon" href="/assets/logo.svg">`));
-    assert(html.includes(`<link rel="stylesheet" href="/style/app.css">`));
     assert(html.includes(`<script type="module" src="/main.tsx"></script>`));
     assert(html.includes(`<script id="routes-manifest" type="application/json">`));
     assert(html.includes(`<script id="ssr-modules" type="application/json">`));
@@ -65,9 +65,9 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertEquals(res.status, 200);
     assertEquals(res.headers.get("Content-Type"), "text/html; charset=utf-8");
     assert(html.includes(`<title ssr>Todos</title>`));
-    assert(html.includes(`<header style=`));
-    assert(html.includes(`<div class="todos-app"><h1><span>Todos</span><em>1`));
-    assert(html.includes(`<label class="completed">Better Call Saul!</label>`));
+    assert(html.includes(`<header style="`));
+    assert(html.includes(`>1</em>`));
+    assert(html.includes(`Better Call Saul!</label>`));
   });
 
   await t.step("API DELETE /todos", async () => {
@@ -92,6 +92,6 @@ Deno.test("[integration] examples/react-app", async (t) => {
     const html = await res.text();
     assertEquals(res.status, 404);
     assertEquals(res.headers.get("Content-Type"), "text/html; charset=utf-8");
-    assert(html.includes(`<h2>Ooooooops, nothing here!</h2>`));
+    assert(html.includes(`>Ooooooops, nothing here!</h2>`));
   });
 });
