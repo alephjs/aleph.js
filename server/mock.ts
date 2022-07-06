@@ -91,6 +91,11 @@ export class MockServer {
       return new Response("Not found", { status: 404 });
     }
 
+    if (!ssr) {
+      ctx.headers.set("Content-Type", "text/html; charset=utf-8");
+      return new Response(this.#indexHtml, { headers: ctx.headers });
+    }
+
     return renderer.fetch(req, ctx, {
       indexHtml: this.#indexHtml,
       routeConfig: this.#routeConfig,
