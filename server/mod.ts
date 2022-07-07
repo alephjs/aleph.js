@@ -264,7 +264,8 @@ export function serve(options: ServerOptions = {}) {
       () => routeGlob ? initRoutes(routeGlob, appDir) : Promise.resolve(null),
     );
     if (routeConfig && routeConfig.routes.length > 0) {
-      const reqData = req.method === "GET" && searchParams.has("_data_");
+      const reqData = req.method === "GET" &&
+        (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       try {
         const resp = await fetchRouteData(req, ctx, routeConfig, reqData);
         if (resp) {

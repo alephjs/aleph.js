@@ -81,7 +81,8 @@ export class MockServer {
       });
     }
 
-    const reqData = req.method === "GET" && url.searchParams.has("_data_");
+    const reqData = req.method === "GET" &&
+      (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
     const res = await fetchRouteData(req, ctx, this.#routeConfig, reqData);
     if (res) {
       return res;
