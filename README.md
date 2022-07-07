@@ -24,6 +24,7 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 ## Real-world Apps
 
 - Deno Deploy: https://dash.deno.com
+- Meet Me: https://meet-me.deno.dev ([source](https://github.com/denoland/meet-me))
 
 ## Get started
 
@@ -45,9 +46,6 @@ deno task dev
 
 # run the app in production mode
 deno task start
-
-# build the app for severless deployment
-deno task build
 ```
 
 ## Documentation
