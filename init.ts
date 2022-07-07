@@ -52,7 +52,7 @@ export default async function init(nameArg?: string, template?: string) {
   // check the dir is clean
   if (
     !(await isFolderEmpty(Deno.cwd(), name)) &&
-    !confirm(`Folder ${blue(name)} already exists, continue?`)
+    !(await confirm(`Folder ${blue(name)} already exists, continue?`))
   ) {
     Deno.exit(1);
   }
@@ -166,7 +166,7 @@ export default async function init(nameArg?: string, template?: string) {
     ),
   ]);
 
-  if (confirm("Initialize VS Code workspace configuration?")) {
+  if (await confirm("Initialize VS Code workspace configuration?")) {
     const settigns = {
       "deno.enable": true,
       "deno.lint": true,
@@ -178,6 +178,13 @@ export default async function init(nameArg?: string, template?: string) {
       JSON.stringify(settigns, undefined, 2),
     );
   }
+
+  await Deno.run({
+    cmd: [Deno.execPath(), "cache", "server.ts"],
+    cwd: appDir,
+    stderr: "inherit",
+    stdout: "inherit",
+  }).status();
 
   console.log([
     "",
@@ -204,6 +211,21 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
       files.every((file) => [".DS_Store"].includes(file));
   }
   return true;
+}
+
+async function ask(question = ":", stdin = Deno.stdin, stdout = Deno.stdout) {
+  await stdout.write(new TextEncoder().encode(question + " "));
+  const buf = new Uint8Array(1024);
+  const n = <number> await stdin.read(buf);
+  const answer = new TextDecoder().decode(buf.subarray(0, n));
+  return answer.trim();
+}
+
+async function confirm(question = "are you sure?") {
+  let a: string;
+  // deno-lint-ignore no-empty
+  while (!/^(y|n|)$/i.test(a = (await ask(question + dim(" [y/n]"))).trim())) {}
+  return a.toLowerCase() === "y";
 }
 
 if (import.meta.main) {
