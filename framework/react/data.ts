@@ -212,7 +212,9 @@ function send(method: HttpMethod, href: string, data: unknown): Promise<Response
       headers.append("Content-Type", "application/json; charset=utf-8");
     }
   }
-  return fetch(href, { method, body, headers });
+  // NOTE: RFC 2616 section 5.1.1 and RFC 7231 section 4.1 state that the method
+  // token is case-sensitive, and all tokens are by convention all-uppercase.
+  return fetch(href, { method: method.toUpperCase(), body, headers });
 }
 
 function shallowClone<T>(obj: T): T {
