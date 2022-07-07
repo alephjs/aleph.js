@@ -1,5 +1,5 @@
 import type { ReactNode, ReactPortal } from "react";
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { RouterContext } from "./context.ts";
 
 /**
@@ -14,49 +14,56 @@ import { RouterContext } from "./context.ts";
  *  ```
  */
 export function usePortal(
-  props?: { key: string | null; className?: string; preventScroll?: boolean },
-): (el: ReactNode) => ReactPortal | null {
-  const { key, className, preventScroll } = props || {};
+  props?: { key?: string | null; className?: string; lockScroll?: boolean; isDialog?: boolean },
+): (children: ReactNode) => ReactPortal | null {
+  const { className, lockScroll, isDialog, key } = props || {};
   const { createPortal } = useContext(RouterContext);
-  const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    const bs = document.body.style;
-    const pof = bs.overflow;
-    const pofX = bs.overflowX;
-    const pofY = bs.overflowY;
-    if (preventScroll) {
-      bs.overflow = "hidden";
-      bs.overflowX = "hidden";
-      bs.overflowY = "hidden";
-    }
-
-    const portalRoot = document.createElement("div");
+    const { body } = document;
+    const portalRoot = document.createElement(isDialog ? "dialog" : "div");
     if (key) {
       portalRoot.id = key;
     }
-    portalRoot.className = className ?? "portal-root";
-    document.body.appendChild(portalRoot);
+    if (className) {
+      portalRoot.className = className;
+    }
+    if (lockScroll) {
+      body.style.overflow = "hidden";
+    }
+    body.appendChild(portalRoot);
     setPortalRoot(portalRoot);
+
+    if (isDialog) {
+      Object.assign(portalRoot.style, {
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "transparent",
+      });
+      /* @ts-ignore */
+      portalRoot.showModal?.();
+    }
 
     return () => {
       setPortalRoot(null);
-      document.body.removeChild(portalRoot);
-      if (preventScroll) {
-        bs.overflow = pof;
-        bs.overflowX = pofX;
-        bs.overflowY = pofY;
+      body.removeChild(portalRoot);
+      if (lockScroll) {
+        body.style.overflow = "";
       }
     };
-  }, [key, className, preventScroll]);
+  }, [key, className, lockScroll, isDialog]);
 
-  if (!portalRoot) {
-    return () => null;
-  }
-
-  if (!createPortal) {
-    throw new Error("Please ensure to pass the `React.createPortal` in `Router` props");
-  }
-
-  return (el: ReactNode) => createPortal(el, portalRoot, key);
+  return useCallback(
+    (chlidren: ReactNode) => {
+      if (!portalRoot) {
+        return null;
+      }
+      if (!createPortal) {
+        throw new Error("Please ensure to pass the `React.createPortal` in `Router` props");
+      }
+      return createPortal(chlidren, portalRoot, key);
+    },
+    [portalRoot, createPortal, key],
+  );
 }
