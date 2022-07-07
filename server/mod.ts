@@ -18,7 +18,7 @@ import { loadAndFixIndexHtml } from "./html.ts";
 import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
-import clientModuleTransformer from "./transformer.ts";
+import transformer from "./transformer.ts";
 import type {
   AlephConfig,
   ConnInfo,
@@ -47,17 +47,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const {
-    baseUrl,
-    fetch,
-    middlewares,
-    loaders,
-    routeGlob,
-    routes,
-    ssr,
-    unocss,
-    onError,
-  } = options;
+  const { baseUrl, fetch, middlewares, loaders, routeGlob, routes, ssr, unocss, onError } = options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
@@ -96,12 +86,9 @@ export function serve(options: ServerOptions = {}) {
       return response;
     }
 
-    const postMiddlewares: Middleware[] = [];
-    const customHTMLRewriter: [
-      selector: string,
-      handlers: HTMLRewriterHandlers,
-    ][] = [];
+    const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
     const ctx = createContext(req, { connInfo, customHTMLRewriter });
+    const postMiddlewares: Middleware[] = [];
 
     // use eager middlewares
     if (Array.isArray(middlewares)) {
@@ -147,13 +134,14 @@ export function serve(options: ServerOptions = {}) {
     let loader: ModuleLoader | undefined;
     if (
       !searchParams.has("raw") &&
-      (clientModuleTransformer.test(pathname) ||
-        (loader = loaders?.find((l) => l.test(pathname))))
+      (transformer.test(pathname) || (loader = loaders?.find((l) => l.test(pathname))))
     ) {
       try {
-        const importMap = await getImportMap(appDir);
-        const jsxConfig = await getJSXConfig(appDir);
-        return await clientModuleTransformer.fetch(req, {
+        const [importMap, jsxConfig] = await Promise.all([
+          getImportMap(appDir),
+          getJSXConfig(appDir),
+        ]);
+        return await transformer.fetch(req, {
           importMap,
           jsxConfig,
           loader,
@@ -187,9 +175,7 @@ export function serve(options: ServerOptions = {}) {
 
     // serve static files
     const contentType = getContentType(pathname);
-    if (
-      !pathname.startsWith("/.") && contentType !== "application/octet-stream"
-    ) {
+    if (!pathname.startsWith("/.") && contentType !== "application/octet-stream") {
       try {
         let filePath = appDir ? join(appDir, pathname) : `.${pathname}`;
         let stat = await Deno.lstat(filePath);
@@ -346,6 +332,7 @@ export function serve(options: ServerOptions = {}) {
       return new Response("Not found", { status: 404 });
     }
 
+    // return index.html
     if (!ssr) {
       const deployId = getDeploymentId();
       let etag: string | undefined;
@@ -371,7 +358,7 @@ export function serve(options: ServerOptions = {}) {
 
     // SSR
     try {
-      return renderer.fetch(req, ctx, {
+      return await renderer.fetch(req, ctx, {
         indexHtml,
         routeConfig,
         customHTMLRewriter,
