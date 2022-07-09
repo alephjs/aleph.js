@@ -134,7 +134,7 @@ export default function Todos() {
       >
         <input
           type="text"
-          className="block w-full py-2 px-4 text-2xl font-300 placeholder:italic placeholder:text-gray-400 bg-gray-50 rounded-lg"
+          className="block w-full py-2 px-4 text-2xl font-300 placeholder:italic placeholder:text-gray-400 bg-gray-50 rounded-lg outline-none"
           name="message"
           placeholder="What needs to be done?"
           autoFocus

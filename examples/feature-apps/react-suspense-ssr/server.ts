@@ -6,8 +6,7 @@ import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  routeGlob: "./routes/**/*.tsx",
-  routes,
+  router: { glob: "./routes/**/*.tsx", routes },
   ssr: {
     dataDefer: true,
     render,

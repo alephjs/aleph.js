@@ -3,12 +3,12 @@ import { join } from "./deps.ts";
 import { loadAndFixIndexHtml } from "./html.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, initRoutes } from "./routing.ts";
-import type { HTMLRewriterHandlers, Middleware, RouteConfig, SSR } from "./types.ts";
+import type { HTMLRewriterHandlers, Middleware, RouteConfig, RouterInit, SSR } from "./types.ts";
 
 type MockServerOptions = {
+  router: RouterInit;
   appDir?: string;
   origin?: string;
-  routeGlob: string;
   middlewares?: Middleware[];
   ssr?: SSR;
 };
@@ -42,7 +42,7 @@ export class MockServer {
   }
 
   async fetch(input: string, init?: RequestInit) {
-    const { middlewares, ssr, origin, routeGlob, appDir } = this.#options;
+    const { middlewares, ssr, origin, router, appDir } = this.#options;
     const url = new URL(input, origin ?? "http://localhost/");
     const req = new Request(url.href, init);
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
@@ -73,7 +73,7 @@ export class MockServer {
     }
 
     if (!this.#routeConfig) {
-      this.#routeConfig = await initRoutes(routeGlob, appDir);
+      this.#routeConfig = await initRoutes(router, appDir);
     }
     if (!this.#indexHtml) {
       this.#indexHtml = await loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {

@@ -47,7 +47,7 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const { baseUrl, fetch, middlewares, loaders, routeGlob, routes, ssr, unocss, onError } = options;
+  const { baseUrl, fetch, middlewares, loaders, router, ssr, unocss, onError } = options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
@@ -57,12 +57,12 @@ export function serve(options: ServerOptions = {}) {
   }
 
   // inject the config to global
-  const config: AlephConfig = { baseUrl, routeGlob, routes, unocss, loaders };
+  const config: AlephConfig = { baseUrl, router, unocss, loaders };
   Reflect.set(globalThis, "__ALEPH_CONFIG", config);
 
   // restore the dependency graph from the re-import route modules
-  if (!isDev && routes && util.isFilledArray(routes.depGraph?.modules)) {
-    routes.depGraph.modules.forEach((module) => {
+  if (!isDev && router && router.routes && util.isFilledArray(router.routes.depGraph?.modules)) {
+    router.routes.depGraph.modules.forEach((module) => {
       depGraph.mark(module.specifier, module);
     });
   }
@@ -261,7 +261,7 @@ export function serve(options: ServerOptions = {}) {
     // request route api
     const routeConfig: RouteConfig | null = await globalIt(
       "__ALEPH_ROUTE_CONFIG",
-      () => routeGlob ? initRoutes(routeGlob, appDir) : Promise.resolve(null),
+      () => router ? initRoutes(router, appDir) : Promise.resolve(null),
     );
     if (routeConfig && routeConfig.routes.length > 0) {
       const reqData = req.method === "GET" &&

@@ -8,21 +8,24 @@ export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
 export type AlephConfig = {
   /** The base url of the server. */
   baseUrl?: string;
-  /** The glob for the file-system based routing.  */
-  routeGlob?: string;
-  /** The pre-built routes.  */
-  routes?: Record<string, Record<string, unknown>>;
+  /** The router options for the file-system based routing. */
+  router?: RouterInit;
   /** The config for UnoCSS. */
   unocss?: UnoConfig & { test?: RegExp };
   /** The module loaders. */
   loaders?: ModuleLoader[];
 };
 
-export interface FetchHandler {
-  (
-    request: Request,
-    context: Record<string, unknown>,
-  ): Promise<Response> | Response;
+/** The router options for the file-system based routing. */
+export interface RouterInit {
+  /** The glob to match routes.  */
+  glob?: string;
+  /** The directory of the FS routing. */
+  dir?: string;
+  /** The extnames to match routes. */
+  exts?: string[];
+  /** The pre-built routes.  */
+  routes?: Record<string, Record<string, unknown>>;
 }
 
 export type CookieOptions = {
@@ -111,17 +114,17 @@ export type JSXConfig = {
 };
 
 export type ModuleLoaderEnv = {
+  isDev?: boolean;
   importMap?: ImportMap;
   jsxConfig?: JSXConfig;
-  isDev?: boolean;
   sourceMap?: boolean;
   ssr?: boolean;
 };
 
 export type ModuleLoaderOutput = {
   code: string;
-  inlineCSS?: string;
   lang?: "js" | "jsx" | "ts" | "tsx";
+  inlineCSS?: string;
   map?: string;
 };
 
@@ -174,6 +177,13 @@ export type SSRResult = {
   nonce?: string;
   is404?: boolean;
 };
+
+export interface FetchHandler {
+  (
+    request: Request,
+    context: Record<string, unknown>,
+  ): Promise<Response> | Response;
+}
 
 export type ErrorHandler = {
   (

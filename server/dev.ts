@@ -71,24 +71,24 @@ export default async function dev(options?: DevOptions) {
   const start = async () => {
     if (ac) {
       ac.abort();
-      log.info(`Restart server...`);
+      log.info(`[dev] Restart server...`);
     }
     ac = new AbortController();
     await bootstrap(ac.signal, serverEntry, appDir);
   };
 
-  defaultEmitter.on(`modify:./${basename(serverEntry)}`, start);
+  defaultEmitter.on(`modify:./${relative(appDir, serverEntry)}`, start);
   // todo: watch server deps to restart the server
 
   // update global route config when fs changess
   defaultEmitter.on("*", async (kind, { specifier }) => {
     const config = getAlephConfig();
     if (config) {
-      if (config.routeGlob) {
+      if (config.router) {
         if (kind === "create" || kind === "remove") {
-          const reg = toRouteRegExp(config.routeGlob);
+          const reg = toRouteRegExp(config.router);
           if (reg.test(specifier)) {
-            const routeConfig = await initRoutes(config.routeGlob, appDir);
+            const routeConfig = await initRoutes(config.router, appDir);
             Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
             generateRoutesExportModule({
               routeConfig,
@@ -102,7 +102,7 @@ export default async function dev(options?: DevOptions) {
     }
   });
 
-  log.info("Watching for file changes...");
+  log.info("[dev] Watching for file changes...");
   watchFs(appDir, (kind: "create" | "remove" | "modify", path: string) => {
     const specifier = "./" + relative(appDir, path).replaceAll("\\", "/");
     // delete global cached index html
@@ -134,13 +134,12 @@ export default async function dev(options?: DevOptions) {
     }
   });
 
-  // generate empty `routes/_export.ts` if not exists
+  // generate empty `./routes/_export.ts` if not exists
   const entryCode = await Deno.readTextFile(serverEntry);
-  const m = entryCode.match(/(\s+)routes:\s*['"`](.+)['"`]/);
+  const m = entryCode.match(/ from "(\.\/.+\/_export.ts)"/);
   if (m) {
-    const reg = toRouteRegExp(m[2]);
-    const exportTs = join(appDir, reg.prefix, "_export.ts");
-    if (entryCode.includes(`from "${reg.prefix}/_exports.ts"`) && !(await existsFile(exportTs))) {
+    const exportTs = join(appDir, m[1]);
+    if (!(await existsFile(exportTs))) {
       await Deno.writeTextFile(exportTs, "export default {}");
     }
   }
@@ -150,7 +149,7 @@ export default async function dev(options?: DevOptions) {
 
 /** Bootstrap the dev server, handle the HMR socket connection. */
 async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __port?: number) {
-  // clean globally cached objects
+  // remove globally cached objects
   Reflect.deleteProperty(globalThis, "__ALEPH_CONFIG");
   Reflect.deleteProperty(globalThis, "__ALEPH_SERVER");
   Reflect.deleteProperty(globalThis, "__ALEPH_ROUTE_CONFIG");
@@ -161,7 +160,7 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
 
   if (Deno.env.get("ALEPH_SERVER_ENTRY") !== entry) {
     Deno.env.set("ALEPH_SERVER_ENTRY", entry);
-    log.info(`Bootstrap server from ${blue(basename(entry))}...`);
+    log.info(`[dev] Bootstrap server from ${blue(basename(entry))}...`);
   }
 
   try {
@@ -177,8 +176,8 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   }
 
   const config = getAlephConfig();
-  if (config?.routeGlob) {
-    const routeConfig = await initRoutes(config.routeGlob, appDir);
+  if (config?.router) {
+    const routeConfig = await initRoutes(config.router, appDir);
     Reflect.set(globalThis, "__ALEPH_ROUTE_CONFIG", routeConfig);
     generateRoutesExportModule({
       routeConfig,
@@ -216,8 +215,8 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
             globalThis,
             "__ALEPH_CONFIG",
           );
-          if (config?.routeGlob) {
-            const reg = toRouteRegExp(config.routeGlob);
+          if (config?.router) {
+            const reg = toRouteRegExp(config.router);
             const routePattern = reg.exec(specifier);
             if (routePattern) {
               send({ type: "create", specifier, routePattern });
@@ -451,6 +450,6 @@ async function generateRoutesExportModule(options: GenerateOptions) {
     await Deno.writeTextFile(genFile, code);
   }
   log.debug(
-    `${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`,
+    `[dev] ${blue(`${routeConfig.prefix}/_export.ts`)} generated in ${Math.round(performance.now() - start)}ms`,
   );
 }

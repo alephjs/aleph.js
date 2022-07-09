@@ -8,8 +8,7 @@ import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  routeGlob: "./routes/**/*.{tsx,ts}",
-  routes,
+  router: { glob: "./routes/**/*.{tsx,ts}", routes },
   unocss: {
     presets: [
       presetUno(),

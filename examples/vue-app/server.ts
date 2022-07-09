@@ -7,8 +7,7 @@ import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  routeGlob: "./routes/**/*.{vue,ts}",
-  routes,
+  router: { glob: "./routes/**/*.{vue,ts}", routes },
   loaders: [new VueLoader()],
   ssr,
 });
