@@ -4,7 +4,9 @@ import { mockFormData, MockServer } from "aleph/server/mock.ts";
 Deno.test("[integration] examples/api-app", async (t) => {
   const api = new MockServer({
     appDir: "./examples/api-app",
-    routeGlob: "./routes/**/*.ts",
+    router: {
+      glob: "./routes/**/*.ts",
+    },
     origin: "https://api.example.com",
   });
 

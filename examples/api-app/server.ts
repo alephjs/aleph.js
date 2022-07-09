@@ -5,6 +5,5 @@ import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  routeGlob: "./routes/**/*.ts",
-  routes,
+  router: { glob: "./routes/**/*.ts", routes },
 });

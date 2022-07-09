@@ -6,7 +6,9 @@ import { renderToReadableStream } from "react-dom/server";
 Deno.test("[integration] examples/react-app", async (t) => {
   const api = new MockServer({
     appDir: "./examples/react-app",
-    routeGlob: "./routes/**/*.{tsx,ts}",
+    router: {
+      glob: "./routes/**/*.{tsx,ts}",
+    },
     ssr: {
       dataDefer: false,
       render: (ctx) => renderToReadableStream(<App ssrContext={ctx} />, ctx),
