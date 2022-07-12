@@ -1,4 +1,4 @@
-import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
+import { URLPatternCompat, type URLPatternInput } from "../runtime/core/url_pattern.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { extname, fromFileUrl, globToRegExp, join, resolve } from "./deps.ts";

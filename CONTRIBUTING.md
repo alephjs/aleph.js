@@ -42,10 +42,10 @@ deno test -A
 ## Project Structure
 
 - **/examples** examples to get started
-- **/framework**
-  - **core** framework core
-  - **react** framework in React
-  - **vue** framework in Vue.js
+- **/runtime**
+  - **core** framework runtime core
+  - **react** framework runtime in React
+  - **vue** framework runtime in Vue.js
 - **/lib** shared libraries
 - **/loaders** builtin loaders
 - **/server** server core of Aleph.js

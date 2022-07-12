@@ -1,6 +1,6 @@
 import { assertEquals } from "std/testing/asserts.ts";
 import { dirname, join } from "std/path/mod.ts";
-import { matchRoutes } from "../framework/core/route.ts";
+import { matchRoutes } from "../runtime/core/route.ts";
 import { initRoutes } from "../server/routing.ts";
 
 Deno.test("[unit] server/routing.ts: matchRoutes", async () => {

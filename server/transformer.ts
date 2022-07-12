@@ -1,4 +1,4 @@
-import { TransformError } from "../framework/core/error.ts";
+import { TransformError } from "../runtime/core/error.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { bundleCSS } from "./bundle.ts";
@@ -201,7 +201,7 @@ export default {
           map = ret.map;
           deps = ret.deps;
         }
-        const styleTs = `${alephPkgUri}/framework/core/style.ts`;
+        const styleTs = `${alephPkgUri}/runtime/core/style.ts`;
         if (isDev && config?.unocss) {
           const { presets, test } = config.unocss;
           if (
@@ -211,11 +211,12 @@ export default {
             try {
               const unoGenerator = getUnoGenerator();
               if (unoGenerator) {
-                const { css } = await unoGenerator.generate(source, {
+                const { css, matched } = await unoGenerator.generate(source, {
                   id: specifier,
+                  preflights: false,
                   minify: !isDev,
                 });
-                if (css) {
+                if (matched.size > 0) {
                   code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
                     JSON.stringify(specifier)
                   }, ${JSON.stringify(css)});\n`;

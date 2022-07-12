@@ -89,10 +89,10 @@ export async function bundleCSS(
     return {
       code: [
         options.hmr &&
-        `import createHotContext from "${alephPkgPath}/framework/core/hmr.ts";`,
+        `import createHotContext from "${alephPkgPath}/runtime/core/hmr.ts";`,
         options.hmr &&
         `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
-        `import { applyCSS } from "${alephPkgPath}/framework/core/style.ts";`,
+        `import { applyCSS } from "${alephPkgPath}/runtime/core/style.ts";`,
         `export const css = ${JSON.stringify(css)};`,
         `export default ${JSON.stringify(cssModulesExports)};`,
         `applyCSS(${JSON.stringify(specifier)}, css);`,

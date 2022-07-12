@@ -390,11 +390,11 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
             "aleph/": "https://aleph/",
             "aleph/server": "https://aleph/server/mod.ts",
             "aleph/dev": "https://aleph/server/dev.ts",
-            "aleph/react": "https://aleph/framework/react/mod.ts",
-            "aleph/react-ssr": "https://aleph/framework/react/ssr.ts",
-            "aleph/react-client": "https://aleph/framework/react/client.ts",
-            "aleph/vue": "https://aleph/framework/vue/mod.ts",
-            "aleph/vue-ssr": "https://aleph/framework/vue/ssr.ts",
+            "aleph/react": "https://aleph/runtime/react/mod.ts",
+            "aleph/react-ssr": "https://aleph/runtime/react/ssr.ts",
+            "aleph/react-client": "https://aleph/runtime/react/client.ts",
+            "aleph/vue": "https://aleph/runtime/vue/mod.ts",
+            "aleph/vue-ssr": "https://aleph/runtime/vue/ssr.ts",
           });
         }
       }

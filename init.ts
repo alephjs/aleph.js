@@ -133,9 +133,9 @@ export default async function init(nameArg?: string, template?: string) {
         "jsxImportSource": `https://esm.sh/react@${versions.react}`,
       });
       Object.assign(importMap.imports, {
-        "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
-        "aleph/react-client": `${alephPkgUri}/framework/react/client.ts`,
-        "aleph/react-ssr": `${alephPkgUri}/framework/react/ssr.ts`,
+        "aleph/react": `${alephPkgUri}/runtime/react/mod.ts`,
+        "aleph/react-client": `${alephPkgUri}/runtime/react/client.ts`,
+        "aleph/react-ssr": `${alephPkgUri}/runtime/react/ssr.ts`,
         "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/react-dom@${versions.react}/`,
@@ -144,8 +144,8 @@ export default async function init(nameArg?: string, template?: string) {
     }
     case "vue": {
       Object.assign(importMap.imports, {
-        "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
-        "aleph/vue-ssr": `${alephPkgUri}/framework/vue/ssr.ts`,
+        "aleph/vue": `${alephPkgUri}/runtime/vue/mod.ts`,
+        "aleph/vue-ssr": `${alephPkgUri}/runtime/vue/ssr.ts`,
         "aleph/vue-loader": `${alephPkgUri}/loaders/vue.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
         "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,

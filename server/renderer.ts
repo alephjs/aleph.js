@@ -1,5 +1,5 @@
-import { FetchError } from "../framework/core/error.ts";
-import { matchRoutes } from "../framework/core/route.ts";
+import { FetchError } from "../runtime/core/error.ts";
+import { matchRoutes } from "../runtime/core/route.ts";
 import util from "../lib/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";

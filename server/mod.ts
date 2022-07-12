@@ -1,4 +1,4 @@
-import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
+import { generateErrorHtml, TransformError } from "../runtime/core/error.ts";
 import log, { type LevelName } from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { createContext } from "./context.ts";
@@ -152,7 +152,7 @@ export function serve(options: ServerOptions = {}) {
           log.error(err);
           const alephPkgUri = toLocalPath(getAlephPkgUri());
           return new Response(
-            `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
+            `import { showTransformError } from "${alephPkgUri}/runtime/core/error.ts";showTransformError(${
               JSON.stringify(err)
             });export default null;`,
             {
