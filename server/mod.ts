@@ -42,12 +42,12 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   middlewares?: Middleware[];
   fetch?: FetchHandler;
   ssr?: SSR;
-  onError?: ErrorHandler;
+  error?: ErrorHandler;
 } & AlephConfig;
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const { baseUrl, fetch, middlewares, loaders, router, ssr, unocss, onError } = options;
+  const { baseUrl, fetch, middlewares, loaders, router, ssr, unocss, error: onError } = options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
   const isDev = Deno.env.get("ALEPH_ENV") === "development";
 
