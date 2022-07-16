@@ -11,9 +11,11 @@ export type AlephConfig = {
   /** The router options for the file-system based routing. */
   router?: RouterInit;
   /** The config for UnoCSS. */
-  unocss?: UnoConfig & { test?: RegExp };
+  unocss?: "preset" | (UnoConfig & { test?: RegExp });
   /** The module loaders. */
   loaders?: ModuleLoader[];
+  /* The options for optimization */
+  optimization?: OptimizationOptions;
 };
 
 /** The router options for the file-system based routing. */
@@ -45,25 +47,25 @@ export interface Cookies {
 }
 
 export interface SessionStorage {
-  get(sid: string): Promise<unknown | undefined>;
-  set(sid: string, data: unknown, expires: number): Promise<void>;
+  get(sid: string): Promise<Record<string, unknown> | undefined>;
+  set(sid: string, data: Record<string, unknown>, expires: number): Promise<void>;
   delete(sid: string): Promise<void>;
 }
 
-export interface SessionCookieOptions {
+export type SessionCookieOptions = {
   name?: string;
   domain?: string;
   path?: string;
   secure?: boolean;
   sameSite?: "lax" | "strict" | "none";
-}
+};
 
-export interface SessionOptions {
+export type SessionOptions = {
   storage?: SessionStorage;
   cookie?: SessionCookieOptions;
   secret?: string;
   maxAge?: number;
-}
+};
 
 export interface Session<T> {
   store: T | undefined;
@@ -87,9 +89,7 @@ export interface Context extends Record<string, unknown> {
   readonly headers: Headers;
   readonly cookies: Cookies;
   readonly htmlRewriter: HTMLRewriter;
-  getSession<
-    T extends Record<string, unknown> = Record<string, unknown>,
-  >(): Promise<Session<T>>;
+  getSession<T extends Record<string, unknown> = Record<string, unknown>>(): Promise<Session<T>>;
 }
 
 export interface Middleware {
@@ -136,6 +136,23 @@ export interface ModuleLoader {
     env: ModuleLoaderEnv,
   ): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
 }
+
+/** The optimization options for the server. */
+export type OptimizationOptions = {
+  /** The output directory, default is './out'. */
+  outputDir?: string;
+  /** The built target for esbuild, default is 'es2018'. */
+  buildTarget?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
+  /** The SSG options for the FS routing. */
+  ssg?: SSGOptions;
+};
+
+/** The SSG options for the FS routing. */
+export type SSGOptions = {
+  include?: RegExp;
+  exclude?: RegExp;
+  getStaticPaths?: () => string[] | Promise<string[]>;
+};
 
 export type SSRContext = {
   readonly url: URL;

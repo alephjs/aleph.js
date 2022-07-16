@@ -203,11 +203,8 @@ export default {
         }
         const styleTs = `${alephPkgUri}/runtime/core/style.ts`;
         if (isDev && config?.unocss) {
-          const { presets, test } = config.unocss;
-          if (
-            Array.isArray(presets) &&
-            (test instanceof RegExp ? test : /\.(jsx|tsx)$/).test(pathname)
-          ) {
+          const { test = /\.(jsx|tsx)$/ } = config.unocss === "preset" ? { test: undefined } : config.unocss;
+          if (test.test(pathname)) {
             try {
               const unoGenerator = getUnoGenerator();
               if (unoGenerator) {

@@ -1,4 +1,5 @@
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
+import presetWind from "../lib/@unocss/preset-wind.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
@@ -73,8 +74,8 @@ export function getUnoGenerator(): UnoGenerator | null {
     return null;
   }
   return globalItSync("__UNO_GENERATOR", () => {
-    if (config?.unocss && Array.isArray(config.unocss.presets)) {
-      return createGenerator(config.unocss);
+    if (config?.unocss) {
+      return createGenerator(config.unocss === "preset" ? { presets: [presetWind()] } : config.unocss);
     }
     return null;
   });

@@ -65,8 +65,8 @@ export default {
 
     // build unocss
     const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
-    if (config?.unocss && Array.isArray(config.unocss.presets)) {
-      const test: RegExp = config.unocss.test instanceof RegExp ? config.unocss.test : /\.(jsx|tsx)$/;
+    if (config?.unocss) {
+      const { test = /\.(jsx|tsx)$/ } = config.unocss === "preset" ? { test: undefined } : config.unocss;
       const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
       const files = await getFiles(dir);
       const inputSources = await Promise.all(

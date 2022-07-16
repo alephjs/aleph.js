@@ -2,9 +2,9 @@ import { setCookieHeader } from "./helpers.ts";
 import type { Session, SessionOptions, SessionStorage } from "./types.ts";
 
 export class MemorySessionStorage implements SessionStorage {
-  #store: Map<string, [unknown, number]> = new Map();
+  #store: Map<string, [Record<string, unknown>, number]> = new Map();
 
-  get(sid: string): Promise<unknown | undefined> {
+  get(sid: string): Promise<Record<string, unknown> | undefined> {
     const [data, expires] = this.#store.get(sid) ?? [undefined, 0];
     if (expires > 0 && Date.now() > expires) {
       this.#store.delete(sid);
@@ -13,7 +13,7 @@ export class MemorySessionStorage implements SessionStorage {
     return Promise.resolve(data);
   }
 
-  set(sid: string, data: unknown, expires: number): Promise<void> {
+  set(sid: string, data: Record<string, unknown>, expires: number): Promise<void> {
     this.#store.set(sid, [data, expires]);
     return Promise.resolve();
   }
