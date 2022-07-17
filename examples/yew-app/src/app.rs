@@ -5,9 +5,7 @@ use yew_router::history::{AnyHistory, History, MemoryHistory};
 use yew_router::prelude::*;
 
 use crate::components::header::Header;
-use crate::routes::index::Index;
-use crate::routes::todos::Todos;
-use crate::routes::_404::NotFound;
+use crate::routes::switch;
 use crate::shared::Route;
 
 #[derive(Properties, PartialEq, Default)]
@@ -38,13 +36,5 @@ pub fn App(props: &AppProps) -> Html {
         <Switch<Route> render={switch} />
       </BrowserRouter>
     }
-  }
-}
-
-fn switch(routes: Route) -> Html {
-  match routes {
-    Route::Home => html! { <Index /> },
-    Route::Todos => html! { <Todos /> },
-    Route::NotFound => html! { <NotFound/> },
   }
 }
