@@ -18,7 +18,7 @@ const templates = [
   // todo:
   // "preact",
   // "svelte",
-  // "solid.js",
+  // "solid",
   // "lit",
   // "vanilla",
 ];
@@ -113,6 +113,7 @@ export default async function init(nameArg?: string, template?: string) {
     "tasks": {
       "dev": "deno run -A -q dev.ts",
       "start": "deno run -A server.ts",
+      "opt": "deno run -A server.ts --optimize",
     },
   };
   const importMap = {
@@ -190,8 +191,9 @@ export default async function init(nameArg?: string, template?: string) {
     "",
     green("Aleph.js is ready to go!"),
     `${dim("$")} cd ${name}`,
-    `${dim("$")} deno task dev    ${dim("# Start the app in `development` mode")}`,
-    `${dim("$")} deno task start  ${dim("# Start the app in `production` mode")}`,
+    `${dim("$")} deno task dev    ${dim("# Start the server in `development` mode")}`,
+    `${dim("$")} deno task start  ${dim("# Start the server in `production` mode")}`,
+    `${dim("$")} deno task opt    ${dim("# Optimize the application (bundling, ssg, etc.)")}`,
     "",
     `Docs: ${cyan("https://alephjs.org/docs")}`,
     `Bugs: ${cyan("https://github.com/alephjs/aleph.js/issues")}`,

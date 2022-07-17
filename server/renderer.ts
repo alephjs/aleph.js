@@ -3,18 +3,9 @@ import { matchRoutes } from "../runtime/core/route.ts";
 import util from "../lib/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
-import { getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
+import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
 import { importRouteModule } from "./routing.ts";
-import type {
-  AlephConfig,
-  Element,
-  HTMLRewriterHandlers,
-  RouteConfig,
-  RouteModule,
-  SSR,
-  SSRContext,
-  SSRResult,
-} from "./types.ts";
+import type { Element, HTMLRewriterHandlers, RouteConfig, RouteModule, SSR, SSRContext, SSRResult } from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
@@ -64,13 +55,16 @@ export default {
     });
 
     // build unocss
-    const config: AlephConfig | undefined = Reflect.get(globalThis, "__ALEPH_CONFIG");
+    const config = getAlephConfig();
     if (config?.unocss) {
       const { test = /\.(jsx|tsx)$/ } = config.unocss === "preset" ? { test: undefined } : config.unocss;
       const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
       const files = await getFiles(dir);
+      const outputDir = "." + util.cleanPath(config.optimization?.outputDir ?? "./output");
       const inputSources = await Promise.all(
-        files.filter((name) => test.test(name)).map((name) => Deno.readTextFile(join(dir, name))),
+        files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
+          Deno.readTextFile(join(dir, name))
+        ),
       );
       const unoGenerator = getUnoGenerator();
       if (unoGenerator) {

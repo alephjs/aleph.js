@@ -195,6 +195,11 @@ export function restoreUrl(pathname: string): string {
   return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
 }
 
+// check if the url is a npm package from esm.sh
+export function isNpmPkg(url: string) {
+  return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
+}
+
 /* check whether or not the given path exists as a directory. */
 export async function existsDir(path: string): Promise<boolean> {
   try {
@@ -383,7 +388,7 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
   if (importMapFile) {
     try {
       const { __filename, imports, scopes } = await parseImportMap(importMapFile);
-      if (appDir && import.meta.url.startsWith("file://")) {
+      if (import.meta.url.startsWith("file://") && appDir) {
         const alephPkgUri = getAlephPkgUri();
         if (alephPkgUri === "https://aleph") {
           Object.assign(imports, {

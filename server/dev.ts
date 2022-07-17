@@ -39,6 +39,8 @@ export function removeWatchFsEmitter(e: Emitter<WatchFsEvents>) {
 
 /** The options for dev server. */
 export type DevOptions = {
+  /** The entry of the server. Default is `server.{tsx,ts,jsx,js}`. */
+  serverEntry?: string;
   /** The base URL. */
   baseUrl?: string;
   /** The url for the HMR web socket. This is useful for dev server proxy mode. */
@@ -48,12 +50,12 @@ export type DevOptions = {
 /** Watch for file changes and listen the dev server. */
 export default async function dev(options?: DevOptions) {
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : Deno.cwd();
-  const serverEntry = await findFile(
+  const serverEntry = options?.serverEntry ? join(appDir, options.serverEntry) : await findFile(
     builtinModuleExts.map((ext) => `server.${ext}`),
     appDir,
   );
-  if (!serverEntry) {
-    log.error(`Could not find the server entry file.`);
+  if (!serverEntry || !(await existsFile(serverEntry))) {
+    log.error(`Could not find the server entry.`);
     Deno.exit(1);
   }
 
@@ -191,10 +193,7 @@ async function bootstrap(signal: AbortSignal, entry: string, appDir: string, __p
   const { hostname, certFile, keyFile } = server;
   const useTls = certFile && keyFile;
   const port = __port ?? server.port ?? 3000;
-  const handler = async (
-    req: Request,
-    connInfo: ConnInfo,
-  ): Promise<Response> => {
+  const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
     const { pathname } = new URL(req.url);
     if (pathname === "/-/hmr") {
       const { socket, response } = Deno.upgradeWebSocket(req);
