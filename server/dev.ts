@@ -418,8 +418,7 @@ async function generateRoutesExportModule(options: GenerateOptions) {
             return {
               contents: `export default ${
                 // deno-lint-ignore no-unused-vars
-                JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })
-              };`,
+                JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })};`,
               loader: "js",
             };
           });
