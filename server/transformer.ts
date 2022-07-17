@@ -1,7 +1,6 @@
-import { TransformError } from "../framework/core/error.ts";
+import { TransformError } from "../runtime/core/error.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { bundleCSS } from "./bundle.ts";
 import type { TransformOptions, TransformResult } from "./deps.ts";
 import { MagicString, parseDeps, transform } from "./deps.ts";
 import depGraph from "./graph.ts";
@@ -18,6 +17,7 @@ import {
 } from "./helpers.ts";
 import { getContentType } from "./media_type.ts";
 import { isRouteFile } from "./routing.ts";
+import { bundleCSS } from "./optimizer.ts";
 import type { ImportMap, JSXConfig, ModuleLoader, ModuleLoaderOutput } from "./types.ts";
 
 const cache = new Map<string, [content: string, headers: Headers]>();
@@ -201,21 +201,19 @@ export default {
           map = ret.map;
           deps = ret.deps;
         }
-        const styleTs = `${alephPkgUri}/framework/core/style.ts`;
+        const styleTs = `${alephPkgUri}/runtime/core/style.ts`;
         if (isDev && config?.unocss) {
-          const { presets, test } = config.unocss;
-          if (
-            Array.isArray(presets) &&
-            (test instanceof RegExp ? test : /\.(jsx|tsx)$/).test(pathname)
-          ) {
+          const { test = /\.(jsx|tsx)$/ } = config.unocss === "preset" ? { test: undefined } : config.unocss;
+          if (test.test(pathname)) {
             try {
               const unoGenerator = getUnoGenerator();
               if (unoGenerator) {
-                const { css } = await unoGenerator.generate(source, {
+                const { css, matched } = await unoGenerator.generate(source, {
                   id: specifier,
+                  preflights: false,
                   minify: !isDev,
                 });
-                if (css) {
+                if (matched.size > 0) {
                   code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
                     JSON.stringify(specifier)
                   }, ${JSON.stringify(css)});\n`;

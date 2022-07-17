@@ -18,7 +18,7 @@ const templates = [
   // todo:
   // "preact",
   // "svelte",
-  // "solid.js",
+  // "solid",
   // "lit",
   // "vanilla",
 ];
@@ -113,6 +113,7 @@ export default async function init(nameArg?: string, template?: string) {
     "tasks": {
       "dev": "deno run -A -q dev.ts",
       "start": "deno run -A server.ts",
+      "opt": "deno run -A server.ts --optimize",
     },
   };
   const importMap = {
@@ -133,9 +134,9 @@ export default async function init(nameArg?: string, template?: string) {
         "jsxImportSource": `https://esm.sh/react@${versions.react}`,
       });
       Object.assign(importMap.imports, {
-        "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
-        "aleph/react-client": `${alephPkgUri}/framework/react/client.ts`,
-        "aleph/react-ssr": `${alephPkgUri}/framework/react/ssr.ts`,
+        "aleph/react": `${alephPkgUri}/runtime/react/mod.ts`,
+        "aleph/react-client": `${alephPkgUri}/runtime/react/client.ts`,
+        "aleph/react-ssr": `${alephPkgUri}/runtime/react/ssr.ts`,
         "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/react-dom@${versions.react}/`,
@@ -144,8 +145,8 @@ export default async function init(nameArg?: string, template?: string) {
     }
     case "vue": {
       Object.assign(importMap.imports, {
-        "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
-        "aleph/vue-ssr": `${alephPkgUri}/framework/vue/ssr.ts`,
+        "aleph/vue": `${alephPkgUri}/runtime/vue/mod.ts`,
+        "aleph/vue-ssr": `${alephPkgUri}/runtime/vue/ssr.ts`,
         "aleph/vue-loader": `${alephPkgUri}/loaders/vue.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
         "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
@@ -190,8 +191,9 @@ export default async function init(nameArg?: string, template?: string) {
     "",
     green("Aleph.js is ready to go!"),
     `${dim("$")} cd ${name}`,
-    `${dim("$")} deno task dev    ${dim("# Start the app in `development` mode")}`,
-    `${dim("$")} deno task start  ${dim("# Start the app in `production` mode")}`,
+    `${dim("$")} deno task dev    ${dim("# Start the server in `development` mode")}`,
+    `${dim("$")} deno task start  ${dim("# Start the server in `production` mode")}`,
+    `${dim("$")} deno task opt    ${dim("# Optimize the application (bundling, ssg, etc.)")}`,
     "",
     `Docs: ${cyan("https://alephjs.org/docs")}`,
     `Bugs: ${cyan("https://github.com/alephjs/aleph.js/issues")}`,

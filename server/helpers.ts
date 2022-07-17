@@ -1,4 +1,5 @@
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
+import presetWind from "../lib/@unocss/preset-wind.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
@@ -73,8 +74,8 @@ export function getUnoGenerator(): UnoGenerator | null {
     return null;
   }
   return globalItSync("__UNO_GENERATOR", () => {
-    if (config?.unocss && Array.isArray(config.unocss.presets)) {
-      return createGenerator(config.unocss);
+    if (config?.unocss) {
+      return createGenerator(config.unocss === "preset" ? { presets: [presetWind()] } : config.unocss);
     }
     return null;
   });
@@ -192,6 +193,11 @@ export function restoreUrl(pathname: string): string {
   }
   const [host, port] = h.split("_");
   return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
+}
+
+// check if the url is a npm package from esm.sh
+export function isNpmPkg(url: string) {
+  return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
 }
 
 /* check whether or not the given path exists as a directory. */
@@ -382,7 +388,7 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
   if (importMapFile) {
     try {
       const { __filename, imports, scopes } = await parseImportMap(importMapFile);
-      if (appDir && import.meta.url.startsWith("file://")) {
+      if (import.meta.url.startsWith("file://") && appDir) {
         const alephPkgUri = getAlephPkgUri();
         if (alephPkgUri === "https://aleph") {
           Object.assign(imports, {
@@ -390,11 +396,11 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
             "aleph/": "https://aleph/",
             "aleph/server": "https://aleph/server/mod.ts",
             "aleph/dev": "https://aleph/server/dev.ts",
-            "aleph/react": "https://aleph/framework/react/mod.ts",
-            "aleph/react-ssr": "https://aleph/framework/react/ssr.ts",
-            "aleph/react-client": "https://aleph/framework/react/client.ts",
-            "aleph/vue": "https://aleph/framework/vue/mod.ts",
-            "aleph/vue-ssr": "https://aleph/framework/vue/ssr.ts",
+            "aleph/react": "https://aleph/runtime/react/mod.ts",
+            "aleph/react-ssr": "https://aleph/runtime/react/ssr.ts",
+            "aleph/react-client": "https://aleph/runtime/react/client.ts",
+            "aleph/vue": "https://aleph/runtime/vue/mod.ts",
+            "aleph/vue-ssr": "https://aleph/runtime/vue/ssr.ts",
           });
         }
       }

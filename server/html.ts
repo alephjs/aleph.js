@@ -13,8 +13,8 @@ type LoadOptions = {
 
 // load and fix the `index.html`
 // - fix relative url to absolute url of `src` and `href`
-// - add `./framework/core/hmr.ts` when in `development` mode
-// - add `./framework/core/nomodule.ts`
+// - add `./runtime/core/hmr.ts` when in `development` mode
+// - add `./runtime/core/nomodule.ts`
 // - check the `<ssr-body>` element if the ssr is enabled
 // - add `data-defer` attribute to `<body>` if possible
 // - todo: apply unocss
@@ -96,7 +96,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
           const specifier = `.${href}`;
           el.setAttribute("data-module-id", specifier);
           el.after(
-            `<script type="module">import hot from "${toLocalPath(alephPkgUri)}/framework/core/hmr.ts";hot(${
+            `<script type="module">import hot from "${toLocalPath(alephPkgUri)}/runtime/core/hmr.ts";hot(${
               JSON.stringify(specifier)
             }).accept();</script>`,
             { html: true },
@@ -123,7 +123,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
       }
       if (!nomoduleInserted && el.getAttribute("type") === "module") {
         el.after(
-          `<script nomodule src="${toLocalPath(alephPkgUri)}/framework/core/nomodule.ts"></script>`,
+          `<script nomodule src="${toLocalPath(alephPkgUri)}/runtime/core/nomodule.ts"></script>`,
           { html: true },
         );
         nomoduleInserted = true;
@@ -151,7 +151,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
         el.append(
           `<script type="module">import hot from "${
             toLocalPath(alephPkgUri)
-          }/framework/core/hmr.ts";hot("./index.html").decline();</script>`,
+          }/runtime/core/hmr.ts";hot("./index.html").decline();</script>`,
           { html: true },
         );
         if (hmr.url) {
