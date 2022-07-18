@@ -66,6 +66,7 @@ export async function optimize(
 
   const entryModules = new Map(queue.map((task) => [task, 0]));
   const allClientModules = new Set<string>();
+  const memFS = new Map<string, string>();
 
   // transform client modules
   while (queue.length > 0) {
@@ -73,23 +74,23 @@ export async function optimize(
     await Promise.all(queue.map(async (specifier) => {
       const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
       const isCSS = url.pathname.endsWith(".css");
-      const req = new Request(url.toString());
+      const req = new Request(url.toString(), { headers: { "Pragma": "no-output" } });
       let savePath = join(outputDir, url.pathname);
       if (isNpmPkg(specifier)) {
         savePath += ".js";
       } else if (isCSS && url.searchParams.has("module")) {
         savePath += ".js";
       }
-      await ensureDir(dirname(savePath));
       const addr: Deno.Addr = { transport: "tcp", hostname: "localhost", port: 80 };
-      const [res, file] = await Promise.all([
-        serverHandler(req, { localAddr: addr, remoteAddr: addr }),
-        Deno.open(savePath, { write: true, create: true }),
-      ]);
-      if (res.headers.has("X-Transform-Error")) {
+      const res = await serverHandler(req, { localAddr: addr, remoteAddr: addr });
+      if (
+        res.status !== 200 ||
+        res.headers.get("Content-Type")?.startsWith("text/html") ||
+        res.headers.has("X-Transform-Error")
+      ) {
         throw new Error("Transform Error");
       }
-      await res.body?.pipeTo(file.writable);
+      memFS.set(savePath, await res.text());
       if (!isCSS) {
         depGraph?.get(specifier)?.deps?.forEach(({ specifier, dynamic }) => {
           if (dynamic) {
@@ -103,6 +104,9 @@ export async function optimize(
         });
       } else if (url.searchParams.has("module")) {
         deps.add(`${alephPkgUri}/runtime/core/style.ts`);
+      } else {
+        await ensureDir(dirname(savePath));
+        await Deno.writeTextFile(savePath, memFS.get(savePath)!);
       }
       allClientModules.add(specifier);
     }));
@@ -180,9 +184,6 @@ export async function optimize(
         minify: true,
         treeShaking: true,
         sourcemap: false,
-        loader: {
-          ".vue": "js",
-        },
         plugins: [{
           name: "bundle-client-modules",
           setup(build) {
@@ -211,6 +212,12 @@ export async function optimize(
               }
               return { path: jsFile };
             });
+            build.onLoad({ filter: /.*/ }, (args) => {
+              return {
+                contents: memFS.get(args.path),
+                loader: "js",
+              };
+            });
           },
         }],
       });
@@ -218,6 +225,7 @@ export async function optimize(
   );
 
   stopEsbuild();
+  memFS.clear();
 
   log.info(`${bold(routeFiles.length.toString())} routes found`);
   log.info(`${bold(clientModules.size.toString())} client modules built`);

@@ -66,8 +66,11 @@ export function serve(options: ServerOptions = {}) {
     });
   }
 
-  // set the log level if specified
-  if (options.logLevel) {
+  // set the log level
+  if (import.meta.url.startsWith("file:")) {
+    // set log level to debug when debug aleph.js itself.
+    log.setLevel("debug");
+  } else if (options.logLevel) {
     log.setLevel(options.logLevel);
   }
 
@@ -137,17 +140,25 @@ export function serve(options: ServerOptions = {}) {
       !searchParams.has("raw") &&
       (transformer.test(pathname) || (loader = loaders?.find((l) => l.test(pathname))))
     ) {
-      let outFile = join(appDir ?? Deno.cwd(), optimization?.outputDir ?? "./output", pathname);
-      if (pathname.startsWith("/-/") && isNpmPkg(restoreUrl(pathname))) {
-        outFile += ".js";
-      }
-      if (await existsFile(outFile)) {
-        const headers = new Headers({ "Content-Type": "application/javascript; charset=utf-8" });
-        const file = await Deno.open(outFile, { read: true });
-        if (searchParams.get("v") || (pathname.startsWith("/-/") && regFullVersion.test(pathname))) {
-          headers.append("Cache-Control", "public, max-age=31536000, immutable");
+      // check the optimization output
+      if (req.headers.get("Pragma") !== "no-output") {
+        let outFile = join(appDir ?? Deno.cwd(), optimization?.outputDir ?? "./output", pathname);
+        if (pathname.startsWith("/-/") && isNpmPkg(restoreUrl(pathname))) {
+          outFile += ".js";
         }
-        return new Response(file.readable, { headers });
+        if (await existsFile(outFile)) {
+          const file = await Deno.open(outFile, { read: true });
+          const headers = new Headers();
+          if (outFile.endsWith(".css")) {
+            headers.set("Content-Type", "text/css; charset=utf-8");
+          } else {
+            headers.set("Content-Type", "application/javascript; charset=utf-8");
+          }
+          if (searchParams.get("v") || (pathname.startsWith("/-/") && regFullVersion.test(pathname))) {
+            headers.append("Cache-Control", "public, max-age=31536000, immutable");
+          }
+          return new Response(file.readable, { headers });
+        }
       }
       try {
         const [importMap, jsxConfig] = await Promise.all([

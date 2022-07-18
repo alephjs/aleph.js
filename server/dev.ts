@@ -281,7 +281,7 @@ async function generateRoutesExportModule(options: GenerateOptions) {
   const appDir = routeConfig.appDir ?? Deno.cwd();
   const routesDir = join(appDir, routeConfig.prefix);
   const genFile = join(routesDir, "_export.ts");
-  const useLoader = routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
+  const withLoader = routeConfig.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
 
   if (routeConfig.routes.length == 0) {
     try {
@@ -320,7 +320,7 @@ async function generateRoutesExportModule(options: GenerateOptions) {
     preResult.stop?.();
   }
 
-  if (useLoader) {
+  if (withLoader) {
     const input = [
       ...imports,
       "export default {",
@@ -371,9 +371,6 @@ async function generateRoutesExportModule(options: GenerateOptions) {
         name: "bundle-non-standard-modules",
         setup(build) {
           build.onResolve({ filter: /.*/ }, (args) => {
-            if (args.path === "dep-graph") {
-              return { path: args.path, namespace: "dep-graph" };
-            }
             if (
               args.path.startsWith(".") &&
               loaders?.some((l) => l.test(args.path))
@@ -413,14 +410,6 @@ async function generateRoutesExportModule(options: GenerateOptions) {
               };
             }
             throw new Error(`Loader not found for ${args.path}`);
-          });
-          build.onLoad({ filter: /.*/, namespace: "dep-graph" }, () => {
-            return {
-              contents: `export default ${
-                // deno-lint-ignore no-unused-vars
-                JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })};`,
-              loader: "js",
-            };
           });
         },
       }],
