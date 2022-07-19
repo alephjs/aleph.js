@@ -187,7 +187,7 @@ export default {
             target,
             importMap: JSON.stringify(importMap),
             graphVersions,
-            globalVersion: depGraph.globalVersion.toString(36),
+            globalVersion: getDeploymentId() ?? depGraph.globalVersion.toString(36),
             stripDataExport: isRouteFile(specifier),
             reactRefresh: (
               jsxConfig.jsxPragma === "React.createElement" ||
