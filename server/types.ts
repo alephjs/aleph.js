@@ -125,17 +125,18 @@ export type ModuleLoaderEnv = {
   jsxConfig?: JSXConfig;
   sourceMap?: boolean;
   ssr?: boolean;
+  hydratable?: boolean;
 };
 
 export type ModuleLoaderOutput = {
   code: string;
-  lang?: "js" | "jsx" | "ts" | "tsx";
   inlineCSS?: string;
+  lang?: "js" | "jsx" | "ts" | "tsx";
   map?: string;
 };
 
 export interface ModuleLoader {
-  test(pathname: string): boolean;
+  test(path: string): boolean;
   load(
     specifier: string,
     content: string,

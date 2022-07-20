@@ -45,6 +45,8 @@ export type DevOptions = {
   baseUrl?: string;
   /** The url for the HMR web socket. This is useful for dev server proxy mode. */
   hmrWebSocketUrl?: string;
+  /** Enable react refresh (HMR). */
+  reactRefresh?: boolean;
 };
 
 /** Watch for file changes and listen the dev server. */
@@ -62,6 +64,9 @@ export default async function dev(options?: DevOptions) {
   Deno.env.set("ALEPH_ENV", "development");
   if (options?.hmrWebSocketUrl) {
     Deno.env.set("ALEPH_HMR_WS_URL", options?.hmrWebSocketUrl);
+  }
+  if (options?.reactRefresh) {
+    Deno.env.set("ALEPH_HMR_REACT_REFRESH", "true");
   }
 
   // set log level to debug when debug aleph.js itself.

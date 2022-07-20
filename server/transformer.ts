@@ -27,6 +27,8 @@ export type TransformerOptions = {
   importMap: ImportMap;
   jsxConfig: JSXConfig;
   loader?: ModuleLoader;
+  isDev?: boolean;
+  hydratable?: boolean;
 };
 
 export default {
@@ -39,11 +41,10 @@ export default {
     );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { loader, jsxConfig, importMap } = options;
+    const { loader, jsxConfig, importMap, isDev, hydratable } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const ssr = searchParams.has("ssr");
-    const isDev = Deno.env.get("ALEPH_ENV") === "development";
     const target = isDev ? "es2022" : "es2018"; // todo: get target from user-agent header
 
     const deployId = getDeploymentId();
@@ -61,7 +62,9 @@ export default {
       const loaded = await loader.load(
         specifier,
         sourceRaw,
-        ssr ? { jsxConfig, importMap, ssr: true, sourceMap: true } : { jsxConfig, importMap, isDev, sourceMap: isDev },
+        ssr
+          ? { jsxConfig, importMap, ssr: true, sourceMap: true }
+          : { jsxConfig, importMap, isDev, sourceMap: isDev, hydratable },
       );
       source = loaded.code;
       lang = loaded.lang;
@@ -190,10 +193,7 @@ export default {
             graphVersions,
             globalVersion: getDeploymentId() ?? depGraph.globalVersion.toString(36),
             stripDataExport: isRouteFile(specifier),
-            reactRefresh: (
-              jsxConfig.jsxPragma === "React.createElement" ||
-              jsxConfig.jsxImportSource?.startsWith("https://esm.sh/react@")
-            ),
+            reactRefresh: Deno.env.get("ALEPH_HMR_REACT_REFRESH") === "true",
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
             isDev,

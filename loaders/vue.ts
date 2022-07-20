@@ -28,14 +28,13 @@ export default class VueSFCLoader implements ModuleLoader {
     this.#options = { ...options };
   }
 
-  test(pathname: string): boolean {
-    return pathname.endsWith(".vue");
+  test(path: string): boolean {
+    return path.endsWith(".vue");
   }
 
-  async load(pathname: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
-    const filename = "." + util.cleanPath(pathname);
-    const id = (await util.computeHash("SHA-256", filename)).slice(0, 8);
-    const { descriptor } = parse(content, { filename, sourceMap: env.sourceMap });
+  async load(specifier: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
+    const id = (await util.computeHash("SHA-256", specifier)).slice(0, 8);
+    const { descriptor } = parse(content, { filename: specifier, sourceMap: env.sourceMap });
     const scriptLang = (descriptor.script && descriptor.script.lang) ||
       (descriptor.scriptSetup && descriptor.scriptSetup.lang);
     const isTS = scriptLang === "ts";
@@ -85,7 +84,7 @@ export default class VueSFCLoader implements ModuleLoader {
         output.push(templateResult.code.replace("export function render(", "__sfc__.render = function render("));
       }
     }
-    output.push(`__sfc__.__file = ${JSON.stringify(filename)}`);
+    output.push(`__sfc__.__file = ${JSON.stringify(specifier)}`);
     if (descriptor.styles.some((s) => s.scoped)) {
       output.push(`__sfc__.__scopeId = ${JSON.stringify(`data-v-${id}`)}`);
     }
@@ -112,8 +111,8 @@ export default class VueSFCLoader implements ModuleLoader {
     const css = (await Promise.all(descriptor.styles.map(async (style) => {
       const result = await compileStyleAsync({
         ...this.#options.style,
+        filename: descriptor.filename,
         source: style.content,
-        filename,
         id,
         scoped: style.scoped,
         modules: false,

@@ -11,10 +11,13 @@
     "aleph/vue": "./runtime/vue/mod.ts",
     "aleph/vue-ssr": "./runtime/vue/ssr.ts",
     "aleph/vue-loader": "./loaders/vue.ts",
+    "aleph/solid-loader": "./loaders/solid.ts",
     "react": "https://esm.sh/react@18.2.0",
     "react-dom": "https://esm.sh/react-dom@18.2.0",
     "react-dom/": "https://esm.sh/react-dom@18.2.0/",
     "vue": "https://esm.sh/vue@3.2.37",
-    "vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.37"
+    "vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.37",
+    "solid-js": "https://esm.sh/solid-js@1.4.7",
+    "solid-js/web": "https://esm.sh/solid-js@1.4.7/web"
   }
 }

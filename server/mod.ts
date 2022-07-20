@@ -137,8 +137,10 @@ export function serve(options: ServerOptions = {}) {
     // transform modules
     let loader: ModuleLoader | undefined;
     if (
-      !searchParams.has("raw") &&
-      (transformer.test(pathname) || (loader = loaders?.find((l) => l.test(pathname))))
+      !searchParams.has("raw") && (
+        (loader = loaders?.find((l) => l.test(pathname))) ||
+        transformer.test(pathname)
+      )
     ) {
       // check the optimization output
       if (req.headers.get("Pragma") !== "no-output") {
@@ -165,10 +167,13 @@ export function serve(options: ServerOptions = {}) {
           getImportMap(appDir),
           getJSXConfig(appDir),
         ]);
+        const hydratable = Boolean(ssr);
         return await transformer.fetch(req, {
           importMap,
           jsxConfig,
           loader,
+          isDev,
+          hydratable,
         });
       } catch (err) {
         console.log(err);
@@ -348,7 +353,7 @@ export function serve(options: ServerOptions = {}) {
     const indexHtml = await globalIt(
       "__ALEPH_INDEX_HTML",
       () =>
-        loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
+        loadAndFixIndexHtml(join(appDir ?? ".", "index.html"), {
           ssr: typeof ssr === "function" ? {} : ssr,
           hmr: isDev ? { url: Deno.env.get("ALEPH_HMR_WS_URL") } : undefined,
         }),
@@ -364,7 +369,7 @@ export function serve(options: ServerOptions = {}) {
       if (deployId) {
         etag = `W/${btoa("./index.html").replace(/[^a-z0-9]/g, "")}-${deployId}`;
       } else {
-        const { mtime, size } = await Deno.lstat("./index.html");
+        const { mtime, size } = await Deno.lstat(join(appDir ?? ".", "./index.html"));
         if (mtime) {
           etag = `W/${mtime.getTime().toString(16)}-${size.toString(16)}`;
           ctx.headers.set("Last-Modified", new Date(mtime).toUTCString());
