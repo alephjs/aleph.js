@@ -1,6 +1,6 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/server.ts";
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.4/types.d.ts";
-import type { UserConfig as UnoConfig } from "../lib/@unocss/core.ts";
+import type { UserConfig } from "../lib/@unocss/core.ts";
 import type { RouteModule } from "../runtime/core/route.ts";
 export type { Route, RouteConfig, RouteMatch, RouteMeta } from "../runtime/core/route.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
@@ -11,7 +11,7 @@ export type AlephConfig = {
   /** The router options for the file-system based routing. */
   router?: RouterInit;
   /** The config for UnoCSS. */
-  unocss?: "preset" | (UnoConfig & { test?: RegExp });
+  unocss?: "preset" | UnoConfig;
   /** The module loaders. */
   loaders?: ModuleLoader[];
   /* The options for optimization */
@@ -29,6 +29,12 @@ export interface RouterInit {
   /** The pre-built routes.  */
   routes?: Record<string, Record<string, unknown>>;
 }
+
+/** The config for UnoCSS. */
+export type UnoConfig = UserConfig & {
+  test?: RegExp;
+  resetCSS?: "normalize" | "eric-meyer" | "tailwind" | "antfu";
+};
 
 export type CookieOptions = {
   expires?: number | Date;

@@ -3,9 +3,18 @@ import { matchRoutes } from "../runtime/core/route.ts";
 import util from "../lib/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
-import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator } from "./helpers.ts";
+import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regUseUnocss } from "./helpers.ts";
 import { importRouteModule } from "./routing.ts";
-import type { Element, HTMLRewriterHandlers, RouteConfig, RouteModule, SSR, SSRContext, SSRResult } from "./types.ts";
+import type {
+  Element,
+  HTMLRewriterHandlers,
+  RouteConfig,
+  RouteModule,
+  SSR,
+  SSRContext,
+  SSRResult,
+  UnoConfig,
+} from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
@@ -57,32 +66,39 @@ export default {
     // build unocss
     const config = getAlephConfig();
     if (config?.unocss) {
-      const { test = /\.(jsx|tsx)$/ } = config.unocss === "preset" ? { test: undefined } : config.unocss;
-      const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
-      const files = await getFiles(dir);
-      const outputDir = "." + util.cleanPath(config.optimization?.outputDir ?? "./output");
-      const inputSources = await Promise.all(
-        files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
-          Deno.readTextFile(join(dir, name))
-        ),
-      );
       const unoGenerator = getUnoGenerator();
       if (unoGenerator) {
-        const start = performance.now();
-        let css = Reflect.get(globalThis, "__ALEPH_GLOBAL_UNOCSS");
+        const t = performance.now();
+        const {
+          test = regUseUnocss,
+          resetCSS = "tailwind",
+        } = config.unocss === "preset" ? {} as UnoConfig : config.unocss;
+        let css = Reflect.get(globalThis, "__ALEPH_UNOCSS_BUILD");
         if (!css) {
-          const ret = await unoGenerator.generate(inputSources.join("\n"), {
-            minify: !isDev,
-          });
-          css = ret.css;
-          if (!isDev) {
-            Reflect.set(globalThis, "__ALEPH_GLOBAL_UNOCSS", css);
+          const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
+          const files = await getFiles(dir);
+          const outputDir = "." + util.cleanPath(config.optimization?.outputDir ?? "./output");
+          const inputSources = await Promise.all(
+            files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
+              Deno.readTextFile(join(dir, name))
+            ),
+          );
+          if (inputSources.length > 0) {
+            const ret = await unoGenerator.generate(inputSources.join("\n"), {
+              minify: !isDev,
+            });
+            if (ret.matched.size > 0) {
+              css = ret.css;
+              if (!isDev) {
+                Reflect.set(globalThis, "__ALEPH_UNOCSS_BUILD", css);
+              }
+            }
           }
         }
         if (css) {
-          const buildTime = (performance.now() - start).toFixed(2);
+          const buildTime = (performance.now() - t).toFixed(2);
           headCollection.push(
-            `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.43.2/tailwind.css">`,
+            `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.43.2/${resetCSS}.css">`,
             `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
           );
         }

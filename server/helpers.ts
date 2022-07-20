@@ -5,10 +5,10 @@ import util from "../lib/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
 import { basename, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
-
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
+export const regUseUnocss = /\.(jsx|tsx)$/;
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
