@@ -1,4 +1,3 @@
-import presetUno from "@unocss/preset-uno.ts";
 import { serve } from "aleph/server";
 import ssr from "aleph/react-ssr";
 import { GithubOauth } from "./oauth.ts";
@@ -10,11 +9,7 @@ serve({
     glob: "./routes/**/*.{tsx,ts}",
     routes,
   },
-  unocss: {
-    presets: [
-      presetUno(),
-    ],
-  },
+  unocss: "preset",
   middlewares: [
     new GithubOauth({
       clientId: Deno.env.get("GITHUB_OAUTH_CLIENT_ID"),
