@@ -3,18 +3,22 @@ import init, { ssr } from "./pkg/yew_app.js";
 import { createWatchFsEmitter } from "aleph/dev";
 import { build } from "./build.ts";
 
+const initWasm = async () => {
+  const wasmUrl = new URL("./pkg/yew_app_bg.wasm", import.meta.url);
+  await init(await Deno.readFile(wasmUrl));
+};
+
 if (Deno.args.includes("--dev")) {
   const emitter = createWatchFsEmitter();
   emitter.on("modify", ({ specifier }) => {
     if (specifier.endsWith(".rs")) {
-      build();
+      build().then(initWasm);
     }
   });
   await build();
 }
 
-const wasmUrl = new URL("./pkg/yew_app_bg.wasm", import.meta.url);
-await init(await Deno.readFile(wasmUrl));
+await initWasm();
 
 serve({
   baseUrl: import.meta.url,
