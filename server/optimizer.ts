@@ -15,7 +15,7 @@ import {
   toLocalPath,
 } from "./helpers.ts";
 import { parseHtmlLinks } from "./html.ts";
-import { initRoutes } from "./routing.ts";
+import { initRouter } from "./routing.ts";
 import type { ConnInfo } from "./types.ts";
 
 export async function optimize(
@@ -41,7 +41,7 @@ export async function optimize(
   // find route files by the `routes` config
   const routeFiles: string[] = [];
   if (config?.router) {
-    const { routes } = await initRoutes(config.router, appDir);
+    const { routes } = await initRouter(config.router, appDir);
     routes.forEach(([_, { filename }]) => {
       routeFiles.push(filename);
     });

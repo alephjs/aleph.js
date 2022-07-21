@@ -19,4 +19,7 @@ serve({
     ],
   },
   ssr,
+  dev: {
+    reactRefresh: true,
+  },
 });

@@ -8,8 +8,8 @@ import { importRouteModule } from "./routing.ts";
 import type {
   Element,
   HTMLRewriterHandlers,
-  RouteConfig,
   RouteModule,
+  Router,
   SSR,
   SSRContext,
   SSRResult,
@@ -19,8 +19,9 @@ import type {
 export type RenderOptions = {
   indexHtml: Uint8Array;
   customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
-  routeConfig: RouteConfig | null;
+  router: Router | null;
   ssr: SSR;
+  isDev: boolean;
 };
 
 /** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
@@ -28,15 +29,14 @@ const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* st
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, routeConfig, customHTMLRewriter, ssr } = options;
+    const { indexHtml, router, customHTMLRewriter, ssr, isDev } = options;
     const headers = new Headers(ctx.headers as Headers);
-    const isDev = Deno.env.get("ALEPH_ENV") === "development";
     const isFn = typeof ssr === "function";
     const dataDefer = isFn ? false : !!ssr.dataDefer;
     const cc = !isFn ? ssr.cacheControl : "public";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;
-    const [url, routeModules, deferedData] = await initSSR(req, ctx, routeConfig, dataDefer);
+    const [url, routeModules, deferedData] = await initSSR(req, ctx, router, dataDefer);
     const headCollection: string[] = [];
     const ssrContext: SSRContext = {
       url,
@@ -109,7 +109,7 @@ export default {
       context: ssrContext,
       body,
       deferedData,
-      is404: routeConfig !== null && (routeModules.length === 0 || routeModules.at(-1)?.url.pathname ===
+      is404: router !== null && (routeModules.length === 0 || routeModules.at(-1)?.url.pathname ===
           "/_404"),
     };
     if (!isDev && CSP) {
@@ -141,10 +141,10 @@ export default {
         // inject the roures manifest
         rewriter.on("head", {
           element(el: Element) {
-            if (routeConfig && routeConfig.routes.length > 0) {
+            if (router && router.routes.length > 0) {
               const json = JSON.stringify({
-                routes: routeConfig.routes.map(([_, meta]) => meta),
-                prefix: routeConfig.prefix,
+                routes: router.routes.map(([_, meta]) => meta),
+                prefix: router.prefix,
               });
               el.append(`<script id="routes-manifest" type="application/json">${json}</script>`, {
                 html: true,
@@ -285,7 +285,7 @@ export default {
 async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
-  routeConfig: RouteConfig | null,
+  router: Router | null,
   dataDefer: boolean,
 ): Promise<[
   url: URL,
@@ -293,16 +293,16 @@ async function initSSR(
   deferedData: Record<string, unknown>,
 ]> {
   const url = new URL(req.url);
-  if (!routeConfig) {
+  if (!router) {
     return [url, [], {}];
   }
 
-  const matches = matchRoutes(url, routeConfig);
+  const matches = matchRoutes(url, router);
   const deferedData: Record<string, unknown> = {};
 
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, meta]) => {
-    const mod = await importRouteModule(meta, routeConfig.appDir);
+    const mod = await importRouteModule(meta, router.appDir);
     const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),

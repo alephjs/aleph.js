@@ -2,7 +2,7 @@ import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/ser
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.4/types.d.ts";
 import type { UserConfig } from "../lib/@unocss/core.ts";
 import type { RouteModule } from "../runtime/core/route.ts";
-export type { Route, RouteConfig, RouteMatch, RouteMeta } from "../runtime/core/route.ts";
+export type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../runtime/core/route.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
 
 export type AlephConfig = {
@@ -16,6 +16,14 @@ export type AlephConfig = {
   loaders?: ModuleLoader[];
   /* The options for optimization */
   optimization?: OptimizationOptions;
+};
+
+/** The options for dev server. */
+export type DevOptions = {
+  /** The url for the HMR web socket. This is useful for dev server proxy mode. */
+  hmrWebSocketUrl?: string;
+  /** Enable react refresh (HMR). */
+  reactRefresh?: boolean;
 };
 
 /** The router options for the file-system based routing. */

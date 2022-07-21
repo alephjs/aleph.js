@@ -1,12 +1,11 @@
 import { Untar } from "https://deno.land/std@0.145.0/archive/tar.ts";
 import { parse } from "https://deno.land/std@0.145.0/flags/mod.ts";
-import { ensureDir } from "https://deno.land/std@0.145.0/fs/ensure_dir.ts";
 import { Buffer } from "https://deno.land/std@0.145.0/io/buffer.ts";
-import { copy, readAll } from "https://deno.land/std@0.145.0/streams/conversion.ts";
+import { copy } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import log from "./lib/log.ts";
 import util from "./lib/util.ts";
-import { basename, blue, cyan, dim, green, join, red } from "./server/deps.ts";
+import { basename, blue, cyan, dim, ensureDir, green, join, red } from "./server/deps.ts";
 import { existsDir, existsFile, getFiles } from "./server/helpers.ts";
 import { isCanary } from "./version.ts";
 
@@ -76,8 +75,7 @@ export default async function init(nameArg?: string, template?: string) {
     console.error(await resp.text());
     Deno.exit(1);
   }
-  const gzData = await readAll(new Buffer(await resp.arrayBuffer()));
-  const tarData = gunzip(gzData);
+  const tarData = gunzip(new Uint8Array(await resp.arrayBuffer()));
   const entryList = new Untar(new Buffer(tarData));
   const appDir = join(Deno.cwd(), name);
   const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app/`;
@@ -111,7 +109,7 @@ export default async function init(nameArg?: string, template?: string) {
     },
     "importMap": "import_map.json",
     "tasks": {
-      "dev": "deno run -A -q dev.ts",
+      "dev": "deno run -A -q server.ts --dev",
       "start": "deno run -A server.ts",
       "opt": "deno run -A server.ts --optimize",
     },

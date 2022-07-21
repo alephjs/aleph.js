@@ -23,7 +23,7 @@ export type Route = readonly [
   meta: RouteMeta,
 ];
 
-export type RouteConfig = {
+export type Router = {
   routes: Route[];
   prefix: string;
   appDir?: string;
@@ -31,11 +31,17 @@ export type RouteConfig = {
   _app?: Route;
 };
 
+export type RouteRegExp = {
+  prefix: string;
+  test(filename: string): boolean;
+  exec(filename: string): URLPatternInput | null;
+};
+
 export type RouteMatch = [ret: URLPatternResult, route: RouteMeta];
 
 /** match routes against the given url */
-export function matchRoutes(url: URL, config: RouteConfig): RouteMatch[] {
-  const { routes, _app, _404 } = config;
+export function matchRoutes(url: URL, router: Router): RouteMatch[] {
+  const { routes, _app, _404 } = router;
   let { pathname } = url;
   if (pathname !== "/") {
     pathname = util.trimSuffix(pathname, "/");

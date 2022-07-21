@@ -1,7 +1,5 @@
 import { serve } from "aleph/server";
 import ssr from "aleph/react-ssr";
-
-// pre-import route modules
 import routes from "./routes/_export.ts";
 
 serve({
@@ -12,4 +10,7 @@ serve({
   },
   unocss: "preset",
   ssr,
+  dev: {
+    reactRefresh: true,
+  },
 });

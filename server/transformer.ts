@@ -27,8 +27,9 @@ export type TransformerOptions = {
   importMap: ImportMap;
   jsxConfig: JSXConfig;
   loader?: ModuleLoader;
-  isDev?: boolean;
   hydratable?: boolean;
+  isDev?: boolean;
+  reactRefresh?: boolean;
 };
 
 export default {
@@ -41,7 +42,7 @@ export default {
     );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { loader, jsxConfig, importMap, isDev, hydratable } = options;
+    const { loader, jsxConfig, importMap, hydratable, isDev, reactRefresh } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
     const ssr = searchParams.has("ssr");
@@ -187,16 +188,16 @@ export default {
           const ret = await transform(specifier, source, {
             ...jsxConfig,
             alephPkgUri,
-            lang: lang as TransformOptions["lang"],
             target,
+            lang: lang as TransformOptions["lang"],
             importMap: JSON.stringify(importMap),
             graphVersions,
             globalVersion: getDeploymentId() ?? depGraph.globalVersion.toString(36),
             stripDataExport: isRouteFile(specifier),
-            reactRefresh: Deno.env.get("ALEPH_HMR_REACT_REFRESH") === "true",
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
             isDev,
+            reactRefresh,
           });
           code = ret.code;
           map = ret.map;

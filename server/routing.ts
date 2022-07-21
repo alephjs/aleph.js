@@ -1,24 +1,30 @@
 import { URLPatternCompat, type URLPatternInput } from "../runtime/core/url_pattern.ts";
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import { extname, fromFileUrl, globToRegExp, join, resolve } from "./deps.ts";
-import graph from "./graph.ts";
-import { fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
-import type { Route, RouteConfig, RouteMatch, RouteMeta, RouterInit } from "./types.ts";
+import { esbuild, extname, fromFileUrl, globToRegExp, join, relative, resolve } from "./deps.ts";
+import type { BuildResult } from "./deps.ts";
+import graph, { DependencyGraph } from "./graph.ts";
+import {
+  existsFile,
+  fixResponse,
+  getAlephConfig,
+  getFiles,
+  getImportMap,
+  getJSXConfig,
+  toResponse,
+} from "./helpers.ts";
+import type { ModuleLoader, Route, RouteMatch, RouteMeta, Router, RouteRegExp, RouterInit } from "./types.ts";
 
 /** import the route module. */
 export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
   const config = getAlephConfig();
   const routes = config?.router?.routes;
-  if (
-    Deno.env.get("ALEPH_ENV") !== "development" &&
-    (routes && pattern.pathname in routes)
-  ) {
+  if (routes && pattern.pathname in routes) {
     return routes[pattern.pathname];
   }
 
   const version = graph.get(filename)?.version;
-  const devPort = Deno.env.get("ALEPH_DEV_SERVER_PORT");
+  const devPort = Deno.env.get("ALEPH_DEV_PORT");
   let url: string;
   if (devPort) {
     url = `http://localhost:${devPort}${filename.slice(1)}?ssr&v=${(version ?? graph.globalVersion).toString(36)}`;
@@ -32,18 +38,18 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
 export async function fetchRouteData(
   req: Request,
   ctx: Record<string, unknown>,
-  routeConfig: RouteConfig,
+  router: Router,
   reqData: boolean,
 ): Promise<Response | void> {
   const { pathname, host } = new URL(req.url);
-  if (routeConfig.routes.length > 0) {
+  if (router.routes.length > 0) {
     let pathnameInput = pathname;
     if (pathnameInput !== "/") {
       pathnameInput = util.trimSuffix(pathname, "/");
     }
     let matched: RouteMatch | null = null;
     // find the direct match
-    for (const [pattern, meta] of routeConfig.routes) {
+    for (const [pattern, meta] of router.routes) {
       const ret = pattern.exec({ host, pathname: pathnameInput });
       if (ret) {
         matched = [ret, meta];
@@ -52,7 +58,7 @@ export async function fetchRouteData(
     }
     if (!matched) {
       // find index route
-      for (const [pattern, meta] of routeConfig.routes) {
+      for (const [pattern, meta] of router.routes) {
         if (meta.pattern.pathname.endsWith("/index")) {
           const ret = pattern.exec({ host, pathname: pathnameInput + "/index" });
           if (ret) {
@@ -65,7 +71,7 @@ export async function fetchRouteData(
     if (matched) {
       const { method } = req;
       const [ret, meta] = matched;
-      const mod = await importRouteModule(meta, routeConfig.appDir);
+      const mod = await importRouteModule(meta, router.appDir);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
       if (method !== "GET" || mod.default === undefined || reqData) {
         Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
@@ -93,29 +99,8 @@ export async function fetchRouteData(
   }
 }
 
-/* check if the filename is a route */
-export function isRouteFile(filename: string): boolean {
-  const routeConfig: RouteConfig | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTE_CONFIG");
-  const index = routeConfig?.routes.findIndex(([_, meta]) => meta.filename === filename);
-  if (index !== undefined && index !== -1) {
-    return true;
-  }
-  const config = getAlephConfig();
-  if (config?.router) {
-    const reg = toRouteRegExp(config.router);
-    return reg.test(filename);
-  }
-  return false;
-}
-
-type RouteRegExp = {
-  prefix: string;
-  test(filename: string): boolean;
-  exec(filename: string): URLPatternInput | null;
-};
-
-/** initialize routes from routes config */
-export async function initRoutes(options: RouterInit, appDir?: string): Promise<RouteConfig> {
+/** initialize router from routes config */
+export async function initRouter(options: RouterInit, appDir?: string): Promise<Router> {
   const reg = toRouteRegExp(options);
   const files = await getFiles(appDir ? resolve(appDir) : Deno.cwd());
   const routes: Route[] = [];
@@ -159,6 +144,191 @@ export async function initRoutes(options: RouterInit, appDir?: string): Promise<
     _404,
     _app,
   };
+}
+
+/** generate the `routes/_export.ts` module by given the routes config. */
+export async function generateRoutesExportModule(router: Router, loaders?: ModuleLoader[]) {
+  const appDir = router.appDir ?? Deno.cwd();
+  const routesDir = join(appDir, router.prefix);
+  const genFile = join(routesDir, "_export.ts");
+  const withLoader = router.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
+
+  if (router.routes.length == 0) {
+    try {
+      await Deno.remove(genFile);
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) {
+        throw error;
+      }
+    }
+    return;
+  }
+
+  const comments = [
+    "// Imports route modules for serverless env that doesn't support the dynamic import.",
+    "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
+  ];
+  const imports: string[] = [];
+  const revives: string[] = [];
+
+  router.routes.forEach(([_, { filename, pattern }], idx) => {
+    const importUrl = JSON.stringify(
+      "." + util.trimPrefix(filename, router.prefix),
+    );
+    imports.push(`import * as $${idx} from ${importUrl};`);
+    revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
+  });
+
+  // stop previous esbuild watcher
+  const preResult: BuildResult | undefined = Reflect.get(
+    globalThis,
+    "__ALEPH_PREV_ESBUILD_RES",
+  );
+  if (preResult) {
+    Reflect.deleteProperty(globalThis, "__ALEPH_PREV_ESBUILD_RES");
+    preResult.stop?.();
+  }
+
+  if (withLoader) {
+    const input = [
+      ...imports,
+      "export default {",
+      ...revives,
+      "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null,",
+      "}",
+    ].join("\n");
+    const depGraph = new DependencyGraph();
+    const write = async (build: BuildResult) => {
+      await Promise.all(build.outputFiles!.map(async (file) => {
+        if (file.path === genFile) {
+          await writeFile(
+            genFile,
+            file.text.replace(
+              "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
+              // deno-lint-ignore no-unused-vars
+              `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
+            ),
+          );
+        }
+      }));
+    };
+    const result = await esbuild({
+      stdin: {
+        sourcefile: genFile,
+        contents: input,
+      },
+      outfile: genFile,
+      platform: "browser",
+      format: "esm",
+      target: ["esnext"],
+      bundle: true,
+      minify: true,
+      treeShaking: true,
+      // todo: enable sourcemap
+      sourcemap: false,
+      write: false,
+      banner: {
+        js: [
+          ...comments,
+          "// deno-fmt-ignore-file",
+          "// deno-lint-ignore-file",
+          "// @ts-nocheck",
+        ].join("\n"),
+      },
+      plugins: [{
+        name: "bundle-non-standard-modules",
+        setup(build) {
+          build.onResolve({ filter: /.*/ }, (args) => {
+            if (
+              args.path.startsWith(".") &&
+              loaders?.some((l) => l.test(args.path))
+            ) {
+              const specifier = "./" + relative(appDir, join(routesDir, args.path));
+              depGraph.mark(specifier, {});
+              if (args.importer.startsWith(".")) {
+                const importer = "./" + relative(appDir, join(routesDir, args.importer));
+                depGraph.mark(importer, { deps: [{ specifier }] });
+              }
+              return { path: args.path, namespace: "loader" };
+            }
+            return { path: args.path, external: true };
+          });
+          build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
+            const loader = loaders?.find((l) => l.test(args.path));
+            if (loader) {
+              const fullpath = join(routesDir, args.path);
+              const specifier = "./" + relative(appDir, fullpath);
+              const [importMap, jsxConfig, source] = await Promise.all([
+                getImportMap(appDir),
+                getJSXConfig(appDir),
+                Deno.readTextFile(fullpath),
+              ]);
+              const { code, lang, inlineCSS } = await loader.load(specifier, source, {
+                importMap,
+                jsxConfig,
+                ssr: true,
+              });
+              if (inlineCSS) {
+                depGraph.mark(specifier, { inlineCSS });
+              }
+              return {
+                contents: code,
+                loader: lang,
+                watchFiles: [fullpath],
+              };
+            }
+            throw new Error(`Loader not found for ${args.path}`);
+          });
+        },
+      }],
+      watch: {
+        onRebuild(error, result) {
+          if (error) log.warn("[esbuild] watch build failed:", error);
+          else write(result!);
+        },
+      },
+    });
+    Reflect.set(globalThis, "__ALEPH_PREV_ESBUILD_RES", result);
+    await write(result);
+  } else {
+    const empty = "";
+    const code = [
+      ...comments,
+      empty,
+      ...imports,
+      empty,
+      "export default {",
+      ...revives,
+      "};",
+      empty,
+    ].join("\n");
+    await writeFile(genFile, code);
+  }
+}
+
+async function writeFile(filename: string, content: string) {
+  if (await existsFile(filename)) {
+    const oldContent = await Deno.readTextFile(filename);
+    if (oldContent === content) {
+      return;
+    }
+  }
+  await Deno.writeTextFile(filename, content);
+}
+
+/* check if the filename is a route */
+export function isRouteFile(filename: string): boolean {
+  const router: Router | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
+  const index = router?.routes.findIndex(([_, meta]) => meta.filename === filename);
+  if (index !== undefined && index !== -1) {
+    return true;
+  }
+  const config = getAlephConfig();
+  if (config?.router) {
+    const reg = toRouteRegExp(config.router);
+    return reg.test(filename);
+  }
+  return false;
 }
 
 /** convert route config to `RouteRegExp` */
