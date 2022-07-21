@@ -34,14 +34,21 @@ export async function cacheFetch(
   url: string,
   options?: { forceRefresh?: boolean; retryTimes?: number; userAgent?: string },
 ): Promise<Response> {
-  const { protocol, hostname, port, pathname, search } = new URL(url);
+  const urlObj = new URL(url);
+  const { protocol, hostname, port, pathname, searchParams } = urlObj;
   const isLocalhost = ["localhost", "0.0.0.0", "127.0.0.1"].includes(hostname);
   const modulesCacheDir = Deno.env.get("MODULES_CACHE_DIR");
-  const cacheKey = isLocalhost ? "" : await util.computeHash("sha-256", pathname + search + (options?.userAgent || ""));
 
+  let cacheKey = "";
   let cacheDir = "";
   let metaFilepath = "";
   let contentFilepath = "";
+  if (!isLocalhost) {
+    searchParams.delete("v");
+    searchParams.sort();
+    url = urlObj.toString();
+    cacheKey = await util.computeHash("sha-256", pathname + searchParams.toString() + (options?.userAgent || ""));
+  }
   if (modulesCacheDir) {
     cacheDir = join(modulesCacheDir, util.trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
     contentFilepath = join(cacheDir, cacheKey);
