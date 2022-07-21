@@ -21,7 +21,7 @@ export type RenderOptions = {
   customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
   router: Router | null;
   ssr: SSR;
-  isDev: boolean;
+  isDev?: boolean;
 };
 
 /** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */

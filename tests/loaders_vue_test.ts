@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "std/testing/asserts.ts";
+import { assert, assertEquals, assertStringIncludes } from "std/testing/asserts.ts";
 import VueLoader from "../loaders/vue.ts";
 
 Deno.test("[unit] loaders/vue.ts", async (t) => {
@@ -22,17 +22,17 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     </style>
   `;
     const loader = new VueLoader();
-    const { lang, code, inlineCSS } = await loader.load("test.vue", testVue, { isDev: false });
+    const { lang, code, inlineCSS } = await loader.load("./test.vue", testVue, { isDev: false });
     assert(loader.test("test.vue"));
     assertEquals(lang, "js");
-    assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
-    assert(code.includes(`setup(__props)`));
-    assert(code.includes(`const msg = ref("Hello World!")`));
-    assert(code.includes(`_createElementBlock(_Fragment`));
-    assert(code.includes(`_createElementVNode("h1"`));
-    assert(code.includes(`_withDirectives(_createElementVNode("input"`));
-    assert(code.includes(`__sfc__.__file = "./test.vue"`));
-    assert(code.includes(`__sfc__.__scopeId = "data-v-`));
+    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/vue"`);
+    assertStringIncludes(code, `setup(__props)`);
+    assertStringIncludes(code, `const msg = ref("Hello World!")`);
+    assertStringIncludes(code, `_createElementBlock(_Fragment`);
+    assertStringIncludes(code, `_createElementVNode("h1"`);
+    assertStringIncludes(code, `_withDirectives(_createElementVNode("input"`);
+    assertStringIncludes(code, `__sfc__.__file = "./test.vue"`);
+    assertStringIncludes(code, `__sfc__.__scopeId = "data-v-`);
     assert(inlineCSS?.includes("h1[data-v-"));
     assert(inlineCSS?.includes("font-size: 30px;"));
   });
@@ -48,13 +48,13 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     </template>
   `;
     const loader = new VueLoader();
-    const { lang, code } = await loader.load("test.vue", testVue, { isDev: false });
+    const { lang, code } = await loader.load("./test.vue", testVue, { isDev: false });
     assertEquals(lang, "ts");
-    assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
-    assert(code.includes(`setup(__props)`));
-    assert(code.includes(`let x: string | number = 1`));
-    assert(code.includes(`_createElementBlock("p"`));
-    assert(code.includes(`__sfc__.__file = "./test.vue"`));
+    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/vue"`);
+    assertStringIncludes(code, `setup(__props)`);
+    assertStringIncludes(code, `let x: string | number = 1`);
+    assertStringIncludes(code, `_createElementBlock("p"`);
+    assertStringIncludes(code, `__sfc__.__file = "./test.vue"`);
   });
 
   await t.step("VueLoader(hmr)", async () => {
@@ -77,11 +77,11 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
       </style>
     `;
     const loader = new VueLoader();
-    const { code } = await loader.load("/test.vue", testVue, { isDev: true });
-    assert(code.includes(`createElementBlock as _createElementBlock } from "https://esm.sh/vue"`));
-    assert(code.includes(`__sfc__.__hmrId = "`));
-    assert(code.includes(`__sfc__.__scriptHash = "`));
-    assert(code.includes(`__sfc__.render = function render(`));
+    const { code } = await loader.load("./test.vue", testVue, { isDev: true });
+    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/vue"`);
+    assertStringIncludes(code, `__sfc__.__hmrId = "`);
+    assertStringIncludes(code, `__sfc__.__scriptHash = "`);
+    assertStringIncludes(code, `__sfc__.render = function render(`);
   });
 
   await t.step("VueLoader(ssr)", async () => {
@@ -104,16 +104,16 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
       </style>
     `;
     const loader = new VueLoader();
-    const { code, inlineCSS } = await loader.load("test.vue", testVue, { ssr: true });
-    assert(code.includes(`ssrInterpolate as _ssrInterpolate } from "https://esm.sh/@vue/server-renderer"`));
-    assert(code.includes(`__ssrInlineRender: true,`));
-    assert(code.includes(`setup(__props)`));
-    assert(code.includes(`const msg = ref("Hello World!")`));
-    assert(code.includes(`<h1`));
-    assert(code.includes(`<input`));
-    assert(code.includes(` data-v-`));
-    assert(code.includes(`__file = "./test.vue"`));
-    assert(code.includes(`__scopeId = "data-v-`));
+    const { code, inlineCSS } = await loader.load("./test.vue", testVue, { ssr: true });
+    assertStringIncludes(code, `ssrInterpolate as _ssrInterpolate } from "https://esm.sh/@vue/server-renderer"`);
+    assertStringIncludes(code, `__ssrInlineRender: true,`);
+    assertStringIncludes(code, `setup(__props)`);
+    assertStringIncludes(code, `const msg = ref("Hello World!")`);
+    assertStringIncludes(code, `<h1`);
+    assertStringIncludes(code, `<input`);
+    assertStringIncludes(code, ` data-v-`);
+    assertStringIncludes(code, `__file = "./test.vue"`);
+    assertStringIncludes(code, `__scopeId = "data-v-`);
     assert(inlineCSS?.includes("h1[data-v-"));
     assert(inlineCSS?.includes("font-size: 30px;"));
   });

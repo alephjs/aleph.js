@@ -1,6 +1,6 @@
 import type { App, Component, Ref, ShallowRef } from "vue";
 import { createSSRApp as vueCreateSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
-import type { Route, RouteConfig, RouteMeta, RouteModule } from "../core/route.ts";
+import type { Route, RouteMeta, RouteModule, Router } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import events from "../core/events.ts";
 import { FetchError } from "../core/error.ts";
@@ -45,7 +45,7 @@ const createRouter = (props: RouterProps) => {
   const { modules, url, dataCache, dataUrl } = props;
 
   const routeModules = getRouteModules();
-  const routes = loadRoutesFromTag();
+  const router = loadRouterFromTag();
 
   const _dataUrl = url.value.pathname + url.value.search;
   modules.value.forEach((module) => {
@@ -105,7 +105,7 @@ const createRouter = (props: RouterProps) => {
   const onmoduleprefetch = (e: Record<string, unknown>) => {
     const deployId = document.body.getAttribute("data-deployment-id");
     const pageUrl = new URL(e.href as string, location.href);
-    const matches = matchRoutes(pageUrl, routes);
+    const matches = matchRoutes(pageUrl, router);
     matches.map(([_, meta]) => {
       const { filename } = meta;
       if (!(filename in routeModules)) {
@@ -123,7 +123,7 @@ const createRouter = (props: RouterProps) => {
 
   const onpopstate = async (e: Record<string, unknown>) => {
     const next_url = (e.url as URL | undefined) || new URL(window.location.href);
-    const matches = matchRoutes(next_url, routes);
+    const matches = matchRoutes(next_url, router);
     const loadingBar = getLoadingBar();
     let loading: number | null = setTimeout(() => {
       loading = null;
@@ -358,7 +358,7 @@ function getLoadingBar(): HTMLDivElement {
   return bar;
 }
 
-function loadRoutesFromTag(): RouteConfig {
+function loadRouterFromTag(): Router {
   const el = window.document?.getElementById("routes-manifest");
   if (el) {
     try {
@@ -379,7 +379,7 @@ function loadRoutesFromTag(): RouteConfig {
         return { routes, prefix: manifest.prefix, _app, _404 };
       }
     } catch (e) {
-      throw new Error(`loadRoutesFromTag: ${e.message}`);
+      throw new Error(`loadRouterFromTag: ${e.message}`);
     }
   }
   return { routes: [], prefix: "" };

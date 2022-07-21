@@ -1,7 +1,7 @@
 import { assertEquals } from "std/testing/asserts.ts";
 import { dirname, join } from "std/path/mod.ts";
 import { matchRoutes } from "../runtime/core/route.ts";
-import { initRoutes } from "../server/routing.ts";
+import { initRouter } from "../server/routing.ts";
 
 Deno.test("[unit] server/routing.ts: matchRoutes", async () => {
   const tmpDir = await Deno.makeTempDir();
@@ -29,7 +29,7 @@ Deno.test("[unit] server/routing.ts: matchRoutes", async () => {
   ];
   await Promise.all(files.map((file) => Deno.mkdir(join(tmpDir, dirname(file)), { recursive: true })));
   await Promise.all(files.map((file) => Deno.writeTextFile(join(tmpDir, file), "")));
-  const routes = await initRoutes({ glob: "./routes/**/*.{tsx,mdx}" }, tmpDir);
+  const routes = await initRouter({ glob: "./routes/**/*.{tsx,mdx}" }, tmpDir);
   assertEquals(routes.routes.length, files.length - 1);
   assertEquals(routes.routes.filter(([_, meta]) => meta.nesting).length, 5);
 
