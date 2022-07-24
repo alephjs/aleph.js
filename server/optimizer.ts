@@ -74,7 +74,7 @@ export async function optimize(
     await Promise.all(queue.map(async (specifier) => {
       const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
       const isCSS = url.pathname.endsWith(".css");
-      const req = new Request(url.toString(), { headers: { "Pragma": "no-output" } });
+      const req = new Request(url.toString());
       let savePath = join(outputDir, url.pathname);
       if (isNpmPkg(specifier)) {
         savePath += ".js";

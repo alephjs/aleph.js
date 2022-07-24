@@ -67,6 +67,7 @@ export function serve(options: ServerOptions = {}) {
     dev,
   } = options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
+  const optimizeMode = Deno.args.includes("--optimize");
   const isDev = Deno.args.includes("--dev");
 
   // inject the config to global
@@ -164,8 +165,8 @@ export function serve(options: ServerOptions = {}) {
         transformer.test(pathname)
       )
     ) {
-      // check the optimization output
-      if (req.headers.get("Pragma") !== "no-output") {
+      // check the optimized output
+      if (!isDev && !optimizeMode) {
         let outFile = join(appDir ?? Deno.cwd(), optimization?.outputDir ?? "./output", pathname);
         if (pathname.startsWith("/-/") && isNpmPkg(restoreUrl(pathname))) {
           outFile += ".js";
@@ -439,7 +440,7 @@ export function serve(options: ServerOptions = {}) {
   };
 
   // optimize the application for production
-  if (Deno.args.includes("--optimize")) {
+  if (optimizeMode) {
     optimize(handler, appDir);
     return;
   }
