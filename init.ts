@@ -166,7 +166,7 @@ export default async function init(nameArg?: string, template?: string) {
   ]);
 
   if (await confirm("Initialize VS Code workspace configuration?")) {
-    const settigns = {
+    const settings = {
       "deno.enable": true,
       "deno.lint": true,
       "deno.config": "./deno.json",
@@ -174,7 +174,7 @@ export default async function init(nameArg?: string, template?: string) {
     await ensureDir(join(appDir, ".vscode"));
     await Deno.writeTextFile(
       join(appDir, ".vscode", "settings.json"),
-      JSON.stringify(settigns, undefined, 2),
+      JSON.stringify(settings, undefined, 2),
     );
   }
 
