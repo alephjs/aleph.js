@@ -192,13 +192,6 @@ export const Router: FC<RouterProps> = (props) => {
     events.on("hmr:remove", onhmrremove);
     events.emit("routerready", { type: "routerready" });
 
-    // remove ssr head elements
-    Array.from(head.children).forEach((el: Element) => {
-      if (el.hasAttribute("ssr")) {
-        head.removeChild(el);
-      }
-    });
-
     // clean up
     return () => {
       removeEventListener("popstate", onpopstate as unknown as EventListener);

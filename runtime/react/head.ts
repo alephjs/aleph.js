@@ -36,6 +36,7 @@ export const Head: FC<{ children?: ReactNode }> = (props) => {
 
   useEffect(() => {
     const { document } = window;
+    const { head } = document;
     const insertedEls: Array<HTMLElement> = [];
 
     if (els.length > 0) {
@@ -53,13 +54,20 @@ export const Head: FC<{ children?: ReactNode }> = (props) => {
             el.setAttribute(key, String(value || ""));
           }
         });
-        document.head.appendChild(el);
+        head.appendChild(el);
         insertedEls.push(el);
       });
     }
 
+    // remove ssr head elements
+    Array.from(head.children).forEach((el: Element) => {
+      if (el.hasAttribute("ssr")) {
+        head.removeChild(el);
+      }
+    });
+
     return () => {
-      insertedEls.forEach((el) => document.head.removeChild(el));
+      insertedEls.forEach((el) => head.removeChild(el));
     };
   }, [els]);
 
