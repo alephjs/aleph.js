@@ -191,13 +191,14 @@ export function serve(options: ServerOptions = {}) {
           getJSXConfig(appDir),
         ]);
         const hydratable = Boolean(ssr);
+        const reactRefresh = Boolean(Deno.env.get("REACT_REFRESH"));
         return await transformer.fetch(req, {
           importMap,
           jsxConfig,
           loader,
           hydratable,
           isDev,
-          reactRefresh: dev?.reactRefresh,
+          reactRefresh,
         });
       } catch (err) {
         console.log(err);

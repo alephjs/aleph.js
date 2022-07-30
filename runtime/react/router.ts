@@ -57,7 +57,7 @@ export const Router: FC<RouterProps> = (props) => {
   }, [modules]);
 
   useEffect(() => {
-    const { head, body } = window.document;
+    const { body } = window.document;
     const routeModules = getRouteModules();
     const router = loadRouterFromTag();
     const dataDefer = body.hasAttribute("data-defer") ?? dataDeferProp;
@@ -430,4 +430,8 @@ function getLoadingBarEl(): HTMLDivElement {
     transition: "opacity 0.6s ease-in, width 3s ease-in",
   });
   return bar;
+}
+
+if (window.Deno?.env) {
+  Deno.env.set("REACT_REFRESH", "true");
 }

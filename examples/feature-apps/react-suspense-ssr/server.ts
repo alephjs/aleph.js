@@ -12,7 +12,4 @@ serve({
     dataDefer: true,
     render,
   },
-  dev: {
-    reactRefresh: true,
-  },
 });

@@ -11,7 +11,7 @@ export type AlephConfig = {
   /** The router options for the file-system based routing. */
   router?: RouterInit;
   /** The config for UnoCSS. */
-  unocss?: "preset" | UnoConfig;
+  unocss?: UnoConfig;
   /** The module loaders. */
   loaders?: ModuleLoader[];
   /* The options for optimization */
@@ -22,8 +22,6 @@ export type AlephConfig = {
 export type DevOptions = {
   /** The url for the HMR web socket. This is useful for dev server proxy mode. */
   hmrWebSocketUrl?: string;
-  /** Enable react refresh (HMR). */
-  reactRefresh?: boolean;
 };
 
 /** The router options for the file-system based routing. */
