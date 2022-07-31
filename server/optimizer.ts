@@ -8,7 +8,6 @@ import {
   existsDir,
   existsFile,
   fetchCode,
-  getAlephConfig,
   getAlephPkgUri,
   isNpmPkg,
   restoreUrl,
@@ -16,14 +15,14 @@ import {
 } from "./helpers.ts";
 import { parseHtmlLinks } from "./html.ts";
 import { initRouter } from "./routing.ts";
-import type { ConnInfo } from "./types.ts";
+import type { AlephConfig, ConnInfo } from "./types.ts";
 
 export async function optimize(
   serverHandler: (req: Request, connInfo: ConnInfo) => Promise<Response>,
+  config: AlephConfig,
   appDir?: string,
 ) {
   const start = performance.now();
-  const config = getAlephConfig();
   const alephPkgUri = getAlephPkgUri();
   const options = config?.optimization ?? {};
   const target = options.buildTarget ?? "es2018";

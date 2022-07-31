@@ -1,11 +1,11 @@
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
-import type { Emitter } from "./deps.ts";
-import { mitt, relative } from "./deps.ts";
-import depGraph from "./graph.ts";
-import { getAlephConfig, watchFs } from "./helpers.ts";
-import { generateRoutesExportModule, initRouter, toRouteRegExp } from "./routing.ts";
-import type { AlephConfig } from "./types.ts";
+import type { BuildResult, Emitter } from "./deps.ts";
+import { esbuild, join, mitt, relative } from "./deps.ts";
+import depGraph, { DependencyGraph } from "./graph.ts";
+import { existsFile, getAlephConfig, getImportMap, getJSXConfig, watchFs } from "./helpers.ts";
+import { initRouter, toRouteRegExp } from "./routing.ts";
+import type { AlephConfig, ModuleLoader, Router } from "./types.ts";
 
 type WatchFsEvents = {
   [key in "create" | "remove" | "modify" | `modify:${string}` | `hotUpdate:${string}`]: {
@@ -30,32 +30,33 @@ export function removeWatchFsEmitter(e: Emitter<WatchFsEvents>) {
 
 /** Watch for file changes and listen the dev server. */
 export function watch(appDir = Deno.cwd()) {
+  const config = getAlephConfig();
   const emitter = createWatchFsEmitter();
 
   emitter.on("*", async (kind, { specifier }) => {
-    const config = getAlephConfig();
-    if (config) {
-      if (config.router) {
-        if (kind === "create" || kind === "remove") {
-          // reload router when fs changess
-          const reg = toRouteRegExp(config.router);
-          if (reg.test(specifier)) {
-            const router = await initRouter(config.router, appDir);
-            Reflect.set(globalThis, "__ALEPH_ROUTER", router);
-            generateRoutesExportModule(router, config.loaders).catch((err) => log.error(err));
+    if (config?.router) {
+      if (kind === "create" || kind === "remove") {
+        // reload router when fs changess
+        const reg = toRouteRegExp(config.router);
+        if (reg.test(specifier)) {
+          const router = await initRouter(config.router, appDir);
+          Reflect.set(globalThis, "__ALEPH_ROUTER", router);
+          if (config.ssr) {
+            generateExportTs(router, config.loaders).catch((err) => log.error(err));
           }
         }
-      } else {
-        Reflect.set(globalThis, "__ALEPH_ROUTER", null);
       }
+    } else {
+      Reflect.set(globalThis, "__ALEPH_ROUTER", null);
     }
   });
 
-  const config = getAlephConfig();
   if (config?.router) {
     initRouter(config.router, appDir).then((router) => {
       Reflect.set(globalThis, "__ALEPH_ROUTER", router);
-      generateRoutesExportModule(router, config.loaders).catch((err) => log.error(err));
+      if (config.ssr) {
+        generateExportTs(router, config.loaders).catch((err) => log.error(err));
+      }
     });
   } else {
     Reflect.set(globalThis, "__ALEPH_ROUTER", null);
@@ -143,4 +144,174 @@ export function handleHMR(req: Request): Response {
     }
   });
   return response;
+}
+
+/** generate the `routes/_export.ts` module by given the routes config. */
+export async function generateExportTs(router: Router, loaders?: ModuleLoader[]) {
+  const appDir = router.appDir ?? Deno.cwd();
+  const routesDir = join(appDir, router.prefix);
+  const genFile = join(routesDir, "_export.ts");
+  const withLoader = router.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
+
+  if (router.routes.length == 0) {
+    try {
+      await Deno.remove(genFile);
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) {
+        throw error;
+      }
+    }
+    return;
+  }
+
+  const comments = [
+    "// Imports route modules for serverless env that doesn't support the dynamic import.",
+    "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
+  ];
+  const imports: string[] = [];
+  const revives: string[] = [];
+
+  router.routes.forEach(([_, { filename, pattern }], idx) => {
+    const importUrl = JSON.stringify(
+      "." + util.trimPrefix(filename, router.prefix),
+    );
+    imports.push(`import * as $${idx} from ${importUrl};`);
+    revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
+  });
+
+  // stop previous esbuild watcher
+  const preResult: BuildResult | undefined = Reflect.get(
+    globalThis,
+    "__ALEPH_PREV_ESBUILD_RES",
+  );
+  if (preResult) {
+    Reflect.deleteProperty(globalThis, "__ALEPH_PREV_ESBUILD_RES");
+    preResult.stop?.();
+  }
+
+  if (withLoader) {
+    const input = [
+      ...imports,
+      "export default {",
+      ...revives,
+      "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null,",
+      "}",
+    ].join("\n");
+    const depGraph = new DependencyGraph();
+    const write = async (build: BuildResult) => {
+      await Promise.all(build.outputFiles!.map(async (file) => {
+        if (file.path === genFile) {
+          await lazyWriteFile(
+            genFile,
+            file.text.replace(
+              "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
+              // deno-lint-ignore no-unused-vars
+              `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
+            ),
+          );
+        }
+      }));
+    };
+    const result = await esbuild({
+      stdin: {
+        sourcefile: genFile,
+        contents: input,
+      },
+      outfile: genFile,
+      platform: "browser",
+      format: "esm",
+      target: ["esnext"],
+      bundle: true,
+      minify: true,
+      treeShaking: true,
+      // todo: enable sourcemap
+      sourcemap: false,
+      write: false,
+      banner: {
+        js: [
+          ...comments,
+          "// deno-fmt-ignore-file",
+          "// deno-lint-ignore-file",
+          "// @ts-nocheck",
+        ].join("\n"),
+      },
+      plugins: [{
+        name: "bundle-non-standard-modules",
+        setup(build) {
+          build.onResolve({ filter: /.*/ }, (args) => {
+            if (
+              args.path.startsWith(".") &&
+              loaders?.some((l) => l.test(args.path))
+            ) {
+              const specifier = "./" + relative(appDir, join(routesDir, args.path));
+              depGraph.mark(specifier, {});
+              if (args.importer.startsWith(".")) {
+                const importer = "./" + relative(appDir, join(routesDir, args.importer));
+                depGraph.mark(importer, { deps: [{ specifier }] });
+              }
+              return { path: args.path, namespace: "loader" };
+            }
+            return { path: args.path, external: true };
+          });
+          build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
+            const loader = loaders?.find((l) => l.test(args.path));
+            if (loader) {
+              const fullpath = join(routesDir, args.path);
+              const specifier = "./" + relative(appDir, fullpath);
+              const [importMap, jsxConfig, source] = await Promise.all([
+                getImportMap(appDir),
+                getJSXConfig(appDir),
+                Deno.readTextFile(fullpath),
+              ]);
+              const { code, lang, inlineCSS } = await loader.load(specifier, source, {
+                importMap,
+                jsxConfig,
+                ssr: true,
+              });
+              if (inlineCSS) {
+                depGraph.mark(specifier, { inlineCSS });
+              }
+              return {
+                contents: code,
+                loader: lang,
+                watchFiles: [fullpath],
+              };
+            }
+            throw new Error(`Loader not found for ${args.path}`);
+          });
+        },
+      }],
+      watch: {
+        onRebuild(error, result) {
+          if (error) log.warn("[esbuild] watch build failed:", error);
+          else write(result!);
+        },
+      },
+    });
+    Reflect.set(globalThis, "__ALEPH_PREV_ESBUILD_RES", result);
+    await write(result);
+  } else {
+    const empty = "";
+    const code = [
+      ...comments,
+      empty,
+      ...imports,
+      empty,
+      "export default {",
+      ...revives,
+      "};",
+      empty,
+    ].join("\n");
+    await lazyWriteFile(genFile, code);
+  }
+}
+
+async function lazyWriteFile(filename: string, content: string) {
+  if (await existsFile(filename)) {
+    const oldContent = await Deno.readTextFile(filename);
+    if (oldContent === content) {
+      return;
+    }
+  }
+  await Deno.writeTextFile(filename, content);
 }

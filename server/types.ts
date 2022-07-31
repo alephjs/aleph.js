@@ -10,12 +10,18 @@ export type AlephConfig = {
   baseUrl?: string;
   /** The router options for the file-system based routing. */
   router?: RouterInit;
-  /** The config for UnoCSS. */
-  unocss?: UnoConfig;
   /** The module loaders. */
   loaders?: ModuleLoader[];
+  /** The server middlewares. */
+  middlewares?: Middleware[];
+  /** The options for session. */
+  session?: SessionOptions;
+  /** The options for SSR. */
+  ssr?: SSR;
   /* The options for optimization */
   optimization?: OptimizationOptions;
+  /** The config for UnoCSS. */
+  unocss?: UnoConfig;
 };
 
 /** The options for dev server. */

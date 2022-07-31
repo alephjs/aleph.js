@@ -35,19 +35,14 @@ import type {
   ModuleLoader,
   Router,
   ServeInit,
-  SessionOptions,
-  SSR,
 } from "./types.ts";
 
 /** The options for the Aleph.js server.  */
 export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
-  logLevel?: LevelName;
-  session?: SessionOptions;
-  middlewares?: Middleware[];
   fetch?: FetchHandler;
-  ssr?: SSR;
+  logLevel?: LevelName;
   onError?: ErrorHandler;
   dev?: DevOptions;
 } & AlephConfig;
@@ -56,22 +51,32 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 export function serve(options: ServerOptions = {}) {
   const {
     baseUrl,
+    dev,
     fetch,
     loaders,
     middlewares,
     onError,
     optimization,
     router: routerConfig,
+    session,
     ssr,
     unocss,
-    dev,
   } = options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
   const optimizeMode = Deno.args.includes("--optimize");
   const isDev = Deno.args.includes("--dev");
 
-  // inject the config to global
-  const config: AlephConfig = { baseUrl, router: routerConfig, unocss, loaders, optimization };
+  // inject aleph config to global
+  const config: AlephConfig = {
+    baseUrl,
+    loaders,
+    middlewares,
+    optimization,
+    router: routerConfig,
+    session,
+    ssr,
+    unocss,
+  };
   Reflect.set(globalThis, "__ALEPH_CONFIG", config);
 
   if (routerConfig && routerConfig.routes) {
@@ -114,7 +119,7 @@ export function serve(options: ServerOptions = {}) {
     }
 
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
-    const ctx = createContext(req, { connInfo, customHTMLRewriter });
+    const ctx = createContext(req, { connInfo, customHTMLRewriter, session });
     const postMiddlewares: Middleware[] = [];
 
     // use eager middlewares
@@ -442,14 +447,13 @@ export function serve(options: ServerOptions = {}) {
 
   // optimize the application for production
   if (optimizeMode) {
-    optimize(handler, appDir);
+    optimize(handler, config, appDir);
     return;
   }
 
   const port = options.port ?? 3000;
   if (isDev) {
-    Deno.env.set("ALEPH_DEV_PORT", port.toString());
-    // watch for file changes
+    Deno.env.set("ALEPH_SERVER_PORT", port.toString());
     watch(appDir);
   }
 

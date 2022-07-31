@@ -5,10 +5,7 @@ import unocss from "./unocss.config.ts";
 
 serve({
   baseUrl: import.meta.url,
-  router: {
-    glob: "./routes/**/*.{tsx,ts}",
-    routes,
-  },
+  router: { routes },
   unocss,
   ssr,
 });
