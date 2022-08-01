@@ -9,11 +9,17 @@ class Module {
   private _isAccepted = false;
   private _isDeclined = false;
   private _isLocked = false;
+  private _data: Record<string, unknown> = {};
   private _acceptCallbacks: CallableFunction[] = [];
+  private _disposeCallbacks: CallableFunction[] = [];
   private _declineDelay = 0;
 
   constructor(specifier: string) {
     this._specifier = specifier;
+  }
+
+  get data(): Record<string, unknown> {
+    return this._data;
   }
 
   accept(callback?: CallableFunction): void {
@@ -24,7 +30,7 @@ class Module {
       sendMessage({ specifier: this._specifier, type: "hotAccept" });
       this._isAccepted = true;
     }
-    if (callback) {
+    if (typeof callback === "function") {
       this._acceptCallbacks.push(callback);
     }
   }
@@ -36,6 +42,16 @@ class Module {
       this._declineDelay = Math.max(delay, 0);
     }
     this.accept();
+  }
+
+  dispose(callback: CallableFunction) {
+    if (typeof callback === "function") {
+      this._disposeCallbacks.push(callback);
+    }
+  }
+
+  invalidate(): void {
+    location.reload();
   }
 
   watchFile(filename: string, callback: () => void) {
@@ -63,6 +79,13 @@ class Module {
       location.reload();
       return;
     }
+
+    const disposeCallbacks = this._disposeCallbacks;
+    const data = this._data;
+    this._disposeCallbacks = [];
+    this._data = {};
+    disposeCallbacks.map((callback) => callback(data));
+
     try {
       const url = this._specifier.slice(1) + (this._specifier.endsWith(".css") ? "?module&" : "?") + "t=" + Date.now();
       const module = await import(url);
