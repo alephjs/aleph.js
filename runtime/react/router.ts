@@ -431,7 +431,3 @@ function getLoadingBarEl(): HTMLDivElement {
   });
   return bar;
 }
-
-if (window.Deno?.env) {
-  Deno.env.set("REACT_REFRESH", "true");
-}

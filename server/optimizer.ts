@@ -136,7 +136,7 @@ export async function optimize(
     }
   }
 
-  // hygiene check, make sure all shared modules are not only referenced by other shared modules
+  // hygiene checks, make sure all shared modules are not only referenced by other shared modules
   for (let i = 0; i < 100; i++) {
     const toHygiene = new Set<string>();
     for (const [specifier, type] of clientModules) {

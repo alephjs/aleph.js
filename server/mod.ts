@@ -27,7 +27,6 @@ import { optimize } from "./optimizer.ts";
 import type {
   AlephConfig,
   ConnInfo,
-  DevOptions,
   ErrorHandler,
   FetchHandler,
   HTMLRewriterHandlers,
@@ -44,24 +43,12 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   fetch?: FetchHandler;
   logLevel?: LevelName;
   onError?: ErrorHandler;
-  dev?: DevOptions;
 } & AlephConfig;
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const {
-    baseUrl,
-    dev,
-    fetch,
-    loaders,
-    middlewares,
-    onError,
-    optimization,
-    router: routerConfig,
-    session,
-    ssr,
-    unocss,
-  } = options;
+  const { baseUrl, fetch, loaders, middlewares, onError, optimization, router: routerConfig, session, ssr, unocss } =
+    options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
   const optimizeMode = Deno.args.includes("--optimize");
   const isDev = Deno.args.includes("--dev");
@@ -385,7 +372,7 @@ export function serve(options: ServerOptions = {}) {
       () =>
         loadAndFixIndexHtml(join(appDir ?? ".", "index.html"), {
           ssr: typeof ssr === "function" ? {} : ssr,
-          hmr: isDev ? { url: dev?.hmrWebSocketUrl } : undefined,
+          hmr: isDev ? { url: Deno.env.get("HMR_WS_URL") } : undefined,
         }),
     );
     if (!indexHtml) {

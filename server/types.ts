@@ -24,12 +24,6 @@ export type AlephConfig = {
   unocss?: UnoConfig;
 };
 
-/** The options for dev server. */
-export type DevOptions = {
-  /** The url for the HMR web socket. This is useful for dev server proxy mode. */
-  hmrWebSocketUrl?: string;
-};
-
 /** The router options for the file-system based routing. */
 export interface RouterInit {
   /** The glob to match routes.  */
@@ -171,6 +165,7 @@ export type SSGOptions = {
   include?: RegExp;
   exclude?: RegExp;
   getStaticPaths?: () => string[] | Promise<string[]>;
+  clientHeaders?: HeadersInit;
 };
 
 export type SSRContext = {
