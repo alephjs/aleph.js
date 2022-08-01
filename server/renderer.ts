@@ -262,7 +262,7 @@ export default {
           rewriter.write(indexHtml);
           rewriter.end();
         } finally {
-          if (typeof ssrRes.body === "string") {
+          if (!ssrStreaming) {
             controller.close();
           }
           rewriter.free();
