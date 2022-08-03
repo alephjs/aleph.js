@@ -65,7 +65,7 @@ export default {
         sourceRaw,
         ssr
           ? { jsxConfig, importMap, ssr: true, sourceMap: true }
-          : { jsxConfig, importMap, isDev, sourceMap: isDev, hasSSRFn: Boolean(config?.ssr) },
+          : { jsxConfig, importMap, isDev, hasSSRFn: Boolean(config?.ssr), sourceMap: isDev },
       );
       source = loaded.code;
       lang = loaded.lang;
@@ -88,10 +88,10 @@ export default {
       if (deps.length) {
         const s = new MagicString(source);
         deps.forEach((dep) => {
-          const { specifier, importUrl, loc } = dep;
-          if (!isRemote && loc) {
+          const { specifier: depSpecifier, importUrl, loc } = dep;
+          if (!util.isLikelyHttpURL(depSpecifier) && loc) {
             const sep = importUrl.includes("?") ? "&" : "?";
-            const version = depGraph.get(specifier)?.version ?? depGraph.globalVersion;
+            const version = depGraph.get(depSpecifier)?.version ?? depGraph.globalVersion;
             const url = `"${importUrl}${sep}ssr&v=${version.toString(36)}"`;
             s.overwrite(loc.start - 1, loc.end - 1, url);
           }
