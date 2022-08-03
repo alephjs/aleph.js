@@ -7,7 +7,7 @@ import { builtinModuleExts, fixResponse, getAlephConfig, getFiles, toResponse } 
 import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp, RouterInit } from "./types.ts";
 
 /** import the route module. */
-export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
+export async function importRouteModule({ filename, pattern }: RouteMeta) {
   const config = getAlephConfig();
   const routes = config?.router?.routes;
   if (routes && pattern.pathname in routes) {
@@ -20,7 +20,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   if (devPort) {
     url = `http://localhost:${devPort}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
   } else {
-    const root = appDir ?? (config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
+    const root = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
     url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
   }
   return await import(url);
@@ -62,7 +62,7 @@ export async function fetchRouteData(
     if (matched) {
       const { method } = req;
       const [ret, meta] = matched;
-      const mod = await importRouteModule(meta, router.appDir);
+      const mod = await importRouteModule(meta);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
       if (method !== "GET" || mod.default === undefined || reqData) {
         Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
@@ -131,7 +131,6 @@ export async function initRouter(options: RouterInit, appDir?: string): Promise<
   return {
     routes,
     prefix: reg.prefix,
-    appDir: appDir ? resolve(appDir) : undefined,
     _404,
     _app,
   };

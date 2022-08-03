@@ -26,8 +26,6 @@ declare interface Data<GetDataType = ResponseLike, ActionDataType = ResponseLike
   delete?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;
 }
 
-declare function loaderImport(url: string, options?: Record<string, unknown>): Promise<Record<string, unknown>>;
-
 declare interface ImportMeta {
   readonly hot?: {
     readonly data: Record<string, unknown>;

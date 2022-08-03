@@ -42,7 +42,7 @@ export function watch(appDir = Deno.cwd()) {
           const router = await initRouter(config.router, appDir);
           Reflect.set(globalThis, "__ALEPH_ROUTER", router);
           if (config.ssr) {
-            generateExportTs(router, config.loaders).catch((err) => log.error(err));
+            generateExportTs(appDir, router, config.loaders).catch((err) => log.error(err));
           }
         }
       }
@@ -55,7 +55,7 @@ export function watch(appDir = Deno.cwd()) {
     initRouter(config.router, appDir).then((router) => {
       Reflect.set(globalThis, "__ALEPH_ROUTER", router);
       if (config.ssr) {
-        generateExportTs(router, config.loaders).catch((err) => log.error(err));
+        generateExportTs(appDir, router, config.loaders).catch((err) => log.error(err));
       }
     });
   } else {
@@ -147,8 +147,7 @@ export function handleHMR(req: Request): Response {
 }
 
 /** generate the `routes/_export.ts` module by given the routes config. */
-export async function generateExportTs(router: Router, loaders?: ModuleLoader[]) {
-  const appDir = router.appDir ?? Deno.cwd();
+export async function generateExportTs(appDir: string, router: Router, loaders?: ModuleLoader[]) {
   const routesDir = join(appDir, router.prefix);
   const genFile = join(routesDir, "_export.ts");
   const withLoader = router.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
