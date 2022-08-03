@@ -14,10 +14,10 @@ const templates = [
   "react",
   "vue",
   "yew",
+  "solid",
   // todo:
   // "preact",
   // "svelte",
-  // "solid",
   // "lit",
   // "vanilla",
 ];
@@ -25,6 +25,7 @@ const templates = [
 const versions = {
   react: "18.2.0",
   vue: "3.2.37",
+  solid: "1.4.8",
 };
 
 export default async function init(nameArg?: string, template?: string) {
@@ -148,6 +149,13 @@ export default async function init(nameArg?: string, template?: string) {
         "aleph/vue-loader": `${alephPkgUri}/loaders/vue.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
         "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
+      });
+      break;
+    }
+    case "solid": {
+      Object.assign(importMap.imports, {
+        "solid-js": `https://esm.sh/solid-js@${versions.solid}`,
+        "solid-js/web": `https://esm.sh/solid-js@${versions.solid}/web`,
       });
       break;
     }
