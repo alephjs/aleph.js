@@ -28,7 +28,7 @@ export type AlephConfig = {
 export interface RouterInit {
   /** The glob to match routes.  */
   glob?: string;
-  /** The directory of the FS routing. */
+  /** The directory of the FS routing. Default is './routes' */
   dir?: string;
   /** The extnames to match routes. */
   exts?: string[];
@@ -131,7 +131,7 @@ export type ModuleLoaderEnv = {
   jsxConfig?: JSXConfig;
   sourceMap?: boolean;
   ssr?: boolean;
-  hydratable?: boolean;
+  hasSSRFn?: boolean;
 };
 
 export type ModuleLoaderOutput = {

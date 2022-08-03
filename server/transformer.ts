@@ -27,9 +27,7 @@ export type TransformerOptions = {
   importMap: ImportMap;
   jsxConfig: JSXConfig;
   loader?: ModuleLoader;
-  hydratable?: boolean;
   isDev?: boolean;
-  reactRefresh?: boolean;
 };
 
 export default {
@@ -42,9 +40,10 @@ export default {
     );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
-    const { loader, jsxConfig, importMap, hydratable, isDev, reactRefresh } = options;
+    const { loader, jsxConfig, importMap, isDev } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
+    const isRemote = util.isLikelyHttpURL(specifier);
     const ssr = searchParams.has("ssr");
     const target = isDev ? "es2022" : "es2018"; // todo: get target from user-agent header
 
@@ -54,18 +53,19 @@ export default {
       return new Response(null, { status: 304 });
     }
 
+    const config = getAlephConfig();
     const [sourceRaw, sourceContentType] = await fetchCode(specifier, target);
     let source = sourceRaw;
     let lang: ModuleLoaderOutput["lang"];
     let inlineCSS: string | undefined;
     let isCSS = false;
-    if (loader) {
+    if (loader && !isRemote) {
       const loaded = await loader.load(
         specifier,
         sourceRaw,
         ssr
           ? { jsxConfig, importMap, ssr: true, sourceMap: true }
-          : { jsxConfig, importMap, isDev, sourceMap: isDev, hydratable },
+          : { jsxConfig, importMap, isDev, sourceMap: isDev, hasSSRFn: Boolean(config?.ssr) },
       );
       source = loaded.code;
       lang = loaded.lang;
@@ -89,7 +89,7 @@ export default {
         const s = new MagicString(source);
         deps.forEach((dep) => {
           const { specifier, importUrl, loc } = dep;
-          if (!util.isLikelyHttpURL(specifier) && loc) {
+          if (!isRemote && loc) {
             const sep = importUrl.includes("?") ? "&" : "?";
             const version = depGraph.get(specifier)?.version ?? depGraph.globalVersion;
             const url = `"${importUrl}${sep}ssr&v=${version.toString(36)}"`;
@@ -140,15 +140,13 @@ export default {
           resType = "text/css";
         }
       } else {
-        const config = getAlephConfig();
         const alephPkgUri = getAlephPkgUri();
         let code: string;
         let map: string | undefined;
         let deps: TransformResult["deps"];
         let hasInlineCSS = false;
         if (
-          util.isLikelyHttpURL(specifier) &&
-          !specifier.startsWith("https://aleph/") &&
+          (isRemote && !specifier.startsWith("https://aleph/")) &&
           (
             /^https?:\/\/(cdn\.)?esm\.sh\//i.test(specifier) ||
             /^(text|application)\/javascript/i.test(sourceContentType)
@@ -178,13 +176,14 @@ export default {
         } else {
           const graphVersions = Object.fromEntries(
             depGraph.modules.filter((mod) => (
-              !util.isLikelyHttpURL(specifier) &&
+              !isRemote &&
               !util.isLikelyHttpURL(mod.specifier) &&
               mod.specifier !== specifier
             )).map((
               { specifier, version },
             ) => [specifier, version.toString(36)]),
           );
+          const reactRefresh = isDev && Boolean(Deno.env.get("REACT_REFRESH"));
           const ret = await transform(specifier, source, {
             ...jsxConfig,
             alephPkgUri,
@@ -240,7 +239,7 @@ export default {
         if (map) {
           try {
             const m = JSON.parse(map);
-            if (!util.isLikelyHttpURL(specifier)) {
+            if (!isRemote) {
               m.sources = [`file://source${util.trimPrefix(specifier, ".")}`];
             }
             // todo: merge loader map

@@ -15,7 +15,7 @@ import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../server/types.ts";
 
-type Options = {
+export type Options = {
   script?: Omit<SFCScriptCompileOptions, "id">;
   template?: Partial<SFCTemplateCompileOptions>;
   style?: Partial<SFCAsyncStyleCompileOptions>;
