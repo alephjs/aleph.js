@@ -1,4 +1,4 @@
-import { render } from "solid-js/web";
-import App from "./App.tsx";
+import { hydrate } from "solid-js/web";
+import App from "./routes/index.tsx";
 
-render(App, document.getElementById("root")!);
+hydrate(App, document.getElementById("root")!);

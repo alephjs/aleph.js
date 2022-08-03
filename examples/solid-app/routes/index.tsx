@@ -6,11 +6,18 @@ function Counter() {
 
   return (
     <button type="button" onClick={increment}>
-      {count()}
+      {count() + 1}
     </button>
   );
 }
 
 export default function App() {
-  return <Counter />;
+  return (
+    <div>
+      <h1>Solid.js + Aleph.js</h1>
+      <p>
+        <Counter />
+      </p>
+    </div>
+  );
 }

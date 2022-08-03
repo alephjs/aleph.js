@@ -5,10 +5,10 @@ import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
+  loaders: [new VueLoader()],
   router: {
-    glob: "./routes/**/*.{vue,ts}",
+    exts: [".vue", ".ts"],
     routes,
   },
-  loaders: [new VueLoader()],
   ssr,
 });

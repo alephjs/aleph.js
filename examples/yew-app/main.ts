@@ -1,5 +1,7 @@
 import init, { main } from "./pkg/yew_app.js";
 
-init().then(main);
+// reload page on rebuild
+import.meta.hot?.decline();
 
-import.meta.hot?.decline({ delay: 500 });
+// run app main
+init().then(main);
