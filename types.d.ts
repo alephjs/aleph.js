@@ -30,7 +30,7 @@ declare interface ImportMeta {
   readonly hot?: {
     readonly data: Record<string, unknown>;
     accept<T = Record<string, unknown>>(callback?: (module: T) => void): void;
-    decline(options?: { delay?: number }): void;
+    decline(): void;
     dispose: (callback: (data: Record<string, unknown>) => void) => void;
     invalidate(): void;
     watchFile(filename: string, callback: () => void): () => void;
