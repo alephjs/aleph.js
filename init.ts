@@ -148,7 +148,7 @@ export default async function init(nameArg?: string, template?: string) {
         "aleph/vue-ssr": `${alephPkgUri}/runtime/vue/ssr.ts`,
         "aleph/vue-loader": `${alephPkgUri}/loaders/vue.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
-        "vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
+        "@vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
       });
       break;
     }

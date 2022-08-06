@@ -59,7 +59,6 @@ export default class VueSFCLoader implements ModuleLoader {
         runtimeModuleName: this.#options?.template?.compilerOptions?.runtimeModuleName ??
           env.importMap?.imports["vue"] ?? "https://esm.sh/vue",
         ssrRuntimeModuleName: this.#options?.template?.compilerOptions?.ssrRuntimeModuleName ??
-          env.importMap?.imports["vue/server-renderer"] ??
           env.importMap?.imports["@vue/server-renderer"] ??
           "https://esm.sh/@vue/server-renderer",
         expressionPlugins,

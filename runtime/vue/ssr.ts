@@ -1,4 +1,4 @@
-import { renderToWebStream } from "vue/server-renderer";
+import { renderToWebStream } from "@vue/server-renderer";
 import type { SSRContext } from "../../server/types.ts";
 import { App, createSSRApp } from "./router.ts";
 

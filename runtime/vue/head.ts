@@ -1,5 +1,5 @@
 import { defineComponent, inject, isVNode, onBeforeUnmount, VNode } from "vue";
-import { ssrRenderComponent } from "vue/server-renderer";
+import { ssrRenderComponent } from "@vue/server-renderer";
 import util from "../../lib/util.ts";
 
 export const Head = defineComponent({
