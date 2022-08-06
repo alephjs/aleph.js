@@ -1,6 +1,6 @@
 import { serve } from "aleph/server";
 import ssr from "aleph/vue-ssr";
-import VueLoader from "aleph/vue-loader";
+import VueLoader from "aleph/loaders/vue";
 import routes from "./routes/_export.ts";
 
 serve({
