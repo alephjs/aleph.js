@@ -391,15 +391,10 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
         const alephPkgUri = getAlephPkgUri();
         if (alephPkgUri === "https://aleph") {
           Object.assign(imports, {
-            "@unocss/": "https://aleph/lib/@unocss/",
             "aleph/": "https://aleph/",
-            "aleph/server": "https://aleph/server/mod.ts",
-            "aleph/dev": "https://aleph/server/dev.ts",
             "aleph/react": "https://aleph/runtime/react/mod.ts",
-            "aleph/react-ssr": "https://aleph/runtime/react/ssr.ts",
             "aleph/react-client": "https://aleph/runtime/react/client.ts",
             "aleph/vue": "https://aleph/runtime/vue/mod.ts",
-            "aleph/vue-ssr": "https://aleph/runtime/vue/ssr.ts",
           });
         }
       }

@@ -5,12 +5,6 @@ export type GithubUser = {
   name: string;
 };
 
-declare global {
-  interface Context {
-    user: GithubUser | undefined;
-  }
-}
-
 export type GithubOauthConfig = {
   clientId?: string;
   clientSecret?: string;

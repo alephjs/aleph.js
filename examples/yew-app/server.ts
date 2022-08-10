@@ -1,7 +1,7 @@
 import { createWatchFsEmitter } from "aleph/dev";
 import { serve } from "aleph/server";
-import init, { ssr } from "./pkg/yew_app.js";
 import { build } from "./build.ts";
+import init, { ssr } from "./pkg/yew_app.js";
 
 const initWasm = async () => {
   const wasmUrl = new URL("./pkg/yew_app_bg.wasm", import.meta.url);

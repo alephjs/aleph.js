@@ -13,6 +13,6 @@ serve({
       return "404 page not found";
     }
     ctx.headCollection.push(generateHydrationScript());
-    return renderToString(App);
+    return renderToString(App as () => unknown);
   },
 });

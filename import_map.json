@@ -4,7 +4,6 @@
     "@unocss/": "./lib/@unocss/",
     "aleph/": "./",
     "aleph/server": "./server/mod.ts",
-    "aleph/dev": "./server/dev.ts",
     "aleph/react": "./runtime/react/mod.ts",
     "aleph/react-client": "./runtime/react/client.ts",
     "aleph/react-ssr": "./runtime/react/ssr.ts",
