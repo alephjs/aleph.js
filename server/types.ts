@@ -18,7 +18,7 @@ export type AlephConfig = {
   session?: SessionOptions;
   /** The options for SSR. */
   ssr?: SSR;
-  /* The options for optimization */
+  /** The options for optimization. */
   optimization?: OptimizationOptions;
   /** The config for UnoCSS. */
   unocss?: UnoConfig;
