@@ -167,10 +167,10 @@ export default {
                   params,
                   filename,
                   withData,
-                  error: data instanceof Error ? { message: data.message, stack: data.stack } : undefined,
-                  data: defered ? undefined : data instanceof Error ? undefined : data,
                   dataCacheTtl,
+                  data: defered ? undefined : data instanceof Error ? undefined : data,
                   dataDefered: defered,
+                  error: data instanceof Error ? { message: data.message, stack: data.stack } : undefined,
                 };
               });
 
