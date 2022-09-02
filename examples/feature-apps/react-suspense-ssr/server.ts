@@ -1,11 +1,5 @@
-import { serve } from "aleph/server";
-import render from "aleph/react-ssr";
+import { serve } from "aleph/react-server";
 import routes from "./routes/_export.ts";
-
-if (Deno.args.includes("--dev")) {
-  // Enable react refresh
-  Deno.env.set("REACT_REFRESH", "true");
-}
 
 serve({
   baseUrl: import.meta.url,
@@ -13,7 +7,6 @@ serve({
     routes,
   },
   ssr: {
-    dataDefer: true,
-    render,
+    suspense: true,
   },
 });

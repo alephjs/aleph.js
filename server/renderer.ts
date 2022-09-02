@@ -32,7 +32,7 @@ export default {
     const { indexHtml, router, customHTMLRewriter, ssr, isDev } = options;
     const headers = new Headers(ctx.headers as Headers);
     const isFn = typeof ssr === "function";
-    const dataDefer = isFn ? false : !!ssr.dataDefer;
+    const dataDefer = isFn ? false : Boolean(ssr.suspense);
     const cc = !isFn ? ssr.cacheControl : "public";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;

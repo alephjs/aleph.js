@@ -189,17 +189,21 @@ export type CSP = {
   nonce?: boolean;
 };
 
-export type SSR = {
+export type SSROptions = {
   cacheControl?: "private" | "public";
   CSP?: CSP;
-  dataDefer: true;
-  render: (ssr: SSRContext) => Promise<ReadableStream> | ReadableStream;
-} | {
-  cacheControl?: "private" | "public";
-  CSP?: CSP;
-  dataDefer?: false;
-  render: SSRFn;
-} | SSRFn;
+};
+
+export type SSR =
+  | ({
+    suspense: true;
+    render: (ssr: SSRContext) => Promise<ReadableStream> | ReadableStream;
+  } & SSROptions)
+  | ({
+    suspense?: false;
+    render: SSRFn;
+  } & SSROptions)
+  | SSRFn;
 
 export type SSRResult = {
   context: SSRContext;

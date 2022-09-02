@@ -1,13 +1,7 @@
 import presetUno from "@unocss/preset-uno.ts";
-import { serve } from "aleph/server";
-import ssr from "aleph/react-ssr";
+import { serve } from "aleph/react-server";
 import { GithubOauth } from "./oauth.ts";
 import routes from "./routes/_export.ts";
-
-if (Deno.args.includes("--dev")) {
-  // Enable react refresh
-  Deno.env.set("REACT_REFRESH", "true");
-}
 
 serve({
   baseUrl: import.meta.url,
@@ -25,5 +19,5 @@ serve({
       clientSecret: Deno.env.get("GITHUB_OAUTH_CLIENT_SECRET"),
     }),
   ],
-  ssr,
+  ssr: true,
 });

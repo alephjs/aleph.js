@@ -135,7 +135,7 @@ export default async function init(nameArg?: string, template?: string) {
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/runtime/react/mod.ts`,
         "aleph/react-client": `${alephPkgUri}/runtime/react/client.ts`,
-        "aleph/react-ssr": `${alephPkgUri}/runtime/react/ssr.ts`,
+        "aleph/react-server": `${alephPkgUri}/runtime/react/server.ts`,
         "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/react-dom@${versions.react}/`,
@@ -145,8 +145,7 @@ export default async function init(nameArg?: string, template?: string) {
     case "vue": {
       Object.assign(importMap.imports, {
         "aleph/vue": `${alephPkgUri}/runtime/vue/mod.ts`,
-        "aleph/vue-ssr": `${alephPkgUri}/runtime/vue/ssr.ts`,
-        "aleph/loaders/vue": `${alephPkgUri}/loaders/vue.ts`,
+        "aleph/vue-server": `${alephPkgUri}/runtime/vue/server.ts`,
         "vue": `https://esm.sh/vue@${versions.vue}`,
         "@vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
       });
@@ -154,7 +153,6 @@ export default async function init(nameArg?: string, template?: string) {
     }
     case "solid": {
       Object.assign(importMap.imports, {
-        "aleph/loaders/solid": `${alephPkgUri}/loaders/solid.ts`,
         "solid-js": `https://esm.sh/solid-js@${versions.solid}`,
         "solid-js/web": `https://esm.sh/solid-js@${versions.solid}/web`,
       });

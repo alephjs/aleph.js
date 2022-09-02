@@ -7,7 +7,7 @@ import type { Comment, Element } from "./types.ts";
 await initLolHtml(lolHtmlWasm());
 
 type LoadOptions = {
-  ssr?: { dataDefer?: boolean };
+  ssr?: { suspense?: boolean };
   hmr?: { url?: string };
 };
 
@@ -133,7 +133,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
 
   rewriter.on("body", {
     element: (el: Element) => {
-      if (ssr?.dataDefer) {
+      if (ssr?.suspense) {
         el.setAttribute("data-defer", "true");
       }
       if (deployId) {

@@ -1,5 +1,5 @@
 import { serve } from "aleph/server";
-import SolidLoader from "aleph/loaders/solid";
+import SolidLoader from "aleph/loaders/solid.ts";
 import { generateHydrationScript, renderToString } from "solid-js/web";
 import routes from "./routes/_export.ts";
 
