@@ -1,5 +1,5 @@
-import type { App, Component, Ref, ShallowRef } from "vue";
-import { createSSRApp as vueCreateSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
+import type { Component, Ref, ShallowRef } from "vue";
+import { createSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
 import type { Route, RouteMeta, RouteModule, Router } from "../core/route.ts";
 import { matchRoutes } from "../core/route.ts";
 import events from "../core/events.ts";
@@ -22,10 +22,6 @@ export type RouteData = {
 
 type RootProps = {
   ssrContext?: SSRContext;
-};
-
-const createApp = (props?: RootProps) => {
-  return createAppApi(props);
 };
 
 type RouterProps = {
@@ -240,12 +236,12 @@ const createRouterRoot = (props: RouterRootProps) => {
   return RouterRoot;
 };
 
-const createAppApi = (props?: RootProps) => {
+const createApp = (props?: RootProps) => {
   const { ssrContext } = props || {};
   const modules = shallowRef(ssrContext?.routeModules || loadSSRModulesFromTag());
 
   if (modules.value.length === 0) {
-    return vueCreateSSRApp(Err, { status: 404, message: "page not found" });
+    return createSSRApp(Err, { status: 404, message: "page not found" });
   }
 
   const url = ref(ssrContext?.url || new URL(window.location?.href));
@@ -257,14 +253,12 @@ const createAppApi = (props?: RootProps) => {
 
   if (defaultExport) {
     const Router = createRouter({ modules, url, dataCache, dataUrl });
-    const App = defineComponent({
+    const app = createSSRApp(defineComponent({
       name: "App",
       render() {
         return [h(Router)];
       },
-    });
-
-    const app = vueCreateSSRApp(App);
+    }));
 
     app.provide("modules", modules);
     app.provide("dataCache", dataCache);
@@ -279,17 +273,7 @@ const createAppApi = (props?: RootProps) => {
     return app;
   }
 
-  const errApp = vueCreateSSRApp(Err);
-
-  return errApp;
-};
-
-const createSSRApp = (createSSRAppApi: (props?: RootProps) => App<Element>, props?: RootProps) => {
-  if (createSSRAppApi === undefined) {
-    throw new Error("[aleph/vue] createSSRApp without `App` component");
-  }
-
-  return createSSRAppApi(props);
+  return createSSRApp(Err);
 };
 
 function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
@@ -389,4 +373,4 @@ const useRouter = () => {
   return RouterContext;
 };
 
-export { createApp as App, createSSRApp, useRouter };
+export { createApp, useRouter };

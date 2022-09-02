@@ -1,7 +1,7 @@
 import { renderToWebStream } from "@vue/server-renderer";
 import type { SSRContext } from "../../server/types.ts";
-import { App, createSSRApp } from "./router.ts";
+import { createApp } from "./router.ts";
 
-const render = (ctx: SSRContext) => renderToWebStream(createSSRApp(App, { ssrContext: ctx }), ctx);
+const render = (ctx: SSRContext) => renderToWebStream(createApp({ ssrContext: ctx }), ctx);
 
 export default render;

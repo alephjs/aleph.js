@@ -1,3 +1,3 @@
-import { hydrate } from "aleph/react-client";
+import { bootstrap } from "aleph/react-client";
 
-hydrate();
+bootstrap({ hydrate: true });

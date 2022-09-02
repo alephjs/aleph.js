@@ -1,3 +1,3 @@
-import { App, createSSRApp } from "aleph/vue";
+import { bootstrap } from "aleph/vue";
 
-createSSRApp(App).mount("#root", true);
+bootstrap({ hydrate: true });

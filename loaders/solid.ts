@@ -10,7 +10,7 @@ export default class SolidLoader implements ModuleLoader {
   load(specifier: string, content: string, env: ModuleLoaderEnv): ModuleLoaderOutput {
     const { code, map } = transform(content, {
       presets: [
-        [babelPresetSolid, { generate: env.ssr ? "ssr" : "dom", hydratable: env.ssr || env.hasSSRFn }],
+        [babelPresetSolid, { generate: env.ssr ? "ssr" : "dom", hydratable: env.ssr || !env.spaMode }],
         ["typescript", { onlyRemoveTypeImports: true }],
       ],
       filename: specifier,

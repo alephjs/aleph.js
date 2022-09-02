@@ -65,7 +65,7 @@ export default {
         sourceRaw,
         ssr
           ? { jsxConfig, importMap, ssr: true, sourceMap: true }
-          : { jsxConfig, importMap, isDev, hasSSRFn: Boolean(config?.ssr), sourceMap: isDev },
+          : { jsxConfig, importMap, isDev, spaMode: !config?.ssr, sourceMap: isDev },
       );
       source = loaded.code;
       lang = loaded.lang;

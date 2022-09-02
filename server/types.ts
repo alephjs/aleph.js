@@ -130,8 +130,8 @@ export type ModuleLoaderEnv = {
   importMap?: ImportMap;
   jsxConfig?: JSXConfig;
   sourceMap?: boolean;
+  spaMode?: boolean;
   ssr?: boolean;
-  hasSSRFn?: boolean;
 };
 
 export type ModuleLoaderOutput = {
