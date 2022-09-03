@@ -21,7 +21,7 @@ import {
 import { loadAndFixIndexHtml } from "./html.ts";
 import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
-import { fetchRouteData, initRouter } from "./routing.ts";
+import { fetchRouteData, importRouteModule, initRouter } from "./routing.ts";
 import transformer from "./transformer.ts";
 import { optimize } from "./optimizer.ts";
 import type {
@@ -305,6 +305,27 @@ export function serve(options: ServerOptions = {}) {
       "__ALEPH_ROUTER",
       () => routerConfig ? initRouter(routerConfig, appDir) : Promise.resolve(null),
     );
+
+    if (pathname === "/__get_static_paths") {
+      if (router) {
+        const pattern = searchParams.get("pattern");
+        const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);
+        if (route) {
+          const mod = await importRouteModule(route[1], appDir);
+          if (typeof mod.getStaticPaths === "function") {
+            let ret = mod.getStaticPaths();
+            if (ret instanceof Promise) {
+              ret = await ret;
+            }
+            if (Array.isArray(ret)) {
+              return Response.json(ret);
+            }
+          }
+        }
+      }
+      return Response.json([]);
+    }
+
     if (router && router.routes.length > 0) {
       const reqData = req.method === "GET" &&
         (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");

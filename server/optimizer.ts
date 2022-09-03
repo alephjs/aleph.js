@@ -28,6 +28,11 @@ export async function optimize(
   const target = options.buildTarget ?? "es2018";
   const outputDir = join(appDir ?? Deno.cwd(), options.outputDir ?? "./output");
 
+  const request = (url: URL, headers?: HeadersInit) => {
+    const addr: Deno.Addr = { transport: "tcp", hostname: "localhost", port: 80 };
+    return serverHandler(new Request(url, { headers }), { localAddr: addr, remoteAddr: addr });
+  };
+
   // clean previous build
   if (await existsDir(outputDir)) {
     for await (const entry of Deno.readDir(outputDir)) {
@@ -44,6 +49,51 @@ export async function optimize(
     routes.forEach(([_, { filename }]) => {
       routeFiles.push(filename);
     });
+    // ssg
+    const ssgOptions = config.optimization?.ssg ?? {};
+    const ssgPaths: string[] = [];
+    for (const [_, { pattern }] of routes) {
+      const { pathname } = pattern;
+      if (pathname.includes(":")) {
+        const url = new URL("/__get_static_paths", "http://localhost");
+        url.searchParams.set("pattern", pathname);
+        const res = await request(url);
+        if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
+          const staticPaths = await res.json();
+          if (Array.isArray(staticPaths)) {
+            ssgPaths.push(...staticPaths);
+          }
+        }
+      } else if (pathname !== "/_app") {
+        ssgPaths.push(pathname);
+      }
+    }
+    if (ssgOptions.getStaticPaths) {
+      ssgPaths.push(...await ssgOptions.getStaticPaths());
+    }
+    await Promise.all(
+      ssgPaths.filter((pathname) => {
+        if (ssgOptions?.include) {
+          return ssgOptions.include.test(pathname);
+        }
+        if (ssgOptions?.exclude) {
+          return !ssgOptions.exclude.test(pathname);
+        }
+        return true;
+      }).map(async (pathname) => {
+        const url = new URL(pathname, "http://localhost");
+        const res = await request(url, ssgOptions?.clientHeaders);
+        if (
+          (res.status === 200 || (res.status === 404 && pathname === "/_404")) &&
+          res.headers.get("content-type")?.startsWith("text/html")
+        ) {
+          const savePath = join(outputDir, `${pathname === "/" ? "/index" : pathname}.html`);
+          const html = await res.text();
+          await ensureDir(dirname(savePath));
+          await Deno.writeTextFile(savePath, html);
+        }
+      }),
+    );
   }
 
   // look up client modules
@@ -73,15 +123,13 @@ export async function optimize(
     await Promise.all(queue.map(async (specifier) => {
       const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
       const isCSS = url.pathname.endsWith(".css");
-      const req = new Request(url.toString());
       let savePath = join(outputDir, url.pathname);
       if (isNpmPkg(specifier)) {
         savePath += ".js";
       } else if (isCSS && url.searchParams.has("module")) {
         savePath += ".js";
       }
-      const addr: Deno.Addr = { transport: "tcp", hostname: "localhost", port: 80 };
-      const res = await serverHandler(req, { localAddr: addr, remoteAddr: addr });
+      const res = await request(url);
       if (
         res.status !== 200 ||
         res.headers.get("Content-Type")?.startsWith("text/html") ||
