@@ -1,8 +1,8 @@
 import { createApp } from "./router.ts";
 
-export function bootstrap(options?: { mountPoint?: string | HTMLElement; hydrate?: boolean }) {
-  const { mountPoint, hydrate } = options ?? {};
-  createApp().mount(mountPoint, hydrate);
+export function bootstrap(options?: { root?: string | HTMLElement; hydrate?: boolean }) {
+  const { root = "#root", hydrate } = options ?? {};
+  createApp().mount(root, hydrate);
 }
 
 export { useData } from "./data.ts";

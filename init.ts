@@ -153,6 +153,7 @@ export default async function init(nameArg?: string, template?: string) {
     }
     case "solid": {
       Object.assign(importMap.imports, {
+        "aleph/solid-server": `${alephPkgUri}/runtime/solid/server.ts`,
         "solid-js": `https://esm.sh/solid-js@${versions.solid}`,
         "solid-js/web": `https://esm.sh/solid-js@${versions.solid}/web`,
       });

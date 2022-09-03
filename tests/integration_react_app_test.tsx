@@ -10,7 +10,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
       glob: "./routes/**/*.{tsx,ts}",
     },
     ssr: {
-      dataDefer: false,
+      suspense: false,
       render: (ctx) => renderToReadableStream(<App ssrContext={ctx} />, ctx),
     },
   });

@@ -9,6 +9,7 @@
     "aleph/react-server": "./runtime/react/server.ts",
     "aleph/vue": "./runtime/vue/mod.ts",
     "aleph/vue-server": "./runtime/vue/server.ts",
+    "aleph/solid-server": "./runtime/solid/server.ts",
     "react": "https://esm.sh/react@18.2.0",
     "react-dom": "https://esm.sh/react-dom@18.2.0",
     "react-dom/": "https://esm.sh/react-dom@18.2.0/",

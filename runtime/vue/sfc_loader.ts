@@ -11,9 +11,9 @@ import {
   parse,
   rewriteDefault,
 } from "https://esm.sh/@vue/compiler-sfc@3.2.37?target=esnext";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
-import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../server/types.ts";
+import log from "../../lib/log.ts";
+import util from "../../lib/util.ts";
+import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
 
 export type Options = {
   script?: Omit<SFCScriptCompileOptions, "id">;
@@ -83,29 +83,29 @@ export default class VueSFCLoader implements ModuleLoader {
         output.push(templateResult.code.replace("export function render(", "__sfc__.render = function render("));
       }
     }
-    output.push(`__sfc__.__file = ${JSON.stringify(specifier)}`);
+    output.push(`__sfc__.__file = ${JSON.stringify(specifier)};`);
     if (descriptor.styles.some((s) => s.scoped)) {
-      output.push(`__sfc__.__scopeId = ${JSON.stringify(`data-v-${id}`)}`);
+      output.push(`__sfc__.__scopeId = ${JSON.stringify(`data-v-${id}`)};`);
     }
     if (!env.ssr && env.isDev) {
       const mainScriptHash = (await util.computeHash("SHA-256", mainScript)).slice(0, 8);
-      output.push(`__sfc__.__scriptHash = ${JSON.stringify(mainScriptHash)}`);
-      output.push(`__sfc__.__hmrId = ${JSON.stringify(id)}`);
-      output.push(`window.__VUE_HMR_RUNTIME__?.createRecord(__sfc__.__hmrId, __sfc__)`);
-      output.push(`let __currentScriptHash = ${JSON.stringify(mainScriptHash)}`);
+      output.push(`__sfc__.__scriptHash = ${JSON.stringify(mainScriptHash)};`);
+      output.push(`__sfc__.__hmrId = ${JSON.stringify(id)};`);
+      output.push(`window.__VUE_HMR_RUNTIME__?.createRecord(__sfc__.__hmrId, __sfc__);`);
+      output.push(`let __currentScriptHash = ${JSON.stringify(mainScriptHash)};`);
       output.push(
         `import.meta.hot.accept(({ default: sfc }) => {`,
-        `  const rerenderOnly = __currentScriptHash === sfc.__scriptHash`,
+        `  const rerenderOnly = __currentScriptHash === sfc.__scriptHash;`,
         `  if (rerenderOnly) {`,
-        `    __currentScriptHash = sfc.__scriptHash; // update '__currentScriptHash'`,
-        `    __VUE_HMR_RUNTIME__.rerender(sfc.__hmrId, sfc.render)`,
+        `    __currentScriptHash = sfc.__scriptHash; // update '__currentScriptHash';`,
+        `    __VUE_HMR_RUNTIME__.rerender(sfc.__hmrId, sfc.render);`,
         `  } else {`,
-        `    __VUE_HMR_RUNTIME__.reload(sfc.__hmrId, sfc)`,
+        `    __VUE_HMR_RUNTIME__.reload(sfc.__hmrId, sfc);`,
         `  }`,
-        `})`,
+        `});`,
       );
     }
-    output.push(`export default __sfc__`);
+    output.push(`export default __sfc__;`);
 
     const css = (await Promise.all(descriptor.styles.map(async (style) => {
       const result = await compileStyleAsync({

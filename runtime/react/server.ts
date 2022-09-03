@@ -20,8 +20,8 @@ export function serve(
     ...options,
     ssr: options?.ssr
       ? {
-        render,
         ...(typeof options.ssr === "object" ? options.ssr : {}),
+        render,
       }
       : undefined,
   });

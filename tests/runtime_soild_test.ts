@@ -1,8 +1,8 @@
 import { assert, assertEquals } from "std/testing/asserts.ts";
-import SolidLoader from "../loaders/solid.ts";
+import SolidTransformer from "../runtime/solid/transformer.ts";
 
 Deno.test("[unit] loaders/solid.ts", async (t) => {
-  await t.step("SolidLoader", async () => {
+  await t.step("SolidTransformer", async () => {
     const testCode = `
     import { render} from "https://esm.sh/solid-js/web";
     import { createSignal } from "https://esm.sh/solid-js";
@@ -22,9 +22,9 @@ Deno.test("[unit] loaders/solid.ts", async (t) => {
 
     render(() => <Counter />, document.getElementById("app")!);
   `;
-    const loader = new SolidLoader();
-    const { lang, code } = await loader.load("test.tsx", testCode, {});
-    assert(loader.test("test.tsx"));
+    const transformer = new SolidTransformer();
+    const { lang, code } = await transformer.load("test.tsx", testCode, {});
+    assert(transformer.test("test.tsx"));
     assertEquals(lang, "js");
     assert(code.includes('_$template(`<button type="button"></button>`,'));
     assert(code.includes("_$createComponent(Counter, {})"));
