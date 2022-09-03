@@ -157,7 +157,7 @@ export type OptimizationOptions = {
   /** The built target for esbuild, default is 'es2018'. */
   buildTarget?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
   /** The SSG options for the FS routing. */
-  ssg?: SSGOptions;
+  ssg?: boolean | SSGOptions;
 };
 
 /** The SSG options for the FS routing. */

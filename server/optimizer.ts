@@ -1,7 +1,18 @@
 import log from "../lib/log.ts";
 import util from "../lib/util.ts";
 import type { TransformCSSOptions } from "./deps.ts";
-import { bold, dirname, ensureDir, esbuild, extname, fromFileUrl, join, stopEsbuild, transformCSS } from "./deps.ts";
+import {
+  bold,
+  dirname,
+  ensureDir,
+  esbuild,
+  extname,
+  fromFileUrl,
+  green,
+  join,
+  stopEsbuild,
+  transformCSS,
+} from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
@@ -50,29 +61,30 @@ export async function optimize(
       routeFiles.push(filename);
     });
     // ssg
-    const ssgOptions = config.optimization?.ssg ?? {};
-    const ssgPaths: string[] = [];
-    for (const [_, { pattern }] of routes) {
-      const { pathname } = pattern;
-      if (pathname.includes(":")) {
-        const url = new URL("/__get_static_paths", "http://localhost");
-        url.searchParams.set("pattern", pathname);
-        const res = await request(url);
-        if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
-          const staticPaths = await res.json();
-          if (Array.isArray(staticPaths)) {
-            ssgPaths.push(...staticPaths);
+    if (config.optimization?.ssg !== false) {
+      const ssg = config.optimization?.ssg;
+      const ssgOptions = ssg === true ? {} : ssg ?? {};
+      const staticPaths: string[] = [];
+      for (const [_, { pattern }] of routes) {
+        const { pathname } = pattern;
+        if (pathname.includes(":")) {
+          const url = new URL("/__get_static_paths", "http://localhost");
+          url.searchParams.set("pattern", pathname);
+          const res = await request(url);
+          if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
+            const a = await res.json();
+            if (Array.isArray(a)) {
+              staticPaths.push(...a);
+            }
           }
+        } else if (pathname !== "/_app") {
+          staticPaths.push(pathname);
         }
-      } else if (pathname !== "/_app") {
-        ssgPaths.push(pathname);
       }
-    }
-    if (ssgOptions.getStaticPaths) {
-      ssgPaths.push(...await ssgOptions.getStaticPaths());
-    }
-    await Promise.all(
-      ssgPaths.filter((pathname) => {
+      if (ssgOptions?.getStaticPaths) {
+        staticPaths.push(...await ssgOptions.getStaticPaths());
+      }
+      const ssgPaths = staticPaths.filter((pathname) => {
         if (ssgOptions?.include) {
           return ssgOptions.include.test(pathname);
         }
@@ -80,7 +92,8 @@ export async function optimize(
           return !ssgOptions.exclude.test(pathname);
         }
         return true;
-      }).map(async (pathname) => {
+      });
+      await Promise.all(ssgPaths.map(async (pathname) => {
         const url = new URL(pathname, "http://localhost");
         const res = await request(url, ssgOptions?.clientHeaders);
         if (
@@ -92,8 +105,15 @@ export async function optimize(
           await ensureDir(dirname(savePath));
           await Deno.writeTextFile(savePath, html);
         }
-      }),
-    );
+      }));
+      console.log(`${green("SSG")} ${bold(ssgPaths.length.toString())} page generated.`);
+      console.log(
+        ssgPaths.map((pathname, index) => {
+          const tab = index === ssgPaths.length - 1 ? "└─" : "├─";
+          return `${tab} ${pathname}`;
+        }).join("\n"),
+      );
+    }
   }
 
   // look up client modules
