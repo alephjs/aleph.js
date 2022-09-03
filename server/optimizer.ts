@@ -61,7 +61,7 @@ export async function optimize(
       routeFiles.push(filename);
     });
     // ssg
-    if (config.optimization?.ssg !== false) {
+    if (config.ssr && config.optimization?.ssg !== false) {
       const ssg = config.optimization?.ssg;
       const ssgOptions = ssg === true ? {} : ssg ?? {};
       const staticPaths: string[] = [];
@@ -132,6 +132,11 @@ export async function optimize(
     }
   }
   queue.push(`${alephPkgUri}/runtime/core/nomodule.ts`);
+
+  // unocss reset css
+  if (config.unocss) {
+    queue.push(`https://esm.sh/@unocss/reset@0.45.14/${config.unocss.resetCSS ?? "tailwind"}.css`);
+  }
 
   const entryModules = new Map(queue.map((task) => [task, 0]));
   const allClientModules = new Set<string>();
