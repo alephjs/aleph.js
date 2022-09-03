@@ -122,7 +122,6 @@ export default async function init(nameArg?: string, template?: string) {
       "@unocss/": `${alephPkgUri}/lib/@unocss/`,
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
-      "aleph/dev": `${alephPkgUri}/server/dev.ts`,
     },
     scopes: {},
   };
