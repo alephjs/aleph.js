@@ -306,7 +306,7 @@ export function serve(options: ServerOptions = {}) {
       () => routerConfig ? initRouter(routerConfig, appDir) : Promise.resolve(null),
     );
 
-    if (pathname === "/__get_static_paths") {
+    if (pathname === "/__aleph/get_static_paths") {
       if (router) {
         const pattern = searchParams.get("pattern");
         const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);

@@ -12,7 +12,7 @@ import {
   getDeploymentId,
   getUnoGenerator,
   regFullVersion,
-  regUseUnocss,
+  regJsxFile,
   restoreUrl,
   toLocalPath,
 } from "./helpers.ts";
@@ -203,8 +203,9 @@ export default {
           deps = ret.deps;
         }
         const styleTs = `${alephPkgUri}/runtime/core/style.ts`;
-        if (isDev && config?.unocss) {
-          const reg = (typeof config.unocss !== "string" ? config.unocss.test : undefined) ?? regUseUnocss;
+        // embed module unocss css in dev mode
+        if (isDev && config?.unocss?.presets) {
+          const reg = (typeof config.unocss !== "string" ? config.unocss.test : undefined) ?? regJsxFile;
           if (reg.test(pathname)) {
             try {
               const unoGenerator = getUnoGenerator();

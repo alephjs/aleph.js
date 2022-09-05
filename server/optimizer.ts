@@ -67,8 +67,8 @@ export async function optimize(
       const staticPaths: string[] = [];
       for (const [_, { pattern }] of routes) {
         const { pathname } = pattern;
-        if (pathname.includes(":")) {
-          const url = new URL("/__get_static_paths", "http://localhost");
+        if (pathname.includes("/:")) {
+          const url = new URL("/__aleph/get_static_paths", "http://localhost");
           url.searchParams.set("pattern", pathname);
           const res = await request(url);
           if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
@@ -133,7 +133,7 @@ export async function optimize(
   }
   queue.push(`${alephPkgUri}/runtime/core/nomodule.ts`);
 
-  // unocss reset css
+  // add unocss reset css
   if (config.unocss) {
     queue.push(`https://esm.sh/@unocss/reset@0.45.14/${config.unocss.resetCSS ?? "tailwind"}.css`);
   }

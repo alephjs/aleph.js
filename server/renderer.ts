@@ -3,18 +3,9 @@ import { matchRoutes } from "../runtime/core/route.ts";
 import util from "../lib/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
-import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regUseUnocss } from "./helpers.ts";
+import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";
 import { importRouteModule } from "./routing.ts";
-import type {
-  Element,
-  HTMLRewriterHandlers,
-  RouteModule,
-  Router,
-  SSR,
-  SSRContext,
-  SSRResult,
-  UnoConfig,
-} from "./types.ts";
+import type { Element, HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContext, SSRResult } from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
@@ -65,14 +56,14 @@ export default {
 
     // build unocss
     const config = getAlephConfig();
-    if (config?.unocss) {
+    if (config?.unocss?.presets) {
       const unoGenerator = getUnoGenerator();
       if (unoGenerator) {
         const t = performance.now();
         const {
-          test = regUseUnocss,
+          test = regJsxFile,
           resetCSS = "tailwind",
-        } = config.unocss === "preset" ? {} as UnoConfig : config.unocss;
+        } = config.unocss;
         let css = Reflect.get(globalThis, "__ALEPH_UNOCSS_BUILD");
         if (!css) {
           const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
