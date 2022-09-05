@@ -5,6 +5,6 @@ import unocss from "./unocss.config.ts";
 serve({
   baseUrl: import.meta.url,
   router: { routes },
-  unocss,
   ssr: true,
+  unocss,
 });
