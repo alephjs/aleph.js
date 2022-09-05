@@ -1,6 +1,6 @@
 import { FetchError } from "../runtime/core/error.ts";
 import { matchRoutes } from "../runtime/core/route.ts";
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";

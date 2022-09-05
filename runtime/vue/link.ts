@@ -1,6 +1,6 @@
 import { computed, defineComponent, h } from "vue";
 import { useRouter } from "./router.ts";
-import util from "../../lib/util.ts";
+import util from "../../shared/util.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 

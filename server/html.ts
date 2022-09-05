@@ -1,4 +1,4 @@
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm } from "./deps.ts";
 import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import type { Comment, Element } from "./types.ts";

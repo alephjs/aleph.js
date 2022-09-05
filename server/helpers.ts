@@ -1,9 +1,9 @@
 import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
 import { basename, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
+import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 

@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, MutableRefObject, PropsWithChildren } from "react";
 import { createElement, useCallback, useEffect, useMemo, useRef } from "react";
-import util from "../../lib/util.ts";
+import util from "../../shared/util.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import { useRouter } from "./router.ts";

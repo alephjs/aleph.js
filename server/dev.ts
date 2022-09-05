@@ -1,9 +1,9 @@
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import type { BuildResult, Emitter } from "./deps.ts";
 import { esbuild, join, mitt, relative } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
 import { existsFile, getAlephConfig, getImportMap, getJSXConfig, watchFs } from "./helpers.ts";
+import log from "./log.ts";
 import { initRouter, toRouteRegExp } from "./routing.ts";
 import type { AlephConfig, ModuleLoader, Router } from "./types.ts";
 

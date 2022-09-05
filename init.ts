@@ -3,10 +3,10 @@ import { parse } from "https://deno.land/std@0.145.0/flags/mod.ts";
 import { Buffer } from "https://deno.land/std@0.145.0/io/buffer.ts";
 import { copy } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
-import log from "./lib/log.ts";
-import util from "./lib/util.ts";
+import util from "./shared/util.ts";
 import { basename, blue, bold, cyan, dim, ensureDir, green, join, red } from "./server/deps.ts";
 import { existsDir, existsFile, getFiles } from "./server/helpers.ts";
+import log from "./server/log.ts";
 import { isCanary } from "./version.ts";
 
 const templates = [

@@ -1,5 +1,4 @@
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import type { TransformCSSOptions } from "./deps.ts";
 import {
   bold,
@@ -25,6 +24,7 @@ import {
   toLocalPath,
 } from "./helpers.ts";
 import { parseHtmlLinks } from "./html.ts";
+import log from "./log.ts";
 import { initRouter } from "./routing.ts";
 import type { AlephConfig, ConnInfo } from "./types.ts";
 

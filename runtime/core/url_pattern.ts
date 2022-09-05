@@ -1,4 +1,4 @@
-import util from "../../lib/util.ts";
+import util from "../../shared/util.ts";
 
 export type URLPatternInput = {
   host?: string;

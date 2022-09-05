@@ -1,4 +1,4 @@
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import { setCookieHeader } from "./helpers.ts";
 import { SessionImpl } from "./session.ts";
 import type { ConnInfo, Context, CookieOptions, HTMLRewriterHandlers, Session, SessionOptions } from "./types.ts";

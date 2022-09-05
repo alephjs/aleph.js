@@ -1,8 +1,8 @@
 import { URLPatternCompat, type URLPatternInput } from "../runtime/core/url_pattern.ts";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import { extname, fromFileUrl, globToRegExp, join, resolve } from "./deps.ts";
 import depGraph from "./graph.ts";
+import log from "./log.ts";
 import { builtinModuleExts, fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
 import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp, RouterInit } from "./types.ts";
 

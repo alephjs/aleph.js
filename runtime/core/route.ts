@@ -1,4 +1,4 @@
-import util from "../../lib/util.ts";
+import util from "../../shared/util.ts";
 import type { URLPatternCompat, URLPatternInput, URLPatternResult } from "./url_pattern.ts";
 import { createStaticURLPatternResult } from "./url_pattern.ts";
 

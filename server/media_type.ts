@@ -1,4 +1,4 @@
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 
 // MIME types for web
 const mimeTypes: Record<string, string[]> = {

@@ -1,6 +1,5 @@
 import { generateErrorHtml, TransformError } from "../runtime/core/error.ts";
-import log, { type LevelName } from "../lib/log.ts";
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR, watch } from "./dev.ts";
 import { fromFileUrl, join, serve as stdServe, serveTls } from "./deps.ts";
@@ -20,6 +19,7 @@ import {
   toLocalPath,
 } from "./helpers.ts";
 import { createHtmlResponse, loadIndexHtml } from "./html.ts";
+import log, { type LevelName } from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, importRouteModule, initRouter } from "./routing.ts";

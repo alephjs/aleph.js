@@ -1,4 +1,4 @@
-import { dim, green, red, yellow } from "https://deno.land/std@0.145.0/fmt/colors.ts";
+import { dim, green, red, yellow } from "./deps.ts";
 
 export type LevelName = "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -8,27 +8,6 @@ export enum Level {
   Warn = 2,
   Error = 3,
   Fatal = 4,
-}
-
-export class Timing {
-  #t = performance.now();
-
-  reset() {
-    this.#t = performance.now();
-  }
-
-  stop(message: string) {
-    const now = performance.now();
-    const d = Math.round(now - this.#t);
-    let cf = green;
-    if (d > 10000) {
-      cf = red;
-    } else if (d > 1000) {
-      cf = yellow;
-    }
-    console.debug(dim("TIMING"), message, "in", cf(d + "ms"));
-    this.#t = now;
-  }
 }
 
 export class Logger {
@@ -87,13 +66,6 @@ export class Logger {
       console.error(red("FATAL"), ...args);
       Deno.exit(1);
     }
-  }
-
-  timing(): { reset(): void; stop(message: string): void } {
-    if (this.level === Level.Debug) {
-      return new Timing();
-    }
-    return { reset: () => {}, stop: () => {} };
   }
 }
 

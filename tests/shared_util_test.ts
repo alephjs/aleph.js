@@ -1,8 +1,8 @@
 import { delay } from "std/async/delay.ts";
 import { assertEquals } from "std/testing/asserts.ts";
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 
-Deno.test("[unit] lib/util.ts", async (t) => {
+Deno.test("[unit] shared/util.ts", async (t) => {
   await t.step("util.isLikelyHttpURL", () => {
     assertEquals(util.isLikelyHttpURL("https://deno.land"), true);
     assertEquals(util.isLikelyHttpURL("http://deno.land"), true);

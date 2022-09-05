@@ -1,6 +1,5 @@
 import { TransformError } from "../runtime/core/error.ts";
-import log from "../lib/log.ts";
-import util from "../lib/util.ts";
+import util from "../shared/util.ts";
 import type { TransformOptions, TransformResult } from "./deps.ts";
 import { btoa, MagicString, parseDeps, transform } from "./deps.ts";
 import depGraph from "./graph.ts";
@@ -16,6 +15,7 @@ import {
   restoreUrl,
   toLocalPath,
 } from "./helpers.ts";
+import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import { isRouteFile } from "./routing.ts";
 import { bundleCSS } from "./optimizer.ts";

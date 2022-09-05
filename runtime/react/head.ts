@@ -1,6 +1,6 @@
 import type { FC, ReactNode } from "react";
 import { Children, createElement, Fragment, isValidElement, useContext, useEffect, useMemo } from "react";
-import util from "../../lib/util.ts";
+import util from "../../shared/util.ts";
 import { RouterContext } from "./context.ts";
 
 export const Head: FC<{ children?: ReactNode }> = (props) => {

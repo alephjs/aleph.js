@@ -1,7 +1,7 @@
 // ESM Hot Module Replacement (ESM-HMR) Specification
 // https://github.com/withastro/esm-hmr
 
-import util from "../../lib/util.ts";
+import util from "../../shared/util.ts";
 import events from "./events.ts";
 
 class Module {

@@ -11,9 +11,9 @@ import {
   parse,
   rewriteDefault,
 } from "https://esm.sh/@vue/compiler-sfc@3.2.37?target=esnext";
-import log from "../../lib/log.ts";
-import util from "../../lib/util.ts";
+import util from "../../shared/util.ts";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
+import log from "../../server/log.ts";
 
 export type Options = {
   script?: Omit<SFCScriptCompileOptions, "id">;
