@@ -399,7 +399,7 @@ export function serve(options: ServerOptions = {}) {
       () =>
         loadIndexHtml(join(appDir ?? ".", "index.html"), {
           ssr: typeof ssr === "function" ? {} : ssr,
-          hmr: isDev ? { url: Deno.env.get("HMR_WS_URL") } : undefined,
+          hmr: isDev ? { wsUrl: Deno.env.get("HMR_WS_URL") } : undefined,
         }),
     );
     if (!indexHtml) {
@@ -411,7 +411,7 @@ export function serve(options: ServerOptions = {}) {
       return createHtmlResponse(req, ctx.headers, join(appDir ?? ".", "./index.html"), indexHtml);
     }
 
-    // check ssg output
+    // check SSG output
     if (!isDev && !optimizeMode && outDir) {
       const htmlFile = join(outDir, pathname === "/" ? "index.html" : pathname + ".html");
       if (await existsFile(htmlFile)) {

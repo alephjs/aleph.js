@@ -8,7 +8,7 @@ await initLolHtml(lolHtmlWasm());
 
 type LoadOptions = {
   ssr?: { suspense?: boolean };
-  hmr?: { url?: string };
+  hmr?: { wsUrl?: string };
 };
 
 // load and fix the `index.html`
@@ -154,8 +154,8 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
           }/runtime/core/hmr.ts";hot("./index.html").decline();</script>`,
           { html: true },
         );
-        if (hmr.url) {
-          el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(hmr.url)};</script>`, {
+        if (hmr.wsUrl) {
+          el.append(`<script>window.__hmrWebSocketUrl=${JSON.stringify(hmr.wsUrl)};</script>`, {
             html: true,
           });
         }
