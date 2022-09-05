@@ -1,6 +1,6 @@
 import { createContext } from "./context.ts";
 import { join } from "./deps.ts";
-import { loadAndFixIndexHtml } from "./html.ts";
+import { loadIndexHtml } from "./html.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, initRouter } from "./routing.ts";
 import type { HTMLRewriterHandlers, Middleware, Router, RouterInit, SSR } from "./types.ts";
@@ -76,7 +76,7 @@ export class MockServer {
       this.#router = await initRouter(router, appDir);
     }
     if (!this.#indexHtml) {
-      this.#indexHtml = await loadAndFixIndexHtml(join(appDir ?? "./", "index.html"), {
+      this.#indexHtml = await loadIndexHtml(join(appDir ?? "./", "index.html"), {
         ssr: typeof ssr === "function" ? {} : ssr,
       });
     }
