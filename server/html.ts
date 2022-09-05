@@ -18,7 +18,7 @@ type LoadOptions = {
 // - check the `<ssr-body>` element if the ssr is enabled
 // - add `data-defer` attribute to `<body>` if possible
 // - todo: apply unocss
-export async function loadAndFixIndexHtml(filepath: string, options: LoadOptions): Promise<Uint8Array | null> {
+export async function loadIndexHtml(filepath: string, options: LoadOptions): Promise<Uint8Array | null> {
   if (await existsFile(filepath)) {
     const htmlRaw = await Deno.readFile(filepath);
     const [html, hasSSRBody] = checkSSRBody(htmlRaw);
@@ -209,4 +209,32 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
       reject(error);
     }
   });
+}
+
+export async function createHtmlResponse(
+  req: Request,
+  headers: Headers,
+  filepath: string,
+  content?: Uint8Array,
+): Promise<Response> {
+  const deployId = getDeploymentId();
+  let etag: string | undefined;
+  if (deployId) {
+    etag = `W/${deployId}`;
+  } else {
+    const { mtime, size } = await Deno.lstat(filepath);
+    if (mtime) {
+      etag = `W/${mtime.getTime().toString(16)}-${size.toString(16)}`;
+      headers.set("Last-Modified", new Date(mtime).toUTCString());
+    }
+  }
+  if (etag) {
+    if (req.headers.get("If-None-Match") === etag) {
+      return new Response(null, { status: 304 });
+    }
+    headers.set("ETag", etag);
+  }
+  headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  return new Response(content ?? await Deno.readFile(filepath), { headers });
 }

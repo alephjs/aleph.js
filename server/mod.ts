@@ -6,6 +6,7 @@ import { handleHMR, watch } from "./dev.ts";
 import { fromFileUrl, join, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
+  existsDir,
   existsFile,
   fixResponse,
   getAlephPkgUri,
@@ -18,7 +19,7 @@ import {
   restoreUrl,
   toLocalPath,
 } from "./helpers.ts";
-import { loadAndFixIndexHtml } from "./html.ts";
+import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, importRouteModule, initRouter } from "./routing.ts";
@@ -149,17 +150,26 @@ export function serve(options: ServerOptions = {}) {
       }
     }
 
+    const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
+      if (!isDev && !optimizeMode) {
+        const outDir = join(appDir ?? Deno.cwd(), optimization?.outputDir ?? "./output");
+        if (await existsDir(outDir)) {
+          return outDir;
+        }
+      }
+      return null;
+    });
+
     // transform modules
     let loader: ModuleLoader | undefined;
     if (
       !searchParams.has("raw") && (
-        (loader = loaders?.find((l) => l.test(pathname))) ||
-        transformer.test(pathname)
+        (loader = loaders?.find((l) => l.test(pathname))) || transformer.test(pathname)
       )
     ) {
       // check the optimized output
-      if (!isDev && !optimizeMode) {
-        let outFile = join(appDir ?? Deno.cwd(), optimization?.outputDir ?? "./output", pathname);
+      if (!isDev && !optimizeMode && outDir) {
+        let outFile = join(outDir, pathname);
         if (pathname.startsWith("/-/") && isNpmPkg(restoreUrl(pathname))) {
           outFile += ".js";
         }
@@ -387,7 +397,7 @@ export function serve(options: ServerOptions = {}) {
     const indexHtml = await globalIt(
       "__ALEPH_INDEX_HTML",
       () =>
-        loadAndFixIndexHtml(join(appDir ?? ".", "index.html"), {
+        loadIndexHtml(join(appDir ?? ".", "index.html"), {
           ssr: typeof ssr === "function" ? {} : ssr,
           hmr: isDev ? { url: Deno.env.get("HMR_WS_URL") } : undefined,
         }),
@@ -398,26 +408,15 @@ export function serve(options: ServerOptions = {}) {
 
     // return index.html
     if (!ssr) {
-      const deployId = getDeploymentId();
-      let etag: string | undefined;
-      if (deployId) {
-        etag = `W/${btoa("./index.html").replace(/[^a-z0-9]/g, "")}-${deployId}`;
-      } else {
-        const { mtime, size } = await Deno.lstat(join(appDir ?? ".", "./index.html"));
-        if (mtime) {
-          etag = `W/${mtime.getTime().toString(16)}-${size.toString(16)}`;
-          ctx.headers.set("Last-Modified", new Date(mtime).toUTCString());
-        }
+      return createHtmlResponse(req, ctx.headers, join(appDir ?? ".", "./index.html"), indexHtml);
+    }
+
+    // check ssg output
+    if (!isDev && !optimizeMode && outDir) {
+      const htmlFile = join(outDir, pathname === "/" ? "index.html" : pathname + ".html");
+      if (await existsFile(htmlFile)) {
+        return createHtmlResponse(req, ctx.headers, htmlFile);
       }
-      if (etag) {
-        if (req.headers.get("If-None-Match") === etag) {
-          return new Response(null, { status: 304 });
-        }
-        ctx.headers.set("ETag", etag);
-      }
-      ctx.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
-      ctx.headers.set("Content-Type", "text/html; charset=utf-8");
-      return new Response(indexHtml, { headers: ctx.headers });
     }
 
     // SSR
