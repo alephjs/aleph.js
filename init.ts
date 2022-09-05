@@ -5,7 +5,7 @@ import { copy } from "https://deno.land/std@0.145.0/streams/conversion.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import log from "./lib/log.ts";
 import util from "./lib/util.ts";
-import { basename, blue, cyan, dim, ensureDir, green, join, red } from "./server/deps.ts";
+import { basename, blue, bold, cyan, dim, ensureDir, green, join, red } from "./server/deps.ts";
 import { existsDir, existsFile, getFiles } from "./server/helpers.ts";
 import { isCanary } from "./version.ts";
 
@@ -29,18 +29,14 @@ const versions = {
 };
 
 export default async function init(nameArg?: string, template?: string) {
-  if (!template) {
-    // todo: template choose dialog
-    template = "react";
-  }
-  if (!(templates.includes(template))) {
+  if (template && !(templates.includes(template))) {
     log.fatal(
       `Invalid template name ${red(template)}, must be one of [${blue(templates.join(","))}]`,
     );
   }
 
   // get and check the project name
-  const name = nameArg || (prompt("Project Name:") || "").trim();
+  const name = nameArg || (await ask("Project Name:") || "").trim();
   if (name === "") {
     await init(nameArg, template);
     return;
@@ -57,8 +53,24 @@ export default async function init(nameArg?: string, template?: string) {
     Deno.exit(1);
   }
 
+  if (!template) {
+    const answer = await ask(
+      [
+        "Select a framework:",
+        ...templates.map((name, i) => `  ${bold((i + 1).toString())}. ${toTitle(name)}`),
+        dim(`[1-${templates.length}]`),
+      ].join("\n"),
+    );
+    const n = parseInt(answer);
+    if (!isNaN(n) && n > 0 && n <= templates.length) {
+      template = templates[n - 1];
+    } else {
+      log.fatal(`Please entry ${dim(`[1-${templates.length}]`)}`);
+    }
+  }
+
   // download template
-  console.log("Downloading template, this might take a moment...");
+  console.log(`Downloading template(${blue(template!)}), this might take a moment...`);
   const pkgName = isCanary ? "aleph_canary" : "aleph";
   const res = await fetch(
     `https://cdn.deno.land/${pkgName}/meta/versions.json`,
@@ -221,7 +233,7 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
 }
 
 async function ask(question = ":", stdin = Deno.stdin, stdout = Deno.stdout) {
-  await stdout.write(new TextEncoder().encode(question + " "));
+  await stdout.write(new TextEncoder().encode(cyan("? ") + question + " "));
   const buf = new Uint8Array(1024);
   const n = <number> await stdin.read(buf);
   const answer = new TextDecoder().decode(buf.subarray(0, n));
@@ -231,8 +243,15 @@ async function ask(question = ":", stdin = Deno.stdin, stdout = Deno.stdout) {
 async function confirm(question = "are you sure?") {
   let a: string;
   // deno-lint-ignore no-empty
-  while (!/^(y|n|)$/i.test(a = (await ask(question + dim(" [y/n]"))).trim())) {}
+  while (!/^(y|n|)$/i.test(a = (await ask(question + dim(" [y/N]"))).trim())) {}
   return a.toLowerCase() === "y";
+}
+
+function toTitle(name: string) {
+  if (name === "api") {
+    return "API";
+  }
+  return name.at(0)?.toUpperCase() + name.slice(1);
 }
 
 if (import.meta.main) {
