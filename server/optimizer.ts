@@ -55,16 +55,14 @@ export async function optimize(
 
   // find route files by the `routes` config
   const routeFiles: string[] = [];
+  const ssgOptions = config.optimization?.ssg === true ? {} : config.optimization?.ssg ?? {};
+  const ssgPaths: string[] = [];
   if (config?.router) {
     const { routes } = await initRouter(config.router, appDir);
     routes.forEach(([_, { filename }]) => {
       routeFiles.push(filename);
     });
-    // ssg
-    if (config.ssr && config.optimization?.ssg !== false) {
-      const ssg = config.optimization?.ssg;
-      const ssgOptions = ssg === true ? {} : ssg ?? {};
-      const staticPaths: string[] = [];
+    if (ssgOptions && config.ssr) {
       for (const [_, { pattern }] of routes) {
         const { pathname } = pattern;
         if (pathname.includes("/:")) {
@@ -74,46 +72,49 @@ export async function optimize(
           if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
             const a = await res.json();
             if (Array.isArray(a)) {
-              staticPaths.push(...a);
+              ssgPaths.push(...a);
             }
           }
         } else if (pathname !== "/_app") {
-          staticPaths.push(pathname);
+          ssgPaths.push(pathname);
         }
       }
-      if (ssgOptions?.getStaticPaths) {
-        staticPaths.push(...await ssgOptions.getStaticPaths());
-      }
-      const ssgPaths = staticPaths.filter((pathname) => {
-        if (ssgOptions?.include) {
-          return ssgOptions.include.test(pathname);
-        }
-        if (ssgOptions?.exclude) {
-          return !ssgOptions.exclude.test(pathname);
-        }
-        return true;
-      });
-      await Promise.all(ssgPaths.map(async (pathname) => {
-        const url = new URL(pathname, "http://localhost");
-        const res = await request(url, ssgOptions?.clientHeaders);
-        if (
-          (res.status === 200 || (res.status === 404 && pathname === "/_404")) &&
-          res.headers.get("content-type")?.startsWith("text/html")
-        ) {
-          const savePath = join(outputDir, `${pathname === "/" ? "/index" : pathname}.html`);
-          const html = await res.text();
-          await ensureDir(dirname(savePath));
-          await Deno.writeTextFile(savePath, html);
-        }
-      }));
-      console.log(`${green("SSG")} ${bold(ssgPaths.length.toString())} page generated.`);
-      console.log(
-        ssgPaths.map((pathname, index) => {
-          const tab = index === ssgPaths.length - 1 ? "└─" : "├─";
-          return `${tab} ${pathname}`;
-        }).join("\n"),
-      );
     }
+  }
+
+  if (ssgOptions && config.ssr) {
+    if (typeof ssgOptions.getStaticPaths === "function") {
+      ssgPaths.push(...await ssgOptions.getStaticPaths());
+    }
+    const finalPaths = ssgPaths.filter((pathname) => {
+      if (ssgOptions?.include) {
+        return ssgOptions.include.test(pathname);
+      }
+      if (ssgOptions?.exclude) {
+        return !ssgOptions.exclude.test(pathname);
+      }
+      return true;
+    });
+    await Promise.all(finalPaths.map(async (pathname) => {
+      const url = new URL(pathname, "http://localhost");
+      const res = await request(url, ssgOptions?.clientHeaders);
+      if (
+        (res.status === 200 || (res.status === 404 && pathname === "/_404")) &&
+        res.headers.get("content-type")?.startsWith("text/html")
+      ) {
+        const savePath = join(outputDir, `${pathname === "/" ? "/index" : pathname}.html`);
+        const html = await res.text();
+        await ensureDir(dirname(savePath));
+        await Deno.writeTextFile(savePath, html);
+      }
+    }));
+    console.log(`${green("SSG")} ${bold(finalPaths.length.toString())} page generated.`);
+    console.log(
+      finalPaths.map((pathname, index) => {
+        const tab = index === finalPaths.length - 1 ? "└─" : "├─";
+        return `${tab} ${pathname}`;
+      }).join("\n"),
+    );
   }
 
   // look up client modules
