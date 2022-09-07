@@ -62,9 +62,7 @@ export function watch(appDir = Deno.cwd()) {
   if (config?.router) {
     initRouter(config.router, appDir).then((router) => {
       Reflect.set(globalThis, "__ALEPH_ROUTER", router);
-      if (config.ssr) {
-        generateExportTs(appDir, router, config.loaders).catch((err) => log.error(err));
-      }
+      generateExportTs(appDir, router, config.loaders).catch((err) => log.error(err));
     });
   } else {
     Reflect.set(globalThis, "__ALEPH_ROUTER", null);
