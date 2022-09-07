@@ -122,9 +122,9 @@ export default async function init(nameArg?: string, template?: string) {
     },
     "importMap": "import_map.json",
     "tasks": {
-      "dev": "deno run -A -q server.ts --dev",
+      "dev": "deno run -A -q dev.ts",
+      "opt": "deno run -A -q dev.ts --optimize",
       "start": "deno run -A server.ts",
-      "opt": "deno run -A server.ts --optimize",
     },
   };
   const importMap = {

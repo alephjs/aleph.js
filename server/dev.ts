@@ -1,8 +1,16 @@
 import util from "../shared/util.ts";
-import type { BuildResult, Emitter } from "./deps.ts";
-import { esbuild, join, mitt, relative } from "./deps.ts";
+import { basename, BuildResult, dim, dirname, Emitter, ensureDir, parseDeps } from "./deps.ts";
+import { esbuild, fromFileUrl, join, mitt, relative } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
-import { existsFile, getAlephConfig, getImportMap, getJSXConfig, watchFs } from "./helpers.ts";
+import {
+  builtinModuleExts,
+  existsFile,
+  findFile,
+  getAlephConfig,
+  getImportMap,
+  getJSXConfig,
+  watchFs,
+} from "./helpers.ts";
 import log from "./log.ts";
 import { initRouter, toRouteRegExp } from "./routing.ts";
 import type { AlephConfig, ModuleLoader, Router } from "./types.ts";
@@ -62,7 +70,6 @@ export function watch(appDir = Deno.cwd()) {
     Reflect.set(globalThis, "__ALEPH_ROUTER", null);
   }
 
-  log.info("[dev] Watching for file changes...");
   watchFs(appDir, (kind: "create" | "remove" | "modify", path: string) => {
     const specifier = "./" + relative(appDir, path).replaceAll("\\", "/");
     // delete global cached index html
@@ -93,6 +100,73 @@ export function watch(appDir = Deno.cwd()) {
       watchFsEmitters.forEach((e) => e.emit(kind, { specifier }));
     }
   });
+}
+
+export type DevOptions = {
+  baseUrl?: string;
+  serverEntry?: string;
+};
+
+let devProcess: Deno.Process | null = null;
+let watched = false;
+
+export default async function dev(options?: DevOptions) {
+  // stop previous dev server
+  if (devProcess) {
+    devProcess.kill("SIGTERM");
+    devProcess.close();
+  }
+
+  const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : Deno.cwd();
+  const serverEntry = options?.serverEntry
+    ? join(appDir, options?.serverEntry)
+    : await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
+  if (serverEntry) {
+    const serverSpecifier = `./${util.trimPrefix(serverEntry, appDir)}`;
+    const source = await Deno.readTextFile(serverEntry);
+    const importMap = getImportMap();
+    const deps = await parseDeps(serverSpecifier, source, {
+      importMap: JSON.stringify(importMap),
+    });
+
+    // ensure the `_export.ts` file exists
+    for (const dep of deps) {
+      if (dep.specifier.startsWith("./") && dep.specifier.endsWith("/_export.ts")) {
+        const fp = join(appDir, dep.specifier);
+        await ensureDir(dirname(fp));
+        await Deno.writeTextFile(fp, "export default {}");
+      }
+    }
+
+    if (!watched) {
+      log.info("[dev] Watching for file changes...");
+      watch(appDir);
+      watched = true;
+    }
+
+    const emitter = createWatchFsEmitter();
+    emitter.on("*", (kind, { specifier }) => {
+      if (
+        kind === "modify" && (
+          specifier === serverSpecifier ||
+          deps.some((dep) => !dep.specifier.endsWith("/_export.ts") && dep.specifier === specifier)
+        )
+      ) {
+        dev(options);
+      }
+    });
+
+    const cmd = [Deno.execPath(), "run", "-A", serverEntry, "--dev"];
+    if (Deno.args.includes("--optimize")) {
+      cmd.push("--optimize");
+    }
+    if (devProcess) {
+      console.debug(dim("Restarting the server..."));
+    }
+    devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
+    await devProcess.status();
+    removeWatchFsEmitter(emitter);
+  }
 }
 
 export function handleHMR(req: Request): Response {
@@ -200,7 +274,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
     const write = async (build: BuildResult) => {
       await Promise.all(build.outputFiles!.map(async (file) => {
         if (file.path === genFile) {
-          await lazyWriteFile(
+          await stealWriteTextFile(
             genFile,
             file.text.replace(
               "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
@@ -301,11 +375,11 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
       "};",
       empty,
     ].join("\n");
-    await lazyWriteFile(genFile, code);
+    await stealWriteTextFile(genFile, code);
   }
 }
 
-async function lazyWriteFile(filename: string, content: string) {
+async function stealWriteTextFile(filename: string, content: string) {
   if (await existsFile(filename)) {
     const oldContent = await Deno.readTextFile(filename);
     if (oldContent === content) {
