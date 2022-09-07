@@ -142,12 +142,10 @@ function connect() {
     if (conn !== null) {
       conn = null;
       console.log("[HMR] closed.");
-      // re-connect after 0.5s
-      setTimeout(() => {
-        connect();
-      }, 500);
+      // try to re-connect
+      connect();
     } else {
-      // reload the page when re-connected
+      // ping to reload the page
       ping(() => location.reload());
     }
   });
