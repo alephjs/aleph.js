@@ -46,13 +46,15 @@ Deno.test("server/helper.ts", async (t) => {
       import React from "htts://esm.sh/react";
       import foo from "./foo.js";
       import { bar } from './bar.js';
-      await import('./baz.js');
+      const baz = await import('./baz.js');
+      const worker = new Worker('./worker.js', { type: 'module' });
     `;
     const overwritedCode = `// Deno 🦕 App (应用)
       import React from "htts://esm.sh/react?dev";
       import foo from "./foo.js?v=123";
       import { bar } from "./bar.js?v=123";
-      await import("./baz.js?v=123");
+      const baz = await import("./baz.js?v=123");
+      const worker = new Worker("./worker.js?v=123", { type: 'module' });
     `;
     const deps = await parseDeps("./app.js", code);
     const m = new MagicString(code);

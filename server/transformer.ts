@@ -97,7 +97,7 @@ export default {
             s.overwrite(loc.start - 1, loc.end - 1, url);
           }
         });
-        return new Response(s.toString(), {
+        return new Response(s.toBytes(), {
           headers: [["Content-Type", contentType]],
         });
       }

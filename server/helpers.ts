@@ -2,7 +2,7 @@ import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
 import util from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { basename, concatBytes, dirname, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
+import { basename, dirname, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
@@ -466,11 +466,13 @@ function toStringMap(v: unknown): Record<string, string> {
 
 /** A `MagicString` alternative using byte offsets */
 export class MagicString {
+  enc: TextEncoder;
+  dec: TextDecoder;
   chunks: [number, Uint8Array][];
-  enc = new TextEncoder();
-  dec = new TextDecoder();
 
   constructor(source: string) {
+    this.enc = new TextEncoder();
+    this.dec = new TextDecoder();
     this.chunks = [[0, this.enc.encode(source)]];
   }
 
@@ -478,23 +480,28 @@ export class MagicString {
     for (let i = 0; i < this.chunks.length; i++) {
       const [offset, bytes] = this.chunks[i];
       if (offset !== -1 && start >= offset && end <= offset + bytes.length) {
-        const newBytes = this.enc.encode(content);
         const left = bytes.subarray(0, start - offset);
         const right = bytes.subarray(end - offset);
-        this.chunks.splice(
-          i,
-          1,
-          [offset, left],
-          [-1, newBytes],
-          [end, right],
-        );
+        const insert = this.enc.encode(content);
+        this.chunks.splice(i, 1, [offset, left], [-1, insert], [end, right]);
         return;
       }
     }
     throw new Error(`overwrite: invalid range: ${start}-${end}`);
   }
 
+  toBytes(): Uint8Array {
+    const length = this.chunks.reduce((sum, [, chunk]) => sum + chunk.length, 0);
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    for (const [, chunk] of this.chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return bytes;
+  }
+
   toString() {
-    return this.dec.decode(concatBytes(...this.chunks.map(([_, content]) => (content))));
+    return this.dec.decode(this.toBytes());
   }
 }
