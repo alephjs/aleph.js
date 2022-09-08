@@ -1,9 +1,10 @@
 import { SEP } from "std/path/separator.ts";
 import { assert, assertEquals } from "std/testing/asserts.ts";
-import { existsDir, existsFile, restoreUrl, toLocalPath } from "../server/helpers.ts";
+import { existsDir, existsFile, MagicString, restoreUrl, toLocalPath } from "../server/helpers.ts";
+import { parseDeps } from "../server/deps.ts";
 
 Deno.test("server/helper.ts", async (t) => {
-  await t.step(`lib/fs.ts: existsDir`, async () => {
+  await t.step(`existsDir`, async () => {
     // true test cases
     const dir = await Deno.makeTempDir();
     assert(await existsDir(dir));
@@ -14,7 +15,7 @@ Deno.test("server/helper.ts", async (t) => {
     assertEquals(await existsDir(`${dir}${SEP}foo${SEP}bar`), false);
   });
 
-  await t.step(`lib/fs.ts: existsFile`, async () => {
+  await t.step(`existsFile`, async () => {
     // true test cases
     const file = await Deno.makeTempFile();
     assert(await existsFile(file));
@@ -38,6 +39,35 @@ Deno.test("server/helper.ts", async (t) => {
     assertEquals(restoreUrl("/-/deno.land/x/aleph@0.1.0"), "https://deno.land/x/aleph@0.1.0");
     assertEquals(restoreUrl("/-/http_foo.com/bar?lang=us-en"), "http://foo.com/bar?lang=us-en");
     assertEquals(restoreUrl("/-/http_foo.com_8080/bar"), "http://foo.com:8080/bar");
+  });
+
+  await t.step("MagicString", async () => {
+    const code = `// Deno 🦕 App (应用)
+      import React from "htts://esm.sh/react";
+      import foo from "./foo.js";
+      import { bar } from './bar.js';
+      await import('./baz.js');
+    `;
+    const overwritedCode = `// Deno 🦕 App (应用)
+      import React from "htts://esm.sh/react?dev";
+      import foo from "./foo.js?v=123";
+      import { bar } from "./bar.js?v=123";
+      await import("./baz.js?v=123");
+    `;
+    const deps = await parseDeps("./app.js", code);
+    const m = new MagicString(code);
+    for (const dep of deps) {
+      if (dep.loc) {
+        let url = dep.specifier;
+        if (url.startsWith("htts://esm.sh/")) {
+          url += "?dev";
+        } else {
+          url += "?v=123";
+        }
+        m.overwrite(dep.loc.start - 1, dep.loc.end - 1, `"${url}"`);
+      }
+    }
+    assertEquals(m.toString(), overwritedCode);
   });
 });
 

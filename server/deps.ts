@@ -26,4 +26,3 @@ export { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 
 // npm
 export { default as mitt, type Emitter } from "https://esm.sh/mitt@3.0.0";
-export { default as MagicString } from "https://esm.sh/magic-string@0.26.3?target=esnext";

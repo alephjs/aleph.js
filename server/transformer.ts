@@ -1,7 +1,7 @@
 import { TransformError } from "../runtime/core/error.ts";
 import util from "../shared/util.ts";
 import type { TransformOptions, TransformResult } from "./deps.ts";
-import { btoa, MagicString, parseDeps, transform } from "./deps.ts";
+import { btoa, parseDeps, transform } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
@@ -10,6 +10,7 @@ import {
   getAlephPkgUri,
   getDeploymentId,
   getUnoGenerator,
+  MagicString,
   regFullVersion,
   regJsxFile,
   restoreUrl,

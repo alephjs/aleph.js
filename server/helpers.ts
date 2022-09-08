@@ -2,7 +2,7 @@ import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
 import util from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { basename, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
+import { basename, concatBytes, dirname, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
@@ -37,7 +37,7 @@ export function globalItSync<T>(name: string, fn: () => T): T {
   return ret;
 }
 
-/* Get the module URI of Aleph.js */
+/** Get the module URI of Aleph.js */
 export function getAlephPkgUri(): string {
   return globalItSync("__ALEPH_PKG_URI", () => {
     const uriEnv = Deno.env.get("ALEPH_PKG_URI");
@@ -51,7 +51,7 @@ export function getAlephPkgUri(): string {
   });
 }
 
-/* Get Aleph.js package URI. */
+/** Get Aleph.js package URI. */
 export function getAlephConfig(): AlephConfig | undefined {
   return Reflect.get(globalThis, "__ALEPH_CONFIG");
 }
@@ -199,7 +199,7 @@ export function isNpmPkg(url: string) {
   return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
 }
 
-/* check whether or not the given path exists as a directory. */
+/** check whether or not the given path exists as a directory. */
 export async function existsDir(path: string): Promise<boolean> {
   try {
     const stat = await Deno.lstat(path);
@@ -212,7 +212,7 @@ export async function existsDir(path: string): Promise<boolean> {
   }
 }
 
-/* check whether or not the given path exists as regular file. */
+/** check whether or not the given path exists as regular file. */
 export async function existsFile(path: string): Promise<boolean> {
   try {
     const stat = await Deno.lstat(path);
@@ -225,7 +225,7 @@ export async function existsFile(path: string): Promise<boolean> {
   }
 }
 
-/* find file in the directory */
+/** find file in the directory */
 export async function findFile(filenames: string[], cwd = Deno.cwd()): Promise<string | undefined> {
   for (const filename of filenames) {
     const fullPath = join(cwd, filename);
@@ -233,7 +233,18 @@ export async function findFile(filenames: string[], cwd = Deno.cwd()): Promise<s
       return fullPath;
     }
   }
-  return void 0;
+}
+
+async function findConfigFile(filenames: string[], appDir?: string): Promise<string | undefined> {
+  let denoConfigFile: string | undefined;
+  if (appDir) {
+    denoConfigFile = await findFile(filenames, appDir);
+  }
+  // find config file in current working directory
+  if (!denoConfigFile) {
+    denoConfigFile = await findFile(filenames);
+  }
+  return denoConfigFile;
 }
 
 /** Watch the directory and its subdirectories. */
@@ -308,7 +319,7 @@ export async function getFiles(
   return list;
 }
 
-/* fetch source code from fs/cdn/cache */
+/** fetch source code from fs/cdn/cache */
 export async function fetchCode(
   specifier: string,
   target?: TransformOptions["target"],
@@ -333,17 +344,6 @@ export async function fetchCode(
 
   const root = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
   return [await Deno.readTextFile(join(root, specifier)), getContentType(specifier)];
-}
-
-async function findConfigFile(filenames: string[], appDir?: string): Promise<string | undefined> {
-  let denoConfigFile: string | undefined;
-  if (appDir) {
-    denoConfigFile = await findFile(filenames, appDir);
-  }
-  if (!denoConfigFile) {
-    denoConfigFile = await findFile(filenames);
-  }
-  return denoConfigFile;
 }
 
 /** Load the JSX config base the given import maps and the existing deno config. */
@@ -380,10 +380,18 @@ export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
 /** Load the import maps from the json file. */
 export async function loadImportMap(appDir?: string): Promise<ImportMap> {
   const importMap: ImportMap = { __filename: "", imports: {}, scopes: {} };
-  const importMapFile = await findConfigFile(
-    ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`),
-    appDir,
-  );
+  let importMapFile: string | undefined;
+  const denoConfigFile = await findConfigFile(["deno.jsonc", "deno.json"], appDir);
+  if (denoConfigFile) {
+    const { importMap } = await parseJSONFile(denoConfigFile);
+    importMapFile = importMap ? join(dirname(denoConfigFile), importMap) : undefined;
+  }
+  if (!importMapFile) {
+    importMapFile = await findConfigFile(
+      ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`),
+      appDir,
+    );
+  }
   if (importMapFile) {
     try {
       const { __filename, imports, scopes } = await parseImportMap(importMapFile);
@@ -409,7 +417,8 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
   return importMap;
 }
 
-export async function parseJSONFile(jsonFile: string): Promise<Record<string, unknown>> {
+// deno-lint-ignore no-explicit-any
+export async function parseJSONFile(jsonFile: string): Promise<Record<string, any>> {
   const raw = await Deno.readTextFile(jsonFile);
   if (jsonFile.endsWith(".jsonc")) {
     return JSONC.parse(raw);
@@ -453,4 +462,39 @@ function toStringMap(v: unknown): Record<string, string> {
     });
   }
   return m;
+}
+
+/** A `MagicString` alternative using byte offsets */
+export class MagicString {
+  chunks: [number, Uint8Array][];
+  enc = new TextEncoder();
+  dec = new TextDecoder();
+
+  constructor(source: string) {
+    this.chunks = [[0, this.enc.encode(source)]];
+  }
+
+  overwrite(start: number, end: number, content: string) {
+    for (let i = 0; i < this.chunks.length; i++) {
+      const [offset, bytes] = this.chunks[i];
+      if (offset !== -1 && start >= offset && end <= offset + bytes.length) {
+        const newBytes = this.enc.encode(content);
+        const left = bytes.subarray(0, start - offset);
+        const right = bytes.subarray(end - offset);
+        this.chunks.splice(
+          i,
+          1,
+          [offset, left],
+          [-1, newBytes],
+          [end, right],
+        );
+        return;
+      }
+    }
+    throw new Error(`overwrite: invalid range: ${start}-${end}`);
+  }
+
+  toString() {
+    return this.dec.decode(concatBytes(...this.chunks.map(([_, content]) => (content))));
+  }
 }
