@@ -13,13 +13,10 @@ declare type ResponseLike =
   | Array<unknown>
   | null;
 
-declare interface Data<GetDataType = ResponseLike, ActionDataType = ResponseLike> {
+declare interface Data<DataType = ResponseLike, ActionDataType = ResponseLike> {
   cacheTtl?: number;
   any?(request: Request, context: Context): Promise<Response | void> | Response | void;
-  get?(
-    request: Request,
-    context: Context,
-  ): Promise<GetDataType> | GetDataType;
+  get?(request: Request, context: Context): Promise<DataType> | DataType;
   post?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;
   put?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;
   patch?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;

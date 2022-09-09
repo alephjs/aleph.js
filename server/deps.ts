@@ -16,7 +16,7 @@ export {
 } from "https://deno.land/std@0.145.0/path/mod.ts";
 
 // third-party
-// @deno-types="https://deno.land/x/esbuild@v0.14.49/mod.d.ts"
+// @deno-types="https://deno.land/x/esbuild@v0.15.7/mod.d.ts"
 export { build as esbuild, type BuildResult, stop as stopEsbuild } from "https://deno.land/x/esbuild@v0.15.7/mod.js";
 export * from "https://deno.land/x/aleph_compiler@0.7.6/mod.ts";
 export * from "https://deno.land/x/aleph_compiler@0.7.6/types.ts";

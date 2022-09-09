@@ -14,10 +14,10 @@ const store: Store = {
   todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
 };
 
-export const data: Data<Store, Store> = {
+export const data: Data = {
   cacheTtl: 0, // no cache
   get: () => {
-    return store;
+    return Response.json(store);
   },
   put: async (req) => {
     const { message } = await req.json();
@@ -25,7 +25,7 @@ export const data: Data<Store, Store> = {
       store.todos.push({ id: Date.now(), message, completed: false });
       window.localStorage?.setItem("todos", JSON.stringify(store.todos));
     }
-    return store;
+    return Response.json(store);
   },
   patch: async (req) => {
     const { id, message, completed } = await req.json();
@@ -39,7 +39,7 @@ export const data: Data<Store, Store> = {
       }
       window.localStorage?.setItem("todos", JSON.stringify(store.todos));
     }
-    return store;
+    return Response.json(store);
   },
   delete: async (req) => {
     const { id } = await req.json();
@@ -47,7 +47,7 @@ export const data: Data<Store, Store> = {
       store.todos = store.todos.filter((todo) => todo.id !== id);
       window.localStorage?.setItem("todos", JSON.stringify(store.todos));
     }
-    return store;
+    return Response.json(store);
   },
 };
 
