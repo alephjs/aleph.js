@@ -28,8 +28,8 @@ import { optimize } from "./optimizer.ts";
 import type {
   AlephConfig,
   ConnInfo,
+  Context,
   ErrorHandler,
-  FetchHandler,
   HTMLRewriterHandlers,
   Middleware,
   ModuleLoader,
@@ -41,8 +41,8 @@ import type {
 export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
-  fetch?: FetchHandler;
   logLevel?: LevelName;
+  fetch?: (request: Request, context: Context) => Promise<Response> | Response;
   onError?: ErrorHandler;
 } & AlephConfig;
 
@@ -129,11 +129,7 @@ export function serve(options: ServerOptions = {}) {
                 setTimeout(res, 0);
               }
             } catch (err) {
-              const res = onError?.(err, {
-                by: "middleware",
-                url: req.url,
-                context: ctx,
-              });
+              const res = onError?.(err, "middleware", req, ctx);
               if (res instanceof Response) {
                 return res;
               }
@@ -216,7 +212,7 @@ export function serve(options: ServerOptions = {}) {
           );
         } else if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, { by: "transform", url: req.url }) ??
+          return onError?.(err, "transform", req, ctx) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html;"]],
@@ -266,7 +262,7 @@ export function serve(options: ServerOptions = {}) {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, { by: "fs", url: req.url }) ??
+          return onError?.(err, "fs", req, ctx) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html;"]],
@@ -289,11 +285,7 @@ export function serve(options: ServerOptions = {}) {
           setTimeout(res, 0);
         }
       } catch (err) {
-        const res = onError?.(err, {
-          by: "middleware",
-          url: req.url,
-          context: ctx,
-        });
+        const res = onError?.(err, "middleware", req, ctx);
         if (res instanceof Response) {
           return res;
         }
@@ -354,16 +346,12 @@ export function serve(options: ServerOptions = {}) {
         }
 
         // use the `onError` if available
-        const res = onError?.(err, {
-          by: "route-data-fetch",
-          url: req.url,
-          context: ctx,
-        });
+        const res = onError?.(err, "route-data-fetch", req, ctx);
         if (res instanceof Response) {
           return fixResponse(res, ctx.headers, reqData);
         }
 
-        // user throw a response
+        // user throws a response
         if (err instanceof Response) {
           return fixResponse(err, ctx.headers, reqData);
         }

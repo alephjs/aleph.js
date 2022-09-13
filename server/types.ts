@@ -213,20 +213,11 @@ export type SSRResult = {
   is404?: boolean;
 };
 
-export interface FetchHandler {
-  (
-    request: Request,
-    context: Record<string, unknown>,
-  ): Promise<Response> | Response;
-}
-
 export type ErrorHandler = {
   (
     error: unknown,
-    cause: {
-      by: "route-data-fetch" | "ssr" | "transform" | "fs" | "middleware";
-      url: string;
-      context?: Record<string, unknown>;
-    },
+    cause: "route-data-fetch" | "ssr" | "transform" | "fs" | "middleware",
+    request: Request,
+    context: Context,
   ): Response | void;
 };
