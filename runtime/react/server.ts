@@ -9,7 +9,7 @@ if (Deno.args.includes("--dev")) {
   Deno.env.set("REACT_REFRESH", "true");
 }
 
-const render = (ctx: SSRContext): [Promise<ReadableStream>, number] => {
+export const render = (ctx: SSRContext): [Promise<ReadableStream>, number] => {
   let status = 200;
   if (ctx.routeModules.length === 0 || ctx.routeModules.at(-1)?.url.pathname === "/_404") {
     status = 404;

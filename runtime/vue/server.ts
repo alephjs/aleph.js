@@ -5,7 +5,7 @@ import type { SSRContext, SSROptions } from "../../server/types.ts";
 import { createApp } from "./router.ts";
 import SFCLoader from "./sfc_loader.ts";
 
-const render = (ctx: SSRContext): [ReadableStream, number] => {
+export const render = (ctx: SSRContext): [ReadableStream, number] => {
   let status = 200;
   if (ctx.routeModules.length === 0 || ctx.routeModules.at(-1)?.url.pathname === "/_404") {
     status = 404;

@@ -6,7 +6,7 @@ import { fetchRouteData, initRouter } from "./routing.ts";
 import type { HTMLRewriterHandlers, Middleware, Router, RouterInit, SSR } from "./types.ts";
 
 type MockServerOptions = {
-  router: RouterInit;
+  router?: RouterInit;
   appDir?: string;
   origin?: string;
   middlewares?: Middleware[];
@@ -35,8 +35,8 @@ export class MockServer {
   #router: Router | null;
   #indexHtml: Uint8Array | null;
 
-  constructor(options: MockServerOptions) {
-    this.#options = options;
+  constructor(options?: MockServerOptions) {
+    this.#options = options || {};
     this.#router = null;
     this.#indexHtml = null;
   }
@@ -72,7 +72,7 @@ export class MockServer {
       }
     }
 
-    if (!this.#router) {
+    if (!this.#router && router) {
       this.#router = await initRouter(router, appDir);
     }
     if (!this.#indexHtml) {
@@ -81,11 +81,13 @@ export class MockServer {
       });
     }
 
-    const reqData = req.method === "GET" &&
-      (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
-    const res = await fetchRouteData(req, ctx, this.#router, reqData);
-    if (res) {
-      return res;
+    if (this.#router) {
+      const reqData = req.method === "GET" &&
+        (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
+      const res = await fetchRouteData(req, ctx, this.#router, reqData);
+      if (res) {
+        return res;
+      }
     }
 
     if (!this.#indexHtml) {
