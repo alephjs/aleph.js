@@ -1,8 +1,8 @@
-import { createGenerator, type UnoGenerator } from "https://esm.sh/@unocss/core@0.45.14";
 import util from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { basename, dirname, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
+import { type TransformOptions, type UnoGenerator } from "./deps.ts";
+import { basename, createGenerator, dirname, fromFileUrl, join, JSONC } from "./deps.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";

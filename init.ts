@@ -70,6 +70,7 @@ export default async function init(nameArg?: string, template?: string) {
   }
 
   const withUnocss = ["react", "yew"].includes(template!) && await confirm("Using Unocss(TailwindCSS)?");
+  const withVscode = await confirm("Initialize VS Code workspace configuration?");
 
   // download template
   console.log(`Downloading template(${blue(template!)}), this might take a moment...`);
@@ -192,7 +193,7 @@ export default async function init(nameArg?: string, template?: string) {
     ),
   ]);
 
-  if (await confirm("Initialize VS Code workspace configuration?")) {
+  if (withVscode) {
     const settings = {
       "deno.enable": true,
       "deno.lint": true,
