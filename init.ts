@@ -65,9 +65,11 @@ export default async function init(nameArg?: string, template?: string) {
     if (!isNaN(n) && n > 0 && n <= templates.length) {
       template = templates[n - 1];
     } else {
-      log.fatal(`Please entry ${dim(`[1-${templates.length}]`)}`);
+      log.fatal(`Please entry ${cyan(`[1-${templates.length}]`)}`);
     }
   }
+
+  const withUnocss = ["react", "yew"].includes(template!) && await confirm("Using Unocss(TailwindCSS)?");
 
   // download template
   console.log(`Downloading template(${blue(template!)}), this might take a moment...`);
@@ -91,7 +93,7 @@ export default async function init(nameArg?: string, template?: string) {
   const tarData = gunzip(new Uint8Array(await resp.arrayBuffer()));
   const entryList = new Untar(new Buffer(tarData));
   const appDir = join(Deno.cwd(), name);
-  const prefix = `${basename(repo)}-${VERSION}/examples/${template}-app/`;
+  const prefix = `${basename(repo)}-${VERSION}/examples/${withUnocss ? "with-unocss/" : ""}${template}-app/`;
 
   // write template files
   for await (const entry of entryList) {
