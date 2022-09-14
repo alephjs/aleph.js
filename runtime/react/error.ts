@@ -22,9 +22,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { error: Error 
   }
 }
 
-export function Err(
-  { error: { status, message }, fullscreen }: { error: { status?: number; message: string }; fullscreen?: boolean },
-) {
+export function Err({
+  error: { status, message },
+  fullscreen,
+}: {
+  error: { status?: number; message: string };
+  fullscreen?: boolean;
+}) {
   return createElement(
     "div",
     {
@@ -38,16 +42,10 @@ export function Err(
           fontSize: 18,
         }
         : {
-          boxSizing: "border-box",
-          width: "96%",
-          height: "96%",
-          margin: "auto",
-          border: "1px solid rgba(255,0,0,0.5)",
-          backgroundColor: "rgba(255,0,0,0.05)",
-          borderRadius: "8px",
+          margin: "0",
           padding: "1.5rem 2rem",
           color: "red",
-          textAlign: "center",
+          fontSize: 18,
         },
     },
     status && createElement("strong", { style: { fontWeight: "600" } }, status),

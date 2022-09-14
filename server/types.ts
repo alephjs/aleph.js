@@ -178,8 +178,10 @@ export type SSRContext = {
   readonly onError?: (error: unknown) => void;
 };
 
-export type SSRFn = {
-  (ssr: SSRContext): Promise<ReadableStream | string> | ReadableStream | string;
+export type SSRBody<T> = T | [body: T, status: number];
+
+export type SSRFn<T> = {
+  (ssr: SSRContext): SSRBody<Promise<T> | T>;
 };
 
 // Options for the content-security-policy
@@ -197,20 +199,20 @@ export type SSROptions = {
 export type SSR =
   | ({
     suspense: true;
-    render: (ssr: SSRContext) => Promise<ReadableStream> | ReadableStream;
+    render: SSRFn<ReadableStream>;
   } & SSROptions)
   | ({
     suspense?: false;
-    render: SSRFn;
+    render: SSRFn<ReadableStream | string>;
   } & SSROptions)
-  | SSRFn;
+  | SSRFn<ReadableStream | string>;
 
 export type SSRResult = {
   context: SSRContext;
   body: ReadableStream | string;
+  status: number;
   deferedData: Record<string, unknown>;
   nonce?: string;
-  is404?: boolean;
 };
 
 export type ErrorHandler = {

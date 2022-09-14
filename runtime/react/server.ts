@@ -9,8 +9,12 @@ if (Deno.args.includes("--dev")) {
   Deno.env.set("REACT_REFRESH", "true");
 }
 
-const render = (ctx: SSRContext) => {
-  return renderToReadableStream(createElement(App, { ssrContext: ctx }), ctx);
+const render = (ctx: SSRContext): [Promise<ReadableStream>, number] => {
+  let status = 200;
+  if (ctx.routeModules.length === 0 || ctx.routeModules.at(-1)?.url.pathname === "/_404") {
+    status = 404;
+  }
+  return [renderToReadableStream(createElement(App, { ssrContext: ctx }), ctx), status];
 };
 
 export function serve(

@@ -41,7 +41,14 @@ export default {
       },
     };
 
-    let body = await render(ssrContext);
+    let body = render(ssrContext);
+    let status = 200;
+    if (Array.isArray(body)) {
+      [body, status] = body;
+    }
+    if (body instanceof Promise) {
+      body = await body;
+    }
     if (typeof body !== "string" && !(body instanceof ReadableStream)) {
       body = "";
     }
@@ -97,11 +104,10 @@ export default {
     }
 
     const ssrRes: SSRResult = {
-      context: ssrContext,
       body,
+      status,
+      context: ssrContext,
       deferedData,
-      is404: router !== null && (routeModules.length === 0 || routeModules.at(-1)?.url.pathname ===
-          "/_404"),
     };
     if (!isDev && CSP) {
       const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
@@ -268,7 +274,7 @@ export default {
       headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
     }
     headers.set("Content-Type", "text/html; charset=utf-8");
-    return new Response(stream, { headers, status: ssrRes.is404 ? 404 : 200 });
+    return new Response(stream, { headers, status });
   },
 };
 
