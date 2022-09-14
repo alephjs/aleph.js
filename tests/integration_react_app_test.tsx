@@ -1,7 +1,6 @@
 import { assert, assertEquals } from "std/testing/asserts.ts";
 import { MockServer } from "aleph/server/mock.ts";
-import { App } from "aleph/react";
-import { renderToReadableStream } from "react-dom/server";
+import { render } from "aleph/runtime/react/server.ts";
 
 Deno.test("[integration] examples/react-app", async (t) => {
   const api = new MockServer({
@@ -9,10 +8,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     router: {
       glob: "./routes/**/*.{tsx,ts}",
     },
-    ssr: {
-      suspense: false,
-      render: (ctx) => renderToReadableStream(<App ssrContext={ctx} />, ctx),
-    },
+    ssr: { render },
   });
 
   await t.step("API GET /", async () => {
