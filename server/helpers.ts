@@ -1,4 +1,4 @@
-import { createGenerator, type UnoGenerator } from "../lib/@unocss/core.ts";
+import { createGenerator, type UnoGenerator } from "https://esm.sh/@unocss/core@0.45.14";
 import util from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";

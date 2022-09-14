@@ -55,41 +55,29 @@ export default function Todos() {
   const { data: { todos }, isMutating, mutation } = useData<Store>();
 
   return (
-    <div className="w-9/10 max-w-150 mx-auto mt-15">
+    <div className="todos-app">
       <Head>
         <title>Todos</title>
         <meta name="description" content="A todos app powered by Aleph.js" />
       </Head>
-      <h1 className="flex items-center justify-between text-5xl font-200">
+      <h1>
         <span>Todos</span>
-        {todos.length > 0 && (
-          <em className="text-3xl text-gray-300">{todos.filter((todo) => todo.completed).length}/{todos.length}</em>
-        )}
+        {todos.length > 0 && <em>{todos.filter((todo) => todo.completed).length}/{todos.length}</em>}
       </h1>
-      <ul className="mt-6">
+      <ul>
         {todos.map((todo) => (
-          <li className="flex items-center justify-between gap-2 px-3 py-1.5" key={todo.id}>
-            <div
-              className={[
-                "flex items-center justify-center w-4.5 h-4.5 border border-gray-300 rounded-full",
-                todo.completed && "!border-teal-500/50",
-              ].filter(Boolean).join(" ")}
+          <li key={todo.id}>
+            <input
+              type="checkbox"
+              checked={todo.completed}
               onClick={() => mutation.patch({ id: todo.id, completed: !todo.completed }, "replace")}
-            >
-              {todo.completed && <span className="inline-block w-1.5 h-1.5 bg-teal-500 rounded-full" />}
-            </div>
-            <label
-              className={[
-                "flex-1 text-xl text-gray-700 font-300",
-                todo.completed && "line-through !text-gray-400",
-              ].filter(Boolean).join(" ")}
-            >
+            />
+            <label className={todo.completed ? "completed" : ""}>
               {todo.message}
             </label>
             {todo.id > 0 && (
               <button onClick={() => mutation.delete({ id: todo.id }, "replace")}>
                 <svg
-                  className="w-5 h-5 text-gray-300 hover:text-red-500"
                   viewBox="0 0 32 32"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -105,7 +93,6 @@ export default function Todos() {
         ))}
       </ul>
       <form
-        className="mt-6"
         onSubmit={async (e) => {
           e.preventDefault();
           const form = e.currentTarget;
@@ -131,7 +118,6 @@ export default function Todos() {
       >
         <input
           type="text"
-          className="block w-full py-2 px-4 text-2xl font-300 placeholder:italic placeholder:text-gray-400 bg-gray-50 rounded-lg outline-none"
           name="message"
           placeholder="What needs to be done?"
           autoFocus

@@ -15,8 +15,6 @@ wasm-bindgen-futures = "0.4.32"
 wee_alloc = "0.4.5"
 web-sys = "0.3.59"
 url = "2.2.2"
-reqwest = { version = "0.11.11", features = ["json"] }
-serde = { version = "1.0.132", features = ["derive"] }
 
 [profile.release]
 # less code to include into binary

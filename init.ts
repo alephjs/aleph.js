@@ -1,7 +1,7 @@
-import { Untar } from "https://deno.land/std@0.145.0/archive/tar.ts";
-import { parse } from "https://deno.land/std@0.145.0/flags/mod.ts";
-import { Buffer } from "https://deno.land/std@0.145.0/io/buffer.ts";
-import { copy } from "https://deno.land/std@0.145.0/streams/conversion.ts";
+import { Untar } from "https://deno.land/std@0.155.0/archive/tar.ts";
+import { parse } from "https://deno.land/std@0.155.0/flags/mod.ts";
+import { Buffer } from "https://deno.land/std@0.155.0/io/buffer.ts";
+import { copy } from "https://deno.land/std@0.155.0/streams/conversion.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import util from "./shared/util.ts";
 import { basename, blue, bold, cyan, dim, ensureDir, green, join, red } from "./server/deps.ts";
@@ -132,14 +132,19 @@ export default async function init(nameArg?: string, template?: string) {
   const importMap = {
     imports: {
       "~/": "./",
-      "std/": "https://deno.land/std@0.145.0/",
-      "@unocss/": `${alephPkgUri}/lib/@unocss/`,
+      "std/": "https://deno.land/std@0.155.0/",
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
       "aleph/dev": `${alephPkgUri}/server/dev.ts`,
-    },
+    } as Record<string, string>,
     scopes: {},
   };
+  if (withUnocss) {
+    Object.assign(importMap.imports, {
+      "@unocss/core": "https://esm.sh/@unocss/core@0.45.14",
+      "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.45.14",
+    });
+  }
   switch (template) {
     case "react": {
       Object.assign(denoConfig.compilerOptions, {

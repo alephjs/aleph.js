@@ -16,7 +16,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     const html = await res.text();
     assertEquals(res.status, 200);
     assertEquals(res.headers.get("Content-Type"), "text/html; charset=utf-8");
-    assert(html.includes(`<header style=`));
+    assert(html.includes(`<header`));
     assert(html.includes(`<title ssr>Aleph.js</title>`));
     assert(html.includes(`<meta name="description" content="The Fullstack Framework in Deno." ssr>`));
     assert(html.includes(`The Fullstack Framework in Deno.</h1>`));
@@ -63,7 +63,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertEquals(res.status, 200);
     assertEquals(res.headers.get("Content-Type"), "text/html; charset=utf-8");
     assert(html.includes(`<title ssr>Todos</title>`));
-    assert(html.includes(`<header style="`));
+    assert(html.includes(`<header`));
     assert(html.includes(`>1</em>`));
     assert(html.includes(`Better Call Saul!</label>`));
   });

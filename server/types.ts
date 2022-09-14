@@ -1,6 +1,6 @@
-import type { ConnInfo, ServeInit } from "https://deno.land/std@0.145.0/http/server.ts";
+import type { ConnInfo, ServeInit } from "https://deno.land/std@0.155.0/http/server.ts";
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.4/types.d.ts";
-import type { UserConfig } from "../lib/@unocss/core.ts";
+import type { UserConfig } from "https://esm.sh/@unocss/core@0.45.14";
 import type { RouteModule } from "../runtime/core/route.ts";
 export type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../runtime/core/route.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };

@@ -2,33 +2,12 @@ import { Link } from "aleph/react";
 
 export default function Header() {
   return (
-    <header
-      style={{
-        position: "sticky",
-        top: 0,
-        width: "100%",
-        height: 80,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          width: "90%",
-          maxWidth: 900,
-          height: "100%",
-          margin: "0 auto",
-        }}
-      >
+    <header>
+      <div className="header-wrapper">
         <h1>
-          <Link
-            style={{ fontSize: 16, color: "#333" }}
-            to="/"
-          >
+          <Link to="/">
             <svg
               viewBox="0 0 60 12.09"
-              style={{ width: "auto", height: "1em" }}
               fill="currentColor"
             >
               <title>Aleph.js</title>
@@ -43,20 +22,10 @@ export default function Header() {
             </svg>
           </Link>
         </h1>
-        <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 20,
-          }}
-        >
-          <a
-            href="https://deno.land/x/aleph"
-            style={{ fontSize: 20, color: "#454545" }}
-          >
+        <nav>
+          <a href="https://deno.land/x/aleph">
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              style={{ width: "1em", height: "1em" }}
               viewBox="0 0 512 512"
             >
               <title>Deno Land</title>
@@ -81,13 +50,9 @@ export default function Header() {
               <circle mask="url(#deno-logo-mask)" cx="262" cy="203" r="16" />
             </svg>
           </a>
-          <a
-            href="https://github.com/alephjs/aleph.js"
-            style={{ fontSize: 20, color: "#454545" }}
-          >
+          <a href="https://github.com/alephjs/aleph.js">
             <svg
               viewBox="0 0 1024 1024"
-              style={{ width: "1em", height: "1em" }}
               fill="currentColor"
             >
               <title>Github</title>
