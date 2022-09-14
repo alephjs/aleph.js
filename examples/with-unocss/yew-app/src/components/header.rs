@@ -6,11 +6,12 @@ use crate::routes::Route;
 #[function_component]
 pub fn Header() -> Html {
   html! {
-    <header>
-      <div class={"header-wrapper"}>
+    <header class="sticky top-0 w-full h-20">
+      <div class="flex items-center justify-between w-[90%] max-w-[900px] h-full m-x-auto">
         <h1>
           <Link<Route> to={Route::Home}>
             <svg
+              class="w-auto h-4"
               viewbox="0 0 60 12.09"
               fill="currentColor"
             >
@@ -26,11 +27,13 @@ pub fn Header() -> Html {
             </svg>
           </Link<Route>>
         </h1>
-        <nav>
+        <nav class="flex items-center gap-5">
           <a
             href="https://deno.land/x/aleph"
+            class="text-[#454545] hover:text-black"
           >
             <svg
+              class="w-5 h-5"
               xmlns="http://www.w3.org/2000/svg"
               viewbox="0 0 512 512"
             >
@@ -56,8 +59,12 @@ pub fn Header() -> Html {
               <circle mask="url(#deno-logo-mask)" cx="262" cy="203" r="16" />
             </svg>
           </a>
-          <a href="https://github.com/alephjs/aleph.js">
+          <a
+            href="https://github.com/alephjs/aleph.js"
+            class="text-[#454545] hover:text-black"
+          >
             <svg
+              class="w-5 h-5"
               viewbox="0 0 1024 1024"
               fill="currentColor"
             >

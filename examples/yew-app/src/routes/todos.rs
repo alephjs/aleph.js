@@ -64,6 +64,7 @@ pub fn Todos() -> Html {
       todos.set(v)
     })
   };
+
   let ontoggle = {
     let todos = todos.clone();
     Callback::from(move |id: usize| {
@@ -86,6 +87,7 @@ pub fn Todos() -> Html {
       )
     })
   };
+
   let onremove = {
     let todos = todos.clone();
     Callback::from(move |id: usize| todos.set(todos.to_vec().into_iter().filter(|t| t.id != id).collect()))

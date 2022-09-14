@@ -1,7 +1,7 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use crate::shared::Route;
+use crate::routes::Route;
 
 #[function_component]
 pub fn NotFound() -> Html {
