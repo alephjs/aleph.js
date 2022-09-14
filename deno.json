@@ -24,14 +24,17 @@
         "LICENSE",
         "CODE_OF_CONDUCT.md",
         "examples/yew-app/pkg",
-        "examples/yew-app/target"
+        "examples/yew-app/target",
+        "examples/with-unocss/yew-app/pkg",
+        "examples/with-unocss/yew-app/target"
       ]
     }
   },
   "lint": {
     "files": {
       "exclude": [
-        "examples/yew-app/pkg"
+        "examples/yew-app/pkg",
+        "examples/with-unocss/yew-app/pkg"
       ]
     }
   }
