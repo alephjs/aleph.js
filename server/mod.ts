@@ -442,7 +442,13 @@ export function serve(options: ServerOptions = {}) {
     return;
   }
 
-  const port = options.port ?? 3000;
+  let port = options.port ?? 3000;
+  if (!options.port) {
+    const m = Deno.args.join(" ").match(/(--port|-P)(\s+|=)(\d+)/);
+    if (m) {
+      port = parseInt(m[3]);
+    }
+  }
   if (isDev) {
     Deno.env.set("ALEPH_SERVER_PORT", port.toString());
     watch(appDir);
