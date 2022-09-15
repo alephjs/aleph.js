@@ -14,6 +14,7 @@ declare type ResponseLike =
   | null;
 
 declare interface Data<DataType = ResponseLike, ActionDataType = ResponseLike> {
+  defer?: boolean;
   cacheTtl?: number;
   any?(request: Request, context: Context): Promise<Response | void> | Response | void;
   get?(request: Request, context: Context): Promise<DataType> | DataType;

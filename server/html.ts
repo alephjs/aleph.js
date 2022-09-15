@@ -1,4 +1,5 @@
 import util from "../shared/util.ts";
+import depGraph from "./graph.ts";
 import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm } from "./deps.ts";
 import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import type { Comment, Element } from "./types.ts";
@@ -7,7 +8,7 @@ import type { Comment, Element } from "./types.ts";
 await initLolHtml(lolHtmlWasm());
 
 type LoadOptions = {
-  ssr?: { suspense?: boolean };
+  ssr?: boolean;
   hmr?: { wsUrl?: string };
 };
 
@@ -74,7 +75,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
   const alephPkgUri = getAlephPkgUri();
   const chunks: Uint8Array[] = [];
   const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
-  const deployId = getDeploymentId();
+  const buildId = getDeploymentId() ?? depGraph.globalVersion.toString(36);
   let nomoduleInserted = false;
 
   rewriter.on("link", {
@@ -84,9 +85,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
         const isHttpUrl = util.isLikelyHttpURL(href);
         if (!isHttpUrl) {
           href = util.cleanPath(href);
-          if (deployId) {
-            href += (href.includes("?") ? "&v=" : "?v=") + deployId;
-          }
+          href += (href.includes("?") ? "&v=" : "?v=") + buildId;
           el.setAttribute("href", href);
         } else {
           href = toLocalPath(href);
@@ -112,9 +111,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
       if (src) {
         if (!util.isLikelyHttpURL(src)) {
           src = util.cleanPath(src);
-          if (deployId) {
-            src += (src.includes("?") ? "&v=" : "?v=") + deployId;
-          }
+          src += (src.includes("?") ? "&v=" : "?v=") + buildId;
           el.setAttribute("src", src);
         } else {
           src = toLocalPath(src);
@@ -133,12 +130,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
 
   rewriter.on("body", {
     element: (el: Element) => {
-      if (ssr?.suspense) {
-        el.setAttribute("data-defer", "true");
-      }
-      if (deployId) {
-        el.setAttribute("data-deployment-id", deployId);
-      }
+      el.setAttribute("data-build-id", buildId);
       if (ssr && !hasSSRBody) {
         el.prepend("<ssr-body></ssr-body>", { html: true });
       }

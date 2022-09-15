@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from "react";
-import { createElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
+import { createElement, isValidElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import events from "../core/events.ts";
 import { FetchError } from "../core/error.ts";
 import { redirect } from "../core/redirect.ts";
@@ -17,19 +17,17 @@ export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
-  readonly dataDefer: boolean;
 };
 
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
-  readonly dataDefer?: boolean;
   readonly strictMode?: boolean;
   readonly createPortal?: RouterContextProps["createPortal"];
 };
 
 /** The `Router` component for react. */
 export const Router: FC<RouterProps> = (props) => {
-  const { ssrContext, dataDefer: dataDeferProp, strictMode, createPortal } = props;
+  const { ssrContext, strictMode, createPortal } = props;
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
@@ -60,19 +58,22 @@ export const Router: FC<RouterProps> = (props) => {
     const { body } = window.document;
     const routeModules = getRouteModules();
     const router = loadRouterFromTag();
-    const dataDefer = body.hasAttribute("data-defer") ?? dataDeferProp;
-    const deployId = body.getAttribute("data-deployment-id");
+    const buildId = body.getAttribute("data-build-id");
 
     // import route module
-    const importModule = async ({ filename }: RouteMeta) => {
+    const importModule = async ({ filename }: RouteMeta): Promise<ARModule> => {
+      if (filename in routeModules) return routeModules[filename];
       let url = filename.slice(1);
-      if (deployId) {
-        url += `?v=${deployId}`;
+      if (buildId) {
+        url += `?v=${buildId}`;
       }
-      const { default: defaultExport, data, GET } = await import(url);
+      const { default: defaultExport, fallback, Fallback, data, GET } = await import(url);
       const withData = Boolean(data ?? GET);
-      routeModules[filename] = { defaultExport, withData };
-      return { defaultExport, withData };
+      const fallbackExport = fallback ?? Fallback;
+      const dataDefer = data?.defer;
+      const mod: ARModule = { defaultExport, fallbackExport, withData, dataDefer };
+      routeModules[filename] = mod;
+      return mod;
     };
 
     // prefetch module using `<link rel="modulepreload" href="...">`
@@ -84,8 +85,8 @@ export const Router: FC<RouterProps> = (props) => {
         if (!(filename in routeModules)) {
           const link = document.createElement("link");
           let href = meta.filename.slice(1);
-          if (deployId) {
-            href += `?v=${deployId}`;
+          if (buildId) {
+            href += `?v=${buildId}`;
           }
           link.setAttribute("rel", "modulepreload");
           link.setAttribute("href", href);
@@ -112,15 +113,11 @@ export const Router: FC<RouterProps> = (props) => {
           filename,
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;
-        if (filename in routeModules) {
-          Object.assign(rmod, routeModules[filename]);
-        } else {
-          const { defaultExport, withData } = await importModule(meta);
-          Object.assign(rmod, { defaultExport, withData });
-        }
-        if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
+        const mod = await importModule(meta);
+        Object.assign(rmod, mod);
+        if (!dataCache.has(dataUrl) && mod.withData === true) {
           rmod.withData = true;
-          await prefetchRouteData(dataCache, dataUrl, dataDefer);
+          await prefetchRouteData(dataCache, dataUrl, mod.dataDefer);
         }
         return rmod;
       }));
@@ -232,7 +229,7 @@ type RouteRootProps = {
 };
 
 const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
-  const { url, defaultExport, withData } = modules[0];
+  const { url, defaultExport, fallbackExport, withData } = modules[0];
   const dataUrl = url.pathname + url.search;
   let el: ReactNode;
 
@@ -249,7 +246,11 @@ const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
       el = createElement(
         Suspense,
         {
-          fallback: null,
+          fallback: (
+            typeof fallbackExport === "function" ? createElement(fallbackExport as FC) : (
+              typeof fallbackExport === "object" && isValidElement(fallbackExport) ? fallbackExport : null
+            )
+          ),
         },
         createElement(
           DataProvider,
@@ -329,7 +330,7 @@ function loadRouterFromTag(): IRouter {
 }
 
 // prefetch route data
-async function prefetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, dataDefer: boolean) {
+async function prefetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, dataDefer?: boolean) {
   const rd: RouteData = {};
   const fetchData = async () => {
     const res = await fetch(dataUrl + (dataUrl.includes("?") ? "&" : "?") + "_data_");
@@ -369,6 +370,7 @@ function loadSSRModulesFromTag(): RouteModule[] {
         let deferedData: Record<string, unknown> | null | undefined = undefined;
         const routeModules = getRouteModules();
         return data.map(({ url, filename, dataDefered, ...rest }) => {
+          const { defaultExport, fallbackExport } = routeModules[filename];
           if (dataDefered) {
             if (deferedData === undefined) {
               const el = window.document?.getElementById("defered-data");
@@ -391,7 +393,8 @@ function loadSSRModulesFromTag(): RouteModule[] {
           return {
             url: new URL(url, location.href),
             filename,
-            defaultExport: routeModules[filename].defaultExport,
+            defaultExport,
+            fallbackExport,
             ...rest,
           };
         });
@@ -403,7 +406,14 @@ function loadSSRModulesFromTag(): RouteModule[] {
   return [];
 }
 
-function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
+type ARModule = {
+  defaultExport?: unknown;
+  fallbackExport?: unknown;
+  withData?: boolean;
+  dataDefer?: boolean;
+};
+
+function getRouteModules(): Record<string, ARModule> {
   return global.__ROUTE_MODULES || (global.__ROUTE_MODULES = {});
 }
 

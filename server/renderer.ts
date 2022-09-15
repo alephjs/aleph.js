@@ -23,17 +23,15 @@ export default {
     const { indexHtml, router, customHTMLRewriter, ssr, isDev } = options;
     const headers = new Headers(ctx.headers as Headers);
     const isFn = typeof ssr === "function";
-    const dataDefer = isFn ? false : Boolean(ssr.suspense);
     const cc = !isFn ? ssr.cacheControl : "public";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;
-    const [url, routeModules, deferedData] = await initSSR(req, ctx, router, dataDefer);
+    const [url, routeModules, deferedData] = await initSSR(req, ctx, router);
     const headCollection: string[] = [];
     const ssrContext: SSRContext = {
       url,
       routeModules,
       headCollection,
-      dataDefer,
       signal: req.signal,
       bootstrapScripts: [bootstrapScript],
       onError: (_error: unknown) => {
@@ -178,13 +176,19 @@ export default {
                 { html: true },
               );
 
-              const deployId = getDeploymentId();
+              const deployId = getDeploymentId() ?? depGraph.globalVersion.toString(36);
               const importStmts = routeModules.map(({ filename }, idx) =>
-                `import $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))} ;`
+                `import * as $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))};`
               ).join("");
-              const kvs = routeModules.map(({ filename, data }, idx) =>
-                `${JSON.stringify(filename)}:{defaultExport:$${idx}${data !== undefined ? ",withData:true" : ""}}`
-              ).join(",");
+              const kvs = routeModules.map(({ filename, data, fallbackExport }, idx) => {
+                const exports = [
+                  `defaultExport: $${idx}.default`,
+                  fallbackExport !== undefined && `fallbackExport: $${idx}.fallback ?? $${idx}.Fallback`,
+                  data !== undefined && `withData:true`,
+                  typeof data === "function" && `dataDefer:true`,
+                ].filter(Boolean).join(",");
+                return `${JSON.stringify(filename)}:{${exports}}`;
+              }).join(",");
               const nonceAttr = nonce ? ` nonce="${nonce}"` : "";
               el.append(
                 `<script type="module"${nonceAttr}>${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`,
@@ -283,7 +287,6 @@ async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
   router: Router | null,
-  dataDefer: boolean,
 ): Promise<[
   url: URL,
   routeModules: RouteModule[],
@@ -301,11 +304,13 @@ async function initSSR(
   const modules = await Promise.all(matches.map(async ([ret, meta]) => {
     const mod = await importRouteModule(meta, router.appDir);
     const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
+    const dataDefer = Boolean(dataConfig?.defer);
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),
       params: ret.pathname.groups,
       filename: meta.filename,
       defaultExport: mod.default,
+      fallbackExport: mod.fallback ?? mod.Fallback,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
     };
 

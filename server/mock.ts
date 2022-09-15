@@ -77,7 +77,7 @@ export class MockServer {
     }
     if (!this.#indexHtml) {
       this.#indexHtml = await loadIndexHtml(join(appDir ?? "./", "index.html"), {
-        ssr: typeof ssr === "function" ? {} : ssr,
+        ssr: Boolean(ssr),
       });
     }
 

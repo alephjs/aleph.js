@@ -386,7 +386,7 @@ export function serve(options: ServerOptions = {}) {
       "__ALEPH_INDEX_HTML",
       () =>
         loadIndexHtml(join(appDir ?? ".", "index.html"), {
-          ssr: typeof ssr === "function" ? {} : ssr,
+          ssr: Boolean(ssr),
           hmr: isDev ? { wsUrl: Deno.env.get("HMR_WS_URL") } : undefined,
         }),
     );

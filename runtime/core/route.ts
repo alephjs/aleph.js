@@ -7,6 +7,7 @@ export type RouteModule = {
   params: Record<string, string>;
   filename: string;
   defaultExport?: unknown;
+  fallbackExport?: unknown; // fallback component for react suspense
   withData?: boolean;
   data?: unknown;
   dataCacheTtl?: number;

@@ -61,10 +61,11 @@ const createRouter = (props: RouterProps) => {
   }, { immediate: true });
 
   const importModule = async ({ filename }: RouteMeta) => {
-    const deployId = document.body.getAttribute("data-deployment-id");
+    const buildId = document.body.getAttribute("data-build-id");
+    if (filename in routeModules) return routeModules[filename];
     let url = filename.slice(1);
-    if (deployId) {
-      url += `?v=${deployId}`;
+    if (buildId) {
+      url += `?v=${buildId}`;
     }
     const { default: defaultExport, data: withData } = await import(url);
     routeModules[filename] = { defaultExport, withData };
@@ -134,12 +135,8 @@ const createRouter = (props: RouterProps) => {
         filename,
       };
       const dataUrl = rmod.url.pathname + rmod.url.search;
-      if (filename in routeModules) {
-        Object.assign(rmod, routeModules[filename]);
-      } else {
-        const { defaultExport, withData } = await importModule(meta);
-        Object.assign(rmod, { defaultExport, withData });
-      }
+      const mod = await importModule(meta);
+      Object.assign(rmod, mod);
       if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
         rmod.withData = true;
         await prefetchData(dataUrl);

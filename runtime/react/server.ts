@@ -18,7 +18,7 @@ export const render = (ctx: SSRContext): [Promise<ReadableStream>, number] => {
 };
 
 export function serve(
-  options?: Omit<ServerOptions, "ssr"> & { ssr?: boolean | (SSROptions & { suspense?: boolean }) },
+  options?: Omit<ServerOptions, "ssr"> & { ssr?: boolean | SSROptions },
 ) {
   alephServe({
     ...options,

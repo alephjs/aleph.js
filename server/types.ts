@@ -172,7 +172,6 @@ export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
-  readonly dataDefer: boolean;
   readonly signal: AbortSignal;
   readonly bootstrapScripts?: string[];
   readonly onError?: (error: unknown) => void;
@@ -180,8 +179,8 @@ export type SSRContext = {
 
 export type SSRBody<T> = T | [body: T, status: number];
 
-export type SSRFn<T> = {
-  (ssr: SSRContext): SSRBody<Promise<T> | T>;
+export type SSRFn = {
+  (ssr: SSRContext): SSRBody<Promise<ReadableStream | string> | ReadableStream | string>;
 };
 
 // Options for the content-security-policy
@@ -197,15 +196,10 @@ export type SSROptions = {
 };
 
 export type SSR =
-  | ({
-    suspense: true;
-    render: SSRFn<ReadableStream>;
-  } & SSROptions)
-  | ({
-    suspense?: false;
-    render: SSRFn<ReadableStream | string>;
-  } & SSROptions)
-  | SSRFn<ReadableStream | string>;
+  | SSRFn
+  | SSROptions & {
+    render: SSRFn;
+  };
 
 export type SSRResult = {
   context: SSRContext;
