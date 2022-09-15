@@ -10,6 +10,7 @@ import Comments from "../components/Comments.tsx";
 const delay = 3000;
 
 export const data: Data = {
+  defer: true,
   get: async () => {
     await new Promise((resolve) => setTimeout(resolve, delay));
     return {

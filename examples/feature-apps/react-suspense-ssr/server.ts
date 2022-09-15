@@ -6,7 +6,5 @@ serve({
   router: {
     routes,
   },
-  ssr: {
-    suspense: true,
-  },
+  ssr: true,
 });
