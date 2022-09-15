@@ -10,10 +10,10 @@ crate-type = ["cdylib", "rlib"]
 # this is the development version of Yew
 yew = { git = "https://github.com/yewstack/yew.git", features = ["ssr", "hydration"] }
 yew-router = { git = "https://github.com/yewstack/yew.git" }
-wasm-bindgen = { version = "0.2.82", features = ["strict-macro"] }
-wasm-bindgen-futures = "0.4.32"
-wee_alloc = "0.4.5"
-web-sys = "0.3.59"
+wasm-bindgen = { version = "0.2.83", features = ["strict-macro"] }
+wasm-bindgen-futures = "0.4.33"
+serde-wasm-bindgen = "0.4.3"
+web-sys = "0.3.60"
 url = "2.2.2"
 
 [profile.release]
