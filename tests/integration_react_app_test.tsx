@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "std/testing/asserts.ts";
+import { assertEquals, assertStringIncludes } from "std/testing/asserts.ts";
 import { MockServer } from "aleph/server/mock.ts";
 import { render } from "aleph/runtime/react/server.ts";
 
@@ -16,16 +16,16 @@ Deno.test("[integration] examples/react-app", async (t) => {
     const html = await res.text();
     assertEquals(res.status, 200);
     assertEquals(res.headers.get("Content-Type"), "text/html; charset=utf-8");
-    assert(html.includes(`<header`));
-    assert(html.includes(`<title ssr>Aleph.js</title>`));
-    assert(html.includes(`<meta name="description" content="The Fullstack Framework in Deno." ssr>`));
-    assert(html.includes(`The Fullstack Framework in Deno.</h1>`));
-    assert(html.includes(` href="/todos" `));
-    assert(html.includes(`>Todos App Demo</a>`));
-    assert(html.includes(`<link rel="icon" href="/assets/logo.svg">`));
-    assert(html.includes(`<script type="module" src="/main.tsx"></script>`));
-    assert(html.includes(`<script id="routes-manifest" type="application/json">`));
-    assert(html.includes(`<script id="ssr-modules" type="application/json">`));
+    assertStringIncludes(html, `<header`);
+    assertStringIncludes(html, `<title ssr>Aleph.js</title>`);
+    assertStringIncludes(html, `<meta name="description" content="The Fullstack Framework in Deno." ssr>`);
+    assertStringIncludes(html, `The Fullstack Framework in Deno.</h1>`);
+    assertStringIncludes(html, ` href="/todos" `);
+    assertStringIncludes(html, `>Todos App Demo</a>`);
+    assertStringIncludes(html, `<link rel="icon" href="/assets/logo.svg?v=`);
+    assertStringIncludes(html, `<script type="module" src="/main.tsx?v=`);
+    assertStringIncludes(html, `<script id="routes-manifest" type="application/json">`);
+    assertStringIncludes(html, `<script id="ssr-modules" type="application/json">`);
   });
 
   await t.step("API PUT+PATCH /todos", async () => {
@@ -62,10 +62,10 @@ Deno.test("[integration] examples/react-app", async (t) => {
     const html = await res.text();
     assertEquals(res.status, 200);
     assertEquals(res.headers.get("Content-Type"), "text/html; charset=utf-8");
-    assert(html.includes(`<title ssr>Todos</title>`));
-    assert(html.includes(`<header`));
-    assert(html.includes(`>1</em>`));
-    assert(html.includes(`Better Call Saul!</label>`));
+    assertStringIncludes(html, `<title ssr>Todos</title>`);
+    assertStringIncludes(html, `<header`);
+    assertStringIncludes(html, `>1</em>`);
+    assertStringIncludes(html, `Better Call Saul!</label>`);
   });
 
   await t.step("API DELETE /todos", async () => {
@@ -90,6 +90,6 @@ Deno.test("[integration] examples/react-app", async (t) => {
     const html = await res.text();
     assertEquals(res.status, 404);
     assertEquals(res.headers.get("Content-Type"), "text/html; charset=utf-8");
-    assert(html.includes(`>Ooooooops, nothing here!</h2>`));
+    assertStringIncludes(html, `>Ooooooops, nothing here!</h2>`);
   });
 });
