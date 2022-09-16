@@ -1,23 +1,47 @@
-import { createSignal } from "solid-js";
+import Header from "../components/Header.tsx";
 
-function Counter() {
-  const [count, setCount] = createSignal(0);
-  const increment = () => setCount(count() + 1);
-
-  return (
-    <button type="button" onClick={increment}>
-      {count() + 1}
-    </button>
-  );
-}
+const externalLinks = [
+  ["Get Started", "https://alephjs.org/docs/get-started"],
+  ["Docs", "https://alephjs.org/docs"],
+  ["Github", "https://github.com/alephjs/aleph.js"],
+];
 
 export default function App() {
   return (
-    <div>
-      <h1>Solid.js + Aleph.js</h1>
-      <p>
-        <Counter />
-      </p>
-    </div>
+    <>
+      <Header />
+      <div className="screen index">
+        <p className="logo">
+          <img src="./assets/logo.svg" width="70" height="70" title="Aleph.js" />
+          <img src="./assets/solid.svg" width="70" height="70" title="SolidJS" />
+        </p>
+        <h1>
+          The Fullstack Framework in Deno.
+        </h1>
+        <p>
+          <strong>Aleph.js</strong> gives you the best developer experience for building web applications<br />{" "}
+          with modern toolings. <label>SolidJS experimental version</label>.
+        </p>
+        <div className="external-links">
+          {externalLinks.map(([text, href]) => (
+            <a
+              href={href}
+              target="_blank"
+              key={href}
+            >
+              {text}
+            </a>
+          ))}
+        </div>
+        <nav>
+          <a
+            role="button"
+            href="/todos"
+          >
+            Todos App Demo
+          </a>
+        </nav>
+      </div>
+    </>
   );
 }

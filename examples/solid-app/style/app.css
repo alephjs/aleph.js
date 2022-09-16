@@ -1,0 +1,316 @@
+@import url('./reset.css');
+
+header {
+  width: 100%;
+  height: 80px;
+  position: sticky;
+  top: 0;
+}
+
+header .header-wrapper {
+  margin: 0 auto;
+  width: 90%;
+  max-width: 900px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header h1 a {
+  color: #333;
+}
+
+header h1 svg {
+  width: auto;
+  height: 16px;
+}
+
+header nav {
+  display: flex;
+  align-items: center;
+  gap: 20px
+}
+
+header nav a {
+  color: #454545;
+}
+
+header nav a svg {
+  width: 20px;
+  height: 20px;
+}
+
+header a svg {
+  display: inline-flex;
+}
+
+header a:hover {
+  color: #000!important;
+}
+
+.screen {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  width: 100vw;
+  height: calc(100vh - 2 * 80px);
+}
+
+.e404 h2 {
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.e404 p {
+  margin-top: 8px;
+}
+
+.e404 p a {
+  color: #999;
+  text-decoration: none;
+}
+
+.e404 p a:hover {
+  text-decoration: underline;
+}
+
+.index .logo {
+  display: flex;
+}
+
+.index h1 {
+  margin: 0;
+  line-height: 1.4;
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  color: #000;
+}
+
+.index p {
+  margin: 0;
+  line-height: 1.2;
+  font-size: 18px;
+  text-align: center;
+  color: #333;
+}
+
+.index p strong {
+  font-weight: 600;
+}
+
+.index p label {
+  display: inline-block;
+  font-weight: 600;
+  border-bottom: 4px #42b883 solid;
+}
+
+.index .external-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 12px;
+}
+
+.index .external-links a {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #666;
+  text-decoration: none;
+  transition: color 0.15s ease-in;
+}
+
+.index .external-links a:hover {
+  color: #000;
+}
+
+.index .external-links a:after {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: url(../assets/external-link.svg) no-repeat center;
+  background-size: contain;
+  content: "";
+}
+
+.index nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 45px;
+}
+
+.index nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 240px;
+  height: 50px;
+  border: 1px solid #ddd;
+  border-radius: 25px;
+  color: #454545;
+  transition: border-color 0.15s ease-in;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.index nav a:hover {
+  color: #000;
+  border-color: #aaa;
+}
+
+
+/* todos page */
+
+.todos-app {
+  width: 90%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding-top: 60px;
+}
+
+.todos-app h1 {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px;
+  font-size: 48px;
+  font-weight: 200;
+  text-align: left;
+  color: #333;
+}
+
+.todos-app h1 em {
+  font-size: 24px;
+  font-weight: 100;
+  color: #ccc;
+}
+
+.todos-app ul {
+  width: 100%;
+  list-style: none;
+}
+
+.todos-app ul li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.todos-app ul li:hover {
+  background-color: #f9f9f9;
+}
+
+.todos-app ul li input {
+  position: relative;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.todos-app ul li input:hover,
+.todos-app ul li input:checked {
+  border: 1px solid #b8dad4;
+}
+
+.todos-app ul li input:checked::after {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: #5dc2af;
+  content: " ";
+}
+
+.todos-app ul li label {
+  line-height: 20px;
+  flex-grow: 1;
+  font-size: 20px;
+  font-weight: 300;
+  color: #333;
+  transition: color 0.15s ease;
+}
+
+.todos-app ul li label.completed {
+  color: #aaa;
+  text-decoration: line-through;
+}
+
+.todos-app ul li button {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  overflow: hidden;
+  color: #ddd;
+  transition: color 0.15s ease;
+  cursor: pointer;
+}
+
+.todos-app ul li:hover button {
+  color: #ccc;
+}
+
+.todos-app ul li button:hover {
+  color: #c26c5d;
+}
+
+.todos-app ul li button:before,
+.todos-app ul li button:after {
+  content: " ";
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  width: 16px;
+  height: 1px;
+  margin-left: -8px;
+  background: currentColor;
+}
+
+.todos-app ul li button:before {
+  transform: rotate(45deg);
+}
+
+.todos-app ul li button:after {
+  transform: rotate(-45deg);
+}
+
+.todos-app form {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.todos-app form input {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 24px;
+  font-weight: 300;
+  color: #333;
+}
+
+.todos-app form input:focus{
+  background-color: #f9f9f9;
+  outline: none;
+}
+
+.todos-app form input::placeholder{
+  font-style: italic;
+  font-weight: 300;
+  color: #aaa;
+}
