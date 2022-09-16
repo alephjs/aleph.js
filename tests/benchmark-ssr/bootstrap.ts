@@ -11,16 +11,24 @@ const servers = frameworks.map((framework, i) => {
       "--port",
       `${port + i}`,
     ],
-    stdout: "inherit",
-    stderr: "inherit",
+    stdout: "null",
+    stderr: "null",
   });
 });
 
-await new Promise((resolve) => setTimeout(resolve, 1000));
-
-for (let i = 0; i < frameworks.length; i++) {
-  await fetch(`http://localhost:${port + i}/`);
-}
+await Promise.all(frameworks.map(async (framework, i) => {
+  const url = `http://localhost:${port + i}`;
+  let status = 0;
+  while (status !== 200) {
+    try {
+      const res = await fetch(url);
+      status = res.status;
+    } catch (e) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  console.log(`Server for ${framework} is ready at ${url}`);
+}));
 
 await Deno.run({
   cmd: [
