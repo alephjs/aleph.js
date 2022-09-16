@@ -23,7 +23,7 @@ await Promise.all(frameworks.map(async (framework, i) => {
     try {
       const res = await fetch(url);
       status = res.status;
-    } catch (e) {
+    } catch (_e) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
