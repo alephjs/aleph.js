@@ -15,10 +15,14 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   }
 
   const version = depGraph.get(filename)?.version;
+  const useTls = Deno.env.get("ALEPH_SERVER_TLS");
+  const hostname = Deno.env.get("ALEPH_SERVER_HOST");
   const devPort = Deno.env.get("ALEPH_SERVER_PORT");
   let url: string;
   if (devPort) {
-    url = `http://localhost:${devPort}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
+    url = `${useTls ? "https" : "http"}://${hostname}:${devPort}${filename.slice(1)}?ssr&v=${
+      (version ?? depGraph.globalVersion).toString(36)
+    }`;
   } else {
     const root = appDir ?? (config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
     url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;

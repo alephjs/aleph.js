@@ -328,7 +328,10 @@ export async function fetchCode(
   if (util.isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
     if (url.host === "aleph") {
-      return [await Deno.readTextFile("." + url.pathname), getContentType(url.pathname)];
+      return [
+        await Deno.readTextFile(fromFileUrl(new URL(".." + url.pathname, import.meta.url))),
+        getContentType(url.pathname),
+      ];
     }
     if (url.hostname === "esm.sh") {
       if (target && !url.pathname.includes(`/${target}/`) && !url.searchParams.has("target")) {

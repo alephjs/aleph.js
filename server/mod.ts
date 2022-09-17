@@ -449,17 +449,19 @@ export function serve(options: ServerOptions = {}) {
       port = parseInt(m[3]);
     }
   }
+  const { hostname = "localhost", certFile, keyFile, signal } = options;
+  const useTls = certFile && keyFile;
   if (isDev) {
+    Deno.env.set("ALEPH_SERVER_TLS", useTls ? "true" : "");
+    Deno.env.set("ALEPH_SERVER_HOST", hostname);
     Deno.env.set("ALEPH_SERVER_PORT", port.toString());
     watch(appDir);
   }
 
-  const { hostname, certFile, keyFile, signal } = options;
-  const useTls = certFile && keyFile;
   const onListen = (arg: { port: number; hostname: string }) => {
     if (!getDeploymentId()) {
       log.info(
-        `Server ready on ${useTls ? "https" : "http"}://localhost:${port}`,
+        `Server ready on ${useTls ? "https" : "http"}://${hostname}:${port}`,
       );
     }
     options.onListen?.(arg);
