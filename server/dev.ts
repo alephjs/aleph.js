@@ -122,7 +122,7 @@ export default async function dev(options?: DevOptions) {
   if (serverEntry) {
     const serverSpecifier = `./${util.trimPrefix(serverEntry, appDir)}`;
     const source = await Deno.readTextFile(serverEntry);
-    const importMap = getImportMap();
+    const importMap = await getImportMap();
     const deps = await parseDeps(serverSpecifier, source, {
       importMap: JSON.stringify(importMap),
     });
@@ -154,24 +154,15 @@ export default async function dev(options?: DevOptions) {
       }
     });
 
-    const cmd = [Deno.execPath(), "run", "-A", serverEntry];
-    const optimizeMode = Deno.args.includes("--optimize") || Deno.args.includes("-O");
-    if (optimizeMode) {
-      cmd.push("--optimize");
-    } else {
-      cmd.push("--dev");
-    }
+    const cmd = [Deno.execPath(), "run", "-A", serverEntry, "--dev"];
     if (devProcess) {
       console.debug(dim("[dev] Restarting the server..."));
     }
     devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
-    const { code } = await devProcess.status();
+    await devProcess.status();
     devProcess.close();
     devProcess = null;
     removeWatchFsEmitter(emitter);
-    if (optimizeMode) {
-      Deno.exit(code);
-    }
   } else {
     log.fatal("[dev] No server entry found.");
   }
