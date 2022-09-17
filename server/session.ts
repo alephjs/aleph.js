@@ -1,4 +1,4 @@
-import { setCookieHeader } from "./helpers.ts";
+import { cookieHeader } from "./helpers.ts";
 import type { Session, SessionOptions, SessionStorage } from "./types.ts";
 
 export class MemorySessionStorage implements SessionStorage {
@@ -50,7 +50,10 @@ export class SessionImpl<StoreType extends Record<string, unknown>> implements S
     this.#store = (await this.#storage.get(this.#id)) as StoreType | undefined;
   }
 
-  async update(store: StoreType | ((prev: StoreType | undefined) => StoreType)): Promise<string> {
+  async update(
+    store: StoreType | ((prev: StoreType | undefined) => StoreType),
+    redirect: string,
+  ): Promise<Response> {
     if (typeof store !== "object" && typeof store !== "function") {
       throw new Error("store must be a valid object or a function");
     }
@@ -62,9 +65,11 @@ export class SessionImpl<StoreType extends Record<string, unknown>> implements S
       nextStore = store;
     }
 
+    // save the new store
     await this.#storage.set(this.#id, nextStore, Date.now() + 1000 * (this.#options.maxAge ?? 1800));
     this.#store = nextStore;
-    return setCookieHeader(
+
+    const cookie = cookieHeader(
       this.#options.cookie?.name ?? "session",
       this.#id,
       {
@@ -72,12 +77,19 @@ export class SessionImpl<StoreType extends Record<string, unknown>> implements S
         expires: new Date(Date.now() + 1000 * (this.#options.maxAge ?? 1800)),
       },
     );
+    return new Response("", {
+      status: 302,
+      headers: { "Set-Cookie": cookie, "Location": redirect },
+    });
   }
 
-  async end(): Promise<string> {
-    await this.#storage.delete(this.#id);
+  async end(redirect: string): Promise<Response> {
+    if (!this.#store) {
+      await this.#storage.delete(this.#id);
+    }
     this.#store = undefined;
-    return setCookieHeader(
+
+    const cookie = cookieHeader(
       this.#options.cookie?.name ?? "session",
       "",
       {
@@ -85,5 +97,9 @@ export class SessionImpl<StoreType extends Record<string, unknown>> implements S
         expires: new Date(0),
       },
     );
+    return new Response("", {
+      status: 302,
+      headers: { "Set-Cookie": cookie, "Location": redirect },
+    });
   }
 }

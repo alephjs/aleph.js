@@ -51,7 +51,7 @@ export function serve(options: ServerOptions = {}) {
   const { baseUrl, fetch, loaders, middlewares, onError, optimization, router: routerConfig, session, ssr, unocss } =
     options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
-  const optimizeMode = Deno.args.includes("--optimize");
+  const optimizeMode = Deno.args.includes("--optimize") || Deno.args.includes("-O");
   const isDev = Deno.args.includes("--dev");
 
   // inject aleph config to global

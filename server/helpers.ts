@@ -11,7 +11,7 @@ export const regJsxFile = /\.(jsx|tsx)$/;
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
-/** Stores and returns the `fn` output in the `globalThis` object */
+/** Stores and returns the `fn` output in the `globalThis` object. */
 export async function globalIt<T>(name: string, fn: () => Promise<T>): Promise<T> {
   const v: T | undefined = Reflect.get(globalThis, name);
   if (v !== undefined) {
@@ -85,7 +85,7 @@ export function getDeploymentId(): string | undefined {
   return Deno.env.get("DENO_DEPLOYMENT_ID");
 }
 
-export function setCookieHeader(name: string, value: string, options?: CookieOptions): string {
+export function cookieHeader(name: string, value: string, options?: CookieOptions): string {
   const cookie = [`${name}=${value}`];
   if (options) {
     if (options.expires) {
@@ -157,7 +157,7 @@ export function fixResponse(res: Response, addtionHeaders: Headers, fixRedirect:
 }
 
 /**
- * fix remote url to local path.
+ * Fix remote url to local path.
  * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`
  */
 export function toLocalPath(url: string): string {
@@ -180,7 +180,7 @@ export function toLocalPath(url: string): string {
 }
 
 /**
- * restore the remote url from local path.
+ * Restore the remote url from local path.
  * e.g. `/-/esm.sh/react@17.0.2` -> `https://esm.sh/react@17.0.2`
  */
 export function restoreUrl(pathname: string): string {
@@ -194,12 +194,12 @@ export function restoreUrl(pathname: string): string {
   return `${protocol}://${host}${port ? ":" + port : ""}/${rest.join("/")}`;
 }
 
-// check if the url is a npm package from esm.sh
+/** Check if the url is a npm package from esm.sh */
 export function isNpmPkg(url: string) {
   return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
 }
 
-/** check whether or not the given path exists as a directory. */
+/** Check whether or not the given path exists as a directory. */
 export async function existsDir(path: string): Promise<boolean> {
   try {
     const stat = await Deno.lstat(path);
@@ -212,7 +212,7 @@ export async function existsDir(path: string): Promise<boolean> {
   }
 }
 
-/** check whether or not the given path exists as regular file. */
+/** Check whether or not the given path exists as regular file. */
 export async function existsFile(path: string): Promise<boolean> {
   try {
     const stat = await Deno.lstat(path);
@@ -225,7 +225,7 @@ export async function existsFile(path: string): Promise<boolean> {
   }
 }
 
-/** find file in the directory */
+/** Find file in the `cwd` directory. */
 export async function findFile(filenames: string[], cwd = Deno.cwd()): Promise<string | undefined> {
   for (const filename of filenames) {
     const fullPath = join(cwd, filename);
@@ -235,6 +235,7 @@ export async function findFile(filenames: string[], cwd = Deno.cwd()): Promise<s
   }
 }
 
+/** Find config file in the `appDir` if exits, or find in current working directory. */
 async function findConfigFile(filenames: string[], appDir?: string): Promise<string | undefined> {
   let denoConfigFile: string | undefined;
   if (appDir) {
@@ -297,7 +298,7 @@ export async function watchFs(rootDir: string, listener: (kind: "create" | "remo
   }
 }
 
-/** get files in the directory. */
+/** Get files in the directory. */
 export async function getFiles(
   dir: string,
   filter?: (filename: string) => boolean,
@@ -319,7 +320,7 @@ export async function getFiles(
   return list;
 }
 
-/** fetch source code from fs/cdn/cache */
+/** Fetch source code from fs/cdn/cache. */
 export async function fetchCode(
   specifier: string,
   target?: TransformOptions["target"],

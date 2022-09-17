@@ -1,5 +1,5 @@
 import util from "../shared/util.ts";
-import { setCookieHeader } from "./helpers.ts";
+import { cookieHeader } from "./helpers.ts";
 import { SessionImpl } from "./session.ts";
 import type { ConnInfo, Context, CookieOptions, HTMLRewriterHandlers, Session, SessionOptions } from "./types.ts";
 
@@ -33,11 +33,11 @@ export function createContext(req: Request, options?: ContextOptions): Context {
       },
       set(name: string, value: string, options?: CookieOptions) {
         cookies?.set(name, value);
-        ctx.headers.set("Set-Cookie", setCookieHeader(name, value, options));
+        ctx.headers.set("Set-Cookie", cookieHeader(name, value, options));
       },
       delete(name: string, options?: CookieOptions) {
         cookies?.delete(name);
-        ctx.headers.set("Set-Cookie", setCookieHeader(name, "", { ...options, expires: new Date(0) }));
+        ctx.headers.set("Set-Cookie", cookieHeader(name, "", { ...options, expires: new Date(0) }));
       },
     },
     // deno-lint-ignore ban-ts-comment

@@ -81,8 +81,8 @@ export type SessionOptions = {
 
 export interface Session<T> {
   store: T | undefined;
-  update(store: T | ((store: T | undefined) => T)): Promise<string>;
-  end(): Promise<string>;
+  update(store: T | ((store: T | undefined) => T), redirectTo: string): Promise<Response>;
+  end(redirectTo: string): Promise<Response>;
 }
 
 export interface HTMLRewriterHandlers {

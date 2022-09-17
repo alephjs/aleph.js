@@ -155,15 +155,17 @@ export default async function dev(options?: DevOptions) {
     });
 
     const cmd = [Deno.execPath(), "run", "-A", serverEntry, "--dev"];
-    if (Deno.args.includes("--optimize")) {
+    if (Deno.args.includes("--optimize") || Deno.args.includes("-O")) {
       cmd.push("--optimize");
     }
     if (devProcess) {
-      console.debug(dim("Restarting the server..."));
+      console.debug(dim("[dev] Restarting the server..."));
     }
     devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
     await devProcess.status();
     removeWatchFsEmitter(emitter);
+  } else {
+    log.fatal("[dev] No server entry found.");
   }
 }
 
