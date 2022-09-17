@@ -19,6 +19,7 @@ import {
   existsFile,
   fetchCode,
   getAlephPkgUri,
+  globalIt,
   isNpmPkg,
   restoreUrl,
   toLocalPath,
@@ -58,7 +59,10 @@ export async function optimize(
   const ssgOptions = config.optimization?.ssg === true ? {} : config.optimization?.ssg ?? {};
   const ssgPaths: string[] = [];
   if (config?.router) {
-    const { routes } = await initRouter(config.router, appDir);
+    const { routes } = await globalIt(
+      "__ALEPH_ROUTER",
+      () => initRouter(config.router!, appDir),
+    );
     routes.forEach(([_, { filename }]) => {
       routeFiles.push(filename);
     });

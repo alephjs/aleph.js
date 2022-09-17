@@ -154,16 +154,24 @@ export default async function dev(options?: DevOptions) {
       }
     });
 
-    const cmd = [Deno.execPath(), "run", "-A", serverEntry, "--dev"];
-    if (Deno.args.includes("--optimize") || Deno.args.includes("-O")) {
+    const cmd = [Deno.execPath(), "run", "-A", serverEntry];
+    const optimizeMode = Deno.args.includes("--optimize") || Deno.args.includes("-O");
+    if (optimizeMode) {
       cmd.push("--optimize");
+    } else {
+      cmd.push("--dev");
     }
     if (devProcess) {
       console.debug(dim("[dev] Restarting the server..."));
     }
     devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
-    await devProcess.status();
+    const { code } = await devProcess.status();
+    devProcess.close();
+    devProcess = null;
     removeWatchFsEmitter(emitter);
+    if (optimizeMode) {
+      Deno.exit(code);
+    }
   } else {
     log.fatal("[dev] No server entry found.");
   }

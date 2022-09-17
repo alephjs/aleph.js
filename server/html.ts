@@ -2,6 +2,7 @@ import util from "../shared/util.ts";
 import depGraph from "./graph.ts";
 import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm } from "./deps.ts";
 import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
+import log from "./log.ts";
 import type { Comment, Element } from "./types.ts";
 
 // init `lol-html` Wasm
@@ -23,7 +24,9 @@ export async function loadIndexHtml(filepath: string, options: LoadOptions): Pro
   if (await existsFile(filepath)) {
     const htmlRaw = await Deno.readFile(filepath);
     const [html, hasSSRBody] = checkSSRBody(htmlRaw);
-    return fixIndexHtml(html, hasSSRBody, options);
+    const fixedHtml = fixIndexHtml(html, hasSSRBody, options);
+    log.debug("index.html loaded");
+    return fixedHtml;
   }
   return null;
 }

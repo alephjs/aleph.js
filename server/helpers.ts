@@ -15,13 +15,18 @@ export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 export async function globalIt<T>(name: string, fn: () => Promise<T>): Promise<T> {
   const v: T | undefined = Reflect.get(globalThis, name);
   if (v !== undefined) {
+    if (v instanceof Promise) {
+      const ret = await v;
+      Reflect.set(globalThis, name, ret);
+      return ret;
+    }
     return v;
   }
-  const ret = await fn();
+  const ret = fn();
   if (ret !== undefined) {
     Reflect.set(globalThis, name, ret);
   }
-  return ret;
+  return await ret;
 }
 
 /** Stores and returns the `fn` output in the `globalThis` object synchronously. */
@@ -374,6 +379,7 @@ export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
           jsxConfig.jsxPragmaFrag = jsxFragmentFactory;
         }
       }
+      log.debug(`deno config ${basename(denoConfigFile)} loaded`);
     } catch (error) {
       log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
     }
@@ -413,6 +419,7 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
       Object.assign(importMap, { __filename });
       Object.assign(importMap.imports, imports);
       Object.assign(importMap.scopes, scopes);
+      log.debug(`import maps ${basename(importMapFile)} loaded`);
     } catch (e) {
       log.error("loadImportMap:", e.message);
     }

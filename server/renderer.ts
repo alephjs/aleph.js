@@ -4,6 +4,7 @@ import util from "../shared/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";
+import log from "./log.ts";
 import { importRouteModule } from "./routing.ts";
 import type { Element, HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContext, SSRResult } from "./types.ts";
 
@@ -97,6 +98,7 @@ export default {
             `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.45.14/${resetCSS}.css">`,
             `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
           );
+          log.debug(`Uncss generated in ${buildTime}ms`);
         }
       }
     }
