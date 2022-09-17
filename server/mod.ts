@@ -449,7 +449,7 @@ export function serve(options: ServerOptions = {}) {
       port = parseInt(m[3]);
     }
   }
-  const { hostname = 'localhost', certFile, keyFile, signal } = options;
+  const { hostname = "localhost", certFile, keyFile, signal } = options;
   const useTls = certFile && keyFile;
   if (isDev) {
     Deno.env.set("ALEPH_SERVER_TLS", useTls ? "true" : "");
