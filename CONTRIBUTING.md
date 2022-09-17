@@ -22,10 +22,13 @@ You will need [Deno](https://deno.land/) 1.20+.
 ### Run The Examples
 
 ```bash
-# run the example app in development mode
+# Run the example app in development mode
 deno run -A examples/$APP/dev.ts
 
-# run the example app in production mode
+# Run the example app in production mode
+deno run -A examples/$APP/server.ts
+
+# Optimize the application (bundling, ssg, etc.)
 deno run -A examples/$APP/server.ts
 ```
 
@@ -44,11 +47,11 @@ deno test -A
 - **/examples** examples to get started
 - **/runtime**
   - **core** framework runtime core
-  - **react** framework runtime in React
-  - **vue** framework runtime in Vue.js
-- **/lib** shared libraries
-- **/loaders** builtin loaders
+  - **react** framework runtime for React
+  - **vue** framework runtime for Vue.js
+  - **solid** framework runtime for SolidJS
 - **/server** server core of Aleph.js
+- **/shared** shared libraries
 - **/tests** unit/integration testings
 
 ## Code Style We Followed
