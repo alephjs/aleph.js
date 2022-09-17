@@ -24,14 +24,7 @@ export class GithubOauth implements Middleware {
     const session = await ctx.getSession<{ user: GithubUser }>();
 
     if (pathname === "/logout") {
-      const cookie = await session.end();
-      return new Response("", {
-        status: 302,
-        headers: {
-          "Set-Cookie": cookie,
-          "Location": "/",
-        },
-      });
+      return session.end("/");
     }
 
     if (!session.store?.user) {
@@ -69,18 +62,13 @@ export class GithubOauth implements Middleware {
         headers: {
           "Authorization": `token ${ret.access_token}`,
           "Accept": "application/json",
-          "User-Agent": "Cloudflare/2021-11-10",
         },
       }).then((res) => res.json());
 
-      const cookie = await session.update({ user });
-      return new Response("", {
-        status: 302,
-        headers: {
-          "Set-Cookie": cookie,
-          "Location": searchParams.get("redirect") ?? "/",
-        },
-      });
+      return session.update(
+        { user },
+        searchParams.get("redirect") ?? "/",
+      );
     }
 
     ctx.user = session.store.user;

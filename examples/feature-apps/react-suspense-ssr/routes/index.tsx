@@ -13,13 +13,13 @@ export const data: Data = {
   defer: true,
   get: async () => {
     await new Promise((resolve) => setTimeout(resolve, delay));
-    return {
+    return Response.json({
       comments: [
         "Wait, it doesn't wait for React to load?",
         "How does this even work?",
         "I like marshmallows",
       ],
-    };
+    });
   },
 };
 
