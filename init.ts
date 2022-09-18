@@ -172,6 +172,10 @@ export default async function init(nameArg?: string, template?: string) {
       break;
     }
     case "solid": {
+      Object.assign(denoConfig.compilerOptions, {
+        "jsx": "react-jsx",
+        "jsxImportSource": `https://esm.sh/solid-js@${versions.solid} `,
+      });
       Object.assign(importMap.imports, {
         "aleph/solid-server": `${alephPkgUri}/runtime/solid/server.ts`,
         "solid-js": `https://esm.sh/solid-js@${versions.solid}`,
