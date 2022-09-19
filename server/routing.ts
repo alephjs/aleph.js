@@ -1,13 +1,13 @@
 import { URLPatternCompat, type URLPatternInput } from "../runtime/core/url_pattern.ts";
 import util from "../shared/util.ts";
-import { extname, fromFileUrl, globToRegExp, join } from "./deps.ts";
+import { extname, fromFileUrl, globToRegExp, join, resolve } from "./deps.ts";
 import depGraph from "./graph.ts";
 import log from "./log.ts";
 import { builtinModuleExts, fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
 import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp, RouterInit } from "./types.ts";
 
 /** import the route module. */
-export async function importRouteModule({ filename, pattern }: RouteMeta) {
+export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
   const config = getAlephConfig();
   const routes = config?.router?.routes;
   if (routes && pattern.pathname in routes) {
@@ -24,7 +24,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta) {
       (version ?? depGraph.globalVersion).toString(36)
     }`;
   } else {
-    const root = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
+    const root = appDir ? resolve(appDir) : (config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
     url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
   }
   return await import(url);
@@ -66,7 +66,7 @@ export async function fetchRouteData(
     if (matched) {
       const { method } = req;
       const [ret, meta] = matched;
-      const mod = await importRouteModule(meta);
+      const mod = await importRouteModule(meta, router.appDir);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
       if (method !== "GET" || mod.default === undefined || reqData) {
         Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
@@ -133,6 +133,7 @@ export async function initRouter(options: RouterInit, appDir?: string): Promise<
 
   log.debug(`${routes.length} routes found`);
   return {
+    appDir,
     routes,
     prefix: reg.prefix,
     _404,

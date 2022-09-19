@@ -24,8 +24,8 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertStringIncludes(html, `>Todos App Demo</a>`);
     assertStringIncludes(html, `<link rel="icon" href="/assets/logo.svg?v=`);
     assertStringIncludes(html, `<script type="module" src="/main.tsx?v=`);
-    assertStringIncludes(html, `<script id="routes-manifest" type="application/json">`);
-    assertStringIncludes(html, `<script id="ssr-modules" type="application/json">`);
+    assertStringIncludes(html, `<script id="router-manifest" type="application/json">`);
+    assertStringIncludes(html, `<script id="ssr-data" type="application/json">`);
   });
 
   await t.step("API PUT+PATCH /todos", async () => {
