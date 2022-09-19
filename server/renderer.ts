@@ -125,6 +125,7 @@ export default {
       context: ssrContext,
       deferedData,
     };
+
     if (!isDev && CSP) {
       const nonce = ssrContext.nonce;
       const policy = CSP.getPolicy(url, nonce);
@@ -138,10 +139,11 @@ export default {
 
     const stream = new ReadableStream({
       start: (controller) => {
-        let suspenseSSR = false;
+        let ssrStreaming = false;
+
         const suspenseChunks: Uint8Array[] = [];
         const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
-          if (suspenseSSR) {
+          if (ssrStreaming) {
             suspenseChunks.push(chunk);
           } else {
             controller.enqueue(chunk);
@@ -215,6 +217,7 @@ export default {
             if (typeof body === "string") {
               el.replace(body, { html: true });
             } else if (body instanceof ReadableStream) {
+              ssrStreaming = true;
               el.remove();
 
               const rw = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
@@ -230,7 +233,6 @@ export default {
                     }
                   },
                 });
-                suspenseSSR = true;
               }
 
               const send = async () => {
@@ -279,7 +281,7 @@ export default {
           rewriter.write(indexHtml);
           rewriter.end();
         } finally {
-          if (!suspenseSSR) {
+          if (!ssrStreaming) {
             controller.close();
           }
           rewriter.free();
@@ -294,6 +296,7 @@ export default {
       headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
     }
     headers.set("Content-Type", "text/html; charset=utf-8");
+
     return new Response(stream, { headers, status: ssrContext.status });
   },
 };
