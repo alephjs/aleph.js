@@ -24,7 +24,15 @@ declare interface Data<DataType = ResponseLike, ActionDataType = ResponseLike> {
   delete?(request: Request, context: Context): Promise<ActionDataType> | ActionDataType;
 }
 
+declare const __aleph: {
+  // deno-lint-ignore no-explicit-any
+  importRouteModule(url: string): Promise<any>;
+  // deno-lint-ignore no-explicit-any
+  getRouteModule(url: string): any;
+};
+
 declare interface ImportMeta {
+  /** Aleph.js HMR `hot` API. */
   readonly hot?: {
     readonly data: Record<string, unknown>;
     accept<T = Record<string, unknown>>(callback?: (module: T) => void): void;

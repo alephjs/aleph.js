@@ -18,6 +18,32 @@ export type RenderOptions = {
 
 /** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
 const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* stage ready */")}`;
+const runtimeScript = [
+  `let e=fn=>new Error('module "'+fn+'" not found');`,
+  `const getRouteModule=(fn)=>{`,
+  `if(map.has(fn)){`,
+  `let m=map.get(fn);`,
+  `if(m instanceof Promise) throw e(fn);`,
+  `return m;`,
+  `}`,
+  `throw e(fn);`,
+  `};`,
+  `const importRouteModule=async(fn)=>{`,
+  `if(map.has(fn)){`,
+  `let m=map.get(fn);`,
+  `if(m instanceof Promise) {`,
+  `m=await m;`,
+  `map.set(fn,m);`,
+  `}`,
+  `return m;`,
+  `}`,
+  `let v=document.body.getAttribute("data-build-id");`,
+  `let m=import(fn.slice(1)+(v?"?v="+v:""));`,
+  `map.set(fn,m);`,
+  `return await m.then(m=>{map.set(fn,m);return m;});`,
+  `};`,
+  `window.__aleph={getRouteModule,importRouteModule};`,
+].join("");
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
@@ -182,18 +208,12 @@ export default {
               const importStmts = routeModules.map(({ filename }, idx) =>
                 `import * as $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))};`
               ).join("");
-              const kvs = routeModules.map(({ filename, data, fallbackExport }, idx) => {
-                const exports = [
-                  `defaultExport: $${idx}.default`,
-                  fallbackExport !== undefined && `fallbackExport: $${idx}.fallback ?? $${idx}.Fallback`,
-                  data !== undefined && `withData:true`,
-                  typeof data === "function" && `dataDefer:true`,
-                ].filter(Boolean).join(",");
-                return `${JSON.stringify(filename)}:{${exports}}`;
-              }).join(",");
+              const kvs = routeModules.map(({ filename }, idx) => `${JSON.stringify(filename)}:$${idx}`).join(
+                ",",
+              );
               const nonceAttr = nonce ? ` nonce="${nonce}"` : "";
               el.append(
-                `<script type="module"${nonceAttr}>${importStmts}window.__ROUTE_MODULES={${kvs}};</script>`,
+                `<script type="module"${nonceAttr}>${importStmts}let map=new Map(Object.entries({${kvs}}));${runtimeScript}</script>`,
                 { html: true },
               );
             }
@@ -304,15 +324,14 @@ async function initSSR(
 
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, meta]) => {
-    const mod = await importRouteModule(meta, router.appDir);
+    const mod = await importRouteModule(meta);
     const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
     const dataDefer = Boolean(dataConfig?.defer);
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),
       params: ret.pathname.groups,
       filename: meta.filename,
-      defaultExport: mod.default,
-      fallbackExport: mod.fallback ?? mod.Fallback,
+      exports: mod,
       dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
     };
 
@@ -385,7 +404,7 @@ async function initSSR(
 
   return [
     url,
-    modules.filter(({ defaultExport }) => defaultExport !== undefined),
+    modules.filter(({ exports }) => exports.default !== undefined),
     deferedData,
   ];
 }

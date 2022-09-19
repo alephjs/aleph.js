@@ -6,8 +6,7 @@ export type RouteModule = {
   url: URL;
   params: Record<string, string>;
   filename: string;
-  defaultExport?: unknown;
-  fallbackExport?: unknown; // fallback component for react suspense
+  exports: Record<string, unknown>;
   withData?: boolean;
   data?: unknown;
   dataCacheTtl?: number;
@@ -25,9 +24,8 @@ export type Route = readonly [
 ];
 
 export type Router = {
-  appDir?: string;
-  routes: Route[];
   prefix: string;
+  routes: Route[];
   _404?: Route;
   _app?: Route;
 };

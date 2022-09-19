@@ -14,6 +14,7 @@ export type DataProviderProps = {
   dataCache: Map<string, RouteData>;
 };
 
+// fixme: drop unnecessary data fetching
 const createDataProvider = () => {
   const dataCache: Map<string, RouteData> = inject("dataCache") || new Map();
   const ssrContext: SSRContext | undefined = inject("ssrContext");

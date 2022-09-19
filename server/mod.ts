@@ -313,7 +313,7 @@ export function serve(options: ServerOptions = {}) {
         const pattern = searchParams.get("pattern");
         const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);
         if (route) {
-          const mod = await importRouteModule(route[1], appDir);
+          const mod = await importRouteModule(route[1]);
           if (typeof mod.getStaticPaths === "function") {
             let ret = mod.getStaticPaths();
             if (ret instanceof Promise) {
@@ -472,3 +472,27 @@ export function serve(options: ServerOptions = {}) {
     stdServe(handler, { hostname, port, signal, onListen });
   }
 }
+
+// inject the `__aleph` global variable
+Reflect.set(
+  globalIt,
+  "__aleph",
+  {
+    getRouteModule: () => {
+      throw new Error("only available in client-side");
+    },
+    importRouteModule: async (filename: string) => {
+      let router: Router | Promise<Router> | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
+      if (router) {
+        if (router instanceof Promise) {
+          router = await router;
+        }
+        const route = router.routes.find(([, meta]) => meta.filename === filename);
+        if (route) {
+          return importRouteModule(route[1]);
+        }
+      }
+      return importRouteModule({ filename, pattern: { pathname: "" } });
+    },
+  },
+);

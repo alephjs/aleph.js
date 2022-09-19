@@ -26,7 +26,10 @@ export async function globalIt<T>(name: string, fn: () => Promise<T>): Promise<T
   if (ret !== undefined) {
     Reflect.set(globalThis, name, ret);
   }
-  return await ret;
+  return await ret.then((v) => {
+    Reflect.set(globalThis, name, v);
+    return v;
+  });
 }
 
 /** Stores and returns the `fn` output in the `globalThis` object synchronously. */

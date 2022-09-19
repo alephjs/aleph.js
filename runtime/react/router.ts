@@ -10,9 +10,6 @@ import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./c
 import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
 
-// deno-lint-ignore no-explicit-any
-const global = window as any;
-
 export type SSRContext = {
   readonly url: URL;
   readonly routeModules: RouteModule[];
@@ -56,25 +53,8 @@ export const Router: FC<RouterProps> = (props) => {
 
   useEffect(() => {
     const { body } = window.document;
-    const routeModules = getRouteModules();
     const router = loadRouterFromTag();
     const buildId = body.getAttribute("data-build-id");
-
-    // import route module
-    const importModule = async ({ filename }: RouteMeta): Promise<ARModule> => {
-      if (filename in routeModules) return routeModules[filename];
-      let url = filename.slice(1);
-      if (buildId) {
-        url += `?v=${buildId}`;
-      }
-      const { default: defaultExport, fallback, Fallback, data, GET } = await import(url);
-      const withData = Boolean(data ?? GET);
-      const fallbackExport = fallback ?? Fallback;
-      const dataDefer = data?.defer;
-      const mod: ARModule = { defaultExport, fallbackExport, withData, dataDefer };
-      routeModules[filename] = mod;
-      return mod;
-    };
 
     // prefetch module using `<link rel="modulepreload" href="...">`
     const onmoduleprefetch = (e: Record<string, unknown>) => {
@@ -82,7 +62,9 @@ export const Router: FC<RouterProps> = (props) => {
       const matches = matchRoutes(pageUrl, router);
       matches.map(([_, meta]) => {
         const { filename } = meta;
-        if (!(filename in routeModules)) {
+        try {
+          __aleph.getRouteModule(filename);
+        } catch (_e) {
           const link = document.createElement("link");
           let href = meta.filename.slice(1);
           if (buildId) {
@@ -111,13 +93,13 @@ export const Router: FC<RouterProps> = (props) => {
           url: new URL(ret.pathname.input + url.search, url.href),
           params: ret.pathname.groups,
           filename,
+          exports: await __aleph.importRouteModule(filename),
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;
-        const mod = await importModule(meta);
-        Object.assign(rmod, mod);
-        if (!dataCache.has(dataUrl) && mod.withData === true) {
-          rmod.withData = true;
-          await prefetchRouteData(dataCache, dataUrl, mod.dataDefer);
+        const dataConfig = rmod.exports.data as undefined | Record<string, boolean>;
+        rmod.withData = Boolean(dataConfig?.get || dataConfig?.GET);
+        if (rmod.withData && !dataCache.has(dataUrl)) {
+          await prefetchRouteData(dataCache, dataUrl, dataConfig?.defer);
         }
         return rmod;
       }));
@@ -134,10 +116,10 @@ export const Router: FC<RouterProps> = (props) => {
             loadingBarEl.style.opacity = "0";
           }, moveOutTime * 1000);
           const t2 = setTimeout(() => {
-            global.__LOADING_BAR_CLEANUP = null;
+            clearLoadingBar = null;
             loadingBarEl.remove();
           }, (moveOutTime + fadeOutTime) * 1000);
-          global.__LOADING_BAR_CLEANUP = () => {
+          clearLoadingBar = () => {
             clearTimeout(t1);
             clearTimeout(t2);
           };
@@ -229,13 +211,13 @@ type RouteRootProps = {
 };
 
 const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
-  const { url, defaultExport, fallbackExport, withData } = modules[0];
+  const { url, exports, withData } = modules[0];
   const dataUrl = url.pathname + url.search;
   let el: ReactNode;
 
-  if (typeof defaultExport === "function") {
+  if (typeof exports.default === "function") {
     el = createElement(
-      defaultExport as FC,
+      exports.default as FC,
       null,
       modules.length > 1 && createElement(
         RouteRoot,
@@ -243,12 +225,13 @@ const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
       ),
     );
     if (withData) {
+      const fallback = exports.fallback || exports.Fallback;
       el = createElement(
         Suspense,
         {
           fallback: (
-            typeof fallbackExport === "function" ? createElement(fallbackExport as FC) : (
-              typeof fallbackExport === "object" && isValidElement(fallbackExport) ? fallbackExport : null
+            typeof fallback === "function" ? createElement(fallback as FC) : (
+              typeof fallback === "object" && isValidElement(fallback) ? fallback : null
             )
           ),
         },
@@ -368,9 +351,8 @@ function loadSSRModulesFromTag(): RouteModule[] {
       const data = JSON.parse(el.innerText);
       if (Array.isArray(data)) {
         let deferedData: Record<string, unknown> | null | undefined = undefined;
-        const routeModules = getRouteModules();
         return data.map(({ url, filename, dataDefered, ...rest }) => {
-          const { defaultExport, fallbackExport } = routeModules[filename];
+          const mod = __aleph.getRouteModule(filename);
           if (dataDefered) {
             if (deferedData === undefined) {
               const el = window.document?.getElementById("defered-data");
@@ -390,11 +372,10 @@ function loadSSRModulesFromTag(): RouteModule[] {
             rest.data = new FetchError(500, rest.error.message, { stack: rest.error.stack });
             rest.error = undefined;
           }
-          return {
+          return <RouteModule> {
             url: new URL(url, location.href),
             filename,
-            defaultExport,
-            fallbackExport,
+            exports: mod,
             ...rest,
           };
         });
@@ -406,21 +387,12 @@ function loadSSRModulesFromTag(): RouteModule[] {
   return [];
 }
 
-type ARModule = {
-  defaultExport?: unknown;
-  fallbackExport?: unknown;
-  withData?: boolean;
-  dataDefer?: boolean;
-};
-
-function getRouteModules(): Record<string, ARModule> {
-  return global.__ROUTE_MODULES || (global.__ROUTE_MODULES = {});
-}
+let clearLoadingBar: CallableFunction | null = null;
 
 function getLoadingBarEl(): HTMLDivElement {
-  if (typeof global.__LOADING_BAR_CLEANUP === "function") {
-    global.__LOADING_BAR_CLEANUP();
-    global.__LOADING_BAR_CLEANUP = null;
+  if (typeof clearLoadingBar === "function") {
+    clearLoadingBar();
+    clearLoadingBar = null;
   }
   let bar = (document.getElementById("loading-bar") as HTMLDivElement | null);
   if (!bar) {

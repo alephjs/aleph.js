@@ -11,9 +11,6 @@ import { Link } from "./link.ts";
 import { Head } from "./head.ts";
 import { Err } from "./error.ts";
 
-// deno-lint-ignore no-explicit-any
-const global = window as any;
-
 export type RouteData = {
   data?: unknown;
   dataCacheTtl?: number;
@@ -37,13 +34,10 @@ type RouterRootProps = {
   ssrContext?: SSRContext;
 };
 
-const createRouter = (props: RouterProps) => {
-  const { modules, url, dataCache, dataUrl } = props;
-
-  const routeModules = getRouteModules();
+const createRouter = ({ modules, url, dataCache, dataUrl }: RouterProps) => {
   const router = loadRouterFromTag();
-
   const _dataUrl = url.value.pathname + url.value.search;
+
   modules.value.forEach((module) => {
     const { data, dataCacheTtl } = module;
     dataCache.set(_dataUrl, {
@@ -59,18 +53,6 @@ const createRouter = (props: RouterProps) => {
     dataUrl.value = url.value.pathname + url.value.search;
     RouterContext.value = { url: url.value, params };
   }, { immediate: true });
-
-  const importModule = async ({ filename }: RouteMeta) => {
-    const buildId = document.body.getAttribute("data-build-id");
-    if (filename in routeModules) return routeModules[filename];
-    let url = filename.slice(1);
-    if (buildId) {
-      url += `?v=${buildId}`;
-    }
-    const { default: defaultExport, data: withData } = await import(url);
-    routeModules[filename] = { defaultExport, withData };
-    return { defaultExport, withData };
-  };
 
   const prefetchData = async (dataUrl: string) => {
     const rd: RouteData = {};
@@ -105,7 +87,9 @@ const createRouter = (props: RouterProps) => {
     const matches = matchRoutes(pageUrl, router);
     matches.map(([_, meta]) => {
       const { filename } = meta;
-      if (!(filename in routeModules)) {
+      try {
+        __aleph.getRouteModule(filename);
+      } catch (_e) {
         const link = document.createElement("link");
         let href = meta.filename.slice(1);
         if (deployId) {
@@ -133,12 +117,12 @@ const createRouter = (props: RouterProps) => {
         url: new URL(ret.pathname.input + next_url.search, next_url.href),
         params: ret.pathname.groups,
         filename,
+        exports: await __aleph.importRouteModule(filename),
       };
       const dataUrl = rmod.url.pathname + rmod.url.search;
-      const mod = await importModule(meta);
-      Object.assign(rmod, mod);
-      if (!dataCache.has(dataUrl) && routeModules[filename]?.withData === true) {
-        rmod.withData = true;
+      const dataConfig = rmod.exports.data as undefined | Record<string, boolean>;
+      rmod.withData = Boolean(dataConfig?.get || dataConfig?.GET);
+      if (rmod.withData && !dataCache.has(dataUrl)) {
         await prefetchData(dataUrl);
       }
       return rmod;
@@ -156,10 +140,10 @@ const createRouter = (props: RouterProps) => {
           loadingBar.style.opacity = "0";
         }, moveOutTime * 1000);
         const t2 = setTimeout(() => {
-          global.__loading_bar_cleanup = null;
+          clearLoadingBar = null;
           loadingBar.remove();
         }, (moveOutTime + fadeOutTime) * 1000);
-        global.__loading_bar_cleanup = () => {
+        clearLoadingBar = () => {
           clearTimeout(t1);
           clearTimeout(t2);
         };
@@ -189,7 +173,7 @@ const createRouter = (props: RouterProps) => {
     },
     render() {
       if (modules.value.length > 0) {
-        const defaultExport = modules.value[0].defaultExport;
+        const defaultExport = modules.value[0].exports.default;
         if (modules.value.length > 1) {
           return h(
             defaultExport as Component,
@@ -213,7 +197,7 @@ const createRouterRoot = (props: RouterRootProps) => {
     name: "RouterRoot",
     render() {
       if (modules.value.length > 0) {
-        const defaultExport = modules.value[0].defaultExport;
+        const defaultExport = modules.value[0].exports.default;
         if (modules.value.length > 1) {
           return h(
             defaultExport as Component,
@@ -246,9 +230,9 @@ const createApp = (props?: RootProps) => {
   const dataUrl = ref(url.value.pathname + url.value.search);
 
   const defaultRouteModules = modules.value[0];
-  const { defaultExport } = defaultRouteModules;
+  const { exports } = defaultRouteModules;
 
-  if (defaultExport) {
+  if (exports.default) {
     const Router = createRouter({ modules, url, dataCache, dataUrl });
     const app = createSSRApp(defineComponent({
       name: "App",
@@ -273,10 +257,6 @@ const createApp = (props?: RootProps) => {
   return createSSRApp(Err);
 };
 
-function getRouteModules(): Record<string, { defaultExport?: unknown; withData?: boolean }> {
-  return global.__ROUTE_MODULES || (global.__ROUTE_MODULES = {});
-}
-
 function loadSSRModulesFromTag(): RouteModule[] {
   const el = window.document?.getElementById("ssr-modules");
   if (el) {
@@ -284,8 +264,8 @@ function loadSSRModulesFromTag(): RouteModule[] {
       const data = JSON.parse(el.innerText);
       if (Array.isArray(data)) {
         let deferedData: Record<string, unknown> | null | undefined = undefined;
-        const routeModules = getRouteModules();
         return data.map(({ url, filename, dataDefered, ...rest }) => {
+          const mod = __aleph.getRouteModule(filename);
           if (dataDefered) {
             if (deferedData === undefined) {
               const el = window.document?.getElementById("defered-data");
@@ -299,10 +279,10 @@ function loadSSRModulesFromTag(): RouteModule[] {
               rest.data = deferedData[url];
             }
           }
-          return {
+          return <RouteModule> {
             url: new URL(url, location.href),
             filename,
-            defaultExport: routeModules[filename].defaultExport,
+            exports: mod,
             ...rest,
           };
         });
@@ -314,10 +294,12 @@ function loadSSRModulesFromTag(): RouteModule[] {
   return [];
 }
 
+let clearLoadingBar: CallableFunction | null = null;
+
 function getLoadingBar(): HTMLDivElement {
-  if (typeof global.__loading_bar_cleanup === "function") {
-    global.__loading_bar_cleanup();
-    global.__loading_bar_cleanup = null;
+  if (typeof clearLoadingBar === "function") {
+    clearLoadingBar();
+    clearLoadingBar = null;
   }
   let bar = (document.getElementById("loading-bar") as HTMLDivElement | null);
   if (!bar) {
