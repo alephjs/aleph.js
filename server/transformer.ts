@@ -183,7 +183,6 @@ export default {
               mod.specifier !== specifier
             )).map(({ specifier, version }) => [specifier, version.toString(36)]),
           );
-          const reactRefresh = isDev && Boolean(Deno.env.get("REACT_REFRESH"));
           const ret = await transform(specifier, source, {
             ...jsxConfig,
             alephPkgUri,
@@ -195,8 +194,8 @@ export default {
             stripDataExport: isRouteModule(specifier),
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
+            reactRefresh: isDev && Boolean(Deno.env.get("SWC_REACT_REFRESH")),
             isDev,
-            reactRefresh,
           });
           code = ret.code;
           map = ret.map;
