@@ -1,4 +1,4 @@
-import { generateHydrationScript, renderToString } from "solid-js/web";
+import { generateHydrationScript, renderToStream } from "solid-js/web";
 import { serve as alephServe, type ServerOptions } from "../../server/mod.ts";
 import type { SSRContext, SSROptions } from "../../server/types.ts";
 import SolidTransformer from "./transformer.ts";
@@ -9,7 +9,9 @@ const render = (ctx: SSRContext): [ReadableStream | string, number] => {
     return ["<p>404 page not found</p>", 404];
   }
   ctx.headCollection.push(generateHydrationScript());
-  return [renderToString(App as () => unknown), 200];
+  const { readable, writable } = new TransformStream();
+  renderToStream(App as () => unknown).pipeTo(writable);
+  return [readable, 200];
 };
 
 export function serve(
