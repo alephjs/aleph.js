@@ -1,7 +1,7 @@
 export default function Header() {
   return (
     <header>
-      <div className="header-wrapper">
+      <div class="header-wrapper">
         <h1>
           <a href="/">
             <svg

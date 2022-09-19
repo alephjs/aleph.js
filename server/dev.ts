@@ -154,7 +154,7 @@ export default async function dev(options?: DevOptions) {
       }
     });
 
-    const cmd = [Deno.execPath(), "run", "-A", serverEntry, "--dev"];
+    const cmd = [Deno.execPath(), "run", "-A", "-q", serverEntry, "--dev"];
     if (devProcess) {
       console.debug(dim("[dev] Restarting the server..."));
     }

@@ -10,8 +10,8 @@ export default function App() {
   return (
     <>
       <Header />
-      <div className="screen index">
-        <p className="logo">
+      <div class="screen index">
+        <p class="logo">
           <img src="./assets/logo.svg" width="70" height="70" title="Aleph.js" />
           <img src="./assets/solid.svg" width="70" height="70" title="SolidJS" />
         </p>
@@ -22,12 +22,11 @@ export default function App() {
           <strong>Aleph.js</strong> gives you the best developer experience for building web applications<br />{" "}
           with modern toolings. <label>SolidJS experimental version</label>.
         </p>
-        <div className="external-links">
+        <div class="external-links">
           {externalLinks.map(([text, href]) => (
             <a
               href={href}
               target="_blank"
-              key={href}
             >
               {text}
             </a>

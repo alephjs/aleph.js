@@ -25,7 +25,7 @@ const templates = [
 const versions = {
   react: "18.2.0",
   vue: "3.2.37",
-  solid: "1.4.8",
+  solid: "1.5.5",
 };
 
 export default async function init(nameArg?: string, template?: string) {
@@ -125,7 +125,7 @@ export default async function init(nameArg?: string, template?: string) {
     },
     "importMap": "import_map.json",
     "tasks": {
-      "dev": "deno run -A -q dev.ts",
+      "dev": "deno run -A dev.ts",
       "start": "deno run -A server.ts",
       "opt": "deno run -A server.ts --optimize",
     },
@@ -174,7 +174,7 @@ export default async function init(nameArg?: string, template?: string) {
     case "solid": {
       Object.assign(denoConfig.compilerOptions, {
         "jsx": "react-jsx",
-        "jsxImportSource": `https://esm.sh/solid-js@${versions.solid} `,
+        "jsxImportSource": `https://esm.sh/solid-js@${versions.solid}`,
       });
       Object.assign(importMap.imports, {
         "aleph/solid-server": `${alephPkgUri}/runtime/solid/server.ts`,
