@@ -258,7 +258,7 @@ const createApp = (props?: RootProps) => {
 };
 
 function loadSSRModulesFromTag(): RouteModule[] {
-  const el = window.document?.getElementById("ssr-modules");
+  const el = window.document?.getElementById("ssr-data");
   if (el) {
     try {
       const data = JSON.parse(el.innerText);
@@ -322,7 +322,7 @@ function getLoadingBar(): HTMLDivElement {
 }
 
 function loadRouterFromTag(): Router {
-  const el = window.document?.getElementById("routes-manifest");
+  const el = window.document?.getElementById("router-manifest");
   if (el) {
     try {
       const manifest = JSON.parse(el.innerText);

@@ -16,8 +16,6 @@ export type RenderOptions = {
   isDev?: boolean;
 };
 
-/** The virtual `bootstrapScript` to mark the ssr streaming initial UI is ready */
-const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* stage ready */")}`;
 const runtimeScript = [
   `let e=fn=>new Error('module "'+fn+'" not found');`,
   `const getRouteModule=(fn)=>{`,
@@ -60,17 +58,13 @@ export default {
       routeModules,
       headCollection,
       signal: req.signal,
-      bootstrapScripts: [bootstrapScript],
+      nonce: CSP?.nonce ? Date.now().toString(36) : undefined,
       onError: (_error: unknown) => {
         // todo: handle suspense ssr error
       },
     };
 
     let body = render(ssrContext);
-    let status = 200;
-    if (Array.isArray(body)) {
-      [body, status] = body;
-    }
     if (body instanceof Promise) {
       body = await body;
     }
@@ -131,16 +125,15 @@ export default {
 
     const ssrRes: SSRResult = {
       body,
-      status,
       context: ssrContext,
       deferedData,
     };
     if (!isDev && CSP) {
-      const nonce = CSP.nonce ? Date.now().toString(36) : undefined;
+      const nonce = ssrContext.nonce;
       const policy = CSP.getPolicy(url, nonce);
       if (policy) {
         headers.append("Content-Security-Policy", policy);
-        if (policy.includes("nonce-" + nonce)) {
+        if (nonce && policy.includes("nonce-" + nonce)) {
           ssrRes.nonce = nonce;
         }
       }
@@ -148,10 +141,10 @@ export default {
 
     const stream = new ReadableStream({
       start: (controller) => {
-        let ssrStreaming = false;
+        let suspenseSSR = false;
         const suspenseChunks: Uint8Array[] = [];
         const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
-          if (ssrStreaming) {
+          if (suspenseSSR) {
             suspenseChunks.push(chunk);
           } else {
             controller.enqueue(chunk);
@@ -169,7 +162,7 @@ export default {
                 routes: router.routes.map(([_, meta]) => meta),
                 prefix: router.prefix,
               });
-              el.append(`<script id="routes-manifest" type="application/json">${json}</script>`, {
+              el.append(`<script id="router-manifest" type="application/json">${json}</script>`, {
                 html: true,
               });
             }
@@ -200,7 +193,7 @@ export default {
               // replace "/" to "\/" to prevent xss
               const modulesJSON = JSON.stringify(ssrModules).replaceAll("/", "\\/");
               el.append(
-                `<script id="ssr-modules" type="application/json">${modulesJSON}</script>`,
+                `<script id="ssr-data" type="application/json">${modulesJSON}</script>`,
                 { html: true },
               );
 
@@ -226,19 +219,23 @@ export default {
               el.replace(body, { html: true });
             } else if (body instanceof ReadableStream) {
               el.remove();
-              ssrStreaming = true;
 
               const rw = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
                 controller.enqueue(chunk);
               });
-              rw.on("script", {
-                element(el: Element) {
-                  if (el.getAttribute("src") === bootstrapScript) {
-                    suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
-                    el.remove();
-                  }
-                },
-              });
+
+              if (ssrContext.suspenseMark) {
+                const { selector, test } = ssrContext.suspenseMark;
+                rw.on(selector, {
+                  element(el: Element) {
+                    if (test(el)) {
+                      suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
+                    }
+                  },
+                });
+                suspenseSSR = true;
+              }
+
               const send = async () => {
                 try {
                   const reader = body.getReader();
@@ -285,7 +282,7 @@ export default {
           rewriter.write(indexHtml);
           rewriter.end();
         } finally {
-          if (!ssrStreaming) {
+          if (!suspenseSSR) {
             controller.close();
           }
           rewriter.free();
@@ -300,7 +297,7 @@ export default {
       headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
     }
     headers.set("Content-Type", "text/html; charset=utf-8");
-    return new Response(stream, { headers, status });
+    return new Response(stream, { headers, status: ssrContext.status });
   },
 };
 

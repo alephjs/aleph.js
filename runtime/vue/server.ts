@@ -2,15 +2,15 @@ import { renderToWebStream } from "@vue/server-renderer";
 import { builtinModuleExts } from "../../server/helpers.ts";
 import { serve as alephServe, type ServerOptions } from "../../server/mod.ts";
 import type { SSRContext, SSROptions } from "../../server/types.ts";
+import util from "../../shared/util.ts";
 import { createApp } from "./router.ts";
 import SFCLoader from "./sfc_loader.ts";
 
-export const render = (ctx: SSRContext): [ReadableStream, number] => {
-  let status = 200;
+export const render = (ctx: SSRContext): ReadableStream => {
   if (ctx.routeModules.length === 0 || ctx.routeModules.at(-1)?.url.pathname === "/_404") {
-    status = 404;
+    ctx.status = 404;
   }
-  return [renderToWebStream(createApp({ ssrContext: ctx }), ctx), status];
+  return renderToWebStream(createApp({ ssrContext: ctx }), util.pick(ctx, "signal", "onError", "nonce"));
 };
 
 export function serve(

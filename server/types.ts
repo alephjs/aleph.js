@@ -173,18 +173,20 @@ export type SSRContext = {
   readonly routeModules: RouteModule[];
   readonly headCollection: string[];
   readonly signal: AbortSignal;
-  readonly bootstrapScripts?: string[];
+  readonly nonce?: string;
   readonly onError?: (error: unknown) => void;
+  status?: number;
+  suspenseMark?: { selector: string; test: (el: Element) => boolean };
 };
-
-export type SSRBody<T> = T | [body: T, status: number];
 
 export type SSRFn = {
-  (ssr: SSRContext): SSRBody<Promise<ReadableStream | string> | ReadableStream | string>;
+  (ssr: SSRContext): Promise<ReadableStream | string> | ReadableStream | string;
 };
 
-// Options for the content-security-policy
-// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+/**
+ * Options for the content-security-policy.
+ * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+ */
 export type CSP = {
   getPolicy: (url: URL, nonce?: string) => string | null;
   nonce?: boolean;
@@ -204,7 +206,6 @@ export type SSR =
 export type SSRResult = {
   context: SSRContext;
   body: ReadableStream | string;
-  status: number;
   deferedData: Record<string, unknown>;
   nonce?: string;
 };

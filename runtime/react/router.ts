@@ -286,7 +286,7 @@ export const useForwardProps = <T = Record<string, unknown>>(): T => {
 };
 
 function loadRouterFromTag(): IRouter {
-  const el = window.document?.getElementById("routes-manifest");
+  const el = window.document?.getElementById("router-manifest");
   if (el) {
     try {
       const manifest = JSON.parse(el.innerText);
@@ -345,7 +345,7 @@ async function prefetchRouteData(dataCache: Map<string, RouteData>, dataUrl: str
 }
 
 function loadSSRModulesFromTag(): RouteModule[] {
-  const el = window.document?.getElementById("ssr-modules");
+  const el = window.document?.getElementById("ssr-data");
   if (el) {
     try {
       const data = JSON.parse(el.innerText);
