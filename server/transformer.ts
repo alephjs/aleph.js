@@ -18,7 +18,7 @@ import {
 } from "./helpers.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
-import { isRouteFile } from "./routing.ts";
+import { isRouteModule } from "./routing.ts";
 import { bundleCSS } from "./optimizer.ts";
 import type { ImportMap, JSXConfig, ModuleLoader, ModuleLoaderOutput } from "./types.ts";
 
@@ -175,14 +175,13 @@ export default {
             code = source;
           }
         } else {
-          const graphVersions = Object.fromEntries(
+          const deploymentId = getDeploymentId();
+          const graphVersions = deploymentId ? {} : Object.fromEntries(
             depGraph.modules.filter((mod) => (
               !isRemote &&
               !util.isLikelyHttpURL(mod.specifier) &&
               mod.specifier !== specifier
-            )).map((
-              { specifier, version },
-            ) => [specifier, version.toString(36)]),
+            )).map(({ specifier, version }) => [specifier, version.toString(36)]),
           );
           const reactRefresh = isDev && Boolean(Deno.env.get("REACT_REFRESH"));
           const ret = await transform(specifier, source, {
@@ -192,8 +191,8 @@ export default {
             lang: lang as TransformOptions["lang"],
             importMap: JSON.stringify(importMap),
             graphVersions,
-            globalVersion: getDeploymentId() ?? depGraph.globalVersion.toString(36),
-            stripDataExport: isRouteFile(specifier),
+            globalVersion: deploymentId ?? depGraph.globalVersion.toString(36),
+            stripDataExport: isRouteModule(specifier),
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
             isDev,

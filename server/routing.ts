@@ -143,9 +143,9 @@ export async function initRouter(options: RouterInit, _appDir?: string): Promise
 }
 
 /* check if the filename is a route */
-export function isRouteFile(filename: string): boolean {
+export function isRouteModule(filename: string): boolean {
   const router: Router | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
-  const index = router?.routes.findIndex(([_, meta]) => meta.filename === filename);
+  const index = router?.routes?.findIndex(([_, meta]) => meta.filename === filename);
   if (index !== undefined && index !== -1) {
     return true;
   }
