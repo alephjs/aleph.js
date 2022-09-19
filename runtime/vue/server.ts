@@ -10,7 +10,7 @@ export const render = (ctx: SSRContext): ReadableStream => {
   if (ctx.routeModules.length === 0 || ctx.routeModules.at(-1)?.url.pathname === "/_404") {
     ctx.status = 404;
   }
-  return renderToWebStream(createApp({ ssrContext: ctx }), util.pick(ctx, "signal", "onError", "nonce"));
+  return renderToWebStream(createApp({ ssrContext: ctx }), util.pick(ctx, "signal", "nonce"));
 };
 
 export function serve(

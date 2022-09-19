@@ -12,9 +12,10 @@ const render = (ctx: SSRContext): ReadableStream | string => {
   }
   ctx.headCollection.push(generateHydrationScript());
   const { readable, writable } = new TransformStream();
-  renderToStream(() => createComponent(App as () => null, {}), { nonce: ctx.nonce }).pipeTo(
-    writable,
-  );
+  renderToStream(
+    () => createComponent(App as () => null, {}),
+    { nonce: ctx.nonce },
+  ).pipeTo(writable);
   return readable;
 };
 

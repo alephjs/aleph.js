@@ -10,8 +10,8 @@ if (Deno.args.includes("--dev")) {
   Deno.env.set("REACT_REFRESH", "true");
 }
 
-/** The `bootstrapScript` to mark the suspense sync rendering is done. */
-const bootstrapScript = `data:text/javascript;charset=utf-8;base64,${btoa("/* suspense mark */")}`;
+/** The `suspenseMark` to mark the susponse rendering is starting. */
+const suspenseMark = `data:text/javascript;/** suspense mark **/`;
 
 export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   if (ctx.routeModules.length === 0 || ctx.routeModules.at(-1)?.url.pathname === "/_404") {
@@ -20,7 +20,7 @@ export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   ctx.suspenseMark = {
     selector: "script",
     test: (el) => {
-      if (el.getAttribute("src") === bootstrapScript) {
+      if (el.getAttribute("src") === suspenseMark) {
         el.remove();
         return true;
       }
@@ -30,8 +30,8 @@ export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   return renderToReadableStream(
     createElement(App, { ssrContext: ctx }),
     {
-      ...util.pick(ctx, "signal", "onError", "nonce"),
-      bootstrapScripts: [bootstrapScript],
+      ...util.pick(ctx, "signal", "nonce"),
+      bootstrapScripts: [suspenseMark],
     },
   );
 };

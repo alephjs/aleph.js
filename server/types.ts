@@ -174,7 +174,6 @@ export type SSRContext = {
   readonly headCollection: string[];
   readonly signal: AbortSignal;
   readonly nonce?: string;
-  readonly onError?: (error: unknown) => void;
   status?: number;
   suspenseMark?: { selector: string; test: (el: Element) => boolean };
 };

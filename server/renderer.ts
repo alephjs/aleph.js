@@ -59,9 +59,6 @@ export default {
       headCollection,
       signal: req.signal,
       nonce: CSP?.nonce ? Date.now().toString(36) : undefined,
-      onError: (_error: unknown) => {
-        // todo: handle suspense ssr error
-      },
     };
 
     let body = render(ssrContext);
