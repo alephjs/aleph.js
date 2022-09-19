@@ -70,7 +70,7 @@ export default function Todos() {
             <input
               type="checkbox"
               checked={todo.completed}
-              onClick={() => mutation.patch({ id: todo.id, completed: !todo.completed }, "replace")}
+              onChange={() => mutation.patch({ id: todo.id, completed: !todo.completed }, "replace")}
             />
             <label className={todo.completed ? "completed" : ""}>
               {todo.message}
