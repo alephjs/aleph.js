@@ -18,6 +18,7 @@
     "vue": "https://esm.sh/vue@3.2.37",
     "@vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.37",
     "solid-js": "https://esm.sh/solid-js@1.5.5",
-    "solid-js/web": "https://esm.sh/solid-js@1.5.5/web"
+    "solid-js/web": "https://esm.sh/solid-js@1.5.5/web",
+    "solid-refresh": "https://esm.sh/solid-refresh@0.4.1"
   }
 }

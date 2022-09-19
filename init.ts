@@ -180,6 +180,7 @@ export default async function init(nameArg?: string, template?: string) {
         "aleph/solid-server": `${alephPkgUri}/runtime/solid/server.ts`,
         "solid-js": `https://esm.sh/solid-js@${versions.solid}`,
         "solid-js/web": `https://esm.sh/solid-js@${versions.solid}/web`,
+        "solid-refresh": "https://esm.sh/solid-refresh@0.4.1",
       });
       break;
     }
