@@ -1,7 +1,7 @@
 import { createApp } from "./router.ts";
 
 export function bootstrap(options?: { root?: string | HTMLElement; hydrate?: boolean }) {
-  const { root = "#root", hydrate } = options ?? {};
+  const { root = "#root", hydrate = !!document.head.querySelector("script#ssr-data") } = options ?? {};
   createApp().mount(root, hydrate);
 }
 
