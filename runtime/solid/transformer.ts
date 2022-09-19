@@ -1,4 +1,4 @@
-import { transform } from "https://esm.sh/@babel/standalone@7.18.9";
+import { transform } from "https://esm.sh/@babel/standalone@7.19.2";
 import babelPresetSolid from "https://esm.sh/babel-preset-solid@1.5.5";
 import solidRefresh from "https://esm.sh/solid-refresh@0.4.1/babel";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
