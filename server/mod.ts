@@ -195,9 +195,9 @@ export function serve(options: ServerOptions = {}) {
           isDev,
         });
       } catch (err) {
-        console.log(err);
         if (err instanceof TransformError) {
-          log.error(err);
+          // todo: format error message in terminal
+          log.error(err.message);
           const alephPkgUri = toLocalPath(getAlephPkgUri());
           return new Response(
             `import { showTransformError } from "${alephPkgUri}/runtime/core/error.ts";showTransformError(${
