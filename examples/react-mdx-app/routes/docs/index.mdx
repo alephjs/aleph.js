@@ -1,36 +1,55 @@
 ---
-title: "Index - Docs"
-description: "Suppport frontmatter in YAML."
+title: "About - Docs"
+author: ije
 ---
 
-import { Link, Head } from "aleph/react"
+import { Head } from "aleph/react"
 
 <Head>
-  <title>Index - Docs</title>
+  <title>About - Docs</title>
 </Head>
 
-# Docs Index
+# About
 
-- <Link to="/docs/about">About</Link>
-- <Link to="/docs/get-started">Get started</Link>
+**Aleph.js** (or **Aleph** or **א** or **阿莱夫**, <samp>ˈɑːlɛf</samp>) is a
+fullstack framework in [Deno]. Inspired by [Next.js], [Remix] and [Vite].
 
+> The name is taken from the book [_The Aleph_] by **Jorge Luis Borges**.
 
-### Support GFM
+Aleph.js is modern framework that doesn't need **webpack** or other bundler
+since it uses the [ES Module] syntax during development. Every module only needs
+to be compiled once, when a module changes, Aleph.js just needs to re-compile
+that single module. There is no time wasted _re-bundling_ everytime a change is
+made. This, along with Hot Module Replacement (**HMR**) and **Fast Refresh**,
+leads to instant updates in the browser.
 
-#### Autolink literals
+Aleph.js uses modern tools to build your app. It transpiles code using [swc] in
+WASM with high performance, and bundles modules with [esbuild] at optimization
+time extremely fast.
 
-www.example.com, https://example.com, and contact@example.com.
+Aleph.js works on top of **Deno**, a _simple_, _modern_ and _secure_ runtime for
+JavaScript and TypeScript. All dependencies are imported using URLs, and managed
+by Deno cache system. No `package.json` and `node_modules` directory needed.
 
-#### Strikethrough
+[_The Aleph_]: http://phinnweb.org/links/literature/borges/aleph.html
+[ES Module]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules
+[deno]: https://deno.land
+[next.js]: https://nextjs.org
+[Remix]: https://remix.run
+[Vite]: https://vitejs.dev
+[swc]: https://swc.rs
+[esbuild]: https://github.com/evanw/esbuild
 
-~one~ or ~~two~~ tildes.
+```js
+import React from 'https://esm.sh/react'
+import Logo from '../components/logo.tsx'
 
-#### Table
-
-| a | b  |  c |  d  |
-| - | :- | -: | :-: |
-
-#### Tasklist
-
-* [ ] to do
-* [x] done
+export default function Home() {
+  return (
+    <div>
+      <Logo />
+      <h1>Hello World!</h1>
+    </div>
+  )
+}
+```

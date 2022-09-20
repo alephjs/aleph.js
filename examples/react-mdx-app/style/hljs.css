@@ -1,0 +1,104 @@
+/* copied from https://esm.sh/highlightjs@9.16.2/styles/github.css */
+
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: .5em;
+  color: #333;
+  background: #f8f8f8
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #998;
+  font-style: italic
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  color: #111;
+  font-weight: 500
+}
+
+.hljs-literal,
+.hljs-number,
+.hljs-template-variable,
+.hljs-variable {
+  color: teal
+}
+
+.hljs-doctag,
+.hljs-string {
+  color: var(--theme-color)
+}
+
+.hljs-section,
+.hljs-selector-id,
+.hljs-title {
+  color: var(--theme-color);
+  font-weight: 600
+}
+
+.hljs-subst {
+  font-weight: 400
+}
+
+.hljs-class .hljs-title,
+.hljs-type {
+  color: #458;
+  font-weight: 600
+}
+
+.hljs-attribute,
+.hljs-name,
+.hljs-tag {
+  color: #999;
+  font-weight: 400
+}
+
+.hljs-tag .hljs-name {
+  color: teal;
+  font-weight: 500
+}
+
+.hljs-tag .hljs-attr {
+  color: #454545;
+  font-weight: 500
+}
+
+.hljs-link,
+.hljs-regexp {
+  color: #009926
+}
+
+.hljs-bullet,
+.hljs-symbol {
+  color: var(--theme-color)
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  color: teal
+}
+
+.hljs-meta {
+  color: #999;
+  font-weight: 600
+}
+
+.hljs-deletion {
+  background: #fdd
+}
+
+.hljs-addition {
+  background: #dfd
+}
+
+.hljs-emphasis {
+  font-style: italic
+}
+
+.hljs-strong {
+  font-weight: 600
+}

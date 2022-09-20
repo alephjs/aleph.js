@@ -3,38 +3,39 @@
 // deno-fmt-ignore-file
 // deno-lint-ignore-file
 // @ts-nocheck
-var b=Object.defineProperty;var c=(t,e)=>{for(var h in e)b(t,h,{get:e[h],enumerable:!0})};import*as S from"./_404.tsx";import*as v from"./_app.tsx";import*as C from"./index.tsx";import*as O from"./docs.tsx";var a={};c(a,{default:()=>_});import{Fragment as x,jsx as i,jsxs as m}from"https://esm.sh/react@18.2.0/jsx-runtime";import{Head as j}from"aleph/react";function p(t){let e=Object.assign({h1:"h1",p:"p",code:"code",pre:"pre"},t.components);return m(x,{children:[i(j,{children:i("title",{children:"Get Started - Docs"})}),`
-`,i(e.h1,{children:"Get Started"}),`
-`,m(e.p,{children:["Initialize a new project, you can pick a start template with ",i(e.code,{children:"--template"}),` flag, available templates:
-`,i(e.code,{children:"[react, vue, api, yew]"})]}),`
-`,i(e.pre,{children:i(e.code,{className:"language-bash",children:`deno run -A https://deno.land/x/aleph@1.0.0-beta.10/init.ts
-`})})]})}function w(t={}){let{wrapper:e}=t.components||{};return e?i(e,Object.assign({},t,{children:i(p,t)})):p(t)}var _=w;var d={};c(d,{default:()=>D});import{Fragment as k,jsx as n,jsxs as o}from"https://esm.sh/react@18.2.0/jsx-runtime";import{Link as u,Head as y}from"aleph/react";function g(t){let e=Object.assign({h1:"h1",ul:"ul",li:"li",h3:"h3",h4:"h4",p:"p",a:"a",del:"del",table:"table",thead:"thead",tr:"tr",th:"th",input:"input"},t.components);return o(k,{children:[n(y,{children:n("title",{children:"Index - Docs"})}),`
-`,n(e.h1,{children:"Docs Index"}),`
-`,o(e.ul,{children:[`
-`,o(e.li,{children:[`
-`,n(u,{to:"/docs/about",children:"About"}),`
+var m=Object.defineProperty;var c=(s,e)=>{for(var o in e)m(s,o,{get:e[o],enumerable:!0})};import*as x from"./_404.tsx";import*as y from"./_app.tsx";import*as _ from"./index.tsx";import*as k from"./docs.tsx";var l={};c(l,{default:()=>j});import{Fragment as p,jsx as r,jsxs as i}from"https://esm.sh/react@18.2.0/jsx-runtime";import{Head as u}from"aleph/react";function d(s){let e=Object.assign({h1:"h1",p:"p",code:"code",pre:"pre"},s.components);return i(p,{children:[r(u,{children:r("title",{children:"Get Started - Docs"})}),`
+`,r(e.h1,{children:"Get Started"}),`
+`,i(e.p,{children:["Initialize a new project, you can pick a start template with ",r(e.code,{children:"--template"}),` flag, available templates:
+`,r(e.code,{children:"[react, vue, api, yew]"})]}),`
+`,r(e.pre,{children:r(e.code,{className:"hljs language-bash",children:`deno run -A https://deno.land/x/aleph@1.0.0-beta.10/init.ts
+`})})]})}function g(s={}){let{wrapper:e}=s.components||{};return e?r(e,Object.assign({},s,{children:r(d,s)})):d(s)}var j=g;var t={};c(t,{default:()=>w});import{Fragment as f,jsx as n,jsxs as a}from"https://esm.sh/react@18.2.0/jsx-runtime";import{Head as b}from"aleph/react";function h(s){let e=Object.assign({h1:"h1",p:"p",strong:"strong",a:"a",blockquote:"blockquote",em:"em",code:"code",pre:"pre",span:"span"},s.components);return a(f,{children:[n(b,{children:n("title",{children:"About - Docs"})}),`
+`,n(e.h1,{children:"About"}),`
+`,a(e.p,{children:[n(e.strong,{children:"Aleph.js"})," (or ",n(e.strong,{children:"Aleph"})," or ",n(e.strong,{children:"\u05D0"})," or ",n(e.strong,{children:"\u963F\u83B1\u592B"}),", ",n("samp",{children:"\u02C8\u0251\u02D0l\u025Bf"}),`) is a
+fullstack framework in `,n(e.a,{href:"https://deno.land",children:"Deno"}),". Inspired by ",n(e.a,{href:"https://nextjs.org",children:"Next.js"}),", ",n(e.a,{href:"https://remix.run",children:"Remix"})," and ",n(e.a,{href:"https://vitejs.dev",children:"Vite"}),"."]}),`
+`,a(e.blockquote,{children:[`
+`,a(e.p,{children:["The name is taken from the book ",n(e.a,{href:"http://phinnweb.org/links/literature/borges/aleph.html",children:n(e.em,{children:"The Aleph"})})," by ",n(e.strong,{children:"Jorge Luis Borges"}),"."]}),`
 `]}),`
-`,o(e.li,{children:[`
-`,n(u,{to:"/docs/get-started",children:"Get started"}),`
-`]}),`
-`]}),`
-`,n(e.h3,{children:"Support GFM"}),`
-`,n(e.h4,{children:"Autolink literals"}),`
-`,o(e.p,{children:[n(e.a,{href:"http://www.example.com",children:"www.example.com"}),", ",n(e.a,{href:"https://example.com",children:"https://example.com"}),", and ",n(e.a,{href:"mailto:contact@example.com",children:"contact@example.com"}),"."]}),`
-`,n(e.h4,{children:"Strikethrough"}),`
-`,o(e.p,{children:[n(e.del,{children:"one"})," or ",n(e.del,{children:"two"})," tildes."]}),`
-`,n(e.h4,{children:"Table"}),`
-`,n(e.table,{children:n(e.thead,{children:o(e.tr,{children:[n(e.th,{children:"a"}),n(e.th,{align:"left",children:"b"}),n(e.th,{align:"right",children:"c"}),n(e.th,{align:"center",children:"d"})]})})}),`
-`,n(e.h4,{children:"Tasklist"}),`
-`,o(e.ul,{className:"contains-task-list",children:[`
-`,o(e.li,{className:"task-list-item",children:[n(e.input,{type:"checkbox",disabled:!0})," ","to do"]}),`
-`,o(e.li,{className:"task-list-item",children:[n(e.input,{type:"checkbox",checked:!0,disabled:!0})," ","done"]}),`
-`]})]})}function A(t={}){let{wrapper:e}=t.components||{};return e?n(e,Object.assign({},t,{children:n(g,t)})):g(t)}var D=A;var s={};c(s,{default:()=>H});import{Fragment as M,jsx as r,jsxs as l}from"https://esm.sh/react@18.2.0/jsx-runtime";import{Head as L}from"aleph/react";function f(t){let e=Object.assign({h1:"h1",p:"p",strong:"strong",code:"code",a:"a",blockquote:"blockquote"},t.components);return l(M,{children:[r(L,{children:r("title",{children:"About - Docs"})}),`
-`,r(e.h1,{children:"About"}),`
-`,l(e.p,{children:[r(e.strong,{children:"Aleph.js"})," (or ",r(e.strong,{children:"Aleph"})," or ",r(e.strong,{children:"\u05D0"})," or ",r(e.strong,{children:"\u963F\u83B1\u592B"}),", ",r(e.code,{children:"\u02C8\u0251\u02D0l\u025Bf"}),") is a fullstack framework in ",r(e.a,{href:"https://deno.land",children:"Deno"}),"."]}),`
-`,l(e.blockquote,{children:[`
-`,r(e.p,{children:"The name is taken from the book The Aleph by Jorge Luis Borges."}),`
-`]}),`
-`,r(e.p,{children:"Aleph.js is a module framework that doesn't need webpack or other bundler since it uses the [ES Module] syntax during development. Every module only needs to be compiled once. When a module changes, Aleph.js just needs to re-compile that single module. There is no time wasted re-bundling everytime a change is made. This, along with Hot Module Replacement (HMR) and Fast Refresh, leads to instant updates in the browser."}),`
-`,l(e.p,{children:["Aleph.js uses modern tools to build your app. It transpiles code using ",r(e.a,{href:"https://swc.rs",children:"swc"})," in WASM with high performance, and bundles modules with ",r(e.a,{href:"https://github.com/evanw/esbuild",children:"esbuild"})," at build time extremely fast."]}),`
-`,l(e.p,{children:["Aleph.js works on top of Deno, a simple, modern and secure runtime for JavaScript and TypeScript. All dependencies are imported using URLs, and managed by Deno cache system. No ",r(e.code,{children:"package.json"})," and ",r(e.code,{children:"node_modules"})," directory needed."]})]})}function F(t={}){let{wrapper:e}=t.components||{};return e?r(e,Object.assign({},t,{children:r(f,t)})):f(t)}var H=F;var I={"/_404":S,"/_app":v,"/":C,"/docs":O,"/docs/get-started":a,"/docs/index":d,"/docs/about":s,depGraph:{"modules":[{"specifier":"./routes/docs/get-started.mdx"},{"specifier":"./routes/docs/index.mdx"},{"specifier":"./routes/docs/about.mdx"}]}};export{I as default};
+`,a(e.p,{children:["Aleph.js is modern framework that doesn't need ",n(e.strong,{children:"webpack"}),` or other bundler
+since it uses the `,n(e.a,{href:"https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules",children:"ES Module"}),` syntax during development. Every module only needs
+to be compiled once, when a module changes, Aleph.js just needs to re-compile
+that single module. There is no time wasted `,n(e.em,{children:"re-bundling"}),` everytime a change is
+made. This, along with Hot Module Replacement (`,n(e.strong,{children:"HMR"}),") and ",n(e.strong,{children:"Fast Refresh"}),`,
+leads to instant updates in the browser.`]}),`
+`,a(e.p,{children:["Aleph.js uses modern tools to build your app. It transpiles code using ",n(e.a,{href:"https://swc.rs",children:"swc"}),` in
+WASM with high performance, and bundles modules with `,n(e.a,{href:"https://github.com/evanw/esbuild",children:"esbuild"}),` at optimization
+time extremely fast.`]}),`
+`,a(e.p,{children:["Aleph.js works on top of ",n(e.strong,{children:"Deno"}),", a ",n(e.em,{children:"simple"}),", ",n(e.em,{children:"modern"})," and ",n(e.em,{children:"secure"}),` runtime for
+JavaScript and TypeScript. All dependencies are imported using URLs, and managed
+by Deno cache system. No `,n(e.code,{children:"package.json"})," and ",n(e.code,{children:"node_modules"})," directory needed."]}),`
+`,n(e.pre,{children:a(e.code,{className:"hljs language-js",children:[n(e.span,{className:"hljs-keyword",children:"import"})," ",n(e.span,{className:"hljs-title class_",children:"React"})," ",n(e.span,{className:"hljs-keyword",children:"from"})," ",n(e.span,{className:"hljs-string",children:"'https://esm.sh/react'"}),`
+`,n(e.span,{className:"hljs-keyword",children:"import"})," ",n(e.span,{className:"hljs-title class_",children:"Logo"})," ",n(e.span,{className:"hljs-keyword",children:"from"})," ",n(e.span,{className:"hljs-string",children:"'../components/logo.tsx'"}),`
+
+`,n(e.span,{className:"hljs-keyword",children:"export"})," ",n(e.span,{className:"hljs-keyword",children:"default"})," ",n(e.span,{className:"hljs-keyword",children:"function"})," ",n(e.span,{className:"hljs-title function_",children:"Home"}),"(",n(e.span,{className:"hljs-params"}),`) {
+  `,n(e.span,{className:"hljs-keyword",children:"return"}),` (
+    `,a(e.span,{className:"xml",children:[a(e.span,{className:"hljs-tag",children:["<",n(e.span,{className:"hljs-name",children:"div"}),">"]}),`
+      `,a(e.span,{className:"hljs-tag",children:["<",n(e.span,{className:"hljs-name",children:"Logo"})," />"]}),`
+      `,a(e.span,{className:"hljs-tag",children:["<",n(e.span,{className:"hljs-name",children:"h1"}),">"]}),"Hello World!",a(e.span,{className:"hljs-tag",children:["</",n(e.span,{className:"hljs-name",children:"h1"}),">"]}),`
+    `,a(e.span,{className:"hljs-tag",children:["</",n(e.span,{className:"hljs-name",children:"div"}),">"]})]}),`
+  )
+}
+`]})})]})}function N(s={}){let{wrapper:e}=s.components||{};return e?n(e,Object.assign({},s,{children:n(h,s)})):h(s)}var w=N;var L={"/_404":x,"/_app":y,"/":_,"/docs":k,"/docs/get-started":l,"/docs/index":t,depGraph:{"modules":[{"specifier":"./routes/docs/get-started.mdx"},{"specifier":"./routes/docs/index.mdx"}]}};export{L as default};

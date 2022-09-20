@@ -2,7 +2,7 @@ import { PropsWithChildren } from "react";
 import { Head, NavLink } from "aleph/react";
 
 const nav = [
-  ["About", "/docs/about"],
+  ["About", "/docs"],
   ["Get Started", "/docs/get-started"],
 ];
 
@@ -21,13 +21,13 @@ export default function Docs(props: PropsWithChildren) {
             <ul>
               {nav.map(([title, href]) => (
                 <li key={href}>
-                  <NavLink to={href} activeClassName="active">{title}</NavLink>
+                  <NavLink to={href} activeClassName="active" exact>{title}</NavLink>
                 </li>
               ))}
             </ul>
           </nav>
         </aside>
-        <div className="docs-content">
+        <div className="markdown-body">
           {props.children}
         </div>
       </div>
