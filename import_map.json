@@ -9,6 +9,7 @@
     "aleph/react": "./runtime/react/mod.ts",
     "aleph/react-client": "./runtime/react/client.ts",
     "aleph/react-server": "./runtime/react/server.ts",
+    "aleph/react/mdx-loader": "./runtime/react/mdx-loader.ts",
     "aleph/vue": "./runtime/vue/mod.ts",
     "aleph/vue-server": "./runtime/vue/server.ts",
     "aleph/solid-server": "./runtime/solid/server.ts",

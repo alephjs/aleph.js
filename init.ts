@@ -10,11 +10,12 @@ import log from "./server/log.ts";
 import { isCanary } from "./version.ts";
 
 const templates = [
-  "api",
   "react",
+  "react-mdx",
   "vue",
   "yew",
   "solid",
+  "api",
   // todo:
   // "preact",
   // "svelte",
@@ -147,6 +148,11 @@ export default async function init(nameArg?: string, template?: string) {
     });
   }
   switch (template) {
+    case "mdx-docs":
+      Object.assign(importMap.imports, {
+        "aleph/react/mdx-loader": `${alephPkgUri}/runtime/react/mdx-loader.ts`,
+      });
+      /* falls through */
     case "react": {
       Object.assign(denoConfig.compilerOptions, {
         "jsx": "react-jsx",
@@ -263,7 +269,10 @@ async function confirm(question = "are you sure?") {
 
 function toTitle(name: string) {
   if (name === "api") {
-    return "API";
+    return "REST API";
+  }
+  if (name === "react-mdx") {
+    return "React with MDX";
   }
   return name.at(0)?.toUpperCase() + name.slice(1);
 }
