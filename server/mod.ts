@@ -1,12 +1,11 @@
 import { generateErrorHtml, TransformError } from "../runtime/core/error.ts";
+import { existsDir, existsFile } from "../shared/fs.ts";
 import util from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR, watch } from "./dev.ts";
 import { fromFileUrl, join, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
-  existsDir,
-  existsFile,
   fixResponse,
   getAlephPkgUri,
   getDeploymentId,

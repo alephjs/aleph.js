@@ -1,11 +1,13 @@
 import { Untar } from "https://deno.land/std@0.155.0/archive/tar.ts";
 import { parse } from "https://deno.land/std@0.155.0/flags/mod.ts";
+import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.155.0/fmt/colors.ts";
 import { Buffer } from "https://deno.land/std@0.155.0/io/buffer.ts";
 import { copy } from "https://deno.land/std@0.155.0/streams/conversion.ts";
+import { ensureDir } from "https://deno.land/std@0.155.0/fs/ensure_dir.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
+import { basename, join } from "https://deno.land/std@0.155.0/path/mod.ts";
 import util from "./shared/util.ts";
-import { basename, blue, bold, cyan, dim, ensureDir, green, join, red } from "./server/deps.ts";
-import { existsDir, existsFile, getFiles } from "./server/helpers.ts";
+import { existsDir, existsFile, getFiles } from "./shared/fs.ts";
 import log from "./server/log.ts";
 import { isCanary } from "./version.ts";
 

@@ -1,6 +1,6 @@
+import { existsDir, existsFile } from "../shared/fs.ts";
 import util from "../shared/util.ts";
 import { green, join } from "./deps.ts";
-import { existsDir, existsFile } from "./helpers.ts";
 import log from "./log.ts";
 
 type CacheMeta = {

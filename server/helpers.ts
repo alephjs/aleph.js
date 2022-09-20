@@ -1,3 +1,4 @@
+import { findFile, getFiles } from "../shared/fs.ts";
 import util from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
@@ -207,42 +208,6 @@ export function isNpmPkg(url: string) {
   return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
 }
 
-/** Check whether or not the given path exists as a directory. */
-export async function existsDir(path: string): Promise<boolean> {
-  try {
-    const stat = await Deno.lstat(path);
-    return stat.isDirectory;
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) {
-      return false;
-    }
-    throw err;
-  }
-}
-
-/** Check whether or not the given path exists as regular file. */
-export async function existsFile(path: string): Promise<boolean> {
-  try {
-    const stat = await Deno.lstat(path);
-    return stat.isFile;
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) {
-      return false;
-    }
-    throw err;
-  }
-}
-
-/** Find file in the `cwd` directory. */
-export async function findFile(filenames: string[], cwd = Deno.cwd()): Promise<string | undefined> {
-  for (const filename of filenames) {
-    const fullPath = join(cwd, filename);
-    if (await existsFile(fullPath)) {
-      return fullPath;
-    }
-  }
-}
-
 /** Find config file in the `appDir` if exits, or find in current working directory. */
 async function findConfigFile(filenames: string[], appDir?: string): Promise<string | undefined> {
   let denoConfigFile: string | undefined;
@@ -304,28 +269,6 @@ export async function watchFs(rootDir: string, listener: (kind: "create" | "remo
       }, 100);
     }
   }
-}
-
-/** Get files in the directory. */
-export async function getFiles(
-  dir: string,
-  filter?: (filename: string) => boolean,
-  __path: string[] = [],
-): Promise<string[]> {
-  const list: string[] = [];
-  if (await existsDir(dir)) {
-    for await (const dirEntry of Deno.readDir(dir)) {
-      if (dirEntry.isDirectory) {
-        list.push(...await getFiles(join(dir, dirEntry.name), filter, [...__path, dirEntry.name]));
-      } else {
-        const filename = [".", ...__path, dirEntry.name].join("/");
-        if (!filter || filter(filename)) {
-          list.push(filename);
-        }
-      }
-    }
-  }
-  return list;
 }
 
 /** Fetch source code from fs/cdn/cache. */

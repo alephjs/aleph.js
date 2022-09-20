@@ -1,6 +1,7 @@
+import { existsFile } from "../shared/fs.ts";
 import util from "../shared/util.ts";
 import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm } from "./deps.ts";
-import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
+import { getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
 import type { Comment, Element } from "./types.ts";
 

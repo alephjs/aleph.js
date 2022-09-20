@@ -1,16 +1,9 @@
 import util from "../shared/util.ts";
+import { existsFile, findFile } from "../shared/fs.ts";
 import { BuildResult, dim, dirname, Emitter, ensureDir, parseDeps } from "./deps.ts";
 import { esbuild, fromFileUrl, join, mitt, relative } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
-import {
-  builtinModuleExts,
-  existsFile,
-  findFile,
-  getAlephConfig,
-  getImportMap,
-  getJSXConfig,
-  watchFs,
-} from "./helpers.ts";
+import { builtinModuleExts, getAlephConfig, getImportMap, getJSXConfig, watchFs } from "./helpers.ts";
 import log from "./log.ts";
 import { initRouter, toRouteRegExp } from "./routing.ts";
 import type { AlephConfig, ModuleLoader, Router } from "./types.ts";
