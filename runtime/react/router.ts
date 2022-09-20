@@ -54,7 +54,7 @@ export const Router: FC<RouterProps> = (props) => {
   useEffect(() => {
     const { body } = window.document;
     const router = loadRouterFromTag();
-    const buildId = body.getAttribute("data-build-id");
+    const deploymentId = body.getAttribute("data-deployment-id");
 
     // prefetch module using `<link rel="modulepreload" href="...">`
     const onmoduleprefetch = (e: Record<string, unknown>) => {
@@ -67,8 +67,8 @@ export const Router: FC<RouterProps> = (props) => {
         } catch (_e) {
           const link = document.createElement("link");
           let href = meta.filename.slice(1);
-          if (buildId) {
-            href += `?v=${buildId}`;
+          if (deploymentId) {
+            href += `?v=${deploymentId}`;
           }
           link.setAttribute("rel", "modulepreload");
           link.setAttribute("href", href);

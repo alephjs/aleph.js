@@ -35,7 +35,7 @@ const runtimeScript = [
   `}`,
   `return m;`,
   `}`,
-  `let v=document.body.getAttribute("data-build-id");`,
+  `let v=document.body.getAttribute("data-deployment-id");`,
   `let m=import(fn.slice(1)+(v?"?v="+v:""));`,
   `map.set(fn,m);`,
   `return await m.then(m=>{map.set(fn,m);return m;});`,
@@ -108,7 +108,8 @@ export default {
           resetCSS = "tailwind",
         } = config.unocss;
         let css = Reflect.get(globalThis, "__ALEPH_UNOCSS_BUILD");
-        if (!css) {
+        const cacheHit = !!css;
+        if (!cacheHit) {
           const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
           const files = await getFiles(dir);
           const outputDir = "." + util.cleanPath(config.optimization?.outputDir ?? "./output");
@@ -133,9 +134,13 @@ export default {
           const buildTime = (performance.now() - t).toFixed(2);
           headCollection.push(
             `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.45.14/${resetCSS}.css">`,
-            `<style data-unocss="${unoGenerator.version}" data-build-time="${buildTime}ms">${css}</style>`,
+            `<style data-unocss="${unoGenerator.version}" ${
+              cacheHit ? `data-cache-hit="true"` : `data-build-time="${buildTime}ms"`
+            }>${css}</style>`,
           );
-          log.debug(`Uncss generated in ${buildTime}ms`);
+          if (!cacheHit) {
+            log.debug(`Uncss generated in ${buildTime}ms`);
+          }
         }
       }
     }
@@ -196,7 +201,7 @@ export default {
                 { html: true },
               );
 
-              const deployId = getDeploymentId() ?? depGraph.globalVersion.toString(36);
+              const deployId = getDeploymentId();
               const importStmts = routing.map(({ filename }, idx) =>
                 `import * as $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))};`
               ).join("");

@@ -1,5 +1,4 @@
 import util from "../shared/util.ts";
-import depGraph from "./graph.ts";
 import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm } from "./deps.ts";
 import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
@@ -78,7 +77,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
   const alephPkgUri = getAlephPkgUri();
   const chunks: Uint8Array[] = [];
   const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
-  const buildId = getDeploymentId() ?? depGraph.globalVersion.toString(36);
+  const deploymentId = getDeploymentId();
   let nomoduleInserted = false;
 
   rewriter.on("link", {
@@ -98,7 +97,10 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
               { html: true },
             );
           }
-          href = pathname + (pathname.includes("?") ? "&v=" : "?v=") + buildId;
+          href = pathname;
+          if (deploymentId) {
+            href += (pathname.includes("?") ? "&v=" : "?v=") + deploymentId;
+          }
         } else {
           href = toLocalPath(href);
         }
@@ -113,7 +115,9 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
       if (src) {
         if (!util.isLikelyHttpURL(src)) {
           src = util.cleanPath(src);
-          src += (src.includes("?") ? "&v=" : "?v=") + buildId;
+          if (deploymentId) {
+            src += (src.includes("?") ? "&v=" : "?v=") + deploymentId;
+          }
           el.setAttribute("src", src);
         } else {
           src = toLocalPath(src);
@@ -132,7 +136,9 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
 
   rewriter.on("body", {
     element: (el: Element) => {
-      el.setAttribute("data-build-id", buildId);
+      if (deploymentId) {
+        el.setAttribute("data-deployment-id", deploymentId);
+      }
       if (ssr && !hasSSRBody) {
         el.prepend("<ssr-body></ssr-body>", { html: true });
       }
