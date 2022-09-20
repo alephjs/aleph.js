@@ -170,7 +170,7 @@ header a:hover {
   width: 90%;
   max-width: 900px;
   margin: 0 auto;
-  padding-top: 60px;
+  padding: 60px 0;
   display: flex;
   gap: 2.4rem;
 }
@@ -288,16 +288,16 @@ header a:hover {
     font-size: 1.27rem;
   }
 
-  & p {
+  & > p {
     margin-top: 1.5rem;
     line-height: 1.5;
   }
 
-  & p+p {
+  & > p + p {
     margin-top: 1.2rem;
   }
 
-  & h4+p {
+  & > h4 + p {
     margin-top: 0.9rem;
   }
 
@@ -307,6 +307,12 @@ header a:hover {
 
   & ol {
     list-style: decimal inside;
+  }
+
+  & ul, & ol {
+    & li p {
+      display: inline;
+    }
   }
 
   & pre {
