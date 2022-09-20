@@ -1,5 +1,5 @@
-const port = 3000;
 const frameworks = ["react", "vue", "solid", "yew"];
+const startPort = 3001;
 
 const servers = frameworks.map((framework, i) => {
   return Deno.run({
@@ -9,7 +9,7 @@ const servers = frameworks.map((framework, i) => {
       "-A",
       `examples/${framework}-app/server.ts`,
       "--port",
-      `${port + i}`,
+      `${startPort + i}`,
     ],
     stdout: "null",
     stderr: "null",
@@ -17,7 +17,7 @@ const servers = frameworks.map((framework, i) => {
 });
 
 await Promise.all(frameworks.map(async (framework, i) => {
-  const url = `http://localhost:${port + i}`;
+  const url = `http://localhost:${startPort + i}`;
   let status = 0;
   while (status !== 200) {
     try {
