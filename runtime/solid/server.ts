@@ -5,9 +5,9 @@ import type { SSRContext, SSROptions } from "../../server/types.ts";
 import SolidTransformer from "./transformer.ts";
 
 const render = (ctx: SSRContext): ReadableStream | string => {
-  const App = ctx.routeModules[0]?.exports.default; // routes/index.tsx
+  const App = ctx.routing[0]?.exports.default; // routes/index.tsx
   if (!App) {
-    ctx.status = 404;
+    ctx.setStatus(404);
     return "<p>404 page not found</p>";
   }
   ctx.headCollection.push(generateHydrationScript());

@@ -6,7 +6,7 @@ import depGraph from "./graph.ts";
 import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";
 import log from "./log.ts";
 import { importRouteModule } from "./routing.ts";
-import type { Element, HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContext, SSRResult } from "./types.ts";
+import type { Element, HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContext, SuspenseMark } from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
@@ -51,26 +51,46 @@ export default {
     const cc = !isFn ? ssr.cacheControl : "public";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;
-    const [url, routeModules, deferedData] = await initSSR(req, ctx, router);
+    const [url, routing, deferedData] = await initSSR(req, ctx, router);
     const headCollection: string[] = [];
+
+    let status = 200;
+    let suspenseMark: SuspenseMark | undefined;
+    let nonce: string | undefined;
+
     const ssrContext: SSRContext = {
       url,
-      routeModules,
+      routing,
       headCollection,
       signal: req.signal,
-      nonce: CSP?.nonce ? Date.now().toString(36) : undefined,
+      setStatus: (code) => {
+        status = code;
+      },
+      setSuspenseMark: (selector: string, test: (el: Element) => boolean) => {
+        suspenseMark = { selector, test };
+      },
     };
 
-    let body = render(ssrContext);
-    if (body instanceof Promise) {
-      body = await body;
+    if (!isDev && CSP) {
+      const _nonce = CSP.nonce ? Date.now().toString(36) : undefined;
+      const policy = CSP.getPolicy(url, _nonce);
+      if (policy) {
+        headers.append("Content-Security-Policy", policy);
+        if (_nonce && policy.includes("nonce-" + _nonce)) {
+          nonce = _nonce;
+          (ssrContext as Record<string, unknown>).nonce = _nonce;
+        }
+      }
     }
+
+    let body = await render(ssrContext);
     if (typeof body !== "string" && !(body instanceof ReadableStream)) {
+      log.warn("Invalid SSR body");
       body = "";
     }
 
     // find inline css
-    depGraph.shallowWalk(routeModules.map(({ filename }) => filename), (mod) => {
+    depGraph.shallowWalk(routing.map(({ filename }) => filename), (mod) => {
       const { specifier, inlineCSS } = mod;
       if (inlineCSS) {
         headCollection.push(`<style data-module-id="${specifier}" ssr>${inlineCSS}</style>`);
@@ -120,23 +140,6 @@ export default {
       }
     }
 
-    const ssrRes: SSRResult = {
-      body,
-      context: ssrContext,
-      deferedData,
-    };
-
-    if (!isDev && CSP) {
-      const nonce = ssrContext.nonce;
-      const policy = CSP.getPolicy(url, nonce);
-      if (policy) {
-        headers.append("Content-Security-Policy", policy);
-        if (nonce && policy.includes("nonce-" + nonce)) {
-          ssrRes.nonce = nonce;
-        }
-      }
-    }
-
     const stream = new ReadableStream({
       start: (controller) => {
         let ssrStreaming = false;
@@ -168,14 +171,11 @@ export default {
           },
         });
 
-        const { context, body, deferedData, nonce } = ssrRes;
-        const { routeModules, headCollection } = context;
-
         rewriter.on("head", {
           element(el: Element) {
             headCollection.forEach((h) => util.isFilledString(h) && el.append(h, { html: true }));
-            if (routeModules.length > 0) {
-              const ssrModules = routeModules.map(({ url, params, filename, withData, data, dataCacheTtl }) => {
+            if (routing.length > 0) {
+              const ssrModules = routing.map(({ url, params, filename, withData, data, dataCacheTtl }) => {
                 const defered = typeof data === "function" ? true : undefined;
                 return {
                   url: url.pathname + url.search,
@@ -197,10 +197,10 @@ export default {
               );
 
               const deployId = getDeploymentId() ?? depGraph.globalVersion.toString(36);
-              const importStmts = routeModules.map(({ filename }, idx) =>
+              const importStmts = routing.map(({ filename }, idx) =>
                 `import * as $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))};`
               ).join("");
-              const kvs = routeModules.map(({ filename }, idx) => `${JSON.stringify(filename)}:$${idx}`).join(
+              const kvs = routing.map(({ filename }, idx) => `${JSON.stringify(filename)}:$${idx}`).join(
                 ",",
               );
               const nonceAttr = nonce ? ` nonce="${nonce}"` : "";
@@ -224,20 +224,19 @@ export default {
                 controller.enqueue(chunk);
               });
 
-              if (ssrContext.suspenseMark) {
-                const { selector, test } = ssrContext.suspenseMark;
-                rw.on(selector, {
+              if (suspenseMark) {
+                rw.on(suspenseMark.selector, {
                   element(el: Element) {
-                    if (test(el)) {
+                    if (suspenseMark!.test(el)) {
                       suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
                     }
                   },
                 });
               }
 
+              const reader = body.getReader();
               const send = async () => {
                 try {
-                  const reader = body.getReader();
                   while (true) {
                     const { done, value } = await reader.read();
                     if (done) {
@@ -271,7 +270,7 @@ export default {
             element(el: Element) {
               const typeAttr = el.getAttribute("type");
               if ((!typeAttr || typeAttr === "module") && !el.getAttribute("src")) {
-                el.setAttribute("nonce", nonce);
+                el.setAttribute("nonce", nonce!);
               }
             },
           });
@@ -289,15 +288,15 @@ export default {
       },
     });
 
-    if (routeModules.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)) {
-      const ttls = routeModules.map(({ dataCacheTtl }) => Number(dataCacheTtl));
+    if (routing.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)) {
+      const ttls = routing.map(({ dataCacheTtl }) => Number(dataCacheTtl));
       headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
     } else {
       headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
     }
     headers.set("Content-Type", "text/html; charset=utf-8");
 
-    return new Response(stream, { headers, status: ssrContext.status });
+    return new Response(stream, { headers, status });
   },
 };
 
@@ -308,7 +307,7 @@ async function initSSR(
   router: Router | null,
 ): Promise<[
   url: URL,
-  routeModules: RouteModule[],
+  routing: RouteModule[],
   deferedData: Record<string, unknown>,
 ]> {
   const url = new URL(req.url);

@@ -170,12 +170,17 @@ export type SSGOptions = {
 
 export type SSRContext = {
   readonly url: URL;
-  readonly routeModules: RouteModule[];
+  readonly routing: RouteModule[];
   readonly headCollection: string[];
   readonly signal: AbortSignal;
   readonly nonce?: string;
-  status?: number;
-  suspenseMark?: { selector: string; test: (el: Element) => boolean };
+  setStatus(code: number): void;
+  setSuspenseMark(selector: string, test: (el: Element) => boolean): void;
+};
+
+export type SuspenseMark = {
+  selector: string;
+  test: (el: Element) => boolean;
 };
 
 export type SSRFn = {
@@ -201,13 +206,6 @@ export type SSR =
   | SSROptions & {
     render: SSRFn;
   };
-
-export type SSRResult = {
-  context: SSRContext;
-  body: ReadableStream | string;
-  deferedData: Record<string, unknown>;
-  nonce?: string;
-};
 
 export type ErrorHandler = {
   (

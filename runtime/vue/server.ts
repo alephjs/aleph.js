@@ -7,8 +7,8 @@ import { createApp } from "./router.ts";
 import SFCLoader from "./sfc_loader.ts";
 
 export const render = (ctx: SSRContext): ReadableStream => {
-  if (ctx.routeModules.length === 0 || ctx.routeModules.at(-1)?.url.pathname === "/_404") {
-    ctx.status = 404;
+  if (ctx.routing.length === 0 || ctx.routing.at(-1)?.url.pathname === "/_404") {
+    ctx.setStatus(404);
   }
   return renderToWebStream(createApp({ ssrContext: ctx }), util.pick(ctx, "signal", "nonce"));
 };

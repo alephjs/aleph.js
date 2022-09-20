@@ -12,7 +12,7 @@ import { Err, ErrorBoundary } from "./error.ts";
 
 export type SSRContext = {
   readonly url: URL;
-  readonly routeModules: RouteModule[];
+  readonly routing: RouteModule[];
   readonly headCollection: string[];
 };
 
@@ -26,7 +26,7 @@ export type RouterProps = {
 export const Router: FC<RouterProps> = (props) => {
   const { ssrContext, strictMode, createPortal } = props;
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
-  const [modules, setModules] = useState(() => ssrContext?.routeModules || loadSSRModulesFromTag());
+  const [modules, setModules] = useState(() => ssrContext?.routing || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
     const cache = new Map<string, RouteData>();
     modules.forEach(({ url, data, dataCacheTtl }) => {

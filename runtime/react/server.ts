@@ -14,19 +14,16 @@ if (Deno.args.includes("--dev")) {
 const suspenseMark = `data:text/javascript;/** suspense mark **/`;
 
 export const render = (ctx: SSRContext): Promise<ReadableStream> => {
-  if (ctx.routeModules.length === 0 || ctx.routeModules.at(-1)?.url.pathname === "/_404") {
-    ctx.status = 404;
+  if (ctx.routing.length === 0 || ctx.routing.at(-1)?.url.pathname === "/_404") {
+    ctx.setStatus(404);
   }
-  ctx.suspenseMark = {
-    selector: "script",
-    test: (el) => {
-      if (el.getAttribute("src") === suspenseMark) {
-        el.remove();
-        return true;
-      }
-      return false;
-    },
-  };
+  ctx.setSuspenseMark("script", (el) => {
+    if (el.getAttribute("src") === suspenseMark) {
+      el.remove();
+      return true;
+    }
+    return false;
+  });
   return renderToReadableStream(
     createElement(App, { ssrContext: ctx }),
     {
