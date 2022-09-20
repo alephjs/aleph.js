@@ -175,7 +175,7 @@ header a:hover {
   gap: 2.4rem;
 }
 
-aside {
+.docs>aside {
   width: 210px;
   flex-shrink: 0;
 
@@ -209,6 +209,7 @@ aside {
         color: #000;
         border-color: #999;
       }
+
       &:focus {
         color: #111;
         background-color: #fff;
@@ -216,9 +217,11 @@ aside {
       }
     }
   }
+
   & nav {
     margin-top: 1.2rem;
   }
+
   & ul li {
     margin-top: 0.5rem;
     list-style: disc inside;
@@ -234,112 +237,116 @@ aside {
   }
 }
 
-.docs-content ul {
-  list-style: disc inside;
-}
-
-.docs-content ol {
-  list-style: decimal inside;
-}
-
-.docs-content a {
-  color: rgb(42, 114, 247);
-}
-.docs-content a:hover {
-  text-decoration: underline;
-}
-
-.docs-content strong {
-  font-weight: 600;
-}
-
-.docs-content em {
-  font-style: italic;
-}
-
-.docs-content h1,
-.docs-content h2,
-.docs-content h3,
-.docs-content h4 {
-  line-height: 1.27;
-  font-weight: 500;
-  color: #000;
-}
-
-.docs-content h1 {
-  margin-bottom: 1.2rem;
-  font-size: 2.4rem;
-  font-weight: 700;
-}
-.docs-content h1:first-child {
-  margin-top: 0;
-}
-
-.docs-content h2 {
-  margin-top: 3rem;
-  font-size: 1.8rem;
-}
-
-.docs-content h3 {
-  margin-top: 2.7rem;
-  font-size: 1.5rem;
-}
-
-.docs-content h4 {
-  margin-top: 2.4rem;
-  font-size: 1.27rem;
-}
-
-.docs-content p {
-  margin-top: 1.5rem;
-  line-height: 1.5;
-}
-
-.docs-content p + p {
-  margin-top: 1.2rem;
-}
-
-.docs-content h4 + p {
-  margin-top: 0.9rem;
-}
-
-.docs-content :not(pre) > code {
-  display: inline-block;
-  white-space: pre-wrap;
-  background-color: #f3f3f3;
-  border-radius: 6px;
-  padding: 0 0.4rem;
-}
-
-.docs-content pre {
-  box-sizing: border-box;
-  overflow-x: auto;
-  width: 100%;
-  margin-top: 1.5rem;
-  border-radius: 6px;
-  line-height: 1.5;
-  color: #333;
-  background-color: #f3f3f3;
-  white-space: pre;
-  -webkit-overflow-scrolling: touch;
-
-  & > code {
-    display: block;
-    padding: 1.2rem;
+.docs-content {
+  & a {
+    color: rgb(42, 114, 247);
   }
-}
 
-.docs-content  blockquote {
-  color: #666;
-  padding: 0.3rem 1.2rem;
-  margin: 1.2rem 0;
-  border-left: 2px solid #ccc;
+  & a:hover {
+    text-decoration: underline;
+  }
+
+  & strong {
+    font-weight: 600;
+  }
+
+  & em {
+    font-style: italic;
+  }
+
+  & h1,
+  & h2,
+  & h3,
+  & h4 {
+    line-height: 1.27;
+    font-weight: 500;
+    color: #000;
+  }
+
+  & h1 {
+    margin-bottom: 1.2rem;
+    font-size: 2.4rem;
+    font-weight: 700;
+  }
+
+  & h1:first-child {
+    margin-top: 0;
+  }
+
+  & h2 {
+    margin-top: 3rem;
+    font-size: 1.8rem;
+  }
+
+  & h3 {
+    margin-top: 2.7rem;
+    font-size: 1.5rem;
+  }
+
+  & h4 {
+    margin-top: 2.4rem;
+    font-size: 1.27rem;
+  }
 
   & p {
-    margin: 0;
+    margin-top: 1.5rem;
+    line-height: 1.5;
   }
-  & a {
-    box-shadow: none;
+
+  & p+p {
+    margin-top: 1.2rem;
+  }
+
+  & h4+p {
+    margin-top: 0.9rem;
+  }
+
+  & ul {
+    list-style: disc inside;
+  }
+
+  & ol {
+    list-style: decimal inside;
+  }
+
+  & pre {
+    box-sizing: border-box;
+    overflow-x: auto;
+    width: 100%;
+    margin-top: 1.5rem;
+    border-radius: 6px;
+    line-height: 1.5;
+    color: #333;
+    background-color: #f3f3f3;
+    white-space: pre;
+    -webkit-overflow-scrolling: touch;
+
+    &>code {
+      display: block;
+      padding: 1.2rem;
+    }
+  }
+
+  & :not(pre)>code {
+    display: inline-block;
+    white-space: pre-wrap;
+    background-color: #f3f3f3;
+    border-radius: 6px;
+    padding: 0 0.4rem;
+  }
+
+  & blockquote {
+    color: #666;
+    padding: 0.3rem 1.2rem;
+    margin: 1.2rem 0;
+    border-left: 2px solid #ccc;
+
+    & p {
+      margin: 0;
+    }
+
+    & a {
+      box-shadow: none;
+    }
   }
 }
-
