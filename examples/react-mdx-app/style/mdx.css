@@ -112,6 +112,7 @@
   & :not(pre)>code {
     display: inline;
     white-space: pre-wrap;
+    font-size: 90%;
     color: var(--theme-color);
 
     &::before,

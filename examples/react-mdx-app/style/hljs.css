@@ -37,7 +37,7 @@
 .hljs-selector-id,
 .hljs-title {
   color: var(--theme-color);
-  font-weight: 600
+  font-weight: 500
 }
 
 .hljs-subst {
@@ -47,7 +47,7 @@
 .hljs-class .hljs-title,
 .hljs-type {
   color: #458;
-  font-weight: 600
+  font-weight: 500
 }
 
 .hljs-attribute,
@@ -69,7 +69,7 @@
 
 .hljs-link,
 .hljs-regexp {
-  color: #009926
+  color: #926711
 }
 
 .hljs-bullet,
@@ -84,7 +84,7 @@
 
 .hljs-meta {
   color: #999;
-  font-weight: 600
+  font-weight: 500
 }
 
 .hljs-deletion {
@@ -100,5 +100,5 @@
 }
 
 .hljs-strong {
-  font-weight: 600
+  font-weight: 500
 }
