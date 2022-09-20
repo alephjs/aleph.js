@@ -48,7 +48,7 @@ export default {
     const { indexHtml, router, customHTMLRewriter, ssr, isDev } = options;
     const headers = new Headers(ctx.headers as Headers);
     const isFn = typeof ssr === "function";
-    const cc = !isFn ? ssr.cacheControl : "public";
+    const cc = !isFn ? ssr.cacheControl ?? "public" : "public";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;
     const [url, routing, deferedData] = await initSSR(req, ctx, router);
