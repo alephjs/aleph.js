@@ -24,7 +24,7 @@ const templates = [
 
 const versions = {
   react: "18.2.0",
-  vue: "3.2.37",
+  vue: "3.2.39",
   solid: "1.5.5",
 };
 
