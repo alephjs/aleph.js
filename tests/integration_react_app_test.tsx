@@ -22,8 +22,8 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertStringIncludes(html, `The Fullstack Framework in Deno.</h1>`);
     assertStringIncludes(html, ` href="/todos" `);
     assertStringIncludes(html, `>Todos App Demo</a>`);
-    assertStringIncludes(html, `<link rel="icon" href="/assets/logo.svg?v=`);
-    assertStringIncludes(html, `<script type="module" src="/main.tsx?v=`);
+    assertStringIncludes(html, `<link rel="icon" href="/assets/logo.svg"`);
+    assertStringIncludes(html, `<script type="module" src="/main.tsx"`);
     assertStringIncludes(html, `<script id="router-manifest" type="application/json">`);
     assertStringIncludes(html, `<script id="ssr-data" type="application/json">`);
   });
