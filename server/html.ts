@@ -87,23 +87,22 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
       if (href) {
         const isHttpUrl = util.isLikelyHttpURL(href);
         if (!isHttpUrl) {
-          href = util.cleanPath(href);
-          href += (href.includes("?") ? "&v=" : "?v=") + buildId;
-          el.setAttribute("href", href);
+          const pathname = util.cleanPath(href);
+          if (hmr && pathname.endsWith(".css")) {
+            const specifier = `.${pathname}`;
+            el.setAttribute("data-module-id", specifier);
+            el.after(
+              `<script type="module">import hot from "${toLocalPath(alephPkgUri)}/runtime/core/hmr.ts";hot(${
+                JSON.stringify(specifier)
+              }).accept();</script>`,
+              { html: true },
+            );
+          }
+          href = pathname + (pathname.includes("?") ? "&v=" : "?v=") + buildId;
         } else {
           href = toLocalPath(href);
         }
         el.setAttribute("href", href);
-        if (hmr && !isHttpUrl && href.split("?")[0].endsWith(".css")) {
-          const specifier = `.${href}`;
-          el.setAttribute("data-module-id", specifier);
-          el.after(
-            `<script type="module">import hot from "${toLocalPath(alephPkgUri)}/runtime/core/hmr.ts";hot(${
-              JSON.stringify(specifier)
-            }).accept();</script>`,
-            { html: true },
-          );
-        }
       }
     },
   });
