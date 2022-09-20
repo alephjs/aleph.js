@@ -1,30 +1,8 @@
-import { SEP } from "std/path/separator.ts";
-import { assert, assertEquals } from "std/testing/asserts.ts";
-import { existsDir, existsFile, MagicString, restoreUrl, toLocalPath } from "../server/helpers.ts";
+import { assertEquals } from "std/testing/asserts.ts";
+import { MagicString, restoreUrl, toLocalPath } from "../server/helpers.ts";
 import { parseDeps } from "../server/deps.ts";
 
 Deno.test("server/helper.ts", async (t) => {
-  await t.step(`existsDir`, async () => {
-    // true test cases
-    const dir = await Deno.makeTempDir();
-    assert(await existsDir(dir));
-    assert(await existsDir(await Deno.realPath(getStandardFolder())));
-    // false test cases
-    const file = await Deno.makeTempFile();
-    assertEquals(await existsDir(file), false);
-    assertEquals(await existsDir(`${dir}${SEP}foo${SEP}bar`), false);
-  });
-
-  await t.step(`existsFile`, async () => {
-    // true test cases
-    const file = await Deno.makeTempFile();
-    assert(await existsFile(file));
-    // false test cases
-    const dir = await Deno.makeTempDir();
-    assert(!await existsFile(`${dir}`));
-    assert(!await existsFile(`${dir}${SEP}foo${SEP}bar`));
-  });
-
   await t.step("toLocalPath", () => {
     assertEquals(toLocalPath("https://foo.com/lib@0.1.0?action"), "/-/foo.com/lib@0.1.0?action");
     assertEquals(toLocalPath("https://deno.land/x/aleph@0.1.0/"), "/-/deno.land/x/aleph@0.1.0");
@@ -72,13 +50,3 @@ Deno.test("server/helper.ts", async (t) => {
     assertEquals(m.toString(), overwritedCode);
   });
 });
-
-/**
- * Returns an operating system-specific
- * example folder.
- * @returns 'C:\Windows' for Windows or
- *  '/tmp' for unix-based operating systems
- */
-const getStandardFolder = () => {
-  return Deno.build.os === "windows" ? "C:\\Windows" : "/tmp";
-};
