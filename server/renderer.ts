@@ -288,7 +288,7 @@ export default {
       },
     });
 
-    if (routing.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0)) {
+    if (routing.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0) && !isDev) {
       const ttls = routing.map(({ dataCacheTtl }) => Number(dataCacheTtl));
       headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
     } else {
