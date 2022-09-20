@@ -5,7 +5,7 @@ import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../se
 
 export default class SolidTransformer implements ModuleLoader {
   test(path: string): boolean {
-    return path.endsWith(".js") || path.endsWith(".jsx") || path.endsWith(".tsx");
+    return path.endsWith(".tsx") || path.endsWith(".jsx");
   }
 
   load(specifier: string, content: string, env: ModuleLoaderEnv): ModuleLoaderOutput {

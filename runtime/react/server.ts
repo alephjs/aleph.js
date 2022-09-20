@@ -17,6 +17,7 @@ export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   if (ctx.routing.length === 0 || ctx.routing.at(-1)?.url.pathname === "/_404") {
     ctx.setStatus(404);
   }
+  // support suspense rendering in server-side
   ctx.setSuspenseMark("script", (el) => {
     if (el.getAttribute("src") === suspenseMark) {
       el.remove();
