@@ -30,7 +30,6 @@ import type {
   Context,
   ErrorHandler,
   HTMLRewriterHandlers,
-  Middleware,
   ModuleLoader,
   Router,
   ServeInit,
@@ -107,7 +106,6 @@ export function serve(options: ServerOptions = {}) {
 
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
     const ctx = createContext(req, { connInfo, customHTMLRewriter, session });
-    const postMiddlewares: Middleware[] = [];
 
     // use eager middlewares
     if (Array.isArray(middlewares)) {
@@ -115,31 +113,27 @@ export function serve(options: ServerOptions = {}) {
         const mw = middlewares[i];
         const handler = mw.fetch;
         if (typeof handler === "function") {
-          if (mw.eager) {
-            try {
-              let res = handler(req, ctx);
-              if (res instanceof Promise) {
-                res = await res;
-              }
-              if (res instanceof Response) {
-                return res;
-              }
-              if (typeof res === "function") {
-                setTimeout(res, 0);
-              }
-            } catch (err) {
-              const res = onError?.(err, "middleware", req, ctx);
-              if (res instanceof Response) {
-                return res;
-              }
-              log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
-              return new Response(generateErrorHtml(err.stack ?? err.message), {
-                status: 500,
-                headers: [["Content-Type", "text/html; charset=utf-8"]],
-              });
+          try {
+            let res = handler(req, ctx);
+            if (res instanceof Promise) {
+              res = await res;
             }
-          } else {
-            postMiddlewares.push(mw);
+            if (res instanceof Response) {
+              return res;
+            }
+            if (typeof res === "function") {
+              setTimeout(res, 0);
+            }
+          } catch (err) {
+            const res = onError?.(err, "middleware", req, ctx);
+            if (res instanceof Response) {
+              return res;
+            }
+            log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
+            return new Response(generateErrorHtml(err.stack ?? err.message), {
+              status: 500,
+              headers: [["Content-Type", "text/html; charset=utf-8"]],
+            });
           }
         }
       }
@@ -267,32 +261,6 @@ export function serve(options: ServerOptions = {}) {
               headers: [["Content-Type", "text/html;"]],
             });
         }
-      }
-    }
-
-    // use post middlewares
-    for (const mw of postMiddlewares) {
-      try {
-        let res = mw.fetch(req, ctx);
-        if (res instanceof Promise) {
-          res = await res;
-        }
-        if (res instanceof Response) {
-          return res;
-        }
-        if (typeof res === "function") {
-          setTimeout(res, 0);
-        }
-      } catch (err) {
-        const res = onError?.(err, "middleware", req, ctx);
-        if (res instanceof Response) {
-          return res;
-        }
-        log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
-        return new Response(generateErrorHtml(err.stack ?? err.message), {
-          status: 500,
-          headers: [["Content-Type", "text/html;"]],
-        });
       }
     }
 

@@ -105,8 +105,9 @@ export interface Context extends Record<string, unknown> {
 }
 
 export interface Middleware {
+  /* The middleware name. */
   readonly name?: string;
-  readonly eager?: boolean;
+  /* The middleware fetch method. */
   fetch(
     request: Request,
     context: Context,
