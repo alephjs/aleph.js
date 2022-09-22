@@ -27,7 +27,6 @@ import { optimize } from "./optimizer.ts";
 import type {
   AlephConfig,
   ConnInfo,
-  Context,
   ErrorHandler,
   HTMLRewriterHandlers,
   ModuleLoader,
@@ -40,14 +39,12 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
   logLevel?: LevelName;
-  fetch?: (request: Request, context: Context) => Promise<Response> | Response;
   onError?: ErrorHandler;
 } & AlephConfig;
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const { baseUrl, fetch, loaders, middlewares, onError, optimization, router: routerConfig, session, ssr, unocss } =
-    options;
+  const { baseUrl, loaders, middlewares, onError, optimization, router: routerConfig, session, ssr, unocss } = options;
   const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
   const optimizeMode = Deno.args.includes("--optimize") || Deno.args.includes("-O");
   const isDev = Deno.args.includes("--dev");
@@ -262,11 +259,6 @@ export function serve(options: ServerOptions = {}) {
             });
         }
       }
-    }
-
-    // use the `fetch` handler if available
-    if (typeof fetch === "function") {
-      return fetch(req, ctx);
     }
 
     // request route api
