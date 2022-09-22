@@ -16,12 +16,12 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   }
 
   const version = depGraph.get(filename)?.version;
-  const useTls = Deno.env.get("ALEPH_SERVER_TLS");
-  const hostname = Deno.env.get("ALEPH_SERVER_HOST");
-  const devPort = Deno.env.get("ALEPH_SERVER_PORT");
+  const proto = Deno.env.get("ALEPH_SERVER_TLS") ? "https" : "http";
+  const hostname = Deno.env.get("ALEPH_SERVER_HOST") ?? "localhost";
+  const devPort = Deno.env.get("ALEPH_SERVER_PORT") ?? 3000;
   let url: string;
   if (devPort) {
-    url = `${useTls ? "https" : "http"}://${hostname}:${devPort}${filename.slice(1)}?ssr&v=${
+    url = `${proto}://${hostname}:${devPort}${filename.slice(1)}?ssr&v=${
       (version ?? depGraph.globalVersion).toString(36)
     }`;
   } else {
