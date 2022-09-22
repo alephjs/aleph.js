@@ -96,18 +96,27 @@ export interface HTMLRewriter {
 }
 
 export interface Context extends Record<string, unknown> {
+  /** The request connection info. */
   readonly connInfo?: ConnInfo;
+  /** The params of dynamic routes. */
   readonly params: Record<string, string>;
+  /** The headers for final response. */
   readonly headers: Headers;
+  /** The cookies from client. */
   readonly cookies: Cookies;
+  /** The HtmlRewriter to rewrite the html output. */
   readonly htmlRewriter: HTMLRewriter;
-  getSession<T extends Record<string, unknown> = Record<string, unknown>>(): Promise<Session<T>>;
+  /** Returns the `Session` object. */
+  getSession<
+    T extends Record<string, unknown> = Record<string, unknown>,
+  >(): Promise<Session<T>>;
 }
 
+/** The Middleare for Aleph server. */
 export interface Middleware {
-  /* The middleware name. */
+  /** The middleware name. */
   readonly name?: string;
-  /* The middleware fetch method. */
+  /** The middleware fetch method. */
   fetch(
     request: Request,
     context: Context,
