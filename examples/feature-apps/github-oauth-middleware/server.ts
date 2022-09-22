@@ -1,4 +1,4 @@
-import presetUno from "@unocss/preset-uno.ts";
+import presetUno from "@unocss/preset-uno";
 import { serve } from "aleph/react-server";
 import { GithubOauth } from "./oauth.ts";
 import routes from "./routes/_export.ts";
