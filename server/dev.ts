@@ -1,5 +1,5 @@
+import { findFile } from "../shared/fs.ts";
 import util from "../shared/util.ts";
-import { existsFile, findFile } from "../shared/fs.ts";
 import { BuildResult, dim, dirname, Emitter, ensureDir, parseDeps } from "./deps.ts";
 import { esbuild, fromFileUrl, join, mitt, relative } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
@@ -266,7 +266,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
     const write = async (build: BuildResult) => {
       await Promise.all(build.outputFiles!.map(async (file) => {
         if (file.path === genFile) {
-          await stealWriteTextFile(
+          await Deno.writeTextFile(
             genFile,
             file.text.replace(
               "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
@@ -277,84 +277,99 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
         }
       }));
     };
-    const result = await esbuild({
-      stdin: {
-        sourcefile: genFile,
-        contents: input,
-      },
-      outfile: genFile,
-      platform: "browser",
-      format: "esm",
-      target: ["esnext"],
-      bundle: true,
-      minify: true,
-      treeShaking: true,
-      // todo: enable sourcemap
-      sourcemap: false,
-      write: false,
-      banner: {
-        js: [
-          ...comments,
-          "// deno-fmt-ignore-file",
-          "// deno-lint-ignore-file",
-          "// @ts-nocheck",
-        ].join("\n"),
-      },
-      plugins: [{
-        name: "bundle-non-standard-modules",
-        setup(build) {
-          build.onResolve({ filter: /.*/ }, (args) => {
-            if (
-              args.path.startsWith(".") &&
-              loaders?.some((l) => l.test(args.path))
-            ) {
-              const specifier = "./" + relative(appDir, join(routesDir, args.path));
-              depGraph.mark(specifier, {});
-              if (args.importer.startsWith(".")) {
-                const importer = "./" + relative(appDir, join(routesDir, args.importer));
-                depGraph.mark(importer, { deps: [{ specifier }] });
+    try {
+      const result = await esbuild({
+        stdin: {
+          sourcefile: genFile,
+          contents: input,
+        },
+        outfile: genFile,
+        platform: "browser",
+        format: "esm",
+        target: ["esnext"],
+        bundle: true,
+        minify: true,
+        treeShaking: true,
+        // todo: enable sourcemap
+        sourcemap: false,
+        write: false,
+        banner: {
+          js: [
+            ...comments,
+            "// deno-fmt-ignore-file",
+            "// deno-lint-ignore-file",
+            "// @ts-nocheck",
+          ].join("\n"),
+        },
+        plugins: [{
+          name: "aleph-loader",
+          setup(build) {
+            build.onResolve({ filter: /.*/ }, (args) => {
+              if (
+                args.path.startsWith(".") &&
+                loaders?.some((l) => l.test(args.path))
+              ) {
+                const specifier = "./" + relative(appDir, join(routesDir, args.path));
+                depGraph.mark(specifier, {});
+                if (args.importer.startsWith(".")) {
+                  const importer = "./" + relative(appDir, join(routesDir, args.importer));
+                  depGraph.mark(importer, { deps: [{ specifier }] });
+                }
+                return { path: args.path, namespace: "loader" };
               }
-              return { path: args.path, namespace: "loader" };
-            }
-            return { path: args.path, external: true };
-          });
-          build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
-            const loader = loaders?.find((l) => l.test(args.path));
-            if (loader) {
-              const fullpath = join(routesDir, args.path);
-              const specifier = "./" + relative(appDir, fullpath);
-              const [importMap, jsxConfig, source] = await Promise.all([
-                getImportMap(appDir),
-                getJSXConfig(appDir),
-                Deno.readTextFile(fullpath),
-              ]);
-              const { code, lang, inlineCSS } = await loader.load(specifier, source, {
-                importMap,
-                jsxConfig,
-                ssr: true,
-              });
-              if (inlineCSS) {
-                depGraph.mark(specifier, { inlineCSS });
+              return { path: args.path, external: true };
+            });
+            build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
+              const loader = loaders?.find((l) => l.test(args.path));
+              if (loader) {
+                const fullpath = join(routesDir, args.path);
+                const specifier = "./" + relative(appDir, fullpath);
+                const [importMap, jsxConfig, source] = await Promise.all([
+                  getImportMap(appDir),
+                  getJSXConfig(appDir),
+                  Deno.readTextFile(fullpath),
+                ]);
+                try {
+                  const { code, lang, inlineCSS } = await loader.load(specifier, source, {
+                    importMap,
+                    jsxConfig,
+                    ssr: true,
+                  });
+                  if (inlineCSS) {
+                    depGraph.mark(specifier, { inlineCSS });
+                  }
+                  return {
+                    contents: code,
+                    loader: lang,
+                    watchFiles: [fullpath],
+                  };
+                } catch (error) {
+                  return {
+                    errors: [{ text: error.message }],
+                  };
+                }
               }
               return {
-                contents: code,
-                loader: lang,
-                watchFiles: [fullpath],
+                errors: [{ text: `Loader not found for ${args.path}` }],
               };
+            });
+          },
+        }],
+        watch: {
+          onRebuild(error, result) {
+            if (error) {
+              return;
             }
-            throw new Error(`Loader not found for ${args.path}`);
-          });
+            write(result!);
+            log.debug("rebuild _export.ts");
+          },
         },
-      }],
-      watch: {
-        onRebuild(error, result) {
-          if (error) log.warn("[esbuild] watch build failed:", error);
-          else write(result!);
-        },
-      },
-    });
-    Reflect.set(globalThis, "__ALEPH_PREV_ESBUILD_RES", result);
-    await write(result);
+      });
+      Reflect.set(globalThis, "__ALEPH_PREV_ESBUILD_RES", result);
+      await write(result);
+    } catch (_e) {
+      // ignore
+    }
   } else {
     const empty = "";
     const code = [
@@ -367,16 +382,6 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
       "};",
       empty,
     ].join("\n");
-    await stealWriteTextFile(genFile, code);
+    await Deno.writeTextFile(genFile, code);
   }
-}
-
-async function stealWriteTextFile(filename: string, content: string) {
-  if (await existsFile(filename)) {
-    const oldContent = await Deno.readTextFile(filename);
-    if (oldContent === content) {
-      return;
-    }
-  }
-  await Deno.writeTextFile(filename, content);
 }
