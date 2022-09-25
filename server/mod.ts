@@ -241,10 +241,7 @@ export function serve(options: ServerOptions = {}) {
             headers.append("ETag", etag);
           }
           if (searchParams.get("v") || regFullVersion.test(pathname)) {
-            headers.append(
-              "Cache-Control",
-              "public, max-age=31536000, immutable",
-            );
+            headers.append("Cache-Control", "public, max-age=31536000, immutable");
           }
           const file = await Deno.open(filePath, { read: true });
           return new Response(file.readable, { headers });
@@ -267,7 +264,7 @@ export function serve(options: ServerOptions = {}) {
       () => routerConfig ? initRouter(routerConfig, appDir) : Promise.resolve(null),
     );
 
-    if (pathname === "/__aleph/get_static_paths") {
+    if (pathname === "/aleph.getStaticPaths") {
       if (router) {
         const pattern = searchParams.get("pattern");
         const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);
@@ -288,16 +285,16 @@ export function serve(options: ServerOptions = {}) {
     }
 
     if (router && router.routes.length > 0) {
-      const reqData = req.method === "GET" &&
+      const _data_ = req.method === "GET" &&
         (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       try {
-        const resp = await fetchRouteData(req, ctx, router, reqData);
+        const resp = await fetchRouteData(req, ctx, router, _data_);
         if (resp) {
           return resp;
         }
       } catch (err) {
         // javascript syntax error
-        if (err instanceof TypeError && !reqData) {
+        if (err instanceof TypeError && !_data_) {
           return new Response(generateErrorHtml(err.stack ?? err.message), {
             status: 500,
             headers: [["Content-Type", "text/html;"]],
@@ -307,12 +304,12 @@ export function serve(options: ServerOptions = {}) {
         // use the `onError` if available
         const res = onError?.(err, "route-data-fetch", req, ctx);
         if (res instanceof Response) {
-          return fixResponse(res, ctx.headers, reqData);
+          return fixResponse(res, ctx.headers, _data_);
         }
 
         // user throws a response
         if (err instanceof Response) {
-          return fixResponse(err, ctx.headers, reqData);
+          return fixResponse(err, ctx.headers, _data_);
         }
 
         // prints the error stack
@@ -386,8 +383,9 @@ export function serve(options: ServerOptions = {}) {
       } else {
         message = err?.toString?.() || String(err);
       }
-      const cc = ssr && typeof ssr !== "function" ? ssr.cacheControl : "public";
-      ctx.headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
+      if (!ctx.headers.has("Cache-Control")) {
+        ctx.headers.append("Cache-Control", "public, max-age=0, must-revalidate");
+      }
       ctx.headers.append("Content-Type", "text/html; charset=utf-8");
       return new Response(generateErrorHtml(message, "SSR"), {
         headers: ctx.headers,

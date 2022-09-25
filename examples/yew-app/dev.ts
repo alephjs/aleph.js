@@ -28,6 +28,7 @@ async function start() {
     await buildProc.status();
     buildProc.close();
     await Deno.remove(`${cwd}/pkg/.gitignore`);
+    // start aleph dev server
     dev({ baseUrl: import.meta.url });
   } finally {
     buildProc = null;

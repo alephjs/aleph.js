@@ -5,7 +5,7 @@ import { extname, fromFileUrl, globToRegExp, join, resolve } from "./deps.ts";
 import depGraph from "./graph.ts";
 import log from "./log.ts";
 import { builtinModuleExts, fixResponse, getAlephConfig, toResponse } from "./helpers.ts";
-import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp, RouterInit } from "./types.ts";
+import type { Context, Route, RouteMatch, RouteMeta, Router, RouteRegExp, RouterInit } from "./types.ts";
 
 /** import the route module. */
 export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
@@ -33,9 +33,9 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
 
 export async function fetchRouteData(
   req: Request,
-  ctx: Record<string, unknown>,
+  ctx: Context,
   router: Router,
-  reqData: boolean,
+  _data_: boolean,
 ): Promise<Response | void> {
   const { pathname, host } = new URL(req.url);
   if (router.routes.length > 0) {
@@ -69,7 +69,7 @@ export async function fetchRouteData(
       const [ret, meta] = matched;
       const mod = await importRouteModule(meta, router.appDir);
       const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
-      if (method !== "GET" || mod.default === undefined || reqData) {
+      if (method !== "GET" || mod.default === undefined || _data_) {
         Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
         const anyFetcher = dataConfig.any ?? dataConfig.ANY;
         if (typeof anyFetcher === "function") {
@@ -83,9 +83,9 @@ export async function fetchRouteData(
           const res = await fetcher(req, ctx);
           const headers = ctx.headers as unknown as Headers;
           // todo: set cache for "GET" with `cacheTtl` option
-          headers.set("cache-control", "no-cache, no-store, must-revalidate");
+          headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
           if (res instanceof Response) {
-            return fixResponse(res, headers, reqData);
+            return fixResponse(res, headers, _data_);
           }
           return toResponse(res, headers);
         }

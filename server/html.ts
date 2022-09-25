@@ -235,7 +235,9 @@ export async function createHtmlResponse(
     }
     headers.set("ETag", etag);
   }
-  headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  if (!headers.has("Cache-Control")) {
+    headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  }
   headers.set("Content-Type", "text/html; charset=utf-8");
   return new Response(content ?? await Deno.readFile(filepath), { headers });
 }

@@ -82,9 +82,9 @@ export class MockServer {
     }
 
     if (this.#router) {
-      const reqData = req.method === "GET" &&
+      const _data_ = req.method === "GET" &&
         (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
-      const res = await fetchRouteData(req, ctx, this.#router, reqData);
+      const res = await fetchRouteData(req, ctx, this.#router, _data_);
       if (res) {
         return res;
       }
