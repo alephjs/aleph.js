@@ -55,7 +55,7 @@ export async function optimize(
 
   // find route files by the `routes` config
   const routeFiles: string[] = [];
-  const ssgOptions = config.optimization?.ssg === true ? {} : config.optimization?.ssg ?? {};
+  const ssgOptions = options.ssg === true ? {} : options.ssg ?? false;
   const ssgPaths: string[] = [];
   if (config?.router) {
     const { routes } = await globalIt(
@@ -69,7 +69,7 @@ export async function optimize(
       for (const [_, { pattern }] of routes) {
         const { pathname } = pattern;
         if (pathname.includes("/:")) {
-          const url = new URL("/__aleph/get_static_paths", "http://localhost");
+          const url = new URL("http://localhost/aleph.getStaticPaths");
           url.searchParams.set("pattern", pathname);
           const res = await request(url);
           if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
