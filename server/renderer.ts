@@ -20,36 +20,35 @@ export type RenderOptions = {
 const runtimeScript = [
   `let e=fn=>new Error('module "'+fn+'" not found');`,
   `const getRouteModule=(fn)=>{`,
-  `if(map.has(fn)){`,
-  `let m=map.get(fn);`,
-  `if(m instanceof Promise) throw e(fn);`,
-  `return m;`,
-  `}`,
-  `throw e(fn);`,
+  `    if(map.has(fn)){`,
+  `    let m=map.get(fn);`,
+  `    if(m instanceof Promise) throw e(fn);`,
+  `    return m;`,
+  `  }`,
+  `  throw e(fn);`,
   `};`,
   `const importRouteModule=async(fn)=>{`,
-  `if(map.has(fn)){`,
-  `let m=map.get(fn);`,
-  `if(m instanceof Promise) {`,
-  `m=await m;`,
-  `map.set(fn,m);`,
-  `}`,
-  `return m;`,
-  `}`,
-  `let v=document.body.getAttribute("data-deployment-id");`,
-  `let m=import(fn.slice(1)+(v?"?v="+v:""));`,
-  `map.set(fn,m);`,
-  `return await m.then(m=>{map.set(fn,m);return m;});`,
+  `  if(map.has(fn)){`,
+  `    let m=map.get(fn);`,
+  `    if(m instanceof Promise){`,
+  `      m=await m;`,
+  `      map.set(fn,m);`,
+  `    }`,
+  `   return m;`,
+  `  }`,
+  `  let v=document.body.getAttribute("data-deployment-id");`,
+  `  let m=import(fn.slice(1)+(v?"?v="+v:""));`,
+  `  map.set(fn,m);`,
+  `  return await m.then(m=>{map.set(fn,m);return m;});`,
   `};`,
   `window.__aleph={getRouteModule,importRouteModule};`,
-].join("");
+].map((l) => l.trim()).join("");
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
     const { indexHtml, router, customHTMLRewriter, ssr, isDev } = options;
     const headers = new Headers(ctx.headers as Headers);
     const isFn = typeof ssr === "function";
-    const cc = !isFn ? ssr.cacheControl ?? "public" : "public";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;
     const [url, routing, deferedData] = await initSSR(req, ctx, router);
@@ -294,11 +293,8 @@ export default {
       },
     });
 
-    if (routing.every(({ dataCacheTtl: ttl }) => typeof ttl === "number" && !Number.isNaN(ttl) && ttl > 0) && !isDev) {
-      const ttls = routing.map(({ dataCacheTtl }) => Number(dataCacheTtl));
-      headers.append("Cache-Control", `${cc}, max-age=${Math.min(...ttls)}`);
-    } else {
-      headers.append("Cache-Control", `${cc}, max-age=0, must-revalidate`);
+    if (!headers.has("Cache-Control")) {
+      headers.append("Cache-Control", "public, max-age=0, must-revalidate");
     }
     headers.set("Content-Type", "text/html; charset=utf-8");
 
@@ -391,11 +387,11 @@ async function initSSR(
       } else {
         try {
           rmod.data = await fetchData();
-        } catch (error) {
-          if (error instanceof Error) {
-            rmod.data = error;
+        } catch (v) {
+          if (v instanceof Error) {
+            rmod.data = v;
           } else {
-            throw error;
+            throw v;
           }
         }
       }

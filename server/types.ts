@@ -162,9 +162,9 @@ export interface ModuleLoader {
 
 /** The optimization options for the server. */
 export type OptimizationOptions = {
-  /** The output directory, default is './out'. */
+  /** The output directory, default is "./out". */
   outputDir?: string;
-  /** The built target for esbuild, default is 'es2018'. */
+  /** The built target for esbuild, default is "es2018". */
   buildTarget?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
   /** The SSG options for the FS routing. */
   ssg?: boolean | SSGOptions;
@@ -202,12 +202,11 @@ export type SSRFn = {
  * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
  */
 export type CSP = {
-  getPolicy: (url: URL, nonce?: string) => string | null;
   nonce?: boolean;
+  getPolicy: (url: URL, nonce?: string) => string | null;
 };
 
 export type SSROptions = {
-  cacheControl?: "private" | "public";
   CSP?: CSP;
 };
 
