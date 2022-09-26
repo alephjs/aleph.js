@@ -1,10 +1,9 @@
 import { FetchError } from "../runtime/core/error.ts";
 import { matchRoutes } from "../runtime/core/route.ts";
-import { getFiles } from "../shared/fs.ts";
 import util from "../shared/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
-import { getAlephConfig, getDeploymentId, getUnoGenerator, regJsxFile } from "./helpers.ts";
+import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";
 import log from "./log.ts";
 import { importRouteModule } from "./routing.ts";
 import type { Element, HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContext, SuspenseMark } from "./types.ts";

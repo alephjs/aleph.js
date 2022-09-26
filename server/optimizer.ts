@@ -1,4 +1,3 @@
-import { existsDir, existsFile } from "../shared/fs.ts";
 import util from "../shared/util.ts";
 import type { TransformCSSOptions } from "./deps.ts";
 import {
@@ -16,6 +15,8 @@ import {
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
+  existsDir,
+  existsFile,
   fetchCode,
   getAlephPkgUri,
   globalIt,

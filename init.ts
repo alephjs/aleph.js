@@ -6,7 +6,6 @@ import { copy } from "https://deno.land/std@0.155.0/streams/conversion.ts";
 import { ensureDir } from "https://deno.land/std@0.155.0/fs/ensure_dir.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import { basename, join } from "https://deno.land/std@0.155.0/path/mod.ts";
-import { existsDir, existsFile, getFiles } from "./shared/fs.ts";
 
 const templates = [
   "react",
@@ -250,9 +249,11 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
     throw new Error(`Folder ${name} already exists as a file.`);
   }
   if (await existsDir(dir)) {
-    const files = await getFiles(dir);
-    return files.length === 0 ||
-      files.every((file) => [".DS_Store"].includes(file));
+    for await (const file of Deno.readDir(dir)) {
+      if (file.name !== ".DS_Store") {
+        return false;
+      }
+    }
   }
   return true;
 }
@@ -287,6 +288,32 @@ function toTitle(name: string) {
     return "React with MDX";
   }
   return name.at(0)?.toUpperCase() + name.slice(1);
+}
+
+/** Check whether or not the given path exists as a directory. */
+export async function existsDir(path: string): Promise<boolean> {
+  try {
+    const stat = await Deno.lstat(path);
+    return stat.isDirectory;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+/** Check whether or not the given path exists as regular file. */
+export async function existsFile(path: string): Promise<boolean> {
+  try {
+    const stat = await Deno.lstat(path);
+    return stat.isFile;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
+      return false;
+    }
+    throw err;
+  }
 }
 
 if (import.meta.main) {

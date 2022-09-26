@@ -1,11 +1,12 @@
 import { generateErrorHtml, TransformError } from "../runtime/core/error.ts";
-import { existsDir, existsFile } from "../shared/fs.ts";
 import util from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR, watch } from "./dev.ts";
 import { fromFileUrl, join, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
+  existsDir,
+  existsFile,
   fixResponse,
   getAlephPkgUri,
   getDeploymentId,
@@ -49,7 +50,7 @@ export function serve(options: ServerOptions = {}) {
   const isDev = Deno.args.includes("--dev");
 
   // inject aleph config to global
-  Reflect.set(globalThis, "__ALEPH_CONFIG", {
+  const config: AlephConfig = {
     baseUrl,
     loaders,
     middlewares,
@@ -58,7 +59,8 @@ export function serve(options: ServerOptions = {}) {
     session,
     ssr,
     unocss,
-  } as AlephConfig);
+  };
+  Reflect.set(globalThis, "__ALEPH_CONFIG", config);
 
   if (routerConfig && routerConfig.routes) {
     if (isDev) {
