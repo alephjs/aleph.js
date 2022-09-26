@@ -6,10 +6,7 @@ import { copy } from "https://deno.land/std@0.155.0/streams/conversion.ts";
 import { ensureDir } from "https://deno.land/std@0.155.0/fs/ensure_dir.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import { basename, join } from "https://deno.land/std@0.155.0/path/mod.ts";
-import util from "./shared/util.ts";
 import { existsDir, existsFile, getFiles } from "./shared/fs.ts";
-import log from "./server/log.ts";
-import { isCanary } from "./version.ts";
 
 const templates = [
   "react",
@@ -31,21 +28,26 @@ const versions = {
   solid: "1.5.5",
 };
 
-export default async function init(nameArg?: string, template?: string) {
-  if (template && !(templates.includes(template))) {
-    log.fatal(
-      `Invalid template name ${red(template)}, must be one of [${blue(templates.join(","))}]`,
-    );
-  }
+type Options = {
+  canary?: boolean;
+  template?: string;
+};
+
+export default async function init(nameArg?: string, options?: Options) {
+  let { template, canary } = options || {};
 
   // get and check the project name
-  const name = nameArg || (await ask("Project Name:") || "").trim();
-  if (name === "") {
-    await init(nameArg, template);
-    return;
+  const name = nameArg ?? await ask("Project Name:");
+  if (!name) {
+    console.error(`${red("!")} Please entry project name.`);
+    Deno.exit(1);
   }
-  if (!/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) {
-    log.fatal(`Invalid project name: ${red(name)}`);
+
+  if (template && !(templates.includes(template))) {
+    console.error(
+      `${red("!")} Invalid template name ${red(template)}, must be one of [${blue(templates.join(","))}]`,
+    );
+    Deno.exit(1);
   }
 
   // check the dir is clean
@@ -68,7 +70,8 @@ export default async function init(nameArg?: string, template?: string) {
     if (!isNaN(n) && n > 0 && n <= templates.length) {
       template = templates[n - 1];
     } else {
-      log.fatal(`Please entry ${cyan(`[1-${templates.length}]`)}`);
+      console.error(`${red("!")} Please entry ${cyan(`[1-${templates.length}]`)}.`);
+      Deno.exit(1);
     }
   }
 
@@ -77,7 +80,7 @@ export default async function init(nameArg?: string, template?: string) {
 
   // download template
   console.log(`Downloading template(${blue(template!)}), this might take a moment...`);
-  const pkgName = isCanary ? "aleph_canary" : "aleph";
+  const pkgName = canary ? "aleph_canary" : "aleph";
   const res = await fetch(
     `https://cdn.deno.land/${pkgName}/meta/versions.json`,
   );
@@ -86,7 +89,7 @@ export default async function init(nameArg?: string, template?: string) {
     Deno.exit(1);
   }
   const { latest: VERSION } = await res.json();
-  const repo = isCanary ? "ije/aleph-canary" : "alephjs/aleph.js";
+  const repo = canary ? "ije/aleph-canary" : "alephjs/aleph.js";
   const resp = await fetch(
     `https://codeload.github.com/${repo}/tar.gz/refs/tags/${VERSION}`,
   );
@@ -102,7 +105,7 @@ export default async function init(nameArg?: string, template?: string) {
   // write template files
   for await (const entry of entryList) {
     if (entry.fileName.startsWith(prefix) && !entry.fileName.endsWith("/README.md")) {
-      const fp = join(appDir, util.trimPrefix(entry.fileName, prefix));
+      const fp = join(appDir, trimPrefix(entry.fileName, prefix));
       if (entry.type === "directory") {
         await ensureDir(fp);
         continue;
@@ -150,7 +153,7 @@ export default async function init(nameArg?: string, template?: string) {
     });
   }
   switch (template) {
-    case "mdx-docs":
+    case "react-mdx":
       Object.assign(importMap.imports, {
         "aleph/react/mdx-loader": `${alephPkgUri}/runtime/react/mdx-loader.ts`,
       });
@@ -254,10 +257,10 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
   return true;
 }
 
-async function ask(question = ":", stdin = Deno.stdin, stdout = Deno.stdout) {
-  await stdout.write(new TextEncoder().encode(cyan("? ") + question + " "));
+async function ask(question = ":") {
+  await Deno.stdout.write(new TextEncoder().encode(cyan("? ") + question + " "));
   const buf = new Uint8Array(1024);
-  const n = <number> await stdin.read(buf);
+  const n = <number> await Deno.stdin.read(buf);
   const answer = new TextDecoder().decode(buf.subarray(0, n));
   return answer.trim();
 }
@@ -265,8 +268,15 @@ async function ask(question = ":", stdin = Deno.stdin, stdout = Deno.stdout) {
 async function confirm(question = "are you sure?") {
   let a: string;
   // deno-lint-ignore no-empty
-  while (!/^(y|n|)$/i.test(a = (await ask(question + dim(" [y/N]"))).trim())) {}
+  while (!/^(y|n|)$/i.test(a = await ask(question + dim(" [y/N]")))) {}
   return a.toLowerCase() === "y";
+}
+
+function trimPrefix(s: string, prefix: string): string {
+  if (prefix !== "" && s.startsWith(prefix)) {
+    return s.slice(prefix.length);
+  }
+  return s;
 }
 
 function toTitle(name: string) {
@@ -281,5 +291,5 @@ function toTitle(name: string) {
 
 if (import.meta.main) {
   const { _: args, ...options } = parse(Deno.args);
-  await init(args[0], options?.template);
+  await init(args[0], options);
 }
