@@ -1,13 +1,12 @@
 import { dim, green, red, yellow } from "https://deno.land/std@0.155.0/fmt/colors.ts";
 
-export type LevelName = "debug" | "info" | "warn" | "error" | "fatal";
+export type LevelName = "debug" | "info" | "warn" | "error";
 
 export enum Level {
   Debug = 0,
   Info = 1,
   Warn = 2,
   Error = 3,
-  Fatal = 4,
 }
 
 export class Logger {
@@ -30,9 +29,6 @@ export class Logger {
         break;
       case "error":
         this.#level = Level.Error;
-        break;
-      case "fatal":
-        this.#level = Level.Fatal;
         break;
     }
   }
@@ -61,11 +57,9 @@ export class Logger {
     }
   }
 
-  fatal(...args: unknown[]): void {
-    if (this.#level <= Level.Fatal) {
-      console.error(red("FATAL"), ...args);
-      Deno.exit(1);
-    }
+  fatal(...args: unknown[]): never {
+    console.error(red("FATAL"), ...args);
+    return Deno.exit(1);
   }
 }
 
