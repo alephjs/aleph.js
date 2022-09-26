@@ -409,9 +409,7 @@ export function serve(options: ServerOptions = {}) {
   const { hostname = "localhost", certFile, keyFile, signal } = options;
   const useTls = certFile && keyFile;
   if (isDev) {
-    Deno.env.set("ALEPH_SERVER_TLS", useTls ? "true" : "");
-    Deno.env.set("ALEPH_SERVER_HOST", hostname);
-    Deno.env.set("ALEPH_SERVER_PORT", port.toString());
+    Deno.env.set("ALEPH_SERVER_ORIGIN", `${useTls ? "https" : "http"}://${hostname}:${port}`);
     watch(appDir);
   }
 
