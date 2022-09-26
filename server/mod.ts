@@ -38,19 +38,18 @@ import type {
 export type ServerOptions = Omit<ServeInit, "onError"> & {
   certFile?: string;
   keyFile?: string;
-  logLevel?: LevelName;
   onError?: ErrorHandler;
 } & AlephConfig;
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
   const { baseUrl, loaders, middlewares, onError, optimization, router: routerConfig, session, ssr, unocss } = options;
-  const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : undefined;
+  const appDir = baseUrl ? fromFileUrl(new URL(".", baseUrl)) : undefined;
   const optimizeMode = Deno.args.includes("--optimize") || Deno.args.includes("-O");
   const isDev = Deno.args.includes("--dev");
 
   // inject aleph config to global
-  const config: AlephConfig = {
+  Reflect.set(globalThis, "__ALEPH_CONFIG", {
     baseUrl,
     loaders,
     middlewares,
@@ -59,8 +58,7 @@ export function serve(options: ServerOptions = {}) {
     session,
     ssr,
     unocss,
-  };
-  Reflect.set(globalThis, "__ALEPH_CONFIG", config);
+  } as AlephConfig);
 
   if (routerConfig && routerConfig.routes) {
     if (isDev) {
@@ -73,12 +71,9 @@ export function serve(options: ServerOptions = {}) {
     }
   }
 
-  // set the log level
+  // set log level to debug when debug aleph.js itself.
   if (import.meta.url.startsWith("file:")) {
-    // set log level to debug when debug aleph.js itself.
     log.setLevel("debug");
-  } else if (options.logLevel) {
-    log.setLevel(options.logLevel);
   }
 
   // server handler
@@ -104,7 +99,7 @@ export function serve(options: ServerOptions = {}) {
     const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
     const ctx = createContext(req, { connInfo, customHTMLRewriter, session });
 
-    // use eager middlewares
+    // use middlewares
     if (Array.isArray(middlewares)) {
       for (let i = 0, l = middlewares.length; i < l; i++) {
         const mw = middlewares[i];
@@ -136,6 +131,7 @@ export function serve(options: ServerOptions = {}) {
       }
     }
 
+    // check if the "out" directory exists
     const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
       if (!isDev && !optimizeMode) {
         const outDir = join(appDir ?? Deno.cwd(), optimization?.outputDir ?? "./output");
@@ -428,26 +424,26 @@ export function serve(options: ServerOptions = {}) {
   }
 }
 
+export function setLogLeavel(level: LevelName) {
+  log.setLevel(level);
+}
+
 // inject the `__aleph` global variable
-Reflect.set(
-  globalIt,
-  "__aleph",
-  {
-    getRouteModule: () => {
-      throw new Error("only available in client-side");
-    },
-    importRouteModule: async (filename: string) => {
-      let router: Router | Promise<Router> | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
-      if (router) {
-        if (router instanceof Promise) {
-          router = await router;
-        }
-        const route = router.routes.find(([, meta]) => meta.filename === filename);
-        if (route) {
-          return importRouteModule(route[1]);
-        }
-      }
-      return importRouteModule({ filename, pattern: { pathname: "" } });
-    },
+Reflect.set(globalIt, "__aleph", {
+  getRouteModule: () => {
+    throw new Error("only available in client-side");
   },
-);
+  importRouteModule: async (filename: string) => {
+    let router: Router | Promise<Router> | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
+    if (router) {
+      if (router instanceof Promise) {
+        router = await router;
+      }
+      const route = router.routes.find(([, meta]) => meta.filename === filename);
+      if (route) {
+        return importRouteModule(route[1]);
+      }
+    }
+    return importRouteModule({ filename, pattern: { pathname: "" } });
+  },
+});
