@@ -18,7 +18,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   const version = depGraph.get(filename)?.version;
   const proto = Deno.env.get("ALEPH_SERVER_TLS") ? "https" : "http";
   const hostname = Deno.env.get("ALEPH_SERVER_HOST") ?? "localhost";
-  const devPort = Deno.env.get("ALEPH_SERVER_PORT") ?? 3000;
+  const devPort = Deno.env.get("ALEPH_SERVER_PORT");
   let url: string;
   if (devPort) {
     url = `${proto}://${hostname}:${devPort}${filename.slice(1)}?ssr&v=${
