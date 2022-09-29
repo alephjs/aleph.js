@@ -318,5 +318,5 @@ export async function existsFile(path: string): Promise<boolean> {
 
 if (import.meta.main) {
   const { _: args, ...options } = parse(Deno.args);
-  await init(args[0], options);
+  await init(args[0] as string | undefined, options);
 }
