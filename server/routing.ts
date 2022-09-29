@@ -91,8 +91,8 @@ export async function fetchRouteData(
 }
 
 /** initialize router from routes config */
-export async function initRouter(options: RouterInit, appDir?: string): Promise<Router> {
-  const reg = toRouteRegExp(options);
+export async function initRouter(init: RouterInit = {}, appDir?: string): Promise<Router> {
+  const reg = toRouteRegExp(init);
   const files = await getFiles(appDir ?? Deno.cwd());
   const routes: Route[] = [];
   let _app: Route | undefined = undefined;
@@ -153,7 +153,7 @@ export function isRouteModule(filename: string): boolean {
 }
 
 /** convert route config to `RouteRegExp` */
-export function toRouteRegExp(init: RouterInit): RouteRegExp {
+export function toRouteRegExp(init: RouterInit = {}): RouteRegExp {
   const glob = util.isFilledString(init.glob)
     ? init.glob
     : `.${util.cleanPath(init.dir ?? "routes")}/**/*.{${

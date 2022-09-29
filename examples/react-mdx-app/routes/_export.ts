@@ -1,4 +1,4 @@
-// Imports route modules for serverless env that doesn't support the dynamic import.
+// Re-imports route modules for serverless env that doesn't support the dynamic import.
 // This module will be updated automaticlly in develoment mode, do NOT edit it manually.
 // deno-fmt-ignore-file
 // deno-lint-ignore-file

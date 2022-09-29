@@ -1,5 +1,5 @@
 import util from "../shared/util.ts";
-import { BuildResult, dim, dirname, Emitter, ensureDir, parseDeps } from "./deps.ts";
+import { blue, BuildResult, dim, dirname, Emitter, ensureDir, parseDeps } from "./deps.ts";
 import { esbuild, fromFileUrl, join, mitt, relative } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
 import { builtinModuleExts, findFile, getAlephConfig, getImportMap, getJSXConfig, watchFs } from "./helpers.ts";
@@ -29,35 +29,28 @@ export function removeWatchFsEmitter(e: Emitter<WatchFsEvents>) {
 }
 
 /** Watch for file changes and listen the dev server. */
-export function watch(appDir = Deno.cwd()) {
+export function watch(generate: boolean, appDir = Deno.cwd()) {
   const config = getAlephConfig();
   const emitter = createWatchFsEmitter();
 
   emitter.on("*", async (kind, { specifier }) => {
-    if (config?.router) {
-      if (kind === "create" || kind === "remove") {
-        // reload router when fs changess
-        const reg = toRouteRegExp(config.router);
-        if (reg.test(specifier)) {
-          const router = await initRouter(config.router, appDir);
-          Reflect.set(globalThis, "__ALEPH_ROUTER", router);
-          if (config.ssr) {
-            generateExportTs(appDir, router, config.loaders).catch((err) => log.error(err));
-          }
+    if (kind === "create" || kind === "remove") {
+      // reload router when fs changess
+      const reg = toRouteRegExp(config?.router);
+      if (reg.test(specifier)) {
+        const router = await initRouter(config?.router, appDir);
+        Reflect.set(globalThis, "__ALEPH_ROUTER", router);
+        if (generate) {
+          generateExportTs(appDir, router, config?.loaders).catch((err) => log.error(err));
         }
       }
-    } else {
-      Reflect.set(globalThis, "__ALEPH_ROUTER", null);
     }
   });
-
-  if (config?.router) {
-    initRouter(config.router, appDir).then((router) => {
+  if (generate) {
+    initRouter(config?.router, appDir).then((router) => {
       Reflect.set(globalThis, "__ALEPH_ROUTER", router);
-      generateExportTs(appDir, router, config.loaders).catch((err) => log.error(err));
+      generateExportTs(appDir, router, config?.loaders).catch((err) => log.error(err));
     });
-  } else {
-    Reflect.set(globalThis, "__ALEPH_ROUTER", null);
   }
 
   watchFs(appDir, (kind: "create" | "remove" | "modify", path: string) => {
@@ -94,7 +87,10 @@ export function watch(appDir = Deno.cwd()) {
 
 export type DevOptions = {
   baseUrl?: string;
+  /** The server entry, default is `server.{ts,tsx,js,jsx}` */
   serverEntry?: string;
+  /** Whether to generate the `./routes/_export.ts` module for serverless env that doesn't support dynamic import. */
+  generateExportTs?: boolean;
 };
 
 let devProcess: Deno.Process | null = null;
@@ -130,7 +126,7 @@ export default async function dev(options?: DevOptions) {
 
     if (!watched) {
       log.info("[dev] Watching for file changes...");
-      watch(appDir);
+      watch(false, appDir);
       watched = true;
     }
 
@@ -142,12 +138,17 @@ export default async function dev(options?: DevOptions) {
           deps.some((dep) => !dep.specifier.endsWith("/_export.ts") && dep.specifier === specifier)
         )
       ) {
+        // restart the dev server
         dev(options);
       }
     });
 
     const cmd = [Deno.execPath(), "run", "-A", "-q", serverEntry, "--dev"];
+    if (options?.generateExportTs) {
+      cmd.push("--generate");
+    }
     if (devProcess) {
+      console.clear();
       console.debug(dim("[dev] Restarting the server..."));
     }
     devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
@@ -229,7 +230,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
   }
 
   const comments = [
-    "// Imports route modules for serverless env that doesn't support the dynamic import.",
+    "// Re-imports route modules for serverless env that doesn't support the dynamic import.",
     "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
   ];
   const imports: string[] = [];
@@ -273,6 +274,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
               `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
             ),
           );
+          log.debug(`${blue("_export.ts")} updated ${dim(util.prettyBytes(file.text.length))}`);
         }
       }));
     };
@@ -360,7 +362,6 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
               return;
             }
             write(result!);
-            log.debug("rebuild _export.ts");
           },
         },
       });
@@ -382,5 +383,6 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
       empty,
     ].join("\n");
     await Deno.writeTextFile(genFile, code);
+    log.debug(`${blue("_export.ts")} updated`);
   }
 }
