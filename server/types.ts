@@ -18,8 +18,8 @@ export type AlephConfig = {
   session?: SessionOptions;
   /** The options for SSR. */
   ssr?: SSR;
-  /** The options for optimization. */
-  optimization?: OptimizationOptions;
+  /** The options for build. */
+  build?: BuildOptions;
   /** The config for UnoCSS. */
   unocss?: UnoConfig;
 };
@@ -161,7 +161,7 @@ export interface ModuleLoader {
 }
 
 /** The optimization options for the server. */
-export type OptimizationOptions = {
+export type BuildOptions = {
   /** The output directory, default is "./out". */
   outputDir?: string;
   /** The built target for esbuild, default is "es2018". */

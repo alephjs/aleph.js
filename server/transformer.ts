@@ -19,7 +19,7 @@ import {
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import { isRouteModule } from "./routing.ts";
-import { bundleCSS } from "./optimizer.ts";
+import { bundleCSS } from "./build.ts";
 import type { ImportMap, JSXConfig, ModuleLoader, ModuleLoaderOutput } from "./types.ts";
 
 const cache = new Map<string, [content: string, headers: Headers]>();

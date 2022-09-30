@@ -24,7 +24,7 @@ import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, importRouteModule, initRouter } from "./routing.ts";
 import transformer from "./transformer.ts";
-import { optimize } from "./optimizer.ts";
+import { build } from "./build.ts";
 import type {
   AlephConfig,
   ConnInfo,
@@ -44,9 +44,10 @@ export type ServerOptions = Omit<ServeInit, "onError"> & {
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const { baseUrl, loaders, middlewares, onError, optimization, router: routerConfig, session, ssr, unocss } = options;
+  const { baseUrl, loaders, middlewares, onError, build: buildOptions, router: routerConfig, session, ssr, unocss } =
+    options;
   const appDir = baseUrl ? fromFileUrl(new URL(".", baseUrl)) : undefined;
-  const optimizeMode = Deno.args.includes("--optimize") || Deno.args.includes("-O");
+  const buildMode = Deno.args.includes("--build") || Deno.args.includes("-O");
   const isDev = Deno.args.includes("--dev");
 
   // inject aleph config to global
@@ -54,7 +55,7 @@ export function serve(options: ServerOptions = {}) {
     baseUrl,
     loaders,
     middlewares,
-    optimization,
+    build: buildOptions,
     router: routerConfig,
     session,
     ssr,
@@ -135,8 +136,8 @@ export function serve(options: ServerOptions = {}) {
 
     // check if the "out" directory exists
     const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
-      if (!isDev && !optimizeMode) {
-        const outDir = join(appDir ?? Deno.cwd(), optimization?.outputDir ?? "./output");
+      if (!isDev && !buildMode) {
+        const outDir = join(appDir ?? Deno.cwd(), buildOptions?.outputDir ?? "./output");
         if (await existsDir(outDir)) {
           return outDir;
         }
@@ -152,7 +153,7 @@ export function serve(options: ServerOptions = {}) {
       )
     ) {
       // check the optimized output
-      if (!isDev && !optimizeMode && outDir) {
+      if (!isDev && !buildMode && outDir) {
         let outFile = join(outDir, pathname);
         if (pathname.startsWith("/-/") && isNpmPkg(restoreUrl(pathname))) {
           outFile += ".js";
@@ -354,7 +355,7 @@ export function serve(options: ServerOptions = {}) {
     }
 
     // check SSG output
-    if (!isDev && !optimizeMode && outDir) {
+    if (!isDev && !buildMode && outDir) {
       const htmlFile = join(outDir, pathname === "/" ? "index.html" : pathname + ".html");
       if (await existsFile(htmlFile)) {
         return createHtmlResponse(req, ctx.headers, htmlFile);
@@ -392,8 +393,8 @@ export function serve(options: ServerOptions = {}) {
   };
 
   // optimize the application for production
-  if (optimizeMode) {
-    optimize(handler, config, appDir);
+  if (buildMode) {
+    build(handler, config, appDir);
     return;
   }
 

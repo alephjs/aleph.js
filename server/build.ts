@@ -29,14 +29,14 @@ import log from "./log.ts";
 import { initRouter } from "./routing.ts";
 import type { AlephConfig, ConnInfo } from "./types.ts";
 
-export async function optimize(
+export async function build(
   serverHandler: (req: Request, connInfo: ConnInfo) => Promise<Response>,
   config: AlephConfig,
   appDir?: string,
 ) {
   const start = performance.now();
   const alephPkgUri = getAlephPkgUri();
-  const options = config?.optimization ?? {};
+  const options = config?.build ?? {};
   const target = options.buildTarget ?? "es2018";
   const outputDir = join(appDir ?? Deno.cwd(), options.outputDir ?? "./output");
 
