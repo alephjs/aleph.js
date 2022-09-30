@@ -111,7 +111,7 @@ export default {
         if (!cacheHit) {
           const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
           const files = await getFiles(dir);
-          const outputDir = "." + util.cleanPath(config.optimization?.outputDir ?? "./output");
+          const outputDir = "." + util.cleanPath(config.build?.outputDir ?? "./output");
           const inputSources = await Promise.all(
             files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
               Deno.readTextFile(join(dir, name))
