@@ -74,6 +74,9 @@ export default async function init(nameArg?: string, options?: Options) {
     }
   }
 
+  const generateExportTs = await confirm(
+    "Generate `_export.ts` module for serverless env that doesn't support dynamic import?",
+  );
   const withUnocss = ["react", "yew"].includes(template!) && await confirm("Using Unocss(TailwindCSS)?");
   const withVscode = await confirm("Initialize VS Code workspace configuration?");
 
@@ -114,6 +117,26 @@ export default async function init(nameArg?: string, options?: Options) {
     }
   }
 
+  let serverCode = await Deno.readTextFile(join(appDir, "server.ts"));
+  if (!generateExportTs) {
+    const importExpr = `import routes from "./routes/_export.ts";\n`;
+    if (serverCode.includes(importExpr)) {
+      serverCode = serverCode
+        .replace(importExpr, "")
+        .replace("  router: { routes },\n", "")
+        .replace("    routes,\n  },", "  },");
+      await Deno.writeTextFile(
+        join(appDir, "dev.ts"),
+        [`import dev from "aleph/dev";`, "dev();"].join("\n\n"),
+      );
+      await Deno.remove(join(appDir, "routes/_export.ts"));
+    }
+  }
+  await Deno.writeTextFile(
+    join(appDir, "server.ts"),
+    serverCode.replace("  baseUrl: import.meta.url,\n", ""),
+  );
+
   const alephPkgUri = `https://deno.land/x/${pkgName}@${VERSION}`;
   const denoConfig = {
     "compilerOptions": {
@@ -132,7 +155,7 @@ export default async function init(nameArg?: string, options?: Options) {
     "tasks": {
       "dev": "deno run -A dev.ts",
       "start": "deno run -A server.ts",
-      "opt": "deno run -A server.ts --optimize",
+      "build": "deno run -A server.ts --build",
     },
   };
   const importMap = {
@@ -231,10 +254,11 @@ export default async function init(nameArg?: string, options?: Options) {
   console.log([
     "",
     green("Aleph.js is ready to go!"),
+    "",
     `${dim("$")} cd ${name}`,
     `${dim("$")} deno task dev    ${dim("# Start the server in `development` mode")}`,
     `${dim("$")} deno task start  ${dim("# Start the server in `production` mode")}`,
-    `${dim("$")} deno task opt    ${dim("# Optimize the application (bundling, ssg, etc.)")}`,
+    `${dim("$")} deno task build  ${dim("# Build & Optimize the app (bundling, SSG, etc.)")}`,
     "",
     `Docs: ${cyan("https://alephjs.org/docs")}`,
     `Bugs: ${cyan("https://github.com/alephjs/aleph.js/issues")}`,
