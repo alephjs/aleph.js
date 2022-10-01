@@ -75,13 +75,13 @@ export default async function init(nameArg?: string, options?: Options) {
   }
 
   const generateExportTs = await confirm(
-    "Generate `_export.ts` module for serverless env that doesn't support dynamic import?",
+    "Generate `_export.ts` module for runtime that doesn't support dynamic import (deploy to Deno Deploy)?",
   );
   const withUnocss = ["react", "yew"].includes(template!) && await confirm("Using Unocss(TailwindCSS)?");
   const withVscode = await confirm("Initialize VS Code workspace configuration?");
 
   // download template
-  console.log(`Downloading template(${blue(template!)}), this might take a moment...`);
+  console.log(`${dim("↓")} Downloading template(${blue(template!)}), this might take a moment...`);
   const pkgName = canary ? "aleph_canary" : "aleph";
   const res = await fetch(
     `https://cdn.deno.land/${pkgName}/meta/versions.json`,
@@ -254,7 +254,7 @@ export default async function init(nameArg?: string, options?: Options) {
 
   console.log([
     "",
-    green("Aleph.js is ready to go!"),
+    green("▲ Aleph.js is ready to go!"),
     "",
     `${dim("$")} cd ${name}`,
     `${dim("$")} deno task dev    ${dim("# Start the server in `development` mode")}`,
