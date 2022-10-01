@@ -1,8 +1,8 @@
 {
   "imports": {
     "std/": "https://deno.land/std@0.155.0/",
-    "@unocss/core": "https://esm.sh/@unocss/core@0.45.14",
-    "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.45.14",
+    "@unocss/core": "https://esm.sh/@unocss/core@0.45.26",
+    "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.45.26",
     "aleph/": "./",
     "aleph/server": "./server/mod.ts",
     "aleph/dev": "./server/dev.ts",

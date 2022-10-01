@@ -140,7 +140,7 @@ export async function build(
 
   // add unocss reset css
   if (config.unocss) {
-    queue.push(`https://esm.sh/@unocss/reset@0.45.14/${config.unocss.resetCSS ?? "tailwind"}.css`);
+    queue.push(`https://esm.sh/@unocss/reset@0.45.26/${config.unocss.resetCSS ?? "tailwind"}.css`);
   }
 
   const entryModules = new Map(queue.map((task) => [task, 0]));
