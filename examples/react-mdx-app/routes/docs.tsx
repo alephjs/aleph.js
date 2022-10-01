@@ -1,5 +1,7 @@
 import { PropsWithChildren } from "react";
+import { MDXProvider } from "@mdx-js/react";
 import { Head, NavLink } from "aleph/react";
+import { components } from "../components/Heading.tsx";
 
 const nav = [
   ["About", "/docs"],
@@ -28,7 +30,9 @@ export default function Docs(props: PropsWithChildren) {
           </nav>
         </aside>
         <div className="markdown-body">
-          {props.children}
+          <MDXProvider components={components}>
+            {props.children}
+          </MDXProvider>
         </div>
       </div>
     </>

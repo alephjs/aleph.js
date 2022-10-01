@@ -175,7 +175,7 @@ header a:hover {
   margin: 0 auto;
   padding: 48px 0;
   display: flex;
-  gap: 60px;
+  gap: 30px;
 }
 
 .docs > aside {

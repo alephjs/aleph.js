@@ -5,6 +5,7 @@
 .markdown-body {
   overflow: hidden;
   color: #333;
+  padding-left: 30px;
 
   & a {
     color: var(--theme-color);
@@ -30,6 +31,25 @@
     line-height: 1.2;
     font-weight: 500;
     color: #111;
+    position: relative;
+
+    & .anchor {
+      position: absolute;
+      left: -24px;
+      top: 0.1em;
+      padding-right: 24px;
+      display: none;
+      font-size: 80%;
+      color: #999;
+
+      &:hover {
+        color: #333;
+      }
+    }
+    &:hover .anchor {
+      display: inline-block;
+      text-decoration: none;
+    }
   }
 
   & h1 {
@@ -57,7 +77,7 @@
     font-size: 1.27rem;
   }
 
-  & > p {
+  &>p {
     margin-top: 1.2rem;
     line-height: 1.5;
   }
@@ -80,10 +100,12 @@
     list-style: decimal inside;
   }
 
-  & ul, & ol {
-    & li + li {
+  & ul,
+  & ol {
+    & li+li {
       margin-top: 0.5rem;
     }
+
     & li p {
       display: inline;
     }
