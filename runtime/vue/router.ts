@@ -1,7 +1,7 @@
 import type { Component, Ref, ShallowRef } from "vue";
 import { createSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
-import type { Route, RouteMeta, RouteModule, Router } from "../core/route.ts";
-import { matchRoutes } from "../core/route.ts";
+import type { Route, RouteMeta, RouteModule, Router } from "../core/routes.ts";
+import { matchRoutes } from "../core/routes.ts";
 import events from "../core/events.ts";
 import { FetchError } from "../core/error.ts";
 import { URLPatternCompat } from "../core/url_pattern.ts";
