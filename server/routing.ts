@@ -14,11 +14,11 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
     return routes[pattern.pathname];
   }
 
-  const origin = Deno.env.get("ALEPH_SERVER_ORIGIN");
   const version = depGraph.get(filename)?.version;
   let url: string;
-  if (origin) {
-    url = `${origin}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
+  const devOrigin = Deno.env.get("ALEPH_DEV_SERVER_ORIGIN");
+  if (devOrigin) {
+    url = `${devOrigin}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
   } else {
     const root = appDir ? resolve(appDir) : (config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
     url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;

@@ -40,6 +40,7 @@ export type RouteRegExp = {
 export type RouteMatch = [ret: URLPatternResult, route: RouteMeta];
 
 /** match routes against the given url */
+// todo: support basePath
 export function matchRoutes(url: URL, router: Router): RouteMatch[] {
   const { routes, _app, _404 } = router;
   let { pathname } = url;

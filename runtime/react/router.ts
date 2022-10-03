@@ -3,8 +3,8 @@ import { createElement, isValidElement, StrictMode, Suspense, useContext, useEff
 import events from "../core/events.ts";
 import { FetchError } from "../core/error.ts";
 import { redirect } from "../core/redirect.ts";
-import type { Route, RouteMeta, RouteModule, Router as IRouter } from "../core/route.ts";
-import { matchRoutes } from "../core/route.ts";
+import type { Route, RouteMeta, RouteModule, Router as IRouter } from "../core/routes.ts";
+import { matchRoutes } from "../core/routes.ts";
 import { URLPatternCompat, URLPatternInput } from "../core/url_pattern.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";

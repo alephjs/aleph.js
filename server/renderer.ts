@@ -1,5 +1,5 @@
 import { FetchError } from "../runtime/core/error.ts";
-import { matchRoutes } from "../runtime/core/route.ts";
+import { matchRoutes } from "../runtime/core/routes.ts";
 import util from "../shared/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
@@ -107,7 +107,7 @@ export default {
           resetCSS = "tailwind",
         } = config.unocss;
         let css = Reflect.get(globalThis, "__ALEPH_UNOCSS_BUILD");
-        const cacheHit = !!css;
+        const cacheHit = Boolean(css);
         if (!cacheHit) {
           const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
           const files = await getFiles(dir);

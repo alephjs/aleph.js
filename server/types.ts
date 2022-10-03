@@ -1,8 +1,8 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.155.0/http/server.ts";
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.4/types.d.ts";
 import type { UserConfig } from "https://esm.sh/@unocss/core@0.45.26";
-import type { RouteModule } from "../runtime/core/route.ts";
-export type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../runtime/core/route.ts";
+import type { RouteModule } from "../runtime/core/routes.ts";
+export type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../runtime/core/routes.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
 
 export type AlephConfig = {
@@ -26,9 +26,11 @@ export type AlephConfig = {
 
 /** The router options for the file-system based routing. */
 export interface RouterInit {
+  /** The base url of the router. Dafault is `/` */
+  basePath?: string;
   /** The glob to match routes.  */
   glob?: string;
-  /** The directory of the FS routing. Default is './routes' */
+  /** The directory of the FS routing. Default is `./routes` */
   dir?: string;
   /** The extnames to match routes. */
   exts?: string[];
