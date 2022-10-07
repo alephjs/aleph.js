@@ -61,7 +61,7 @@ export default {
   splitBy(s: string, searchString: string, fromLast = false): [prefix: string, suffix: string] {
     const i = fromLast ? s.lastIndexOf(searchString) : s.indexOf(searchString);
     if (i >= 0) {
-      return [s.slice(0, i), s.slice(i + 1)];
+      return [s.slice(0, i), s.slice(i + searchString.length)];
     }
     return [s, ""];
   },
