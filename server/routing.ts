@@ -15,10 +15,11 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   }
 
   const version = depGraph.get(filename)?.version;
+  const origin = Deno.env.get("ALEPH_SERVER_ORIGIN");
+
   let url: string;
-  const devOrigin = Deno.env.get("ALEPH_DEV_SERVER_ORIGIN");
-  if (devOrigin) {
-    url = `${devOrigin}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
+  if (origin) {
+    url = `${origin}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
   } else {
     const root = appDir ? resolve(appDir) : (config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
     url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
@@ -139,7 +140,7 @@ export async function initRouter(init: RouterInit = {}, appDir?: string): Promis
 
 /* check if the filename is a route */
 export function isRouteModule(filename: string): boolean {
-  const router: Router | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
+  const router: Router | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
   const index = router?.routes?.findIndex(([_, meta]) => meta.filename === filename);
   if (index !== undefined && index !== -1) {
     return true;

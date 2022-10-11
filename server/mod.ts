@@ -258,10 +258,7 @@ export function serve(options: ServerOptions = {}) {
     }
 
     // request route api
-    const router: Router | null = await globalIt(
-      "__ALEPH_ROUTER",
-      () => routerConfig ? initRouter(routerConfig, appDir) : Promise.resolve(null),
-    );
+    const router: Router | null = await globalIt("__ALEPH_ROUTER", () => initRouter(routerConfig, appDir));
 
     if (pathname === "/aleph.getStaticPaths") {
       if (router) {
@@ -398,6 +395,9 @@ export function serve(options: ServerOptions = {}) {
     return;
   }
 
+  const { hostname = "localhost", certFile, keyFile, signal } = options;
+  const tls = certFile && keyFile;
+
   let port = options.port ?? 3000;
   if (!options.port) {
     const m = Deno.args.join(" ").match(/(--port|-P)(\s+|=)(\d+)/);
@@ -405,22 +405,20 @@ export function serve(options: ServerOptions = {}) {
       port = parseInt(m[3]);
     }
   }
-  const { hostname = "localhost", certFile, keyFile, signal } = options;
-  const useTls = certFile && keyFile;
+  Deno.env.set("ALEPH_SERVER_ORIGIN", `${tls ? "https" : "http"}://${hostname}:${port}`);
+
+  // watch file changes in development mode
   if (isDev) {
-    Deno.env.set("ALEPH_DEV_SERVER_ORIGIN", `${useTls ? "https" : "http"}://${hostname}:${port}`);
     watch(Deno.args.includes("--generate"), appDir);
   }
 
   const onListen = (arg: { port: number; hostname: string }) => {
     if (!getDeploymentId()) {
-      log.info(
-        `Server ready on ${useTls ? "https" : "http"}://${hostname}:${port}`,
-      );
+      log.info(`Server ready on ${tls ? "https" : "http"}://${hostname}:${port}`);
     }
     options.onListen?.(arg);
   };
-  if (useTls) {
+  if (tls) {
     serveTls(handler, { hostname, port, certFile, keyFile, signal, onListen });
   } else {
     stdServe(handler, { hostname, port, signal, onListen });
@@ -437,7 +435,7 @@ Reflect.set(globalIt, "__aleph", {
     throw new Error("only available in client-side");
   },
   importRouteModule: async (filename: string) => {
-    let router: Router | Promise<Router> | null | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
+    let router: Router | Promise<Router> | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
     if (router) {
       if (router instanceof Promise) {
         router = await router;
