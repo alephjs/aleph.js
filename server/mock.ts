@@ -1,15 +1,16 @@
 import { createContext } from "./context.ts";
 import { join } from "./deps.ts";
-import { loadIndexHtml } from "./html.ts";
+import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, initRouter } from "./routing.ts";
-import type { HTMLRewriterHandlers, Middleware, Router, RouterInit, SSR } from "./types.ts";
+import type { Middleware, Router, RouterInit, SessionOptions, SSR } from "./types.ts";
 
 type MockServerOptions = {
   router?: RouterInit;
   appDir?: string;
   origin?: string;
   middlewares?: Middleware[];
+  session?: SessionOptions;
   ssr?: SSR;
 };
 
@@ -41,36 +42,29 @@ export class MockServer {
     this.#indexHtml = null;
   }
 
-  async fetch(input: string, init?: RequestInit) {
-    const { middlewares, ssr, origin, router, appDir } = this.#options;
+  fetch(input: string, init?: RequestInit) {
+    const { middlewares, origin } = this.#options;
     const url = new URL(input, origin ?? "http://localhost/");
     const req = new Request(url.href, init);
-    const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
-    const ctx = createContext(req, { customHTMLRewriter });
-
-    // use middlewares
-    if (middlewares) {
-      for (let i = 0, l = middlewares.length; i < l; i++) {
+    const next = (i: number): Promise<Response> | Response => {
+      if (Array.isArray(middlewares) && i < middlewares.length) {
         const mw = middlewares[i];
-        const handler = mw.fetch;
-        if (typeof handler === "function") {
-          try {
-            let res = handler(req, ctx);
-            if (res instanceof Promise) {
-              res = await res;
-            }
-            if (res instanceof Response) {
-              return res;
-            }
-            if (typeof res === "function") {
-              setTimeout(res, 0);
-            }
-          } catch (err) {
-            throw new Error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
-          }
+        const ctx = createContext(req, next.bind(null, i + 1), { session: this.#options.session });
+        try {
+          return mw.fetch(req, ctx);
+        } catch (err) {
+          throw new Error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
         }
       }
-    }
+      const ctx = createContext(req, () => Promise.resolve(new Response(null)), { session: this.#options.session });
+      return this.#handler(req, ctx);
+    };
+    return next(0);
+  }
+
+  async #handler(req: Request, ctx: Context) {
+    const { ssr, router, appDir } = this.#options;
+    const { searchParams } = new URL(req.url);
 
     if (!this.#router && router) {
       this.#router = await initRouter(router, appDir);
@@ -83,7 +77,7 @@ export class MockServer {
 
     if (this.#router) {
       const _data_ = req.method === "GET" &&
-        (url.searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
+        (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       const res = await fetchRouteData(req, ctx, this.#router, _data_);
       if (res) {
         return res;
@@ -95,14 +89,12 @@ export class MockServer {
     }
 
     if (!ssr) {
-      ctx.headers.set("Content-Type", "text/html; charset=utf-8");
-      return new Response(this.#indexHtml, { headers: ctx.headers });
+      return createHtmlResponse(req, join(appDir ?? ".", "./index.html"), this.#indexHtml);
     }
 
     return renderer.fetch(req, ctx, {
       indexHtml: this.#indexHtml,
       router: this.#router,
-      customHTMLRewriter,
       ssr,
     });
   }

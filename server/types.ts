@@ -56,8 +56,6 @@ export type CookieOptions = {
 
 export interface Cookies {
   get(key: string): string | undefined;
-  set(key: string, value: string, options?: CookieOptions): void;
-  delete(key: string, options?: CookieOptions): void;
 }
 
 export interface SessionStorage {
@@ -97,21 +95,21 @@ export interface HTMLRewriter {
   on: (selector: string, handlers: HTMLRewriterHandlers) => void;
 }
 
-export interface Context extends Record<string, unknown> {
+// deno-lint-ignore no-explicit-any
+export interface Context extends Record<string, any> {
   /** The request connection info. */
   readonly connInfo?: ConnInfo;
   /** The params of dynamic routes. */
   readonly params: Record<string, string>;
-  /** The headers for final response. */
-  readonly headers: Headers;
   /** The cookies from client. */
   readonly cookies: Cookies;
   /** The HtmlRewriter to rewrite the html output. */
   readonly htmlRewriter: HTMLRewriter;
   /** Returns the `Session` object. */
-  getSession<
-    T extends Record<string, unknown> = Record<string, unknown>,
-  >(): Promise<Session<T>>;
+  // deno-lint-ignore no-explicit-any
+  getSession: <T extends Record<string, any> = Record<string, any>>() => Promise<Session<T>>;
+  /** Returns the next `Response` object. */
+  next: () => Promise<Response> | Response;
 }
 
 /** The Middleare for Aleph server. */
@@ -122,7 +120,7 @@ export interface Middleware {
   fetch(
     request: Request,
     context: Context,
-  ): Promise<Response | (() => void) | void> | Response | (() => void) | void;
+  ): Promise<Response> | Response;
 }
 
 export type ImportMap = {

@@ -25,15 +25,7 @@ import renderer from "./renderer.ts";
 import { fetchRouteData, importRouteModule, initRouter } from "./routing.ts";
 import transformer from "./transformer.ts";
 import { build } from "./build.ts";
-import type {
-  AlephConfig,
-  ConnInfo,
-  ErrorHandler,
-  HTMLRewriterHandlers,
-  ModuleLoader,
-  Router,
-  ServeInit,
-} from "./types.ts";
+import type { AlephConfig, ConnInfo, ErrorHandler, ModuleLoader, Router, ServeInit } from "./types.ts";
 
 /** The options for the Aleph.js server.  */
 export type ServerOptions = Omit<ServeInit, "onError"> & {
@@ -80,7 +72,32 @@ export function serve(options: ServerOptions = {}) {
   }
 
   // server handler
-  const handler = async (req: Request, connInfo: ConnInfo): Promise<Response> => {
+  const handler = (req: Request, connInfo: ConnInfo): Promise<Response> | Response => {
+    const next = (i: number): Promise<Response> | Response => {
+      if (Array.isArray(middlewares) && i < middlewares.length) {
+        const mw = middlewares[i];
+        const ctx = createContext(req, next.bind(null, i + 1), { connInfo, session });
+        try {
+          return mw.fetch(req, ctx);
+        } catch (err) {
+          const res = onError?.(err, "middleware", req, ctx);
+          if (res instanceof Response) {
+            return res;
+          }
+          log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
+          return new Response(generateErrorHtml(err.stack ?? err.message), {
+            status: 500,
+            headers: [["Content-Type", "text/html; charset=utf-8"]],
+          });
+        }
+      }
+      const ctx = createContext(req, () => Promise.resolve(new Response(null)), { connInfo, session });
+      return alephHandler(req, ctx);
+    };
+    return next(0);
+  };
+
+  const alephHandler = async (req: Request, ctx: Context): Promise<Response> => {
     const { pathname, searchParams } = new URL(req.url);
 
     // handle HMR socket
@@ -97,41 +114,6 @@ export function serve(options: ServerOptions = {}) {
         }, 50);
       });
       return response;
-    }
-
-    const customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][] = [];
-    const ctx = createContext(req, { connInfo, customHTMLRewriter, session });
-
-    // use middlewares
-    if (Array.isArray(middlewares)) {
-      for (let i = 0, l = middlewares.length; i < l; i++) {
-        const mw = middlewares[i];
-        const handler = mw.fetch;
-        if (typeof handler === "function") {
-          try {
-            let res = handler(req, ctx);
-            if (res instanceof Promise) {
-              res = await res;
-            }
-            if (res instanceof Response) {
-              return res;
-            }
-            if (typeof res === "function") {
-              setTimeout(res, 0);
-            }
-          } catch (err) {
-            const res = onError?.(err, "middleware", req, ctx);
-            if (res instanceof Response) {
-              return res;
-            }
-            log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
-            return new Response(generateErrorHtml(err.stack ?? err.message), {
-              status: 500,
-              headers: [["Content-Type", "text/html; charset=utf-8"]],
-            });
-          }
-        }
-      }
     }
 
     // check if the "out" directory exists
@@ -300,12 +282,12 @@ export function serve(options: ServerOptions = {}) {
         // use the `onError` if available
         const res = onError?.(err, "route-data-fetch", req, ctx);
         if (res instanceof Response) {
-          return fixResponse(res, ctx.headers, _data_);
+          return fixResponse(res, _data_);
         }
 
         // user throws a response
         if (err instanceof Response) {
-          return fixResponse(err, ctx.headers, _data_);
+          return fixResponse(err, _data_);
         }
 
         // prints the error stack
@@ -320,10 +302,7 @@ export function serve(options: ServerOptions = {}) {
           status,
           message: err.message ?? String(err),
           stack: err.stack,
-        }, {
-          status,
-          headers: ctx.headers,
-        });
+        }, { status });
       }
     }
 
@@ -348,14 +327,14 @@ export function serve(options: ServerOptions = {}) {
 
     // return index.html
     if (!ssr) {
-      return createHtmlResponse(req, ctx.headers, join(appDir ?? ".", "./index.html"), indexHtml);
+      return createHtmlResponse(req, join(appDir ?? ".", "./index.html"), indexHtml);
     }
 
     // check SSG output
     if (!isDev && !buildMode && outDir) {
       const htmlFile = join(outDir, pathname === "/" ? "index.html" : pathname + ".html");
       if (await existsFile(htmlFile)) {
-        return createHtmlResponse(req, ctx.headers, htmlFile);
+        return createHtmlResponse(req, htmlFile);
       }
     }
 
@@ -364,7 +343,6 @@ export function serve(options: ServerOptions = {}) {
       return await renderer.fetch(req, ctx, {
         indexHtml,
         router,
-        customHTMLRewriter,
         ssr,
         isDev,
       });
@@ -379,12 +357,11 @@ export function serve(options: ServerOptions = {}) {
       } else {
         message = err?.toString?.() || String(err);
       }
-      if (!ctx.headers.has("Cache-Control")) {
-        ctx.headers.append("Cache-Control", "public, max-age=0, must-revalidate");
-      }
-      ctx.headers.append("Content-Type", "text/html; charset=utf-8");
       return new Response(generateErrorHtml(message, "SSR"), {
-        headers: ctx.headers,
+        headers: {
+          "Cache-Control": "public, max-age=0, must-revalidate",
+          "Content-Type": "text/html; charset=utf-8",
+        },
       });
     }
   };

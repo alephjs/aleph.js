@@ -10,7 +10,6 @@ import type { Element, HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContex
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
-  customHTMLRewriter: [selector: string, handlers: HTMLRewriterHandlers][];
   router: Router | null;
   ssr: SSR;
   isDev?: boolean;
@@ -45,13 +44,14 @@ const runtimeScript = [
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
-    const { indexHtml, router, customHTMLRewriter, ssr, isDev } = options;
+    const { indexHtml, router, ssr, isDev } = options;
     const headers = new Headers(ctx.headers as Headers);
     const isFn = typeof ssr === "function";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;
     const [url, routing, deferedData] = await initSSR(req, ctx, router);
     const headCollection: string[] = [];
+    const customHTMLRewriter = ctx.__htmlRewriterHandlers as [string, HTMLRewriterHandlers][];
 
     let status = 200;
     let suspenseMark: SuspenseMark | undefined;

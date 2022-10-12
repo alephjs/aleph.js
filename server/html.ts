@@ -213,11 +213,11 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
 
 export async function createHtmlResponse(
   req: Request,
-  headers: Headers,
   filepath: string,
   content?: Uint8Array,
 ): Promise<Response> {
   const deployId = getDeploymentId();
+  const headers = new Headers();
   let etag: string | undefined;
   if (deployId) {
     etag = `W/${deployId}`;

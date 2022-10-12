@@ -30,7 +30,7 @@ import { initRouter } from "./routing.ts";
 import type { AlephConfig, ConnInfo } from "./types.ts";
 
 export async function build(
-  serverHandler: (req: Request, connInfo: ConnInfo) => Promise<Response>,
+  serverHandler: (req: Request, connInfo: ConnInfo) => Promise<Response> | Response,
   config: AlephConfig,
   appDir?: string,
 ) {

@@ -77,13 +77,16 @@ export async function fetchRouteData(
         const fetcher = dataConfig[method.toLowerCase()] ?? dataConfig[method];
         if (typeof fetcher === "function") {
           const res = await fetcher(req, ctx);
-          const headers = ctx.headers as unknown as Headers;
           // todo: set cache for "GET" with `cacheTtl` option
-          headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
           if (res instanceof Response) {
-            return fixResponse(res, headers, _data_);
+            return fixResponse(res, _data_);
           }
-          return toResponse(res, headers);
+          return toResponse(
+            res,
+            new Headers({
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+            }),
+          );
         }
         return new Response("Method Not Allowed", { status: 405 });
       }

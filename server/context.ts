@@ -1,16 +1,18 @@
 import util from "../shared/util.ts";
-import { cookieHeader } from "./helpers.ts";
 import { SessionImpl } from "./session.ts";
-import type { ConnInfo, Context, CookieOptions, HTMLRewriterHandlers, Session, SessionOptions } from "./types.ts";
+import type { ConnInfo, Context, HTMLRewriterHandlers, Session, SessionOptions } from "./types.ts";
 
 type ContextOptions = {
   connInfo?: ConnInfo;
-  customHTMLRewriter?: [selector: string, handlers: HTMLRewriterHandlers][];
   session?: SessionOptions;
 };
 
 /** create a context object */
-export function createContext(req: Request, options?: ContextOptions): Context {
+export function createContext(
+  req: Request,
+  next: () => Promise<Response> | Response,
+  options?: ContextOptions,
+): Context {
   let cookies: Map<string, string> | null = null;
   let session: Session<Record<string, unknown>> | null = null;
   const ctx: Context = {
@@ -30,14 +32,6 @@ export function createContext(req: Request, options?: ContextOptions): Context {
           }
         }
         return cookies.get(name);
-      },
-      set(name: string, value: string, options?: CookieOptions) {
-        cookies?.set(name, value);
-        ctx.headers.set("Set-Cookie", cookieHeader(name, value, options));
-      },
-      delete(name: string, options?: CookieOptions) {
-        cookies?.delete(name);
-        ctx.headers.set("Set-Cookie", cookieHeader(name, "", { ...options, expires: new Date(0) }));
       },
     },
     // deno-lint-ignore ban-ts-comment
@@ -70,12 +64,13 @@ export function createContext(req: Request, options?: ContextOptions): Context {
       session = sessionImpl;
       return session;
     },
+    __htmlRewriterHandlers: [],
     htmlRewriter: {
       on: (selector: string, handlers: HTMLRewriterHandlers) => {
-        options?.customHTMLRewriter?.push([selector, handlers]);
+        (ctx.__htmlRewriterHandlers as unknown[]).push([selector, handlers]);
       },
     },
+    next,
   };
-
   return ctx;
 }
