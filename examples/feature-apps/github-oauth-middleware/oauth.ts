@@ -72,5 +72,6 @@ export class GithubOauth implements Middleware {
     }
 
     ctx.user = session.store.user;
+    return ctx.next();
   }
 }
