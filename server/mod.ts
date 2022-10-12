@@ -55,6 +55,7 @@ export function serve(options: ServerOptions = {}) {
   };
   Reflect.set(globalThis, "__ALEPH_CONFIG", config);
 
+  // check `_export.ts` imports
   if (routerConfig && routerConfig.routes) {
     if (isDev) {
       routerConfig.routes = undefined;
@@ -65,37 +66,6 @@ export function serve(options: ServerOptions = {}) {
       });
     }
   }
-
-  // set log level to debug when debug aleph.js itself.
-  if (import.meta.url.startsWith("file:")) {
-    log.setLevel("debug");
-  }
-
-  // server handler
-  const handler = (req: Request, connInfo: ConnInfo): Promise<Response> | Response => {
-    const next = (i: number): Promise<Response> | Response => {
-      if (Array.isArray(middlewares) && i < middlewares.length) {
-        const mw = middlewares[i];
-        const ctx = createContext(req, next.bind(null, i + 1), { connInfo, session });
-        try {
-          return mw.fetch(req, ctx);
-        } catch (err) {
-          const res = onError?.(err, "middleware", req, ctx);
-          if (res instanceof Response) {
-            return res;
-          }
-          log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
-          return new Response(generateErrorHtml(err.stack ?? err.message), {
-            status: 500,
-            headers: [["Content-Type", "text/html; charset=utf-8"]],
-          });
-        }
-      }
-      const ctx = createContext(req, () => Promise.resolve(new Response(null)), { connInfo, session });
-      return alephHandler(req, ctx);
-    };
-    return next(0);
-  };
 
   const alephHandler = async (req: Request, ctx: Context): Promise<Response> => {
     const { pathname, searchParams } = new URL(req.url);
@@ -366,7 +336,38 @@ export function serve(options: ServerOptions = {}) {
     }
   };
 
-  // optimize the application for production
+  // the final server handler
+  const handler = (req: Request, connInfo: ConnInfo): Promise<Response> | Response => {
+    const next = (i: number): Promise<Response> | Response => {
+      if (Array.isArray(middlewares) && i < middlewares.length) {
+        const mw = middlewares[i];
+        const ctx = createContext(req, next.bind(null, i + 1), { connInfo, session });
+        try {
+          return mw.fetch(req, ctx);
+        } catch (err) {
+          const res = onError?.(err, "middleware", req, ctx);
+          if (res instanceof Response) {
+            return res;
+          }
+          log.error(`[middleare${mw.name ? `(${mw.name})` : ""}]`, err);
+          return new Response(generateErrorHtml(err.stack ?? err.message), {
+            status: 500,
+            headers: [["Content-Type", "text/html; charset=utf-8"]],
+          });
+        }
+      }
+      const ctx = createContext(req, () => Promise.resolve(new Response(null)), { connInfo, session });
+      return alephHandler(req, ctx);
+    };
+    return next(0);
+  };
+
+  // set log level to debug when debug aleph.js itself.
+  if (import.meta.url.startsWith("file:")) {
+    log.setLevel("debug");
+  }
+
+  // build the app for production
   if (buildMode) {
     build(handler, config, appDir);
     return;
