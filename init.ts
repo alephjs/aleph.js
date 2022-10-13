@@ -170,8 +170,8 @@ export default async function init(nameArg?: string, options?: Options) {
   };
   if (withUnocss) {
     Object.assign(importMap.imports, {
-      "@unocss/core": "https://esm.sh/@unocss/core@0.45.26",
-      "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.45.26",
+      "@unocss/core": "https://esm.sh/@unocss/core@0.45.29",
+      "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.45.29",
     });
   }
   switch (template) {

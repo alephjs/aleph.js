@@ -1,6 +1,6 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.155.0/http/server.ts";
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.4/types.d.ts";
-import type { UserConfig } from "https://esm.sh/@unocss/core@0.45.26";
+import type { UserConfig } from "https://esm.sh/@unocss/core@0.45.29";
 import type { RouteModule } from "../runtime/core/routes.ts";
 export type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../runtime/core/routes.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
@@ -117,10 +117,7 @@ export interface Middleware {
   /** The middleware name. */
   readonly name?: string;
   /** The middleware fetch method. */
-  fetch(
-    request: Request,
-    context: Context,
-  ): Promise<Response> | Response;
+  fetch(request: Request, context: Context): Promise<Response> | Response;
 }
 
 export type ImportMap = {
@@ -153,11 +150,7 @@ export type ModuleLoaderOutput = {
 
 export interface ModuleLoader {
   test(path: string): boolean;
-  load(
-    specifier: string,
-    content: string,
-    env: ModuleLoaderEnv,
-  ): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
+  load(specifier: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> | ModuleLoaderOutput;
 }
 
 /** The optimization options for the server. */
