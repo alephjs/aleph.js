@@ -16,8 +16,8 @@ export {
 } from "https://deno.land/std@0.155.0/path/mod.ts";
 
 // third-party
-// @deno-types="https://deno.land/x/esbuild@v0.15.7/mod.d.ts"
-export { build as esbuild, type BuildResult, stop as stopEsbuild } from "https://deno.land/x/esbuild@v0.15.7/mod.js";
+// @deno-types="https://deno.land/x/esbuild@v0.15.10/mod.d.ts"
+export { build as esbuild, type BuildResult, stop as stopEsbuild } from "https://deno.land/x/esbuild@v0.15.10/mod.js";
 export * from "https://deno.land/x/aleph_compiler@0.8.0/mod.ts";
 export * from "https://deno.land/x/aleph_compiler@0.8.0/types.ts";
 export { default as initLolHtml, HTMLRewriter } from "https://deno.land/x/lol_html@0.0.4/mod.js";
