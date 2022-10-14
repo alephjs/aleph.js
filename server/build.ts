@@ -329,7 +329,9 @@ export async function bundleCSS(
     sourceCode,
     {
       ...options,
-      analyzeDependencies: true,
+      analyzeDependencies: {
+        removeImports: true,
+      },
       drafts: {
         nesting: true,
         customMedia: true,
