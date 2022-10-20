@@ -383,7 +383,12 @@ export function serve(options: ServerOptions = {}) {
       port = parseInt(m[3]);
     }
   }
-  Deno.env.set("ALEPH_SERVER_ORIGIN", `${tls ? "https" : "http"}://${hostname}:${port}`);
+
+  try {
+    Deno.env.set("ALEPH_SERVER_ORIGIN", `${tls ? "https" : "http"}://${hostname}:${port}`);
+  } catch (_) {
+    // deno deploy: Can not modify env vars during execution.
+  }
 
   // watch file changes in development mode
   if (isDev) {
