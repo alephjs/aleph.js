@@ -1,0 +1,29 @@
+{
+	"name": "Deno",
+ 	"build": {
+		"dockerfile": "Dockerfile"
+	},
+
+	// Configure tool-specific properties.
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			// Set *default* container specific settings.json values on container create.
+			"settings": { 
+				// Enables the project as a Deno project
+				"deno.enable": true,
+				// Enables Deno linting for the project
+				"deno.lint": true,
+				// Sets Deno as the default formatter for the project
+				"editor.defaultFormatter": "denoland.vscode-deno"
+			},
+			
+			// Add the IDs of extensions you want installed when the container is created.
+			"extensions": [
+				"denoland.vscode-deno"
+			]
+		}
+	},
+
+	"remoteUser": "vscode"
+}
