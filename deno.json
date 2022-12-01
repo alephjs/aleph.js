@@ -5,7 +5,8 @@
       "dom.iterable",
       "dom.asynciterable",
       "dom.extras",
-      "deno.ns"
+      "deno.ns",
+      "deno.worker"
     ],
     "types": [
       "./types.d.ts"
