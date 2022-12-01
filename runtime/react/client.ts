@@ -6,7 +6,7 @@ import { App } from "./mod.ts";
 export function bootstrap(options?: { root?: string | HTMLElement; hydrate?: boolean }) {
   const { root = "#root", hydrate = !!document.head.querySelector("script#ssr-data") } = options ?? {};
   const rootEl = typeof root === "string" ? document.querySelector(root) : root;
-  if (typeof root === "string" && !rootEl) {
+  if (!rootEl) {
     throw new Error(`No element found for selector "${root}"`);
   }
   const el = createElement(App, { createPortal });
