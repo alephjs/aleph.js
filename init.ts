@@ -1,10 +1,9 @@
 import { Untar } from "https://deno.land/std@0.165.0/archive/tar.ts";
 import { parse } from "https://deno.land/std@0.165.0/flags/mod.ts";
 import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.165.0/fmt/colors.ts";
-import { Buffer } from "https://deno.land/std@0.165.0/io/buffer.ts";
 import { copy } from "https://deno.land/std@0.165.0/streams/conversion.ts";
+import { readerFromStreamReader } from "https://deno.land/std@0.167.0/streams/reader_from_stream_reader.ts";
 import { ensureDir } from "https://deno.land/std@0.165.0/fs/ensure_dir.ts";
-import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 import { basename, join } from "https://deno.land/std@0.165.0/path/mod.ts";
 
 const templates = [
@@ -99,8 +98,9 @@ export default async function init(nameArg?: string, options?: Options) {
     console.error(await resp.text());
     Deno.exit(1);
   }
-  const tarData = gunzip(new Uint8Array(await resp.arrayBuffer()));
-  const entryList = new Untar(new Buffer(tarData));
+  const entryList = new Untar(
+    readerFromStreamReader(resp.body!.pipeThrough<Uint8Array>(new DecompressionStream("gzip")).getReader()),
+  );
   const appDir = join(Deno.cwd(), name);
   const prefix = `${basename(repo)}-${VERSION}/examples/${withUnocss ? "with-unocss/" : ""}${template}-app/`;
 
