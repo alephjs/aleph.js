@@ -1,11 +1,11 @@
-import { Untar } from "https://deno.land/std@0.155.0/archive/tar.ts";
-import { parse } from "https://deno.land/std@0.155.0/flags/mod.ts";
-import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.155.0/fmt/colors.ts";
-import { Buffer } from "https://deno.land/std@0.155.0/io/buffer.ts";
-import { copy } from "https://deno.land/std@0.155.0/streams/conversion.ts";
-import { ensureDir } from "https://deno.land/std@0.155.0/fs/ensure_dir.ts";
+import { Untar } from "https://deno.land/std@0.165.0/archive/tar.ts";
+import { parse } from "https://deno.land/std@0.165.0/flags/mod.ts";
+import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.165.0/fmt/colors.ts";
+import { Buffer } from "https://deno.land/std@0.165.0/io/buffer.ts";
+import { copy } from "https://deno.land/std@0.165.0/streams/conversion.ts";
+import { ensureDir } from "https://deno.land/std@0.165.0/fs/ensure_dir.ts";
 import { gunzip } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
-import { basename, join } from "https://deno.land/std@0.155.0/path/mod.ts";
+import { basename, join } from "https://deno.land/std@0.165.0/path/mod.ts";
 
 const templates = [
   "react",
@@ -161,7 +161,7 @@ export default async function init(nameArg?: string, options?: Options) {
   const importMap = {
     imports: {
       "~/": "./",
-      "std/": "https://deno.land/std@0.155.0/",
+      "std/": "https://deno.land/std@0.165.0/",
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
       "aleph/dev": `${alephPkgUri}/server/dev.ts`,
@@ -170,8 +170,8 @@ export default async function init(nameArg?: string, options?: Options) {
   };
   if (withUnocss) {
     Object.assign(importMap.imports, {
-      "@unocss/core": "https://esm.sh/@unocss/core@0.45.29",
-      "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.45.29",
+      "@unocss/core": "https://esm.sh/@unocss/core@0.47.4",
+      "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.47.4",
     });
   }
   switch (template) {
