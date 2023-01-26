@@ -1,7 +1,7 @@
-import { Untar } from "https://deno.land/std@0.170.0/archive/tar.ts";
+import { Untar } from "https://deno.land/std@0.170.0/archive/untar.ts";
 import { parse } from "https://deno.land/std@0.170.0/flags/mod.ts";
 import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.170.0/fmt/colors.ts";
-import { copy } from "https://deno.land/std@0.170.0/streams/conversion.ts";
+import { copy } from "https://deno.land/std@0.170.0/streams/copy.ts";
 import { readerFromStreamReader } from "https://deno.land/std@0.170.0/streams/reader_from_stream_reader.ts";
 import { ensureDir } from "https://deno.land/std@0.170.0/fs/ensure_dir.ts";
 import { basename, join } from "https://deno.land/std@0.170.0/path/mod.ts";
@@ -74,7 +74,7 @@ export default async function init(nameArg?: string, options?: Options) {
   }
 
   const generateExportTs = await confirm(
-    "Generate `_export.ts` module for runtime that doesn't support dynamic import (deploy to Deno Deploy)?",
+    "Generate `_export.ts` file for runtime that doesn't support dynamic import (deploy to Deno Deploy)?",
   );
   const withUnocss = ["react", "yew"].includes(template!) && await confirm("Using Unocss(TailwindCSS)?");
   const withVscode = await confirm("Initialize VS Code workspace configuration?");
