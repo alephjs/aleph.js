@@ -26,4 +26,3 @@ export { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 
 // npm
 export { default as mitt, type Emitter } from "https://esm.sh/mitt@3.0.0";
-export { createGenerator, type UnoGenerator } from "https://esm.sh/@unocss/core@0.47.4";

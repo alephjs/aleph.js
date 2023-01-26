@@ -19,6 +19,7 @@ import {
   existsFile,
   fetchCode,
   getAlephPkgUri,
+  getUnoGenerator,
   globalIt,
   isNpmPkg,
   restoreUrl,
@@ -139,8 +140,12 @@ export async function build(
   queue.push(`${alephPkgUri}/runtime/core/nomodule.ts`);
 
   // add unocss reset css
-  if (config.unocss) {
-    queue.push(`https://esm.sh/@unocss/reset@0.47.4/${config.unocss.resetCSS ?? "tailwind"}.css`);
+  if (config.unocss?.presets) {
+    const uno = await getUnoGenerator();
+    if (uno) {
+      const { resetCSS = "tailwind" } = config.unocss;
+      queue.push(`https://esm.sh/@unocss/reset@${uno.version}/${resetCSS}.css`);
+    }
   }
 
   const entryModules = new Map(queue.map((task) => [task, 0]));

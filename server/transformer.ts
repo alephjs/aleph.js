@@ -207,7 +207,7 @@ export default {
           const reg = (typeof config.unocss !== "string" ? config.unocss.test : undefined) ?? regJsxFile;
           if (reg.test(pathname)) {
             try {
-              const unoGenerator = getUnoGenerator();
+              const unoGenerator = await getUnoGenerator();
               if (unoGenerator) {
                 const { css, matched } = await unoGenerator.generate(source, {
                   id: specifier,

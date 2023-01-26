@@ -1,6 +1,5 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.170.0/http/server.ts";
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.4/types.d.ts";
-import type { UserConfig } from "https://esm.sh/@unocss/core@0.47.4";
 import type { RouteModule } from "../runtime/core/routes.ts";
 export type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../runtime/core/routes.ts";
 export type { Comment, ConnInfo, Element, RouteModule, ServeInit, TextChunk };
@@ -39,7 +38,7 @@ export interface RouterInit {
 }
 
 /** The config for UnoCSS. */
-export type UnoConfig = UserConfig & {
+export type UnoConfig = import("@unocss/core").UserConfig & {
   test?: RegExp;
   resetCSS?: "normalize" | "eric-meyer" | "tailwind" | "antfu";
 };

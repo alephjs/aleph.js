@@ -99,8 +99,8 @@ export default {
     // build unocss
     const config = getAlephConfig();
     if (config?.unocss?.presets) {
-      const unoGenerator = getUnoGenerator();
-      if (unoGenerator) {
+      const uno = await getUnoGenerator();
+      if (uno) {
         const t = performance.now();
         const {
           test = regJsxFile,
@@ -118,7 +118,7 @@ export default {
             ),
           );
           if (inputSources.length > 0) {
-            const ret = await unoGenerator.generate(inputSources.join("\n"), {
+            const ret = await uno.generate(inputSources.join("\n"), {
               minify: !isDev,
             });
             if (ret.matched.size > 0) {
@@ -132,13 +132,13 @@ export default {
         if (css) {
           const buildTime = (performance.now() - t).toFixed(2);
           headCollection.push(
-            `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@0.47.4/${resetCSS}.css">`,
-            `<style data-unocss="${unoGenerator.version}" ${
+            `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@${uno.version}/${resetCSS}.css">`,
+            `<style data-unocss="${uno.version}" ${
               cacheHit ? `data-cache-hit="true"` : `data-build-time="${buildTime}ms"`
             }>${css}</style>`,
           );
           if (!cacheHit) {
-            log.debug(`Uncss generated in ${buildTime}ms`);
+            log.debug(`UnoCSS generated in ${buildTime}ms`);
           }
         }
       }

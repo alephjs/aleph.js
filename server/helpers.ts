@@ -1,8 +1,7 @@
 import util from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { type TransformOptions, type UnoGenerator } from "./deps.ts";
-import { basename, createGenerator, dirname, fromFileUrl, join, JSONC } from "./deps.ts";
+import { basename, dirname, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
@@ -75,14 +74,25 @@ export async function getJSXConfig(appDir?: string): Promise<JSXConfig> {
 }
 
 /** Get the UnoCSS generator, return `null` if the presets are empty. */
-export function getUnoGenerator(): UnoGenerator | null {
+export function getUnoGenerator(): Promise<
+  | {
+    generate: (input: string, options?: Record<string, unknown>) => Promise<{ matched: Set<string>; css: string }>;
+    version: string;
+  }
+  | null
+> {
   const config = getAlephConfig();
   if (config === undefined) {
-    return null;
+    return Promise.resolve(null);
   }
-  return globalItSync("__UNO_GENERATOR", () => {
+  return globalIt("__UNO_GENERATOR", async () => {
     if (config?.unocss) {
-      return createGenerator(config.unocss);
+      try {
+        const { createGenerator } = await import("@unocss/core");
+        return createGenerator(config.unocss);
+      } catch (_) {
+        log.error("Failed to import `@unocss/core`, please ensure that `@unocss/core` is added in the import maps.");
+      }
     }
     return null;
   });
