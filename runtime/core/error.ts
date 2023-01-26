@@ -17,7 +17,7 @@ export class FetchError extends Error {
 
   static async fromResponse(res: Response): Promise<FetchError> {
     let status = res.status;
-    let message = (await res.text());
+    let message = await res.text();
     const details: Record<string, unknown> = {};
     if (message.startsWith("{") && message.endsWith("}")) {
       try {

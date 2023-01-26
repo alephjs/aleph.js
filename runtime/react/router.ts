@@ -394,7 +394,7 @@ function getLoadingBarEl(): HTMLDivElement {
     clearLoadingBar();
     clearLoadingBar = null;
   }
-  let bar = (document.getElementById("loading-bar") as HTMLDivElement | null);
+  let bar = document.getElementById("loading-bar") as HTMLDivElement | null;
   if (!bar) {
     bar = document.createElement("div");
     bar.id = "loading-bar";
