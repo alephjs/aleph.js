@@ -1,10 +1,10 @@
-import { Untar } from "https://deno.land/std@0.165.0/archive/tar.ts";
-import { parse } from "https://deno.land/std@0.165.0/flags/mod.ts";
-import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.165.0/fmt/colors.ts";
-import { copy } from "https://deno.land/std@0.165.0/streams/conversion.ts";
-import { readerFromStreamReader } from "https://deno.land/std@0.167.0/streams/reader_from_stream_reader.ts";
-import { ensureDir } from "https://deno.land/std@0.165.0/fs/ensure_dir.ts";
-import { basename, join } from "https://deno.land/std@0.165.0/path/mod.ts";
+import { Untar } from "https://deno.land/std@0.170.0/archive/tar.ts";
+import { parse } from "https://deno.land/std@0.170.0/flags/mod.ts";
+import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.170.0/fmt/colors.ts";
+import { copy } from "https://deno.land/std@0.170.0/streams/conversion.ts";
+import { readerFromStreamReader } from "https://deno.land/std@0.170.0/streams/reader_from_stream_reader.ts";
+import { ensureDir } from "https://deno.land/std@0.170.0/fs/ensure_dir.ts";
+import { basename, join } from "https://deno.land/std@0.170.0/path/mod.ts";
 
 const templates = [
   "react",
@@ -161,7 +161,7 @@ export default async function init(nameArg?: string, options?: Options) {
   const importMap = {
     imports: {
       "~/": "./",
-      "std/": "https://deno.land/std@0.165.0/",
+      "std/": "https://deno.land/std@0.170.0/",
       "aleph/": `${alephPkgUri}/`,
       "aleph/server": `${alephPkgUri}/server/mod.ts`,
       "aleph/dev": `${alephPkgUri}/server/dev.ts`,
