@@ -88,7 +88,7 @@ export function getUnoGenerator(): Promise<
   return globalIt("__UNO_GENERATOR", async () => {
     if (config?.unocss) {
       try {
-        const { createGenerator } = await import("@unocss/core");
+        const { createGenerator } = Reflect.get(globalThis, "UNOCSS_CORE") ?? await import("@unocss/core");
         return createGenerator(config.unocss);
       } catch (_) {
         log.error("Failed to import `@unocss/core`, please ensure that `@unocss/core` is added in the import maps.");

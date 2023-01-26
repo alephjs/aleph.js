@@ -217,6 +217,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
   const routesDir = join(appDir, router.prefix);
   const genFile = join(routesDir, "_export.ts");
   const withLoader = router.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
+  const config = getAlephConfig();
 
   if (router.routes.length == 0) {
     try {
@@ -230,11 +231,17 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
   }
 
   const comments = [
-    "// Imports router modules for serverless env that doesn't support the dynamic import.",
+    "// Pre-imports router modules for serverless env that doesn't support the dynamic import.",
     "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
   ];
   const imports: string[] = [];
   const revives: string[] = [];
+
+  if (config?.unocss?.presets) {
+    imports.push(`import * as uno from "@unocss/core";`);
+    imports.push(`Reflect.set(globalThis, "UNOCSS_CORE", uno);`);
+    imports.push(""); // empty line
+  }
 
   router.routes.forEach(([_, { filename, pattern }], idx) => {
     const importUrl = JSON.stringify(
