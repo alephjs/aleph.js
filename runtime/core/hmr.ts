@@ -4,6 +4,9 @@
 import util from "../../shared/util.ts";
 import events from "./events.ts";
 
+const modules: Map<string, Module> = new Map();
+const messageQueue: string[] = [];
+
 class Module {
   private _specifier: string;
   private _isAccepted = false;
@@ -79,8 +82,12 @@ class Module {
     disposeCallbacks.map((callback) => callback(data));
 
     try {
-      const url = this._specifier.slice(1) + (this._specifier.endsWith(".css") ? "?module&" : "?") + "t=" + Date.now();
-      const module = await import(url);
+      const url = new URL(this._specifier.slice(1), location.href);
+      url.searchParams.set("t", Date.now().toString(36));
+      if (url.hostname.endsWith(".css")) {
+        url.searchParams.set("module", "");
+      }
+      const module = await import(url.href);
       this._acceptCallbacks.forEach((cb) => cb(module));
     } catch (err) {
       console.error(err);
@@ -88,27 +95,13 @@ class Module {
   }
 }
 
-export default function createHotContext(specifier: string) {
-  if (modules.has(specifier)) {
-    const mod = modules.get(specifier)!;
-    mod.lock();
-    return mod;
-  }
-  const mod = new Module(specifier);
-  modules.set(specifier, mod);
-  return mod;
-}
-
-const modules: Map<string, Module> = new Map();
-const messageQueue: string[] = [];
-
-let conn: WebSocket | null = null;
+let ws: WebSocket | null = null;
 function sendMessage(msg: Record<string, unknown>) {
   const json = JSON.stringify(msg);
-  if (!conn || conn.readyState !== WebSocket.OPEN) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
     messageQueue.push(json);
   } else {
-    conn.send(json);
+    ws.send(json);
   }
 }
 
@@ -116,12 +109,12 @@ function connect() {
   const { location, __hmrWebSocketUrl } = window as { location: Location; __hmrWebSocketUrl?: string };
   const { protocol, host } = location;
   const wsUrl = __hmrWebSocketUrl || `${protocol === "https:" ? "wss" : "ws"}://${host}/-/hmr`;
-  const ws = new WebSocket(wsUrl);
+  const socket = new WebSocket(wsUrl);
   const ping = (callback: () => void) => {
     setTimeout(() => {
-      const ws = new WebSocket(wsUrl);
-      ws.addEventListener("open", callback);
-      ws.addEventListener("close", () => {
+      const socket = new WebSocket(wsUrl);
+      socket.addEventListener("open", callback);
+      socket.addEventListener("close", () => {
         ping(callback); // retry
       });
     }, 500);
@@ -132,15 +125,15 @@ function connect() {
     remove: "#F00C08",
   };
 
-  ws.addEventListener("open", () => {
-    conn = ws;
-    messageQueue.splice(0, messageQueue.length).forEach((msg) => ws.send(msg));
+  socket.addEventListener("open", () => {
+    ws = socket;
+    messageQueue.splice(0, messageQueue.length).forEach((msg) => socket.send(msg));
     console.log("%c[HMR]", "color:#999", "listening for file changes...");
   });
 
-  ws.addEventListener("close", () => {
-    if (conn !== null) {
-      conn = null;
+  socket.addEventListener("close", () => {
+    if (ws !== null) {
+      ws = null;
       console.log("[HMR] closed.");
       // try to re-connect
       connect();
@@ -150,7 +143,7 @@ function connect() {
     }
   });
 
-  ws.addEventListener("message", ({ data }: { data?: string }) => {
+  socket.addEventListener("message", ({ data }: { data?: string }) => {
     if (data) {
       try {
         const { type, specifier, ...rest } = JSON.parse(data);
@@ -202,4 +195,15 @@ function connect() {
   });
 }
 
-addEventListener("load", connect);
+globalThis.addEventListener("load", connect);
+
+export default function createHotContext(specifier: string) {
+  if (modules.has(specifier)) {
+    const mod = modules.get(specifier)!;
+    mod.lock();
+    return mod;
+  }
+  const mod = new Module(specifier);
+  modules.set(specifier, mod);
+  return mod;
+}
