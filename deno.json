@@ -3,10 +3,8 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "dom.asynciterable",
       "dom.extras",
-      "deno.ns",
-      "deno.worker"
+      "deno.ns"
     ],
     "types": [
       "./types.d.ts"

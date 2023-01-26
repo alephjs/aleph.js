@@ -98,8 +98,11 @@ export default async function init(nameArg?: string, options?: Options) {
     console.error(await resp.text());
     Deno.exit(1);
   }
+  // deno-lint-ignore ban-ts-comment
+  // @ts-ignore
+  const gz = new DecompressionStream("gzip");
   const entryList = new Untar(
-    readerFromStreamReader(resp.body!.pipeThrough<Uint8Array>(new DecompressionStream("gzip")).getReader()),
+    readerFromStreamReader(resp.body!.pipeThrough<Uint8Array>(gz).getReader()),
   );
   const appDir = join(Deno.cwd(), name);
   const prefix = `${basename(repo)}-${VERSION}/examples/${withUnocss ? "with-unocss/" : ""}${template}-app/`;
@@ -143,7 +146,6 @@ export default async function init(nameArg?: string, options?: Options) {
       "lib": [
         "dom",
         "dom.iterable",
-        "dom.asynciterable",
         "dom.extras",
         "deno.ns",
       ],
