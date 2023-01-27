@@ -2,7 +2,6 @@ import util from "../shared/util.ts";
 import { concatBytes, HTMLRewriter } from "./deps.ts";
 import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
-import type { Comment, Element } from "./types.ts";
 
 type LoadOptions = {
   ssr?: boolean;
@@ -37,7 +36,7 @@ function checkSSRBody(html: Uint8Array): [Uint8Array, boolean] {
   });
 
   rewriter.on("*", {
-    element: (e: Element) => {
+    element: (e) => {
       if (e.hasAttribute("data-ssr-root")) {
         if (hasSSRBody) {
           e.removeAttribute("data-ssr-root");
@@ -47,7 +46,7 @@ function checkSSRBody(html: Uint8Array): [Uint8Array, boolean] {
         }
       }
     },
-    comments: (c: Comment) => {
+    comments: (c) => {
       const text = c.text.trim();
       if (text === "ssr-body" || text === "ssr-output") {
         if (hasSSRBody) {
@@ -78,7 +77,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
   let nomoduleInserted = false;
 
   rewriter.on("link", {
-    element: (el: Element) => {
+    element: (el) => {
       let href = el.getAttribute("href");
       if (href) {
         const isHttpUrl = util.isLikelyHttpURL(href);
@@ -107,7 +106,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
   });
 
   rewriter.on("script", {
-    element: (el: Element) => {
+    element: (el) => {
       let src = el.getAttribute("src");
       if (src) {
         if (!util.isLikelyHttpURL(src)) {
@@ -132,7 +131,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
   });
 
   rewriter.on("body", {
-    element: (el: Element) => {
+    element: (el) => {
       if (deploymentId) {
         el.setAttribute("data-deployment-id", deploymentId);
       }
@@ -144,7 +143,7 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
 
   if (hmr) {
     rewriter.on("head", {
-      element(el: Element) {
+      element(el) {
         el.append(
           `<script type="module">import hot from "${
             toLocalPath(alephPkgUri)
@@ -176,7 +175,7 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
       const links: string[] = [];
       const rewriter = new HTMLRewriter("utf8", () => {});
       rewriter.on("link", {
-        element(el: Element) {
+        element(el) {
           const href = el.getAttribute("href");
           if (href) {
             links.push(href);
@@ -184,7 +183,7 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
         },
       });
       rewriter.on("script", {
-        element(el: Element) {
+        element(el) {
           const src = el.getAttribute("src");
           if (src) {
             links.push(src);
