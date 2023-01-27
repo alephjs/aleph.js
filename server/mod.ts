@@ -1,8 +1,9 @@
 import { generateErrorHtml, TransformError } from "../runtime/core/error.ts";
+import type { Router } from "../runtime/core/routes.ts";
 import util from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR, watch } from "./dev.ts";
-import { fromFileUrl, join, serve as stdServe, ServeInit, serveTls } from "./deps.ts";
+import { fromFileUrl, join, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   existsDir,
@@ -25,7 +26,7 @@ import renderer from "./renderer.ts";
 import { fetchRouteData, importRouteModule, initRouter } from "./routing.ts";
 import transformer from "./transformer.ts";
 import { build } from "./build.ts";
-import type { AlephConfig, ConnInfo, ErrorHandler, ModuleLoader, Router } from "./types.ts";
+import type { AlephConfig, ConnInfo, ErrorHandler, ModuleLoader, ServeInit } from "./types.ts";
 
 /** The options for the Aleph.js server.  */
 export type ServerOptions = Omit<ServeInit, "onError"> & {

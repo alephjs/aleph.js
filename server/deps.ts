@@ -2,7 +2,7 @@
 export { concat as concatBytes } from "https://deno.land/std@0.170.0/bytes/mod.ts";
 export { blue, bold, cyan, dim, green, red, yellow } from "https://deno.land/std@0.170.0/fmt/colors.ts";
 export { ensureDir } from "https://deno.land/std@0.170.0/fs/ensure_dir.ts";
-export { serve, type ServeInit, serveTls } from "https://deno.land/std@0.170.0/http/server.ts";
+export { serve, serveTls } from "https://deno.land/std@0.170.0/http/server.ts";
 export { encode as btoa } from "https://deno.land/std@0.170.0/encoding/base64.ts";
 export {
   basename,

@@ -1,12 +1,12 @@
 import { FetchError } from "../runtime/core/error.ts";
-import { matchRoutes } from "../runtime/core/routes.ts";
+import { matchRoutes, type RouteModule, type Router } from "../runtime/core/routes.ts";
 import util from "../shared/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";
 import log from "./log.ts";
 import { importRouteModule } from "./routing.ts";
-import type { HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContext, SuspenseMarker } from "./types.ts";
+import type { HTMLRewriterHandlers, SSR, SSRContext, SuspenseMarker } from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;

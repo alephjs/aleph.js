@@ -1,9 +1,10 @@
+import type { Router } from "../runtime/core/routes.ts";
 import { createContext } from "./context.ts";
 import { join } from "./deps.ts";
 import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, initRouter } from "./routing.ts";
-import type { Middleware, Router, RouterInit, SessionOptions, SSR } from "./types.ts";
+import type { Middleware, RouterInit, SessionOptions, SSR } from "./types.ts";
 
 type MockServerOptions = {
   router?: RouterInit;
