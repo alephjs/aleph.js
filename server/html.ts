@@ -1,11 +1,8 @@
 import util from "../shared/util.ts";
-import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm } from "./deps.ts";
+import { concatBytes, HTMLRewriter } from "./deps.ts";
 import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
 import type { Comment, Element } from "./types.ts";
-
-// init `lol-html` Wasm
-await initLolHtml(lolHtmlWasm());
 
 type LoadOptions = {
   ssr?: boolean;

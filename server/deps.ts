@@ -20,9 +20,13 @@ export {
 export { build as esbuild, type BuildResult, stop as stopEsbuild } from "https://deno.land/x/esbuild@v0.15.16/mod.js";
 export * from "https://deno.land/x/aleph_compiler@0.8.4/mod.ts";
 export * from "https://deno.land/x/aleph_compiler@0.8.4/types.ts";
-export { default as initLolHtml, HTMLRewriter } from "https://deno.land/x/lol_html@0.0.4/mod.js";
-export { default as lolHtmlWasm } from "https://deno.land/x/lol_html@0.0.4/wasm.js";
+export { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.5/mod.js";
 export { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 
 // npm
 export { default as mitt, type Emitter } from "https://esm.sh/mitt@3.0.0";
+
+// init lol-html wasm
+import initLolHtml from "https://deno.land/x/lol_html@0.0.5/mod.js";
+import getLolHtmlWasmData from "https://deno.land/x/lol_html@0.0.5/wasm.js";
+await initLolHtml(getLolHtmlWasmData());
