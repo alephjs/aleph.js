@@ -10,16 +10,16 @@ if (Deno.args.includes("--dev")) {
   Deno.env.set("SWC_REACT_REFRESH", "true");
 }
 
-/** The `suspenseMark` to mark the susponse rendering is starting. */
-const suspenseMark = `data:text/javascript;/** suspense mark **/`;
+/** The `suspenseMarker` to mark the susponse rendering is starting. */
+const suspenseMarker = `data:text/javascript;/** suspense marker **/`;
 
 export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   if (ctx.routing.length === 0 || ctx.routing.at(-1)?.url.pathname === "/_404") {
     ctx.setStatus(404);
   }
   // support suspense rendering in server-side
-  ctx.setSuspenseMark("script", (el) => {
-    if (el.getAttribute("src") === suspenseMark) {
+  ctx.setSuspenseMarker("script", (el) => {
+    if (el.getAttribute("src") === suspenseMarker) {
       el.remove();
       return true;
     }
@@ -29,7 +29,7 @@ export const render = (ctx: SSRContext): Promise<ReadableStream> => {
     createElement(App, { ssrContext: ctx }),
     {
       ...util.pick(ctx, "signal", "nonce"),
-      bootstrapScripts: [suspenseMark],
+      bootstrapScripts: [suspenseMarker],
     },
   );
 };

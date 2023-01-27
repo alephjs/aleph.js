@@ -6,7 +6,7 @@ import depGraph from "./graph.ts";
 import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";
 import log from "./log.ts";
 import { importRouteModule } from "./routing.ts";
-import type { Element, HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContext, SuspenseMark } from "./types.ts";
+import type { HTMLRewriterHandlers, RouteModule, Router, SSR, SSRContext, SuspenseMarker } from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
@@ -54,7 +54,7 @@ export default {
     const customHTMLRewriter = ctx.__htmlRewriterHandlers as [string, HTMLRewriterHandlers][];
 
     let status = 200;
-    let suspenseMark: SuspenseMark | undefined;
+    let suspenseMarker: SuspenseMarker | undefined;
     let nonce: string | undefined;
 
     const ssrContext: SSRContext = {
@@ -65,8 +65,8 @@ export default {
       setStatus: (code) => {
         status = code;
       },
-      setSuspenseMark: (selector: string, test: (el: Element) => boolean) => {
-        suspenseMark = { selector, test };
+      setSuspenseMarker: (selector, test) => {
+        suspenseMarker = { selector, test };
       },
     };
 
@@ -162,7 +162,7 @@ export default {
 
         // inject the roures manifest
         rewriter.on("head", {
-          element(el: Element) {
+          element(el) {
             if (router && router.routes.length > 0) {
               const json = JSON.stringify({
                 routes: router.routes.map(([_, meta]) => meta),
@@ -176,7 +176,7 @@ export default {
         });
 
         rewriter.on("head", {
-          element(el: Element) {
+          element(el) {
             headCollection.forEach((h) => util.isFilledString(h) && el.append(h, { html: true }));
             if (routing.length > 0) {
               const ssrModules = routing.map(({ url, params, filename, withData, data, dataCacheTtl }) => {
@@ -217,7 +217,7 @@ export default {
         });
 
         rewriter.on("ssr-body", {
-          element(el: Element) {
+          element(el) {
             if (typeof body === "string") {
               el.replace(body, { html: true });
             } else if (body instanceof ReadableStream) {
@@ -228,10 +228,10 @@ export default {
                 controller.enqueue(chunk);
               });
 
-              if (suspenseMark) {
-                rw.on(suspenseMark.selector, {
-                  element(el: Element) {
-                    if (suspenseMark!.test(el)) {
+              if (suspenseMarker) {
+                rw.on(suspenseMarker.selector, {
+                  element(el) {
+                    if (suspenseMarker!.test(el)) {
                       suspenseChunks.splice(0, suspenseChunks.length).forEach((chunk) => controller.enqueue(chunk));
                     }
                   },
@@ -271,7 +271,7 @@ export default {
 
         if (nonce) {
           rewriter.on("script", {
-            element(el: Element) {
+            element(el) {
               const typeAttr = el.getAttribute("type");
               if ((!typeAttr || typeAttr === "module") && !el.getAttribute("src")) {
                 el.setAttribute("nonce", nonce!);

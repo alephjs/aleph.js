@@ -177,10 +177,10 @@ export type SSRContext = {
   readonly signal: AbortSignal;
   readonly nonce?: string;
   setStatus(code: number): void;
-  setSuspenseMark(selector: string, test: (el: Element) => boolean): void;
+  setSuspenseMarker(selector: string, test: (el: Element) => boolean): void;
 };
 
-export type SuspenseMark = {
+export type SuspenseMarker = {
   selector: string;
   test: (el: Element) => boolean;
 };
