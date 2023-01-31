@@ -9,29 +9,61 @@ emitter.on("modify", ({ specifier }) => {
   }
 });
 
-let buildProc: Deno.Process | null = null;
+let buildClientProc: Deno.Process | null = null;
+let buildServerProc: Deno.Process | null = null;
 
 // build the leptos app then start the dev server
 async function start() {
   const cwd = fromFileUrl(new URL(".", import.meta.url));
-  if (buildProc) {
-    buildProc.kill("SIGTERM");
-    buildProc.close();
+  if (buildServerProc) {
+    buildServerProc.kill("SIGTERM");
+    buildServerProc.close();
   }
-  buildProc = Deno.run({
-    cmd: ["wasm-pack", "build", "--target", "web"],
+  if (buildClientProc) {
+    buildClientProc.kill("SIGTERM");
+    buildClientProc.close();
+  }
+  buildServerProc = Deno.run({
+    cmd: [
+      "wasm-pack",
+      "build",
+      "--target",
+      "web",
+      "--out-name",
+      "server",
+      "--features",
+      "ssr",
+    ],
+    stdout: "inherit",
+    stderr: "inherit",
+    cwd,
+  });
+  buildClientProc = Deno.run({
+    cmd: [
+      "wasm-pack",
+      "build",
+      "--target",
+      "web",
+      "--out-name",
+      "client",
+      "--features",
+      "hydrate",
+    ],
     stdout: "inherit",
     stderr: "inherit",
     cwd,
   });
   try {
-    await buildProc.status();
-    buildProc.close();
+    await buildServerProc.status();
+    await buildClientProc.status();
+    buildServerProc.close();
+    buildClientProc.close();
     await Deno.remove(`${cwd}/pkg/.gitignore`);
     // start aleph dev server
     dev({ baseUrl: import.meta.url });
   } finally {
-    buildProc = null;
+    buildServerProc = null;
+    buildClientProc = null;
   }
 }
 
