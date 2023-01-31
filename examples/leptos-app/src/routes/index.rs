@@ -10,9 +10,6 @@ pub fn Counter(
     let (value, set_value) = create_signal(cx, 0);
     let step = 1;
 
-    
-    web_sys::console::log_1(&"inside".into());
-
     view! { cx,
         <div>
             <button on:click=move |_| set_value(0)>"Clear"</button>
