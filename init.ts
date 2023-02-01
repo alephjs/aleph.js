@@ -11,6 +11,7 @@ const templates = [
   "react-mdx",
   "vue",
   "yew",
+  "leptos",
   "solid",
   "api",
   // todo:
