@@ -7,6 +7,6 @@ await init(await Deno.readFile(wasmUrl));
 serve({
   baseUrl: import.meta.url,
   ssr: ({ url }) => {
-    return ssr(url.href)
+    return ssr(url.href);
   },
 });
