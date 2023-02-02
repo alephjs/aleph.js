@@ -11,11 +11,11 @@ pub fn Counter(
     let step = 1;
 
     view! { cx,
-        <div>
-            <button class="bg-gray-300 rounded p-1 border hover:bg-gray-400" on:click=move |_| set_value(0)>"Clear"</button>
-            <button class="bg-gray-300 rounded p-1 border hover:bg-gray-400" on:click=move |_| set_value.update(|value| *value -= step)>"-1"</button>
+        <div class="flex flex-row gap-1 items-center">
+            <button class="bg-gray-300 rounded px-1 py-0.5 border hover:bg-gray-400" on:click=move |_| set_value(0)>"Clear"</button>
+            <button class="bg-gray-300 rounded px-1 py-0.5 border hover:bg-gray-400" on:click=move |_| set_value.update(|value| *value -= step)>"-1"</button>
             <span>"Value: " {value} "!"</span>
-            <button on:click=move |_| set_value.update(|value| *value += step)>"+1"</button>
+            <button class="bg-gray-300 rounded px-1 py-0.5 border hover:bg-gray-400" on:click=move |_| set_value.update(|value| *value += step)>"+1"</button>
         </div>
     }
 }
