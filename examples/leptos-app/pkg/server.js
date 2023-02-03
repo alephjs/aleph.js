@@ -52,7 +52,7 @@ let WASM_VECTOR_LEN = 0;
 
 const cachedTextEncoder = new TextEncoder("utf-8");
 
-const encodeString = (typeof cachedTextEncoder.encodeInto === "function"
+const encodeString = typeof cachedTextEncoder.encodeInto === "function"
   ? function (arg, view) {
     return cachedTextEncoder.encodeInto(arg, view);
   }
@@ -63,7 +63,7 @@ const encodeString = (typeof cachedTextEncoder.encodeInto === "function"
       read: arg.length,
       written: buf.length,
     };
-  });
+  };
 
 function passStringToWasm0(arg, malloc, realloc) {
   if (realloc === undefined) {
