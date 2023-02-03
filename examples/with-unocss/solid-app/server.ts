@@ -6,5 +6,5 @@ serve({
   baseUrl: import.meta.url,
   router: { routes },
   ssr: true,
-  unocss
+  unocss,
 });
