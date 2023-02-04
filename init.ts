@@ -11,6 +11,7 @@ const templates = [
   "react-mdx",
   "vue",
   "yew",
+  "leptos",
   "solid",
   "api",
   // todo:
@@ -76,7 +77,7 @@ export default async function init(nameArg?: string, options?: Options) {
   const generateExportTs = await confirm(
     "Generate `_export.ts` file for runtime that doesn't support dynamic import (deploy to Deno Deploy)?",
   );
-  const withUnocss = ["react", "yew"].includes(template!) && await confirm("Using Unocss(TailwindCSS)?");
+  const withUnocss = ["react", "yew", "leptos"].includes(template!) && await confirm("Using Unocss(TailwindCSS)?");
   const withVscode = await confirm("Initialize VS Code workspace configuration?");
 
   // download template
