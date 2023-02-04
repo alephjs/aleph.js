@@ -78,7 +78,8 @@ export default async function init(nameArg?: string, options?: Options) {
     "Generate `_export.ts` file for runtime that doesn't support dynamic import (deploy to Deno Deploy)?",
   );
 
-  const withUnocss = ["react", "yew", "leptos", "solid"].includes(template!) && await confirm("Using Unocss(TailwindCSS)?");
+  const withUnocss = ["react", "yew", "leptos", "solid"].includes(template!) &&
+    await confirm("Using Unocss(TailwindCSS)?");
 
   const withVscode = await confirm("Initialize VS Code workspace configuration?");
 
