@@ -1,0 +1,7 @@
+.leptos.kdl
+target/
+pkg/*
+!pkg/client.js
+!pkg/client_bg.wasm
+!pkg/server.js
+!pkg/server_bg.wasm
