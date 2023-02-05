@@ -25,7 +25,11 @@
         "examples/yew-app/pkg",
         "examples/yew-app/target",
         "examples/with-unocss/yew-app/pkg",
-        "examples/with-unocss/yew-app/target"
+        "examples/with-unocss/yew-app/target",
+        "examples/leptos-app/pkg",
+        "examples/leptos-app/target",
+        "examples/with-unocss/leptos-app/pkg",
+        "examples/with-unocss/leptos-app/target"
       ]
     }
   },
@@ -33,7 +37,9 @@
     "files": {
       "exclude": [
         "examples/yew-app/pkg",
-        "examples/with-unocss/yew-app/pkg"
+        "examples/with-unocss/yew-app/pkg",
+        "examples/leptos-app/pkg",
+        "examples/with-unocss/leptos-app/pkg"
       ]
     }
   }
