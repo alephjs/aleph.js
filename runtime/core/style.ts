@@ -114,11 +114,11 @@ function getConditionText(rule: CSSRule): string {
   return rule.conditionText || rule.cssText.substring(6, cssText.indexOf("{")).trim();
 }
 
-const isChorme = globalThis.document && /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+const isChrome = globalThis.document && /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
 
 function fixCSSText(cssText: string): string {
   // fix chrome dropping `mask` webkit prefix
-  if (isChorme && cssText.startsWith(".i-")) {
+  if (isChrome && cssText.startsWith(".i-")) {
     return cssText.replace(/(mask:[^;]+;)/, "$1-webkit-$1");
   }
   return cssText;
