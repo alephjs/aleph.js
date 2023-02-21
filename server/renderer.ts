@@ -1,6 +1,6 @@
 import { FetchError } from "../runtime/core/error.ts";
 import { matchRoutes, type RouteModule, type Router } from "../runtime/core/routes.ts";
-import util from "../shared/util.ts";
+import { cleanPath, isFilledString, isPlainObject, utf8Enc } from "../shared/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";
@@ -111,7 +111,7 @@ export default {
         if (!cacheHit) {
           const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
           const files = await getFiles(dir);
-          const outputDir = "." + util.cleanPath(config.build?.outputDir ?? "./output");
+          const outputDir = "." + cleanPath(config.build?.outputDir ?? "./output");
           const inputSources = await Promise.all(
             files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
               Deno.readTextFile(join(dir, name))
@@ -177,7 +177,7 @@ export default {
 
         rewriter.on("head", {
           element(el) {
-            headCollection.forEach((h) => util.isFilledString(h) && el.append(h, { html: true }));
+            headCollection.forEach((h) => isFilledString(h) && el.append(h, { html: true }));
             if (routing.length > 0) {
               const ssrModules = routing.map(({ url, params, filename, withData, data, dataCacheTtl }) => {
                 const defered = typeof data === "function" ? true : undefined;
@@ -254,7 +254,7 @@ export default {
                   }
                   if (Object.keys(deferedData).length > 0) {
                     controller.enqueue(
-                      util.utf8TextEncoder.encode(
+                      utf8Enc.encode(
                         `<script type="application/json" id="defered-data">${JSON.stringify(deferedData)}</script>`,
                       ),
                     );
@@ -322,7 +322,7 @@ async function initSSR(
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, meta]) => {
     const mod = await importRouteModule(meta, router.appDir);
-    const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
+    const dataConfig = isPlainObject(mod.data) ? mod.data : mod;
     const dataDefer = Boolean(dataConfig?.defer);
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),
@@ -371,7 +371,7 @@ async function initSSR(
           } catch (_e) {
             throw new FetchError(500, "Data must be valid JSON");
           }
-        } else if (res === null || util.isPlainObject(res) || Array.isArray(res)) {
+        } else if (res === null || isPlainObject(res) || Array.isArray(res)) {
           if (dataDefer) {
             deferedData[rmod.url.pathname + rmod.url.search] = res;
           }

@@ -2,9 +2,17 @@
 // @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
 
 import runtime from "https://esm.sh/react-refresh@0.14.0/runtime";
-import util from "../../shared/util.ts";
 
-const refresh = util.debounce(runtime.performReactRefresh, 30);
+let timer: number | null;
+const refresh = () => {
+  if (timer !== null) {
+    clearTimeout(timer);
+  }
+  timer = setTimeout(() => {
+    runtime.performReactRefresh();
+    timer = null;
+  }, 50);
+};
 
 runtime.injectIntoGlobalHook(window);
 Object.assign(window, {

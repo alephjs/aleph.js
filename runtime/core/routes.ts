@@ -1,4 +1,4 @@
-import util from "../../shared/util.ts";
+import { splitPath, trimSuffix } from "../../shared/util.ts";
 import type { URLPatternCompat, URLPatternInput, URLPatternResult } from "./url_pattern.ts";
 import { createStaticURLPatternResult } from "./url_pattern.ts";
 
@@ -45,7 +45,7 @@ export function matchRoutes(url: URL, router: Router): RouteMatch[] {
   const { routes, _app, _404 } = router;
   let { pathname } = url;
   if (pathname !== "/") {
-    pathname = util.trimSuffix(pathname, "/");
+    pathname = trimSuffix(pathname, "/");
   }
   const matches: [ret: URLPatternResult, route: RouteMeta][] = [];
   if (routes.length > 0) {
@@ -74,7 +74,7 @@ export function matchRoutes(url: URL, router: Router): RouteMatch[] {
     }
     if (matches.length > 0) {
       const directMatch = matches[matches.length - 1][1];
-      const parts = util.splitPath(pathname);
+      const parts = splitPath(pathname);
       const nestRoutes = routes.filter(([_, m]) =>
         m.nesting && m.pattern.pathname !== "/_app" && directMatch.pattern.pathname.startsWith(m.pattern.pathname + "/")
       );

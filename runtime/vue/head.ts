@@ -1,6 +1,6 @@
 import { defineComponent, inject, isVNode, onBeforeUnmount, VNode } from "vue";
 import { ssrRenderComponent } from "@vue/server-renderer";
-import util from "../../shared/util.ts";
+import { isFilledArray, isFilledString } from "../../shared/util.ts";
 
 export const Head = defineComponent({
   name: "Head",
@@ -78,9 +78,9 @@ function parseSlots(vnodes: VNode[]): ParseSlots[] {
         els.push({ type, props });
         break;
       case "title":
-        if (util.isFilledString(children)) {
+        if (isFilledString(children)) {
           els.push({ type, props, children });
-        } else if (util.isFilledArray(children)) {
+        } else if (isFilledArray(children)) {
           els.push({ type, props, children: children.join("") });
         } else {
           els.push({ type, props });

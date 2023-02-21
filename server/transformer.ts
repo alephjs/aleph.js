@@ -1,5 +1,5 @@
 import { TransformError } from "../runtime/core/error.ts";
-import util from "../shared/util.ts";
+import { isLikelyHttpURL, trimPrefix } from "../shared/util.ts";
 import type { TransformOptions, TransformResult } from "./deps.ts";
 import { btoa, parseDeps, transform } from "./deps.ts";
 import depGraph from "./graph.ts";
@@ -44,7 +44,7 @@ export default {
     const { loader, jsxConfig, importMap, isDev } = options;
     const { pathname, searchParams, search } = new URL(req.url);
     const specifier = pathname.startsWith("/-/") ? restoreUrl(pathname + search) : `.${pathname}`;
-    const isRemote = util.isLikelyHttpURL(specifier);
+    const isRemote = isLikelyHttpURL(specifier);
     const ssr = searchParams.has("ssr");
     const target = isDev ? "es2022" : "es2018"; // todo: get target from user-agent header
 
@@ -90,7 +90,7 @@ export default {
         const s = new MagicString(source);
         deps.forEach((dep) => {
           const { specifier: depSpecifier, importUrl, loc } = dep;
-          if (!util.isLikelyHttpURL(depSpecifier) && loc) {
+          if (!isLikelyHttpURL(depSpecifier) && loc) {
             const sep = importUrl.includes("?") ? "&" : "?";
             const version = depGraph.get(depSpecifier)?.version ?? depGraph.globalVersion;
             const url = `"${importUrl}${sep}ssr&v=${version.toString(36)}"`;
@@ -179,7 +179,7 @@ export default {
           const graphVersions = deploymentId ? {} : Object.fromEntries(
             depGraph.modules.filter((mod) => (
               !isRemote &&
-              !util.isLikelyHttpURL(mod.specifier) &&
+              !isLikelyHttpURL(mod.specifier) &&
               mod.specifier !== specifier
             )).map(({ specifier, version }) => [specifier, version.toString(36)]),
           );
@@ -240,7 +240,7 @@ export default {
           try {
             const m = JSON.parse(map);
             if (!isRemote) {
-              m.sources = [`file://source${util.trimPrefix(specifier, ".")}`];
+              m.sources = [`file://source${trimPrefix(specifier, ".")}`];
             }
             // todo: merge loader map
             m.sourcesContent = [source];

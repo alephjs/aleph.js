@@ -1,6 +1,6 @@
 import { computed, defineComponent, h } from "vue";
 import { useRouter } from "./router.ts";
-import util from "../../shared/util.ts";
+import { cleanPath, isFilledString, isLikelyHttpURL, splitBy } from "../../shared/util.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 
@@ -23,17 +23,17 @@ export const Link = defineComponent({
     const to = props.to;
     const pathname = router.value.url.pathname;
     const href = computed(() => {
-      if (!util.isFilledString(to)) {
+      if (!isFilledString(to)) {
         throw new Error("<Link>: prop `to` is required.");
       }
-      if (util.isLikelyHttpURL(to)) {
+      if (isLikelyHttpURL(to)) {
         return to;
       }
-      let [p, q] = util.splitBy(to, "?");
+      let [p, q] = splitBy(to, "?");
       if (p.startsWith("/")) {
-        p = util.cleanPath(p);
+        p = cleanPath(p);
       } else {
-        p = util.cleanPath(pathname + "/" + p);
+        p = cleanPath(pathname + "/" + p);
       }
       return [p, q].filter(Boolean).join("?");
     });
@@ -47,7 +47,7 @@ export const Link = defineComponent({
     };
 
     const prefetch = () => {
-      if (!util.isLikelyHttpURL(href.value) && !prefetched.has(href.value)) {
+      if (!isLikelyHttpURL(href.value) && !prefetched.has(href.value)) {
         events.emit("moduleprefetch", { href });
         prefetched.add(href.value);
       }

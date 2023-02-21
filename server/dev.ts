@@ -1,4 +1,4 @@
-import util from "../shared/util.ts";
+import { isFilledString, prettyBytes, trimPrefix } from "../shared/util.ts";
 import type { Router } from "../runtime/core/routes.ts";
 import { blue, BuildResult, dim, dirname, Emitter, ensureDir, parseDeps } from "./deps.ts";
 import { esbuild, fromFileUrl, join, mitt, relative } from "./deps.ts";
@@ -30,7 +30,7 @@ export function removeWatchFsEmitter(e: Emitter<WatchFsEvents>) {
 }
 
 /** Watch for file changes and listen the dev server. */
-export function watch(generate: boolean, appDir = Deno.cwd()) {
+export function watch(appDir: string, shouldGenerateExportTs: boolean) {
   const config = getAlephConfig();
   const emitter = createWatchFsEmitter();
 
@@ -41,13 +41,14 @@ export function watch(generate: boolean, appDir = Deno.cwd()) {
       if (reg.test(specifier)) {
         const router = await initRouter(config?.router, appDir);
         Reflect.set(globalThis, "__ALEPH_ROUTER", router);
-        if (generate) {
+        if (shouldGenerateExportTs) {
           generateExportTs(appDir, router, config?.loaders).catch((err) => log.error(err));
         }
       }
     }
   });
-  if (generate) {
+
+  if (shouldGenerateExportTs) {
     initRouter(config?.router, appDir).then((router) => {
       Reflect.set(globalThis, "__ALEPH_ROUTER", router);
       generateExportTs(appDir, router, config?.loaders).catch((err) => log.error(err));
@@ -109,7 +110,7 @@ export default async function dev(options?: DevOptions) {
     ? join(appDir, options?.serverEntry)
     : await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
   if (serverEntry) {
-    const serverSpecifier = `./${util.trimPrefix(serverEntry, appDir)}`;
+    const serverSpecifier = `./${trimPrefix(serverEntry, appDir)}`;
     const source = await Deno.readTextFile(serverEntry);
     const importMap = await getImportMap();
     const deps = await parseDeps(serverSpecifier, source, {
@@ -127,7 +128,7 @@ export default async function dev(options?: DevOptions) {
 
     if (!watched) {
       log.info("[dev] Watching for file changes...");
-      watch(false, appDir);
+      watch(appDir, false);
       watched = true;
     }
 
@@ -197,10 +198,10 @@ export function handleHMR(req: Request): Response {
     });
   });
   socket.addEventListener("message", (e) => {
-    if (util.isFilledString(e.data)) {
+    if (isFilledString(e.data)) {
       try {
         const { type, specifier } = JSON.parse(e.data);
-        if (type === "hotAccept" && util.isFilledString(specifier)) {
+        if (type === "hotAccept" && isFilledString(specifier)) {
           emitter.on(`hotUpdate:${specifier}`, () => {
             send({ type: "modify", specifier });
           });
@@ -245,7 +246,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
 
   router.routes.forEach(([_, { filename, pattern }], idx) => {
     const importUrl = JSON.stringify(
-      "." + util.trimPrefix(filename, router.prefix),
+      "." + trimPrefix(filename, router.prefix),
     );
     imports.push(`import * as $${idx} from ${importUrl};`);
     revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
@@ -281,7 +282,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
               `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
             ),
           );
-          log.debug(`${blue("_export.ts")} updated ${dim(util.prettyBytes(file.text.length))}`);
+          log.debug(`${blue("_export.ts")} updated ${dim(prettyBytes(file.text.length))}`);
         }
       }));
     };

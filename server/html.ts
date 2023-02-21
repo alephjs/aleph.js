@@ -1,4 +1,4 @@
-import util from "../shared/util.ts";
+import { cleanPath, isLikelyHttpURL, utf8Enc } from "../shared/util.ts";
 import { concatBytes, HTMLRewriter } from "./deps.ts";
 import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
@@ -80,9 +80,9 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
     element: (el) => {
       let href = el.getAttribute("href");
       if (href) {
-        const isHttpUrl = util.isLikelyHttpURL(href);
+        const isHttpUrl = isLikelyHttpURL(href);
         if (!isHttpUrl) {
-          const pathname = util.cleanPath(href);
+          const pathname = cleanPath(href);
           if (hmr && pathname.endsWith(".css")) {
             const specifier = `.${pathname}`;
             el.setAttribute("data-module-id", specifier);
@@ -109,8 +109,8 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
     element: (el) => {
       let src = el.getAttribute("src");
       if (src) {
-        if (!util.isLikelyHttpURL(src)) {
-          src = util.cleanPath(src);
+        if (!isLikelyHttpURL(src)) {
+          src = cleanPath(src);
           if (deploymentId) {
             src += (src.includes("?") ? "&v=" : "?v=") + deploymentId;
           }
@@ -196,7 +196,7 @@ export function parseHtmlLinks(html: string | Uint8Array): Promise<string[]> {
         },
       });
       try {
-        rewriter.write(typeof html === "string" ? util.utf8TextEncoder.encode(html) : html);
+        rewriter.write(typeof html === "string" ? utf8Enc.encode(html) : html);
         rewriter.end();
       } finally {
         rewriter.free();

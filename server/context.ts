@@ -1,4 +1,4 @@
-import util from "../shared/util.ts";
+import { computeHash, hmacSign, splitBy } from "../shared/util.ts";
 import { SessionImpl } from "./session.ts";
 import type { ConnInfo, Context, HTMLRewriterHandlers, Session, SessionOptions } from "./types.ts";
 
@@ -26,7 +26,7 @@ export function createContext(
           const cookieHeader = req.headers.get("Cookie");
           if (cookieHeader) {
             for (const cookie of cookieHeader.split(";")) {
-              const [key, value] = util.splitBy(cookie, "=");
+              const [key, value] = splitBy(cookie, "=");
               cookies.set(key.trim(), value);
             }
           }
@@ -44,15 +44,15 @@ export function createContext(
       const cookieName = options?.session?.cookie?.name ?? "session";
       let sid = ctx.cookies.get(cookieName);
       if (sid && options?.session?.secret) {
-        const [rid, signature] = util.splitBy(sid, ".");
-        if (!signature || signature !== await util.hmacSign(rid, options?.session?.secret, "SHA-256")) {
+        const [rid, signature] = splitBy(sid, ".");
+        if (!signature || signature !== await hmacSign(rid, options?.session?.secret, "SHA-256")) {
           sid = undefined;
         }
       }
       if (!sid) {
-        sid = await util.computeHash("SHA-1", crypto.randomUUID());
+        sid = await computeHash("SHA-1", crypto.randomUUID());
         if (options?.session?.secret) {
-          sid = sid + "." + util.hmacSign(sid, options.session.secret);
+          sid = sid + "." + hmacSign(sid, options.session.secret);
         }
       }
 

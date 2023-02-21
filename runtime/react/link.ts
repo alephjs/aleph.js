@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, MutableRefObject, PropsWithChildren } from "react";
 import { createElement, useCallback, useEffect, useMemo, useRef } from "react";
-import util from "../../shared/util.ts";
+import { cleanPath, isFilledString, isLikelyHttpURL, splitBy, trimSuffix } from "../../shared/util.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import { useRouter } from "./router.ts";
@@ -36,22 +36,22 @@ export function Link(props: LinkProps) {
   } = props;
   const { url: { pathname } } = useRouter();
   const href = useMemo(() => {
-    if (!util.isFilledString(to)) {
+    if (!isFilledString(to)) {
       throw new Error("<Link>: prop `to` is required.");
     }
-    if (util.isLikelyHttpURL(to)) {
+    if (isLikelyHttpURL(to)) {
       return to;
     }
-    let [p, q] = util.splitBy(to, "?");
+    let [p, q] = splitBy(to, "?");
     if (p.startsWith("/")) {
-      p = util.cleanPath(p);
+      p = cleanPath(p);
     } else {
-      p = util.cleanPath(pathname + "/" + p);
+      p = cleanPath(pathname + "/" + p);
     }
     return [p, q].filter(Boolean).join("?");
   }, [pathname, to]);
   const ariaCurrent = useMemo(() => {
-    if (util.isFilledString(propAriaCurrent)) {
+    if (isFilledString(propAriaCurrent)) {
       return propAriaCurrent;
     }
     if (href.startsWith("/")) {
@@ -60,7 +60,7 @@ export function Link(props: LinkProps) {
     return undefined;
   }, [href, propAriaCurrent]);
   const prefetch = useCallback(() => {
-    if (!util.isLikelyHttpURL(href) && !prefetched.has(href)) {
+    if (!isLikelyHttpURL(href) && !prefetched.has(href)) {
       events.emit("moduleprefetch", { href });
       prefetched.add(href);
     }
@@ -145,17 +145,17 @@ export function NavLink(props: NavLinkProps) {
   const { to, exact, className: propClassName, style: propStyle, activeStyle, activeClassName, ...rest } = props;
   const { url } = useRouter();
   const isActivated = useMemo(() => {
-    if (!util.isFilledString(to)) {
+    if (!isFilledString(to)) {
       return false;
     }
 
-    const [p, q] = util.splitBy(to, "?");
-    const currentPathname = util.trimSuffix(url.pathname, "/");
+    const [p, q] = splitBy(to, "?");
+    const currentPathname = trimSuffix(url.pathname, "/");
     let pathname: string;
     if (p.startsWith("/")) {
-      pathname = util.cleanPath(p);
+      pathname = cleanPath(p);
     } else {
-      pathname = util.cleanPath(currentPathname + "/" + p);
+      pathname = cleanPath(currentPathname + "/" + p);
     }
     if (!exact) {
       return pathname === currentPathname || currentPathname.startsWith(pathname + "/");
@@ -166,7 +166,7 @@ export function NavLink(props: NavLinkProps) {
     if (!isActivated || !activeClassName) {
       return propClassName;
     }
-    return [propClassName, activeClassName].filter(util.isFilledString).join(" ");
+    return [propClassName, activeClassName].filter(isFilledString).join(" ");
   }, [propClassName, activeClassName, isActivated]);
   const style = useMemo(() => {
     if (!isActivated || !activeStyle) {

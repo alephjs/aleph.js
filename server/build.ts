@@ -1,4 +1,4 @@
-import util from "../shared/util.ts";
+import { cleanPath, isLikelyHttpURL, splitBy, trimPrefix } from "../shared/util.ts";
 import type { TransformCSSOptions } from "./deps.ts";
 import {
   bold,
@@ -132,7 +132,7 @@ export async function build(
       const url = new URL(src, "http://localhost/");
       const ext = extname(url.pathname).slice(1);
       if (ext === "css" || builtinModuleExts.includes(ext)) {
-        const specifier = util.isLikelyHttpURL(src) ? src : "." + util.cleanPath(src);
+        const specifier = isLikelyHttpURL(src) ? src : "." + cleanPath(src);
         queue.push(specifier);
       }
     }
@@ -156,7 +156,7 @@ export async function build(
   while (queue.length > 0) {
     const deps = new Set<string>();
     await Promise.all(queue.map(async (specifier) => {
-      const url = new URL(util.isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
+      const url = new URL(isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
       const isCSS = url.pathname.endsWith(".css");
       let savePath = join(outputDir, url.pathname);
       if (isNpmPkg(specifier)) {
@@ -247,7 +247,7 @@ export async function build(
   // bundle client modules
   await Promise.all(
     Array.from(clientModules.keys()).map(async (entryPoint) => {
-      const url = new URL(util.isLikelyHttpURL(entryPoint) ? toLocalPath(entryPoint) : entryPoint, "http://localhost");
+      const url = new URL(isLikelyHttpURL(entryPoint) ? toLocalPath(entryPoint) : entryPoint, "http://localhost");
       if (url.pathname.endsWith(".css")) {
         return;
       }
@@ -274,8 +274,8 @@ export async function build(
               if (argsPath.startsWith("./") || argsPath.startsWith("../")) {
                 argsPath = join(args.resolveDir, argsPath);
               }
-              const [fp, q] = util.splitBy(argsPath, "?");
-              const path = util.trimPrefix(fp, outputDir);
+              const [fp, q] = splitBy(argsPath, "?");
+              const path = trimPrefix(fp, outputDir);
               let specifier = "." + path;
               if (args.path.startsWith("/-/")) {
                 specifier = restoreUrl(path);
@@ -345,8 +345,8 @@ export async function bundleCSS(
   );
   const deps = dependencies?.filter((dep) => dep.type === "import" && !dep.media).map((dep) => {
     let url = dep.url;
-    if (util.isLikelyHttpURL(specifier)) {
-      if (!util.isLikelyHttpURL(url)) {
+    if (isLikelyHttpURL(specifier)) {
+      if (!isLikelyHttpURL(url)) {
         url = new URL(url, specifier).toString();
       }
     } else {

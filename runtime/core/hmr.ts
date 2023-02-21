@@ -1,7 +1,7 @@
 // ESM Hot Module Replacement (ESM-HMR) Specification
 // https://github.com/withastro/esm-hmr
 
-import util from "../../shared/util.ts";
+import { cleanPath } from "../../shared/util.ts";
 import events from "./events.ts";
 
 const modules: Map<string, Module> = new Map();
@@ -53,7 +53,7 @@ class Module {
   }
 
   watchFile(filename: string, callback: () => void) {
-    const specifier = "." + util.cleanPath(filename);
+    const specifier = "." + cleanPath(filename);
     const handler = (data: Record<string, unknown>) => {
       if (data.specifier === specifier) {
         callback();

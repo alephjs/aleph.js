@@ -1,4 +1,4 @@
-import util from "../../shared/util.ts";
+import { isFilledString } from "../../shared/util.ts";
 import events from "./events.ts";
 
 let routerReady = false;
@@ -16,7 +16,7 @@ events.on("routerready", onrouterready);
 
 export function redirect(url: string, replace?: boolean) {
   const { history, location } = globalThis;
-  if (!util.isFilledString(url) || !history || !location) {
+  if (!isFilledString(url) || !history || !location) {
     return;
   }
 

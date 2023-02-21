@@ -1,6 +1,6 @@
 import type { FC, ReactNode } from "react";
 import { Children, createElement, Fragment, isValidElement, useContext, useEffect, useMemo } from "react";
-import util from "../../shared/util.ts";
+import { isFilledArray, isFilledString } from "../../shared/util.ts";
 import { RouterContext } from "./context.ts";
 
 export const Head: FC<{ children?: ReactNode }> = (props) => {
@@ -13,17 +13,17 @@ export const Head: FC<{ children?: ReactNode }> = (props) => {
     els.forEach(({ type, props }) => {
       const { children, ...rest } = props;
       if (type === "title") {
-        if (util.isFilledString(children)) {
+        if (isFilledString(children)) {
           ssrHeadCollection.push(`<title ssr>${children}</title>`);
-        } else if (util.isFilledArray(children)) {
+        } else if (isFilledArray(children)) {
           ssrHeadCollection.push(`<title ssr>${children.join("")}</title>`);
         }
       } else {
         const attrs = Object.entries(rest).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`)
           .join("");
-        if (util.isFilledString(children)) {
+        if (isFilledString(children)) {
           ssrHeadCollection.push(`<${type}${attrs} ssr>${children}</${type}>`);
-        } else if (util.isFilledArray(children)) {
+        } else if (isFilledArray(children)) {
           ssrHeadCollection.push(
             `<${type}${attrs} ssr>${children.join("")}</${type}>`,
           );
@@ -45,9 +45,9 @@ export const Head: FC<{ children?: ReactNode }> = (props) => {
         Object.keys(props).forEach((key) => {
           const value = props[key];
           if (key === "children") {
-            if (util.isFilledString(value)) {
+            if (isFilledString(value)) {
               el.innerText = value;
-            } else if (util.isFilledArray(value)) {
+            } else if (isFilledArray(value)) {
               el.innerText = value.join("");
             }
           } else {

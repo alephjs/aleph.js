@@ -1,4 +1,4 @@
-import util from "../shared/util.ts";
+import { isFilledArray, isFilledString, isLikelyHttpURL, isPlainObject, trimSuffix } from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
 import { basename, dirname, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
@@ -145,7 +145,7 @@ export function toResponse(v: unknown, headers: Headers): Response {
     headers.set("Content-Length", v.size.toString());
     return new Response(v, { headers: headers });
   }
-  if (util.isPlainObject(v) || Array.isArray(v)) {
+  if (isPlainObject(v) || Array.isArray(v)) {
     return Response.json(v, { headers });
   }
   if (v === null) {
@@ -168,7 +168,7 @@ export function fixResponse(res: Response, fixRedirect: boolean): Response {
  * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`
  */
 export function toLocalPath(url: string): string {
-  if (util.isLikelyHttpURL(url)) {
+  if (isLikelyHttpURL(url)) {
     let { hostname, pathname, port, protocol, search } = new URL(url);
     const isHttp = protocol === "http:";
     if ((isHttp && port === "80") || (protocol === "https:" && port === "443")) {
@@ -179,7 +179,7 @@ export function toLocalPath(url: string): string {
       isHttp && "http_",
       hostname,
       port && "_" + port,
-      util.trimSuffix(pathname, "/"),
+      trimSuffix(pathname, "/"),
       search,
     ].filter(Boolean).join("");
   }
@@ -333,7 +333,7 @@ export async function fetchCode(
   target?: TransformOptions["target"],
 ): Promise<[code: string, contentType: string]> {
   const config = getAlephConfig();
-  if (util.isLikelyHttpURL(specifier)) {
+  if (isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
     if (url.host === "aleph") {
       return [
@@ -370,7 +370,7 @@ export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
       >;
       if (
         (jsx === undefined || jsx === "react-jsx" || jsx === "react-jsxdev") &&
-        util.isFilledString(jsxImportSource)
+        isFilledString(jsxImportSource)
       ) {
         jsxConfig.jsxImportSource = jsxImportSource;
       } else {
@@ -444,7 +444,7 @@ export async function parseImportMap(importMapFile: string): Promise<ImportMap> 
   const data = await parseJSONFile(importMapFile);
   const imports: Record<string, string> = toStringMap(data.imports);
   const scopes: Record<string, Record<string, string>> = {};
-  if (util.isPlainObject(data.scopes)) {
+  if (isPlainObject(data.scopes)) {
     Object.entries(data.scopes).forEach(([scope, imports]) => {
       scopes[scope] = toStringMap(imports);
     });
@@ -455,18 +455,18 @@ export async function parseImportMap(importMapFile: string): Promise<ImportMap> 
 
 function toStringMap(v: unknown): Record<string, string> {
   const m: Record<string, string> = {};
-  if (util.isPlainObject(v)) {
+  if (isPlainObject(v)) {
     Object.entries(v).forEach(([key, value]) => {
       if (key === "") {
         return;
       }
-      if (util.isFilledString(value)) {
+      if (isFilledString(value)) {
         m[key] = value;
         return;
       }
-      if (util.isFilledArray(value)) {
+      if (isFilledArray(value)) {
         for (const v of value) {
-          if (util.isFilledString(v)) {
+          if (isFilledString(v)) {
             m[key] = v;
             return;
           }

@@ -11,7 +11,7 @@ import {
   parse,
   rewriteDefault,
 } from "https://esm.sh/@vue/compiler-sfc@3.2.39?target=esnext";
-import util from "../../shared/util.ts";
+import { computeHash } from "../../shared/util.ts";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
 import log from "../../server/log.ts";
 
@@ -33,7 +33,7 @@ export default class VueSFCLoader implements ModuleLoader {
   }
 
   async load(specifier: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
-    const id = (await util.computeHash("SHA-256", specifier)).slice(0, 8);
+    const id = (await computeHash("SHA-256", specifier)).slice(0, 8);
     const { descriptor } = parse(content, { filename: specifier, sourceMap: env.sourceMap });
     const scriptLang = (descriptor.script && descriptor.script.lang) ||
       (descriptor.scriptSetup && descriptor.scriptSetup.lang);
@@ -88,7 +88,7 @@ export default class VueSFCLoader implements ModuleLoader {
       output.push(`__sfc__.__scopeId = ${JSON.stringify(`data-v-${id}`)};`);
     }
     if (!env.ssr && env.isDev) {
-      const mainScriptHash = (await util.computeHash("SHA-256", mainScript)).slice(0, 8);
+      const mainScriptHash = (await computeHash("SHA-256", mainScript)).slice(0, 8);
       output.push(`__sfc__.__scriptHash = ${JSON.stringify(mainScriptHash)};`);
       output.push(`__sfc__.__hmrId = ${JSON.stringify(id)};`);
       output.push(`window.__VUE_HMR_RUNTIME__?.createRecord(__sfc__.__hmrId, __sfc__);`);

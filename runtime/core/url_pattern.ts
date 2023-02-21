@@ -1,4 +1,4 @@
-import util from "../../shared/util.ts";
+import { isFilledString, splitPath } from "../../shared/util.ts";
 
 export type URLPatternInput = {
   host?: string;
@@ -21,8 +21,8 @@ export class URLPatternCompat {
     patternPathname: string,
     pathname: string,
   ): null | Pick<URLPatternResult, "pathname"> {
-    const patternSegments = util.splitPath(patternPathname);
-    const segments = util.splitPath(pathname);
+    const patternSegments = splitPath(patternPathname);
+    const segments = splitPath(pathname);
     const depth = Math.max(patternSegments.length, segments.length);
     const groups: Record<string, string> = {};
 
@@ -66,10 +66,10 @@ export class URLPatternCompat {
     if (typeof pattern.test === "function") {
       return pattern.test(input);
     }
-    if (util.isFilledString(pattern.host) && pattern.host !== input.host) {
+    if (isFilledString(pattern.host) && pattern.host !== input.host) {
       return false;
     }
-    if (util.isFilledString(pattern.pathname)) {
+    if (isFilledString(pattern.pathname)) {
       return URLPatternCompat.execPathname(pattern.pathname, input.pathname) !== null;
     }
     return false;
@@ -80,10 +80,10 @@ export class URLPatternCompat {
     if (typeof pattern.exec === "function") {
       return pattern.exec(input);
     }
-    if (util.isFilledString(pattern.host) && pattern.host !== input.host) {
+    if (isFilledString(pattern.host) && pattern.host !== input.host) {
       return null;
     }
-    if (util.isFilledString(pattern.pathname)) {
+    if (isFilledString(pattern.pathname)) {
       const ret = URLPatternCompat.execPathname(pattern.pathname, input.pathname);
       if (ret) {
         return {

@@ -1,4 +1,4 @@
-import util from "../shared/util.ts";
+import { computeHash, isFilledString, trimSuffix, utf8Dec } from "../shared/util.ts";
 import { green, join } from "./deps.ts";
 import { existsDir, existsFile } from "./helpers.ts";
 import log from "./log.ts";
@@ -21,9 +21,9 @@ if (typeof Deno.run === "function") {
     stdout: "piped",
     stderr: "null",
   });
-  const output = util.utf8TextDecoder.decode(await p.output());
+  const output = utf8Dec.decode(await p.output());
   const { modulesCache } = JSON.parse(output);
-  if (util.isFilledString(modulesCache)) {
+  if (isFilledString(modulesCache)) {
     Deno.env.set("MODULES_CACHE_DIR", modulesCache);
   }
   p.close();
@@ -47,10 +47,10 @@ export async function cacheFetch(
     searchParams.delete("v");
     searchParams.sort();
     url = urlObj.toString();
-    cacheKey = await util.computeHash("sha-256", pathname + searchParams.toString() + (options?.userAgent || ""));
+    cacheKey = await computeHash("sha-256", pathname + searchParams.toString() + (options?.userAgent || ""));
   }
   if (modulesCacheDir) {
-    cacheDir = join(modulesCacheDir, util.trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
+    cacheDir = join(modulesCacheDir, trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
     contentFilepath = join(cacheDir, cacheKey);
     metaFilepath = join(cacheDir, cacheKey + ".metadata.json");
   }

@@ -1,4 +1,4 @@
-import util from "../shared/util.ts";
+import { splitBy, trimPrefix } from "../shared/util.ts";
 
 // MIME types for web
 const mimeTypes: Record<string, string[]> = {
@@ -68,12 +68,12 @@ const typesMap = Object.entries(mimeTypes).reduce((map, [contentType, exts]) => 
 
 /** register a new type */
 export function registerType(ext: string, contentType: string) {
-  typesMap.set(util.trimPrefix(ext, "."), contentType);
+  typesMap.set(trimPrefix(ext, "."), contentType);
 }
 
 /** get the content type by file name */
 export function getContentType(filename: string): string {
-  let [prefix, ext] = util.splitBy(filename, ".", true);
+  let [prefix, ext] = splitBy(filename, ".", true);
   if (ext === "gz" && prefix.endsWith(".tar")) {
     ext = "tar.gz";
   }

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToReadableStream } from "react-dom/server";
 import { serve as alephServe, type ServerOptions } from "../../server/mod.ts";
 import type { SSRContext, SSROptions } from "../../server/types.ts";
-import util from "../../shared/util.ts";
+import { pick } from "../../shared/util.ts";
 import { App } from "./router.ts";
 
 if (Deno.args.includes("--dev")) {
@@ -28,7 +28,7 @@ export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   return renderToReadableStream(
     createElement(App, { ssrContext: ctx }),
     {
-      ...util.pick(ctx, "signal", "nonce"),
+      ...pick(ctx, "signal", "nonce"),
       bootstrapScripts: [suspenseMarker],
     },
   );
