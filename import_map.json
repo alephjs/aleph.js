@@ -1,6 +1,6 @@
 {
   "imports": {
-    "std/": "https://deno.land/std@0.170.0/",
+    "std/": "https://deno.land/std@0.175.0/",
     "@unocss/core": "https://esm.sh/@unocss/core@0.47.4",
     "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.47.4",
     "aleph/": "./",

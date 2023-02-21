@@ -1,9 +1,9 @@
 // deno std
-export { concat as concatBytes } from "https://deno.land/std@0.170.0/bytes/mod.ts";
-export { blue, bold, cyan, dim, green, red, yellow } from "https://deno.land/std@0.170.0/fmt/colors.ts";
-export { ensureDir } from "https://deno.land/std@0.170.0/fs/ensure_dir.ts";
-export { serve, serveTls } from "https://deno.land/std@0.170.0/http/server.ts";
-export { encode as btoa } from "https://deno.land/std@0.170.0/encoding/base64.ts";
+export { concat as concatBytes } from "https://deno.land/std@0.175.0/bytes/mod.ts";
+export { blue, bold, cyan, dim, green, red, yellow } from "https://deno.land/std@0.175.0/fmt/colors.ts";
+export { ensureDir } from "https://deno.land/std@0.175.0/fs/ensure_dir.ts";
+export { serve, serveTls } from "https://deno.land/std@0.175.0/http/server.ts";
+export { encode as btoa } from "https://deno.land/std@0.175.0/encoding/base64.ts";
 export {
   basename,
   dirname,
@@ -13,7 +13,7 @@ export {
   join,
   relative,
   resolve,
-} from "https://deno.land/std@0.170.0/path/mod.ts";
+} from "https://deno.land/std@0.175.0/path/mod.ts";
 
 // third-party
 // @deno-types="https://deno.land/x/esbuild@v0.15.16/mod.d.ts"
