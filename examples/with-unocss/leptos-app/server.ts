@@ -3,8 +3,7 @@ import init, { ssr } from "./pkg/server.js";
 import unocss from "./unocss.config.ts";
 
 // Pre-imports `@unocss/core` for serverless env that doesn't support the dynamic import.
-import * as uno from "@unocss/core";
-Reflect.set(globalThis, "UNOCSS_CORE", uno);
+Reflect.set(globalThis, "UNOCSS", await import("@unocss/core"));
 
 const wasmUrl = new URL("./pkg/server_bg.wasm", import.meta.url);
 await init(await Deno.readFile(wasmUrl));

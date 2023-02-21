@@ -239,8 +239,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
   const revives: string[] = [];
 
   if (config?.unocss?.presets) {
-    imports.push(`import * as uno from "@unocss/core";`);
-    imports.push(`Reflect.set(globalThis, "UNOCSS_CORE", uno);`);
+    imports.push(`Reflect.set(globalThis, "UNOCSS", await import("@unocss/core"));`);
     imports.push(""); // empty line
   }
 
