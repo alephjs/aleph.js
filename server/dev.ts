@@ -1,7 +1,18 @@
 import { isFilledString, prettyBytes, trimPrefix } from "../shared/util.ts";
 import type { Router } from "../runtime/core/routes.ts";
-import { blue, BuildResult, dim, dirname, Emitter, ensureDir, parseDeps } from "./deps.ts";
-import { esbuild, fromFileUrl, join, mitt, relative } from "./deps.ts";
+import {
+  blue,
+  dim,
+  dirname,
+  Emitter,
+  ensureDir,
+  esbuild,
+  fromFileUrl,
+  join,
+  mitt,
+  parseDeps,
+  relative,
+} from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
 import { builtinModuleExts, findFile, getAlephConfig, getImportMap, getJSXConfig, watchFs } from "./helpers.ts";
 import log from "./log.ts";
@@ -145,7 +156,7 @@ export default async function dev(options?: DevOptions) {
       }
     });
 
-    const cmd = [Deno.execPath(), "run", "-A", "-q", serverEntry, "--dev"];
+    const cmd = [Deno.execPath(), "run", "-A", "--no-lock", serverEntry, "--dev"];
     if (options?.generateExportTs) {
       cmd.push("--generate");
     }
@@ -217,13 +228,12 @@ export function handleHMR(req: Request): Response {
 /** generate the `routes/_export.ts` module by given the routes config. */
 export async function generateExportTs(appDir: string, router: Router, loaders?: ModuleLoader[]) {
   const routesDir = join(appDir, router.prefix);
-  const genFile = join(routesDir, "_export.ts");
+  const exportTsFile = join(routesDir, "_export.ts");
   const withLoader = router.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
-  const config = getAlephConfig();
 
   if (router.routes.length == 0) {
     try {
-      await Deno.remove(genFile);
+      await Deno.remove(exportTsFile);
     } catch (error) {
       if (!(error instanceof Deno.errors.NotFound)) {
         throw error;
@@ -239,11 +249,6 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
   const imports: string[] = [];
   const revives: string[] = [];
 
-  if (config?.unocss?.presets) {
-    imports.push(`Reflect.set(globalThis, "UNOCSS", await import("@unocss/core"));`);
-    imports.push(""); // empty line
-  }
-
   router.routes.forEach(([_, { filename, pattern }], idx) => {
     const importUrl = JSON.stringify(
       "." + trimPrefix(filename, router.prefix),
@@ -252,17 +257,15 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
     revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
   });
 
-  // stop previous esbuild watcher
-  const preResult: BuildResult | undefined = Reflect.get(
-    globalThis,
-    "__ALEPH_PREV_ESBUILD_RES",
-  );
-  if (preResult) {
-    Reflect.deleteProperty(globalThis, "__ALEPH_PREV_ESBUILD_RES");
-    preResult.stop?.();
+  // stop previous esbuild context
+  const prevCtx: esbuild.BuildContext | undefined = Reflect.get(globalThis, "__ESBUILD_CTX");
+  if (prevCtx) {
+    Reflect.deleteProperty(globalThis, "__ESBUILD_CTX");
+    prevCtx.dispose?.();
   }
 
   if (withLoader) {
+    const depGraph = new DependencyGraph();
     const input = [
       ...imports,
       "export default {",
@@ -270,114 +273,104 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
       "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null,",
       "}",
     ].join("\n");
-    const depGraph = new DependencyGraph();
-    const write = async (build: BuildResult) => {
+    const write = async (build: esbuild.BuildResult) => {
       await Promise.all(build.outputFiles!.map(async (file) => {
-        if (file.path === genFile) {
+        if (file.path === exportTsFile) {
           await Deno.writeTextFile(
-            genFile,
+            exportTsFile,
             file.text.replace(
               "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
               // deno-lint-ignore no-unused-vars
               `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
             ),
           );
-          log.debug(`${blue("_export.ts")} updated ${dim(prettyBytes(file.text.length))}`);
+          log.debug(`${blue("_export.ts")} updated ${dim(prettyBytes(file.text.length))} by esbuld`);
         }
       }));
     };
-    try {
-      const result = await esbuild({
-        stdin: {
-          sourcefile: genFile,
-          contents: input,
-        },
-        outfile: genFile,
-        platform: "browser",
-        format: "esm",
-        target: ["esnext"],
-        bundle: true,
-        minify: true,
-        treeShaking: true,
-        // todo: enable sourcemap
-        sourcemap: false,
-        write: false,
-        banner: {
-          js: [
-            ...comments,
-            "// deno-fmt-ignore-file",
-            "// deno-lint-ignore-file",
-            "// @ts-nocheck",
-          ].join("\n"),
-        },
-        plugins: [{
-          name: "aleph-loader",
-          setup(build) {
-            build.onResolve({ filter: /.*/ }, (args) => {
-              if (
-                args.path.startsWith(".") &&
-                loaders?.some((l) => l.test(args.path))
-              ) {
-                const specifier = "./" + relative(appDir, join(routesDir, args.path));
-                depGraph.mark(specifier, {});
-                if (args.importer.startsWith(".")) {
-                  const importer = "./" + relative(appDir, join(routesDir, args.importer));
-                  depGraph.mark(importer, { deps: [{ specifier }] });
-                }
-                return { path: args.path, namespace: "loader" };
+    const ctx = await esbuild.context({
+      stdin: { contents: input },
+      outfile: exportTsFile,
+      platform: "browser",
+      format: "esm",
+      target: "esnext",
+      bundle: true,
+      minify: true,
+      treeShaking: true,
+      // todo: enable sourcemap
+      sourcemap: false,
+      write: false,
+      banner: {
+        js: [
+          ...comments,
+          "// deno-fmt-ignore-file",
+          "// deno-lint-ignore-file",
+          "// @ts-nocheck",
+        ].join("\n"),
+      },
+      plugins: [{
+        name: "aleph-loader",
+        setup(build) {
+          build.onResolve({ filter: /.*/ }, (args) => {
+            if (
+              args.path.startsWith(".") &&
+              loaders?.some((l) => l.test(args.path))
+            ) {
+              const specifier = "./" + relative(appDir, join(routesDir, args.path));
+              depGraph.mark(specifier, {});
+              if (args.importer.startsWith(".")) {
+                const importer = "./" + relative(appDir, join(routesDir, args.importer));
+                depGraph.mark(importer, { deps: [{ specifier }] });
               }
-              return { path: args.path, external: true };
-            });
-            build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
-              const loader = loaders?.find((l) => l.test(args.path));
-              if (loader) {
-                const fullpath = join(routesDir, args.path);
-                const specifier = "./" + relative(appDir, fullpath);
-                const [importMap, jsxConfig, source] = await Promise.all([
-                  getImportMap(appDir),
-                  getJSXConfig(appDir),
-                  Deno.readTextFile(fullpath),
-                ]);
-                try {
-                  const { code, lang, inlineCSS } = await loader.load(specifier, source, {
-                    importMap,
-                    jsxConfig,
-                    ssr: true,
-                  });
-                  if (inlineCSS) {
-                    depGraph.mark(specifier, { inlineCSS });
-                  }
-                  return {
-                    contents: code,
-                    loader: lang,
-                    watchFiles: [fullpath],
-                  };
-                } catch (error) {
-                  return {
-                    errors: [{ text: error.message }],
-                  };
-                }
-              }
-              return {
-                errors: [{ text: `Loader not found for ${args.path}` }],
-              };
-            });
-          },
-        }],
-        watch: {
-          onRebuild(error, result) {
-            if (error) {
-              return;
+              return { path: args.path, namespace: "loader" };
             }
-            write(result!);
-          },
+            return { path: args.path, external: true };
+          });
+          build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
+            const loader = loaders?.find((l) => l.test(args.path));
+            if (loader) {
+              const fullpath = join(routesDir, args.path);
+              const specifier = "./" + relative(appDir, fullpath);
+              const [importMap, jsxConfig, source] = await Promise.all([
+                getImportMap(appDir),
+                getJSXConfig(appDir),
+                Deno.readTextFile(fullpath),
+              ]);
+              try {
+                const { code, lang, inlineCSS } = await loader.load(specifier, source, {
+                  importMap,
+                  jsxConfig,
+                  ssr: true,
+                });
+                if (inlineCSS) {
+                  depGraph.mark(specifier, { inlineCSS });
+                }
+                return {
+                  contents: code,
+                  loader: lang,
+                  watchFiles: [fullpath],
+                };
+              } catch (error) {
+                return {
+                  errors: [{ text: error.message }],
+                };
+              }
+            }
+            return {
+              errors: [{ text: `Loader not found for ${args.path}` }],
+            };
+          });
+          build.onEnd((res) => {
+            write(res);
+          });
         },
-      });
-      Reflect.set(globalThis, "__ALEPH_PREV_ESBUILD_RES", result);
-      await write(result);
-    } catch (_e) {
-      // ignore
-    }
+      }],
+    });
+    await ctx.watch();
+    Reflect.set(globalThis, "__ESBUILD_CTX", ctx);
+    addEventListener("unload", () => {
+      ctx.dispose();
+    });
   } else {
     const empty = "";
     const code = [
@@ -390,7 +383,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
       "};",
       empty,
     ].join("\n");
-    await Deno.writeTextFile(genFile, code);
+    await Deno.writeTextFile(exportTsFile, code);
     log.debug(`${blue("_export.ts")} updated`);
   }
 }

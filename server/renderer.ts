@@ -3,7 +3,7 @@ import { matchRoutes, type RouteModule, type Router } from "../runtime/core/rout
 import { cleanPath, isFilledString, isPlainObject, utf8Enc } from "../shared/util.ts";
 import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
 import depGraph from "./graph.ts";
-import { getAlephConfig, getDeploymentId, getFiles, getUnoGenerator, regJsxFile } from "./helpers.ts";
+import { getAlephConfig, getDeploymentId, getFiles, regJsxFile, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
 import { importRouteModule } from "./routing.ts";
 import type { HTMLRewriterHandlers, SSR, SSRContext, SuspenseMarker } from "./types.ts";
@@ -98,48 +98,45 @@ export default {
 
     // build unocss
     const config = getAlephConfig();
-    if (config?.unocss?.presets) {
-      const uno = await getUnoGenerator();
-      if (uno) {
-        const t = performance.now();
-        const {
-          test = regJsxFile,
-          resetCSS = "tailwind",
-        } = config.unocss;
-        let css = Reflect.get(globalThis, "__ALEPH_UNOCSS_BUILD");
-        const cacheHit = Boolean(css);
-        if (!cacheHit) {
-          const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
-          const files = await getFiles(dir);
-          const outputDir = "." + cleanPath(config.build?.outputDir ?? "./output");
-          const inputSources = await Promise.all(
-            files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
-              Deno.readTextFile(join(dir, name))
-            ),
-          );
-          if (inputSources.length > 0) {
-            const ret = await uno.generate(inputSources.join("\n"), {
-              minify: !isDev,
-            });
-            if (ret.matched.size > 0) {
-              css = ret.css;
-              if (!isDev) {
-                Reflect.set(globalThis, "__ALEPH_UNOCSS_BUILD", css);
-              }
+    if (config?.atomicCSS) {
+      const t = performance.now();
+      const {
+        test = regJsxFile,
+        resetCSS,
+        version,
+      } = config.atomicCSS;
+      let css = Reflect.get(globalThis, "__ALEPH_UNOCSS_BUILD");
+      const cacheHit = Boolean(css);
+      if (!cacheHit) {
+        const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
+        const files = await getFiles(dir);
+        const outputDir = "." + cleanPath(config.build?.outputDir ?? "./output");
+        const inputSources = await Promise.all(
+          files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
+            Deno.readTextFile(join(dir, name))
+          ),
+        );
+        if (inputSources.length > 0) {
+          const ret = await config.atomicCSS.generate(inputSources.join("\n"), {
+            minify: !isDev,
+          });
+          if (ret.matched.size > 0) {
+            css = ret.css;
+            if (!isDev) {
+              Reflect.set(globalThis, "__ALEPH_UNOCSS_BUILD", css);
             }
           }
         }
-        if (css) {
-          const buildTime = (performance.now() - t).toFixed(2);
-          headCollection.push(
-            `<link rel="stylesheet" href="/-/esm.sh/@unocss/reset@${uno.version}/${resetCSS}.css">`,
-            `<style data-unocss="${uno.version}" ${
-              cacheHit ? `data-cache-hit="true"` : `data-build-time="${buildTime}ms"`
-            }>${css}</style>`,
-          );
-          if (!cacheHit) {
-            log.debug(`UnoCSS generated in ${buildTime}ms`);
-          }
+      }
+      if (css) {
+        const buildTime = (performance.now() - t).toFixed(2);
+        const attr = cacheHit ? `data-cache-hit="true"` : `data-build-time="${buildTime}ms"`;
+        if (resetCSS) {
+          headCollection.push(`<link rel="stylesheet" href="${toLocalPath(resetCSS)}">`);
+        }
+        headCollection.push(`<style data-unocss="${version}" ${attr}>${css}</style>`);
+        if (!cacheHit) {
+          log.debug(`UnoCSS generated in ${buildTime}ms`);
         }
       }
     }

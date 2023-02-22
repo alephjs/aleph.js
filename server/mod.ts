@@ -22,9 +22,9 @@ export function serve(options: ServerOptions = {}) {
   const buildMode = Deno.args.includes("--build") || Deno.args.includes("-O");
   const isDev = Deno.args.includes("--dev");
   const shouldGenerateExportTs = Deno.args.includes("--generate");
-  const { baseUrl, loaders, middlewares, build: buildOptions, router: router, session, ssr, unocss } = options;
+  const { baseUrl, loaders, middlewares, build: buildOptions, router: router, session, ssr, atomicCSS } = options;
   const { hostname, certFile, keyFile, signal } = options;
-  const config: AlephConfig = { baseUrl, build: buildOptions, loaders, middlewares, router, session, ssr, unocss };
+  const config: AlephConfig = { baseUrl, build: buildOptions, loaders, middlewares, router, session, ssr, atomicCSS };
   const appDir = baseUrl ? fromFileUrl(new URL(".", baseUrl)) : Deno.cwd();
   const handler = createHandler(options);
 

@@ -1,17 +1,6 @@
 import { cleanPath, isLikelyHttpURL, splitBy, trimPrefix } from "../shared/util.ts";
 import type { TransformCSSOptions } from "./deps.ts";
-import {
-  bold,
-  dirname,
-  ensureDir,
-  esbuild,
-  extname,
-  fromFileUrl,
-  green,
-  join,
-  stopEsbuild,
-  transformCSS,
-} from "./deps.ts";
+import { bold, dirname, ensureDir, esbuild, extname, fromFileUrl, green, join, transformCSS } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
@@ -19,7 +8,6 @@ import {
   existsFile,
   fetchCode,
   getAlephPkgUri,
-  getUnoGenerator,
   globalIt,
   isNpmPkg,
   restoreUrl,
@@ -140,12 +128,8 @@ export async function build(
   queue.push(`${alephPkgUri}/runtime/core/nomodule.ts`);
 
   // add unocss reset css
-  if (config.unocss?.presets) {
-    const uno = await getUnoGenerator();
-    if (uno) {
-      const { resetCSS = "tailwind" } = config.unocss;
-      queue.push(`https://esm.sh/@unocss/reset@${uno.version}/${resetCSS}.css`);
-    }
+  if (config.atomicCSS?.resetCSS) {
+    queue.push(config.atomicCSS?.resetCSS);
   }
 
   const entryModules = new Map(queue.map((task) => [task, 0]));
@@ -255,7 +239,7 @@ export async function build(
       if (isNpmPkg(entryPoint)) {
         jsFile += ".js";
       }
-      await esbuild({
+      await esbuild.build({
         entryPoints: [jsFile],
         outfile: jsFile,
         allowOverwrite: true,
@@ -306,7 +290,7 @@ export async function build(
     }),
   );
 
-  stopEsbuild();
+  esbuild.stop();
   memFS.clear();
 
   log.info(`${bold(routeFiles.length.toString())} routes found`);

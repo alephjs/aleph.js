@@ -73,31 +73,6 @@ export async function getJSXConfig(appDir?: string): Promise<JSXConfig> {
   return await globalIt("__ALEPH_JSX_CONFIG", () => loadJSXConfig(appDir));
 }
 
-/** Get the UnoCSS generator, return `null` if the presets are empty. */
-export function getUnoGenerator(): Promise<
-  | {
-    generate: (input: string, options?: Record<string, unknown>) => Promise<{ matched: Set<string>; css: string }>;
-    version: string;
-  }
-  | null
-> {
-  const config = getAlephConfig();
-  if (config === undefined) {
-    return Promise.resolve(null);
-  }
-  return globalIt("__UNO_GENERATOR", async () => {
-    if (config?.unocss) {
-      try {
-        const { createGenerator } = Reflect.get(globalThis, "UNOCSS") ?? await import("@unocss/core");
-        return createGenerator(config.unocss);
-      } catch (_) {
-        log.error("Failed to import `@unocss/core`, please ensure that `@unocss/core` is added in the import maps.");
-      }
-    }
-    return null;
-  });
-}
-
 /** Get the deployment ID. */
 export function getDeploymentId(): string | undefined {
   return Deno.env.get("DENO_DEPLOYMENT_ID");

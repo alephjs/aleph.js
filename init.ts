@@ -176,6 +176,7 @@ export default async function init(nameArg?: string, options?: Options) {
   };
   if (withUnocss) {
     Object.assign(importMap.imports, {
+      "aleph/unocss": `${alephPkgUri}/server/unocss.ts`,
       "@unocss/core": "https://esm.sh/@unocss/core@0.49.7",
       "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.49.7",
     });

@@ -18,7 +18,7 @@ export type AlephConfig = {
   /** The options for build. */
   build?: BuildOptions;
   /** The config for UnoCSS. */
-  unocss?: UnoConfig;
+  atomicCSS?: import("@unocss/core").UnoGenerator & AtomicCSSConfig;
 };
 
 /** The router options for the file-system based routing. */
@@ -36,9 +36,9 @@ export interface RouterInit {
 }
 
 /** The config for UnoCSS. */
-export type UnoConfig = import("@unocss/core").UserConfig & {
+export type AtomicCSSConfig = {
   test?: RegExp;
-  resetCSS?: "normalize" | "eric-meyer" | "tailwind" | "antfu";
+  resetCSS?: string;
 };
 
 export type CookieOptions = {

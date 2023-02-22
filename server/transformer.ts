@@ -9,7 +9,6 @@ import {
   getAlephConfig,
   getAlephPkgUri,
   getDeploymentId,
-  getUnoGenerator,
   MagicString,
   regFullVersion,
   regJsxFile,
@@ -203,23 +202,20 @@ export default {
         }
         const styleTs = `${alephPkgUri}/runtime/core/style.ts`;
         // embed module unocss css in dev mode
-        if (isDev && config?.unocss?.presets) {
-          const reg = (typeof config.unocss !== "string" ? config.unocss.test : undefined) ?? regJsxFile;
-          if (reg.test(pathname)) {
+        if (isDev && config?.atomicCSS) {
+          const regexp = config.atomicCSS.test ?? regJsxFile;
+          if (regexp.test(pathname)) {
             try {
-              const unoGenerator = await getUnoGenerator();
-              if (unoGenerator) {
-                const { css, matched } = await unoGenerator.generate(source, {
-                  id: specifier,
-                  preflights: false,
-                  minify: !isDev,
-                });
-                if (matched.size > 0) {
-                  code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
-                    JSON.stringify(specifier)
-                  }, ${JSON.stringify(css)});\n`;
-                  hasInlineCSS = true;
-                }
+              const { css, matched } = await config.atomicCSS.generate(source, {
+                id: specifier,
+                preflights: false,
+                minify: !isDev,
+              });
+              if (matched.size > 0) {
+                code += `\nimport { applyUnoCSS as __applyUnoCSS } from "${toLocalPath(styleTs)}";\n__applyUnoCSS(${
+                  JSON.stringify(specifier)
+                }, ${JSON.stringify(css)});\n`;
+                hasInlineCSS = true;
               }
             } catch (e) {
               log.warn("[UnoCSS]", e);

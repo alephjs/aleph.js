@@ -6,6 +6,7 @@
     "aleph/": "./",
     "aleph/server": "./server/mod.ts",
     "aleph/dev": "./server/dev.ts",
+    "aleph/unocss": "./server/unocss.ts",
     "aleph/react": "./runtime/react/mod.ts",
     "aleph/react-client": "./runtime/react/client.ts",
     "aleph/react-server": "./runtime/react/server.ts",
