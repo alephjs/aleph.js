@@ -17,7 +17,7 @@
     "react": "https://esm.sh/react@18.2.0",
     "react-dom": "https://esm.sh/react-dom@18.2.0",
     "react-dom/": "https://esm.sh/react-dom@18.2.0/",
-    "@mdx-js/react": "https://esm.sh/@mdx-js/react@2.1.5",
+    "@mdx-js/react": "https://esm.sh/@mdx-js/react@2.3.0",
     "vue": "https://esm.sh/vue@3.2.39",
     "@vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.39",
     "solid-js": "https://esm.sh/solid-js@1.5.5",

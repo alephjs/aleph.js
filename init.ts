@@ -185,7 +185,7 @@ export default async function init(nameArg?: string, options?: Options) {
     case "react-mdx":
       Object.assign(importMap.imports, {
         "aleph/react/mdx-loader": `${alephPkgUri}/runtime/react/mdx-loader.ts`,
-        "@mdx-js/react": "https://esm.sh/@mdx-js/react@2.1.5",
+        "@mdx-js/react": "https://esm.sh/@mdx-js/react@2.3.0",
       });
       /* falls through */
     case "react": {

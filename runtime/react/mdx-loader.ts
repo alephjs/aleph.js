@@ -1,5 +1,5 @@
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
-import { compile, type CompileOptions } from "https://esm.sh/@mdx-js/mdx@2.1.5";
+import { compile, type CompileOptions } from "https://esm.sh/@mdx-js/mdx@2.3.0";
 
 export default class MDXLoader implements ModuleLoader {
   #options: CompileOptions;
