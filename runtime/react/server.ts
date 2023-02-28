@@ -7,7 +7,7 @@ import { App } from "./router.ts";
 
 if (Deno.args.includes("--dev")) {
   // Enable react refresh
-  Deno.env.set("SWC_REACT_REFRESH", "true");
+  Deno.env.set("REACT_REFRESH", "true");
 }
 
 /** The `suspenseMarker` to mark the susponse rendering is starting. */

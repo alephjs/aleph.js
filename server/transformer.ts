@@ -193,7 +193,7 @@ export default {
             stripDataExport: isRouteModule(specifier),
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
-            reactRefresh: isDev && Boolean(Deno.env.get("SWC_REACT_REFRESH")),
+            reactRefresh: isDev && Boolean(Deno.env.get("REACT_REFRESH")),
             isDev,
           });
           code = ret.code;
