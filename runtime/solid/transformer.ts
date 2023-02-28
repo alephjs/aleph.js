@@ -1,6 +1,6 @@
-import { transform } from "https://esm.sh/@babel/standalone@7.19.2";
-import babelPresetSolid from "https://esm.sh/babel-preset-solid@1.5.5";
-import solidRefresh from "https://esm.sh/solid-refresh@0.4.1/babel";
+import { transform } from "https://esm.sh/v108/@babel/standalone@7.19.2";
+import babelPresetSolid from "https://esm.sh/v108/babel-preset-solid@1.5.5";
+import solidRefresh from "https://esm.sh/v108/solid-refresh@0.4.1/babel";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
 
 export default class SolidTransformer implements ModuleLoader {

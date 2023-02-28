@@ -143,11 +143,11 @@ export default {
 
     const stream = new ReadableStream({
       start: (controller) => {
-        let ssrStreaming = false;
+        let streamStarted = false;
 
         const suspenseChunks: Uint8Array[] = [];
         const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
-          if (ssrStreaming) {
+          if (streamStarted) {
             suspenseChunks.push(chunk);
           } else {
             controller.enqueue(chunk);
@@ -218,7 +218,7 @@ export default {
             if (typeof body === "string") {
               el.replace(body, { html: true });
             } else if (body instanceof ReadableStream) {
-              ssrStreaming = true;
+              streamStarted = true;
               el.remove();
 
               const rw = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
@@ -281,7 +281,7 @@ export default {
           rewriter.write(indexHtml);
           rewriter.end();
         } finally {
-          if (!ssrStreaming) {
+          if (!streamStarted) {
             controller.close();
           }
           rewriter.free();

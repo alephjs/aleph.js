@@ -141,7 +141,7 @@ export function fixResponse(res: Response, fixRedirect: boolean): Response {
 
 /**
  * Fix remote url to local path.
- * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`
+ * e.g. `https://esm.sh/v108/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`
  */
 export function toLocalPath(url: string): string {
   if (isLikelyHttpURL(url)) {
@@ -164,7 +164,7 @@ export function toLocalPath(url: string): string {
 
 /**
  * Restore the remote url from local path.
- * e.g. `/-/esm.sh/react@17.0.2` -> `https://esm.sh/react@17.0.2`
+ * e.g. `/-/esm.sh/react@17.0.2` -> `https://esm.sh/v108/react@17.0.2`
  */
 export function restoreUrl(pathname: string): string {
   let [h, ...rest] = pathname.substring(3).split("/");
@@ -179,7 +179,7 @@ export function restoreUrl(pathname: string): string {
 
 /** Check if the url is a npm package from esm.sh */
 export function isNpmPkg(url: string) {
-  return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
+  return url.startsWith("https://esm.sh/v108/") && !url.endsWith(".js") && !url.endsWith(".css");
 }
 
 /** Find config file in the `appDir` if exits, or find in current working directory. */

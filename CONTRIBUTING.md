@@ -29,7 +29,7 @@ deno run -A examples/$APP/dev.ts
 deno run -A examples/$APP/server.ts
 
 # Optimize the application (bundling, ssg, etc.)
-deno run -A examples/$APP/server.ts
+deno run -A examples/$APP/server.ts --build
 ```
 
 **Examples**: https://github.com/alephjs/aleph.js/tree/main/examples

@@ -1,8 +1,8 @@
 {
   "imports": {
     "std/": "https://deno.land/std@0.175.0/",
-    "@unocss/core": "https://esm.sh/@unocss/core@0.49.7",
-    "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.49.7",
+    "@unocss/core": "https://esm.sh/v108/@unocss/core@0.49.7",
+    "@unocss/preset-uno": "https://esm.sh/v108/@unocss/preset-uno@0.49.7",
     "aleph/": "./",
     "aleph/server": "./server/mod.ts",
     "aleph/dev": "./server/dev.ts",
@@ -14,14 +14,14 @@
     "aleph/vue": "./runtime/vue/mod.ts",
     "aleph/vue-server": "./runtime/vue/server.ts",
     "aleph/solid-server": "./runtime/solid/server.ts",
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
-    "@mdx-js/react": "https://esm.sh/@mdx-js/react@2.3.0",
-    "vue": "https://esm.sh/vue@3.2.39",
-    "@vue/server-renderer": "https://esm.sh/@vue/server-renderer@3.2.39",
-    "solid-js": "https://esm.sh/solid-js@1.5.5",
-    "solid-js/web": "https://esm.sh/solid-js@1.5.5/web",
-    "solid-refresh": "https://esm.sh/solid-refresh@0.4.1"
+    "react": "https://esm.sh/v108/react@18.2.0",
+    "react-dom": "https://esm.sh/v108/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/v108/react-dom@18.2.0/",
+    "@mdx-js/react": "https://esm.sh/v108/@mdx-js/react@2.3.0",
+    "vue": "https://esm.sh/v108/vue@3.2.39",
+    "@vue/server-renderer": "https://esm.sh/v108/@vue/server-renderer@3.2.39",
+    "solid-js": "https://esm.sh/v108/solid-js@1.5.5",
+    "solid-js/web": "https://esm.sh/v108/solid-js@1.5.5/web",
+    "solid-refresh": "https://esm.sh/v108/solid-refresh@0.4.1"
   }
 }

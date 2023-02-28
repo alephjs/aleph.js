@@ -15,7 +15,7 @@ export { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.6/mod.ts";
 export { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 
 // npm
-export { default as mitt, type Emitter } from "https://esm.sh/mitt@3.0.0";
+export { default as mitt, type Emitter } from "https://esm.sh/v108/mitt@3.0.0";
 
 // init lol-html wasm
 import initLolHtml from "https://deno.land/x/lol_html@0.0.6/mod.ts";

@@ -86,14 +86,22 @@ export default async function init(nameArg?: string, options?: Options) {
   // download template
   console.log(`${dim("↓")} Downloading template(${blue(template!)}), this might take a moment...`);
   const pkgName = canary ? "aleph_canary" : "aleph";
-  const res = await fetch(
-    `https://cdn.deno.land/${pkgName}/meta/versions.json`,
-  );
+  const [res, res2] = await Promise.all([
+    fetch(
+      `https://cdn.deno.land/${pkgName}/meta/versions.json`,
+    ),
+    fetch("https://esm.sh/status.json"),
+  ]);
   if (res.status !== 200) {
     console.error(await res.text());
     Deno.exit(1);
   }
+  if (res2.status !== 200) {
+    console.error(await res.text());
+    Deno.exit(1);
+  }
   const { latest: VERSION } = await res.json();
+  const { version: ESM_VERSION } = await res2.json();
   const repo = canary ? "ije/aleph-canary" : "alephjs/aleph.js";
   const resp = await fetch(
     `https://codeload.github.com/${repo}/tar.gz/refs/tags/${VERSION}`,
@@ -162,6 +170,9 @@ export default async function init(nameArg?: string, options?: Options) {
       "dev": "deno run -A dev.ts",
       "start": "deno run -A server.ts",
       "build": "deno run -A server.ts --build",
+      "esm:add": `deno run -A https://esm.sh/v${ESM_VERSION} add`,
+      "esm:update": `deno run -A https://esm.sh/v${ESM_VERSION} update`,
+      "esm:remove": `deno run -A https://esm.sh/v${ESM_VERSION} remove`,
     },
   };
   const importMap = {
@@ -177,29 +188,29 @@ export default async function init(nameArg?: string, options?: Options) {
   if (withUnocss) {
     Object.assign(importMap.imports, {
       "aleph/unocss": `${alephPkgUri}/server/unocss.ts`,
-      "@unocss/core": "https://esm.sh/@unocss/core@0.49.7",
-      "@unocss/preset-uno": "https://esm.sh/@unocss/preset-uno@0.49.7",
+      "@unocss/core": `https://esm.sh/v${ESM_VERSION}/@unocss/core@0.49.7`,
+      "@unocss/preset-uno": `https://esm.sh/v${ESM_VERSION}/@unocss/preset-uno@0.49.7`,
     });
   }
   switch (template) {
     case "react-mdx":
       Object.assign(importMap.imports, {
         "aleph/react/mdx-loader": `${alephPkgUri}/runtime/react/mdx-loader.ts`,
-        "@mdx-js/react": "https://esm.sh/@mdx-js/react@2.3.0",
+        "@mdx-js/react": `https://esm.sh/v${ESM_VERSION}/@mdx-js/react@2.3.0`,
       });
       /* falls through */
     case "react": {
       Object.assign(denoConfig.compilerOptions, {
         "jsx": "react-jsx",
-        "jsxImportSource": `https://esm.sh/react@${versions.react}`,
+        "jsxImportSource": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
       });
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/runtime/react/mod.ts`,
         "aleph/react-client": `${alephPkgUri}/runtime/react/client.ts`,
         "aleph/react-server": `${alephPkgUri}/runtime/react/server.ts`,
-        "react": `https://esm.sh/react@${versions.react}`,
-        "react-dom": `https://esm.sh/react-dom@${versions.react}`,
-        "react-dom/": `https://esm.sh/react-dom@${versions.react}/`,
+        "react": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
+        "react-dom": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}`,
+        "react-dom/": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}/`,
       });
       break;
     }
@@ -207,21 +218,21 @@ export default async function init(nameArg?: string, options?: Options) {
       Object.assign(importMap.imports, {
         "aleph/vue": `${alephPkgUri}/runtime/vue/mod.ts`,
         "aleph/vue-server": `${alephPkgUri}/runtime/vue/server.ts`,
-        "vue": `https://esm.sh/vue@${versions.vue}`,
-        "@vue/server-renderer": `https://esm.sh/@vue/server-renderer@${versions.vue}`,
+        "vue": `https://esm.sh/v${ESM_VERSION}/vue@${versions.vue}`,
+        "@vue/server-renderer": `https://esm.sh/v${ESM_VERSION}/@vue/server-renderer@${versions.vue}`,
       });
       break;
     }
     case "solid": {
       Object.assign(denoConfig.compilerOptions, {
         "jsx": "react-jsx",
-        "jsxImportSource": `https://esm.sh/solid-js@${versions.solid}`,
+        "jsxImportSource": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
       });
       Object.assign(importMap.imports, {
         "aleph/solid-server": `${alephPkgUri}/runtime/solid/server.ts`,
-        "solid-js": `https://esm.sh/solid-js@${versions.solid}`,
-        "solid-js/web": `https://esm.sh/solid-js@${versions.solid}/web`,
-        "solid-refresh": "https://esm.sh/solid-refresh@0.4.1",
+        "solid-js": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
+        "solid-js/web": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}/web`,
+        "solid-refresh": `https://esm.sh/v${ESM_VERSION}/solid-refresh@0.4.1`,
       });
       break;
     }
@@ -253,7 +264,7 @@ export default async function init(nameArg?: string, options?: Options) {
   }
 
   await Deno.run({
-    cmd: [Deno.execPath(), "cache", "server.ts"],
+    cmd: [Deno.execPath(), "cache", "--no-lock", "server.ts"],
     cwd: appDir,
     stderr: "inherit",
     stdout: "inherit",
