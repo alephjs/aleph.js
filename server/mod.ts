@@ -81,7 +81,7 @@ export function serve(options: ServerOptions = {}) {
 }
 
 /** Set the log level. */
-export function setLogLeavel(level: LevelName) {
+export function setLogLevel(level: LevelName) {
   log.setLevel(level);
 }
 
