@@ -1,7 +1,7 @@
 import { FetchError } from "../runtime/core/error.ts";
 import { matchRoutes, type RouteModule, type Router } from "../runtime/core/routes.ts";
 import { cleanPath, isFilledString, isPlainObject, utf8Enc } from "../shared/util.ts";
-import { fromFileUrl, HTMLRewriter, join } from "./deps.ts";
+import { HTMLRewriter, path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getAlephConfig, getDeploymentId, getFiles, regJsxFile, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
@@ -108,12 +108,12 @@ export default {
       let css = Reflect.get(globalThis, "__ALEPH_UNOCSS_BUILD");
       const cacheHit = Boolean(css);
       if (!cacheHit) {
-        const dir = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
+        const dir = config?.baseUrl ? path.fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
         const files = await getFiles(dir);
         const outputDir = "." + cleanPath(config.build?.outputDir ?? "./output");
         const inputSources = await Promise.all(
           files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
-            Deno.readTextFile(join(dir, name))
+            Deno.readTextFile(path.join(dir, name))
           ),
         );
         if (inputSources.length > 0) {

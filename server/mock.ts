@@ -1,6 +1,6 @@
 import type { Router } from "../runtime/core/routes.ts";
 import { createContext } from "./context.ts";
-import { join } from "./deps.ts";
+import { path } from "./deps.ts";
 import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import renderer from "./renderer.ts";
 import { fetchRouteData, initRouter } from "./routing.ts";
@@ -71,7 +71,7 @@ export class MockServer {
       this.#router = await initRouter(router, appDir);
     }
     if (!this.#indexHtml) {
-      this.#indexHtml = await loadIndexHtml(join(appDir ?? "./", "index.html"), {
+      this.#indexHtml = await loadIndexHtml(path.join(appDir ?? "./", "index.html"), {
         ssr: Boolean(ssr),
       });
     }
@@ -90,7 +90,7 @@ export class MockServer {
     }
 
     if (!ssr) {
-      return createHtmlResponse(req, join(appDir ?? ".", "./index.html"), this.#indexHtml);
+      return createHtmlResponse(req, path.join(appDir ?? ".", "./index.html"), this.#indexHtml);
     }
 
     return renderer.fetch(req, ctx, {

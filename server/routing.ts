@@ -1,7 +1,7 @@
 import { URLPatternCompat, type URLPatternInput } from "../runtime/core/url_pattern.ts";
 import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../runtime/core/routes.ts";
 import * as util from "../shared/util.ts";
-import { extname, fromFileUrl, globToRegExp, join, resolve } from "./deps.ts";
+import { path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import log from "./log.ts";
 import { builtinModuleExts, fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
@@ -22,8 +22,10 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   if (origin) {
     url = `${origin}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
   } else {
-    const root = appDir ? resolve(appDir) : (config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
-    url = `file://${join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
+    const root = appDir
+      ? path.resolve(appDir)
+      : (config?.baseUrl ? path.fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
+    url = `file://${path.join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
   }
   return await import(url);
 }
@@ -166,7 +168,7 @@ export function toRouteRegExp(init: RouterInit = {}): RouteRegExp {
     }}`;
   if (!glob) throw new Error("invalid router options: `glob` is required");
   const prefix = util.trimSuffix(util.splitBy(glob, "*")[0], "/");
-  const reg = globToRegExp("./" + util.trimPrefix(glob, "./"));
+  const reg = path.globToRegExp("./" + util.trimPrefix(glob, "./"));
   return {
     prefix,
     test: (s: string) => s !== prefix + "/_export.ts" && reg.test(s),
@@ -192,7 +194,7 @@ export function toRouteRegExp(init: RouterInit = {}): RouteRegExp {
           host = parts.shift()!.slice(1);
         }
         const basename = parts.pop()!;
-        const pathname = "/" + [...parts, util.trimSuffix(basename, extname(basename))].join("/");
+        const pathname = "/" + [...parts, util.trimSuffix(basename, path.extname(basename))].join("/");
         return { host, pathname: pathname === "/index" ? "/" : pathname };
       }
       return null;

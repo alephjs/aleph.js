@@ -3,7 +3,7 @@ import type { Router } from "../runtime/core/routes.ts";
 import { trimSuffix } from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR } from "./dev.ts";
-import { fromFileUrl, join } from "./deps.ts";
+import { path } from "./deps.ts";
 import {
   existsDir,
   existsFile,
@@ -29,7 +29,7 @@ import type { AlephConfig, ConnInfo, ErrorHandler, ModuleLoader } from "./types.
 
 export function createHandler(options: AlephConfig & { onError?: ErrorHandler }) {
   const { baseUrl, loaders, middlewares, onError, build: buildOptions, router: routerConfig, session, ssr } = options;
-  const appDir = baseUrl ? fromFileUrl(new URL(".", baseUrl)) : undefined;
+  const appDir = baseUrl ? path.fromFileUrl(new URL(".", baseUrl)) : undefined;
   const buildMode = Deno.args.includes("--build") || Deno.args.includes("-O");
   const isDev = Deno.args.includes("--dev");
 
@@ -55,7 +55,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
     // check if the "out" directory exists
     const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
       if (!isDev && !buildMode) {
-        const outDir = join(appDir ?? Deno.cwd(), buildOptions?.outputDir ?? "./output");
+        const outDir = path.join(appDir ?? Deno.cwd(), buildOptions?.outputDir ?? "./output");
         if (await existsDir(outDir)) {
           return outDir;
         }
@@ -79,7 +79,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       }
       // check the optimized output
       if (!isDev && !buildMode && outDir) {
-        let outFile = join(outDir, pathname);
+        let outFile = path.join(outDir, pathname);
         if (pathname.startsWith("/-/") && isNpmPkg(restoreUrl(pathname))) {
           outFile += ".js";
         }
@@ -139,7 +139,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
     const contentType = getContentType(pathname);
     if (!pathname.startsWith("/.") && contentType !== "application/octet-stream") {
       try {
-        let filePath = appDir ? join(appDir, pathname) : `.${pathname}`;
+        let filePath = appDir ? path.join(appDir, pathname) : `.${pathname}`;
         let stat = await Deno.lstat(filePath);
         if (stat.isDirectory && pathname !== "/") {
           filePath = `${trimSuffix(filePath, "/")}/index.html`;
@@ -185,7 +185,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
     // request route api
     const router: Router | null = await globalIt("__ALEPH_ROUTER", () => initRouter(routerConfig, appDir));
 
-    if (pathname === "/aleph.getStaticPaths") {
+    if (pathname === "/__aleph.getStaticPaths") {
       if (router) {
         const pattern = searchParams.get("pattern");
         const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);
@@ -262,7 +262,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
     const indexHtml = await globalIt(
       "__ALEPH_INDEX_HTML",
       () =>
-        loadIndexHtml(join(appDir ?? ".", "index.html"), {
+        loadIndexHtml(path.join(appDir ?? ".", "index.html"), {
           ssr: Boolean(ssr),
           hmr: isDev ? { wsUrl: Deno.env.get("HMR_WS_URL") } : undefined,
         }),
@@ -273,12 +273,12 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
 
     // return index.html
     if (!ssr) {
-      return createHtmlResponse(req, join(appDir ?? ".", "./index.html"), indexHtml);
+      return createHtmlResponse(req, path.join(appDir ?? ".", "./index.html"), indexHtml);
     }
 
     // check SSG output
     if (!isDev && !buildMode && outDir) {
-      const htmlFile = join(outDir, pathname === "/" ? "index.html" : pathname + ".html");
+      const htmlFile = path.join(outDir, pathname === "/" ? "index.html" : pathname + ".html");
       if (await existsFile(htmlFile)) {
         return createHtmlResponse(req, htmlFile);
       }

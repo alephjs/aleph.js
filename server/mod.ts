@@ -1,6 +1,6 @@
 import type { Router } from "../runtime/core/routes.ts";
 import { isFilledArray } from "../shared/util.ts";
-import { fromFileUrl, serve as stdServe, serveTls } from "./deps.ts";
+import { colors, path, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getDeploymentId, globalIt } from "./helpers.ts";
 import { createHandler } from "./handler.ts";
@@ -25,7 +25,7 @@ export function serve(options: ServerOptions = {}) {
   const { baseUrl, loaders, middlewares, build: buildOptions, router: router, session, ssr, atomicCSS } = options;
   const { hostname, certFile, keyFile, signal } = options;
   const config: AlephConfig = { baseUrl, build: buildOptions, loaders, middlewares, router, session, ssr, atomicCSS };
-  const appDir = baseUrl ? fromFileUrl(new URL(".", baseUrl)) : Deno.cwd();
+  const appDir = baseUrl ? path.fromFileUrl(new URL(".", baseUrl)) : Deno.cwd();
   const handler = createHandler(options);
 
   // force to use the server port in env vars if exists
@@ -61,6 +61,7 @@ export function serve(options: ServerOptions = {}) {
 
   // watch file changes in development mode
   if (isDev) {
+    log.info(colors.dim("[dev]"), "Watching for file changes...");
     watch(appDir, shouldGenerateExportTs);
   }
 

@@ -1,4 +1,4 @@
-import { dim, green, red, yellow } from "./deps.ts";
+import { colors } from "./deps.ts";
 
 export type LevelName = "debug" | "info" | "warn" | "error";
 
@@ -35,30 +35,30 @@ export class Logger {
 
   debug(...args: unknown[]): void {
     if (this.#level <= Level.Debug) {
-      console.debug(dim("DEBUG"), ...args);
+      console.debug(colors.dim("DEBUG"), ...args);
     }
   }
 
   info(...args: unknown[]): void {
     if (this.#level <= Level.Info) {
-      console.log(green("INFO"), ...args);
+      console.log(colors.green("INFO"), ...args);
     }
   }
 
   warn(...args: unknown[]): void {
     if (this.#level <= Level.Warn) {
-      console.warn(yellow("WARN"), ...args);
+      console.warn(colors.yellow("WARN"), ...args);
     }
   }
 
   error(...args: unknown[]): void {
     if (this.#level <= Level.Error) {
-      console.error(red("ERROR"), ...args);
+      console.error(colors.red("ERROR"), ...args);
     }
   }
 
   fatal(...args: unknown[]): never {
-    console.error(red("FATAL"), ...args);
+    console.error(colors.red("FATAL"), ...args);
     return Deno.exit(1);
   }
 }

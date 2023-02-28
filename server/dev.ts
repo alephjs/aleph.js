@@ -1,18 +1,6 @@
 import { isFilledString, prettyBytes, trimPrefix } from "../shared/util.ts";
 import type { Router } from "../runtime/core/routes.ts";
-import {
-  blue,
-  dim,
-  dirname,
-  Emitter,
-  ensureDir,
-  esbuild,
-  fromFileUrl,
-  join,
-  mitt,
-  parseDeps,
-  relative,
-} from "./deps.ts";
+import { colors, Emitter, ensureDir, esbuild, mitt, parseDeps, path } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
 import { builtinModuleExts, findFile, getAlephConfig, getImportMap, getJSXConfig, watchFs } from "./helpers.ts";
 import log from "./log.ts";
@@ -40,7 +28,7 @@ export function removeWatchFsEmitter(e: Emitter<WatchFsEvents>) {
   watchFsEmitters.delete(e);
 }
 
-/** Watch for file changes and listen the dev server. */
+/** Watch for file changes. */
 export function watch(appDir: string, shouldGenerateExportTs: boolean) {
   const config = getAlephConfig();
   const emitter = createWatchFsEmitter();
@@ -66,8 +54,8 @@ export function watch(appDir: string, shouldGenerateExportTs: boolean) {
     });
   }
 
-  watchFs(appDir, (kind: "create" | "remove" | "modify", path: string) => {
-    const specifier = "./" + relative(appDir, path).replaceAll("\\", "/");
+  watchFs(appDir, (kind: "create" | "remove" | "modify", pathname: string) => {
+    const specifier = "./" + path.relative(appDir, pathname).replaceAll("\\", "/");
     // delete global cached index html
     if (specifier === "./index.html") {
       Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
@@ -107,7 +95,6 @@ export type DevOptions = {
 };
 
 let devProcess: Deno.Process | null = null;
-let watched = false;
 
 export default async function dev(options?: DevOptions) {
   // stop previous dev server
@@ -116,38 +103,32 @@ export default async function dev(options?: DevOptions) {
     devProcess.close();
   }
 
-  const appDir = options?.baseUrl ? fromFileUrl(new URL(".", options.baseUrl)) : Deno.cwd();
+  const appDir = options?.baseUrl ? path.fromFileUrl(new URL(".", options.baseUrl)) : Deno.cwd();
   const serverEntry = options?.serverEntry
-    ? join(appDir, options?.serverEntry)
+    ? path.join(appDir, options?.serverEntry)
     : await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
   if (serverEntry) {
-    const serverSpecifier = `./${trimPrefix(serverEntry, appDir)}`;
+    const entry = `./${trimPrefix(serverEntry, appDir)}`;
     const source = await Deno.readTextFile(serverEntry);
     const importMap = await getImportMap();
-    const deps = await parseDeps(serverSpecifier, source, {
+    const deps = await parseDeps(entry, source, {
       importMap: JSON.stringify(importMap),
     });
 
     // ensure the `_export.ts` file exists
     for (const dep of deps) {
       if (dep.specifier.startsWith("./") && dep.specifier.endsWith("/_export.ts")) {
-        const fp = join(appDir, dep.specifier);
-        await ensureDir(dirname(fp));
+        const fp = path.join(appDir, dep.specifier);
+        await ensureDir(path.dirname(fp));
         await Deno.writeTextFile(fp, "export default {}");
       }
-    }
-
-    if (!watched) {
-      log.info("[dev] Watching for file changes...");
-      watch(appDir, false);
-      watched = true;
     }
 
     const emitter = createWatchFsEmitter();
     emitter.on("*", (kind, { specifier }) => {
       if (
         kind === "modify" && (
-          specifier === serverSpecifier ||
+          specifier === entry ||
           deps.some((dep) => !dep.specifier.endsWith("/_export.ts") && dep.specifier === specifier)
         )
       ) {
@@ -162,7 +143,7 @@ export default async function dev(options?: DevOptions) {
     }
     if (devProcess) {
       console.clear();
-      console.debug(dim("[dev] Restarting the server..."));
+      console.info(colors.dim("[dev] Restarting the server..."));
     }
     devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
     await devProcess.status();
@@ -227,8 +208,8 @@ export function handleHMR(req: Request): Response {
 
 /** generate the `routes/_export.ts` module by given the routes config. */
 export async function generateExportTs(appDir: string, router: Router, loaders?: ModuleLoader[]) {
-  const routesDir = join(appDir, router.prefix);
-  const exportTsFile = join(routesDir, "_export.ts");
+  const routesDir = path.join(appDir, router.prefix);
+  const exportTsFile = path.join(routesDir, "_export.ts");
   const withLoader = router.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
 
   if (router.routes.length == 0) {
@@ -284,7 +265,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
               `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
             ),
           );
-          log.debug(`${blue("_export.ts")} updated ${dim(prettyBytes(file.text.length))} by esbuld`);
+          log.debug(`${colors.blue("_export.ts")} updated ${colors.dim(prettyBytes(file.text.length))} by esbuld`);
         }
       }));
     };
@@ -316,10 +297,10 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
               args.path.startsWith(".") &&
               loaders?.some((l) => l.test(args.path))
             ) {
-              const specifier = "./" + relative(appDir, join(routesDir, args.path));
+              const specifier = "./" + path.relative(appDir, path.join(routesDir, args.path));
               depGraph.mark(specifier, {});
               if (args.importer.startsWith(".")) {
-                const importer = "./" + relative(appDir, join(routesDir, args.importer));
+                const importer = "./" + path.relative(appDir, path.join(routesDir, args.importer));
                 depGraph.mark(importer, { deps: [{ specifier }] });
               }
               return { path: args.path, namespace: "loader" };
@@ -329,8 +310,8 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
           build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
             const loader = loaders?.find((l) => l.test(args.path));
             if (loader) {
-              const fullpath = join(routesDir, args.path);
-              const specifier = "./" + relative(appDir, fullpath);
+              const fullpath = path.join(routesDir, args.path);
+              const specifier = "./" + path.relative(appDir, fullpath);
               const [importMap, jsxConfig, source] = await Promise.all([
                 getImportMap(appDir),
                 getJSXConfig(appDir),
@@ -384,6 +365,6 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
       empty,
     ].join("\n");
     await Deno.writeTextFile(exportTsFile, code);
-    log.debug(`${blue("_export.ts")} updated`);
+    log.debug(`${colors.blue("_export.ts")} updated`);
   }
 }

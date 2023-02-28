@@ -1,11 +1,12 @@
 import { isFilledArray, isFilledString, isLikelyHttpURL, isPlainObject, trimSuffix } from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { basename, dirname, fromFileUrl, join, JSONC, type TransformOptions } from "./deps.ts";
+import { JSONC, path, type TransformOptions } from "./deps.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
+const { basename, dirname, fromFileUrl, join } = path;
 export const regJsxFile = /\.(jsx|tsx)$/;
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];

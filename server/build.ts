@@ -1,6 +1,6 @@
 import { cleanPath, isLikelyHttpURL, splitBy, trimPrefix } from "../shared/util.ts";
-import type { TransformCSSOptions } from "./deps.ts";
-import { bold, dirname, ensureDir, esbuild, extname, fromFileUrl, green, join, transformCSS } from "./deps.ts";
+import { colors, path, TransformCSSOptions } from "./deps.ts";
+import { ensureDir, esbuild, transformCSS } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
   builtinModuleExts,
@@ -27,7 +27,7 @@ export async function build(
   const alephPkgUri = getAlephPkgUri();
   const options = config?.build ?? {};
   const target = options.buildTarget ?? "es2018";
-  const outputDir = join(appDir ?? Deno.cwd(), options.outputDir ?? "./output");
+  const outputDir = path.join(appDir ?? Deno.cwd(), options.outputDir ?? "./output");
 
   const request = (url: URL, headers?: HeadersInit) => {
     const addr: Deno.Addr = { transport: "tcp", hostname: "localhost", port: 80 };
@@ -37,7 +37,7 @@ export async function build(
   // clean previous build
   if (await existsDir(outputDir)) {
     for await (const entry of Deno.readDir(outputDir)) {
-      await Deno.remove(join(outputDir, entry.name), { recursive: entry.isDirectory });
+      await Deno.remove(path.join(outputDir, entry.name), { recursive: entry.isDirectory });
     }
   } else {
     await Deno.mkdir(outputDir, { recursive: true });
@@ -59,7 +59,7 @@ export async function build(
       for (const [_, { pattern }] of routes) {
         const { pathname } = pattern;
         if (pathname.includes("/:")) {
-          const url = new URL("http://localhost/aleph.getStaticPaths");
+          const url = new URL("http://localhost/__aleph.getStaticPaths");
           url.searchParams.set("pattern", pathname);
           const res = await request(url);
           if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
@@ -95,13 +95,13 @@ export async function build(
         (res.status === 200 || (res.status === 404 && pathname === "/_404")) &&
         res.headers.get("content-type")?.startsWith("text/html")
       ) {
-        const savePath = join(outputDir, `${pathname === "/" ? "/index" : pathname}.html`);
+        const savePath = path.join(outputDir, `${pathname === "/" ? "/index" : pathname}.html`);
         const html = await res.text();
-        await ensureDir(dirname(savePath));
+        await ensureDir(path.dirname(savePath));
         await Deno.writeTextFile(savePath, html);
       }
     }));
-    console.log(`${green("SSG")} ${bold(finalPaths.length.toString())} page generated.`);
+    console.log(`${colors.green("SSG")} ${colors.bold(finalPaths.length.toString())} page generated.`);
     console.log(
       finalPaths.map((pathname, index) => {
         const tab = index === finalPaths.length - 1 ? "└─" : "├─";
@@ -112,13 +112,13 @@ export async function build(
 
   // look up client modules
   let queue = [...routeFiles];
-  const indexHtml = join(appDir ?? Deno.cwd(), "index.html");
+  const indexHtml = path.join(appDir ?? Deno.cwd(), "index.html");
   if (await existsFile(indexHtml)) {
     const html = await Deno.readFile(indexHtml);
     const links = await parseHtmlLinks(html);
     for (const src of links) {
       const url = new URL(src, "http://localhost/");
-      const ext = extname(url.pathname).slice(1);
+      const ext = path.extname(url.pathname).slice(1);
       if (ext === "css" || builtinModuleExts.includes(ext)) {
         const specifier = isLikelyHttpURL(src) ? src : "." + cleanPath(src);
         queue.push(specifier);
@@ -142,7 +142,7 @@ export async function build(
     await Promise.all(queue.map(async (specifier) => {
       const url = new URL(isLikelyHttpURL(specifier) ? toLocalPath(specifier) : specifier, "http://localhost");
       const isCSS = url.pathname.endsWith(".css");
-      let savePath = join(outputDir, url.pathname);
+      let savePath = path.join(outputDir, url.pathname);
       if (isNpmPkg(specifier)) {
         savePath += ".js";
       } else if (isCSS && url.searchParams.has("module")) {
@@ -171,7 +171,7 @@ export async function build(
       } else if (url.searchParams.has("module")) {
         deps.add(`${alephPkgUri}/runtime/core/style.ts`);
       } else {
-        await ensureDir(dirname(savePath));
+        await ensureDir(path.dirname(savePath));
         await Deno.writeTextFile(savePath, memFS.get(savePath)!);
       }
       allClientModules.add(specifier);
@@ -235,7 +235,7 @@ export async function build(
       if (url.pathname.endsWith(".css")) {
         return;
       }
-      let jsFile = join(outputDir, url.pathname);
+      let jsFile = path.join(outputDir, url.pathname);
       if (isNpmPkg(entryPoint)) {
         jsFile += ".js";
       }
@@ -256,21 +256,21 @@ export async function build(
             build.onResolve({ filter: /.*/ }, (args) => {
               let argsPath = args.path;
               if (argsPath.startsWith("./") || argsPath.startsWith("../")) {
-                argsPath = join(args.resolveDir, argsPath);
+                argsPath = path.join(args.resolveDir, argsPath);
               }
               const [fp, q] = splitBy(argsPath, "?");
-              const path = trimPrefix(fp, outputDir);
-              let specifier = "." + path;
+              const pathname = trimPrefix(fp, outputDir);
+              let specifier = "." + pathname;
               if (args.path.startsWith("/-/")) {
-                specifier = restoreUrl(path);
+                specifier = restoreUrl(pathname);
               }
               if (clientModules.has(specifier) && specifier !== entryPoint) {
                 return {
-                  path: [path, q].filter(Boolean).join("?"),
+                  path: [pathname, q].filter(Boolean).join("?"),
                   external: true,
                 };
               }
-              let jsFile = join(outputDir, path);
+              let jsFile = path.join(outputDir, pathname);
               if (isNpmPkg(specifier)) {
                 jsFile += ".js";
               } else if (specifier.endsWith(".css") && new URLSearchParams(q).has("module")) {
@@ -293,8 +293,8 @@ export async function build(
   esbuild.stop();
   memFS.clear();
 
-  log.info(`${bold(routeFiles.length.toString())} routes found`);
-  log.info(`${bold(clientModules.size.toString())} client modules built`);
+  log.info(`${colors.bold(routeFiles.length.toString())} routes found`);
+  log.info(`${colors.bold(clientModules.size.toString())} client modules built`);
   log.info(`Done in ${(performance.now() - start).toFixed(2)}ms`);
   Deno.exit(0);
 }
@@ -334,7 +334,7 @@ export async function bundleCSS(
         url = new URL(url, specifier).toString();
       }
     } else {
-      url = "." + fromFileUrl(new URL(url, `file://${specifier.slice(1)}`));
+      url = "." + path.fromFileUrl(new URL(url, `file://${specifier.slice(1)}`));
     }
     return url;
   });

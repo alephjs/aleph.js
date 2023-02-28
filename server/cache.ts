@@ -1,5 +1,5 @@
 import { computeHash, isFilledString, trimSuffix, utf8Dec } from "../shared/util.ts";
-import { green, join } from "./deps.ts";
+import { path } from "./deps.ts";
 import { existsDir, existsFile } from "./helpers.ts";
 import log from "./log.ts";
 
@@ -50,9 +50,9 @@ export async function cacheFetch(
     cacheKey = await computeHash("sha-256", pathname + searchParams.toString() + (options?.userAgent || ""));
   }
   if (modulesCacheDir) {
-    cacheDir = join(modulesCacheDir, trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
-    contentFilepath = join(cacheDir, cacheKey);
-    metaFilepath = join(cacheDir, cacheKey + ".metadata.json");
+    cacheDir = path.join(modulesCacheDir, trimSuffix(protocol, ":"), hostname + (port ? "_PORT" + port : ""));
+    contentFilepath = path.join(cacheDir, cacheKey);
+    metaFilepath = path.join(cacheDir, cacheKey + ".metadata.json");
   }
 
   if (!options?.forceRefresh && !isLocalhost) {
@@ -89,7 +89,7 @@ export async function cacheFetch(
   for (let i = 0; i < retryTimes; i++) {
     if (i === 0) {
       if (!isLocalhost) {
-        log.debug(green("Download"), url);
+        log.info("Download", url);
       }
     } else {
       log.warn(`Download ${url} failed, retrying...`);
