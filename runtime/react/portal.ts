@@ -3,26 +3,26 @@ import { useCallback, useContext, useEffect, useState } from "react";
 import { RouterContext } from "./context.ts";
 
 /**
- *  The `usePortal` hook to create a portal helper.
+ *  The `usePortal` hook to create a portal node.
  *  Please ensure to pass the `React.createPortal` in `Router` props.
  *
  *  ```jsx
  *  function Modal() {
- *    const portal = usePortal({ preventScroll: true });
+ *    const portal = usePortal({ type: "dialog", preventScroll: true });
  *    return portal(<p>Hello portal!</p>);
  *  }
  *  ```
  */
 export function usePortal(
-  props?: { key?: string | null; className?: string; lockScroll?: boolean; isDialog?: boolean },
+  props?: { key?: string | null; className?: string; lockScroll?: boolean; type?: "div" | "dialog" },
 ): (children: ReactNode) => ReactPortal | null {
-  const { className, lockScroll, isDialog, key } = props || {};
+  const { className, lockScroll, type, key } = props || {};
   const { createPortal } = useContext(RouterContext);
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const { body } = document;
-    const portalRoot = document.createElement(isDialog ? "dialog" : "div");
+    const portalRoot = document.createElement(type ?? "div");
     if (key) {
       portalRoot.id = key;
     }
@@ -33,9 +33,8 @@ export function usePortal(
       body.style.overflow = "hidden";
     }
     body.appendChild(portalRoot);
-    setPortalRoot(portalRoot);
 
-    if (isDialog) {
+    if (type) {
       Object.assign(portalRoot.style, {
         width: "100vw",
         height: "100vh",
@@ -45,14 +44,16 @@ export function usePortal(
       portalRoot.showModal?.();
     }
 
+    setPortalRoot(portalRoot);
+
     return () => {
-      setPortalRoot(null);
       body.removeChild(portalRoot);
       if (lockScroll) {
         body.style.overflow = "";
       }
+      setPortalRoot(null);
     };
-  }, [key, className, lockScroll, isDialog]);
+  }, [key, className, lockScroll, type]);
 
   return useCallback(
     (chlidren: ReactNode) => {
