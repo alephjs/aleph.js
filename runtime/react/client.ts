@@ -1,10 +1,15 @@
 import { createElement } from "react";
-import { createPortal } from "react-dom";
 import { createRoot, hydrateRoot } from "react-dom/client";
-import { App } from "./mod.ts";
+import { App, RouterProps } from "./mod.ts";
 
-export function bootstrap(options?: { root?: string | HTMLElement; hydrate?: boolean }) {
-  const { root = "#root", hydrate = !!document.head.querySelector("script#ssr-data") } = options ?? {};
+export type RenderOptions = {
+  root?: string | HTMLElement;
+  createPortal?: RouterProps["createPortal"];
+  hydrate?: boolean;
+};
+
+export function bootstrap(options: RenderOptions = {}) {
+  const { root = "#root", createPortal, hydrate = !!document.head.querySelector("script#ssr-data") } = options;
   const rootEl = typeof root === "string" ? document.querySelector(root) : root;
   if (!rootEl) {
     throw new Error(`No element found for selector "${root}"`);
