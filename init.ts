@@ -142,7 +142,7 @@ export default async function init(nameArg?: string, options?: Options) {
         .replace("    routes,\n  },", "  },");
       await Deno.writeTextFile(
         join(appDir, "dev.ts"),
-        [`import dev from "aleph/dev";`, "dev();"].join("\n\n"),
+        [`import dev from "aleph/dev";`, "dev();\n"].join("\n\n"),
       );
       await Deno.remove(join(appDir, "routes/_export.ts"));
     }

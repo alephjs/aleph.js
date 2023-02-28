@@ -224,7 +224,7 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
   }
 
   const comments = [
-    "// Pre-imports router modules for serverless env that doesn't support the dynamic import.",
+    "// Exports router modules for serverless env that doesn't support the dynamic import.",
     "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
   ];
   const imports: string[] = [];

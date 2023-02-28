@@ -166,7 +166,6 @@ export function toRouteRegExp(init: RouterInit = {}): RouteRegExp {
     : `.${util.cleanPath(init.dir ?? "routes")}/**/*.{${
       (init.exts ?? builtinModuleExts).map((s) => util.trimPrefix(s, ".")).join(",")
     }}`;
-  if (!glob) throw new Error("invalid router options: `glob` is required");
   const prefix = util.trimSuffix(util.splitBy(glob, "*")[0], "/");
   const reg = path.globToRegExp("./" + util.trimPrefix(glob, "./"));
   return {

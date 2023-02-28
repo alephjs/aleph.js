@@ -22,7 +22,7 @@ export function serve(options: ServerOptions = {}) {
   const buildMode = Deno.args.includes("--build") || Deno.args.includes("-O");
   const isDev = Deno.args.includes("--dev");
   const shouldGenerateExportTs = Deno.args.includes("--generate");
-  const { baseUrl, loaders, middlewares, build: buildOptions, router: router, session, ssr, atomicCSS } = options;
+  const { baseUrl, loaders, middlewares, build: buildOptions, router, session, ssr, atomicCSS } = options;
   const { hostname, certFile, keyFile, signal } = options;
   const config: AlephConfig = { baseUrl, build: buildOptions, loaders, middlewares, router, session, ssr, atomicCSS };
   const appDir = baseUrl ? path.fromFileUrl(new URL(".", baseUrl)) : Deno.cwd();
@@ -55,7 +55,7 @@ export function serve(options: ServerOptions = {}) {
 
   // build the app for production
   if (buildMode) {
-    build(handler, config, appDir);
+    build(handler, appDir);
     return;
   }
 

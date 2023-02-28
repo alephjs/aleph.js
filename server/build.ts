@@ -7,6 +7,7 @@ import {
   existsDir,
   existsFile,
   fetchCode,
+  getAlephConfig,
   getAlephPkgUri,
   globalIt,
   isNpmPkg,
@@ -16,15 +17,15 @@ import {
 import { parseHtmlLinks } from "./html.ts";
 import log from "./log.ts";
 import { initRouter } from "./routing.ts";
-import type { AlephConfig, ConnInfo } from "./types.ts";
+import type { ConnInfo } from "./types.ts";
 
 export async function build(
   serverHandler: (req: Request, connInfo: ConnInfo) => Promise<Response> | Response,
-  config: AlephConfig,
   appDir?: string,
 ) {
   const start = performance.now();
   const alephPkgUri = getAlephPkgUri();
+  const config = getAlephConfig()!;
   const options = config?.build ?? {};
   const target = options.buildTarget ?? "es2018";
   const outputDir = path.join(appDir ?? Deno.cwd(), options.outputDir ?? "./output");
@@ -47,30 +48,29 @@ export async function build(
   const routeFiles: string[] = [];
   const ssgOptions = options.ssg === true ? {} : options.ssg ?? false;
   const ssgPaths: string[] = [];
-  if (config?.router) {
-    const { routes } = await globalIt(
-      "__ALEPH_ROUTER",
-      () => initRouter(config.router!, appDir),
-    );
-    routes.forEach(([_, { filename }]) => {
-      routeFiles.push(filename);
-    });
-    if (ssgOptions && config.ssr) {
-      for (const [_, { pattern }] of routes) {
-        const { pathname } = pattern;
-        if (pathname.includes("/:")) {
-          const url = new URL("http://localhost/__aleph.getStaticPaths");
-          url.searchParams.set("pattern", pathname);
-          const res = await request(url);
-          if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
-            const a = await res.json();
-            if (Array.isArray(a)) {
-              ssgPaths.push(...a);
-            }
+  const { routes } = await globalIt(
+    "__ALEPH_ROUTER",
+    () => initRouter(config.router, appDir),
+  );
+
+  routes.forEach(([_, { filename }]) => {
+    routeFiles.push(filename);
+  });
+  if (ssgOptions && config.ssr) {
+    for (const [_, { pattern }] of routes) {
+      const { pathname } = pattern;
+      if (pathname.includes("/:")) {
+        const url = new URL("http://localhost/__aleph.getStaticPaths");
+        url.searchParams.set("pattern", pathname);
+        const res = await request(url);
+        if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {
+          const a = await res.json();
+          if (Array.isArray(a)) {
+            ssgPaths.push(...a);
           }
-        } else if (pathname !== "/_app") {
-          ssgPaths.push(pathname);
         }
+      } else if (pathname !== "/_app") {
+        ssgPaths.push(pathname);
       }
     }
   }
