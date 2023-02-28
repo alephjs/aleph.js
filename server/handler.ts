@@ -75,7 +75,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
         });
       }
       // check the optimized output
-      if (!isDev && !buildMode && outDir) {
+      if (!isDev && !buildMode && outDir && !searchParams.has("ssr")) {
         let outFile = path.join(outDir, pathname);
         if (pathname.startsWith("/-/") && isNpmPkg(restoreUrl(pathname))) {
           outFile += ".js";

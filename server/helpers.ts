@@ -179,7 +179,7 @@ export function restoreUrl(pathname: string): string {
 
 /** Check if the url is a npm package from esm.sh */
 export function isNpmPkg(url: string) {
-  return url.startsWith("https://esm.sh/v108/") && !url.endsWith(".js") && !url.endsWith(".css");
+  return url.startsWith("https://esm.sh/") && !url.endsWith(".js") && !url.endsWith(".css");
 }
 
 /** Find config file in the `appDir` if exits, or find in current working directory. */
