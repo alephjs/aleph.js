@@ -84,7 +84,7 @@ class Module {
     try {
       const url = new URL(this._specifier.slice(1), location.href);
       url.searchParams.set("t", Date.now().toString(36));
-      if (url.hostname.endsWith(".css")) {
+      if (url.pathname.endsWith(".css")) {
         url.searchParams.set("module", "");
       }
       const module = await import(url.href);
