@@ -43,11 +43,8 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       }
       const { socket, response } = Deno.upgradeWebSocket(req);
       socket.addEventListener("open", () => {
-        // close the hot-reloading websocket and tell the client to reload the page
+        // tell the client to reload the page
         socket.send(JSON.stringify({ type: "reload" }));
-        setTimeout(() => {
-          socket.close();
-        }, 50);
       });
       return response;
     }

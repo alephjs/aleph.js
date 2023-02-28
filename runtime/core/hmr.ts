@@ -112,9 +112,9 @@ function connect() {
   const socket = new WebSocket(wsUrl);
   const ping = (callback: () => void) => {
     setTimeout(() => {
-      const socket = new WebSocket(wsUrl);
-      socket.addEventListener("open", callback);
-      socket.addEventListener("close", () => {
+      const ws = new WebSocket(wsUrl);
+      ws.addEventListener("open", callback);
+      ws.addEventListener("error", () => {
         ping(callback); // retry
       });
     }, 500);
@@ -135,7 +135,7 @@ function connect() {
     if (ws !== null) {
       ws = null;
       console.log("[HMR] closed.");
-      // try to re-connect
+      // try to re-connect one time
       connect();
     } else {
       // ping to reload the page
@@ -180,6 +180,7 @@ function connect() {
           }
           case "reload": {
             location.reload();
+            break;
           }
         }
         console.log(
