@@ -129,7 +129,7 @@ export async function build(
 
   // add unocss reset css
   if (config.atomicCSS?.resetCSS) {
-    queue.push(config.atomicCSS?.resetCSS);
+    queue.push(config.atomicCSS.resetCSS);
   }
 
   const entryModules = new Map(queue.map((task) => [task, 0]));
@@ -249,7 +249,7 @@ export async function build(
         bundle: true,
         minify: true,
         treeShaking: true,
-        sourcemap: false,
+        sourcemap: options.sourceMap,
         plugins: [{
           name: "bundle-client-modules",
           setup(build) {
@@ -260,20 +260,22 @@ export async function build(
               }
               const [fp, q] = splitBy(argsPath, "?");
               const pathname = trimPrefix(fp, outputDir);
+              const searchParams = new URLSearchParams(q);
               let specifier = "." + pathname;
               if (args.path.startsWith("/-/")) {
                 specifier = restoreUrl(pathname);
+                searchParams.delete("v");
               }
               if (clientModules.has(specifier) && specifier !== entryPoint) {
                 return {
-                  path: [pathname, q].filter(Boolean).join("?"),
+                  path: [pathname, searchParams.toString()].filter(Boolean).join("?"),
                   external: true,
                 };
               }
               let jsFile = path.join(outputDir, pathname);
               if (isNpmPkg(specifier)) {
                 jsFile += ".js";
-              } else if (specifier.endsWith(".css") && new URLSearchParams(q).has("module")) {
+              } else if (specifier.endsWith(".css") && searchParams.has("module")) {
                 jsFile += ".js";
               }
               return { path: jsFile };

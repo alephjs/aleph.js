@@ -158,6 +158,8 @@ export type BuildOptions = {
   buildTarget?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
   /** The SSG options for the FS routing. */
   ssg?: boolean | SSGOptions;
+  /** The source map options for esbuild. */
+  sourceMap?: boolean;
 };
 
 /** The SSG options for the FS routing. */
