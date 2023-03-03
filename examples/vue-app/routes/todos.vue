@@ -1,55 +1,44 @@
 <script lang="ts">
-type TodoItem = {
+type Todo = {
   id: number;
   message: string;
   completed: boolean;
 };
 
-type Store = {
-  todos: TodoItem[];
-};
-
-const store: Store = {
-  todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
-};
-
-export const data: Data = {
-  cacheTtl: 0, // no cache
-  get: () => {
-    return Response.json(store);
+const store = {
+  todos: JSON.parse(window.localStorage?.getItem("todos") || "[]") as Todo[],
+  save() {
+    localStorage?.setItem("todos", JSON.stringify(this.todos));
   },
-  put: async (req) => {
-    const { message } = await req.json();
-    if (typeof message === "string") {
-      const id = Date.now();
-      store.todos.push({ id, message, completed: false });
-      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+};
+
+export function data() {
+  return Response.json(store);
+}
+
+export async function mutation(req: Request): Promise<Response> {
+  const { id, message, completed } = await req.json();
+  switch (req.method) {
+    case "PUT": {
+      store.todos.push({ id: Date.now(), message, completed: false });
+      store.save();
+      break;
     }
-    return Response.json(store);
-  },
-  patch: async (req) => {
-    const { id, message, completed } = await req.json();
-    const todo = store.todos.find((todo) => todo.id === id);
-    if (todo) {
-      if (typeof message === "string") {
-        todo.message = message;
-      }
-      if (typeof completed === "boolean") {
+    case "PATCH": {
+      const todo = store.todos.find((todo) => todo.id === id);
+      if (todo) {
         todo.completed = completed;
+        store.save();
       }
-      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+      break;
     }
-    return Response.json(store);
-  },
-  delete: async (req) => {
-    const { id } = await req.json();
-    if (id) {
+    case "DELETE": {
       store.todos = store.todos.filter((todo) => todo.id !== id);
-      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+      store.save();
     }
-    return Response.json(store);
-  },
-};
+  }
+  return Response.json(store);
+}
 </script>
 
 <script setup lang="ts">
@@ -57,7 +46,7 @@ import { Head, useData } from "aleph/vue"
 
 const { data, isMutating, mutation } = useData();
 
-async function onChange(todo: TodoItem) {
+async function onChange(todo: Todo) {
   const { id } = todo;
   const completed = !todo.completed;
   mutation.patch({ id, completed }, "replace")
@@ -86,7 +75,7 @@ async function onSubmit(e: any) {
   }
 }
 
-function onClick(todo: TodoItem) {
+function onClick(todo: Todo) {
   mutation.delete({ id: todo.id }, "replace");
 }
 </script>

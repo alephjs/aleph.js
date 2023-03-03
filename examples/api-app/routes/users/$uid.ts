@@ -1,14 +1,16 @@
 import { users } from "./index.ts";
 
-export const GET = (_req: Request, ctx: Context) => {
+// GET "/users/:uid"
+export function GET(_req: Request, ctx: Context) {
   const user = users.find((u) => String(u.uid) === ctx.params.uid);
   if (user) {
     return Response.json(user);
   }
   return Response.json({ error: { message: "user not found", code: "userNotFound" } }, { status: 404 });
-};
+}
 
-export const PATCH = async (req: Request, ctx: Context) => {
+// PATCH "/users/:uid"
+export async function PATCH(req: Request, ctx: Context) {
   const user = users.find((u) => String(u.uid) === ctx.params.uid);
   if (user) {
     const data = await req.formData();
@@ -20,12 +22,13 @@ export const PATCH = async (req: Request, ctx: Context) => {
     return Response.json(user);
   }
   return Response.json({ error: { message: "user not found", code: "userNotFound" } }, { status: 404 });
-};
+}
 
-export const DELETE = (_req: Request, ctx: Context) => {
+// DELETE "/users/:uid"
+export function DELETE(_req: Request, ctx: Context) {
   const index = users.findIndex((u) => String(u.uid) === ctx.params.uid);
   if (index) {
     return Response.json(users.splice(index, 1)[0]);
   }
   return Response.json({ error: { message: "user not found", code: "userNotFound" } }, { status: 404 });
-};
+}

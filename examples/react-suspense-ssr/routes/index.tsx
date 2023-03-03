@@ -9,9 +9,9 @@ import Comments from "../components/Comments.tsx";
 // Please update `delay` in ms to adjust how much different things are slowed down.
 const delay = 3000;
 
-export const data: Data = {
+export const data = {
   defer: true,
-  get: async () => {
+  fetch: async () => {
     await new Promise((resolve) => setTimeout(resolve, delay));
     return Response.json({
       comments: [

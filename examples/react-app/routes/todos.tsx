@@ -1,58 +1,71 @@
-import { Head, useData } from "aleph/react";
+import type { FormEvent } from "react";
+import { Head, useData, useMutation } from "aleph/react";
 
-type TodoItem = {
+type Todo = {
   id: number;
   message: string;
   completed: boolean;
 };
 
-type Store = {
-  todos: TodoItem[];
-};
-
-const store: Store = {
-  todos: JSON.parse(window.localStorage?.getItem("todos") || "[]"),
-};
-
-export const data: Data = {
-  cacheTtl: 0, // no cache
-  get: () => {
-    return Response.json(store);
+const store = {
+  todos: JSON.parse(window.localStorage?.getItem("todos") || "[]") as Todo[],
+  save() {
+    localStorage?.setItem("todos", JSON.stringify(this.todos));
   },
-  put: async (req) => {
-    const { message } = await req.json();
-    if (typeof message === "string") {
+};
+
+export function data() {
+  return Response.json(store);
+}
+
+export async function mutation(req: Request): Promise<Response> {
+  const { id, message, completed } = await req.json();
+  switch (req.method) {
+    case "PUT": {
       store.todos.push({ id: Date.now(), message, completed: false });
-      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+      store.save();
+      break;
     }
-    return Response.json(store);
-  },
-  patch: async (req) => {
-    const { id, message, completed } = await req.json();
-    const todo = store.todos.find((todo) => todo.id === id);
-    if (todo) {
-      if (typeof message === "string") {
-        todo.message = message;
-      }
-      if (typeof completed === "boolean") {
+    case "PATCH": {
+      const todo = store.todos.find((todo) => todo.id === id);
+      if (todo) {
         todo.completed = completed;
+        store.save();
       }
-      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+      break;
     }
-    return Response.json(store);
-  },
-  delete: async (req) => {
-    const { id } = await req.json();
-    if (id) {
+    case "DELETE": {
       store.todos = store.todos.filter((todo) => todo.id !== id);
-      window.localStorage?.setItem("todos", JSON.stringify(store.todos));
+      store.save();
     }
-    return Response.json(store);
-  },
-};
+  }
+  return Response.json(store);
+}
 
 export default function Todos() {
-  const { data: { todos }, isMutating, mutation } = useData<Store>();
+  const { data: { todos } } = useData<{ todos: Todo[] }>();
+  const { isMutating, mutation } = useMutation<{ todos: Todo[] }>();
+
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const message = fd.get("message")?.toString().trim();
+    if (message) {
+      await mutation.put({ message }, {
+        // optimistic update data without waiting for the server response
+        optimisticUpdate: (data) => {
+          return {
+            todos: [...data.todos, { id: 0, message, completed: false }],
+          };
+        },
+        // replace the data with the new data that is from the server response
+        replace: true,
+      });
+      setTimeout(() => form.querySelector("input")?.focus(), 0);
+      form.reset();
+    }
+  };
 
   return (
     <div className="todos-app">
@@ -92,30 +105,7 @@ export default function Todos() {
           </li>
         ))}
       </ul>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = e.currentTarget;
-          const fd = new FormData(form);
-          const message = fd.get("message")?.toString().trim();
-          if (message) {
-            await mutation.put({ message }, {
-              // optimistic update data without waiting for the server response
-              optimisticUpdate: (data) => {
-                return {
-                  todos: [...data.todos, { id: 0, message, completed: false }],
-                };
-              },
-              // replace the data with the new data that is from the server response
-              replace: true,
-            });
-            form.reset();
-            setTimeout(() => {
-              form.querySelector("input")?.focus();
-            }, 0);
-          }
-        }}
-      >
+      <form onSubmit={onSubmit}>
         <input
           type="text"
           name="message"

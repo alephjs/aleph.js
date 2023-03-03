@@ -24,7 +24,8 @@ export class GithubOauth implements Middleware {
     const session = await ctx.getSession<{ user: GithubUser }>();
 
     if (pathname === "/logout") {
-      return session.end("/");
+      await session.end();
+      return session.redirect("/");
     }
 
     if (!session.store?.user) {
@@ -65,10 +66,8 @@ export class GithubOauth implements Middleware {
         },
       }).then((res) => res.json());
 
-      return session.update(
-        { user },
-        searchParams.get("redirect") ?? "/",
-      );
+      await session.update({ user });
+      return session.redirect("/");
     }
 
     ctx.user = session.store.user;

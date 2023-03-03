@@ -11,12 +11,14 @@ export const users: User[] = [
   { uid: 4, name: "larry wall", createdAt: "2020-01-04T00:00:00.000Z" },
 ];
 
-export const GET = (req: Request) => {
+// GET "/users"
+export function GET(req: Request) {
   const url = new URL(req.url);
   return Response.json(users.map((user) => ({ ...user, url: `${url.origin}/users/${user.uid}` })));
-};
+}
 
-export const POST = async (req: Request) => {
+// POST "/users"
+export async function POST(req: Request) {
   const data = await req.formData();
   const name = data.get("name");
   if (typeof name !== "string" || name.length === 0) {
@@ -25,4 +27,4 @@ export const POST = async (req: Request) => {
   const user: User = { uid: users.length + 1, name, createdAt: new Date().toISOString() };
   users.push(user);
   return Response.json(user);
-};
+}

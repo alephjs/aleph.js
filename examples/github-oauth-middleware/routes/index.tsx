@@ -1,10 +1,8 @@
 import { useData } from "aleph/react";
-import type { GithubUser } from "../oauth.ts";
+import type { GithubUser } from "../middlewares/oauth.ts";
 
-export const data: Data<{ user: GithubUser }> = {
-  get: (_req, ctx) => {
-    return { user: ctx.user as GithubUser };
-  },
+export const data = (_req: Request, ctx: Context) => {
+  return Response.json({ user: ctx.user as GithubUser });
 };
 
 export default function Index() {
