@@ -4,8 +4,8 @@ import SolidTransformer from "../runtime/solid/transformer.ts";
 Deno.test("[unit] loaders/solid.ts", async (t) => {
   await t.step("SolidTransformer", async () => {
     const testCode = `
-    import { render} from "https://esm.sh/v108/solid-js/web";
-    import { createSignal } from "https://esm.sh/v108/solid-js";
+    import { render} from "https://esm.sh/v110/solid-js/web";
+    import { createSignal } from "https://esm.sh/v110/solid-js";
 
     const foo = "foo";
 

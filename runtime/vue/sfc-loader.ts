@@ -3,14 +3,14 @@ import type {
   SFCAsyncStyleCompileOptions,
   SFCScriptCompileOptions,
   SFCTemplateCompileOptions,
-} from "https://esm.sh/v108/@vue/compiler-sfc@3.2.39?target=esnext";
+} from "https://esm.sh/v110/@vue/compiler-sfc@3.2.39?target=esnext";
 import {
   compileScript,
   compileStyleAsync,
   compileTemplate,
   parse,
   rewriteDefault,
-} from "https://esm.sh/v108/@vue/compiler-sfc@3.2.39?target=esnext";
+} from "https://esm.sh/v110/@vue/compiler-sfc@3.2.39?target=esnext";
 import { computeHash } from "../../shared/util.ts";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
 import log from "../../server/log.ts";
@@ -57,10 +57,10 @@ export default class VueSFCLoader implements ModuleLoader {
       compilerOptions: {
         ...this.#options?.template?.compilerOptions,
         runtimeModuleName: this.#options?.template?.compilerOptions?.runtimeModuleName ??
-          env.importMap?.imports["vue"] ?? "https://esm.sh/v108/vue",
+          env.importMap?.imports["vue"] ?? "https://esm.sh/v110/vue",
         ssrRuntimeModuleName: this.#options?.template?.compilerOptions?.ssrRuntimeModuleName ??
           env.importMap?.imports["@vue/server-renderer"] ??
-          "https://esm.sh/v108/@vue/server-renderer",
+          "https://esm.sh/v110/@vue/server-renderer",
         expressionPlugins,
       },
     };

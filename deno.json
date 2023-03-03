@@ -10,7 +10,7 @@
       "./types.d.ts"
     ],
     "jsx": "react-jsx",
-    "jsxImportSource": "https://esm.sh/v108/react@18.2.0"
+    "jsxImportSource": "https://esm.sh/v110/react@18.2.0"
   },
   "importMap": "./import_map.json",
   "fmt": {

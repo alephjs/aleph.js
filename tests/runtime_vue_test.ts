@@ -5,7 +5,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
   await t.step("VueSFCLoader", async () => {
     const testVue = `
     <script setup>
-      import { ref } from "https://esm.sh/v108/vue@3"
+      import { ref } from "https://esm.sh/v110/vue@3"
 
       const msg = ref("Hello World!")
     </script>
@@ -25,7 +25,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     const { lang, code, inlineCSS } = await loader.load("./test.vue", testVue, { isDev: false });
     assert(loader.test("test.vue"));
     assertEquals(lang, "js");
-    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/v108/vue"`);
+    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/v110/vue"`);
     assertStringIncludes(code, `setup(__props)`);
     assertStringIncludes(code, `const msg = ref("Hello World!")`);
     assertStringIncludes(code, `_createElementBlock(_Fragment`);
@@ -50,7 +50,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     const loader = new VueSFCLoader();
     const { lang, code } = await loader.load("./test.vue", testVue, { isDev: false });
     assertEquals(lang, "ts");
-    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/v108/vue"`);
+    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/v110/vue"`);
     assertStringIncludes(code, `setup(__props)`);
     assertStringIncludes(code, `let x: string | number = 1`);
     assertStringIncludes(code, `_createElementBlock("p"`);
@@ -60,7 +60,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
   await t.step("VueSFCLoader(hmr)", async () => {
     const testVue = `
       <script setup>
-        import { ref } from "https://esm.sh/v108/vue@3"
+        import { ref } from "https://esm.sh/v110/vue@3"
 
         const msg = ref("Hello World!")
       </script>
@@ -78,7 +78,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     `;
     const loader = new VueSFCLoader();
     const { code } = await loader.load("./test.vue", testVue, { isDev: true });
-    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/v108/vue"`);
+    assertStringIncludes(code, `createElementBlock as _createElementBlock } from "https://esm.sh/v110/vue"`);
     assertStringIncludes(code, `__sfc__.__hmrId = "`);
     assertStringIncludes(code, `__sfc__.__scriptHash = "`);
     assertStringIncludes(code, `__sfc__.render = function render(`);
@@ -87,7 +87,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
   await t.step("VueSFCLoader(ssr)", async () => {
     const testVue = `
       <script setup>
-        import { ref } from "https://esm.sh/v108/vue@3"
+        import { ref } from "https://esm.sh/v110/vue@3"
 
         const msg = ref("Hello World!")
       </script>
@@ -105,7 +105,7 @@ Deno.test("[unit] loaders/vue.ts", async (t) => {
     `;
     const loader = new VueSFCLoader();
     const { code, inlineCSS } = await loader.load("./test.vue", testVue, { ssr: true });
-    assertStringIncludes(code, `ssrInterpolate as _ssrInterpolate } from "https://esm.sh/v108/@vue/server-renderer"`);
+    assertStringIncludes(code, `ssrInterpolate as _ssrInterpolate } from "https://esm.sh/v110/@vue/server-renderer"`);
     assertStringIncludes(code, `__ssrInlineRender: true,`);
     assertStringIncludes(code, `setup(__props)`);
     assertStringIncludes(code, `const msg = ref("Hello World!")`);

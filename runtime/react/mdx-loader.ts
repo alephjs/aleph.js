@@ -1,5 +1,5 @@
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
-import { compile, type CompileOptions } from "https://esm.sh/v108/@mdx-js/mdx@2.3.0";
+import { compile, type CompileOptions } from "https://esm.sh/v110/@mdx-js/mdx@2.3.0";
 
 export default class MDXLoader implements ModuleLoader {
   #options: CompileOptions;
@@ -17,7 +17,7 @@ export default class MDXLoader implements ModuleLoader {
       { path: specifier, value: content },
       {
         jsxImportSource: this.#options.jsxImportSource ?? env.jsxConfig?.jsxImportSource ??
-          "https://esm.sh/v108/react@18",
+          "https://esm.sh/v110/react@18",
         ...this.#options,
         providerImportSource: this.#options.providerImportSource
           ? env.importMap?.imports[this.#options.providerImportSource] ?? this.#options.providerImportSource

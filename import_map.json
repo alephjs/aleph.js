@@ -12,16 +12,16 @@
     "aleph/vue": "./runtime/vue/mod.ts",
     "aleph/vue-server": "./runtime/vue/server.ts",
     "aleph/solid-server": "./runtime/solid/server.ts",
-    "@unocss/core": "https://esm.sh/v108/@unocss/core@0.50.3",
-    "@unocss/preset-uno": "https://esm.sh/v108/@unocss/preset-uno@0.50.3",
-    "react": "https://esm.sh/v108/react@18.2.0",
-    "react-dom": "https://esm.sh/v108/react-dom@18.2.0",
-    "react-dom/": "https://esm.sh/v108/react-dom@18.2.0/",
-    "@mdx-js/react": "https://esm.sh/v108/@mdx-js/react@2.3.0",
-    "vue": "https://esm.sh/v108/vue@3.2.39",
-    "@vue/server-renderer": "https://esm.sh/v108/@vue/server-renderer@3.2.39",
-    "solid-js": "https://esm.sh/v108/solid-js@1.5.5",
-    "solid-js/web": "https://esm.sh/v108/solid-js@1.5.5/web",
-    "solid-refresh": "https://esm.sh/v108/solid-refresh@0.4.1"
+    "@unocss/core": "https://esm.sh/v110/@unocss/core@0.50.3",
+    "@unocss/preset-uno": "https://esm.sh/v110/@unocss/preset-uno@0.50.3",
+    "react": "https://esm.sh/v110/react@18.2.0",
+    "react-dom": "https://esm.sh/v110/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/v110/react-dom@18.2.0/",
+    "@mdx-js/react": "https://esm.sh/v110/@mdx-js/react@2.3.0",
+    "vue": "https://esm.sh/v110/vue@3.2.39",
+    "@vue/server-renderer": "https://esm.sh/v110/@vue/server-renderer@3.2.39",
+    "solid-js": "https://esm.sh/v110/solid-js@1.5.5",
+    "solid-js/web": "https://esm.sh/v110/solid-js@1.5.5/web",
+    "solid-refresh": "https://esm.sh/v110/solid-refresh@0.4.1"
   }
 }
