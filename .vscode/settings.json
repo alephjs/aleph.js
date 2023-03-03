@@ -2,10 +2,6 @@
   "deno.enable": true,
   "deno.lint": true,
   "deno.config": "./deno.json",
-  "deno.suggest.imports.hosts": {
-    "https://deno.land": true,
-    "https://esm.sh": false
-  },
   "[typescript][typescriptreact][json][markdown]": {
     "editor.defaultFormatter": "denoland.vscode-deno",
     "editor.formatOnSave": true
