@@ -24,7 +24,7 @@ export default function unocss(
   Reflect.set(
     generator,
     "resetCSS",
-    `https://esm.sh/v108/@unocss/reset@${generator.version}/${config.resetCSS ?? "tailwind"}.css`,
+    `https://esm.sh/@unocss/reset@${generator.version}/${config.resetCSS ?? "tailwind"}.css`,
   );
   return generator;
 }
