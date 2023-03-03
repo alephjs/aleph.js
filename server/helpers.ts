@@ -75,7 +75,30 @@ export async function getJSXConfig(appDir?: string): Promise<JSXConfig> {
 
 /** Get the deployment ID. */
 export function getDeploymentId(): string | undefined {
-  return Deno.env.get("DENO_DEPLOYMENT_ID");
+  const id = Deno.env.get("DENO_DEPLOYMENT_ID");
+  if (id) {
+    return id;
+  }
+
+  // or use git latest commit hash
+  return globalItSync("__ALEPH_DEPLOYMENT_ID", () => {
+    try {
+      if (!Deno.args.includes("--dev")) {
+        const gitDir = path.join(Deno.cwd(), ".git");
+        if (Deno.statSync(gitDir).isDirectory) {
+          const head = Deno.readTextFileSync(path.join(gitDir, "HEAD"));
+          if (head.startsWith("ref: ")) {
+            const ref = head.slice(5).trim();
+            const refFile = path.join(gitDir, ref);
+            return Deno.readTextFileSync(refFile).trim().slice(0, 8);
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }) ?? undefined;
 }
 
 export function cookieHeader(name: string, value: string, options?: CookieOptions): string {
@@ -106,36 +129,43 @@ export function cookieHeader(name: string, value: string, options?: CookieOption
   return cookie.join("; ");
 }
 
-export function toResponse(v: unknown, headers: Headers): Response {
+export function toResponse(v: unknown, init?: ResponseInit): Response {
   if (
     typeof v === "string" ||
     v instanceof ArrayBuffer ||
     v instanceof Uint8Array ||
     v instanceof ReadableStream
   ) {
-    return new Response(v, { headers: headers });
+    return new Response(v, init);
   }
   if (v instanceof Blob || v instanceof File) {
+    const headers = new Headers(init?.headers);
     headers.set("Content-Type", v.type);
     headers.set("Content-Length", v.size.toString());
-    return new Response(v, { headers: headers });
+    return new Response(v, { ...init, headers });
   }
   if (isPlainObject(v) || Array.isArray(v)) {
-    return Response.json(v, { headers });
+    return Response.json(v, init);
   }
   if (v === null) {
-    return new Response(null, { headers });
+    return new Response(null, init);
   }
   throw new Error("Invalid response type: " + typeof v);
 }
 
-export function fixResponse(res: Response, fixRedirect: boolean): Response {
-  if (res.status >= 300 && res.status < 400 && fixRedirect) {
+export function fixResponse(res: Response, options?: { headers?: HeadersInit; fixRedirect?: boolean }): Response {
+  if (res.status >= 300 && res.status < 400 && options?.fixRedirect) {
     return Response.json({ redirect: { location: res.headers.get("Location"), status: res.status } }, {
       status: 501,
     });
   }
-  return res;
+  const headers = new Headers(res.headers);
+  if (options?.headers) {
+    for (const [key, value] of Object.entries(options.headers)) {
+      headers.set(key, value);
+    }
+  }
+  return new Response(res.body, { status: res.status, headers });
 }
 
 /**

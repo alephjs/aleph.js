@@ -19,9 +19,9 @@ export type ServerOptions = AlephConfig & Omit<ServeInit, "onError"> & {
 
 /** Start the Aleph.js server. */
 export function serve(options: ServerOptions = {}) {
-  const buildMode = Deno.args.includes("--build") || Deno.args.includes("-O");
+  const buildMode = Deno.args.includes("--build");
   const isDev = Deno.args.includes("--dev");
-  const shouldGenerateExportTs = Deno.args.includes("--generate");
+  const generate = Deno.args.includes("--generate");
   const { baseUrl, loaders, middlewares, build: buildOptions, router, session, ssr, atomicCSS } = options;
   const { hostname, certFile, keyFile, signal } = options;
   const config: AlephConfig = { baseUrl, build: buildOptions, loaders, middlewares, router, session, ssr, atomicCSS };
@@ -62,7 +62,7 @@ export function serve(options: ServerOptions = {}) {
   // watch file changes in development mode
   if (isDev) {
     log.info(colors.dim("[dev]"), "Watching for file changes...");
-    watch(appDir, shouldGenerateExportTs);
+    watch(appDir, generate);
   }
 
   const onListen = (arg: { port: number; hostname: string }) => {

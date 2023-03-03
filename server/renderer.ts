@@ -257,7 +257,11 @@ export default {
                     );
                   }
                 } finally {
-                  controller.close();
+                  try {
+                    controller.close();
+                  } catch (error) {
+                    log.warn(error);
+                  }
                   rw.free();
                 }
               };
@@ -319,33 +323,34 @@ async function initSSR(
   // import module and fetch data for each matched route
   const modules = await Promise.all(matches.map(async ([ret, meta]) => {
     const mod = await importRouteModule(meta, router.appDir);
-    const dataConfig = isPlainObject(mod.data) ? mod.data : mod;
-    const dataDefer = Boolean(dataConfig?.defer);
+    const dataConfig = mod.data;
     const rmod: RouteModule = {
       url: new URL(ret.pathname.input + url.search, url.href),
       params: ret.pathname.groups,
       filename: meta.filename,
       exports: mod,
-      dataCacheTtl: dataConfig?.cacheTtl as (number | undefined),
     };
+
+    let fetcher: CallableFunction | undefined;
+    let dataDefer = false;
+    if (typeof dataConfig === "function") {
+      fetcher = dataConfig;
+    } else if (isPlainObject(dataConfig)) {
+      const { fetch, defer, cacheTtl } = dataConfig;
+      fetcher = typeof fetch === "function" ? fetch : undefined;
+      dataDefer = Boolean(defer);
+      rmod.dataCacheTtl = typeof cacheTtl === "number" ? cacheTtl : undefined;
+    } else {
+      fetcher = mod.GET;
+    }
 
     // assign route params to context
     Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
 
-    // check the `get` method of data, if `suspense` is enabled then return a promise instead
-    const fetcher = dataConfig.get ?? dataConfig.GET;
     if (typeof fetcher === "function") {
       const fetchData = async () => {
         let res: unknown;
-        // check the `any` method of data, throw the response object if it returns one
-        const anyFetcher = dataConfig.any ?? dataConfig.ANY;
-        if (typeof anyFetcher === "function") {
-          const res = await anyFetcher(req, ctx);
-          if (res instanceof Response) {
-            throw res;
-          }
-        }
-        res = fetcher(req, ctx);
+        res = fetcher!(req, ctx);
         if (res instanceof Promise) {
           res = await res;
         }

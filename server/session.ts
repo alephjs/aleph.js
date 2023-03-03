@@ -46,14 +46,13 @@ export class SessionImpl<StoreType extends Record<string, unknown>> implements S
     return this.#store;
   }
 
-  async read(): Promise<void> {
+  async init(): Promise<void> {
     this.#store = (await this.#storage.get(this.#id)) as StoreType | undefined;
   }
 
   async update(
     store: StoreType | ((prev: StoreType | undefined) => StoreType),
-    redirect: string,
-  ): Promise<Response> {
+  ): Promise<void> {
     if (typeof store !== "object" && typeof store !== "function") {
       throw new Error("store must be a valid object or a function");
     }
@@ -68,38 +67,27 @@ export class SessionImpl<StoreType extends Record<string, unknown>> implements S
     // save the new store
     await this.#storage.set(this.#id, nextStore, Date.now() + 1000 * (this.#options.maxAge ?? 1800));
     this.#store = nextStore;
+  }
 
+  async end(): Promise<void> {
+    if (!this.#store) {
+      await this.#storage.delete(this.#id);
+    }
+    this.#store = undefined;
+  }
+
+  redirect(url: string | URL): Response {
     const cookie = cookieHeader(
       this.#options.cookie?.name ?? "session",
       this.#id,
       {
         ...this.#options.cookie,
-        expires: new Date(Date.now() + 1000 * (this.#options.maxAge ?? 1800)),
+        expires: new Date(this.#store === undefined ? 0 : Date.now() + 1000 * (this.#options.maxAge ?? 1800)),
       },
     );
     return new Response("", {
       status: 302,
-      headers: { "Set-Cookie": cookie, "Location": redirect },
-    });
-  }
-
-  async end(redirect: string): Promise<Response> {
-    if (!this.#store) {
-      await this.#storage.delete(this.#id);
-    }
-    this.#store = undefined;
-
-    const cookie = cookieHeader(
-      this.#options.cookie?.name ?? "session",
-      "",
-      {
-        ...this.#options.cookie,
-        expires: new Date(0),
-      },
-    );
-    return new Response("", {
-      status: 302,
-      headers: { "Set-Cookie": cookie, "Location": redirect },
+      headers: { "Set-Cookie": cookie, "Location": url.toString() },
     });
   }
 }

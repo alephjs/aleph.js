@@ -1,6 +1,6 @@
 import { generateErrorHtml, TransformError } from "../runtime/core/error.ts";
 import type { Router } from "../runtime/core/routes.ts";
-import { trimSuffix } from "../shared/util.ts";
+import { isPlainObject, trimSuffix } from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR } from "./dev.ts";
 import { path } from "./deps.ts";
@@ -23,7 +23,7 @@ import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
-import { fetchRouteData, importRouteModule, initRouter } from "./routing.ts";
+import { fetchRoute, importRouteModule, initRouter } from "./routing.ts";
 import transformer from "./transformer.ts";
 import type { AlephConfig, ConnInfo, ErrorHandler, ModuleLoader } from "./types.ts";
 
@@ -43,7 +43,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       }
       const { socket, response } = Deno.upgradeWebSocket(req);
       socket.addEventListener("open", () => {
-        // tell the client to reload the page
+        // tell the client to reload the page if not _dev_ mode
         socket.send(JSON.stringify({ type: "reload" }));
       });
       return response;
@@ -179,9 +179,9 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       }
     }
 
-    // request route api
     const router: Router | null = await globalIt("__ALEPH_ROUTER", () => initRouter(routerConfig, appDir));
 
+    // getStaticPaths PRC for SSR
     if (pathname === "/__aleph.getStaticPaths") {
       if (router) {
         const pattern = searchParams.get("pattern");
@@ -202,17 +202,23 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       return Response.json([]);
     }
 
+    // for SSR dynamic data
     if (router && router.routes.length > 0) {
-      const _data_ = req.method === "GET" &&
-        (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
       try {
-        const resp = await fetchRouteData(req, ctx, router, _data_);
+        const resp = await fetchRoute(req, ctx, router);
         if (resp) {
           return resp;
         }
       } catch (err) {
+        const asData = req.method === "GET" && searchParams.has("_data_");
+
+        // user throws a response
+        if (err instanceof Response) {
+          return fixResponse(err, { fixRedirect: asData });
+        }
+
         // javascript syntax error
-        if (err instanceof TypeError && !_data_) {
+        if (err instanceof TypeError && !asData) {
           return new Response(generateErrorHtml(err.stack ?? err.message), {
             status: 500,
             headers: [["Content-Type", "text/html;"]],
@@ -222,12 +228,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
         // use the `onError` if available
         const res = onError?.(err, "route-data-fetch", req, ctx);
         if (res instanceof Response) {
-          return fixResponse(res, _data_);
-        }
-
-        // user throws a response
-        if (err instanceof Response) {
-          return fixResponse(err, _data_);
+          return fixResponse(res, { fixRedirect: asData });
         }
 
         // prints the error stack
@@ -260,8 +261,8 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       "__ALEPH_INDEX_HTML",
       () =>
         loadIndexHtml(path.join(appDir ?? ".", "index.html"), {
-          ssr: Boolean(ssr),
           hmr: isDev ? { wsUrl: Deno.env.get("HMR_WS_URL") } : undefined,
+          ssr: ssr ? { root: isPlainObject(ssr) ? ssr.root : undefined } : undefined,
         }),
     );
     if (!indexHtml) {
@@ -273,7 +274,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       return createHtmlResponse(req, path.join(appDir ?? ".", "./index.html"), indexHtml);
     }
 
-    // check SSG output
+    // use SSG output if exists
     if (!isDev && !buildMode && outDir) {
       const htmlFile = path.join(outDir, pathname === "/" ? "index.html" : pathname + ".html");
       if (await existsFile(htmlFile)) {

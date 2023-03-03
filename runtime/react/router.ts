@@ -1,5 +1,6 @@
 import type { FC, ReactNode } from "react";
 import { createElement, isValidElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
+import { isPlainObject } from "../../shared/util.ts";
 import events from "../core/events.ts";
 import { FetchError } from "../core/error.ts";
 import { redirect } from "../core/redirect.ts";
@@ -96,10 +97,13 @@ export const Router: FC<RouterProps> = (props) => {
           exports: await __aleph.importRouteModule(filename),
         };
         const dataUrl = rmod.url.pathname + rmod.url.search;
-        const dataConfig = rmod.exports.data as undefined | Record<string, boolean>;
-        rmod.withData = Boolean(dataConfig?.get || dataConfig?.GET);
+        const dataConfig = rmod.exports.data as Record<string, unknown> | true | undefined;
+        const defer = Boolean(isPlainObject(dataConfig) ? dataConfig.defer : undefined);
+        rmod.withData = Boolean(
+          isPlainObject(dataConfig) ? dataConfig.fetch : dataConfig ?? rmod.exports.GET,
+        );
         if (rmod.withData && !dataCache.has(dataUrl)) {
-          await prefetchRouteData(dataCache, dataUrl, dataConfig?.defer);
+          await prefetchRouteData(dataCache, dataUrl, defer);
         }
         return rmod;
       }));

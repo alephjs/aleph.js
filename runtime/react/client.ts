@@ -3,7 +3,7 @@ import { createRoot, hydrateRoot } from "react-dom/client";
 import { App, RouterProps } from "./mod.ts";
 
 export type RenderOptions = {
-  root?: string | HTMLElement;
+  root?: string | HTMLElement | null;
   createPortal?: RouterProps["createPortal"];
   hydrate?: boolean;
 };

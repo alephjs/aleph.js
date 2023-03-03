@@ -1,9 +1,10 @@
 import type { Router } from "../runtime/core/routes.ts";
+import { isPlainObject } from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { path } from "./deps.ts";
 import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import renderer from "./renderer.ts";
-import { fetchRouteData, initRouter } from "./routing.ts";
+import { fetchRoute, initRouter } from "./routing.ts";
 import type { Middleware, RouterInit, SessionOptions, SSR } from "./types.ts";
 
 type MockServerOptions = {
@@ -36,13 +37,13 @@ type MockServerOptions = {
  */
 export class MockServer {
   #options: MockServerOptions;
-  #router: Router | null;
   #indexHtml: Uint8Array | null;
+  #router: Router | null;
 
   constructor(options?: MockServerOptions) {
     this.#options = options || {};
-    this.#router = null;
     this.#indexHtml = null;
+    this.#router = null;
   }
 
   fetch(input: string, init?: RequestInit) {
@@ -67,21 +68,19 @@ export class MockServer {
 
   async #handler(req: Request, ctx: Context) {
     const { ssr, router, appDir } = this.#options;
-    const { searchParams } = new URL(req.url);
+
+    if (!this.#indexHtml) {
+      this.#indexHtml = await loadIndexHtml(path.join(appDir ?? "./", "index.html"), {
+        ssr: ssr ? { root: isPlainObject(ssr) ? ssr.root : undefined } : undefined,
+      });
+    }
 
     if (!this.#router && router) {
       this.#router = await initRouter(router, appDir);
     }
-    if (!this.#indexHtml) {
-      this.#indexHtml = await loadIndexHtml(path.join(appDir ?? "./", "index.html"), {
-        ssr: Boolean(ssr),
-      });
-    }
 
     if (this.#router) {
-      const _data_ = req.method === "GET" &&
-        (searchParams.has("_data_") || req.headers.get("Accept") === "application/json");
-      const res = await fetchRouteData(req, ctx, this.#router, _data_);
+      const res = await fetchRoute(req, ctx, this.#router);
       if (res) {
         return res;
       }

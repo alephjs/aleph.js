@@ -42,26 +42,29 @@ export function createContext(
       }
 
       const cookieName = options?.session?.cookie?.name ?? "session";
+      const secret = options?.session?.secret ?? "-";
       let sid = ctx.cookies.get(cookieName);
-      if (sid && options?.session?.secret) {
+      let skipInit = false;
+      if (sid) {
         const [rid, signature] = splitBy(sid, ".");
-        if (!signature || signature !== await hmacSign(rid, options?.session?.secret, "SHA-256")) {
+        if (!signature || signature !== await hmacSign(rid, secret, "SHA-256")) {
           sid = undefined;
         }
       }
       if (!sid) {
-        sid = await computeHash("SHA-1", crypto.randomUUID());
-        if (options?.session?.secret) {
-          sid = sid + "." + hmacSign(sid, options.session.secret);
-        }
+        const rid = await computeHash("SHA-1", crypto.randomUUID());
+        sid = rid + "." + hmacSign(rid, secret);
+        skipInit = true;
       }
 
       const sessionImpl = new SessionImpl<Record<string, unknown>>(
         sid,
         options?.session,
       );
-      await sessionImpl.read();
       session = sessionImpl;
+      if (!skipInit) {
+        await sessionImpl.init();
+      }
       return session;
     },
     __htmlRewriterHandlers: [],

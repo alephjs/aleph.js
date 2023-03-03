@@ -78,8 +78,9 @@ export type SessionOptions = {
 
 export interface Session<T> {
   store: T | undefined;
-  update(store: T | ((store: T | undefined) => T), redirectTo: string): Promise<Response>;
-  end(redirectTo: string): Promise<Response>;
+  update(store: T | ((store: T | undefined) => T)): Promise<void>;
+  end(): Promise<void>;
+  redirect(url: string | URL): Response;
 }
 
 export interface HTMLRewriterHandlers {
@@ -92,8 +93,7 @@ export interface HTMLRewriter {
   on: (selector: string, handlers: HTMLRewriterHandlers) => void;
 }
 
-// deno-lint-ignore no-explicit-any
-export interface Context extends Record<string, any> {
+export interface Context extends Record<string, unknown> {
   /** The request connection info. */
   readonly connInfo?: ConnInfo;
   /** The params of dynamic routes. */
@@ -199,6 +199,7 @@ export type CSP = {
 };
 
 export type SSROptions = {
+  root?: string;
   CSP?: CSP;
 };
 

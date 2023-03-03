@@ -4,7 +4,7 @@ import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./help
 import log from "./log.ts";
 
 type LoadOptions = {
-  ssr?: boolean;
+  ssr?: { root?: string };
   hmr?: { wsUrl?: string };
 };
 
@@ -12,64 +12,19 @@ type LoadOptions = {
 // - fix relative url to absolute url of `src` and `href`
 // - add `./runtime/core/hmr.ts` when in `development` mode
 // - add `./runtime/core/nomodule.ts`
-// - check the `<ssr-body>` element if the ssr is enabled
 // - add `data-defer` attribute to `<body>` if possible
 // - todo: apply unocss
-export async function loadIndexHtml(filepath: string, options: LoadOptions): Promise<Uint8Array | null> {
+export async function loadIndexHtml(filepath: string, options: LoadOptions = {}): Promise<Uint8Array | null> {
   if (await existsFile(filepath)) {
     const htmlRaw = await Deno.readFile(filepath);
-    const [html, hasSSRBody] = checkSSRBody(htmlRaw);
-    const fixedHtml = fixIndexHtml(html, hasSSRBody, options);
+    const fixedHtml = fixIndexHtml(htmlRaw, options);
     log.debug("index.html loaded");
     return fixedHtml;
   }
   return null;
 }
 
-function checkSSRBody(html: Uint8Array): [Uint8Array, boolean] {
-  const chunks: Uint8Array[] = [];
-  const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
-  let hasSSRBody = false;
-
-  rewriter.on("ssr-body", {
-    element: () => hasSSRBody = true,
-  });
-
-  rewriter.on("*", {
-    element: (e) => {
-      if (e.hasAttribute("data-ssr-root")) {
-        if (hasSSRBody) {
-          e.removeAttribute("data-ssr-root");
-        } else {
-          e.setInnerContent("<ssr-body></ssr-body>", { html: true });
-          hasSSRBody = true;
-        }
-      }
-    },
-    comments: (c) => {
-      const text = c.text.trim();
-      if (text === "ssr-body" || text === "ssr-output") {
-        if (hasSSRBody) {
-          c.remove();
-        } else {
-          c.replace("<ssr-body></ssr-body>", { html: true });
-          hasSSRBody = true;
-        }
-      }
-    },
-  });
-
-  try {
-    rewriter.write(html);
-    rewriter.end();
-  } finally {
-    rewriter.free();
-  }
-
-  return [concatBytes(...chunks), hasSSRBody];
-}
-
-function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadOptions): Uint8Array {
+function fixIndexHtml(html: Uint8Array, { hmr, ssr }: LoadOptions): Uint8Array {
   const alephPkgUri = getAlephPkgUri();
   const chunks: Uint8Array[] = [];
   const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => chunks.push(chunk));
@@ -135,11 +90,18 @@ function fixIndexHtml(html: Uint8Array, hasSSRBody: boolean, { ssr, hmr }: LoadO
       if (deploymentId) {
         el.setAttribute("data-deployment-id", deploymentId);
       }
-      if (ssr && !hasSSRBody) {
-        el.prepend("<ssr-body></ssr-body>", { html: true });
-      }
     },
   });
+
+  if (ssr) {
+    rewriter.on(ssr.root ?? "#root", {
+      element(el) {
+        el.append(`<ssr-body></ssr-body>`, {
+          html: true,
+        });
+      },
+    });
+  }
 
   if (hmr) {
     rewriter.on("head", {

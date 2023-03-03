@@ -30,13 +30,13 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   return await import(url);
 }
 
-export async function fetchRouteData(
+export async function fetchRoute(
   req: Request,
   ctx: Context,
   router: Router,
-  _data_: boolean,
 ): Promise<Response | void> {
-  const { pathname, host } = new URL(req.url);
+  const { pathname, host, searchParams } = new URL(req.url);
+  const hasDataParam = searchParams.has("_data_");
   if (router.routes.length > 0) {
     let pathnameInput = pathname;
     if (pathnameInput !== "/") {
@@ -67,29 +67,44 @@ export async function fetchRouteData(
       const { method } = req;
       const [ret, meta] = matched;
       const mod = await importRouteModule(meta, router.appDir);
-      const dataConfig = util.isPlainObject(mod.data) ? mod.data : mod;
-      if (method !== "GET" || mod.default === undefined || _data_) {
-        Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
-        const anyFetcher = dataConfig.any ?? dataConfig.ANY;
-        if (typeof anyFetcher === "function") {
-          const res = await anyFetcher(req, ctx);
-          if (res instanceof Response) {
-            return res;
+      if (method !== "GET" || (hasDataParam || mod.default === undefined)) {
+        let fetcher: unknown;
+        let cacheTtl: number | undefined;
+        if (method === "GET") {
+          if (typeof mod.data === "function") {
+            fetcher = mod.data;
+          } else if (util.isPlainObject(mod.data)) {
+            fetcher = mod.data.fetch;
+            cacheTtl = mod.data.cacheTtl;
+          } else {
+            fetcher = mod.GET;
+          }
+        } else {
+          if (typeof mod.mutation === "function") {
+            fetcher = mod.mutation;
+          } else if (util.isPlainObject(mod.mutation)) {
+            fetcher = mod.mutation[method] ?? mod.mutation[method.toLowerCase()];
+          }
+          if (typeof fetcher !== "function") {
+            fetcher = mod[method];
           }
         }
-        const fetcher = dataConfig[method.toLowerCase()] ?? dataConfig[method];
         if (typeof fetcher === "function") {
+          Object.assign(ctx.params as Record<string, string>, ret.pathname.groups);
           const res = await fetcher(req, ctx);
-          // todo: set cache for "GET" with `cacheTtl` option
+          const headers = new Headers({
+            "Cache-Control": cacheTtl ? `public, max-age=${cacheTtl}` : "no-cache, no-store, must-revalidate",
+          });
           if (res instanceof Response) {
-            return fixResponse(res, _data_);
+            const headers = new Headers(res.headers);
+            if (cacheTtl) {
+              headers.set("Cache-Control", `public, max-age=${cacheTtl}`);
+            } else {
+              headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+            }
+            return fixResponse(res, { fixRedirect: hasDataParam, headers });
           }
-          return toResponse(
-            res,
-            new Headers({
-              "Cache-Control": "no-cache, no-store, must-revalidate",
-            }),
-          );
+          return toResponse(res, { headers });
         }
         return new Response("Method Not Allowed", { status: 405 });
       }

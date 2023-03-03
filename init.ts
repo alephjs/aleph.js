@@ -14,11 +14,14 @@ const templates = [
   "leptos",
   "solid",
   "api",
-  // todo:
-  // "preact",
-  // "svelte",
-  // "lit",
-  // "vanilla",
+];
+
+const routerApps = [
+  "react",
+  "react-mdx",
+  "vue",
+  "solid",
+  "api",
 ];
 
 const versions = {
@@ -58,13 +61,11 @@ export default async function init(nameArg?: string, options?: Options) {
   }
 
   if (!template) {
-    const answer = await ask(
-      [
-        "Select a framework:",
-        ...templates.map((name, i) => `  ${bold((i + 1).toString())}. ${toTitle(name)}`),
-        dim(`[1-${templates.length}]`),
-      ].join("\n"),
-    );
+    const answer = await ask([
+      "Select a framework:",
+      ...templates.map((name, i) => `  ${bold((i + 1).toString())}. ${toTitle(name)}`),
+      dim(`[1-${templates.length}]`),
+    ].join("\n"));
     const n = parseInt(answer);
     if (!isNaN(n) && n > 0 && n <= templates.length) {
       template = templates[n - 1];
@@ -74,13 +75,13 @@ export default async function init(nameArg?: string, options?: Options) {
     }
   }
 
-  const generateExportTs = await confirm(
-    "Generate `_export.ts` file for runtime that doesn't support dynamic import (deploy to Deno Deploy)?",
-  );
-
+  const generateExportTs = routerApps.includes(template)
+    ? await confirm(
+      "Generate `_export.ts` file for runtime that doesn't support dynamic import (deploy to Deno Deploy)?",
+    )
+    : false;
   const withUnocss = ["react", "yew", "leptos", "solid"].includes(template!) &&
     await confirm("Using Unocss(TailwindCSS)?");
-
   const withVscode = await confirm("Initialize VS Code workspace configuration?");
 
   // download template
@@ -133,7 +134,7 @@ export default async function init(nameArg?: string, options?: Options) {
   }
 
   let serverCode = await Deno.readTextFile(join(appDir, "server.ts"));
-  if (!generateExportTs) {
+  if (routerApps.includes(template) && !generateExportTs) {
     const importExpr = `import routes from "./routes/_export.ts";\n`;
     if (serverCode.includes(importExpr)) {
       serverCode = serverCode

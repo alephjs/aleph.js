@@ -1,5 +1,6 @@
 import type { Component, Ref, ShallowRef } from "vue";
 import { createSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
+import { isPlainObject } from "../../shared/util.ts";
 import type { Route, RouteMeta, RouteModule, Router } from "../core/routes.ts";
 import { matchRoutes } from "../core/routes.ts";
 import events from "../core/events.ts";
@@ -120,8 +121,10 @@ const createRouter = ({ modules, url, dataCache, dataUrl }: RouterProps) => {
         exports: await __aleph.importRouteModule(filename),
       };
       const dataUrl = rmod.url.pathname + rmod.url.search;
-      const dataConfig = rmod.exports.data as undefined | Record<string, boolean>;
-      rmod.withData = Boolean(dataConfig?.get || dataConfig?.GET);
+      const dataConfig = rmod.exports.data as Record<string, unknown> | true | undefined;
+      rmod.withData = Boolean(
+        isPlainObject(dataConfig) ? dataConfig.fetch : dataConfig ?? rmod.exports.GET,
+      );
       if (rmod.withData && !dataCache.has(dataUrl)) {
         await prefetchData(dataUrl);
       }

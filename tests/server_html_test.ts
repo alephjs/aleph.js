@@ -14,7 +14,7 @@ Deno.test("[unit] lib/html.ts: parseHtmlLinks", async () => {
   </head>
 
   <body>
-    <div id="root"><ssr-body></div>
+    <div id="root"></div>
     <script type="module" src="./main.tsx"></script>
   </body>
 
