@@ -6,7 +6,6 @@ import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
-const { basename, dirname, fromFileUrl, join } = path;
 export const regJsxFile = /\.(jsx|tsx)$/;
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
@@ -221,6 +220,8 @@ export async function existsFile(path: string): Promise<boolean> {
   }
 }
 
+const { basename, dirname, fromFileUrl, join } = path;
+
 /** Find file in the `cwd` directory. */
 export async function findFile(filenames: string[], cwd = Deno.cwd()): Promise<string | undefined> {
   for (const filename of filenames) {
@@ -365,24 +366,33 @@ export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
   return jsxConfig;
 }
 
-/** Load the import maps from the json file. */
+/** Load the import maps. */
 export async function loadImportMap(appDir?: string): Promise<ImportMap> {
   const importMap: ImportMap = { __filename: "", imports: {}, scopes: {} };
-  let importMapFile: string | undefined;
   const denoConfigFile = await findConfigFile(["deno.jsonc", "deno.json"], appDir);
+  let importMapFilename: string | undefined;
   if (denoConfigFile) {
-    const { importMap } = await parseJSONFile(denoConfigFile);
-    importMapFile = importMap ? join(dirname(denoConfigFile), importMap) : undefined;
+    const confg = await parseJSONFile(denoConfigFile);
+    if (!confg.importMap) {
+      if (isPlainObject(confg.imports)) {
+        Object.assign(importMap.imports, confg.imports);
+      }
+      if (isPlainObject(confg.scopes)) {
+        Object.assign(importMap.scopes, confg.scopes);
+      }
+      return importMap;
+    }
+    importMapFilename = join(dirname(denoConfigFile), confg.importMap);
   }
-  if (!importMapFile) {
-    importMapFile = await findConfigFile(
+  if (!importMapFilename) {
+    importMapFilename = await findConfigFile(
       ["import_map", "import-map", "importmap", "importMap"].map((v) => `${v}.json`),
       appDir,
     );
   }
-  if (importMapFile) {
+  if (importMapFilename) {
     try {
-      const { __filename, imports, scopes } = await parseImportMap(importMapFile);
+      const { __filename, imports, scopes } = await parseImportMap(importMapFilename);
       if (import.meta.url.startsWith("file://") && appDir) {
         const alephPkgUri = getAlephPkgUri();
         if (alephPkgUri === "https://aleph") {
@@ -397,12 +407,11 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
       Object.assign(importMap, { __filename });
       Object.assign(importMap.imports, imports);
       Object.assign(importMap.scopes, scopes);
-      log.debug(`import maps ${basename(importMapFile)} loaded`);
+      log.debug(`import maps ${basename(importMapFilename)} loaded`);
     } catch (e) {
       log.error("loadImportMap:", e.message);
     }
   }
-
   return importMap;
 }
 
@@ -415,9 +424,9 @@ export async function parseJSONFile(jsonFile: string): Promise<Record<string, an
   return JSON.parse(raw);
 }
 
-export async function parseImportMap(importMapFile: string): Promise<ImportMap> {
-  const importMap: ImportMap = { __filename: importMapFile, imports: {}, scopes: {} };
-  const data = await parseJSONFile(importMapFile);
+export async function parseImportMap(importMapFilename: string): Promise<ImportMap> {
+  const importMap: ImportMap = { __filename: importMapFilename, imports: {}, scopes: {} };
+  const data = await parseJSONFile(importMapFilename);
   const imports: Record<string, string> = toStringMap(data.imports);
   const scopes: Record<string, Record<string, string>> = {};
   if (isPlainObject(data.scopes)) {
