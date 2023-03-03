@@ -15,6 +15,7 @@ const refresh = () => {
 };
 
 runtime.injectIntoGlobalHook(window);
+
 Object.assign(window, {
   $RefreshReg$: () => {},
   $RefreshSig$: () => (type: unknown) => type,

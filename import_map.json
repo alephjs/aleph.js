@@ -1,8 +1,6 @@
 {
   "imports": {
     "std/": "https://deno.land/std@0.175.0/",
-    "@unocss/core": "https://esm.sh/v108/@unocss/core@0.49.7",
-    "@unocss/preset-uno": "https://esm.sh/v108/@unocss/preset-uno@0.49.7",
     "aleph/": "./",
     "aleph/server": "./server/mod.ts",
     "aleph/dev": "./server/dev.ts",
@@ -14,6 +12,8 @@
     "aleph/vue": "./runtime/vue/mod.ts",
     "aleph/vue-server": "./runtime/vue/server.ts",
     "aleph/solid-server": "./runtime/solid/server.ts",
+    "@unocss/core": "https://esm.sh/v108/@unocss/core@0.50.3",
+    "@unocss/preset-uno": "https://esm.sh/v108/@unocss/preset-uno@0.50.3",
     "react": "https://esm.sh/v108/react@18.2.0",
     "react-dom": "https://esm.sh/v108/react-dom@18.2.0",
     "react-dom/": "https://esm.sh/v108/react-dom@18.2.0/",

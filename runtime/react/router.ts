@@ -263,8 +263,8 @@ export const App: FC<Omit<RouterProps, "strictMode">> = (props) => {
 export const useRouter = (): {
   url: URL;
   params: Record<string, string>;
-  e404?: boolean;
   redirect: typeof redirect;
+  e404?: boolean;
 } => {
   const { url, params, e404 } = useContext(RouterContext);
   return { url, params, e404, redirect };
