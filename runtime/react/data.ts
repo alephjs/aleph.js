@@ -173,8 +173,8 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
   );
 };
 
-export const useData = <T = unknown>(): { data: T } => {
-  const { deferedData, data } = useContext(DataContext) as DataContextProps<T>;
+export const useData = <T = unknown>(): { data: T; reload: DataContextProps["reload"] } => {
+  const { deferedData, data, reload } = useContext(DataContext) as DataContextProps<T>;
   if (data instanceof Error) {
     throw data;
   }
@@ -183,11 +183,11 @@ export const useData = <T = unknown>(): { data: T } => {
       throw deferedData.current;
     }
     if (deferedData?.current !== undefined) {
-      return { data: deferedData.current };
+      return { data: deferedData.current, reload };
     }
     throw data;
   }
-  return { data };
+  return { data, reload };
 };
 
 export const useMutation = <T = unknown>(): Pick<DataContextProps<T>, "mutation" | "isMutating"> => {
