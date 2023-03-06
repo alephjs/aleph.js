@@ -1,6 +1,6 @@
 import type { Router } from "../runtime/core/routes.ts";
 import { isFilledArray } from "../shared/util.ts";
-import { colors, path, serve as stdServe, serveTls } from "./deps.ts";
+import { path, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getDeploymentId, globalIt } from "./helpers.ts";
 import { createHandler } from "./handler.ts";
@@ -61,7 +61,6 @@ export function serve(options: ServerOptions = {}) {
 
   // watch file changes in development mode
   if (isDev) {
-    log.info(colors.dim("[dev]"), "Watching for file changes...");
     watch(appDir, generate);
   }
 

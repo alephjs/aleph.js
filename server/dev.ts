@@ -2,7 +2,15 @@ import { isFilledString, prettyBytes, trimPrefix } from "../shared/util.ts";
 import type { Router } from "../runtime/core/routes.ts";
 import { colors, Emitter, ensureDir, esbuild, mitt, parseDeps, path } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
-import { builtinModuleExts, findFile, getAlephConfig, getImportMap, getJSXConfig, watchFs } from "./helpers.ts";
+import {
+  builtinModuleExts,
+  existsFile,
+  findFile,
+  getAlephConfig,
+  getImportMap,
+  getJSXConfig,
+  watchFs,
+} from "./helpers.ts";
 import log from "./log.ts";
 import { initRouter, toRouteRegExp } from "./routing.ts";
 import type { AlephConfig, ModuleLoader } from "./types.ts";
@@ -95,64 +103,65 @@ export type DevOptions = {
 };
 
 let devProcess: Deno.Process | null = null;
+let watched = false;
 
 export default async function dev(options?: DevOptions) {
-  // stop previous dev server
-  if (devProcess) {
-    devProcess.kill("SIGTERM");
-    devProcess.close();
-  }
-
   const appDir = options?.baseUrl ? path.fromFileUrl(new URL(".", options.baseUrl)) : Deno.cwd();
   const serverEntry = options?.serverEntry
     ? path.join(appDir, options?.serverEntry)
     : await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
-  if (serverEntry) {
-    const entry = `./${trimPrefix(serverEntry, appDir)}`;
-    const source = await Deno.readTextFile(serverEntry);
-    const importMap = await getImportMap();
-    const deps = await parseDeps(entry, source, {
-      importMap: JSON.stringify(importMap),
-    });
 
-    // ensure the `_export.ts` file exists
-    for (const dep of deps) {
-      if (dep.specifier.startsWith("./") && dep.specifier.endsWith("/_export.ts")) {
-        const fp = path.join(appDir, dep.specifier);
-        await ensureDir(path.dirname(fp));
-        await Deno.writeTextFile(fp, "export default {}");
-      }
+  if (!watched) {
+    log.info(colors.dim("[dev]"), "Watching for file changes...");
+    watch(appDir, false);
+    watched = true;
+  }
+
+  if (!serverEntry) {
+    log.fatal("[dev] No server entry found.");
+    return;
+  }
+
+  const entry = `./${trimPrefix(serverEntry, appDir)}`;
+  const source = await Deno.readTextFile(serverEntry);
+  const importMap = await getImportMap();
+  const deps = await parseDeps(entry, source, {
+    importMap: JSON.stringify(importMap),
+  });
+  const exportTs = deps.find((dep) => dep.specifier.startsWith("./") && dep.specifier.endsWith("/_export.ts"));
+
+  // ensure the `_export.ts` file exists
+  if (exportTs) {
+    const fp = path.join(appDir, exportTs.specifier);
+    if (!(await existsFile(fp))) {
+      await ensureDir(path.dirname(fp));
+      await Deno.writeTextFile(fp, "export default {}");
     }
+  }
 
-    const emitter = createWatchFsEmitter();
-    emitter.on("*", (kind, { specifier }) => {
-      if (
-        kind === "modify" && (
-          specifier === entry ||
-          deps.some((dep) => !dep.specifier.endsWith("/_export.ts") && dep.specifier === specifier)
-        )
-      ) {
-        // restart the dev server
-        dev(options);
-      }
-    });
-
-    const cmd = [Deno.execPath(), "run", "-A", "--no-lock", serverEntry, "--dev"];
-    if (options?.generateExportTs) {
-      cmd.push("--generate");
-    }
-    if (devProcess) {
+  // watch server entry and its deps to restart the dev server
+  const emitter = createWatchFsEmitter();
+  emitter.on("*", (kind, { specifier }) => {
+    if (
+      kind === "modify" && specifier !== exportTs?.specifier && (
+        specifier === entry ||
+        deps.some((dep) => dep.specifier === specifier)
+      )
+    ) {
       console.clear();
       console.info(colors.dim("[dev] Restarting the server..."));
+      devProcess?.kill("SIGTERM");
+      dev(options);
     }
-    devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
-    await devProcess.status();
-    devProcess.close();
-    devProcess = null;
-    removeWatchFsEmitter(emitter);
-  } else {
-    log.fatal("[dev] No server entry found.");
+  });
+
+  const cmd = [Deno.execPath(), "run", "-A", "--no-lock", serverEntry, "--dev"];
+  if (options?.generateExportTs) {
+    cmd.push("--generate");
   }
+  devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
+  await devProcess.status();
+  removeWatchFsEmitter(emitter);
 }
 
 export function handleHMR(req: Request): Response {

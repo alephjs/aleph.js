@@ -11,13 +11,9 @@ export * as path from "https://deno.land/std@0.175.0/path/mod.ts";
 export * as esbuild from "https://deno.land/x/esbuild@v0.17.10/mod.js";
 export * from "https://deno.land/x/aleph_compiler@0.8.6/mod.ts";
 export * from "https://deno.land/x/aleph_compiler@0.8.6/types.ts";
-export { HTMLRewriter } from "https://deno.land/x/lol_html@0.0.6/mod.ts";
+export { default as initLolHtml, HTMLRewriter } from "https://deno.land/x/lol_html@0.0.6/mod.ts";
+export { default as lolHtmlWasm } from "https://deno.land/x/lol_html@0.0.6/wasm.js";
 export { JSONC } from "https://deno.land/x/jsonc_parser@v0.0.1/src/jsonc.ts";
 
 // npm
 export { default as mitt, type Emitter } from "https://esm.sh/v110/mitt@3.0.0";
-
-// init lol-html wasm
-import initLolHtml from "https://deno.land/x/lol_html@0.0.6/mod.ts";
-import getLolHtmlWasmData from "https://deno.land/x/lol_html@0.0.6/wasm.js";
-await initLolHtml(getLolHtmlWasmData());

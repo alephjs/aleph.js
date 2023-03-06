@@ -1,5 +1,5 @@
 import { cleanPath, isLikelyHttpURL, utf8Enc } from "../shared/util.ts";
-import { concatBytes, HTMLRewriter } from "./deps.ts";
+import { concatBytes, HTMLRewriter, initLolHtml, lolHtmlWasm } from "./deps.ts";
 import { existsFile, getAlephPkgUri, getDeploymentId, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
 
@@ -7,6 +7,9 @@ type LoadOptions = {
   ssr?: { root?: string };
   hmr?: { wsUrl?: string };
 };
+
+// init lol-html wasm
+await initLolHtml(lolHtmlWasm());
 
 // load and fix the `index.html`
 // - fix relative url to absolute url of `src` and `href`
