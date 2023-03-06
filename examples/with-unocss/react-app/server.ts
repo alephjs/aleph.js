@@ -6,6 +6,6 @@ import routes from "./routes/_export.ts";
 serve({
   baseUrl: import.meta.url,
   router: { routes },
-  atomicCSS: UnoCSS({ ...config, resetCSS: false }),
+  atomicCSS: UnoCSS(config),
   ssr: true,
 });
