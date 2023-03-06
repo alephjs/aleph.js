@@ -203,8 +203,8 @@ export default {
         const styleTs = `${alephPkgUri}/runtime/core/style.ts`;
         // embed module unocss css in dev mode
         if (isDev && config?.atomicCSS) {
-          const regexp = config.atomicCSS.test ?? regJsxFile;
-          if (regexp.test(pathname)) {
+          const re = config.atomicCSS.test ?? regJsxFile;
+          if (re.test(pathname)) {
             try {
               const { css, matched } = await config.atomicCSS.generate(source, {
                 id: specifier,

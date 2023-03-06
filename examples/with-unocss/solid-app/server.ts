@@ -1,11 +1,11 @@
 import { serve } from "aleph/solid-server";
-import unocss from "aleph/unocss";
-import routes from "./routes/_export.ts";
+import UnoCSS from "aleph/unocss";
 import config from "./unocss.config.ts";
+import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
   router: { routes },
-  atomicCSS: unocss(config),
+  atomicCSS: UnoCSS(config),
   ssr: true,
 });

@@ -1,11 +1,11 @@
 import { createGenerator, type UnoGenerator, type UserConfig } from "@unocss/core";
 import type { AtomicCSSConfig } from "./types.ts";
 
-type UnoConfig = UserConfig & AtomicCSSConfig;
+type UnoConfig = UserConfig & { test?: RegExp; resetCSS?: boolean };
 
-export default function unocss(config: UnoConfig): UnoGenerator & AtomicCSSConfig;
-export default function unocss(test: RegExp, config: UnoConfig): UnoGenerator & AtomicCSSConfig;
-export default function unocss(
+export default function UnoCSS(config: UnoConfig): UnoGenerator & AtomicCSSConfig;
+export default function UnoCSS(test: RegExp, config: UnoConfig): UnoGenerator & AtomicCSSConfig;
+export default function UnoCSS(
   testOrConfig: RegExp | UnoConfig,
   config?: UnoConfig,
 ): UnoGenerator & AtomicCSSConfig {
@@ -18,13 +18,15 @@ export default function unocss(
   if (test) {
     Reflect.set(generator, "test", test);
   }
-  if (config.test) {
+  if (config.test instanceof RegExp) {
     Reflect.set(generator, "test", config.test);
   }
-  Reflect.set(
-    generator,
-    "resetCSS",
-    `https://esm.sh/@unocss/reset@${generator.version}/${config.resetCSS ?? "tailwind"}.css`,
-  );
+  if (config.resetCSS !== false) {
+    Reflect.set(
+      generator,
+      "resetCSS",
+      `https://esm.sh/@unocss/reset@${generator.version}/tailwind.css`,
+    );
+  }
   return generator;
 }

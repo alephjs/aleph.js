@@ -6,7 +6,7 @@ import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
 
-export const regJsxFile = /\.(jsx|tsx)$/;
+export const regJsxFile = /\.(jsx|tsx|mdx)$/;
 export const regFullVersion = /@\d+\.\d+\.\d+/;
 export const builtinModuleExts = ["tsx", "ts", "mts", "jsx", "js", "mjs"];
 
