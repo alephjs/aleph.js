@@ -1,4 +1,5 @@
-import { serve } from "aleph/react-server";
+import { serve } from "aleph/server";
+import react from "aleph/plugins/react";
 import mdx from "aleph/plugins/mdx";
 import routes from "./routes/_export.ts";
 
@@ -16,7 +17,7 @@ serve({
       rehypePlugins: [rehypeHighlight, rehypeSlug],
       providerImportSource: "@mdx-js/react",
     }),
+    react({ ssr: true }),
   ],
   router: { routes },
-  ssr: true,
 });

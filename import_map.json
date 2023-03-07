@@ -7,11 +7,10 @@
     "aleph/plugins/unocss": "./plugins/unocss.ts",
     "aleph/plugins/mdx": "./plugins/mdx.ts",
     "aleph/react": "./framework/react/mod.ts",
-    "aleph/react-client": "./framework/react/client.ts",
-    "aleph/react-server": "./framework/react/server.ts",
+    "aleph/plugins/react": "./framework/react/plugin.ts",
     "aleph/vue": "./framework/vue/mod.ts",
-    "aleph/vue-server": "./framework/vue/server.ts",
-    "aleph/solid-server": "./framework/solid/server.ts",
+    "aleph/plugins/vue": "./framework/vue/plugin.ts",
+    "aleph/plugins/solid": "./framework/solid/plugin.ts",
     "@unocss/core": "https://esm.sh/v110/@unocss/core@0.50.3",
     "@unocss/preset-uno": "https://esm.sh/v110/@unocss/preset-uno@0.50.3",
     "react": "https://esm.sh/v110/react@18.2.0",
@@ -20,8 +19,8 @@
     "@mdx-js/react": "https://esm.sh/v110/@mdx-js/react@2.3.0",
     "vue": "https://esm.sh/v110/vue@3.2.39",
     "@vue/server-renderer": "https://esm.sh/v110/@vue/server-renderer@3.2.39",
-    "solid-js": "https://esm.sh/v110/solid-js@1.5.5",
-    "solid-js/web": "https://esm.sh/v110/solid-js@1.5.5/web",
-    "solid-refresh": "https://esm.sh/v110/solid-refresh@0.4.1"
+    "solid-js": "https://esm.sh/v110/solid-js@1.6.12",
+    "solid-js/web": "https://esm.sh/v110/solid-js@1.6.12/web",
+    "solid-refresh": "https://esm.sh/v110/solid-refresh@0.5.1&deps=solid-js@1.6.12"
   }
 }

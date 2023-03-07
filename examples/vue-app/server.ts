@@ -1,8 +1,11 @@
-import { serve } from "aleph/vue-server";
+import { serve } from "aleph/server";
+import vue from "aleph/plugins/vue";
 import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
   router: { routes },
-  ssr: true,
+  plugins: [
+    vue({ ssr: true }),
+  ],
 });

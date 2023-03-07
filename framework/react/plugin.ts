@@ -1,14 +1,8 @@
 import { createElement } from "react";
 import { renderToReadableStream } from "react-dom/server";
-import { serve as alephServe, type ServeOptions } from "../../server/mod.ts";
-import type { SSRContext, SSROptions } from "../../server/types.ts";
+import type { Plugin, SSRContext, SSROptions } from "../../server/types.ts";
 import { isPlainObject, pick } from "../../shared/util.ts";
 import { App } from "./router.ts";
-
-if (Deno.args.includes("--dev")) {
-  // Enable react refresh
-  Deno.env.set("REACT_REFRESH", "true");
-}
 
 /** The `suspenseMarker` to mark the susponse rendering is starting. */
 const suspenseMarker = `data:text/javascript;/** suspense marker **/`;
@@ -34,14 +28,20 @@ export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   );
 };
 
-export function serve(options?: Omit<ServeOptions, "ssr"> & { ssr?: boolean | SSROptions }) {
-  return alephServe({
-    ...options,
-    ssr: options?.ssr
-      ? {
-        ...(isPlainObject(options.ssr) ? options.ssr : {}),
-        render,
+export default function ReactPlugin(options?: { ssr?: boolean | SSROptions }): Plugin {
+  return {
+    name: "react",
+    setup(aleph) {
+      if (Deno.args.includes("--dev")) {
+        // Enable react refresh
+        Deno.env.set("REACT_REFRESH", "true");
       }
-      : undefined,
-  });
+      if (options?.ssr) {
+        aleph.ssr = {
+          ...(isPlainObject(options.ssr) ? options.ssr : {}),
+          render,
+        };
+      }
+    },
+  };
 }

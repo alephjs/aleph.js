@@ -63,8 +63,10 @@ export function createHandler(appDir: string, config: AlephConfig) {
     let loader: ModuleLoader | undefined;
     if (
       !searchParams.has("raw") && (
-        transformer.test(pathname) ||
-        (loader = loaders?.find((l) => l.test(pathname)))
+        // 1. check loader first
+        (loader = loaders?.find((l) => l.test(pathname))) ||
+        // 2. check built-in modules
+        transformer.test(pathname)
       )
     ) {
       if (pathname.endsWith(".js.map") && pathname.startsWith("/-/")) {
@@ -73,7 +75,7 @@ export function createHandler(appDir: string, config: AlephConfig) {
           headers: [["Content-Type", contentType]],
         });
       }
-      // check the optimized output
+      // check and use the build output
       if (!isDev && !buildMode && outDir && !searchParams.has("ssr")) {
         let outFile = path.join(outDir, pathname);
         if (pathname.startsWith("/-/") && isNpmPkg(restoreUrl(pathname))) {
@@ -106,7 +108,7 @@ export function createHandler(appDir: string, config: AlephConfig) {
         });
       } catch (err) {
         if (err instanceof TransformError) {
-          // todo: format error message in terminal
+          // todo: pretty error message in terminal
           log.error(err.message);
           const alephPkgUri = toLocalPath(getAlephPkgUri());
           return new Response(

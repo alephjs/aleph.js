@@ -1,6 +1,6 @@
-import { transform } from "https://esm.sh/v110/@babel/standalone@7.19.2";
-import babelPresetSolid from "https://esm.sh/v110/babel-preset-solid@1.5.5";
-import solidRefresh from "https://esm.sh/v110/solid-refresh@0.4.1/babel";
+import { transform } from "https://esm.sh/@babel/standalone@7.21.2";
+import babelPresetSolid from "https://esm.sh/v110/babel-preset-solid@1.6.12";
+// import solidRefresh from "https://esm.sh/v110/solid-refresh@0.5.1/babel";
 import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
 
 export default class SolidTransformer implements ModuleLoader {
@@ -14,7 +14,7 @@ export default class SolidTransformer implements ModuleLoader {
         [babelPresetSolid, { generate: env.ssr ? "ssr" : "dom", hydratable: env.ssr || !env.spaMode }],
         ["typescript", { onlyRemoveTypeImports: true }],
       ],
-      plugins: env.isDev && !env.ssr ? [[solidRefresh, { bundler: "vite" }]] : [],
+      // plugins: env.isDev && !env.ssr ? [[solidRefresh, { bundler: "vite" }]] : [],
       filename: specifier,
     });
     return {

@@ -1,8 +1,11 @@
-import { serve } from "aleph/solid-server";
+import { serve } from "aleph/server";
+import solid from "aleph/plugins/solid";
 import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
   router: { routes },
-  ssr: true,
+  plugins: [
+    solid({ ssr: true }),
+  ],
 });

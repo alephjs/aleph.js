@@ -1,3 +1,3 @@
-import { bootstrap } from "aleph/react-client";
+import { bootstrap } from "aleph/react";
 
 bootstrap();

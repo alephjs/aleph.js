@@ -1,10 +1,11 @@
 export default function Header() {
   return (
-    <header class="w-full h-12 px-3">
-      <div class="h-full w-full flex items-center justify-between">
-        <h1 class="w-24 h-full flex items-center">
-          <a href="/" class="w-full">
+    <header class="sticky top-0 w-full h-20">
+      <div class="flex items-center justify-between w-[90%] max-w-[900px] h-full m-x-auto">
+        <h1>
+          <a href="/">
             <svg
+              class="w-auto h-4"
               viewBox="0 0 60 12.09"
               fill="currentColor"
             >
@@ -20,9 +21,10 @@ export default function Header() {
             </svg>
           </a>
         </h1>
-        <nav class="flex h-full items-center gap-2">
-          <a href="https://deno.land/x/aleph" class="w-8 h-8">
+        <nav class="flex items-center gap-5">
+          <a href="https://deno.land/x/aleph" class="text-[#454545] hover:text-black">
             <svg
+              class="w-5 h-5"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 512 512"
             >
@@ -48,8 +50,9 @@ export default function Header() {
               <circle mask="url(#deno-logo-mask)" cx="262" cy="203" r="16" />
             </svg>
           </a>
-          <a href="https://github.com/alephjs/aleph.js" class="w-8 h-8">
+          <a href="https://github.com/alephjs/aleph.js" class="text-[#454545] hover:text-black">
             <svg
+              class="w-5 h-5"
               viewBox="0 0 1024 1024"
               fill="currentColor"
             >

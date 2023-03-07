@@ -58,7 +58,7 @@ export async function serve(options?: ServeOptions): Promise<void> {
 
   const onListen = (arg: { port: number; hostname: string }) => {
     const origin = `${tls ? "https" : "http"}://${hostname ?? "localhost"}:${arg.port}`;
-    Deno.env.set("ALEPH_SERVER_ORIGIN", `${origin}`);
+    Reflect.set(globalThis, "__ALEPH_SERVER_ORIGIN", origin);
     log.info(`Server ready on ${origin}`);
     _onListen?.(arg);
   };

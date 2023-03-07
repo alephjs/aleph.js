@@ -25,7 +25,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   }
 
   const version = depGraph.get(filename)?.version;
-  const origin = Deno.env.get("ALEPH_SERVER_ORIGIN");
+  const origin = Reflect.get(globalThis, "__ALEPH_SERVER_ORIGIN");
 
   let url: string;
   if (origin) {
@@ -36,6 +36,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
       : (config?.baseUrl ? path.fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
     url = `file://${path.join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
   }
+
   return await import(url);
 }
 

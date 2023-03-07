@@ -1,6 +1,7 @@
 import { Untar } from "https://deno.land/std@0.175.0/archive/untar.ts";
 import { parse } from "https://deno.land/std@0.175.0/flags/mod.ts";
 import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.175.0/fmt/colors.ts";
+import { copy as copyDir } from "https://deno.land/std@0.175.0/fs/copy.ts";
 import { copy } from "https://deno.land/std@0.175.0/streams/copy.ts";
 import { readerFromStreamReader } from "https://deno.land/std@0.175.0/streams/reader_from_stream_reader.ts";
 import { ensureDir } from "https://deno.land/std@0.175.0/fs/ensure_dir.ts";
@@ -27,16 +28,15 @@ const routerApps = [
 const versions = {
   react: "18.2.0",
   vue: "3.2.39",
-  solid: "1.5.5",
+  solid: "1.6.12",
 };
 
 type Options = {
-  canary?: boolean;
   template?: string;
 };
 
 export default async function init(nameArg?: string, options?: Options) {
-  let { template, canary } = options || {};
+  let { template } = options || {};
 
   // get and check the project name
   const name = nameArg ?? await ask("Project Name:");
@@ -75,6 +75,7 @@ export default async function init(nameArg?: string, options?: Options) {
     }
   }
 
+  const appDir = join(Deno.cwd(), name);
   const generateExportTs = routerApps.includes(template)
     ? await confirm(
       "Generate `_export.ts` file for runtime that doesn't support dynamic import (deploy to Deno Deploy)?",
@@ -86,52 +87,53 @@ export default async function init(nameArg?: string, options?: Options) {
 
   // download template
   console.log(`${dim("↓")} Downloading template(${blue(template!)}), this might take a moment...`);
-  const pkgName = canary ? "aleph_canary" : "aleph";
-  const [res, res2] = await Promise.all([
-    fetch(
-      `https://cdn.deno.land/${pkgName}/meta/versions.json`,
-    ),
-    fetch("https://esm.sh/status.json"),
-  ]);
+  let alephPkgUri: string;
+  if (import.meta.url.startsWith("file://")) {
+    const src = `examples/${withUnocss ? "with-unocss/" : ""}${template}-app/`;
+    await copyDir(src, name);
+    alephPkgUri = "..";
+  } else {
+    const res = await fetch("https://cdn.deno.land/aleph/meta/versions.json");
+    if (res.status !== 200) {
+      console.error(await res.text());
+      Deno.exit(1);
+    }
+    const { latest: VERSION } = await res.json();
+    const repo = "alephjs/aleph.js";
+    const resp = await fetch(
+      `https://codeload.github.com/${repo}/tar.gz/refs/tags/${VERSION}`,
+    );
+    if (resp.status !== 200) {
+      console.error(await resp.text());
+      Deno.exit(1);
+    }
+    // deno-lint-ignore ban-ts-comment
+    // @ts-ignore
+    const gz = new DecompressionStream("gzip");
+    const entryList = new Untar(
+      readerFromStreamReader(resp.body!.pipeThrough<Uint8Array>(gz).getReader()),
+    );
+    const prefix = `${basename(repo)}-${VERSION}/examples/${withUnocss ? "with-unocss/" : ""}${template}-app/`;
+    for await (const entry of entryList) {
+      if (entry.fileName.startsWith(prefix) && !entry.fileName.endsWith("/README.md")) {
+        const fp = join(appDir, trimPrefix(entry.fileName, prefix));
+        if (entry.type === "directory") {
+          await ensureDir(fp);
+          continue;
+        }
+        const file = await Deno.open(fp, { write: true, create: true });
+        await copy(entry, file);
+      }
+    }
+    alephPkgUri = `https://deno.land/x/aleph@${VERSION}`;
+  }
+
+  const res = await fetch("https://esm.sh/status.json");
   if (res.status !== 200) {
     console.error(await res.text());
     Deno.exit(1);
   }
-  if (res2.status !== 200) {
-    console.error(await res.text());
-    Deno.exit(1);
-  }
-  const { latest: VERSION } = await res.json();
-  const { version: ESM_VERSION } = await res2.json();
-  const repo = canary ? "ije/aleph-canary" : "alephjs/aleph.js";
-  const resp = await fetch(
-    `https://codeload.github.com/${repo}/tar.gz/refs/tags/${VERSION}`,
-  );
-  if (resp.status !== 200) {
-    console.error(await resp.text());
-    Deno.exit(1);
-  }
-  // deno-lint-ignore ban-ts-comment
-  // @ts-ignore
-  const gz = new DecompressionStream("gzip");
-  const entryList = new Untar(
-    readerFromStreamReader(resp.body!.pipeThrough<Uint8Array>(gz).getReader()),
-  );
-  const appDir = join(Deno.cwd(), name);
-  const prefix = `${basename(repo)}-${VERSION}/examples/${withUnocss ? "with-unocss/" : ""}${template}-app/`;
-
-  // write template files
-  for await (const entry of entryList) {
-    if (entry.fileName.startsWith(prefix) && !entry.fileName.endsWith("/README.md")) {
-      const fp = join(appDir, trimPrefix(entry.fileName, prefix));
-      if (entry.type === "directory") {
-        await ensureDir(fp);
-        continue;
-      }
-      const file = await Deno.open(fp, { write: true, create: true });
-      await copy(entry, file);
-    }
-  }
+  const { version: ESM_VERSION } = await res.json();
 
   let serverCode = await Deno.readTextFile(join(appDir, "server.ts"));
   if (routerApps.includes(template) && !generateExportTs) {
@@ -153,7 +155,6 @@ export default async function init(nameArg?: string, options?: Options) {
     serverCode.replace("  baseUrl: import.meta.url,\n", ""),
   );
 
-  const alephPkgUri = `https://deno.land/x/${pkgName}@${VERSION}`;
   const denoConfig = {
     "compilerOptions": {
       "lib": [
@@ -207,8 +208,7 @@ export default async function init(nameArg?: string, options?: Options) {
       });
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
-        "aleph/react-client": `${alephPkgUri}/framework/react/client.ts`,
-        "aleph/react-server": `${alephPkgUri}/framework/react/server.ts`,
+        "aleph/plugins/react": `${alephPkgUri}/framework/react/plugin.ts`,
         "react": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
         "react-dom": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}/`,
@@ -218,7 +218,7 @@ export default async function init(nameArg?: string, options?: Options) {
     case "vue": {
       Object.assign(importMap.imports, {
         "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
-        "aleph/vue-server": `${alephPkgUri}/framework/vue/server.ts`,
+        "aleph/plugins/vue": `${alephPkgUri}/framework/vue/plugin.ts`,
         "vue": `https://esm.sh/v${ESM_VERSION}/vue@${versions.vue}`,
         "@vue/server-renderer": `https://esm.sh/v${ESM_VERSION}/@vue/server-renderer@${versions.vue}`,
       });
@@ -230,10 +230,10 @@ export default async function init(nameArg?: string, options?: Options) {
         "jsxImportSource": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
       });
       Object.assign(importMap.imports, {
-        "aleph/solid-server": `${alephPkgUri}/framework/solid/server.ts`,
+        "aleph/plugins/solid": `${alephPkgUri}/framework/solid/plugin.ts`,
         "solid-js": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
         "solid-js/web": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}/web`,
-        "solid-refresh": `https://esm.sh/v${ESM_VERSION}/solid-refresh@0.4.1`,
+        "solid-refresh": `https://esm.sh/v${ESM_VERSION}/solid-refresh@0.5.1`,
       });
       break;
     }

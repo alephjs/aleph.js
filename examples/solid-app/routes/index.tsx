@@ -1,4 +1,5 @@
 import Header from "../components/Header.tsx";
+import { For } from "solid-js";
 
 const externalLinks = [
   ["Get Started", "https://alephjs.org/docs/get-started"],
@@ -23,14 +24,16 @@ export default function App() {
           with modern toolings. <label>SolidJS experimental version</label>.
         </p>
         <div class="external-links">
-          {externalLinks.map(([text, href]) => (
-            <a
-              href={href}
-              target="_blank"
-            >
-              {text}
-            </a>
-          ))}
+          <For each={externalLinks}>
+            {([text, href]) => (
+              <a
+                href={href}
+                target="_blank"
+              >
+                {text}
+              </a>
+            )}
+          </For>
         </div>
         <nav>
           <a

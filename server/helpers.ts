@@ -429,7 +429,6 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
           Object.assign(imports, {
             "aleph/": "https://aleph/",
             "aleph/react": "https://aleph/framework/react/mod.ts",
-            "aleph/react-client": "https://aleph/framework/react/client.ts",
             "aleph/vue": "https://aleph/framework/vue/mod.ts",
           });
         }
