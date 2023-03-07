@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { renderToReadableStream } from "react-dom/server";
-import { serve as alephServe, type ServerOptions } from "../../server/mod.ts";
+import { serve as alephServe, type ServeOptions } from "../../server/mod.ts";
 import type { SSRContext, SSROptions } from "../../server/types.ts";
-import { pick } from "../../shared/util.ts";
+import { isPlainObject, pick } from "../../shared/util.ts";
 import { App } from "./router.ts";
 
 if (Deno.args.includes("--dev")) {
@@ -14,7 +14,7 @@ if (Deno.args.includes("--dev")) {
 const suspenseMarker = `data:text/javascript;/** suspense marker **/`;
 
 export const render = (ctx: SSRContext): Promise<ReadableStream> => {
-  if (ctx.routing.length === 0 || ctx.routing.at(-1)?.url.pathname === "/_404") {
+  if (ctx.modules.length === 0 || ctx.modules.at(-1)?.url.pathname === "/_404") {
     ctx.setStatus(404);
   }
   // support suspense rendering in server-side
@@ -34,14 +34,12 @@ export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   );
 };
 
-export function serve(
-  options?: Omit<ServerOptions, "ssr"> & { ssr?: boolean | SSROptions },
-) {
-  alephServe({
+export function serve(options?: Omit<ServeOptions, "ssr"> & { ssr?: boolean | SSROptions }) {
+  return alephServe({
     ...options,
     ssr: options?.ssr
       ? {
-        ...(typeof options.ssr === "object" ? options.ssr : {}),
+        ...(isPlainObject(options.ssr) ? options.ssr : {}),
         render,
       }
       : undefined,

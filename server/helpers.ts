@@ -428,9 +428,9 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
         if (alephPkgUri === "https://aleph") {
           Object.assign(imports, {
             "aleph/": "https://aleph/",
-            "aleph/react": "https://aleph/runtime/react/mod.ts",
-            "aleph/react-client": "https://aleph/runtime/react/client.ts",
-            "aleph/vue": "https://aleph/runtime/vue/mod.ts",
+            "aleph/react": "https://aleph/framework/react/mod.ts",
+            "aleph/react-client": "https://aleph/framework/react/client.ts",
+            "aleph/vue": "https://aleph/framework/vue/mod.ts",
           });
         }
       }

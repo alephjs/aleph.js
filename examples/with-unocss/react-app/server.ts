@@ -1,11 +1,13 @@
 import { serve } from "aleph/react-server";
-import UnoCSS from "aleph/unocss";
+import unocss from "aleph/plugins/unocss";
 import config from "./unocss.config.ts";
 import routes from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
+  plugins: [
+    unocss(config),
+  ],
   router: { routes },
-  atomicCSS: UnoCSS(config),
   ssr: true,
 });

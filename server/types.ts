@@ -1,10 +1,12 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.175.0/http/server.ts";
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.6/types.d.ts";
-import type { RouteModule } from "../runtime/core/routes.ts";
+import type { RouteModule } from "../framework/core/routes.ts";
 
 export type AlephConfig = {
   /** The base url of the server. */
   baseUrl?: string;
+  /** The TLS options. */
+  tls?: TLSOptions;
   /** The router options for the file-system based routing. */
   router?: RouterInit;
   /** The module loaders. */
@@ -17,9 +19,49 @@ export type AlephConfig = {
   ssr?: SSR;
   /** The options for build. */
   build?: BuildOptions;
-  /** The config for UnoCSS. */
-  atomicCSS?: import("@unocss/core").UnoGenerator & AtomicCSSConfig;
+  /** The atomic CSS engine. */
+  atomicCSS?: AtomicCSSEngine;
+  /** The plugins. */
+  plugins?: Plugin[];
+  /** The error handler. */
+  onError?: ErrorHandler;
 };
+
+export interface Plugin {
+  name?: string;
+  setup(config: AlephConfig): void | Promise<void>;
+}
+
+export interface AtomicCSSGenerateOptions {
+  /**
+   * Filepath of the file being processed.
+   */
+  id?: string;
+  /**
+   * Generate preflights (if defined)
+   *
+   * @default true
+   */
+  preflights?: boolean;
+  /**
+   * Generate minified CSS
+   * @default false
+   */
+  minify?: boolean;
+}
+
+export interface AtomicCSSGenerateResult {
+  css: string;
+  matched: Set<string>;
+}
+
+export interface AtomicCSSEngine {
+  name?: string;
+  version?: string;
+  test?: RegExp;
+  resetCSS?: string;
+  generate(input: string | string[], options?: AtomicCSSGenerateOptions): Promise<AtomicCSSGenerateResult>;
+}
 
 /** The router options for the file-system based routing. */
 export interface RouterInit {
@@ -34,12 +76,6 @@ export interface RouterInit {
   /** The pre-built routes.  */
   routes?: Record<string, Record<string, unknown>>;
 }
-
-/** The config for UnoCSS. */
-export type AtomicCSSConfig = {
-  test?: RegExp;
-  resetCSS?: string;
-};
 
 export type CookieOptions = {
   expires?: number | Date;
@@ -103,8 +139,7 @@ export interface Context extends Record<string, unknown> {
   /** The HtmlRewriter to rewrite the html output. */
   readonly htmlRewriter: HTMLRewriter;
   /** Returns the `Session` object. */
-  // deno-lint-ignore no-explicit-any
-  getSession: <T extends Record<string, any> = Record<string, any>>() => Promise<Session<T>>;
+  getSession: <T extends Record<string, unknown> = Record<string, unknown>>() => Promise<Session<T>>;
   /** Returns the next `Response` object. */
   next: () => Promise<Response> | Response;
 }
@@ -172,7 +207,7 @@ export type SSGOptions = {
 
 export type SSRContext = {
   readonly url: URL;
-  readonly routing: RouteModule[];
+  readonly modules: RouteModule[];
   readonly headCollection: string[];
   readonly signal: AbortSignal;
   readonly nonce?: string;
@@ -199,7 +234,14 @@ export type CSP = {
 };
 
 export type SSROptions = {
+  /** The selector of root to append SSR ouput, default is "#root". */
   root?: string;
+  include?: RegExp | RegExp[];
+  exclude?: RegExp | RegExp[];
+  /**
+   * Options for the content-security-policy.
+   * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+   */
   CSP?: CSP;
 };
 
@@ -216,6 +258,11 @@ export type ErrorHandler = {
     request: Request,
     context: Context,
   ): Response | void;
+};
+
+export type TLSOptions = {
+  certFile: string;
+  keyFile: string;
 };
 
 export type { ConnInfo, ServeInit };

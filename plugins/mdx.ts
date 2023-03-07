@@ -1,7 +1,7 @@
-import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput } from "../../server/types.ts";
 import { compile, type CompileOptions } from "https://esm.sh/v110/@mdx-js/mdx@2.3.0";
+import type { ModuleLoader, ModuleLoaderEnv, ModuleLoaderOutput, Plugin } from "../server/types.ts";
 
-export default class MDXLoader implements ModuleLoader {
+export class MDXLoader implements ModuleLoader {
   #options: CompileOptions;
 
   constructor(options?: CompileOptions) {
@@ -9,7 +9,8 @@ export default class MDXLoader implements ModuleLoader {
   }
 
   test(path: string): boolean {
-    return path.endsWith(".mdx") || path.endsWith(".md") || path.endsWith(".markdown");
+    const exts = this.#options?.mdxExtensions ?? ["mdx"];
+    return exts.some((ext) => path.endsWith(`.${ext}`));
   }
 
   async load(specifier: string, content: string, env: ModuleLoaderEnv): Promise<ModuleLoaderOutput> {
@@ -17,7 +18,7 @@ export default class MDXLoader implements ModuleLoader {
       { path: specifier, value: content },
       {
         jsxImportSource: this.#options.jsxImportSource ?? env.jsxConfig?.jsxImportSource ??
-          "https://esm.sh/v110/react@18",
+          "https://esm.sh/v110/react@18.2.0",
         ...this.#options,
         providerImportSource: this.#options.providerImportSource
           ? env.importMap?.imports[this.#options.providerImportSource] ?? this.#options.providerImportSource
@@ -30,4 +31,15 @@ export default class MDXLoader implements ModuleLoader {
       lang: "js",
     };
   }
+}
+
+export default function MdxPlugin(options?: CompileOptions): Plugin {
+  return {
+    name: "mdx",
+    setup(aleph) {
+      const exts = options?.mdxExtensions ?? ["mdx"];
+      aleph.loaders = [new MDXLoader(options), ...aleph.loaders ?? []];
+      aleph.router = { ...aleph.router, exts: [...exts, ...(aleph.router?.exts ?? [])] };
+    },
+  };
 }

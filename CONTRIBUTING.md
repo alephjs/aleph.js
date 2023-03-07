@@ -45,11 +45,11 @@ deno test -A
 ## Project Structure
 
 - **/examples** examples to get started
-- **/runtime**
-  - **core** framework runtime core
-  - **react** framework runtime for React
-  - **vue** framework runtime for Vue.js
-  - **solid** framework runtime for SolidJS
+- **/framework**
+  - **core** framework framework core
+  - **react** framework framework for React
+  - **vue** framework framework for Vue.js
+  - **solid** framework framework for SolidJS
 - **/server** server core of Aleph.js
 - **/shared** shared libraries
 - **/tests** unit/integration testings

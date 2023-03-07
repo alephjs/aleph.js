@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "std/testing/asserts.ts";
-import SolidTransformer from "../runtime/solid/transformer.ts";
+import SolidTransformer from "../framework/solid/transformer.ts";
 
 Deno.test("[unit] loaders/solid.ts", async (t) => {
   await t.step("SolidTransformer", async () => {

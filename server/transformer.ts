@@ -1,4 +1,4 @@
-import { TransformError } from "../runtime/core/error.ts";
+import { TransformError } from "../framework/core/error.ts";
 import { isLikelyHttpURL, trimPrefix } from "../shared/util.ts";
 import type { TransformOptions, TransformResult } from "./deps.ts";
 import { btoa, parseDeps, transform } from "./deps.ts";
@@ -200,7 +200,7 @@ export default {
           map = ret.map;
           deps = ret.deps;
         }
-        const styleTs = `${alephPkgUri}/runtime/core/style.ts`;
+        const styleTs = `${alephPkgUri}/framework/core/style.ts`;
         // embed module unocss css in dev mode
         if (isDev && config?.atomicCSS) {
           const re = config.atomicCSS.test ?? regJsxFile;

@@ -1,6 +1,15 @@
-import { URLPatternCompat, type URLPatternInput } from "../runtime/core/url_pattern.ts";
-import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../runtime/core/routes.ts";
-import * as util from "../shared/util.ts";
+import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
+import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../framework/core/routes.ts";
+import {
+  cleanPath,
+  isFilledString,
+  isPlainObject,
+  splitBy,
+  splitPath,
+  trimPrefix,
+  trimSuffix,
+  unique,
+} from "../shared/util.ts";
 import { path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import log from "./log.ts";
@@ -40,7 +49,7 @@ export async function fetchRoute(
   if (router.routes.length > 0) {
     let pathnameInput = pathname;
     if (pathnameInput !== "/") {
-      pathnameInput = util.trimSuffix(pathname, "/");
+      pathnameInput = trimSuffix(pathname, "/");
     }
     let matched: RouteMatch | null = null;
     // find the direct match
@@ -73,7 +82,7 @@ export async function fetchRoute(
         if (method === "GET") {
           if (typeof mod.data === "function") {
             fetcher = mod.data;
-          } else if (util.isPlainObject(mod.data)) {
+          } else if (isPlainObject(mod.data)) {
             fetcher = mod.data.fetch;
             cacheTtl = mod.data.cacheTtl;
           } else {
@@ -82,7 +91,7 @@ export async function fetchRoute(
         } else {
           if (typeof mod.mutation === "function") {
             fetcher = mod.mutation;
-          } else if (util.isPlainObject(mod.mutation)) {
+          } else if (isPlainObject(mod.mutation)) {
             fetcher = mod.mutation[method] ?? mod.mutation[method.toLowerCase()];
           }
           if (typeof fetcher !== "function") {
@@ -114,7 +123,7 @@ export async function fetchRoute(
 
 /** initialize router from routes config */
 export async function initRouter(init: RouterInit = {}, appDir?: string): Promise<Router> {
-  const reg = toRouteRegExp(init);
+  const reg = toRouterRegExp(init);
   const files = await getFiles(appDir ?? Deno.cwd());
   const routes: Route[] = [];
   let _app: Route | undefined = undefined;
@@ -168,27 +177,27 @@ export function isRouteModule(filename: string): boolean {
   }
   const config = getAlephConfig();
   if (config?.router) {
-    const reg = toRouteRegExp(config.router);
+    const reg = toRouterRegExp(config.router);
     return reg.test(filename);
   }
   return false;
 }
 
 /** convert route config to `RouteRegExp` */
-export function toRouteRegExp(init: RouterInit = {}): RouteRegExp {
-  const glob = util.isFilledString(init.glob)
-    ? init.glob
-    : `.${util.cleanPath(init.dir ?? "routes")}/**/*.{${
-      (init.exts ?? builtinModuleExts).map((s) => util.trimPrefix(s, ".")).join(",")
-    }}`;
-  const prefix = util.trimSuffix(util.splitBy(glob, "*")[0], "/");
-  const reg = path.globToRegExp("./" + util.trimPrefix(glob, "./"));
+export function toRouterRegExp(init: RouterInit = {}): RouteRegExp {
+  let glob = init.glob;
+  if (!isFilledString(glob)) {
+    const exts = unique([...builtinModuleExts, ...(init.exts ?? [])].map((s) => trimPrefix(s, ".")));
+    glob = `.${cleanPath(init.dir ?? "routes")}/**/*.{${exts.join(",")}}`;
+  }
+  const prefix = splitBy(glob, "/*")[0];
+  const reg = path.globToRegExp("./" + trimPrefix(glob, "./"));
   return {
     prefix,
     test: (s: string) => s !== prefix + "/_export.ts" && reg.test(s),
     exec: (filename: string): URLPatternInput | null => {
       if (reg.test(filename)) {
-        const parts = util.splitPath(util.trimPrefix(filename, prefix)).map((part) => {
+        const parts = splitPath(trimPrefix(filename, prefix)).map((part) => {
           // replace `/blog/[...path]` to `/blog/:path+`
           if (part.startsWith("[...") && part.includes("]") && part.length > 5) {
             return ":" + part.slice(4).replace("]", "+");
@@ -208,7 +217,7 @@ export function toRouteRegExp(init: RouterInit = {}): RouteRegExp {
           host = parts.shift()!.slice(1);
         }
         const basename = parts.pop()!;
-        const pathname = "/" + [...parts, util.trimSuffix(basename, path.extname(basename))].join("/");
+        const pathname = "/" + [...parts, trimSuffix(basename, path.extname(basename))].join("/");
         return { host, pathname: pathname === "/index" ? "/" : pathname };
       }
       return null;

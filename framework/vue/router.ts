@@ -222,7 +222,7 @@ const createRouterRoot = (props: RouterRootProps) => {
 
 const createApp = (props?: RootProps) => {
   const { ssrContext } = props || {};
-  const modules = shallowRef(ssrContext?.routing || loadSSRModulesFromTag());
+  const modules = shallowRef(ssrContext?.modules || loadSSRModulesFromTag());
 
   if (modules.value.length === 0) {
     return createSSRApp(Err, { status: 404, message: "page not found" });

@@ -1,5 +1,5 @@
 import { isFilledString, prettyBytes, trimPrefix } from "../shared/util.ts";
-import type { Router } from "../runtime/core/routes.ts";
+import type { Router } from "../framework/core/routes.ts";
 import { colors, Emitter, ensureDir, esbuild, mitt, parseDeps, path } from "./deps.ts";
 import depGraph, { DependencyGraph } from "./graph.ts";
 import {
@@ -12,7 +12,7 @@ import {
   watchFs,
 } from "./helpers.ts";
 import log from "./log.ts";
-import { initRouter, toRouteRegExp } from "./routing.ts";
+import { initRouter, toRouterRegExp } from "./routing.ts";
 import type { AlephConfig, ModuleLoader } from "./types.ts";
 
 type WatchFsEvents = {
@@ -44,7 +44,7 @@ export function watch(appDir: string, shouldGenerateExportTs: boolean) {
   emitter.on("*", async (kind, { specifier }) => {
     if (kind === "create" || kind === "remove") {
       // reload router when fs changess
-      const reg = toRouteRegExp(config?.router);
+      const reg = toRouterRegExp(config?.router);
       if (reg.test(specifier)) {
         const router = await initRouter(config?.router, appDir);
         Reflect.set(globalThis, "__ALEPH_ROUTER", router);
@@ -184,7 +184,7 @@ export function handleHMR(req: Request): Response {
         "__ALEPH_CONFIG",
       );
       if (config?.router) {
-        const reg = toRouteRegExp(config.router);
+        const reg = toRouterRegExp(config.router);
         const routePattern = reg.exec(specifier);
         if (routePattern) {
           send({ type: "create", specifier, routePattern });

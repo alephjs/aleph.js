@@ -1,5 +1,5 @@
 import { serve } from "aleph/react-server";
-import MDXLoader from "aleph/react/mdx-loader";
+import mdx from "aleph/plugins/mdx";
 import routes from "./routes/_export.ts";
 
 // check https://mdxjs.com/docs/extending-mdx
@@ -10,16 +10,13 @@ import rehypeSlug from "https://esm.sh/v110/rehype-slug@5.0.1";
 
 serve({
   baseUrl: import.meta.url,
-  loaders: [
-    new MDXLoader({
+  plugins: [
+    mdx({
       remarkPlugins: [remarkFrontmatter, remarkGFM],
       rehypePlugins: [rehypeHighlight, rehypeSlug],
       providerImportSource: "@mdx-js/react",
     }),
   ],
-  router: {
-    glob: "./routes/**/*.{tsx,mdx,md}",
-    routes,
-  },
+  router: { routes },
   ssr: true,
 });

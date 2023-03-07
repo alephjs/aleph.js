@@ -10,6 +10,11 @@ export function isFilledArray(a: unknown): a is Array<any> {
   return Array.isArray(a) && a.length > 0;
 }
 
+// remove duplicate items from an array
+export function unique<T>(arr: T[]): T[] {
+  return [...new Set(arr)];
+}
+
 export function isPlainObject<T = Record<string, unknown>>(a: unknown): a is T {
   return a !== null && typeof a === "object" && Object.getPrototypeOf(a) === Object.prototype;
 }

@@ -1,5 +1,5 @@
-import { generateErrorHtml, TransformError } from "../runtime/core/error.ts";
-import type { Router } from "../runtime/core/routes.ts";
+import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
+import type { Router } from "../framework/core/routes.ts";
 import { isPlainObject, trimSuffix } from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR } from "./dev.ts";
@@ -25,12 +25,11 @@ import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
 import { fetchRoute, importRouteModule, initRouter } from "./routing.ts";
 import transformer from "./transformer.ts";
-import type { AlephConfig, ConnInfo, ErrorHandler, ModuleLoader } from "./types.ts";
+import type { AlephConfig, ConnInfo, ModuleLoader } from "./types.ts";
 
-export function createHandler(options: AlephConfig & { onError?: ErrorHandler }) {
-  const { baseUrl, loaders, middlewares, onError, build: buildOptions, router: routerConfig, session, ssr } = options;
-  const appDir = baseUrl ? path.fromFileUrl(new URL(".", baseUrl)) : undefined;
-  const buildMode = Deno.args.includes("--build") || Deno.args.includes("-O");
+export function createHandler(appDir: string, config: AlephConfig) {
+  const { loaders, middlewares, onError, build, router: routerConfig, session, ssr } = config;
+  const buildMode = Deno.args.includes("--build");
   const isDev = Deno.args.includes("--dev");
 
   const handler = async (req: Request, ctx: Context): Promise<Response> => {
@@ -49,10 +48,10 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       return response;
     }
 
-    // check if the "out" directory exists
+    // check if the `out` directory exists
     const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
       if (!isDev && !buildMode) {
-        const outDir = path.join(appDir ?? Deno.cwd(), buildOptions?.outputDir ?? "./output");
+        const outDir = path.join(appDir, build?.outputDir ?? "./output");
         if (await existsDir(outDir)) {
           return outDir;
         }
@@ -111,7 +110,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
           log.error(err.message);
           const alephPkgUri = toLocalPath(getAlephPkgUri());
           return new Response(
-            `import { showTransformError } from "${alephPkgUri}/runtime/core/error.ts";showTransformError(${
+            `import { showTransformError } from "${alephPkgUri}/framework/core/error.ts";showTransformError(${
               JSON.stringify(err)
             });export default null;`,
             {
@@ -136,7 +135,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
     const contentType = getContentType(pathname);
     if (!pathname.startsWith("/.") && contentType !== "application/octet-stream") {
       try {
-        let filePath = appDir ? path.join(appDir, pathname) : `.${pathname}`;
+        let filePath = path.join(appDir, pathname);
         let stat = await Deno.lstat(filePath);
         if (stat.isDirectory && pathname !== "/") {
           filePath = `${trimSuffix(filePath, "/")}/index.html`;
@@ -179,23 +178,22 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       }
     }
 
-    const router: Router | null = await globalIt("__ALEPH_ROUTER", () => initRouter(routerConfig, appDir));
+    // get the router
+    const router: Router = await globalIt("__ALEPH_ROUTER", () => initRouter(routerConfig, appDir));
 
     // getStaticPaths PRC for SSR
     if (pathname === "/__aleph.getStaticPaths") {
-      if (router) {
-        const pattern = searchParams.get("pattern");
-        const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);
-        if (route) {
-          const mod = await importRouteModule(route[1]);
-          if (typeof mod.getStaticPaths === "function") {
-            let ret = mod.getStaticPaths();
-            if (ret instanceof Promise) {
-              ret = await ret;
-            }
-            if (Array.isArray(ret)) {
-              return Response.json(ret);
-            }
+      const pattern = searchParams.get("pattern");
+      const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);
+      if (route) {
+        const mod = await importRouteModule(route[1]);
+        if (typeof mod.getStaticPaths === "function") {
+          let ret = mod.getStaticPaths();
+          if (ret instanceof Promise) {
+            ret = await ret;
+          }
+          if (Array.isArray(ret)) {
+            return Response.json(ret);
           }
         }
       }
@@ -203,12 +201,10 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
     }
 
     // for SSR dynamic data
-    if (router && router.routes.length > 0) {
+    if (router.routes.length > 0) {
       try {
-        const resp = await fetchRoute(req, ctx, router);
-        if (resp) {
-          return resp;
-        }
+        const res = await fetchRoute(req, ctx, router);
+        if (res) return res;
       } catch (err) {
         const asData = req.method === "GET" && searchParams.has("_data_");
 
@@ -255,8 +251,13 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       case "/favicon.ico":
       case "/robots.txt":
         return new Response("Not found", { status: 404 });
+      default:
+        if (pathname.startsWith("/-/") || pathname.startsWith("/.")) {
+          return new Response("Not found", { status: 404 });
+        }
     }
 
+    // load index.html
     const indexHtml = await globalIt(
       "__ALEPH_INDEX_HTML",
       () =>
@@ -269,8 +270,15 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
       return new Response("Not found", { status: 404 });
     }
 
-    // return index.html
-    if (!ssr) {
+    // return index.html if not SSR
+    if (
+      !ssr || (isPlainObject(ssr) && (
+        (ssr.exclude instanceof RegExp && ssr.exclude.test(pathname)) ||
+        (Array.isArray(ssr.exclude) && ssr.exclude.some((p) => p.test(pathname))) ||
+        (ssr.include instanceof RegExp && !ssr.include.test(pathname)) ||
+        (Array.isArray(ssr.include) && !ssr.include.some((p) => p.test(pathname)))
+      ))
+    ) {
       return createHtmlResponse(req, path.join(appDir ?? ".", "./index.html"), indexHtml);
     }
 
@@ -284,12 +292,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
 
     // SSR
     try {
-      return await renderer.fetch(req, ctx, {
-        indexHtml,
-        router,
-        ssr,
-        isDev,
-      });
+      return await renderer.fetch(req, ctx, { indexHtml, router, ssr, isDev });
     } catch (err) {
       if (err instanceof Response) {
         return err;
@@ -310,7 +313,7 @@ export function createHandler(options: AlephConfig & { onError?: ErrorHandler })
     }
   };
 
-  // the final server handler
+  // the deno http server handler
   return (req: Request, connInfo: ConnInfo): Promise<Response> | Response => {
     const next = (i: number): Promise<Response> | Response => {
       if (Array.isArray(middlewares) && i < middlewares.length) {

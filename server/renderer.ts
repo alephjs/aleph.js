@@ -1,46 +1,20 @@
-import { FetchError } from "../runtime/core/error.ts";
-import { matchRoutes, type RouteModule, type Router } from "../runtime/core/routes.ts";
+import { FetchError } from "../framework/core/error.ts";
+import { matchRoutes, type RouteModule, type Router } from "../framework/core/routes.ts";
 import { cleanPath, isFilledString, isPlainObject, utf8Enc } from "../shared/util.ts";
 import { HTMLRewriter, path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getAlephConfig, getDeploymentId, getFiles, regJsxFile, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
+import { runtimeScript } from "./runtime.ts";
 import { importRouteModule } from "./routing.ts";
 import type { HTMLRewriterHandlers, SSR, SSRContext, SuspenseMarker } from "./types.ts";
 
 export type RenderOptions = {
   indexHtml: Uint8Array;
-  router: Router | null;
+  router: Router;
   ssr: SSR;
   isDev?: boolean;
 };
-
-const runtimeScript = [
-  `let e=fn=>new Error('module "'+fn+'" not found');`,
-  `const getRouteModule=(fn)=>{`,
-  `    if(map.has(fn)){`,
-  `    let m=map.get(fn);`,
-  `    if(m instanceof Promise) throw e(fn);`,
-  `    return m;`,
-  `  }`,
-  `  throw e(fn);`,
-  `};`,
-  `const importRouteModule=async(fn)=>{`,
-  `  if(map.has(fn)){`,
-  `    let m=map.get(fn);`,
-  `    if(m instanceof Promise){`,
-  `      m=await m;`,
-  `      map.set(fn,m);`,
-  `    }`,
-  `   return m;`,
-  `  }`,
-  `  let v=document.body.getAttribute("data-deployment-id");`,
-  `  let m=import(fn.slice(1)+(v?"?v="+v:""));`,
-  `  map.set(fn,m);`,
-  `  return await m.then(m=>{map.set(fn,m);return m;});`,
-  `};`,
-  `window.__aleph={getRouteModule,importRouteModule};`,
-].map((l) => l.trim()).join("");
 
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
@@ -49,7 +23,7 @@ export default {
     const isFn = typeof ssr === "function";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;
-    const [url, routing, deferedData] = await initSSR(req, ctx, router);
+    const [url, modules, deferedData] = await initSSR(req, ctx, router);
     const headCollection: string[] = [];
     const customHTMLRewriter = ctx.__htmlRewriterHandlers as [string, HTMLRewriterHandlers][];
 
@@ -59,7 +33,7 @@ export default {
 
     const ssrContext: SSRContext = {
       url,
-      routing,
+      modules,
       headCollection,
       signal: req.signal,
       setStatus: (code) => {
@@ -89,7 +63,7 @@ export default {
     }
 
     // find inline css
-    depGraph.shallowWalk(routing.map(({ filename }) => filename), (mod) => {
+    depGraph.shallowWalk(modules.map(({ filename }) => filename), (mod) => {
       const { specifier, inlineCSS } = mod;
       if (inlineCSS) {
         headCollection.push(`<style data-module-id="${specifier}" ssr>${inlineCSS}</style>`);
@@ -99,45 +73,40 @@ export default {
     // build unocss
     const config = getAlephConfig();
     if (config?.atomicCSS) {
-      const t = performance.now();
-      const {
-        test = regJsxFile,
-        resetCSS,
-        version,
-      } = config.atomicCSS;
-      let css = Reflect.get(globalThis, "__ALEPH_UNOCSS_BUILD");
-      const cacheHit = Boolean(css);
-      if (!cacheHit) {
-        const dir = config?.baseUrl ? path.fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
+      const { atomicCSS, baseUrl, build } = config;
+      const { test = regJsxFile, resetCSS } = atomicCSS;
+      let css = Reflect.get(globalThis, "__ALEPH_ATOMICCSS_BUILD");
+      if (!css) {
+        const t = performance.now();
+        const dir = baseUrl ? path.fromFileUrl(new URL(".", baseUrl)) : Deno.cwd();
         const files = await getFiles(dir);
-        const outputDir = "." + cleanPath(config.build?.outputDir ?? "./output");
+        const outputDir = "." + cleanPath(build?.outputDir ?? "./output");
         const inputSources = await Promise.all(
           files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
             Deno.readTextFile(path.join(dir, name))
           ),
         );
         if (inputSources.length > 0) {
-          const ret = await config.atomicCSS.generate(inputSources.join("\n"), {
+          const ret = await atomicCSS.generate(inputSources.join("\n"), {
             minify: !isDev,
           });
           if (ret.matched.size > 0) {
             css = ret.css;
             if (!isDev) {
-              Reflect.set(globalThis, "__ALEPH_UNOCSS_BUILD", css);
+              Reflect.set(globalThis, "__ALEPH_ATOMICCSS_BUILD", css);
             }
+            log.debug(
+              `Atomic CSS generated in ${(performance.now() - t).toFixed(2)}ms`,
+              atomicCSS.name && atomicCSS.version ? `(Powered by ${atomicCSS.name}@${atomicCSS.version})` : "",
+            );
           }
         }
       }
       if (css) {
-        const buildTime = (performance.now() - t).toFixed(2);
-        const attr = cacheHit ? `data-cache-hit="true"` : `data-build-time="${buildTime}ms"`;
         if (resetCSS) {
           headCollection.push(`<link rel="stylesheet" href="${toLocalPath(resetCSS)}">`);
         }
-        headCollection.push(`<style data-unocss="${version}" ${attr}>${css}</style>`);
-        if (!cacheHit) {
-          log.debug(`UnoCSS generated in ${buildTime}ms`);
-        }
+        headCollection.push(`<style>${css}</style>`);
       }
     }
 
@@ -160,7 +129,7 @@ export default {
         // inject the roures manifest
         rewriter.on("head", {
           element(el) {
-            if (router && router.routes.length > 0) {
+            if (router.routes.length > 0) {
               const json = JSON.stringify({
                 routes: router.routes.map(([_, meta]) => meta),
                 prefix: router.prefix,
@@ -174,42 +143,38 @@ export default {
 
         rewriter.on("head", {
           element(el) {
+            const ssrModules = modules.map(({ url, params, filename, withData, data, dataCacheTtl }) => {
+              const defered = typeof data === "function" ? true : undefined;
+              return {
+                url: url.pathname + url.search,
+                params,
+                filename,
+                withData,
+                dataCacheTtl,
+                data: defered ? undefined : data instanceof Error ? undefined : data,
+                dataDefered: defered,
+                error: data instanceof Error ? { message: data.message, stack: data.stack } : undefined,
+              };
+            });
+
+            // replace "/" to "\/" to prevent xss
+            const modulesJSON = JSON.stringify(ssrModules).replaceAll("/", "\\/");
+            el.append(
+              `<script id="ssr-data" type="application/json">${modulesJSON}</script>`,
+              { html: true },
+            );
+
+            const deployId = getDeploymentId();
+            const importStmts = modules.map(({ filename }, idx) =>
+              `import * as $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))};`
+            ).join("");
+            const kvs = modules.map(({ filename }, idx) => `${JSON.stringify(filename)}:$${idx}`).join(",");
+            const nonceAttr = nonce ? ` nonce="${nonce}"` : "";
+            el.append(
+              `<script type="module"${nonceAttr}>${importStmts}let imports=new Map(Object.entries({${kvs}}));${runtimeScript}</script>`,
+              { html: true },
+            );
             headCollection.forEach((h) => isFilledString(h) && el.append(h, { html: true }));
-            if (routing.length > 0) {
-              const ssrModules = routing.map(({ url, params, filename, withData, data, dataCacheTtl }) => {
-                const defered = typeof data === "function" ? true : undefined;
-                return {
-                  url: url.pathname + url.search,
-                  params,
-                  filename,
-                  withData,
-                  dataCacheTtl,
-                  data: defered ? undefined : data instanceof Error ? undefined : data,
-                  dataDefered: defered,
-                  error: data instanceof Error ? { message: data.message, stack: data.stack } : undefined,
-                };
-              });
-
-              // replace "/" to "\/" to prevent xss
-              const modulesJSON = JSON.stringify(ssrModules).replaceAll("/", "\\/");
-              el.append(
-                `<script id="ssr-data" type="application/json">${modulesJSON}</script>`,
-                { html: true },
-              );
-
-              const deployId = getDeploymentId();
-              const importStmts = routing.map(({ filename }, idx) =>
-                `import * as $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))};`
-              ).join("");
-              const kvs = routing.map(({ filename }, idx) => `${JSON.stringify(filename)}:$${idx}`).join(
-                ",",
-              );
-              const nonceAttr = nonce ? ` nonce="${nonce}"` : "";
-              el.append(
-                `<script type="module"${nonceAttr}>${importStmts}let map=new Map(Object.entries({${kvs}}));${runtimeScript}</script>`,
-                { html: true },
-              );
-            }
           },
         });
 
@@ -306,17 +271,13 @@ export default {
 async function initSSR(
   req: Request,
   ctx: Record<string, unknown>,
-  router: Router | null,
+  router: Router,
 ): Promise<[
   url: URL,
   routing: RouteModule[],
   deferedData: Record<string, unknown>,
 ]> {
   const url = new URL(req.url);
-  if (!router) {
-    return [url, [], {}];
-  }
-
   const matches = matchRoutes(url, router);
   const deferedData: Record<string, unknown> = {};
 

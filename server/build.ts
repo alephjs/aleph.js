@@ -20,8 +20,8 @@ import { initRouter } from "./routing.ts";
 import type { ConnInfo } from "./types.ts";
 
 export async function build(
+  appDir: string,
   serverHandler: (req: Request, connInfo: ConnInfo) => Promise<Response> | Response,
-  appDir?: string,
 ) {
   const start = performance.now();
   const alephPkgUri = getAlephPkgUri();
@@ -125,7 +125,7 @@ export async function build(
       }
     }
   }
-  queue.push(`${alephPkgUri}/runtime/core/nomodule.ts`);
+  queue.push(`${alephPkgUri}/framework/core/nomodule.ts`);
 
   // add unocss reset css
   if (config.atomicCSS?.resetCSS) {
@@ -169,7 +169,7 @@ export async function build(
           }
         });
       } else if (url.searchParams.has("module")) {
-        deps.add(`${alephPkgUri}/runtime/core/style.ts`);
+        deps.add(`${alephPkgUri}/framework/core/style.ts`);
       } else {
         await ensureDir(path.dirname(savePath));
         await Deno.writeTextFile(savePath, memFS.get(savePath)!);
@@ -381,10 +381,10 @@ export async function bundleCSS(
     return {
       code: [
         options.hmr &&
-        `import createHotContext from "${alephPkgPath}/runtime/core/hmr.ts";`,
+        `import createHotContext from "${alephPkgPath}/framework/core/hmr.ts";`,
         options.hmr &&
         `import.meta.hot = createHotContext(${JSON.stringify(specifier)});`,
-        `import { applyCSS } from "${alephPkgPath}/runtime/core/style.ts";`,
+        `import { applyCSS } from "${alephPkgPath}/framework/core/style.ts";`,
         `export const css = ${JSON.stringify(css)};`,
         `export default ${JSON.stringify(cssModulesExports)};`,
         `applyCSS(${JSON.stringify(specifier)}, css);`,

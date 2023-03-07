@@ -1,39 +1,37 @@
-import type { Router } from "../runtime/core/routes.ts";
 import { isFilledArray } from "../shared/util.ts";
 import { path, serve as stdServe, serveTls } from "./deps.ts";
 import depGraph from "./graph.ts";
-import { getDeploymentId, globalIt } from "./helpers.ts";
 import { createHandler } from "./handler.ts";
 import log, { type LevelName } from "./log.ts";
-import { importRouteModule } from "./routing.ts";
 import { build } from "./build.ts";
-import type { AlephConfig, ErrorHandler, ServeInit } from "./types.ts";
+import type { AlephConfig, ServeInit } from "./types.ts";
 import { watch } from "./dev.ts";
 
 /** The options for the Aleph.js server.  */
-export type ServerOptions = AlephConfig & Omit<ServeInit, "onError"> & {
-  certFile?: string;
-  keyFile?: string;
-  onError?: ErrorHandler;
-};
+export type ServeOptions = AlephConfig & Omit<ServeInit, "onError">;
 
 /** Start the Aleph.js server. */
-export function serve(options: ServerOptions = {}) {
-  const buildMode = Deno.args.includes("--build");
+export async function serve(options?: ServeOptions): Promise<void> {
   const isDev = Deno.args.includes("--dev");
-  const generate = Deno.args.includes("--generate");
-  const { baseUrl, loaders, middlewares, build: buildOptions, router, session, ssr, atomicCSS } = options;
-  const { hostname, certFile, keyFile, signal } = options;
-  const config: AlephConfig = { baseUrl, build: buildOptions, loaders, middlewares, router, session, ssr, atomicCSS };
-  const appDir = baseUrl ? path.fromFileUrl(new URL(".", baseUrl)) : Deno.cwd();
-  const handler = createHandler(options);
+  const { hostname, port, signal, onListen: _onListen, tls, plugins, ...config } = options ?? {};
+  const { baseUrl, router } = config;
 
-  // force to use the server port in env vars if exists
-  if (Deno.env.get("ALEPH_SERVER_PORT")) {
-    options.port = parseInt(Deno.env.get("ALEPH_SERVER_PORT")!);
+  // setup plugins
+  if (plugins) {
+    for (const plugin of plugins) {
+      try {
+        await plugin.setup(config);
+        log.debug(`plugin ${plugin.name ?? "Unnamed"} setup`);
+      } catch (err) {
+        log.fatal(`[plugin:${plugin.name}] ${err.message}`);
+      }
+    }
   }
 
-  // check `_export.ts` imports
+  // inject the config to global
+  Reflect.set(globalThis, "__ALEPH_CONFIG", config);
+
+  // use `_export.ts` imports
   if (router && router.routes) {
     if (isDev) {
       router.routes = undefined;
@@ -45,38 +43,34 @@ export function serve(options: ServerOptions = {}) {
     }
   }
 
-  // set log level to debug when debug aleph.js itself.
-  if (import.meta.url.startsWith("file:")) {
-    log.setLevel("debug");
-  }
-
-  // inject the config to global
-  Reflect.set(globalThis, "__ALEPH_CONFIG", config);
+  const appDir = baseUrl ? path.fromFileUrl(new URL(".", baseUrl)) : Deno.cwd();
+  const handler = createHandler(appDir, config);
 
   // build the app for production
-  if (buildMode) {
-    build(handler, appDir);
-    return;
+  if (Deno.args.includes("--build")) {
+    return build(appDir, handler);
   }
 
   // watch file changes in development mode
   if (isDev) {
-    watch(appDir, generate);
+    watch(appDir, Deno.args.includes("--generate"));
   }
 
   const onListen = (arg: { port: number; hostname: string }) => {
-    if (!getDeploymentId()) {
-      const protocol = certFile && keyFile ? "https" : "http";
-      Deno.env.set("ALEPH_SERVER_ORIGIN", `${protocol}://${hostname ?? "localhost"}:${arg.port}`);
-      log.info(`Server ready on ${protocol}://${hostname ?? "localhost"}:${arg.port}`);
-    }
-    options.onListen?.(arg);
+    const origin = `${tls ? "https" : "http"}://${hostname ?? "localhost"}:${arg.port}`;
+    Deno.env.set("ALEPH_SERVER_ORIGIN", `${origin}`);
+    log.info(`Server ready on ${origin}`);
+    _onListen?.(arg);
   };
-  if (certFile && keyFile) {
-    serveTls(handler, { hostname, port: options.port, certFile, keyFile, signal, onListen });
-  } else {
-    stdServe(handler, { hostname, port: options.port, signal, onListen });
+  const serveOptions = { hostname, port, signal, onListen };
+  const flagPort = Number(Deno.args.join(" ").match(/--port=(\d+)/)?.[1]);
+  if (flagPort) {
+    serveOptions.port = flagPort;
   }
+  if (tls) {
+    return serveTls(handler, { ...tls, ...serveOptions });
+  }
+  return stdServe(handler, serveOptions);
 }
 
 /** Set the log level. */
@@ -84,22 +78,7 @@ export function setLogLevel(level: LevelName) {
   log.setLevel(level);
 }
 
-// inject the `__aleph` global variable
-Reflect.set(globalIt, "__aleph", {
-  getRouteModule: () => {
-    throw new Error("only available in client-side");
-  },
-  importRouteModule: async (filename: string) => {
-    let router: Router | Promise<Router> | undefined = Reflect.get(globalThis, "__ALEPH_ROUTER");
-    if (router) {
-      if (router instanceof Promise) {
-        router = await router;
-      }
-      const route = router.routes.find(([, meta]) => meta.filename === filename);
-      if (route) {
-        return importRouteModule(route[1]);
-      }
-    }
-    return importRouteModule({ filename, pattern: { pathname: "" } });
-  },
-});
+// set log level to debug when debug aleph.js itself.
+if (import.meta.url.startsWith("file:")) {
+  log.setLevel("debug");
+}

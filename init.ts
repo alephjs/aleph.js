@@ -188,7 +188,7 @@ export default async function init(nameArg?: string, options?: Options) {
   };
   if (withUnocss) {
     Object.assign(importMap.imports, {
-      "aleph/unocss": `${alephPkgUri}/server/unocss.ts`,
+      "aleph/plugins/unocss": `${alephPkgUri}/plugins/unocss.ts`,
       "@unocss/core": `https://esm.sh/v${ESM_VERSION}/@unocss/core@0.50.3`,
       "@unocss/preset-uno": `https://esm.sh/v${ESM_VERSION}/@unocss/preset-uno@0.50.3`,
     });
@@ -196,7 +196,7 @@ export default async function init(nameArg?: string, options?: Options) {
   switch (template) {
     case "react-mdx":
       Object.assign(importMap.imports, {
-        "aleph/react/mdx-loader": `${alephPkgUri}/runtime/react/mdx-loader.ts`,
+        "aleph/plugins/mdx": `${alephPkgUri}/plugins/mdx.ts`,
         "@mdx-js/react": `https://esm.sh/v${ESM_VERSION}/@mdx-js/react@2.3.0`,
       });
       /* falls through */
@@ -206,9 +206,9 @@ export default async function init(nameArg?: string, options?: Options) {
         "jsxImportSource": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
       });
       Object.assign(importMap.imports, {
-        "aleph/react": `${alephPkgUri}/runtime/react/mod.ts`,
-        "aleph/react-client": `${alephPkgUri}/runtime/react/client.ts`,
-        "aleph/react-server": `${alephPkgUri}/runtime/react/server.ts`,
+        "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
+        "aleph/react-client": `${alephPkgUri}/framework/react/client.ts`,
+        "aleph/react-server": `${alephPkgUri}/framework/react/server.ts`,
         "react": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
         "react-dom": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}/`,
@@ -217,8 +217,8 @@ export default async function init(nameArg?: string, options?: Options) {
     }
     case "vue": {
       Object.assign(importMap.imports, {
-        "aleph/vue": `${alephPkgUri}/runtime/vue/mod.ts`,
-        "aleph/vue-server": `${alephPkgUri}/runtime/vue/server.ts`,
+        "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
+        "aleph/vue-server": `${alephPkgUri}/framework/vue/server.ts`,
         "vue": `https://esm.sh/v${ESM_VERSION}/vue@${versions.vue}`,
         "@vue/server-renderer": `https://esm.sh/v${ESM_VERSION}/@vue/server-renderer@${versions.vue}`,
       });
@@ -230,7 +230,7 @@ export default async function init(nameArg?: string, options?: Options) {
         "jsxImportSource": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
       });
       Object.assign(importMap.imports, {
-        "aleph/solid-server": `${alephPkgUri}/runtime/solid/server.ts`,
+        "aleph/solid-server": `${alephPkgUri}/framework/solid/server.ts`,
         "solid-js": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
         "solid-js/web": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}/web`,
         "solid-refresh": `https://esm.sh/v${ESM_VERSION}/solid-refresh@0.4.1`,

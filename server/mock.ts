@@ -1,4 +1,4 @@
-import type { Router } from "../runtime/core/routes.ts";
+import type { Router } from "../framework/core/routes.ts";
 import { isPlainObject } from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { path } from "./deps.ts";
@@ -75,7 +75,7 @@ export class MockServer {
       });
     }
 
-    if (!this.#router && router) {
+    if (!this.#router) {
       this.#router = await initRouter(router, appDir);
     }
 
