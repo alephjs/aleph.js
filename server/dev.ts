@@ -377,7 +377,3 @@ export async function generateExportTs(appDir: string, router: Router, loaders?:
     log.debug(`${colors.blue("_export.ts")} updated`);
   }
 }
-
-if (import.meta.main) {
-  dev({ generateExportTs: Deno.args.includes("--generate") });
-}
