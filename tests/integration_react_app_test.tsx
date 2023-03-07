@@ -1,6 +1,6 @@
 import { assertEquals, assertStringIncludes } from "std/testing/asserts.ts";
 import { MockServer } from "aleph/server/mock.ts";
-import { render } from "aleph/framework/react/server.ts";
+import { render } from "aleph/framework/react/plugin.ts";
 
 Deno.test("[integration] examples/react-app", async (t) => {
   const api = new MockServer({
