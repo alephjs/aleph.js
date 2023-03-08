@@ -1,7 +1,8 @@
 import { serve } from "aleph/server";
+import denoDeploy from "aleph/plugins/deploy";
 import react from "aleph/plugins/react";
 import mdx from "aleph/plugins/mdx";
-import routes from "./routes/_export.ts";
+import modules from "./routes/_export.ts";
 
 // check https://mdxjs.com/docs/extending-mdx
 import remarkFrontmatter from "https://esm.sh/v110/remark-frontmatter@4.0.1";
@@ -12,6 +13,7 @@ import rehypeSlug from "https://esm.sh/v110/rehype-slug@5.0.1";
 serve({
   baseUrl: import.meta.url,
   plugins: [
+    denoDeploy({ modules }),
     mdx({
       remarkPlugins: [remarkFrontmatter, remarkGFM],
       rehypePlugins: [rehypeHighlight, rehypeSlug],
@@ -19,5 +21,4 @@ serve({
     }),
     react({ ssr: true }),
   ],
-  router: { routes },
 });

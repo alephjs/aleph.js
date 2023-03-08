@@ -29,8 +29,12 @@ export type AlephConfig = {
 
 export interface Plugin {
   name?: string;
-  setup(config: AlephConfig): void | Promise<void>;
+  setup(config: AlephConfig, env: PluginENV): void | Promise<void>;
 }
+
+export type PluginENV = {
+  isDev: boolean;
+};
 
 export interface AtomicCSSGenerateOptions {
   /**
@@ -74,7 +78,7 @@ export interface RouterInit {
   /** The extnames to match routes. */
   exts?: string[];
   /** The pre-built routes.  */
-  routes?: Record<string, Record<string, unknown>>;
+  modules?: Record<string, Record<string, unknown>>;
 }
 
 export type CookieOptions = {

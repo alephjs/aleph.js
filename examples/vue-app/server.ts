@@ -1,11 +1,12 @@
 import { serve } from "aleph/server";
+import denoDeploy from "aleph/plugins/deploy";
 import vue from "aleph/plugins/vue";
-import routes from "./routes/_export.ts";
+import modules from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  router: { routes },
   plugins: [
+    denoDeploy({ modules }),
     vue({ ssr: true }),
   ],
 });

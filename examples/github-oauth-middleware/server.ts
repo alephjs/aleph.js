@@ -1,14 +1,15 @@
 import { serve } from "aleph/server";
+import denoDeploy from "aleph/plugins/deploy";
 import react from "aleph/plugins/react";
 import unocss from "aleph/plugins/unocss";
 import presetUno from "@unocss/preset-uno";
 import { GithubOauth } from "./middlewares/oauth.ts";
-import routes from "./routes/_export.ts";
+import modules from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  router: { routes },
   plugins: [
+    denoDeploy({ modules }),
     react({ ssr: true }),
     unocss({
       presets: [presetUno()],

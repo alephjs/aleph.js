@@ -19,9 +19,9 @@ import type { Context, RouterInit } from "./types.ts";
 /** import the route module. */
 export async function importRouteModule({ filename, pattern }: RouteMeta, appDir?: string) {
   const config = getAlephConfig();
-  const routes = config?.router?.routes;
-  if (routes && pattern.pathname in routes) {
-    return routes[pattern.pathname];
+  const modules = config?.router?.modules;
+  if (modules && pattern.pathname in modules) {
+    return modules[pattern.pathname];
   }
 
   const version = depGraph.get(filename)?.version;

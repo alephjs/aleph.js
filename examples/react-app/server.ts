@@ -1,11 +1,12 @@
 import { serve } from "aleph/server";
 import react from "aleph/plugins/react";
-import routes from "./routes/_export.ts";
+import denoDeploy from "aleph/plugins/deploy";
+import modules from "./routes/_export.ts";
 
 serve({
   baseUrl: import.meta.url,
-  router: { routes },
   plugins: [
+    denoDeploy({ modules }),
     react({ ssr: true }),
   ],
 });

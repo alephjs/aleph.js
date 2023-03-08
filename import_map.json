@@ -4,6 +4,7 @@
     "aleph/": "./",
     "aleph/server": "./server/mod.ts",
     "aleph/dev": "./server/dev.ts",
+    "aleph/plugins/deploy": "./plugins/deploy.ts",
     "aleph/plugins/unocss": "./plugins/unocss.ts",
     "aleph/plugins/mdx": "./plugins/mdx.ts",
     "aleph/react": "./framework/react/mod.ts",
