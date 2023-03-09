@@ -2,33 +2,13 @@ import { Link } from "aleph/react";
 
 export default function Header() {
   return (
-    <header
-      style={{
-        position: "sticky",
-        top: 0,
-        width: "100%",
-        height: 80,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          width: "90%",
-          maxWidth: 900,
-          height: "100%",
-          margin: "0 auto",
-        }}
-      >
+    <header className="sticky top-0 w-full h-20">
+      <div className="flex items-center justify-between w-[90%] max-w-[900px] h-full m-x-auto">
         <h1>
-          <Link
-            style={{ fontSize: 16, color: "#333" }}
-            to="/"
-          >
+          <Link to="/">
             <svg
+              className="w-auto h-4"
               viewBox="0 0 60 12.09"
-              style={{ width: "auto", height: "1em" }}
               fill="currentColor"
             >
               <title>Aleph.js</title>
@@ -43,20 +23,11 @@ export default function Header() {
             </svg>
           </Link>
         </h1>
-        <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 20,
-          }}
-        >
-          <a
-            href="https://deno.land/x/aleph"
-            style={{ fontSize: 20, color: "#454545" }}
-          >
+        <nav className="flex items-center gap-5">
+          <a href="https://deno.land/x/aleph" className="text-[#454545] hover:text-black">
             <svg
+              className="w-5 h-5"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ width: "1em", height: "1em" }}
               viewBox="0 0 512 512"
             >
               <title>Deno Land</title>
@@ -81,13 +52,10 @@ export default function Header() {
               <circle mask="url(#deno-logo-mask)" cx="262" cy="203" r="16" />
             </svg>
           </a>
-          <a
-            href="https://github.com/alephjs/aleph.js"
-            style={{ fontSize: 20, color: "#454545" }}
-          >
+          <a href="https://github.com/alephjs/aleph.js" className="text-[#454545] hover:text-black">
             <svg
+              className="w-5 h-5"
               viewBox="0 0 1024 1024"
-              style={{ width: "1em", height: "1em" }}
               fill="currentColor"
             >
               <title>Github</title>
