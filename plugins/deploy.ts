@@ -21,7 +21,7 @@ export default function DenoDeployPlugin({ moduleMain, modules }: PluginOptions)
         return;
       }
       if (moduleMain) {
-        Reflect.set(globalThis, "__ALEPH_APP_DIR", path.dirname(path.fromFileUrl(Deno.mainModule)));
+        Reflect.set(globalThis, "__ALEPH_APP_DIR", path.dirname(path.fromFileUrl(moduleMain)));
       }
       if (isFilledArray(modules.depGraph?.modules)) {
         modules.depGraph.modules.forEach((module) => {
