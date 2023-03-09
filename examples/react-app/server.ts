@@ -5,7 +5,7 @@ import modules from "./routes/_export.ts";
 
 serve({
   plugins: [
-    denoDeploy({ modules }),
+    denoDeploy({ moduleMain: import.meta.url, modules }),
     react({ ssr: true }),
   ],
 });

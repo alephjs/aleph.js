@@ -6,14 +6,22 @@ import { getAlephConfig, getAppDir, getImportMap, getJSXConfig } from "../server
 import type { Plugin } from "../server/types.ts";
 import { isFilledArray, prettyBytes, trimPrefix } from "../shared/util.ts";
 
+type PluginOptions = {
+  moduleMain?: string;
+  modules: Record<string, Record<string, unknown>>;
+};
+
 /** A plugin for Deno Deploy which doesn't support the dynamic import. */
-export default function DenoDeployPlugin({ modules }: { modules: Record<string, Record<string, unknown>> }): Plugin {
+export default function DenoDeployPlugin({ moduleMain, modules }: PluginOptions): Plugin {
   return {
     name: "deploy",
     setup(aleph, env) {
       if (env.isDev) {
         aleph.router = { ...aleph.router, onChange: generateExportTs };
         return;
+      }
+      if (moduleMain) {
+        Reflect.set(globalThis, "__ALEPH_APP_DIR", path.dirname(path.fromFileUrl(Deno.mainModule)));
       }
       if (isFilledArray(modules.depGraph?.modules)) {
         modules.depGraph.modules.forEach((module) => {

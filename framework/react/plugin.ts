@@ -28,7 +28,11 @@ export const render = (ctx: SSRContext): Promise<ReadableStream> => {
   );
 };
 
-export default function ReactPlugin(options?: { ssr?: boolean | SSROptions }): Plugin {
+export type PluginOptions = {
+  ssr?: boolean | SSROptions;
+};
+
+export default function ReactPlugin(options?: PluginOptions): Plugin {
   return {
     name: "react",
     setup(aleph) {

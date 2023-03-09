@@ -127,28 +127,33 @@ export default async function init(nameArg?: string, options?: Options) {
     alephPkgUri = `https://deno.land/x/aleph@${VERSION}`;
   }
 
+  const serverCode = await Deno.readTextFile(join(appDir, "server.ts"));
+  if (!isRsApp && !deploy) {
+    await Deno.writeTextFile(
+      join(appDir, "server.ts"),
+      serverCode
+        .replace('import modules from "./routes/_export.ts";\n', "")
+        .replace('import denoDeploy from "aleph/plugins/deploy";\n', "")
+        .replace("    denoDeploy({ moduleMain: import.meta.url, modules }),\n", "")
+        .replace("    denoDeploy({ modules }),\n", ""),
+    );
+    await Deno.remove(join(appDir, "routes/_export.ts"));
+  } else {
+    await Deno.writeTextFile(
+      join(appDir, "server.ts"),
+      serverCode.replace(
+        "denoDeploy({ moduleMain: import.meta.url, modules })",
+        "denoDeploy({ modules })",
+      ),
+    );
+  }
+
   const res = await fetch("https://esm.sh/status.json");
   if (res.status !== 200) {
     console.error(await res.text());
     Deno.exit(1);
   }
   const { version: ESM_VERSION } = await res.json();
-
-  if (!isRsApp && !deploy) {
-    const importExpr = `import modules from "./routes/_export.ts";\n`;
-    const serverCode = await Deno.readTextFile(join(appDir, "server.ts"));
-    if (serverCode.includes(importExpr)) {
-      await Deno.writeTextFile(
-        join(appDir, "server.ts"),
-        serverCode
-          .replace(importExpr, "")
-          .replace('import denoDeploy from "aleph/plugins/deploy";\n', "")
-          .replace("    denoDeploy({ modules }),\n", ""),
-      );
-      await Deno.remove(join(appDir, "routes/_export.ts"));
-    }
-  }
-
   const denoConfig = {
     "compilerOptions": {
       "lib": [

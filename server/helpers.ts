@@ -45,7 +45,10 @@ export function globalItSync<T>(name: string, fn: () => T): T {
 }
 
 export function getAppDir() {
-  return globalItSync("__ALEPH_APP_DIR", () => path.dirname(path.fromFileUrl(Deno.mainModule)));
+  return globalItSync(
+    "__ALEPH_APP_DIR",
+    () => Deno.mainModule ? path.dirname(path.fromFileUrl(Deno.mainModule)) : Deno.cwd(),
+  );
 }
 
 /** Get the module URI of Aleph.js */
