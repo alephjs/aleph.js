@@ -23,7 +23,7 @@ You will need [Deno](https://deno.land/) 1.20+.
 
 ```bash
 # Run the example app in development mode
-deno run -A examples/$APP/dev.ts
+deno run -A dev.ts examples/$APP/server.ts
 
 # Run the example app in production mode
 deno run -A examples/$APP/server.ts
