@@ -67,7 +67,7 @@ export default async function init(nameArg?: string, options?: Options) {
   if (!template) {
     const answer = await ask([
       "Select a framework:",
-      ...templates.map((name, i) => `  ${bold((i + 1).toString())}. ${toTitle(name)}`),
+      ...templates.map((name, i) => `  ${bold((i + 1).toString())}. ${getTemplateDisplayName(name)}`),
       dim(`[1-${templates.length}]`),
     ].join("\n"));
     const n = parseInt(answer);
@@ -82,7 +82,7 @@ export default async function init(nameArg?: string, options?: Options) {
   const appDir = join(Deno.cwd(), name);
   const withUnocss = unocssApps.includes(template!) && await confirm("Use Atomic CSS (powered by Unocss)?");
   const withVscode = await confirm("Initialize VS Code workspace configuration?");
-  const deploy = !rsApps.includes(template) ? await confirm("Deploy to Deno Deploy ?") : false;
+  const deploy = !rsApps.includes(template) ? await confirm("Deploy to Deno Deploy?") : false;
   const isRsApp = rsApps.includes(template);
 
   let alephPkgUri: string;
@@ -163,7 +163,7 @@ export default async function init(nameArg?: string, options?: Options) {
     },
     "importMap": "import_map.json",
     "tasks": {
-      "dev": await existsFile("dev.ts") ? "deno run -A dev.ts" : `${alephPkgUri}/dev.ts`,
+      "dev": await existsFile(join(appDir, "dev.ts")) ? "deno run -A dev.ts" : `deno run -A ${alephPkgUri}/dev.ts`,
       "start": "deno run -A server.ts",
       "build": "deno run -A server.ts --build",
       "esm:add": `deno run -A https://esm.sh/v${ESM_VERSION} add`,
@@ -323,7 +323,7 @@ function trimPrefix(s: string, prefix: string): string {
   return s;
 }
 
-function toTitle(name: string) {
+function getTemplateDisplayName(name: string) {
   if (name === "api") {
     return "REST API";
   }
