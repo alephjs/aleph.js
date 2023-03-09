@@ -118,7 +118,7 @@ export async function build(
     const links = await parseHtmlLinks(html);
     for (const src of links) {
       const url = new URL(src, "http://localhost/");
-      const ext = path.extname(url.pathname).slice(1);
+      const ext = splitBy(url.hostname, ".", true)[1].toLowerCase();
       if (ext === "css" || builtinModuleExts.includes(ext)) {
         const specifier = isLikelyHttpURL(src) ? src : "." + cleanPath(src);
         queue.push(specifier);

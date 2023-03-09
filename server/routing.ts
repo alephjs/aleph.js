@@ -192,7 +192,7 @@ export function toRouterRegExp(init: RouterInit = {}): RouteRegExp {
     glob = `.${cleanPath(init.dir ?? "routes")}/**/*.{${exts.join(",")}}`;
   }
   const prefix = splitBy(glob, "/*")[0];
-  const reg = path.globToRegExp("./" + trimPrefix(glob, "./"));
+  const reg = path.globToRegExp("./" + trimPrefix(glob, "./"), { caseInsensitive: true });
   return {
     prefix,
     test: (s: string) => s !== prefix + "/_export.ts" && reg.test(s),

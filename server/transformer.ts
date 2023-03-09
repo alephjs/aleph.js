@@ -1,6 +1,6 @@
 import { TransformError } from "../framework/core/error.ts";
-import { isLikelyHttpURL, trimPrefix } from "../shared/util.ts";
-import type { TransformOptions, TransformResult } from "./deps.ts";
+import { isLikelyHttpURL, splitBy, trimPrefix } from "../shared/util.ts";
+import type { TransformResult } from "./deps.ts";
 import { btoa, parseDeps, transform } from "./deps.ts";
 import depGraph from "./graph.ts";
 import {
@@ -32,11 +32,14 @@ export type TransformerOptions = {
 
 export default {
   test: (pathname: string) => {
+    const ext = splitBy(pathname, ".", true)[1].toLowerCase();
     return (
+      // remote module
       pathname.startsWith("/-/") ||
-      (builtinModuleExts.find((ext) => pathname.endsWith(`.${ext}`)) &&
-        !pathname.endsWith(".d.ts")) ||
-      pathname.endsWith(".css")
+      // builtin module
+      (builtinModuleExts.includes(ext) && !pathname.endsWith(".d.ts")) ||
+      // css
+      ext === "css"
     );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {
@@ -186,7 +189,7 @@ export default {
             ...jsxConfig,
             alephPkgUri,
             target,
-            lang: lang as TransformOptions["lang"],
+            lang,
             importMap: JSON.stringify(importMap),
             graphVersions,
             globalVersion: deploymentId ?? depGraph.globalVersion.toString(36),
