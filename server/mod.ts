@@ -2,8 +2,9 @@ import { serve as stdServe, serveTls } from "./deps.ts";
 import { createHandler } from "./handler.ts";
 import log, { type LevelName } from "./log.ts";
 import { build } from "./build.ts";
-import type { AlephConfig, ServeInit } from "./types.ts";
 import { watch } from "./dev.ts";
+import { getAppDir } from "./helpers.ts";
+import type { AlephConfig, ServeInit } from "./types.ts";
 
 /** The options for Aleph.js server.  */
 export type ServeOptions = AlephConfig & Omit<ServeInit, "onError">;
@@ -37,7 +38,7 @@ export async function serve(options?: ServeOptions): Promise<void> {
 
   // watch file changes in development mode
   if (isDev) {
-    watch(Deno.cwd(), config.router?.onChange);
+    watch(getAppDir(), config.router?.onChange);
   }
 
   const { tls } = config;

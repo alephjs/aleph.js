@@ -44,6 +44,10 @@ export function globalItSync<T>(name: string, fn: () => T): T {
   return ret;
 }
 
+export function getAppDir() {
+  return globalItSync("__ALEPH_APP_DIR", () => path.dirname(path.fromFileUrl(Deno.mainModule)));
+}
+
 /** Get the module URI of Aleph.js */
 export function getAlephPkgUri(): string {
   return globalItSync("__ALEPH_PKG_URI", () => {
@@ -359,7 +363,7 @@ export async function fetchCode(
     return [await res.text(), res.headers.get("Content-Type") || getContentType(url.pathname)];
   }
 
-  return [await Deno.readTextFile(specifier), getContentType(specifier)];
+  return [await Deno.readTextFile(path.join(getAppDir(), specifier)), getContentType(specifier)];
 }
 
 /** Load the JSX config base the given import maps and the existing deno config. */

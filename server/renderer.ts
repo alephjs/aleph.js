@@ -3,7 +3,7 @@ import { matchRoutes, type RouteModule, type Router } from "../framework/core/ro
 import { cleanPath, isFilledString, isPlainObject, utf8Enc } from "../shared/util.ts";
 import { HTMLRewriter, path } from "./deps.ts";
 import depGraph from "./graph.ts";
-import { getAlephConfig, getDeploymentId, getFiles, regJsxFile, toLocalPath } from "./helpers.ts";
+import { getAlephConfig, getAppDir, getDeploymentId, getFiles, regJsxFile, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
 import { runtimeScript } from "./runtime.ts";
 import { importRouteModule } from "./routing.ts";
@@ -78,12 +78,12 @@ export default {
       let css = Reflect.get(globalThis, "__ALEPH_ATOMICCSS_BUILD");
       if (!css) {
         const t = performance.now();
-        const cwd = Deno.cwd();
-        const files = await getFiles(cwd);
+        const appDir = getAppDir();
+        const files = await getFiles(appDir);
         const outputDir = "." + cleanPath(build?.outputDir ?? "./output");
         const inputSources = await Promise.all(
           files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
-            Deno.readTextFile(path.join(cwd, name))
+            Deno.readTextFile(path.join(appDir, name))
           ),
         );
         if (inputSources.length > 0) {

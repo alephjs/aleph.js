@@ -9,6 +9,7 @@ import {
   fetchCode,
   getAlephConfig,
   getAlephPkgUri,
+  getAppDir,
   globalIt,
   isNpmPkg,
   restoreUrl,
@@ -23,12 +24,12 @@ export async function build(
   serverHandler: (req: Request, connInfo: ConnInfo) => Promise<Response> | Response,
 ) {
   const start = performance.now();
-  const cwd = Deno.cwd();
+  const appDir = getAppDir();
   const alephPkgUri = getAlephPkgUri();
   const config = getAlephConfig()!;
   const options = config?.build ?? {};
   const target = options.buildTarget ?? "es2018";
-  const outputDir = path.join(cwd, options.outputDir ?? "./output");
+  const outputDir = path.join(appDir, options.outputDir ?? "./output");
 
   const request = (url: URL, headers?: HeadersInit) => {
     const addr: Deno.Addr = { transport: "tcp", hostname: "localhost", port: 80 };
@@ -50,7 +51,7 @@ export async function build(
   const ssgPaths: string[] = [];
   const { routes } = await globalIt(
     "__ALEPH_ROUTER",
-    () => initRouter(config.router),
+    () => initRouter(appDir, config.router),
   );
 
   routes.forEach(([_, { filename }]) => {
@@ -112,7 +113,7 @@ export async function build(
 
   // look up client modules
   let queue = [...routeFiles];
-  const indexHtml = path.join(cwd, "index.html");
+  const indexHtml = path.join(appDir, "index.html");
   if (await existsFile(indexHtml)) {
     const html = await Deno.readFile(indexHtml);
     const links = await parseHtmlLinks(html);

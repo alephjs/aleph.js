@@ -2,15 +2,16 @@ import type { Router } from "../framework/core/routes.ts";
 import { isPlainObject } from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { path } from "./deps.ts";
+import { getAppDir } from "./helpers.ts";
 import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import renderer from "./renderer.ts";
 import { fetchRoute, initRouter } from "./routing.ts";
 import type { Middleware, RouterInit, SessionOptions, SSR } from "./types.ts";
 
 type MockServerOptions = {
-  router?: RouterInit;
   appDir?: string;
   origin?: string;
+  router?: RouterInit;
   middlewares?: Middleware[];
   session?: SessionOptions;
   ssr?: SSR;
@@ -76,7 +77,7 @@ export class MockServer {
     }
 
     if (!this.#router) {
-      this.#router = await initRouter(router, appDir);
+      this.#router = await initRouter(appDir ?? getAppDir(), router);
     }
 
     if (this.#router) {

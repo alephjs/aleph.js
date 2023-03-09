@@ -2,7 +2,7 @@ import { colors, esbuild, path } from "../server/deps.ts";
 import type { Router } from "../framework/core/routes.ts";
 import depGraph, { DependencyGraph } from "../server/graph.ts";
 import log from "../server/log.ts";
-import { getAlephConfig, getImportMap, getJSXConfig } from "../server/helpers.ts";
+import { getAlephConfig, getAppDir, getImportMap, getJSXConfig } from "../server/helpers.ts";
 import type { Plugin } from "../server/types.ts";
 import { isFilledArray, prettyBytes, trimPrefix } from "../shared/util.ts";
 
@@ -37,8 +37,8 @@ export async function generateExportTs() {
   }
 
   const { loaders } = config;
-  const cwd = Deno.cwd();
-  const routesDir = path.join(cwd, router.prefix);
+  const appDir = getAppDir();
+  const routesDir = path.join(appDir, router.prefix);
   const exportTsFile = path.join(routesDir, "_export.ts");
   const withLoader = router.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
 
@@ -125,10 +125,10 @@ export async function generateExportTs() {
               args.path.startsWith(".") &&
               loaders?.some((l) => l.test(args.path))
             ) {
-              const specifier = "./" + path.relative(cwd, path.join(routesDir, args.path));
+              const specifier = "./" + path.relative(appDir, path.join(routesDir, args.path));
               depGraph.mark(specifier, {});
               if (args.importer.startsWith(".")) {
-                const importer = "./" + path.relative(cwd, path.join(routesDir, args.importer));
+                const importer = "./" + path.relative(appDir, path.join(routesDir, args.importer));
                 depGraph.mark(importer, { deps: [{ specifier }] });
               }
               return { path: args.path, namespace: "loader" };
@@ -139,10 +139,10 @@ export async function generateExportTs() {
             const loader = loaders?.find((l) => l.test(args.path));
             if (loader) {
               const fullpath = path.join(routesDir, args.path);
-              const specifier = "./" + path.relative(cwd, fullpath);
+              const specifier = "./" + path.relative(appDir, fullpath);
               const [importMap, jsxConfig, source] = await Promise.all([
-                getImportMap(cwd),
-                getJSXConfig(cwd),
+                getImportMap(appDir),
+                getJSXConfig(appDir),
                 Deno.readTextFile(fullpath),
               ]);
               try {

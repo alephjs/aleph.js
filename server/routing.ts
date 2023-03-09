@@ -13,7 +13,7 @@ import {
 import { path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import log from "./log.ts";
-import { builtinModuleExts, fixResponse, getAlephConfig, getFiles, toResponse } from "./helpers.ts";
+import { builtinModuleExts, fixResponse, getAlephConfig, getAppDir, getFiles, toResponse } from "./helpers.ts";
 import type { Context, RouterInit } from "./types.ts";
 
 /** import the route module. */
@@ -31,7 +31,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   if (origin) {
     url = `${origin}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
   } else {
-    const root = appDir ? path.resolve(appDir) : Deno.cwd();
+    const root = appDir ? path.resolve(appDir) : getAppDir();
     url = `file://${path.join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
   }
 
@@ -121,9 +121,9 @@ export async function fetchRoute(
 }
 
 /** initialize router from routes config */
-export async function initRouter(init: RouterInit = {}, appDir?: string): Promise<Router> {
+export async function initRouter(appDir: string, init: RouterInit = {}): Promise<Router> {
   const reg = toRouterRegExp(init);
-  const files = await getFiles(appDir ?? Deno.cwd());
+  const files = await getFiles(appDir);
   const routes: Route[] = [];
   let _app: Route | undefined = undefined;
   let _404: Route | undefined = undefined;

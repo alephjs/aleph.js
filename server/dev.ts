@@ -37,7 +37,7 @@ export function watch(appDir: string, onRouterChange?: () => void) {
       // reload router when fs changess
       const reg = toRouterRegExp(config?.router);
       if (reg.test(specifier)) {
-        const router = await initRouter(config?.router, appDir);
+        const router = await initRouter(appDir, config?.router);
         Reflect.set(globalThis, "__ALEPH_ROUTER", router);
         onRouterChange?.();
       }
@@ -45,7 +45,7 @@ export function watch(appDir: string, onRouterChange?: () => void) {
   });
 
   if (onRouterChange) {
-    initRouter(config?.router, appDir).then((router) => {
+    initRouter(appDir, config?.router).then((router) => {
       Reflect.set(globalThis, "__ALEPH_ROUTER", router);
       onRouterChange();
     });
@@ -89,7 +89,7 @@ let watched = false;
 export default async function dev(serverEntry?: string) {
   serverEntry = serverEntry
     ? serverEntry.startsWith("file://") ? path.fromFileUrl(serverEntry) : path.resolve(serverEntry)
-    : await findFile(builtinModuleExts.map((ext) => `server.${ext}`), Deno.cwd());
+    : await findFile(builtinModuleExts.map((ext) => `server.${ext}`));
   if (!serverEntry) {
     log.fatal("[dev] No server entry found.");
     return;
@@ -136,7 +136,7 @@ export default async function dev(serverEntry?: string) {
   });
 
   const cmd = [Deno.execPath(), "run", "-A", "--no-lock", serverEntry, "--dev"];
-  devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit", cwd: appDir });
+  devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
   await devProcess.status();
   removeWatchFsEmitter(emitter);
 }

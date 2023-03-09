@@ -36,10 +36,10 @@ export default {
     return (
       // remote module
       pathname.startsWith("/-/") ||
-      // builtin module
-      (builtinModuleExts.includes(ext) && !pathname.endsWith(".d.ts")) ||
       // css
-      ext === "css"
+      ext === "css" ||
+      // builtin module
+      (builtinModuleExts.includes(ext) && !pathname.endsWith(".d.ts"))
     );
   },
   fetch: async (req: Request, options: TransformerOptions): Promise<Response> => {

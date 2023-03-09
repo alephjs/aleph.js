@@ -10,6 +10,7 @@ import {
   fetchCode,
   fixResponse,
   getAlephPkgUri,
+  getAppDir,
   getDeploymentId,
   getImportMap,
   getJSXConfig,
@@ -31,7 +32,7 @@ export function createHandler(config: AlephConfig) {
   const { loaders, middlewares, onError, build, router: routerConfig, session, ssr } = config;
   const buildMode = Deno.args.includes("--build");
   const isDev = Deno.args.includes("--dev");
-  const cwd = Deno.cwd();
+  const appDir = getAppDir();
 
   const handler = async (req: Request, ctx: Context): Promise<Response> => {
     const { pathname, searchParams } = new URL(req.url);
@@ -52,7 +53,7 @@ export function createHandler(config: AlephConfig) {
     // check if the `out` directory exists
     const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
       if (!isDev && !buildMode) {
-        const outDir = path.join(cwd, build?.outputDir ?? "./output");
+        const outDir = path.join(appDir, build?.outputDir ?? "./output");
         if (await existsDir(outDir)) {
           return outDir;
         }
@@ -98,8 +99,8 @@ export function createHandler(config: AlephConfig) {
       }
       try {
         const [importMap, jsxConfig] = await Promise.all([
-          getImportMap(cwd),
-          getJSXConfig(cwd),
+          getImportMap(appDir),
+          getJSXConfig(appDir),
         ]);
         return await transformer.fetch(req, {
           importMap,
@@ -138,7 +139,7 @@ export function createHandler(config: AlephConfig) {
     const contentType = getContentType(pathname);
     if (!pathname.startsWith("/.") && contentType !== "application/octet-stream") {
       try {
-        let filePath = path.join(cwd, pathname);
+        let filePath = path.join(appDir, pathname);
         let stat = await Deno.lstat(filePath);
         if (stat.isDirectory && pathname !== "/") {
           filePath = `${trimSuffix(filePath, "/")}/index.html`;
@@ -182,7 +183,7 @@ export function createHandler(config: AlephConfig) {
     }
 
     // get the router
-    const router: Router = await globalIt("__ALEPH_ROUTER", () => initRouter(routerConfig, cwd));
+    const router: Router = await globalIt("__ALEPH_ROUTER", () => initRouter(appDir, routerConfig));
 
     // getStaticPaths PRC for SSR
     if (pathname === "/__aleph.getStaticPaths") {
@@ -264,7 +265,7 @@ export function createHandler(config: AlephConfig) {
     const indexHtml = await globalIt(
       "__ALEPH_INDEX_HTML",
       () =>
-        loadIndexHtml(path.join(cwd, "index.html"), {
+        loadIndexHtml(path.join(appDir, "index.html"), {
           hmr: isDev ? { wsUrl: Deno.env.get("HMR_WS_URL") } : undefined,
           ssr: ssr ? { root: isPlainObject(ssr) ? ssr.root : undefined } : undefined,
         }),
@@ -282,7 +283,7 @@ export function createHandler(config: AlephConfig) {
         (Array.isArray(ssr.include) && !ssr.include.some((p) => p.test(pathname)))
       ))
     ) {
-      return createHtmlResponse(req, path.join(cwd, "./index.html"), indexHtml);
+      return createHtmlResponse(req, path.join(appDir, "./index.html"), indexHtml);
     }
 
     // use SSG output if exists
