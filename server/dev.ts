@@ -1,19 +1,10 @@
-import { isFilledString, prettyBytes, trimPrefix } from "../shared/util.ts";
-import type { Router } from "../framework/core/routes.ts";
-import { colors, Emitter, ensureDir, esbuild, mitt, parseDeps, path } from "./deps.ts";
-import depGraph, { DependencyGraph } from "./graph.ts";
-import {
-  builtinModuleExts,
-  existsFile,
-  findFile,
-  getAlephConfig,
-  getImportMap,
-  getJSXConfig,
-  watchFs,
-} from "./helpers.ts";
+import { isFilledString } from "../shared/util.ts";
+import { colors, Emitter, ensureDir, mitt, parseDeps, path } from "./deps.ts";
+import depGraph from "./graph.ts";
+import { builtinModuleExts, existsFile, findFile, getAlephConfig, getImportMap, watchFs } from "./helpers.ts";
 import log from "./log.ts";
 import { initRouter, toRouterRegExp } from "./routing.ts";
-import type { AlephConfig, ModuleLoader } from "./types.ts";
+import type { AlephConfig } from "./types.ts";
 
 type WatchFsEvents = {
   [key in "create" | "remove" | "modify" | `modify:${string}` | `hotUpdate:${string}`]: {
@@ -37,7 +28,7 @@ export function removeWatchFsEmitter(e: Emitter<WatchFsEvents>) {
 }
 
 /** Watch for file changes. */
-export function watch(appDir: string, shouldGenerateExportTs: boolean) {
+export function watch(appDir: string, onRouterChange?: () => void) {
   const config = getAlephConfig();
   const emitter = createWatchFsEmitter();
 
@@ -48,17 +39,15 @@ export function watch(appDir: string, shouldGenerateExportTs: boolean) {
       if (reg.test(specifier)) {
         const router = await initRouter(config?.router, appDir);
         Reflect.set(globalThis, "__ALEPH_ROUTER", router);
-        if (shouldGenerateExportTs) {
-          generateExportTs(appDir, router, config?.loaders).catch((err) => log.error(err));
-        }
+        onRouterChange?.();
       }
     }
   });
 
-  if (shouldGenerateExportTs) {
+  if (onRouterChange) {
     initRouter(config?.router, appDir).then((router) => {
       Reflect.set(globalThis, "__ALEPH_ROUTER", router);
-      generateExportTs(appDir, router, config?.loaders).catch((err) => log.error(err));
+      onRouterChange();
     });
   }
 
@@ -94,38 +83,29 @@ export function watch(appDir: string, shouldGenerateExportTs: boolean) {
   });
 }
 
-export type DevOptions = {
-  baseUrl?: string;
-  /** The server entry, default is `server.{ts,tsx,js,jsx}` */
-  serverEntry?: string;
-  /** Whether to generate the `./routes/_export.ts` module for serverless env that doesn't support dynamic import. */
-  generateExportTs?: boolean;
-};
-
 let devProcess: Deno.Process | null = null;
 let watched = false;
 
-export default async function dev(options?: DevOptions) {
-  const appDir = options?.baseUrl ? path.fromFileUrl(new URL(".", options.baseUrl)) : Deno.cwd();
-  const serverEntry = options?.serverEntry
-    ? path.join(appDir, options?.serverEntry)
-    : await findFile(builtinModuleExts.map((ext) => `server.${ext}`), appDir);
-
-  if (!watched) {
-    log.info(colors.dim("[dev]"), "Watching for file changes...");
-    watch(appDir, false);
-    watched = true;
-  }
-
+export default async function dev(serverEntry?: string) {
+  serverEntry = serverEntry
+    ? serverEntry.startsWith("file://") ? path.fromFileUrl(serverEntry) : path.resolve(serverEntry)
+    : await findFile(builtinModuleExts.map((ext) => `server.${ext}`), Deno.cwd());
   if (!serverEntry) {
     log.fatal("[dev] No server entry found.");
     return;
   }
 
-  const entry = `./${trimPrefix(serverEntry, appDir)}`;
-  const source = await Deno.readTextFile(serverEntry);
+  const appDir = path.dirname(serverEntry);
+  if (!watched) {
+    log.info(colors.dim("[dev]"), "Watching for file changes...");
+    watch(appDir);
+    watched = true;
+  }
+
+  const entry = `./${path.basename(serverEntry)}`;
+  const code = await Deno.readTextFile(serverEntry);
   const importMap = await getImportMap();
-  const deps = await parseDeps(entry, source, {
+  const deps = await parseDeps(entry, code, {
     importMap: JSON.stringify(importMap),
   });
   const exportTs = deps.find((dep) => dep.specifier.startsWith("./") && dep.specifier.endsWith("/_export.ts"));
@@ -143,7 +123,7 @@ export default async function dev(options?: DevOptions) {
   const emitter = createWatchFsEmitter();
   emitter.on("*", (kind, { specifier }) => {
     if (
-      kind === "modify" && specifier !== exportTs?.specifier && (
+      kind === "modify" && !specifier.endsWith("/_export.ts") && (
         specifier === entry ||
         deps.some((dep) => dep.specifier === specifier)
       )
@@ -151,15 +131,12 @@ export default async function dev(options?: DevOptions) {
       console.clear();
       console.info(colors.dim("[dev] Restarting the server..."));
       devProcess?.kill("SIGTERM");
-      dev(options);
+      dev(serverEntry);
     }
   });
 
   const cmd = [Deno.execPath(), "run", "-A", "--no-lock", serverEntry, "--dev"];
-  if (options?.generateExportTs) {
-    cmd.push("--generate");
-  }
-  devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
+  devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit", cwd: appDir });
   await devProcess.status();
   removeWatchFsEmitter(emitter);
 }
@@ -213,167 +190,4 @@ export function handleHMR(req: Request): Response {
     }
   });
   return response;
-}
-
-/** generate the `routes/_export.ts` module by given the routes config. */
-export async function generateExportTs(appDir: string, router: Router, loaders?: ModuleLoader[]) {
-  const routesDir = path.join(appDir, router.prefix);
-  const exportTsFile = path.join(routesDir, "_export.ts");
-  const withLoader = router.routes.some(([_, { filename }]) => loaders?.some((l) => l.test(filename)));
-
-  if (router.routes.length == 0) {
-    try {
-      await Deno.remove(exportTsFile);
-    } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) {
-        throw error;
-      }
-    }
-    return;
-  }
-
-  const comments = [
-    "// Exports router modules for serverless env that doesn't support the dynamic import.",
-    "// This module will be updated automaticlly in develoment mode, do NOT edit it manually.",
-  ];
-  const imports: string[] = [];
-  const revives: string[] = [];
-
-  router.routes.forEach(([_, { filename, pattern }], idx) => {
-    const importUrl = JSON.stringify(
-      "." + trimPrefix(filename, router.prefix),
-    );
-    imports.push(`import * as $${idx} from ${importUrl};`);
-    revives.push(`  ${JSON.stringify(pattern.pathname)}: $${idx},`);
-  });
-
-  // stop previous esbuild context
-  const prevCtx: esbuild.BuildContext | undefined = Reflect.get(globalThis, "__ESBUILD_CTX");
-  if (prevCtx) {
-    Reflect.deleteProperty(globalThis, "__ESBUILD_CTX");
-    prevCtx.dispose?.();
-  }
-
-  if (withLoader) {
-    const depGraph = new DependencyGraph();
-    const input = [
-      ...imports,
-      "export default {",
-      ...revives,
-      "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null,",
-      "}",
-    ].join("\n");
-    const write = async (build: esbuild.BuildResult) => {
-      await Promise.all(build.outputFiles!.map(async (file) => {
-        if (file.path === exportTsFile) {
-          await Deno.writeTextFile(
-            exportTsFile,
-            file.text.replace(
-              "__ALEPH_DEP_GRAPH_PLACEHOLDER__:null",
-              // deno-lint-ignore no-unused-vars
-              `depGraph:${JSON.stringify({ modules: depGraph.modules.map(({ version, ...module }) => module) })}`,
-            ),
-          );
-          log.debug(`${colors.blue("_export.ts")} updated ${colors.dim(prettyBytes(file.text.length))} by esbuld`);
-        }
-      }));
-    };
-    const ctx = await esbuild.context({
-      stdin: { contents: input },
-      outfile: exportTsFile,
-      platform: "browser",
-      format: "esm",
-      target: "esnext",
-      bundle: true,
-      minify: true,
-      treeShaking: true,
-      // todo: enable sourcemap
-      sourcemap: false,
-      write: false,
-      banner: {
-        js: [
-          ...comments,
-          "// deno-fmt-ignore-file",
-          "// deno-lint-ignore-file",
-          "// @ts-nocheck",
-        ].join("\n"),
-      },
-      plugins: [{
-        name: "aleph-loader",
-        setup(build) {
-          build.onResolve({ filter: /.*/ }, (args) => {
-            if (
-              args.path.startsWith(".") &&
-              loaders?.some((l) => l.test(args.path))
-            ) {
-              const specifier = "./" + path.relative(appDir, path.join(routesDir, args.path));
-              depGraph.mark(specifier, {});
-              if (args.importer.startsWith(".")) {
-                const importer = "./" + path.relative(appDir, path.join(routesDir, args.importer));
-                depGraph.mark(importer, { deps: [{ specifier }] });
-              }
-              return { path: args.path, namespace: "loader" };
-            }
-            return { path: args.path, external: true };
-          });
-          build.onLoad({ filter: /.*/, namespace: "loader" }, async (args) => {
-            const loader = loaders?.find((l) => l.test(args.path));
-            if (loader) {
-              const fullpath = path.join(routesDir, args.path);
-              const specifier = "./" + path.relative(appDir, fullpath);
-              const [importMap, jsxConfig, source] = await Promise.all([
-                getImportMap(appDir),
-                getJSXConfig(appDir),
-                Deno.readTextFile(fullpath),
-              ]);
-              try {
-                const { code, lang, inlineCSS } = await loader.load(specifier, source, {
-                  importMap,
-                  jsxConfig,
-                  ssr: true,
-                });
-                if (inlineCSS) {
-                  depGraph.mark(specifier, { inlineCSS });
-                }
-                return {
-                  contents: code,
-                  loader: lang,
-                  watchFiles: [fullpath],
-                };
-              } catch (error) {
-                return {
-                  errors: [{ text: error.message }],
-                };
-              }
-            }
-            return {
-              errors: [{ text: `Loader not found for ${args.path}` }],
-            };
-          });
-          build.onEnd((res) => {
-            write(res);
-          });
-        },
-      }],
-    });
-    await ctx.watch();
-    Reflect.set(globalThis, "__ESBUILD_CTX", ctx);
-    addEventListener("unload", () => {
-      ctx.dispose();
-    });
-  } else {
-    const empty = "";
-    const code = [
-      ...comments,
-      empty,
-      ...imports,
-      empty,
-      "export default {",
-      ...revives,
-      "};",
-      empty,
-    ].join("\n");
-    await Deno.writeTextFile(exportTsFile, code);
-    log.debug(`${colors.blue("_export.ts")} updated`);
-  }
 }

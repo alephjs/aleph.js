@@ -6,7 +6,6 @@ import config from "./unocss.config.ts";
 import modules from "./routes/_export.ts";
 
 serve({
-  baseUrl: import.meta.url,
   plugins: [
     denoDeploy({ modules }),
     solid({ ssr: true }),

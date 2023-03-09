@@ -4,7 +4,6 @@ import solid from "aleph/plugins/solid";
 import modules from "./routes/_export.ts";
 
 serve({
-  baseUrl: import.meta.url,
   plugins: [
     denoDeploy({ modules }),
     solid({ ssr: true }),

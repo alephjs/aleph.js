@@ -3,8 +3,6 @@ import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0
 import type { RouteModule } from "../framework/core/routes.ts";
 
 export type AlephConfig = {
-  /** The base url of the server. */
-  baseUrl?: string;
   /** The TLS options. */
   tls?: TLSOptions;
   /** The router options for the file-system based routing. */
@@ -79,6 +77,8 @@ export interface RouterInit {
   exts?: string[];
   /** The pre-built routes.  */
   modules?: Record<string, Record<string, unknown>>;
+  /** The handler to handle the router change. */
+  onChange?(): void;
 }
 
 export type CookieOptions = {

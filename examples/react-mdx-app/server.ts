@@ -11,7 +11,6 @@ import rehypeHighlight from "https://esm.sh/v110/rehype-highlight@5.0.2";
 import rehypeSlug from "https://esm.sh/v110/rehype-slug@5.0.1";
 
 serve({
-  baseUrl: import.meta.url,
   plugins: [
     denoDeploy({ modules }),
     mdx({

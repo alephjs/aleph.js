@@ -4,7 +4,6 @@ import vue from "aleph/plugins/vue";
 import modules from "./routes/_export.ts";
 
 serve({
-  baseUrl: import.meta.url,
   plugins: [
     denoDeploy({ modules }),
     vue({ ssr: true }),

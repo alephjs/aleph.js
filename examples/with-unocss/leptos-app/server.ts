@@ -7,7 +7,6 @@ const wasmUrl = new URL("./pkg/server_bg.wasm", import.meta.url);
 await init(await Deno.readFile(wasmUrl));
 
 serve({
-  baseUrl: import.meta.url,
   plugins: [
     unocss(/\.rs$/, config),
   ],

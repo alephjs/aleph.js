@@ -339,7 +339,6 @@ export async function fetchCode(
   specifier: string,
   target?: TransformOptions["target"],
 ): Promise<[code: string, contentType: string]> {
-  const config = getAlephConfig();
   if (isLikelyHttpURL(specifier)) {
     const url = new URL(specifier);
     if (url.host === "aleph") {
@@ -360,8 +359,7 @@ export async function fetchCode(
     return [await res.text(), res.headers.get("Content-Type") || getContentType(url.pathname)];
   }
 
-  const root = config?.baseUrl ? fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd();
-  return [await Deno.readTextFile(join(root, specifier)), getContentType(specifier)];
+  return [await Deno.readTextFile(specifier), getContentType(specifier)];
 }
 
 /** Load the JSX config base the given import maps and the existing deno config. */

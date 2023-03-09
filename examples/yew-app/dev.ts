@@ -1,4 +1,4 @@
-import { fromFileUrl } from "std/path/mod.ts";
+import { fromFileUrl, join } from "std/path/mod.ts";
 import dev, { createWatchFsEmitter } from "aleph/dev";
 
 const emitter = createWatchFsEmitter();
@@ -29,7 +29,7 @@ async function start() {
     buildProc.close();
     await Deno.remove(`${cwd}/pkg/.gitignore`);
     // start aleph dev server
-    dev({ baseUrl: import.meta.url });
+    dev(join(cwd, "server.ts"));
   } finally {
     buildProc = null;
   }

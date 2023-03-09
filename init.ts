@@ -83,15 +83,15 @@ export default async function init(nameArg?: string, options?: Options) {
   const withUnocss = unocssApps.includes(template!) && await confirm("Use Atomic CSS (powered by Unocss)?");
   const withVscode = await confirm("Initialize VS Code workspace configuration?");
   const deploy = !rsApps.includes(template) ? await confirm("Deploy to Deno Deploy ?") : false;
+  const isRsApp = rsApps.includes(template);
 
-  // download template
-  console.log(`${dim("↓")} Downloading template(${blue(template!)}), this might take a moment...`);
   let alephPkgUri: string;
   if (import.meta.url.startsWith("file://")) {
     const src = `examples/${withUnocss ? "with-unocss/" : ""}${template}-app/`;
     await copyDir(src, name);
     alephPkgUri = "..";
   } else {
+    console.log(`${dim("↓")} Downloading template(${blue(template!)}), this might take a moment...`);
     const res = await fetch("https://cdn.deno.land/aleph/meta/versions.json");
     if (res.status !== 200) {
       console.error(await res.text());
@@ -134,21 +134,20 @@ export default async function init(nameArg?: string, options?: Options) {
   }
   const { version: ESM_VERSION } = await res.json();
 
-  let serverCode = await Deno.readTextFile(join(appDir, "server.ts"));
-  if (!rsApps.includes(template) && !deploy) {
+  if (!isRsApp && !deploy) {
     const importExpr = `import modules from "./routes/_export.ts";\n`;
+    const serverCode = await Deno.readTextFile(join(appDir, "server.ts"));
     if (serverCode.includes(importExpr)) {
-      serverCode = serverCode
-        .replace(importExpr, "")
-        .replace('import denoDeploy from "aleph/plugins/deploy";\n', "")
-        .replace("    denoDeploy({ modules }),\n", "");
+      await Deno.writeTextFile(
+        join(appDir, "server.ts"),
+        serverCode
+          .replace(importExpr, "")
+          .replace('import denoDeploy from "aleph/plugins/deploy";\n', "")
+          .replace("    denoDeploy({ modules }),\n", ""),
+      );
       await Deno.remove(join(appDir, "routes/_export.ts"));
     }
   }
-  await Deno.writeTextFile(
-    join(appDir, "server.ts"),
-    serverCode.replace("  baseUrl: import.meta.url,\n", ""),
-  );
 
   const denoConfig = {
     "compilerOptions": {
@@ -164,7 +163,7 @@ export default async function init(nameArg?: string, options?: Options) {
     },
     "importMap": "import_map.json",
     "tasks": {
-      "dev": rsApps.includes(template) ? "deno run -A dev.ts" : `${alephPkgUri}/dev.ts${deploy ? " --generate" : ""}`,
+      "dev": await existsFile("dev.ts") ? "deno run -A dev.ts" : `${alephPkgUri}/dev.ts`,
       "start": "deno run -A server.ts",
       "build": "deno run -A server.ts --build",
       "esm:add": `deno run -A https://esm.sh/v${ESM_VERSION} add`,

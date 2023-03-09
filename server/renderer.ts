@@ -73,17 +73,17 @@ export default {
     // build unocss
     const config = getAlephConfig();
     if (config?.atomicCSS) {
-      const { atomicCSS, baseUrl, build } = config;
+      const { atomicCSS, build } = config;
       const { test = regJsxFile, resetCSS } = atomicCSS;
       let css = Reflect.get(globalThis, "__ALEPH_ATOMICCSS_BUILD");
       if (!css) {
         const t = performance.now();
-        const dir = baseUrl ? path.fromFileUrl(new URL(".", baseUrl)) : Deno.cwd();
-        const files = await getFiles(dir);
+        const cwd = Deno.cwd();
+        const files = await getFiles(cwd);
         const outputDir = "." + cleanPath(build?.outputDir ?? "./output");
         const inputSources = await Promise.all(
           files.filter((name) => test.test(name) && !name.startsWith(outputDir)).map((name) =>
-            Deno.readTextFile(path.join(dir, name))
+            Deno.readTextFile(path.join(cwd, name))
           ),
         );
         if (inputSources.length > 0) {

@@ -31,9 +31,7 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   if (origin) {
     url = `${origin}${filename.slice(1)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
   } else {
-    const root = appDir
-      ? path.resolve(appDir)
-      : (config?.baseUrl ? path.fromFileUrl(new URL(".", config.baseUrl)) : Deno.cwd());
+    const root = appDir ? path.resolve(appDir) : Deno.cwd();
     url = `file://${path.join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
   }
 
