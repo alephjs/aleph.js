@@ -49,10 +49,7 @@ export async function build(
   const routeFiles: string[] = [];
   const ssgOptions = options.ssg === true ? {} : options.ssg ?? false;
   const ssgPaths: string[] = [];
-  const { routes } = await globalIt(
-    "__ALEPH_ROUTER",
-    () => initRouter(appDir, config.router),
-  );
+  const { routes } = await globalIt("__ALEPH_ROUTER", () => initRouter(appDir, config.router));
 
   routes.forEach(([_, { filename }]) => {
     routeFiles.push(filename);
