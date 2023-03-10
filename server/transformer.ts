@@ -56,6 +56,7 @@ export default {
       return new Response(null, { status: 304 });
     }
 
+    const alephPkgUri = getAlephPkgUri();
     const config = getAlephConfig();
     const [sourceRaw, sourceContentType] = await fetchCode(specifier, target);
     let source = sourceRaw;
@@ -143,7 +144,6 @@ export default {
           resType = "text/css";
         }
       } else {
-        const alephPkgUri = getAlephPkgUri();
         let code: string;
         let map: string | undefined;
         let deps: TransformResult["deps"];
@@ -193,6 +193,7 @@ export default {
             importMap: JSON.stringify(importMap),
             graphVersions,
             globalVersion: deploymentId ?? depGraph.globalVersion.toString(36),
+            resolveRemoteModule: true,
             stripDataExport: isRouteModule(specifier),
             sourceMap: isDev,
             minify: isDev ? undefined : { compress: true },
