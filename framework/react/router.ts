@@ -2,10 +2,9 @@ import type { FC, ReactNode } from "react";
 import { createElement, isValidElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import { isPlainObject } from "../../shared/util.ts";
 import events from "../core/events.ts";
-import { FetchError } from "../core/error.ts";
 import { redirect } from "../core/redirect.ts";
-import type { Route, RouteMeta, RouteModule, Router as IRouter } from "../core/routes.ts";
-import { matchRoutes } from "../core/routes.ts";
+import type { Route, RouteModule } from "../core/routes.ts";
+import { loadRouterFromTag, loadSSRModulesFromTag, matchRoutes, prefetchRouteData } from "../core/routes.ts";
 import { URLPatternCompat, URLPatternInput } from "../core/url_pattern.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";
@@ -80,14 +79,8 @@ export const Router: FC<RouterProps> = (props) => {
 
     // `popstate` event handler
     const onpopstate = async (e: Record<string, unknown>) => {
-      const url = (e.url as URL | undefined) || new URL(window.location.href);
+      const url = (e.url as URL | undefined) ?? new URL(window.location.href);
       const matches = matchRoutes(url, router);
-      const loadingBarEl = getLoadingBarEl();
-      let loading: number | null = setTimeout(() => {
-        loading = null;
-        loadingBarEl.style.opacity = "1";
-        loadingBarEl.style.width = "50%";
-      }, 300);
       const modules = await Promise.all(matches.map(async ([ret, meta]) => {
         const { filename } = meta;
         const rmod: RouteModule = {
@@ -109,33 +102,7 @@ export const Router: FC<RouterProps> = (props) => {
       }));
       setModules(modules);
       setUrl(url);
-      setTimeout(() => {
-        if (loading) {
-          clearTimeout(loading);
-          loadingBarEl.remove();
-        } else {
-          const moveOutTime = 0.7;
-          const fadeOutTime = 0.3;
-          const t1 = setTimeout(() => {
-            loadingBarEl.style.opacity = "0";
-          }, moveOutTime * 1000);
-          const t2 = setTimeout(() => {
-            clearLoadingBar = null;
-            loadingBarEl.remove();
-          }, (moveOutTime + fadeOutTime) * 1000);
-          clearLoadingBar = () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-          };
-          loadingBarEl.style.transition = `opacity ${fadeOutTime}s ease-out, width ${moveOutTime}s ease-in-out`;
-          setTimeout(() => {
-            loadingBarEl.style.width = "100%";
-          }, 0);
-        }
-      }, 0);
-      if (e.url) {
-        window.scrollTo(0, 0);
-      }
+      window.scrollTo(0, 0);
     };
 
     // update route record when creating a new route file
@@ -168,16 +135,34 @@ export const Router: FC<RouterProps> = (props) => {
       onpopstate({ type: "popstate" });
     };
 
-    addEventListener("popstate", onpopstate as unknown as EventListener);
+    // deno-lint-ignore no-explicit-any
+    const navigation = (window as any).navigation;
+    // deno-lint-ignore no-explicit-any
+    const onnavigate = (e: any) => {
+      e.intercept({
+        async handler() {
+          await onpopstate({ type: "navigate", url: new URL(e.destination.url) });
+        },
+      });
+    };
+
+    if (navigation) {
+      navigation.addEventListener("navigate", onnavigate);
+    } else {
+      globalThis.addEventListener("popstate", onpopstate as unknown as EventListener);
+    }
     events.on("popstate", onpopstate);
     events.on("moduleprefetch", onmoduleprefetch);
     events.on("hmr:create", onhmrcreate);
     events.on("hmr:remove", onhmrremove);
-    events.emit("routerready", { type: "routerready" });
+    events.emit("router", { type: "router" });
 
-    // clean up
     return () => {
-      removeEventListener("popstate", onpopstate as unknown as EventListener);
+      if (navigation) {
+        navigation.removeEventListener("navigate", onnavigate);
+      } else {
+        globalThis.removeEventListener("popstate", onpopstate as unknown as EventListener);
+      }
       events.off("popstate", onpopstate);
       events.off("moduleprefetch", onmoduleprefetch);
       events.off("hmr:create", onhmrcreate);
@@ -288,132 +273,3 @@ export const useForwardProps = <T = Record<string, unknown>>(): T => {
   const { props } = useContext(ForwardPropsContext);
   return props as T;
 };
-
-function loadRouterFromTag(): IRouter {
-  const el = window.document?.getElementById("router-manifest");
-  if (el) {
-    try {
-      const manifest = JSON.parse(el.innerText);
-      if (Array.isArray(manifest.routes)) {
-        let _app: Route | undefined = undefined;
-        let _404: Route | undefined = undefined;
-        const routes = manifest.routes.map((meta: RouteMeta) => {
-          const { pattern } = meta;
-          const route: Route = [new URLPatternCompat(pattern), meta];
-          if (pattern.pathname === "/_app") {
-            _app = route;
-          } else if (pattern.pathname === "/_404") {
-            _404 = route;
-          }
-          return route;
-        });
-        return { routes, prefix: manifest.prefix, _app, _404 };
-      }
-    } catch (e) {
-      throw new Error(`loadRouteConfigFromTag: ${e.message}`);
-    }
-  }
-  return { routes: [], prefix: "" };
-}
-
-// prefetch route data
-async function prefetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, dataDefer?: boolean) {
-  const rd: RouteData = {};
-  const fetchData = async () => {
-    const res = await fetch(dataUrl + (dataUrl.includes("?") ? "&" : "?") + "_data_");
-    if (!res.ok) {
-      const err = await FetchError.fromResponse(res);
-      const details = err.details as { redirect?: { location: string } };
-      if (err.status === 501 && typeof details.redirect?.location === "string") {
-        location.href = details.redirect?.location;
-        return;
-      }
-      return err;
-    }
-    try {
-      const data = await res.json();
-      const cc = res.headers.get("Cache-Control");
-      rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-      rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
-      return data;
-    } catch (_e) {
-      return new Error("Data must be valid JSON");
-    }
-  };
-  if (dataDefer) {
-    rd.data = fetchData;
-  } else {
-    rd.data = await fetchData();
-  }
-  dataCache.set(dataUrl, rd);
-}
-
-function loadSSRModulesFromTag(): RouteModule[] {
-  const el = window.document?.getElementById("ssr-data");
-  if (el) {
-    try {
-      const data = JSON.parse(el.innerText);
-      if (Array.isArray(data)) {
-        let deferedData: Record<string, unknown> | null | undefined = undefined;
-        return data.map(({ url, filename, dataDefered, ...rest }) => {
-          const mod = __aleph.getRouteModule(filename);
-          if (dataDefered) {
-            if (deferedData === undefined) {
-              const el = window.document?.getElementById("defered-data");
-              if (el) {
-                deferedData = JSON.parse(el.innerText);
-              } else {
-                deferedData = null;
-              }
-            }
-            if (deferedData) {
-              rest.data = deferedData[url];
-            } else {
-              rest.data = Promise.resolve(null);
-            }
-          }
-          if (rest.error) {
-            rest.data = new FetchError(500, rest.error.message, { stack: rest.error.stack });
-            rest.error = undefined;
-          }
-          return <RouteModule> {
-            url: new URL(url, location.href),
-            filename,
-            exports: mod,
-            ...rest,
-          };
-        });
-      }
-    } catch (e) {
-      throw new Error(`loadSSRModulesFromTag: ${e.message}`);
-    }
-  }
-  return [];
-}
-
-let clearLoadingBar: CallableFunction | null = null;
-
-function getLoadingBarEl(): HTMLDivElement {
-  if (typeof clearLoadingBar === "function") {
-    clearLoadingBar();
-    clearLoadingBar = null;
-  }
-  let bar = document.getElementById("loading-bar") as HTMLDivElement | null;
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.id = "loading-bar";
-    document.body.appendChild(bar);
-  }
-  Object.assign(bar.style, {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    zIndex: "9999",
-    width: "0",
-    height: "1px",
-    opacity: "0",
-    background: "rgba(128, 128, 128, 0.9)",
-    transition: "opacity 0.6s ease-in, width 3s ease-in",
-  });
-  return bar;
-}
