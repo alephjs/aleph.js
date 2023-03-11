@@ -5,6 +5,7 @@ import { build } from "./build.ts";
 import { watch } from "./dev.ts";
 import { getAppDir } from "./helpers.ts";
 import type { AlephConfig, ServeInit } from "./types.ts";
+export type { Context, Middleware } from "./types.ts";
 
 /** The options for Aleph.js server.  */
 export type ServeOptions = AlephConfig & Omit<ServeInit, "onError">;
