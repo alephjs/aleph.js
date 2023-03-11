@@ -2,7 +2,13 @@ import type { Component, Ref, ShallowRef } from "vue";
 import { createSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
 import { isPlainObject } from "../../shared/util.ts";
 import type { RouteModule } from "../core/routes.ts";
-import { loadRouterFromTag, loadSSRModulesFromTag, matchRoutes, prefetchRouteData } from "../core/routes.ts";
+import {
+  listenHistory,
+  loadRouterFromTag,
+  loadSSRModulesFromTag,
+  matchRoutes,
+  prefetchRouteData,
+} from "../core/routes.ts";
 import events from "../core/events.ts";
 import type { SSRContext } from "../../server/types.ts";
 import { RouterContext } from "./context.ts";
@@ -100,22 +106,8 @@ const createRouter = ({ modules, url, dataCache, dataUrl }: RouterProps) => {
     window.scrollTo(0, 0);
   };
 
-  // deno-lint-ignore no-explicit-any
-  const navigation = (window as any).navigation;
-  // deno-lint-ignore no-explicit-any
-  const onnavigate = (e: any) => {
-    e.intercept({
-      async handler() {
-        await onpopstate({ type: "navigate", url: new URL(e.destination.url) });
-      },
-    });
-  };
+  const dispose = listenHistory(onpopstate);
 
-  if (navigation) {
-    navigation.addEventListener("navigate", onnavigate);
-  } else {
-    globalThis.addEventListener("popstate", onpopstate as unknown as EventListener);
-  }
   events.on("popstate", onpopstate);
   events.on("moduleprefetch", onmoduleprefetch);
   events.emit("router", { type: "router" });
@@ -124,11 +116,7 @@ const createRouter = ({ modules, url, dataCache, dataUrl }: RouterProps) => {
   const Router = defineComponent({
     name: "Router",
     beforeUnmount() {
-      if (navigation) {
-        navigation.removeEventListener("navigate", onnavigate);
-      } else {
-        globalThis.removeEventListener("popstate", onpopstate as unknown as EventListener);
-      }
+      dispose();
       events.off("popstate", onpopstate);
       events.off("moduleprefetch", onmoduleprefetch);
     },

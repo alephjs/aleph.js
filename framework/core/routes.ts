@@ -221,3 +221,30 @@ export function loadSSRModulesFromTag(): RouteModule[] {
   }
   return [];
 }
+
+export function listenHistory(onpopstate: (e: { type: string; url?: URL }) => Promise<void>): () => void {
+  // deno-lint-ignore no-explicit-any
+  const navigation = (window as any).navigation;
+  // deno-lint-ignore no-explicit-any
+  const onnavigate = (e: any) => {
+    e.intercept({
+      async handler() {
+        await onpopstate({ type: "navigate", url: new URL(e.destination.url) });
+      },
+    });
+  };
+
+  if (navigation) {
+    navigation.addEventListener("navigate", onnavigate);
+  } else {
+    globalThis.addEventListener("popstate", onpopstate);
+  }
+
+  return () => {
+    if (navigation) {
+      navigation.removeEventListener("navigate", onnavigate);
+    } else {
+      globalThis.removeEventListener("popstate", onpopstate);
+    }
+  };
+}

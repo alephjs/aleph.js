@@ -4,7 +4,13 @@ import { isPlainObject } from "../../shared/util.ts";
 import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
 import type { Route, RouteModule } from "../core/routes.ts";
-import { loadRouterFromTag, loadSSRModulesFromTag, matchRoutes, prefetchRouteData } from "../core/routes.ts";
+import {
+  listenHistory,
+  loadRouterFromTag,
+  loadSSRModulesFromTag,
+  matchRoutes,
+  prefetchRouteData,
+} from "../core/routes.ts";
 import { URLPatternCompat, URLPatternInput } from "../core/url_pattern.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";
@@ -135,22 +141,9 @@ export const Router: FC<RouterProps> = (props) => {
       onpopstate({ type: "popstate" });
     };
 
-    // deno-lint-ignore no-explicit-any
-    const navigation = (window as any).navigation;
-    // deno-lint-ignore no-explicit-any
-    const onnavigate = (e: any) => {
-      e.intercept({
-        async handler() {
-          await onpopstate({ type: "navigate", url: new URL(e.destination.url) });
-        },
-      });
-    };
+    // listen history change
+    const dispose = listenHistory(onpopstate);
 
-    if (navigation) {
-      navigation.addEventListener("navigate", onnavigate);
-    } else {
-      globalThis.addEventListener("popstate", onpopstate as unknown as EventListener);
-    }
     events.on("popstate", onpopstate);
     events.on("moduleprefetch", onmoduleprefetch);
     events.on("hmr:create", onhmrcreate);
@@ -158,11 +151,7 @@ export const Router: FC<RouterProps> = (props) => {
     events.emit("router", { type: "router" });
 
     return () => {
-      if (navigation) {
-        navigation.removeEventListener("navigate", onnavigate);
-      } else {
-        globalThis.removeEventListener("popstate", onpopstate as unknown as EventListener);
-      }
+      dispose();
       events.off("popstate", onpopstate);
       events.off("moduleprefetch", onmoduleprefetch);
       events.off("hmr:create", onhmrcreate);
