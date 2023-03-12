@@ -1,7 +1,8 @@
-import { splitPath, trimSuffix } from "../../shared/util.ts";
+import { isPlainObject, splitPath, trimSuffix } from "../../shared/util.ts";
 import type { URLPatternInput, URLPatternResult } from "./url_pattern.ts";
 import { createStaticURLPatternResult, URLPatternCompat } from "./url_pattern.ts";
 import { FetchError } from "./error.ts";
+import events from "./events.ts";
 
 export type RouteModule = {
   url: URL;
@@ -147,8 +148,8 @@ export function loadRouterFromTag(): Router {
   return { routes: [], prefix: "" };
 }
 
-// prefetch route data
-export async function prefetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, dataDefer?: boolean) {
+// fetch route data
+export async function fetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, defer?: boolean) {
   const rd: RouteData = {};
   const fetchData = async () => {
     const res = await fetch(dataUrl + (dataUrl.includes("?") ? "&" : "?") + "_data_");
@@ -171,7 +172,7 @@ export async function prefetchRouteData(dataCache: Map<string, RouteData>, dataU
       return new Error("Data must be valid JSON");
     }
   };
-  if (dataDefer) {
+  if (defer) {
     rd.data = fetchData;
   } else {
     rd.data = await fetchData();
@@ -180,14 +181,15 @@ export async function prefetchRouteData(dataCache: Map<string, RouteData>, dataU
 }
 
 export function loadSSRModulesFromTag(): RouteModule[] {
-  const el = window.document?.getElementById("ssr-data");
+  const { getRouteModule } = Reflect.get(window, "__aleph");
+  const el = window.document.getElementById("ssr-data");
   if (el) {
     try {
       const data = JSON.parse(el.innerText);
       if (Array.isArray(data)) {
         let deferedData: Record<string, unknown> | null | undefined = undefined;
         return data.map(({ url, filename, dataDefered, ...rest }) => {
-          const mod = __aleph.getRouteModule(filename);
+          const mod = getRouteModule(filename);
           if (dataDefered) {
             if (deferedData === undefined) {
               const el = window.document?.getElementById("defered-data");
@@ -246,5 +248,85 @@ export function listenHistory(onpopstate: (e: { type: string; url?: URL }) => Pr
     } else {
       globalThis.removeEventListener("popstate", onpopstate);
     }
+  };
+}
+
+export function watchRouter(
+  dataCache: Map<string, RouteData>,
+  onRedirect: (url: URL, modules: RouteModule[]) => void,
+): () => void {
+  const { importRouteModule } = Reflect.get(window, "__aleph");
+  const router = loadRouterFromTag();
+
+  // `popstate` event handler
+  const onpopstate = async (e: Record<string, unknown>) => {
+    const url = (e.url as URL | undefined) ?? new URL(window.location.href);
+    const matches = matchRoutes(url, router);
+    const modules = await Promise.all(matches.map(async ([ret, meta]) => {
+      const { filename } = meta;
+      const rmod: RouteModule = {
+        url: new URL(ret.pathname.input + url.search, url.href),
+        params: ret.pathname.groups,
+        filename,
+        exports: await importRouteModule(filename),
+      };
+      const dataUrl = rmod.url.pathname + rmod.url.search;
+      const dataConfig = rmod.exports.data as Record<string, unknown> | true | undefined;
+      const defer = Boolean(isPlainObject(dataConfig) ? dataConfig.defer : undefined);
+      rmod.withData = Boolean(
+        isPlainObject(dataConfig) ? dataConfig.fetch : dataConfig ?? rmod.exports.GET,
+      );
+      if (rmod.withData && !dataCache.has(dataUrl)) {
+        await fetchRouteData(dataCache, dataUrl, defer);
+      }
+      return rmod;
+    }));
+    onRedirect(url, modules);
+    window.scrollTo(0, 0);
+  };
+
+  // update route record when creating a new route file
+  const onhmrcreate = (e: Record<string, unknown>) => {
+    const pattern = e.routePattern as URLPatternInput | undefined;
+    if (pattern) {
+      const route: Route = [
+        new URLPatternCompat(pattern),
+        {
+          filename: e.specifier as string,
+          pattern,
+        },
+      ];
+      const pathname = pattern.pathname.slice(1);
+      if (pathname === "_app" || pathname === "_404") {
+        router[pathname] = route;
+      }
+      router.routes.push(route);
+    }
+  };
+
+  // update route record when removing a route file
+  const onhmrremove = (e: Record<string, unknown>) => {
+    const route = router.routes.find((v) => v[1].filename === e.specifier);
+    const pathname = (route?.[1].pattern.pathname)?.slice(1);
+    if (pathname === "_app" || pathname === "_404") {
+      router[pathname] = undefined;
+    }
+    router.routes = router.routes.filter((v) => v[1].filename != e.specifier);
+    onpopstate({ type: "popstate" });
+  };
+
+  // listen history change
+  const dispose = listenHistory(onpopstate);
+
+  events.on("popstate", onpopstate);
+  events.on("hmr:create", onhmrcreate);
+  events.on("hmr:remove", onhmrremove);
+  events.emit("router", { type: "router", router });
+
+  return () => {
+    dispose();
+    events.off("popstate", onpopstate);
+    events.off("hmr:create", onhmrcreate);
+    events.off("hmr:remove", onhmrremove);
   };
 }

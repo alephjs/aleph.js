@@ -1,8 +1,7 @@
 import type { AnchorHTMLAttributes, CSSProperties, MouseEvent, MutableRefObject, PropsWithChildren } from "react";
 import { createElement, useCallback, useEffect, useMemo, useRef } from "react";
 import { cleanPath, isFilledString, isLikelyHttpURL, splitBy, trimSuffix } from "../../shared/util.ts";
-import events from "../core/events.ts";
-import { redirect } from "../core/redirect.ts";
+import { prefetchModule, redirect } from "../core/redirect.ts";
 import { useRouter } from "./router.ts";
 
 const prefetched = new Set<string>();
@@ -61,7 +60,7 @@ export function Link(props: LinkProps) {
   }, [href, propAriaCurrent]);
   const prefetch = useCallback(() => {
     if (!isLikelyHttpURL(href) && !prefetched.has(href)) {
-      events.emit("moduleprefetch", { href });
+      prefetchModule(new URL(href, location.href));
       prefetched.add(href);
     }
   }, [href]);

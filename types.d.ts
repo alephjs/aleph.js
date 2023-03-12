@@ -1,8 +1,9 @@
+declare type Context = import("./server/types.ts").Context;
+declare type Middleware = import("./server/types.ts").Middleware;
+
 declare const __aleph: {
-  // deno-lint-ignore no-explicit-any
-  importRouteModule(url: string): Promise<any>;
-  // deno-lint-ignore no-explicit-any
-  getRouteModule(url: string): any;
+  importRouteModule(url: string): Promise<Record<string, unknown>>;
+  getRouteModule(url: string): Record<string, unknown>;
 };
 
 declare interface ImportMeta {

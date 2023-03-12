@@ -1,16 +1,17 @@
 import { isFilledString } from "../../shared/util.ts";
 import events from "./events.ts";
+import { matchRoutes, type Router } from "./routes.ts";
 
-let hasRouter = false;
+let router: Router | null = null;
 let preRedirect: URL | null = null;
 
-const onrouter = (_: Record<string, unknown>) => {
+const onrouter = (e: Record<string, unknown>) => {
   events.off("router", onrouter);
   if (preRedirect) {
     events.emit("popstate", { type: "popstate", url: preRedirect });
     preRedirect = null;
   }
-  hasRouter = true;
+  router = e.router as Router;
 };
 events.on("router", onrouter);
 
@@ -40,7 +41,7 @@ export function redirect(href: string, replace?: boolean) {
     history.pushState(null, "", url);
   }
 
-  if (hasRouter) {
+  if (router) {
     if (!Reflect.has(globalThis, "navigation")) {
       events.emit("popstate", { type: "popstate", url });
     }
@@ -48,3 +49,28 @@ export function redirect(href: string, replace?: boolean) {
     preRedirect = url;
   }
 }
+
+// prefetch module using `<link rel="modulepreload" href="...">`
+export const prefetchModule = (url: URL) => {
+  if (!router) {
+    throw new Error("router is not ready.");
+  }
+  const { getRouteModule } = Reflect.get(window, "__aleph");
+  const deploymentId = window.document.body.getAttribute("data-deployment-id");
+  const matches = matchRoutes(url, router);
+  matches.map(([_, meta]) => {
+    const { filename } = meta;
+    try {
+      getRouteModule(filename);
+    } catch (_e) {
+      const link = document.createElement("link");
+      let href = meta.filename.slice(1);
+      if (deploymentId) {
+        href += `?v=${deploymentId}`;
+      }
+      link.setAttribute("rel", "modulepreload");
+      link.setAttribute("href", href);
+      document.head.appendChild(link);
+    }
+  });
+};

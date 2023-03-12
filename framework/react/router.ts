@@ -1,17 +1,8 @@
 import type { FC, ReactNode } from "react";
 import { createElement, isValidElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
-import { isPlainObject } from "../../shared/util.ts";
-import events from "../core/events.ts";
 import { redirect } from "../core/redirect.ts";
-import type { Route, RouteModule } from "../core/routes.ts";
-import {
-  listenHistory,
-  loadRouterFromTag,
-  loadSSRModulesFromTag,
-  matchRoutes,
-  prefetchRouteData,
-} from "../core/routes.ts";
-import { URLPatternCompat, URLPatternInput } from "../core/url_pattern.ts";
+import { RouteModule, watchRouter } from "../core/routes.ts";
+import { fetchRouteData, loadSSRModulesFromTag } from "../core/routes.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
@@ -38,7 +29,7 @@ export const Router: FC<RouterProps> = (props) => {
     modules.forEach(({ url, data, dataCacheTtl }) => {
       const dataUrl = url.pathname + url.search;
       if (data instanceof Promise) {
-        cache.set(url.href, { data: prefetchRouteData(cache, dataUrl, true) });
+        cache.set(url.href, { data: fetchRouteData(cache, dataUrl, true) });
       } else {
         cache.set(dataUrl, {
           data,
@@ -58,105 +49,11 @@ export const Router: FC<RouterProps> = (props) => {
   }, [modules]);
 
   useEffect(() => {
-    const { body } = window.document;
-    const router = loadRouterFromTag();
-    const deploymentId = body.getAttribute("data-deployment-id");
-
-    // prefetch module using `<link rel="modulepreload" href="...">`
-    const onmoduleprefetch = (e: Record<string, unknown>) => {
-      const pageUrl = new URL(e.href as string, location.href);
-      const matches = matchRoutes(pageUrl, router);
-      matches.map(([_, meta]) => {
-        const { filename } = meta;
-        try {
-          __aleph.getRouteModule(filename);
-        } catch (_e) {
-          const link = document.createElement("link");
-          let href = meta.filename.slice(1);
-          if (deploymentId) {
-            href += `?v=${deploymentId}`;
-          }
-          link.setAttribute("rel", "modulepreload");
-          link.setAttribute("href", href);
-          document.head.appendChild(link);
-        }
-      });
-    };
-
-    // `popstate` event handler
-    const onpopstate = async (e: Record<string, unknown>) => {
-      const url = (e.url as URL | undefined) ?? new URL(window.location.href);
-      const matches = matchRoutes(url, router);
-      const modules = await Promise.all(matches.map(async ([ret, meta]) => {
-        const { filename } = meta;
-        const rmod: RouteModule = {
-          url: new URL(ret.pathname.input + url.search, url.href),
-          params: ret.pathname.groups,
-          filename,
-          exports: await __aleph.importRouteModule(filename),
-        };
-        const dataUrl = rmod.url.pathname + rmod.url.search;
-        const dataConfig = rmod.exports.data as Record<string, unknown> | true | undefined;
-        const defer = Boolean(isPlainObject(dataConfig) ? dataConfig.defer : undefined);
-        rmod.withData = Boolean(
-          isPlainObject(dataConfig) ? dataConfig.fetch : dataConfig ?? rmod.exports.GET,
-        );
-        if (rmod.withData && !dataCache.has(dataUrl)) {
-          await prefetchRouteData(dataCache, dataUrl, defer);
-        }
-        return rmod;
-      }));
-      setModules(modules);
+    const dispose = watchRouter(dataCache, (url, modules) => {
       setUrl(url);
-      window.scrollTo(0, 0);
-    };
-
-    // update route record when creating a new route file
-    const onhmrcreate = (e: Record<string, unknown>) => {
-      const pattern = e.routePattern as URLPatternInput | undefined;
-      if (pattern) {
-        const route: Route = [
-          new URLPatternCompat(pattern),
-          {
-            filename: e.specifier as string,
-            pattern,
-          },
-        ];
-        const pathname = pattern.pathname.slice(1);
-        if (pathname === "_app" || pathname === "_404") {
-          router[pathname] = route;
-        }
-        router.routes.push(route);
-      }
-    };
-
-    // update route record when removing a route file
-    const onhmrremove = (e: Record<string, unknown>) => {
-      const route = router.routes.find((v) => v[1].filename === e.specifier);
-      const pathname = (route?.[1].pattern.pathname)?.slice(1);
-      if (pathname === "_app" || pathname === "_404") {
-        router[pathname] = undefined;
-      }
-      router.routes = router.routes.filter((v) => v[1].filename != e.specifier);
-      onpopstate({ type: "popstate" });
-    };
-
-    // listen history change
-    const dispose = listenHistory(onpopstate);
-
-    events.on("popstate", onpopstate);
-    events.on("moduleprefetch", onmoduleprefetch);
-    events.on("hmr:create", onhmrcreate);
-    events.on("hmr:remove", onhmrremove);
-    events.emit("router", { type: "router" });
-
-    return () => {
-      dispose();
-      events.off("popstate", onpopstate);
-      events.off("moduleprefetch", onmoduleprefetch);
-      events.off("hmr:create", onhmrcreate);
-      events.off("hmr:remove", onhmrremove);
-    };
+      setModules(modules);
+    });
+    return dispose;
   }, []);
 
   if (modules.length === 0) {

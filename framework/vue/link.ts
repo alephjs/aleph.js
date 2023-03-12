@@ -1,8 +1,7 @@
 import { computed, defineComponent, h } from "vue";
 import { useRouter } from "./router.ts";
 import { cleanPath, isFilledString, isLikelyHttpURL, splitBy } from "../../shared/util.ts";
-import events from "../core/events.ts";
-import { redirect } from "../core/redirect.ts";
+import { prefetchModule, redirect } from "../core/redirect.ts";
 
 const prefetched = new Set<string>();
 
@@ -48,7 +47,7 @@ export const Link = defineComponent({
 
     const prefetch = () => {
       if (!isLikelyHttpURL(href.value) && !prefetched.has(href.value)) {
-        events.emit("moduleprefetch", { href });
+        prefetchModule(new URL(href.value, location.href));
         prefetched.add(href.value);
       }
     };
