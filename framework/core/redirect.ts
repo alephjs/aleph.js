@@ -1,6 +1,6 @@
 import { isFilledString } from "../../shared/util.ts";
 import events from "./events.ts";
-import { matchRoutes, type Router } from "./routes.ts";
+import { matchRoutes, type Router } from "./router.ts";
 
 let router: Router | null = null;
 let preRedirect: URL | null = null;

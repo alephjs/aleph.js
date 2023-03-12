@@ -1,5 +1,5 @@
 import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
-import type { Router } from "../framework/core/routes.ts";
+import type { Router } from "../framework/core/router.ts";
 import { isPlainObject, trimSuffix } from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR } from "./dev.ts";

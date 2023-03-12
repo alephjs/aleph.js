@@ -8,7 +8,6 @@ export function applyCSS(url: string, css: string) {
       el.hasAttribute("ssr")
     );
     if (ssrEl) {
-      // apply the css at next time
       ssrEl.removeAttribute("ssr");
     } else {
       const prevEls = Array.from(document.head.children).filter((el: Element) => {
@@ -127,7 +126,6 @@ function fixCSSText(cssText: string): string {
 function createCSSStyleSheet(css: string): CSSStyleSheet | null {
   try {
     const sheet = new CSSStyleSheet();
-    // @ts-ignore
     sheet.replaceSync(css);
     return sheet;
   } catch (_e) {

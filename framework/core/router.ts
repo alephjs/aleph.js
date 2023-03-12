@@ -148,38 +148,6 @@ export function loadRouterFromTag(): Router {
   return { routes: [], prefix: "" };
 }
 
-// fetch route data
-export async function fetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, defer?: boolean) {
-  const rd: RouteData = {};
-  const fetchData = async () => {
-    const res = await fetch(dataUrl + (dataUrl.includes("?") ? "&" : "?") + "_data_");
-    if (!res.ok) {
-      const err = await FetchError.fromResponse(res);
-      const details = err.details as { redirect?: { location: string } };
-      if (err.status === 501 && typeof details.redirect?.location === "string") {
-        location.href = details.redirect?.location;
-        return;
-      }
-      return err;
-    }
-    try {
-      const data = await res.json();
-      const cc = res.headers.get("Cache-Control");
-      rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
-      rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
-      return data;
-    } catch (_e) {
-      return new Error("Data must be valid JSON");
-    }
-  };
-  if (defer) {
-    rd.data = fetchData;
-  } else {
-    rd.data = await fetchData();
-  }
-  dataCache.set(dataUrl, rd);
-}
-
 export function loadSSRModulesFromTag(): RouteModule[] {
   const { getRouteModule } = Reflect.get(window, "__aleph");
   const el = window.document.getElementById("ssr-data");
@@ -222,6 +190,37 @@ export function loadSSRModulesFromTag(): RouteModule[] {
     }
   }
   return [];
+}
+
+export async function fetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, defer?: boolean) {
+  const rd: RouteData = {};
+  const fetchData = async () => {
+    const res = await fetch(dataUrl + (dataUrl.includes("?") ? "&" : "?") + "_data_");
+    if (!res.ok) {
+      const err = await FetchError.fromResponse(res);
+      const details = err.details as { redirect?: { location: string } };
+      if (err.status === 501 && typeof details.redirect?.location === "string") {
+        location.href = details.redirect?.location;
+        return;
+      }
+      return err;
+    }
+    try {
+      const data = await res.json();
+      const cc = res.headers.get("Cache-Control");
+      rd.dataCacheTtl = cc?.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
+      rd.dataExpires = Date.now() + (rd.dataCacheTtl || 1) * 1000;
+      return data;
+    } catch (_e) {
+      return new Error("Data must be valid JSON");
+    }
+  };
+  if (defer) {
+    rd.data = fetchData;
+  } else {
+    rd.data = await fetchData();
+  }
+  dataCache.set(dataUrl, rd);
 }
 
 export function listenHistory(onpopstate: (e: { type: string; url?: URL }) => Promise<void>): () => void {

@@ -1,5 +1,5 @@
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
-import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../framework/core/routes.ts";
+import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../framework/core/router.ts";
 import {
   cleanPath,
   isFilledString,

@@ -1,5 +1,5 @@
 import { FetchError } from "../framework/core/error.ts";
-import { matchRoutes, type RouteModule, type Router } from "../framework/core/routes.ts";
+import { matchRoutes, type RouteModule, type Router } from "../framework/core/router.ts";
 import { cleanPath, isFilledString, isPlainObject, utf8Enc } from "../shared/util.ts";
 import { HTMLRewriter, path } from "./deps.ts";
 import depGraph from "./graph.ts";

@@ -1,7 +1,7 @@
 import type { Component, Ref, ShallowRef } from "vue";
 import { createSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
-import { RouteModule, watchRouter } from "../core/routes.ts";
-import { loadSSRModulesFromTag } from "../core/routes.ts";
+import { RouteModule, watchRouter } from "../core/router.ts";
+import { loadSSRModulesFromTag } from "../core/router.ts";
 import type { SSRContext } from "../../server/types.ts";
 import { RouterContext } from "./context.ts";
 import { Link } from "./link.ts";

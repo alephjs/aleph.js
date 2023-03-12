@@ -1,4 +1,4 @@
-import type { Router } from "../framework/core/routes.ts";
+import type { Router } from "../framework/core/router.ts";
 import { importRouteModule } from "./routing.ts";
 
 // the runtime script for client-side application

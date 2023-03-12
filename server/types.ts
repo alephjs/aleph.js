@@ -1,6 +1,6 @@
 import type { ConnInfo, ServeInit } from "https://deno.land/std@0.175.0/http/server.ts";
 import type { Comment, Element, TextChunk } from "https://deno.land/x/lol_html@0.0.6/types.d.ts";
-import type { RouteModule } from "../framework/core/routes.ts";
+import type { RouteModule } from "../framework/core/router.ts";
 
 export type AlephConfig = {
   /** The TLS options. */

@@ -1,8 +1,8 @@
 import type { FC, ReactNode } from "react";
 import { createElement, isValidElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import { redirect } from "../core/redirect.ts";
-import { RouteModule, watchRouter } from "../core/routes.ts";
-import { fetchRouteData, loadSSRModulesFromTag } from "../core/routes.ts";
+import { RouteModule, watchRouter } from "../core/router.ts";
+import { fetchRouteData, loadSSRModulesFromTag } from "../core/router.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";

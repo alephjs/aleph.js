@@ -1,5 +1,5 @@
 import { colors, esbuild, path } from "../server/deps.ts";
-import type { Router } from "../framework/core/routes.ts";
+import type { Router } from "../framework/core/router.ts";
 import depGraph, { DependencyGraph } from "../server/graph.ts";
 import log from "../server/log.ts";
 import { getAlephConfig, getAppDir, getImportMap, getJSXConfig } from "../server/helpers.ts";
