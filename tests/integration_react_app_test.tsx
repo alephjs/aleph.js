@@ -23,7 +23,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertStringIncludes(html, ` href="/todos" `);
     assertStringIncludes(html, `>Todos App Demo</a>`);
     assertStringIncludes(html, `<link rel="icon" href="/assets/logo.svg`);
-    assertStringIncludes(html, `<script type="module" src="/main.tsx`);
+    assertStringIncludes(html, `<script type="module" src="/main.ts`);
     assertStringIncludes(html, `<script id="router-manifest" type="application/json">`);
     assertStringIncludes(html, `<script id="ssr-data" type="application/json">`);
   });

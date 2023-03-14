@@ -1,27 +1,21 @@
 import type { FC, ReactNode } from "react";
 import { createElement, isValidElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
+import type { SSRContext } from "../../server/types.ts";
 import { redirect } from "../core/redirect.ts";
-import { RouteModule, watchRouter } from "../core/router.ts";
-import { fetchRouteData, loadSSRModulesFromTag } from "../core/router.ts";
+import type { RouteModule } from "../core/router.ts";
+import { fetchRouteData, loadSSRModulesFromTag, watchRouter } from "../core/router.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
 
-export type SSRContext = {
-  readonly url: URL;
-  readonly modules: RouteModule[];
-  readonly headCollection: string[];
-};
-
 export type RouterProps = {
   readonly ssrContext?: SSRContext;
-  readonly strictMode?: boolean;
   readonly createPortal?: RouterContextProps["createPortal"];
 };
 
 /** The `Router` component for react. */
 export const Router: FC<RouterProps> = (props) => {
-  const { ssrContext, strictMode, createPortal } = props;
+  const { ssrContext, createPortal } = props;
   const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
   const [modules, setModules] = useState(() => ssrContext?.modules || loadSSRModulesFromTag());
   const dataCache = useMemo(() => {
@@ -60,23 +54,21 @@ export const Router: FC<RouterProps> = (props) => {
     return createElement(Err, { error: { status: 404, message: "page not found" }, fullscreen: true });
   }
 
-  const el = createElement(
+  const value = {
+    url,
+    params,
+    e404: modules[modules.length - 1].url.pathname === "/_404" ? true : undefined,
+    ssrHeadCollection: ssrContext?.headCollection,
+    createPortal,
+  };
+  return createElement(
     RouterContext.Provider,
-    {
-      value: {
-        url,
-        params,
-        e404: modules[modules.length - 1].url.pathname === "/_404" ? true : undefined,
-        ssrHeadCollection: ssrContext?.headCollection,
-        createPortal,
-      },
-    },
-    createElement(RouteRoot, { modules, dataCache, ssrContext }),
+    { value },
+    createElement(
+      RouteRoot,
+      { modules, dataCache, ssrContext },
+    ),
   );
-  if (strictMode) {
-    return createElement(StrictMode, {}, el);
-  }
-  return el;
 };
 
 type RouteRootProps = {
@@ -100,7 +92,7 @@ const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
       ),
     );
     if (withData) {
-      const fallback = exports.fallback || exports.Fallback;
+      const fallback = exports.Loading ?? exports.Fallback ?? exports.fallback;
       el = createElement(
         Suspense,
         {
@@ -132,7 +124,7 @@ const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
 
 /** The `App` component alias to the `Router` in `StrictMode` mode. */
 export const App: FC<Omit<RouterProps, "strictMode">> = (props) => {
-  return createElement(Router, { ...props, strictMode: true });
+  return createElement(StrictMode, null, createElement(Router, { ...props }));
 };
 
 export const useRouter = (): {

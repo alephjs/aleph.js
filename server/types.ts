@@ -163,6 +163,7 @@ export type ImportMap = {
 };
 
 export type JSXConfig = {
+  jsx?: string;
   jsxPragma?: string;
   jsxPragmaFrag?: string;
   jsxImportSource?: string;

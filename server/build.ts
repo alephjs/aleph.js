@@ -17,7 +17,7 @@ import {
 } from "./helpers.ts";
 import { parseHtmlLinks } from "./html.ts";
 import log from "./log.ts";
-import { initRouter } from "./routing.ts";
+import { initRouter } from "./router.ts";
 import type { ConnInfo } from "./types.ts";
 
 export async function build(

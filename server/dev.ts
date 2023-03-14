@@ -3,7 +3,7 @@ import { colors, Emitter, ensureDir, mitt, parseDeps, path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { builtinModuleExts, existsFile, findFile, getAlephConfig, getImportMap, watchFs } from "./helpers.ts";
 import log from "./log.ts";
-import { initRouter, toRouterRegExp } from "./routing.ts";
+import { initRouter, toRouterRegExp } from "./router.ts";
 import type { AlephConfig } from "./types.ts";
 
 type WatchFsEvents = {

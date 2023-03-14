@@ -1,5 +1,5 @@
 import type { Router } from "../framework/core/router.ts";
-import { importRouteModule } from "./routing.ts";
+import { importRouteModule } from "./router.ts";
 
 // the runtime script for client-side application
 export const runtimeScript = `

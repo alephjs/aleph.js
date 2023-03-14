@@ -6,7 +6,7 @@ import depGraph from "./graph.ts";
 import { getAlephConfig, getAppDir, getDeploymentId, getFiles, regJsxFile, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
 import { runtimeScript } from "./runtime.ts";
-import { importRouteModule } from "./routing.ts";
+import { importRouteModule } from "./router.ts";
 import type { HTMLRewriterHandlers, SSR, SSRContext, SuspenseMarker } from "./types.ts";
 
 export type RenderOptions = {

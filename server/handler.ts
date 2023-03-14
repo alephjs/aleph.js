@@ -24,7 +24,7 @@ import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
-import { fetchRoute, importRouteModule, initRouter } from "./routing.ts";
+import { fetchRoute, importRouteModule, initRouter } from "./router.ts";
 import transformer from "./transformer.ts";
 import type { AlephConfig, ConnInfo, ModuleLoader } from "./types.ts";
 

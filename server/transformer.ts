@@ -17,7 +17,7 @@ import {
 } from "./helpers.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
-import { isRouteModule } from "./routing.ts";
+import { isRouteModule } from "./router.ts";
 import { bundleCSS } from "./build.ts";
 import type { ImportMap, JSXConfig, ModuleLoader, ModuleLoaderOutput } from "./types.ts";
 

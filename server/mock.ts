@@ -5,7 +5,7 @@ import { path } from "./deps.ts";
 import { getAppDir } from "./helpers.ts";
 import { createHtmlResponse, loadIndexHtml } from "./html.ts";
 import renderer from "./renderer.ts";
-import { fetchRoute, initRouter } from "./routing.ts";
+import { fetchRoute, initRouter } from "./router.ts";
 import type { Context, Middleware, RouterInit, SessionOptions, SSR } from "./types.ts";
 
 type MockServerOptions = {

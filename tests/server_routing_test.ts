@@ -1,9 +1,9 @@
 import { assertEquals } from "std/testing/asserts.ts";
 import { dirname, join } from "std/path/mod.ts";
 import { matchRoutes } from "../framework/core/router.ts";
-import { initRouter } from "../server/routing.ts";
+import { initRouter } from "../server/router.ts";
 
-Deno.test("[unit] server/routing.ts: matchRoutes", async () => {
+Deno.test("[unit] server/router.ts: matchRoutes", async () => {
   const tmpDir = await Deno.makeTempDir();
   const files = [
     "./routes/_404.tsx",

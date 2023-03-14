@@ -376,24 +376,21 @@ export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
   if (denoConfigFile) {
     try {
       const { compilerOptions } = await parseJSONFile(denoConfigFile);
-      const { jsx, jsxFactory, jsxFragmentFactory, jsxImportSource } = (compilerOptions || {}) as Record<
-        string,
-        unknown
-      >;
-      if (
-        (jsx === undefined || jsx === "react-jsx" || jsx === "react-jsxdev") &&
-        isFilledString(jsxImportSource)
-      ) {
+      const {
+        jsx = "react",
+        jsxFactory = "React.createElement",
+        jsxFragmentFactory = "React.createElement",
+        jsxImportSource,
+      } = (compilerOptions ?? {}) as Record<string, string | undefined>;
+      if ((jsx === "react-jsx" || jsx === "react-jsxdev") && jsxImportSource) {
+        jsxConfig.jsx = jsx;
         jsxConfig.jsxImportSource = jsxImportSource;
       } else {
-        if (typeof jsxFactory === "string") {
-          jsxConfig.jsxPragma = jsxFactory;
-        }
-        if (typeof jsxFragmentFactory === "string") {
-          jsxConfig.jsxPragmaFrag = jsxFragmentFactory;
-        }
+        jsxConfig.jsx = "react";
+        jsxConfig.jsxPragma = jsxFactory;
+        jsxConfig.jsxPragmaFrag = jsxFragmentFactory;
       }
-      log.debug(`deno config ${basename(denoConfigFile)} loaded`);
+      log.debug(`jsx config from ${basename(denoConfigFile)} loaded`);
     } catch (error) {
       log.error(`Failed to parse ${basename(denoConfigFile)}: ${error.message}`);
     }
@@ -441,7 +438,7 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
       Object.assign(importMap, { __filename });
       Object.assign(importMap.imports, imports);
       Object.assign(importMap.scopes, scopes);
-      log.debug(`import maps ${basename(importMapFilename)} loaded`);
+      log.debug(`import maps from ${basename(importMapFilename)} loaded`);
     } catch (e) {
       log.error("loadImportMap:", e.message);
     }
