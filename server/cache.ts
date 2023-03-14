@@ -36,7 +36,7 @@ export async function cacheFetch(
 ): Promise<Response> {
   const urlObj = new URL(url);
   const { protocol, hostname, port, pathname, searchParams } = urlObj;
-  const isLocalhost = ["localhost", "0.0.0.0", "127.0.0.1"].includes(hostname);
+  const isLocalhost = ["0.0.0.0", "127.0.0.1", "localhost"].includes(hostname);
   const modulesCacheDir = Deno.env.get("MODULES_CACHE_DIR");
 
   let cacheKey = "";
@@ -66,7 +66,7 @@ export async function cacheFetch(
           ]);
           try {
             const meta = JSON.parse(metaJSON);
-            if (!isExpired(meta)) {
+            if (validateCache(meta)) {
               return new Response(content, { headers: { ...meta.headers, "cache-hit": "true" } });
             }
           } catch (_e) {
@@ -78,7 +78,7 @@ export async function cacheFetch(
       }
     } else if (memoryCache.has(cacheKey)) {
       const [content, meta] = memoryCache.get(cacheKey)!;
-      if (!isExpired(meta)) {
+      if (validateCache(meta)) {
         return new Response(content, { headers: { ...meta.headers, "cache-hit": "true" } });
       }
     }
@@ -135,13 +135,13 @@ export async function cacheFetch(
   return finalRes;
 }
 
-function isExpired(meta: CacheMeta) {
+function validateCache(meta: CacheMeta) {
   const cc = meta.headers["cache-control"];
   const dataCacheTtl = cc && cc.includes("max-age=") ? parseInt(cc.split("max-age=")[1]) : undefined;
   if (dataCacheTtl) {
     const now = Date.now();
     const expireTime = (meta.now.secs_since_epoch + dataCacheTtl) * 1000;
-    if (now > expireTime) {
+    if (now < expireTime) {
       return true;
     }
   }
