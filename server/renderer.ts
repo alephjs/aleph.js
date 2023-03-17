@@ -5,7 +5,6 @@ import { HTMLRewriter, path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getAlephConfig, getAppDir, getDeploymentId, getFiles, regJsxFile, toLocalPath } from "./helpers.ts";
 import log from "./log.ts";
-import { runtimeScript } from "./runtime.ts";
 import { importRouteModule } from "./router.ts";
 import type { HTMLRewriterHandlers, SSR, SSRContext, SuspenseMarker } from "./types.ts";
 
@@ -164,16 +163,16 @@ export default {
               { html: true },
             );
 
+            // add module preload links
             const deployId = getDeploymentId();
-            const importStmts = modules.map(({ filename }, idx) =>
-              `import * as $${idx} from ${JSON.stringify(filename.slice(1) + (deployId ? `?v=${deployId}` : ""))};`
-            ).join("");
-            const kvs = modules.map(({ filename }, idx) => `${JSON.stringify(filename)}:$${idx}`).join(",");
-            const nonceAttr = nonce ? ` nonce="${nonce}"` : "";
+            const q = deployId ? `?v=${deployId}` : "";
             el.append(
-              `<script type="module"${nonceAttr}>${importStmts}let imports=new Map(Object.entries({${kvs}}));${runtimeScript}</script>`,
+              modules.map(({ filename }) =>
+                `<link rel="modulepreload" href="${filename.slice(1)}${q}" data-module-id="${filename}" />`
+              ).join(""),
               { html: true },
             );
+
             headCollection.forEach((h) => isFilledString(h) && el.append(h, { html: true }));
           },
         });

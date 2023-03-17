@@ -50,6 +50,26 @@ export function createHandler(config: AlephConfig) {
       return response;
     }
 
+    // getStaticPaths PRC for SSR
+    if (pathname === "/-/getStaticPaths") {
+      const router: Router = await globalIt("__ALEPH_ROUTER", () => initRouter(appDir, routerConfig));
+      const pattern = searchParams.get("pattern");
+      const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);
+      if (route) {
+        const mod = await importRouteModule(route[1]);
+        if (typeof mod.getStaticPaths === "function") {
+          let ret = mod.getStaticPaths();
+          if (ret instanceof Promise) {
+            ret = await ret;
+          }
+          if (Array.isArray(ret)) {
+            return Response.json(ret);
+          }
+        }
+      }
+      return Response.json([]);
+    }
+
     // check if the `out` directory exists
     const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
       if (!isDev && !buildMode) {
@@ -184,25 +204,6 @@ export function createHandler(config: AlephConfig) {
 
     // get the router
     const router: Router = await globalIt("__ALEPH_ROUTER", () => initRouter(appDir, routerConfig));
-
-    // getStaticPaths PRC for SSR
-    if (pathname === "/__aleph.getStaticPaths") {
-      const pattern = searchParams.get("pattern");
-      const route = router.routes.find(([_, r]) => r.pattern.pathname === pattern);
-      if (route) {
-        const mod = await importRouteModule(route[1]);
-        if (typeof mod.getStaticPaths === "function") {
-          let ret = mod.getStaticPaths();
-          if (ret instanceof Promise) {
-            ret = await ret;
-          }
-          if (Array.isArray(ret)) {
-            return Response.json(ret);
-          }
-        }
-      }
-      return Response.json([]);
-    }
 
     // for SSR dynamic data
     if (router.routes.length > 0) {

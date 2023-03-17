@@ -1,8 +1,11 @@
 import { createApp } from "./router.ts";
+import { createCSRContext } from "../core/router.ts";
 
-export function bootstrap(options?: { root?: string | HTMLElement; hydrate?: boolean }) {
-  const { root = "#root", hydrate = !!document.head.querySelector("script#ssr-data") } = options ?? {};
-  createApp().mount(root, hydrate);
+export async function bootstrap(options?: { root?: string | HTMLElement }) {
+  const { root = "#root" } = options ?? {};
+  const hydrate = !!document.head.querySelector("script#ssr-data");
+  const csrContext = await createCSRContext();
+  createApp({ csrContext }).mount(root, hydrate);
 }
 
 export { useData } from "./data.ts";

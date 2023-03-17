@@ -50,26 +50,26 @@ export function redirect(href: string, replace?: boolean) {
   }
 }
 
-// prefetch module using `<link rel="modulepreload" href="...">`
+const prefetched = new Set<string>();
+
+/** prefetch module using `<link rel="modulepreload" href="...">` */
 export const prefetchModule = (url: URL) => {
+  if (prefetched.has(url.href)) {
+    return;
+  }
+  prefetched.add(url.href);
   if (!router) {
     throw new Error("router is not ready.");
   }
-  const { getRouteModule } = Reflect.get(window, "__aleph");
   const deploymentId = window.document.body.getAttribute("data-deployment-id");
+  const q = deploymentId ? `?v=${deploymentId}` : "";
   const matches = matchRoutes(url, router);
   matches.map(([_, meta]) => {
-    const { filename } = meta;
-    try {
-      getRouteModule(filename);
-    } catch (_e) {
+    if (!document.querySelector(`link[data-module-id="${meta.filename}"]`)) {
       const link = document.createElement("link");
-      let href = meta.filename.slice(1);
-      if (deploymentId) {
-        href += `?v=${deploymentId}`;
-      }
       link.setAttribute("rel", "modulepreload");
-      link.setAttribute("href", href);
+      link.setAttribute("href", meta.filename.slice(1) + q);
+      link.setAttribute("data-module-id", meta.filename);
       document.head.appendChild(link);
     }
   });

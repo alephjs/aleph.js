@@ -2,22 +2,23 @@ import type { FC, ReactNode } from "react";
 import { createElement, isValidElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import type { SSRContext } from "../../server/types.ts";
 import { redirect } from "../core/redirect.ts";
-import type { RouteModule } from "../core/router.ts";
-import { fetchRouteData, loadSSRModulesFromTag, watchRouter } from "../core/router.ts";
+import type { CSRContext, RouteModule } from "../core/router.ts";
+import { fetchRouteData, watchRouter } from "../core/router.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
 
 export type RouterProps = {
+  readonly csrContext?: CSRContext;
   readonly ssrContext?: SSRContext;
   readonly createPortal?: RouterContextProps["createPortal"];
 };
 
 /** The `Router` component for react. */
 export const Router: FC<RouterProps> = (props) => {
-  const { ssrContext, createPortal } = props;
-  const [url, setUrl] = useState(() => ssrContext?.url || new URL(window.location?.href));
-  const [modules, setModules] = useState(() => ssrContext?.modules || loadSSRModulesFromTag());
+  const { csrContext, ssrContext, createPortal } = props;
+  const [url, setUrl] = useState(() => ssrContext?.url ?? new URL(window.location?.href));
+  const [modules, setModules] = useState(() => ssrContext?.modules ?? csrContext?.modules ?? []);
   const dataCache = useMemo(() => {
     const cache = new Map<string, RouteData>();
     modules.forEach(({ url, data, dataCacheTtl }) => {
@@ -28,7 +29,7 @@ export const Router: FC<RouterProps> = (props) => {
         cache.set(dataUrl, {
           data,
           dataCacheTtl,
-          dataExpires: Date.now() + (dataCacheTtl || 1) * 1000,
+          dataExpires: Date.now() + (dataCacheTtl ?? 0) * 1000,
         });
       }
     });
@@ -66,7 +67,7 @@ export const Router: FC<RouterProps> = (props) => {
     { value },
     createElement(
       RouteRoot,
-      { modules, dataCache, ssrContext },
+      { modules, dataCache },
     ),
   );
 };
@@ -74,10 +75,9 @@ export const Router: FC<RouterProps> = (props) => {
 type RouteRootProps = {
   modules: RouteModule[];
   dataCache: Map<string, RouteData>;
-  ssrContext?: SSRContext;
 };
 
-const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
+const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache }) => {
   const { url, exports, withData } = modules[0];
   const dataUrl = url.pathname + url.search;
   let el: ReactNode;
@@ -88,7 +88,7 @@ const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
       null,
       modules.length > 1 && createElement(
         RouteRoot,
-        { modules: modules.slice(1), dataCache, ssrContext },
+        { modules: modules.slice(1), dataCache },
       ),
     );
     if (withData) {
@@ -123,7 +123,7 @@ const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache, ssrContext }) => {
 };
 
 /** The `App` component alias to the `Router` in `StrictMode` mode. */
-export const App: FC<Omit<RouterProps, "strictMode">> = (props) => {
+export const App: FC<RouterProps> = (props) => {
   return createElement(StrictMode, null, createElement(Router, { ...props }));
 };
 

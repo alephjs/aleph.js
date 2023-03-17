@@ -1,7 +1,7 @@
 import type { Component, Ref, ShallowRef } from "vue";
 import { createSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
-import { RouteModule, watchRouter } from "../core/router.ts";
-import { loadSSRModulesFromTag } from "../core/router.ts";
+import type { CSRContext, RouteModule } from "../core/router.ts";
+import { watchRouter } from "../core/router.ts";
 import type { SSRContext } from "../../server/types.ts";
 import { RouterContext } from "./context.ts";
 import { Link } from "./link.ts";
@@ -15,6 +15,7 @@ export type RouteData = {
 };
 
 type RootProps = {
+  csrContext?: CSRContext;
   ssrContext?: SSRContext;
 };
 
@@ -108,14 +109,14 @@ const createRouterRoot = (props: RouterRootProps) => {
 };
 
 const createApp = (props?: RootProps) => {
-  const { ssrContext } = props || {};
-  const modules = shallowRef(ssrContext?.modules || loadSSRModulesFromTag());
+  const { csrContext, ssrContext } = props ?? {};
+  const modules = shallowRef(ssrContext?.modules ?? csrContext?.modules ?? []);
 
   if (modules.value.length === 0) {
     return createSSRApp(Err, { status: 404, message: "page not found" });
   }
 
-  const url = ref(ssrContext?.url || new URL(window.location?.href));
+  const url = ref(ssrContext?.url ?? new URL(window.location?.href));
   const dataCache = new Map<string, RouteData>();
   const dataUrl = ref(url.value.pathname + url.value.search);
 

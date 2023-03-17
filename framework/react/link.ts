@@ -4,8 +4,6 @@ import { cleanPath, isFilledString, isLikelyHttpURL, splitBy, trimSuffix } from 
 import { prefetchModule, redirect } from "../core/redirect.ts";
 import { useRouter } from "./router.ts";
 
-const prefetched = new Set<string>();
-
 export type LinkProps = PropsWithChildren<
   {
     to: string;
@@ -59,9 +57,8 @@ export function Link(props: LinkProps) {
     return undefined;
   }, [href, propAriaCurrent]);
   const prefetch = useCallback(() => {
-    if (!isLikelyHttpURL(href) && !prefetched.has(href)) {
+    if (!isLikelyHttpURL(href)) {
       prefetchModule(new URL(href, location.href));
-      prefetched.add(href);
     }
   }, [href]);
   const timerRef = useRef<number | null>(null);
@@ -72,7 +69,7 @@ export function Link(props: LinkProps) {
     if (e.defaultPrevented) {
       return;
     }
-    if (!timerRef.current && !prefetched.has(href)) {
+    if (!timerRef.current) {
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         prefetch();

@@ -39,6 +39,11 @@ export type Router = {
   _app?: Route;
 };
 
+export type CSRContext = {
+  readonly router: Router;
+  readonly modules: RouteModule[];
+};
+
 export type RouteRegExp = {
   prefix: string;
   test(filename: string): boolean;
@@ -148,48 +153,71 @@ export function loadRouterFromTag(): Router {
   return { routes: [], prefix: "" };
 }
 
-export function loadSSRModulesFromTag(): RouteModule[] {
-  const { getRouteModule } = Reflect.get(window, "__aleph");
+export function importModule(filename: string): Promise<Record<string, unknown>> {
+  const v = document.body.getAttribute("data-deployment-id");
+  return import(filename.slice(1) + (v ? "?v=" + v : ""));
+}
+
+export async function createCSRContext(): Promise<CSRContext> {
+  const router = loadRouterFromTag();
   const el = window.document.getElementById("ssr-data");
   if (el) {
     try {
       const data = JSON.parse(el.innerText);
-      if (Array.isArray(data)) {
-        let deferedData: Record<string, unknown> | null | undefined = undefined;
-        return data.map(({ url, filename, dataDefered, ...rest }) => {
-          const mod = getRouteModule(filename);
-          if (dataDefered) {
-            if (deferedData === undefined) {
-              const el = window.document?.getElementById("defered-data");
-              if (el) {
-                deferedData = JSON.parse(el.innerText);
-              } else {
-                deferedData = null;
-              }
-            }
-            if (deferedData) {
-              rest.data = deferedData[url];
-            } else {
-              rest.data = Promise.resolve(null);
-            }
-          }
-          if (rest.error) {
-            rest.data = new FetchError(500, rest.error.message, { stack: rest.error.stack });
-            rest.error = undefined;
-          }
-          return <RouteModule> {
-            url: new URL(url, location.href),
-            filename,
-            exports: mod,
-            ...rest,
-          };
-        });
+      if (!Array.isArray(data)) {
+        throw new Error("invalid SSR data");
       }
+      let deferedData: Record<string, unknown> | null | undefined = undefined;
+      const modules = await Promise.all(data.map(async ({ url, filename, dataDefered, ...rest }) => {
+        const mod = await importModule(filename);
+        if (dataDefered) {
+          if (deferedData === undefined) {
+            const el = window.document?.getElementById("defered-data");
+            if (el) {
+              deferedData = JSON.parse(el.innerText);
+            } else {
+              deferedData = null;
+            }
+          }
+          if (deferedData) {
+            rest.data = deferedData[url];
+          } else {
+            rest.data = Promise.resolve(null);
+          }
+        }
+        if (rest.error) {
+          rest.data = new FetchError(500, rest.error.message, { stack: rest.error.stack });
+          rest.error = undefined;
+        }
+        return <RouteModule> {
+          url: new URL(url, location.href),
+          filename,
+          exports: mod,
+          ...rest,
+        };
+      }));
+      return {
+        router,
+        modules,
+      };
     } catch (e) {
-      throw new Error(`loadSSRModulesFromTag: ${e.message}`);
+      throw new Error(`createCSRContext: ${e.message}`);
     }
   }
-  return [];
+  return {
+    router,
+    modules: await Promise.all(
+      matchRoutes(new URL(location.href), router).map(async ([ret, meta]) => {
+        const mod = await importModule(meta.filename);
+        return {
+          url: new URL(ret.pathname.input + location.search, location.href),
+          params: ret.pathname.groups,
+          filename: meta.filename,
+          exports: mod,
+        };
+      }),
+    ),
+  };
 }
 
 export async function fetchRouteData(dataCache: Map<string, RouteData>, dataUrl: string, defer?: boolean) {
@@ -254,7 +282,6 @@ export function watchRouter(
   dataCache: Map<string, RouteData>,
   onRedirect: (url: URL, modules: RouteModule[]) => void,
 ): () => void {
-  const { importRouteModule } = Reflect.get(window, "__aleph");
   const router = loadRouterFromTag();
 
   // `popstate` event handler
@@ -267,7 +294,7 @@ export function watchRouter(
         url: new URL(ret.pathname.input + url.search, url.href),
         params: ret.pathname.groups,
         filename,
-        exports: await importRouteModule(filename),
+        exports: await importModule(filename),
       };
       const dataUrl = rmod.url.pathname + rmod.url.search;
       const dataConfig = rmod.exports.data as Record<string, unknown> | true | undefined;

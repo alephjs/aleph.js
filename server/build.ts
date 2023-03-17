@@ -58,7 +58,7 @@ export async function build(
     for (const [_, { pattern }] of routes) {
       const { pathname } = pattern;
       if (pathname.includes("/:")) {
-        const url = new URL("http://localhost/__aleph.getStaticPaths");
+        const url = new URL("http://localhost/-/getStaticPaths");
         url.searchParams.set("pattern", pathname);
         const res = await request(url);
         if (res.status === 200 && res.headers.get("content-type")?.startsWith("application/json")) {

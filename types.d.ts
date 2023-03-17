@@ -1,11 +1,6 @@
 declare type Context = import("./server/types.ts").Context;
 declare type Middleware = import("./server/types.ts").Middleware;
 
-declare const __aleph: {
-  importRouteModule(url: string): Promise<Record<string, unknown>>;
-  getRouteModule(url: string): Record<string, unknown>;
-};
-
 declare interface ImportMeta {
   /** Aleph.js HMR `hot` API. */
   readonly hot?: {

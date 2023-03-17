@@ -3,8 +3,6 @@ import { useRouter } from "./router.ts";
 import { cleanPath, isFilledString, isLikelyHttpURL, splitBy } from "../../shared/util.ts";
 import { prefetchModule, redirect } from "../core/redirect.ts";
 
-const prefetched = new Set<string>();
-
 export const Link = defineComponent({
   name: "Link",
   props: {
@@ -46,9 +44,8 @@ export const Link = defineComponent({
     };
 
     const prefetch = () => {
-      if (!isLikelyHttpURL(href.value) && !prefetched.has(href.value)) {
+      if (!isLikelyHttpURL(href.value)) {
         prefetchModule(new URL(href.value, location.href));
-        prefetched.add(href.value);
       }
     };
 
@@ -58,7 +55,7 @@ export const Link = defineComponent({
       if (e.defaultPrevented) {
         return;
       }
-      if (!timer && !prefetched.has(href.value)) {
+      if (!timer) {
         timer = setTimeout(() => {
           timer = null;
           prefetch();
