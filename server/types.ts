@@ -75,7 +75,9 @@ export interface RouterInit {
   dir?: string;
   /** The extnames to match routes. */
   exts?: string[];
-  /** The pre-built routes.  */
+  /** The route module URL. */
+  moduleURL?: string;
+  /** The pre-built module.  */
   modules?: Record<string, Record<string, unknown>>;
   /** The handler to handle the router change. */
   onChange?(): void;
@@ -163,7 +165,7 @@ export type ImportMap = {
 };
 
 export type JSXConfig = {
-  jsx?: string;
+  jsx?: "automatic" | "classic" | "preserve";
   jsxPragma?: string;
   jsxPragmaFrag?: string;
   jsxImportSource?: string;

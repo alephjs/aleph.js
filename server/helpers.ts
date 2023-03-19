@@ -382,11 +382,13 @@ export async function loadJSXConfig(appDir?: string): Promise<JSXConfig> {
         jsxFragmentFactory = "React.createElement",
         jsxImportSource,
       } = (compilerOptions ?? {}) as Record<string, string | undefined>;
-      if ((jsx === "react-jsx" || jsx === "react-jsxdev") && jsxImportSource) {
-        jsxConfig.jsx = jsx;
+      if (jsx === "preserve") {
+        jsxConfig.jsx = "preserve";
+      } else if ((jsx === "react-jsx" || jsx === "react-jsxdev") && jsxImportSource) {
+        jsxConfig.jsx = "automatic";
         jsxConfig.jsxImportSource = jsxImportSource;
       } else {
-        jsxConfig.jsx = "react";
+        jsxConfig.jsx = "classic";
         jsxConfig.jsxPragma = jsxFactory;
         jsxConfig.jsxPragmaFrag = jsxFragmentFactory;
       }
@@ -431,6 +433,7 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
           Object.assign(imports, {
             "aleph/": "https://aleph/",
             "aleph/react": "https://aleph/framework/react/mod.ts",
+            "aleph/solid": "https://aleph/framework/solid/mod.ts",
             "aleph/vue": "https://aleph/framework/vue/mod.ts",
           });
         }

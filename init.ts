@@ -234,6 +234,7 @@ export default async function init(nameArg?: string, options?: Options) {
         "jsxImportSource": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
       });
       Object.assign(importMap.imports, {
+        "aleph/solid": `${alephPkgUri}/framework/solid/mod.ts`,
         "aleph/plugins/solid": `${alephPkgUri}/framework/solid/plugin.ts`,
         "solid-js": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
         "solid-js/web": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}/web`,

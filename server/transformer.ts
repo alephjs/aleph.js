@@ -56,14 +56,15 @@ export default {
       return new Response(null, { status: 304 });
     }
 
+    const [sourceRaw, sourceContentType] = await fetchCode(specifier, target);
     const alephPkgUri = getAlephPkgUri();
     const config = getAlephConfig();
-    const [sourceRaw, sourceContentType] = await fetchCode(specifier, target);
+
     let source = sourceRaw;
     let lang: ModuleLoaderOutput["lang"];
     let inlineCSS: string | undefined;
     let isCSS = false;
-    if (loader && !isRemote) {
+    if (loader) {
       const loaded = await loader.load(
         specifier,
         sourceRaw,
@@ -97,6 +98,10 @@ export default {
             const sep = importUrl.includes("?") ? "&" : "?";
             const version = depGraph.get(depSpecifier)?.version ?? depGraph.globalVersion;
             const url = `"${importUrl}${sep}ssr&v=${version.toString(36)}"`;
+            s.overwrite(loc.start - 1, loc.end - 1, url);
+          } else if (depSpecifier.startsWith(alephPkgUri + "/") && depSpecifier.endsWith(".tsx") && loc) {
+            const origin = Reflect.get(globalThis, "__ALEPH_SERVER_ORIGIN");
+            const url = `"${origin}${toLocalPath(depSpecifier)}?ssr&v=${depGraph.globalVersion.toString(36)}"`;
             s.overwrite(loc.start - 1, loc.end - 1, url);
           }
         });

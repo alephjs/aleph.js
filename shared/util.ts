@@ -1,6 +1,12 @@
 export const utf8Enc = new TextEncoder();
 export const utf8Dec = new TextDecoder();
 
+export function assertString(s: unknown): asserts s is string {
+  if (typeof s !== "string") {
+    throw new Error("assert string failed");
+  }
+}
+
 export function isFilledString(a: unknown): a is string {
   return typeof a === "string" && a.length > 0;
 }

@@ -3,7 +3,7 @@ import type { Router } from "../framework/core/router.ts";
 import { isPlainObject, trimSuffix } from "../shared/util.ts";
 import { createContext } from "./context.ts";
 import { handleHMR } from "./dev.ts";
-import { path } from "./deps.ts";
+import { HTMLRewriter, path } from "./deps.ts";
 import {
   existsDir,
   existsFile,
@@ -202,6 +202,17 @@ export function createHandler(config: AlephConfig) {
       }
     }
 
+    // don't render special asset files
+    switch (pathname) {
+      case "/favicon.ico":
+      case "/robots.txt":
+        return new Response("Not found", { status: 404 });
+      default:
+        if (pathname.startsWith("/-/") || pathname.startsWith("/.")) {
+          return new Response("Not found", { status: 404 });
+        }
+    }
+
     // get the router
     const router: Router = await globalIt("__ALEPH_ROUTER", () => initRouter(appDir, routerConfig));
 
@@ -251,17 +262,6 @@ export function createHandler(config: AlephConfig) {
       }
     }
 
-    // don't render those special asset files
-    switch (pathname) {
-      case "/favicon.ico":
-      case "/robots.txt":
-        return new Response("Not found", { status: 404 });
-      default:
-        if (pathname.startsWith("/-/") || pathname.startsWith("/.")) {
-          return new Response("Not found", { status: 404 });
-        }
-    }
-
     // load index.html
     const indexHtml = await globalIt(
       "__ALEPH_INDEX_HTML",
@@ -275,7 +275,7 @@ export function createHandler(config: AlephConfig) {
       return new Response("Not found", { status: 404 });
     }
 
-    // return index.html if not SSR
+    // non SSR
     if (
       !ssr || (isPlainObject(ssr) && (
         (ssr.exclude instanceof RegExp && ssr.exclude.test(pathname)) ||
@@ -284,7 +284,40 @@ export function createHandler(config: AlephConfig) {
         (Array.isArray(ssr.include) && !ssr.include.some((p) => p.test(pathname)))
       ))
     ) {
-      return createHtmlResponse(req, path.join(appDir, "./index.html"), indexHtml);
+      const stream = new ReadableStream({
+        start: (controller) => {
+          const rewriter = new HTMLRewriter("utf8", (chunk: Uint8Array) => {
+            controller.enqueue(chunk);
+          });
+          // inject the router manifest
+          rewriter.on("head", {
+            element(el) {
+              if (router.routes.length > 0) {
+                const json = JSON.stringify({
+                  routes: router.routes.map(([_, meta]) => meta),
+                  prefix: router.prefix,
+                });
+                el.append(`<script id="router-manifest" type="application/json">${json}</script>`, {
+                  html: true,
+                });
+              }
+            },
+          });
+          try {
+            rewriter.write(indexHtml);
+            rewriter.end();
+          } finally {
+            rewriter.free();
+          }
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=",
+        },
+      });
     }
 
     // use SSG output if exists

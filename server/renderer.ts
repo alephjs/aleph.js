@@ -125,7 +125,7 @@ export default {
         // apply custom html rewrite handlers defined by middlewares
         customHTMLRewriter.forEach(([selector, handlers]) => rewriter.on(selector, handlers));
 
-        // inject the roures manifest
+        // inject the router manifest
         rewriter.on("head", {
           element(el) {
             if (router.routes.length > 0) {

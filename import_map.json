@@ -11,6 +11,7 @@
     "aleph/plugins/react": "./framework/react/plugin.ts",
     "aleph/vue": "./framework/vue/mod.ts",
     "aleph/plugins/vue": "./framework/vue/plugin.ts",
+    "aleph/solid": "./framework/solid/mod.ts",
     "aleph/plugins/solid": "./framework/solid/plugin.ts",
     "@unocss/core": "https://esm.sh/v110/@unocss/core@0.50.3",
     "@unocss/preset-uno": "https://esm.sh/v110/@unocss/preset-uno@0.50.3",
