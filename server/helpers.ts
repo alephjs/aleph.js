@@ -1,7 +1,7 @@
 import { isFilledArray, isFilledString, isLikelyHttpURL, isPlainObject, trimSuffix } from "../shared/util.ts";
 import { isCanary, VERSION } from "../version.ts";
 import { cacheFetch } from "./cache.ts";
-import { JSONC, path, type TransformOptions } from "./deps.ts";
+import { jsonc, path, type TransformOptions } from "./deps.ts";
 import log from "./log.ts";
 import { getContentType } from "./media_type.ts";
 import type { AlephConfig, CookieOptions, ImportMap, JSXConfig } from "./types.ts";
@@ -406,7 +406,7 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
   const denoConfigFile = await findConfigFile(["deno.jsonc", "deno.json"], appDir);
   let importMapFilename: string | undefined;
   if (denoConfigFile) {
-    const confg = await parseJSONFile(denoConfigFile);
+    const confg = await parseJSONFile<Partial<ImportMap> & { importMap?: string }>(denoConfigFile);
     if (!confg.importMap) {
       if (isPlainObject(confg.imports)) {
         Object.assign(importMap.imports, confg.imports);
@@ -449,11 +449,10 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
   return importMap;
 }
 
-// deno-lint-ignore no-explicit-any
-export async function parseJSONFile(jsonFile: string): Promise<Record<string, any>> {
+export async function parseJSONFile<T extends Record<string, unknown>>(jsonFile: string): Promise<T> {
   const raw = await Deno.readTextFile(jsonFile);
   if (jsonFile.endsWith(".jsonc")) {
-    return JSONC.parse(raw);
+    return jsonc.parse(raw) as T;
   }
   return JSON.parse(raw);
 }

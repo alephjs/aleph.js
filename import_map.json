@@ -1,6 +1,6 @@
 {
   "imports": {
-    "std/": "https://deno.land/std@0.175.0/",
+    "std/": "https://deno.land/std@0.180.0/",
     "aleph/": "./",
     "aleph/server": "./server/mod.ts",
     "aleph/dev": "./server/dev.ts",
