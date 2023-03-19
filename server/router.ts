@@ -24,12 +24,12 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
     return modules[pattern.pathname];
   }
 
-  const version = depGraph.get(filename)?.version ?? depGraph.globalVersion;
+  const version = depGraph.get(filename)?.version;
   const origin = Reflect.get(globalThis, "__ALEPH_SERVER_ORIGIN");
 
   let url: string;
   if (origin) {
-    url = `${origin}${cleanPath(filename)}?ssr&v=${(version).toString(36)}`;
+    url = `${origin}${cleanPath(filename)}?ssr&v=${(version ?? depGraph.globalVersion).toString(36)}`;
   } else {
     const root = appDir ? path.resolve(appDir) : getAppDir();
     url = `file://${path.join(root, filename)}${version ? "#" + version.toString(36) : ""}`;
