@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "std/testing/asserts.ts";
 import VueSFCLoader from "../framework/vue/sfc-loader.ts";
 
-Deno.test("[unit] loaders/vue.ts", async (t) => {
+Deno.test("[unit] vue/SFCLoader", async (t) => {
   await t.step("VueSFCLoader", async () => {
     const testVue = `
     <script setup>
