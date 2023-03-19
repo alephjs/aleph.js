@@ -194,8 +194,8 @@ export default async function init(nameArg?: string, options?: Options) {
   if (withUnocss) {
     Object.assign(importMap.imports, {
       "aleph/plugins/unocss": `${alephPkgUri}/plugins/unocss.ts`,
-      "@unocss/core": `https://esm.sh/v${ESM_VERSION}/@unocss/core@0.50.3`,
-      "@unocss/preset-uno": `https://esm.sh/v${ESM_VERSION}/@unocss/preset-uno@0.50.3`,
+      "@unocss/core": `https://esm.sh/v${ESM_VERSION}/@unocss/core@0.50.6`,
+      "@unocss/preset-uno": `https://esm.sh/v${ESM_VERSION}/@unocss/preset-uno@0.50.6`,
     });
   }
   switch (template) {
