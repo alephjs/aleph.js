@@ -94,12 +94,19 @@ export default {
         const s = new MagicString(source);
         deps.forEach((dep) => {
           const { specifier: depSpecifier, importUrl, loc } = dep;
-          if (!isLikelyHttpURL(depSpecifier) && loc) {
+          if (!loc) {
+            return;
+          }
+          if (!isLikelyHttpURL(depSpecifier)) {
             const sep = importUrl.includes("?") ? "&" : "?";
             const version = depGraph.get(depSpecifier)?.version ?? depGraph.globalVersion;
             const url = `"${importUrl}${sep}ssr&v=${version.toString(36)}"`;
             s.overwrite(loc.start - 1, loc.end - 1, url);
-          } else if (depSpecifier.startsWith(alephPkgUri + "/") && depSpecifier.endsWith(".tsx") && loc) {
+          } else if (
+            depSpecifier.startsWith(alephPkgUri + "/") && (
+              depSpecifier.endsWith(".tsx") || alephPkgUri === "https://aleph"
+            )
+          ) {
             const origin = Reflect.get(globalThis, "__ALEPH_SERVER_ORIGIN");
             const url = `"${origin}${toLocalPath(depSpecifier)}?ssr&v=${depGraph.globalVersion.toString(36)}"`;
             s.overwrite(loc.start - 1, loc.end - 1, url);
