@@ -1,7 +1,7 @@
 import type { Component, Ref, ShallowRef } from "vue";
 import { createSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
 import type { CSRContext, RouteModule } from "../core/router.ts";
-import { watchRouter } from "../core/router.ts";
+import { listenRouter } from "../core/router.ts";
 import type { SSRContext } from "../../server/types.ts";
 import { RouterContext } from "./context.ts";
 import { Link } from "./link.ts";
@@ -51,7 +51,7 @@ const createRouter = ({ modules, url, dataCache, dataUrl }: RouterProps) => {
     RouterContext.value = { url: url.value, params };
   }, { immediate: true });
 
-  const dispose = watchRouter(dataCache, (next_url, next_modules) => {
+  const dispose = listenRouter(dataCache, (next_url, next_modules) => {
     url.value = next_url;
     modules.value = next_modules;
   });

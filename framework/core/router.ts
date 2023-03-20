@@ -153,11 +153,6 @@ export function loadRouterFromTag(): Router {
   return { routes: [], prefix: "" };
 }
 
-export function importModule(filename: string): Promise<Record<string, unknown>> {
-  const v = document.body.getAttribute("data-deployment-id");
-  return import(filename.slice(1) + (v ? "?v=" + v : ""));
-}
-
 export async function createCSRContext(): Promise<CSRContext> {
   const router = loadRouterFromTag();
   const el = window.document.getElementById("ssr-data");
@@ -251,36 +246,9 @@ export async function fetchRouteData(dataCache: Map<string, RouteData>, dataUrl:
   dataCache.set(dataUrl, rd);
 }
 
-export function listenHistory(onpopstate: (e: { type: string; url?: URL }) => Promise<void>): () => void {
-  // deno-lint-ignore no-explicit-any
-  const navigation = (window as any).navigation;
-  // deno-lint-ignore no-explicit-any
-  const onnavigate = (e: any) => {
-    e.intercept({
-      async handler() {
-        await onpopstate({ type: "navigate", url: new URL(e.destination.url) });
-      },
-    });
-  };
-
-  if (navigation) {
-    navigation.addEventListener("navigate", onnavigate);
-  } else {
-    globalThis.addEventListener("popstate", onpopstate);
-  }
-
-  return () => {
-    if (navigation) {
-      navigation.removeEventListener("navigate", onnavigate);
-    } else {
-      globalThis.removeEventListener("popstate", onpopstate);
-    }
-  };
-}
-
-export function watchRouter(
+export function listenRouter(
   dataCache: Map<string, RouteData>,
-  onRedirect: (url: URL, modules: RouteModule[]) => void,
+  onNavigate: (url: URL, modules: RouteModule[]) => void,
 ): () => void {
   const router = loadRouterFromTag();
 
@@ -307,7 +275,7 @@ export function watchRouter(
       }
       return rmod;
     }));
-    onRedirect(url, modules);
+    onNavigate(url, modules);
     window.scrollTo(0, 0);
   };
 
@@ -355,4 +323,36 @@ export function watchRouter(
     events.off("hmr:create", onhmrcreate);
     events.off("hmr:remove", onhmrremove);
   };
+}
+
+function listenHistory(onpopstate: (e: { type: string; url?: URL }) => Promise<void>): () => void {
+  // deno-lint-ignore no-explicit-any
+  const navigation = (window as any).navigation;
+  // deno-lint-ignore no-explicit-any
+  const onnavigate = (e: any) => {
+    e.intercept({
+      async handler() {
+        await onpopstate({ type: "navigate", url: new URL(e.destination.url) });
+      },
+    });
+  };
+
+  if (navigation) {
+    navigation.addEventListener("navigate", onnavigate);
+  } else {
+    globalThis.addEventListener("popstate", onpopstate);
+  }
+
+  return () => {
+    if (navigation) {
+      navigation.removeEventListener("navigate", onnavigate);
+    } else {
+      globalThis.removeEventListener("popstate", onpopstate);
+    }
+  };
+}
+
+function importModule(filename: string): Promise<Record<string, unknown>> {
+  const v = document.body.getAttribute("data-deployment-id");
+  return import(filename.slice(1) + (v ? "?v=" + v : ""));
 }

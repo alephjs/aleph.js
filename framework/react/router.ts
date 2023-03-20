@@ -3,7 +3,7 @@ import { createElement, isValidElement, StrictMode, Suspense, useContext, useEff
 import type { SSRContext } from "../../server/types.ts";
 import { redirect } from "../core/redirect.ts";
 import type { CSRContext, RouteModule } from "../core/router.ts";
-import { fetchRouteData, watchRouter } from "../core/router.ts";
+import { fetchRouteData, listenRouter } from "../core/router.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider, type RouteData } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
@@ -44,7 +44,7 @@ export const Router: FC<RouterProps> = (props) => {
   }, [modules]);
 
   useEffect(() => {
-    const dispose = watchRouter(dataCache, (url, modules) => {
+    const dispose = listenRouter(dataCache, (url, modules) => {
       setUrl(url);
       setModules(modules);
     });

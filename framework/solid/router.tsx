@@ -4,7 +4,7 @@ import { Dynamic } from "solid-js/web";
 import type { Accessor, Component } from "solid-js";
 import type { SSRContext } from "../../server/types.ts";
 import { redirect } from "../core/redirect.ts";
-import { CSRContext, RouteModule, watchRouter } from "../core/router.ts";
+import { CSRContext, listenRouter, RouteModule } from "../core/router.ts";
 import { RouterContext } from "./context.ts";
 import { Err } from "./error.tsx";
 
@@ -21,7 +21,7 @@ export const Router: Component<RouterProps> = ({ csrContext, ssrContext }) => {
 
   let dispose = () => {};
   onMount(() => {
-    dispose = watchRouter(new Map(), (url, modules) => {
+    dispose = listenRouter(new Map(), (url, modules) => {
       const params: Record<string, string> = {};
       modules.forEach((m) => {
         Object.assign(params, m.params);
