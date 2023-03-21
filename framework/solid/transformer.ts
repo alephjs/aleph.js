@@ -13,6 +13,10 @@ export default class SolidTransformer implements ModuleLoader {
     const isTs = specifier.endsWith(".tsx") || specifier.includes(".tsx?");
     if (isTs) {
       // use esbuild to strip typescript syntax
+      if (Deno.env.get("DENO_DEPLOYMENT_ID") && !Reflect.has(globalThis, "ESBULID_WASM")) {
+        await esbuild.initialize({ wasmURL: "https://esm.sh/esbuild-wasm@0.17.12/esbuild.wasm" });
+        Reflect.set(globalThis, "ESBULID_WASM", true);
+      }
       const ret = await esbuild.transform(content, {
         loader: "tsx",
         format: "esm",
