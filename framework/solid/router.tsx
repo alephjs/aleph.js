@@ -1,5 +1,5 @@
 /** @jsxImportSource https://esm.sh/v110/solid-js@1.6.12 */
-import { createMemo, createSignal, lazy, Match, onCleanup, onMount, Show, Switch, useContext } from "solid-js";
+import { createMemo, createSignal, Match, onCleanup, onMount, Show, Switch, useContext } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { Accessor, Component } from "solid-js";
 import type { SSRContext } from "../../server/types.ts";

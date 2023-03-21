@@ -7,4 +7,8 @@ export type RouterContextProps = {
 };
 
 /** Context for the router. */
-export const RouterContext = createContext<RouterContextProps>();
+export const RouterContext = createContext<RouterContextProps>({
+  url: (() => new URL("http://localhost")) as Accessor<URL>,
+  params: (() => ({})) as Accessor<Record<string, string>>,
+  e404: (() => false) as Accessor<boolean>,
+});
