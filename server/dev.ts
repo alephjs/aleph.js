@@ -110,13 +110,11 @@ export default async function dev(serverEntry?: string) {
   });
   const exportTs = deps.find((dep) => dep.specifier.startsWith("./") && dep.specifier.endsWith("/_export.ts"));
 
-  // ensure the `_export.ts` file exists
+  // reset the `_export.ts` module
   if (exportTs) {
     const fp = path.join(appDir, exportTs.specifier);
-    if (!(await existsFile(fp))) {
-      await ensureDir(path.dirname(fp));
-      await Deno.writeTextFile(fp, "export default {}");
-    }
+    await ensureDir(path.dirname(fp));
+    await Deno.writeTextFile(fp, "export default {}");
   }
 
   // watch server entry and its deps to restart the dev server
