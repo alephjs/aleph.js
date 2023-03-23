@@ -135,7 +135,7 @@ export interface HTMLRewriter {
   on: (selector: string, handlers: HTMLRewriterHandlers) => void;
 }
 
-export interface Context extends Record<string, unknown> {
+export type Context<T extends Record<string, unknown> = Record<string, unknown>> = T & {
   /** The request connection info. */
   readonly connInfo?: ConnInfo;
   /** The params of dynamic routes. */
@@ -148,7 +148,7 @@ export interface Context extends Record<string, unknown> {
   getSession: <T extends Record<string, unknown> = Record<string, unknown>>() => Promise<Session<T>>;
   /** Returns the next `Response` object. */
   next: () => Promise<Response> | Response;
-}
+};
 
 /** The Middleare for Aleph server. */
 export interface Middleware {

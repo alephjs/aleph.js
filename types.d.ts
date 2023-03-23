@@ -1,4 +1,6 @@
-declare type Context = import("./server/types.ts").Context;
+declare type Context<T extends Record<string, unknown> = Record<string, unknown>> = import("./server/types.ts").Context<
+  T
+>;
 declare type Middleware = import("./server/types.ts").Middleware;
 
 declare interface ImportMeta {
