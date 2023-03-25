@@ -91,7 +91,7 @@ export function createHandler(config: AlephConfig) {
         transformer.test(pathname)
       )
     ) {
-      if (pathname.endsWith(".js.map") && pathname.startsWith("/-/")) {
+      if (pathname.endsWith(".map") && pathname.startsWith("/-/")) {
         const [content, contentType] = await fetchCode(restoreUrl(pathname));
         return new Response(content, {
           headers: [["Content-Type", contentType]],
