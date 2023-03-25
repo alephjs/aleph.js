@@ -1,14 +1,9 @@
 import type { FC, PropsWithChildren } from "react";
 import { createElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { FetchError } from "../core/error.ts";
+import type { RouteData } from "../core/router.ts";
 import type { DataContextProps, HttpMethod, UpdateStrategy } from "./context.ts";
 import { DataContext } from "./context.ts";
-
-export type RouteData = {
-  data?: unknown;
-  dataCacheTtl?: number;
-  dataExpires?: number;
-};
 
 export type DataProviderProps = PropsWithChildren<{
   dataUrl: string;

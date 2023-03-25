@@ -1,18 +1,12 @@
 import type { Component, Ref, ShallowRef } from "vue";
 import { createSSRApp, defineComponent, h, ref, shallowRef, watch } from "vue";
-import type { CSRContext, RouteModule } from "../core/router.ts";
+import type { CSRContext, RouteData, RouteModule } from "../core/router.ts";
 import { listenRouter } from "../core/router.ts";
 import type { SSRContext } from "../../server/types.ts";
 import { RouterContext } from "./context.ts";
 import { Link } from "./link.ts";
 import { Head } from "./head.ts";
 import { Err } from "./error.ts";
-
-export type RouteData = {
-  data?: unknown;
-  dataCacheTtl?: number;
-  dataExpires?: number;
-};
 
 type RootProps = {
   csrContext?: CSRContext;

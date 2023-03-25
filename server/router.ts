@@ -1,5 +1,5 @@
 import { URLPatternCompat, type URLPatternInput } from "../framework/core/url_pattern.ts";
-import type { Route, RouteMatch, RouteMeta, Router, RouteRegExp } from "../framework/core/router.ts";
+import type { RouteMatch, RouteMeta, RoutePattern, Router } from "../framework/core/router.ts";
 import {
   cleanPath,
   isFilledString,
@@ -124,13 +124,13 @@ export async function fetchRoute(
 export async function initRouter(appDir: string, init: RouterInit = {}): Promise<Router> {
   const reg = toRouterRegExp(init);
   const files = await getFiles(appDir);
-  const routes: Route[] = [];
-  let _app: Route | undefined = undefined;
-  let _404: Route | undefined = undefined;
+  const routes: RoutePattern[] = [];
+  let _app: RoutePattern | undefined = undefined;
+  let _404: RoutePattern | undefined = undefined;
   files.forEach((filename) => {
     const pattern = reg.exec(filename);
     if (pattern && pattern.pathname !== "/_export" && !pattern.pathname.endsWith("_test")) {
-      const route: Route = [
+      const route: RoutePattern = [
         new URLPatternCompat(pattern),
         { pattern, filename },
       ];
@@ -182,8 +182,8 @@ export function isRouteModule(filename: string): boolean {
   return false;
 }
 
-/** convert route config to `RouteRegExp` */
-export function toRouterRegExp(init: RouterInit = {}): RouteRegExp {
+/** convert route config to likely `RegExp` */
+export function toRouterRegExp(init: RouterInit = {}) {
   let glob = init.glob;
   if (!isFilledString(glob)) {
     const exts = unique([...builtinModuleExts, ...(init.exts ?? [])].map((s) => trimPrefix(s, ".")));
@@ -225,7 +225,7 @@ export function toRouterRegExp(init: RouterInit = {}): RouteRegExp {
 }
 
 /** get route order by pathname length */
-function getRouteOrder([_, meta]: Route): number {
+function getRouteOrder([_, meta]: RoutePattern): number {
   const { pattern, filename } = meta;
   switch (pattern.pathname) {
     case "/_404":

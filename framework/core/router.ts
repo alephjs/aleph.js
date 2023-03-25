@@ -4,6 +4,14 @@ import { createStaticURLPatternResult, URLPatternCompat } from "./url_pattern.ts
 import { FetchError } from "./error.ts";
 import events from "./events.ts";
 
+export type Router = {
+  prefix: string;
+  routes: RoutePattern[];
+  appDir?: string; // for ssr
+  _404?: RoutePattern;
+  _app?: RoutePattern;
+};
+
 export type RouteModule = {
   url: URL;
   params: Record<string, string>;
@@ -14,43 +22,32 @@ export type RouteModule = {
   dataCacheTtl?: number;
 };
 
-export type RouteMeta = {
-  filename: string;
-  pattern: URLPatternInput;
-  nesting?: boolean;
-};
-
 export type RouteData = {
   data?: unknown;
   dataCacheTtl?: number;
   dataExpires?: number;
 };
 
-export type Route = readonly [
+export type RouteMeta = {
+  filename: string;
+  pattern: URLPatternInput;
+  nesting?: boolean;
+};
+
+export type RoutePattern = readonly [
   pattern: URLPatternCompat,
   meta: RouteMeta,
 ];
 
-export type Router = {
-  appDir?: string;
-  prefix: string;
-  routes: Route[];
-  _404?: Route;
-  _app?: Route;
-};
+export type RouteMatch = readonly [
+  ret: URLPatternResult,
+  route: RouteMeta,
+];
 
 export type CSRContext = {
   readonly router: Router;
   readonly modules: RouteModule[];
 };
-
-export type RouteRegExp = {
-  prefix: string;
-  test(filename: string): boolean;
-  exec(filename: string): URLPatternInput | null;
-};
-
-export type RouteMatch = [ret: URLPatternResult, route: RouteMeta];
 
 /** match routes against the given url */
 // todo: support basePath
@@ -132,11 +129,11 @@ export function loadRouterFromTag(): Router {
     try {
       const manifest = JSON.parse(el.innerText);
       if (Array.isArray(manifest.routes)) {
-        let _app: Route | undefined = undefined;
-        let _404: Route | undefined = undefined;
+        let _app: RoutePattern | undefined = undefined;
+        let _404: RoutePattern | undefined = undefined;
         const routes = manifest.routes.map((meta: RouteMeta) => {
           const { pattern } = meta;
-          const route: Route = [new URLPatternCompat(pattern), meta];
+          const route: RoutePattern = [new URLPatternCompat(pattern), meta];
           if (pattern.pathname === "/_app") {
             _app = route;
           } else if (pattern.pathname === "/_404") {
@@ -283,7 +280,7 @@ export function listenRouter(
   const onhmrcreate = (e: Record<string, unknown>) => {
     const pattern = e.routePattern as URLPatternInput | undefined;
     if (pattern) {
-      const route: Route = [
+      const route: RoutePattern = [
         new URLPatternCompat(pattern),
         {
           filename: e.specifier as string,

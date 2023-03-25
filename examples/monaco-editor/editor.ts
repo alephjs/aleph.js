@@ -1,5 +1,5 @@
-import { editor, Uri } from "https://esm.sh/v110/monaco-editor@0.36.1";
-import "https://esm.sh/v110/monaco-editor@0.36.1?css";
+import { editor, Uri } from "https://esm.sh/monaco-editor@0.36.1";
+import "https://esm.sh/monaco-editor@0.36.1?css";
 
 // deno-lint-ignore ban-ts-comment
 // @ts-ignore
@@ -7,12 +7,12 @@ self.MonacoEnvironment = {
   async getWorker(_: unknown, label: string) {
     if (label === "typescript" || label === "javascript") {
       const { default: tsWorker } = await import(
-        "https://esm.sh/v110/monaco-editor@0.36.1/esm/vs/language/typescript/ts.worker?worker"
+        "https://esm.sh/monaco-editor@0.36.1/esm/vs/language/typescript/ts.worker?worker"
       );
       return tsWorker();
     }
     const { default: editorWorker } = await import(
-      "https://esm.sh/v110/monaco-editor@0.36.1/esm/vs/editor/editor.worker?worker"
+      "https://esm.sh/monaco-editor@0.36.1/esm/vs/editor/editor.worker?worker"
     );
     return editorWorker();
   },

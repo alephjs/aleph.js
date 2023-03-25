@@ -213,7 +213,7 @@ export default async function init(nameArg?: string, options?: Options) {
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
         "aleph/plugins/react": `${alephPkgUri}/framework/react/plugin.ts`,
-        "react": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
+        "react": `https://esm.sh/react@${versions.react}`,
         "react-dom": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}/`,
       });
@@ -223,7 +223,7 @@ export default async function init(nameArg?: string, options?: Options) {
       Object.assign(importMap.imports, {
         "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
         "aleph/plugins/vue": `${alephPkgUri}/framework/vue/plugin.ts`,
-        "vue": `https://esm.sh/v${ESM_VERSION}/vue@${versions.vue}`,
+        "vue": `https://esm.sh/vue@${versions.vue}`,
         "@vue/server-renderer": `https://esm.sh/v${ESM_VERSION}/@vue/server-renderer@${versions.vue}`,
       });
       break;

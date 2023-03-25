@@ -1,4 +1,4 @@
-/** @jsxImportSource https://esm.sh/v110/solid-js@1.6.12 */
+/** @jsxImportSource https://esm.sh/solid-js@1.6.12 */
 import { Show } from "solid-js";
 
 export type ErrorProps = {

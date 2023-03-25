@@ -5,10 +5,10 @@ import mdx from "aleph/plugins/mdx";
 import modules from "./routes/_export.ts";
 
 // check https://mdxjs.com/docs/extending-mdx
-import remarkFrontmatter from "https://esm.sh/v110/remark-frontmatter@4.0.1";
-import remarkGFM from "https://esm.sh/v110/remark-gfm@3.0.1";
-import rehypeHighlight from "https://esm.sh/v110/rehype-highlight@5.0.2";
-import rehypeSlug from "https://esm.sh/v110/rehype-slug@5.0.1";
+import remarkFrontmatter from "https://esm.sh/v112/remark-frontmatter@4.0.1";
+import remarkGFM from "https://esm.sh/v112/remark-gfm@3.0.1";
+import rehypeHighlight from "https://esm.sh/v112/rehype-highlight@5.0.2";
+import rehypeSlug from "https://esm.sh/v112/rehype-slug@5.0.1";
 
 serve({
   plugins: [

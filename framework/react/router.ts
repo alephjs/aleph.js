@@ -2,10 +2,10 @@ import type { FC, ReactNode } from "react";
 import { createElement, isValidElement, StrictMode, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import type { SSRContext } from "../../server/types.ts";
 import { redirect } from "../core/redirect.ts";
-import type { CSRContext, RouteModule } from "../core/router.ts";
+import type { CSRContext, RouteData, RouteModule } from "../core/router.ts";
 import { fetchRouteData, listenRouter } from "../core/router.ts";
 import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
-import { DataProvider, type RouteData } from "./data.ts";
+import { DataProvider } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
 
 export type RouterProps = {

@@ -8,8 +8,8 @@ Deno.test(
   async (t) => {
     await t.step("SolidTransformer", async () => {
       const testCode = `
-    import { render} from "https://esm.sh/v110/solid-js/web";
-    import { createSignal } from "https://esm.sh/v110/solid-js";
+    import { createSignal } from "https://esm.sh/solid-js";
+    import { render } from "https://esm.sh/solid-js/web";
 
     const foo = "foo";
 

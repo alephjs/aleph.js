@@ -1,7 +1,7 @@
 // react-refresh
 // @link https://github.com/facebook/react/issues/16604#issuecomment-528663101
 
-import runtime from "https://esm.sh/v110/react-refresh@0.14.0/runtime";
+import runtime from "https://esm.sh/v112/react-refresh@0.14.0/runtime";
 
 let timer: number | null;
 const refresh = () => {

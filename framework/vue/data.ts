@@ -1,13 +1,8 @@
 import { inject, onBeforeUnmount, Ref, ref, toRaw, watch } from "vue";
 import { FetchError } from "../core/error.ts";
+import type { RouteData } from "../core/router.ts";
 import type { SSRContext } from "../../server/types.ts";
 import { HttpMethod, UpdateStrategy } from "./context.ts";
-
-export type RouteData = {
-  data?: unknown;
-  dataCacheTtl?: number;
-  dataExpires?: number;
-};
 
 export type DataProviderProps = {
   dataUrl: string;
