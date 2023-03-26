@@ -17,8 +17,7 @@ export class MDXLoader implements ModuleLoader {
     const ret = await compile(
       { path: specifier, value: content },
       {
-        jsxImportSource: this.#options.jsxImportSource ?? env.jsxConfig?.jsxImportSource ??
-          "https://esm.sh/react@18.2.0",
+        jsxImportSource: this.#options.jsxImportSource ?? env.jsxConfig?.jsxImportSource,
         ...this.#options,
         providerImportSource: this.#options.providerImportSource
           ? env.importMap?.imports[this.#options.providerImportSource] ?? this.#options.providerImportSource

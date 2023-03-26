@@ -162,7 +162,7 @@ export function toResponse(v: unknown, init?: ResponseInit): Response {
 
 /**
  * Fix remote url to local path.
- * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`
+ * e.g. `https://esm.sh/react@18.2.0?dev` -> `/-/esm.sh/react@18.2.0?dev`
  */
 export function toLocalPath(url: string): string {
   if (isLikelyHttpURL(url)) {
@@ -185,7 +185,7 @@ export function toLocalPath(url: string): string {
 
 /**
  * Restore the remote url from local path.
- * e.g. `/-/esm.sh/react@17.0.2` -> `https://esm.sh/v112/react@17.0.2`
+ * e.g. `/-/esm.sh/react@18.2.0` -> `https://esm.sh/v112/react@18.2.0`
  */
 export function restoreUrl(pathname: string): string {
   let [h, ...rest] = pathname.substring(3).split("/");
