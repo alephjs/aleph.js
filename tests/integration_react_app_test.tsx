@@ -11,7 +11,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     ssr: { render },
   });
 
-  await t.step("API GET /", async () => {
+  await t.step("GET /", async () => {
     const res = await api.fetch("/");
     const html = await res.text();
     assertEquals(res.status, 200);
@@ -28,7 +28,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertStringIncludes(html, `<script id="ssr-data" type="application/json">`);
   });
 
-  await t.step("API PUT+PATCH /todos", async () => {
+  await t.step("PUT+PATCH /todos", async () => {
     const res = await api.fetch("/todos", { method: "PUT", body: JSON.stringify({ message: "Better Call Saul!" }) });
     const data = await res.json();
     assertEquals(res.status, 200);
@@ -49,7 +49,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertEquals(data2.todos.at(0).completed, true);
   });
 
-  await t.step("API GET /todos?_data_", async () => {
+  await t.step("GET /todos?_data_", async () => {
     const res = await api.fetch("/todos?_data_");
     const data = await res.json();
     assertEquals(res.status, 200);
@@ -57,7 +57,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertEquals(data.todos.length, 1);
   });
 
-  await t.step("API GET /todos", async () => {
+  await t.step("GET /todos", async () => {
     const res = await api.fetch("/todos");
     const html = await res.text();
     assertEquals(res.status, 200);
@@ -68,7 +68,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertStringIncludes(html, `Better Call Saul!</label>`);
   });
 
-  await t.step("API DELETE /todos", async () => {
+  await t.step("DELETE /todos", async () => {
     const res = await api.fetch("/todos?_data_");
     const data = await res.json();
     assertEquals(res.status, 200);
@@ -85,7 +85,7 @@ Deno.test("[integration] examples/react-app", async (t) => {
     assertEquals(data2, { todos: [] });
   });
 
-  await t.step("API GET /404", async () => {
+  await t.step("GET /404", async () => {
     const res = await api.fetch("/404");
     const html = await res.text();
     assertEquals(res.status, 404);

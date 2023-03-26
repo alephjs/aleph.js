@@ -8,7 +8,6 @@ import {
   existsDir,
   existsFile,
   fetchCode,
-  fixResponse,
   getAlephPkgUri,
   getAppDir,
   getDeploymentId,
@@ -226,7 +225,7 @@ export function createHandler(config: AlephConfig) {
 
         // user throws a response
         if (err instanceof Response) {
-          return fixResponse(err, { fixRedirect: asData });
+          return err;
         }
 
         // javascript syntax error
@@ -240,7 +239,7 @@ export function createHandler(config: AlephConfig) {
         // use the `onError` if available
         const res = onError?.(err, "route-data-fetch", req, ctx);
         if (res instanceof Response) {
-          return fixResponse(res, { fixRedirect: asData });
+          return res;
         }
 
         // prints the error stack

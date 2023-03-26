@@ -10,19 +10,19 @@ Deno.test("[integration] examples/api-app", async (t) => {
     origin: "https://api.example.com",
   });
 
-  await t.step("API GET /", async () => {
+  await t.step("GET /", async () => {
     const res = await api.fetch("/");
     assertEquals(res.status, 200);
     assertEquals((await res.json()).users_url, "https://api.example.com/users");
   });
 
-  await t.step("API GET /users", async () => {
+  await t.step("GET /users", async () => {
     const res = await api.fetch("/users");
     assertEquals(res.status, 200);
     assertEquals((await res.json()).length, 4);
   });
 
-  await t.step("API POST /users", async () => {
+  await t.step("POST /users", async () => {
     const res = await api.fetch("/users", { method: "POST", body: mockFormData({ "name": "saul" }) });
     const ret = await res.json();
     assertEquals(res.status, 200);
@@ -37,7 +37,7 @@ Deno.test("[integration] examples/api-app", async (t) => {
     assertEquals(ret2.at(-1).name, "saul");
   });
 
-  await t.step("API PATCH /users/5", async () => {
+  await t.step("PATCH /users/5", async () => {
     const res = await api.fetch("/users/5", { method: "PATCH", body: mockFormData({ "name": "saul goodman" }) });
     const ret = await res.json();
     assertEquals(res.status, 200);
@@ -45,7 +45,7 @@ Deno.test("[integration] examples/api-app", async (t) => {
     assertEquals(ret.name, "saul goodman");
   });
 
-  await t.step("API GET /users/5", async () => {
+  await t.step("GET /users/5", async () => {
     const res = await api.fetch("/users/5");
     const ret = await res.json();
     assertEquals(res.status, 200);
@@ -53,7 +53,7 @@ Deno.test("[integration] examples/api-app", async (t) => {
     assertEquals(ret.name, "saul goodman");
   });
 
-  await t.step("API DELETE /users/5", async () => {
+  await t.step("DELETE /users/5", async () => {
     const res = await api.fetch("/users/5", { method: "DELETE" });
     const ret = await res.json();
     assertEquals(res.status, 200);
@@ -61,7 +61,7 @@ Deno.test("[integration] examples/api-app", async (t) => {
     assertEquals(ret.name, "saul goodman");
   });
 
-  await t.step("API GET /users/5", async () => {
+  await t.step("GET /users/5", async () => {
     const res = await api.fetch("/users/5");
     assertEquals(res.status, 404);
   });

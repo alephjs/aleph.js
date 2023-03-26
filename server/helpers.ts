@@ -160,21 +160,6 @@ export function toResponse(v: unknown, init?: ResponseInit): Response {
   throw new Error("Invalid response type: " + typeof v);
 }
 
-export function fixResponse(res: Response, options?: { headers?: HeadersInit; fixRedirect?: boolean }): Response {
-  if (res.status >= 300 && res.status < 400 && options?.fixRedirect) {
-    return Response.json({ redirect: { location: res.headers.get("Location"), status: res.status } }, {
-      status: 501,
-    });
-  }
-  const headers = new Headers(res.headers);
-  if (options?.headers) {
-    for (const [key, value] of Object.entries(options.headers)) {
-      headers.set(key, value);
-    }
-  }
-  return new Response(res.body, { status: res.status, headers });
-}
-
 /**
  * Fix remote url to local path.
  * e.g. `https://esm.sh/react@17.0.2?dev` -> `/-/esm.sh/react@17.0.2?dev`

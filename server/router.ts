@@ -13,7 +13,7 @@ import {
 import { path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import log from "./log.ts";
-import { builtinModuleExts, fixResponse, getAlephConfig, getAppDir, getFiles, toResponse } from "./helpers.ts";
+import { builtinModuleExts, getAlephConfig, getAppDir, getFiles, toResponse } from "./helpers.ts";
 import type { Context, RouterInit } from "./types.ts";
 
 /** import the route module. */
@@ -104,13 +104,7 @@ export async function fetchRoute(
             "Cache-Control": cacheTtl ? `public, max-age=${cacheTtl}` : "no-cache, no-store, must-revalidate",
           });
           if (res instanceof Response) {
-            const headers = new Headers(res.headers);
-            if (cacheTtl) {
-              headers.set("Cache-Control", `public, max-age=${cacheTtl}`);
-            } else {
-              headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
-            }
-            return fixResponse(res, { fixRedirect: hasDataParam, headers });
+            return res;
           }
           return toResponse(res, { headers });
         }
