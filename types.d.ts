@@ -1,7 +1,14 @@
-declare type Context<T extends Record<string, unknown> = Record<string, unknown>> = import("./server/types.ts").Context<
-  T
->;
-declare type Middleware = import("./server/types.ts").Middleware;
+type CTX = import("./server/types.ts").Context;
+// deno-lint-ignore no-empty-interface
+declare interface Context extends CTX {}
+
+/** The Middleare for Aleph server. */
+declare interface Middleware {
+  /** The middleware name. */
+  readonly name?: string;
+  /** The middleware fetch method. */
+  fetch(request: Request, context: Context): Promise<Response> | Response;
+}
 
 declare interface ImportMeta {
   /** Aleph.js HMR `hot` API. */
