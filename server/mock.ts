@@ -1,6 +1,6 @@
 import type { Router } from "../framework/core/router.ts";
 import { isPlainObject } from "../shared/util.ts";
-import { createContext } from "./context.ts";
+import { createContext, NEXT } from "./context.ts";
 import { path } from "./deps.ts";
 import { getAppDir } from "./helpers.ts";
 import { createHtmlResponse, loadIndexHtml } from "./html.ts";
@@ -51,17 +51,24 @@ export class MockServer {
     const { middlewares, origin } = this.#options;
     const url = new URL(input, origin ?? "http://localhost/");
     const req = new Request(url.href, init);
+    const ctx = createContext(() => Promise.resolve(new Response(null)), {
+      req,
+      connInfo: {
+        localAddr: { transport: "tcp", hostname: "localhost", port: 80 },
+        remoteAddr: { transport: "tcp", hostname: "localhost", port: 80 },
+      },
+      sessionOptions: this.#options.session,
+    });
     const next = (i: number): Promise<Response> | Response => {
       if (Array.isArray(middlewares) && i < middlewares.length) {
         const mw = middlewares[i];
-        const ctx = createContext(req, next.bind(null, i + 1), { session: this.#options.session });
         try {
+          Reflect.set(ctx, NEXT, next.bind(null, i + 1));
           return mw.fetch(req, ctx);
         } catch (err) {
           throw new Error(`Middleare${mw.name ? `(${mw.name})` : ""}:`, err);
         }
       }
-      const ctx = createContext(req, () => Promise.resolve(new Response(null)), { session: this.#options.session });
       return this.#handler(req, ctx);
     };
     return next(0);
