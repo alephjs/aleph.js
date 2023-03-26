@@ -1,7 +1,7 @@
 import { generateErrorHtml, TransformError } from "../framework/core/error.ts";
 import type { Router } from "../framework/core/router.ts";
 import { isPlainObject, trimSuffix } from "../shared/util.ts";
-import { createContext } from "./context.ts";
+import { createContext, NEXT } from "./context.ts";
 import { handleHMR } from "./dev.ts";
 import { HTMLRewriter, path } from "./deps.ts";
 import {
@@ -25,10 +25,10 @@ import { getContentType } from "./media_type.ts";
 import renderer from "./renderer.ts";
 import { fetchRoute, importRouteModule, initRouter } from "./router.ts";
 import transformer from "./transformer.ts";
-import type { AlephConfig, ConnInfo, ModuleLoader } from "./types.ts";
+import type { AlephConfig, ConnInfo, Context, ModuleLoader } from "./types.ts";
 
 export function createHandler(config: AlephConfig) {
-  const { loaders, middlewares, onError, build, router: routerConfig, session, ssr } = config;
+  const { loaders, middlewares, onError, build, router: routerConfig, ssr } = config;
   const buildMode = Deno.args.includes("--build");
   const isDev = Deno.args.includes("--dev");
   const appDir = getAppDir();
@@ -72,7 +72,7 @@ export function createHandler(config: AlephConfig) {
     // check if the `out` directory exists
     const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
       if (!isDev && !buildMode) {
-        const outDir = path.join(appDir, build?.outputDir ?? "./output");
+        const outDir = path.join(appDir, build?.outputDir ?? "output");
         if (await existsDir(outDir)) {
           return outDir;
         }
@@ -352,11 +352,16 @@ export function createHandler(config: AlephConfig) {
 
   // the deno http server handler
   return (req: Request, connInfo: ConnInfo): Promise<Response> | Response => {
+    const ctx = createContext(() => Promise.resolve(new Response(null)), {
+      req,
+      connInfo,
+      sessionOptions: config.session,
+    });
     const next = (i: number): Promise<Response> | Response => {
       if (Array.isArray(middlewares) && i < middlewares.length) {
         const mw = middlewares[i];
-        const ctx = createContext(req, next.bind(null, i + 1), { connInfo, session });
         try {
+          Reflect.set(ctx, NEXT, next.bind(null, i + 1));
           return mw.fetch(req, ctx);
         } catch (err) {
           const res = onError?.(err, "middleware", req, ctx);
@@ -370,7 +375,6 @@ export function createHandler(config: AlephConfig) {
           });
         }
       }
-      const ctx = createContext(req, () => Promise.resolve(new Response(null)), { connInfo, session });
       return handler(req, ctx);
     };
     return next(0);

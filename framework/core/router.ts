@@ -70,8 +70,8 @@ export function matchRoutes(url: URL, router: Router): RouteMatch[] {
         }
       }
     }
+    // find index route if no direct match
     if (matches.length === 0) {
-      // find index route
       for (const [p, m] of routes) {
         if (m.pattern.pathname.endsWith("/index")) {
           const ret = p.exec({ host: url.host, pathname: pathname + "/index" });

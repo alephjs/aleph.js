@@ -1,6 +1,7 @@
 import { FetchError } from "../framework/core/error.ts";
 import { matchRoutes, type RouteModule, type Router } from "../framework/core/router.ts";
 import { cleanPath, isFilledString, isPlainObject, utf8Enc } from "../shared/util.ts";
+import { CUSTOM_HTML_REWRITER } from "./context.ts";
 import { HTMLRewriter, path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { getAlephConfig, getAppDir, getDeploymentId, getFiles, regJsxFile, toLocalPath } from "./helpers.ts";
@@ -18,13 +19,13 @@ export type RenderOptions = {
 export default {
   async fetch(req: Request, ctx: Record<string, unknown>, options: RenderOptions): Promise<Response> {
     const { indexHtml, router, ssr, isDev } = options;
-    const headers = new Headers(ctx.headers as Headers);
+    const headers = new Headers();
     const isFn = typeof ssr === "function";
     const CSP = isFn ? undefined : ssr.CSP;
     const render = isFn ? ssr : ssr.render;
     const [url, modules, deferedData] = await initSSR(req, ctx, router);
     const headCollection: string[] = [];
-    const customHTMLRewriter = ctx.__htmlRewriterHandlers as [string, HTMLRewriterHandlers][];
+    const customHTMLRewriter = Reflect.get(ctx, CUSTOM_HTML_REWRITER) as [string, HTMLRewriterHandlers][];
 
     let status = 200;
     let suspenseMarker: SuspenseMarker | undefined;

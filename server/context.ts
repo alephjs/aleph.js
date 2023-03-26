@@ -2,28 +2,29 @@ import { computeHash, hmacSign, splitBy } from "../shared/util.ts";
 import { SessionImpl } from "./session.ts";
 import type { ConnInfo, Context, HTMLRewriterHandlers, Session, SessionOptions } from "./types.ts";
 
-type ContextOptions = {
-  connInfo?: ConnInfo;
-  session?: SessionOptions;
+export const NEXT = Symbol();
+export const CUSTOM_HTML_REWRITER = Symbol();
+
+export type ContextInit = {
+  req: Request;
+  connInfo: ConnInfo;
+  sessionOptions?: SessionOptions;
 };
 
 /** create a context object */
-export function createContext(
-  req: Request,
-  next: () => Promise<Response> | Response,
-  options?: ContextOptions,
-): Context {
+export function createContext(next: () => Promise<Response> | Response, init: ContextInit): Context {
   let cookies: Map<string, string> | null = null;
   let session: Session<Record<string, unknown>> | null = null;
+  const customHtmlRewriter: [string, HTMLRewriterHandlers][] = [];
+  const extension = {};
   const ctx: Context = {
-    connInfo: options?.connInfo,
+    connInfo: init.connInfo,
     params: {},
-    headers: new Headers(),
     cookies: {
       get(name: string) {
-        if (cookies === null) {
+        if (!cookies) {
           cookies = new Map<string, string>();
-          const cookieHeader = req.headers.get("Cookie");
+          const cookieHeader = init.req.headers.get("Cookie");
           if (cookieHeader) {
             for (const cookie of cookieHeader.split(";")) {
               const [key, value] = splitBy(cookie, "=");
@@ -37,12 +38,13 @@ export function createContext(
     // deno-lint-ignore ban-ts-comment
     // @ts-ignore
     async getSession(): Promise<Session<Record<string, unknown>>> {
-      if (session !== null) {
+      if (session) {
         return session;
       }
 
-      const cookieName = options?.session?.cookie?.name ?? "session";
-      const secret = options?.session?.secret ?? "-";
+      const { sessionOptions } = init;
+      const cookieName = sessionOptions?.cookie?.name ?? "session";
+      const secret = sessionOptions?.secret ?? "-";
       let sid = ctx.cookies.get(cookieName);
       let skipInit = false;
       if (sid) {
@@ -57,23 +59,44 @@ export function createContext(
         skipInit = true;
       }
 
-      const sessionImpl = new SessionImpl<Record<string, unknown>>(
-        sid,
-        options?.session,
-      );
+      const sessionImpl = new SessionImpl<Record<string, unknown>>(sid, sessionOptions);
       session = sessionImpl;
       if (!skipInit) {
         await sessionImpl.init();
       }
       return session;
     },
-    __htmlRewriterHandlers: [],
     htmlRewriter: {
       on: (selector: string, handlers: HTMLRewriterHandlers) => {
-        (ctx.__htmlRewriterHandlers as unknown[]).push([selector, handlers]);
+        customHtmlRewriter.push([selector, handlers]);
       },
     },
     next,
   };
-  return ctx;
+  return new Proxy(Object.create({}), {
+    get(_target, prop) {
+      if (prop === CUSTOM_HTML_REWRITER) {
+        return customHtmlRewriter;
+      }
+      if (Reflect.has(ctx, prop)) {
+        return Reflect.get(ctx, prop);
+      }
+      return Reflect.get(extension, prop);
+    },
+    set(_target, prop, value) {
+      if (prop === NEXT) {
+        Reflect.set(ctx, "next", value);
+      }
+      if (!Reflect.has(ctx, prop)) {
+        return Reflect.set(extension, prop, value);
+      }
+      return false;
+    },
+    deleteProperty(_target, prop) {
+      if (!Reflect.has(ctx, prop)) {
+        return Reflect.deleteProperty(extension, prop);
+      }
+      return false;
+    },
+  });
 }
