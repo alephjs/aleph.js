@@ -168,8 +168,8 @@ export const DataProvider: FC<DataProviderProps> = ({ dataUrl, dataCache, childr
   );
 };
 
-export const useData = <T = unknown>(): { data: T; reload: DataContextProps["reload"] } => {
-  const { deferedData, data, reload } = useContext(DataContext) as DataContextProps<T>;
+export const useData = <T = unknown>(): Omit<DataContextProps<T>, "deferedData"> => {
+  const { deferedData, data, reload, mutation, isMutating } = useContext(DataContext) as DataContextProps<T>;
   if (data instanceof Error) {
     throw data;
   }
@@ -178,16 +178,11 @@ export const useData = <T = unknown>(): { data: T; reload: DataContextProps["rel
       throw deferedData.current;
     }
     if (deferedData?.current !== undefined) {
-      return { data: deferedData.current, reload };
+      return { data: deferedData.current, reload, mutation, isMutating };
     }
     throw data;
   }
-  return { data, reload };
-};
-
-export const useMutation = <T = unknown>(): Pick<DataContextProps<T>, "mutation" | "isMutating"> => {
-  const { mutation, isMutating } = useContext(DataContext) as DataContextProps<T>;
-  return { mutation, isMutating };
+  return { data, reload, mutation, isMutating };
 };
 
 function send(method: HttpMethod, href: string, data: unknown): Promise<Response> {

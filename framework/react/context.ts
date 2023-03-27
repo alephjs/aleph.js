@@ -24,6 +24,13 @@ export type RouterContextProps = {
   createPortal?: (children: ReactNode, container: Element, key?: null | string) => ReactPortal;
 };
 
+/** Context for the router. */
+export const RouterContext = createContext<RouterContextProps>({
+  url: new URL("http://localhost/"),
+  params: {},
+});
+RouterContext.displayName = "RouterContext";
+
 export type DataContextProps<T = unknown> = {
   deferedData?: { current?: T };
   data: T;
@@ -31,17 +38,6 @@ export type DataContextProps<T = unknown> = {
   mutation: Mutation<T>;
   reload: (signal?: AbortSignal) => Promise<void>;
 };
-
-export type ForwardPropsContextProps = {
-  props: Record<string, unknown>;
-};
-
-/** Context for the router. */
-export const RouterContext = createContext<RouterContextProps>({
-  url: new URL("http://localhost/"),
-  params: {},
-});
-RouterContext.displayName = "RouterContext";
 
 /** Context for the router data. */
 export const DataContext = createContext<DataContextProps>({
@@ -56,9 +52,3 @@ export const DataContext = createContext<DataContextProps>({
   reload: () => Promise.resolve(undefined),
 });
 DataContext.displayName = "DataContext";
-
-/** Context for the forwarded props. */
-export const ForwardPropsContext = createContext<ForwardPropsContextProps>({
-  props: {},
-});
-ForwardPropsContext.displayName = "ForwardPropsContext";

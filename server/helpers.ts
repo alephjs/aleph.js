@@ -138,7 +138,6 @@ export function cookieHeader(name: string, value: string, options?: CookieOption
 
 export function toResponse(v: unknown, init?: ResponseInit): Response {
   if (
-    typeof v === "string" ||
     v instanceof ArrayBuffer ||
     v instanceof Uint8Array ||
     v instanceof ReadableStream
@@ -151,13 +150,11 @@ export function toResponse(v: unknown, init?: ResponseInit): Response {
     headers.set("Content-Length", v.size.toString());
     return new Response(v, { ...init, headers });
   }
-  if (isPlainObject(v) || Array.isArray(v)) {
+  try {
     return Response.json(v, init);
+  } catch (_) {
+    return new Response("Invalid response type: " + typeof v, { status: 500 });
   }
-  if (v === null) {
-    return new Response(null, init);
-  }
-  throw new Error("Invalid response type: " + typeof v);
 }
 
 /**
@@ -185,7 +182,7 @@ export function toLocalPath(url: string): string {
 
 /**
  * Restore the remote url from local path.
- * e.g. `/-/esm.sh/react@18.2.0` -> `https://esm.sh/v112/react@18.2.0`
+ * e.g. `/-/esm.sh/react@18.2.0` -> `https://esm.sh/v113/react@18.2.0`
  */
 export function restoreUrl(pathname: string): string {
   let [h, ...rest] = pathname.substring(3).split("/");
@@ -418,8 +415,6 @@ export async function loadImportMap(appDir?: string): Promise<ImportMap> {
           Object.assign(imports, {
             "aleph/": "https://aleph/",
             "aleph/react": "https://aleph/framework/react/mod.ts",
-            "aleph/solid": "https://aleph/framework/solid/mod.ts",
-            "aleph/vue": "https://aleph/framework/vue/mod.ts",
           });
         }
       }

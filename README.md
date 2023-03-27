@@ -11,7 +11,6 @@
 Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new architecture:
 
 - React App: https://aleph-hello.deno.dev/
-- Vue App: https://aleph-vue.deno.dev/
 - REST API: https://aleph-api.deno.dev/
 - React 18 Suspense SSR: https://aleph-suspense-ssr.deno.dev/
 - UnoCSS(tailwind): https://aleph-unocss.deno.dev/
@@ -29,7 +28,7 @@ Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new a
 ## Get started
 
 Initialize a new project, you can pick a start template with `--template` flag, available templates:
-`[react, vue, api, solid, yew]`
+`[react, react-mdx, api, yew]`
 
 ```bash
 deno run -A -r https://alephjs.org/init.ts

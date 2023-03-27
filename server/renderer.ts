@@ -301,8 +301,6 @@ async function initSSR(
       fetcher = typeof fetch === "function" ? fetch : undefined;
       dataDefer = Boolean(defer);
       rmod.dataCacheTtl = typeof cacheTtl === "number" ? cacheTtl : undefined;
-    } else {
-      fetcher = mod.GET;
     }
 
     // assign route params to context

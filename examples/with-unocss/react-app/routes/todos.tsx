@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { Head, useData, useMutation } from "aleph/react";
+import { Head, useData } from "aleph/react";
 
 type Todo = {
   id: number;
@@ -43,8 +43,7 @@ export async function mutation(req: Request): Promise<Response> {
 }
 
 export default function Todos() {
-  const { data: { todos } } = useData<{ todos: Todo[] }>();
-  const { isMutating, mutation } = useMutation<{ todos: Todo[] }>();
+  const { data: { todos }, isMutating, mutation } = useData<{ todos: Todo[] }>();
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

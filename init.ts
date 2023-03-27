@@ -10,10 +10,8 @@ import { basename, join } from "https://deno.land/std@0.180.0/path/mod.ts";
 const templates = [
   "react",
   "react-mdx",
-  "vue",
   "yew",
   "leptos",
-  "solid",
   "api",
 ];
 
@@ -26,13 +24,10 @@ const unocssApps = [
   "react",
   "yew",
   "leptos",
-  "solid",
 ];
 
 const versions = {
   react: "18.2.0",
-  vue: "3.2.39",
-  solid: "1.6.12",
 };
 
 type Options = {
@@ -216,29 +211,6 @@ export default async function init(nameArg?: string, options?: Options) {
         "react": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
         "react-dom": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}/`,
-      });
-      break;
-    }
-    case "vue": {
-      Object.assign(importMap.imports, {
-        "aleph/vue": `${alephPkgUri}/framework/vue/mod.ts`,
-        "aleph/plugins/vue": `${alephPkgUri}/framework/vue/plugin.ts`,
-        "vue": `https://esm.sh/v${ESM_VERSION}/vue@${versions.vue}`,
-        "@vue/server-renderer": `https://esm.sh/v${ESM_VERSION}/@vue/server-renderer@${versions.vue}`,
-      });
-      break;
-    }
-    case "solid": {
-      Object.assign(denoConfig.compilerOptions, {
-        "jsx": "react-jsx",
-        "jsxImportSource": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
-      });
-      Object.assign(importMap.imports, {
-        "aleph/solid": `${alephPkgUri}/framework/solid/mod.ts`,
-        "aleph/plugins/solid": `${alephPkgUri}/framework/solid/plugin.ts`,
-        "solid-js": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}`,
-        "solid-js/web": `https://esm.sh/v${ESM_VERSION}/solid-js@${versions.solid}/web`,
-        "solid-refresh": `https://esm.sh/v${ESM_VERSION}/solid-refresh@0.5.1`,
       });
       break;
     }

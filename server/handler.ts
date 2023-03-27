@@ -33,7 +33,7 @@ export function createHandler(config: AlephConfig) {
   const isDev = Deno.args.includes("--dev");
   const appDir = getAppDir();
 
-  const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const staticHandler = async (req: Request): Promise<Response | void> => {
     const { pathname, searchParams } = new URL(req.url);
 
     // handle HMR socket
@@ -145,7 +145,7 @@ export function createHandler(config: AlephConfig) {
           );
         } else if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, "transform", req, ctx) ??
+          return onError?.(err, "transform", req) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html;"]],
@@ -192,7 +192,7 @@ export function createHandler(config: AlephConfig) {
       } catch (err) {
         if (!(err instanceof Deno.errors.NotFound)) {
           log.error(err);
-          return onError?.(err, "fs", req, ctx) ??
+          return onError?.(err, "fs", req) ??
             new Response(generateErrorHtml(err.stack ?? err.message), {
               status: 500,
               headers: [["Content-Type", "text/html;"]],
@@ -200,6 +200,10 @@ export function createHandler(config: AlephConfig) {
         }
       }
     }
+  };
+
+  const routeHandler = async (req: Request, ctx: Context): Promise<Response> => {
+    const { pathname, searchParams } = new URL(req.url);
 
     // don't render special asset files
     switch (pathname) {
@@ -221,7 +225,7 @@ export function createHandler(config: AlephConfig) {
         const res = await fetchRoute(req, ctx, router);
         if (res) return res;
       } catch (err) {
-        const asData = req.method === "GET" && searchParams.has("_data_");
+        const fetchData = req.method === "GET" && searchParams.has("_data_");
 
         // user throws a response
         if (err instanceof Response) {
@@ -229,7 +233,7 @@ export function createHandler(config: AlephConfig) {
         }
 
         // javascript syntax error
-        if (err instanceof TypeError && !asData) {
+        if (err instanceof TypeError && !fetchData) {
           return new Response(generateErrorHtml(err.stack ?? err.message), {
             status: 500,
             headers: [["Content-Type", "text/html;"]],
@@ -237,7 +241,7 @@ export function createHandler(config: AlephConfig) {
         }
 
         // use the `onError` if available
-        const res = onError?.(err, "route-data-fetch", req, ctx);
+        const res = onError?.(err, fetchData ? "fetch-route-data" : "fetch-route", req, ctx);
         if (res instanceof Response) {
           return res;
         }
@@ -319,6 +323,17 @@ export function createHandler(config: AlephConfig) {
       });
     }
 
+    // check if the `out` directory exists
+    const outDir = await globalIt("__ALEPH_OUT_DIR", async () => {
+      if (!isDev && !buildMode) {
+        const outDir = path.join(appDir, build?.outputDir ?? "output");
+        if (await existsDir(outDir)) {
+          return outDir;
+        }
+      }
+      return null;
+    });
+
     // use SSG output if exists
     if (!isDev && !buildMode && outDir) {
       const htmlFile = path.join(outDir, pathname === "/" ? "index.html" : pathname + ".html");
@@ -351,7 +366,10 @@ export function createHandler(config: AlephConfig) {
   };
 
   // the deno http server handler
-  return (req: Request, connInfo: ConnInfo): Promise<Response> | Response => {
+  return async (req: Request, connInfo: ConnInfo): Promise<Response> => {
+    const res = await staticHandler(req);
+    if (res) return res;
+
     const ctx = createContext(() => Promise.resolve(new Response(null)), {
       req,
       connInfo,
@@ -375,7 +393,7 @@ export function createHandler(config: AlephConfig) {
           });
         }
       }
-      return handler(req, ctx);
+      return routeHandler(req, ctx);
     };
     return next(0);
   };

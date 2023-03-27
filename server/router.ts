@@ -38,11 +38,8 @@ export async function importRouteModule({ filename, pattern }: RouteMeta, appDir
   return await import(url);
 }
 
-export async function fetchRoute(
-  req: Request,
-  ctx: Context,
-  router: Router,
-): Promise<Response | void> {
+/** fetch the route. */
+export async function fetchRoute(req: Request, ctx: Context, router: Router): Promise<Response | void> {
   const { pathname, host, searchParams } = new URL(req.url);
   const hasDataParam = searchParams.has("_data_");
   if (router.routes.length > 0) {
@@ -75,15 +72,19 @@ export async function fetchRoute(
       const { method } = req;
       const [ret, meta] = matched;
       const mod = await importRouteModule(meta, router.appDir);
-      if (method !== "GET" || (hasDataParam || mod.default === undefined)) {
+      if (method !== "GET" || (hasDataParam || typeof mod.GET === "function")) {
         let fetcher: unknown;
         let cacheTtl: number | undefined;
         if (method === "GET") {
-          if (typeof mod.data === "function") {
-            fetcher = mod.data;
-          } else if (isPlainObject(mod.data)) {
-            fetcher = mod.data.fetch;
-            cacheTtl = mod.data.cacheTtl;
+          if (hasDataParam) {
+            if (typeof mod.data === "function") {
+              fetcher = mod.data;
+            } else if (isPlainObject(mod.data)) {
+              fetcher = mod.data.fetch;
+              cacheTtl = mod.data.cacheTtl;
+            } else {
+              fetcher = () => null; // empty data
+            }
           } else {
             fetcher = mod.GET;
           }

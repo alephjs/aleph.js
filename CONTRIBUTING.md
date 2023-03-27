@@ -48,8 +48,6 @@ deno test -A
 - **/framework**
   - **core** framework framework core
   - **react** framework framework for React
-  - **vue** framework framework for Vue.js
-  - **solid** framework framework for SolidJS
 - **/server** server core of Aleph.js
 - **/shared** shared libraries
 - **/tests** unit/integration testings

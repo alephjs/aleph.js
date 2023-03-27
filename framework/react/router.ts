@@ -4,7 +4,7 @@ import type { SSRContext } from "../../server/types.ts";
 import { redirect } from "../core/redirect.ts";
 import type { CSRContext, RouteData, RouteModule } from "../core/router.ts";
 import { fetchRouteData, listenRouter } from "../core/router.ts";
-import { ForwardPropsContext, RouterContext, type RouterContextProps } from "./context.ts";
+import { RouterContext, type RouterContextProps } from "./context.ts";
 import { DataProvider } from "./data.ts";
 import { Err, ErrorBoundary } from "./error.ts";
 
@@ -14,7 +14,7 @@ export type RouterProps = {
   readonly createPortal?: RouterContextProps["createPortal"];
 };
 
-/** The `Router` component for react. */
+/** The `Router` component for react app. */
 export const Router: FC<RouterProps> = (props) => {
   const { csrContext, ssrContext, createPortal } = props;
   const [url, setUrl] = useState(() => ssrContext?.url ?? new URL(window.location?.href));
@@ -80,8 +80,8 @@ type RouteRootProps = {
 const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache }) => {
   const { url, exports, withData } = modules[0];
   const dataUrl = url.pathname + url.search;
-  let el: ReactNode;
 
+  let el: ReactNode;
   if (typeof exports.default === "function") {
     el = createElement(
       exports.default as FC,
@@ -92,21 +92,18 @@ const RouteRoot: FC<RouteRootProps> = ({ modules, dataCache }) => {
       ),
     );
     if (withData) {
-      const fallback = exports.Loading ?? exports.Fallback ?? exports.fallback;
+      const v = exports.Loading ?? exports.Fallback ?? exports.fallback;
+      const fallback = typeof v === "function" ? createElement(v as FC) : (
+        typeof v === "object" && isValidElement(v) ? v : null
+      );
       el = createElement(
         Suspense,
-        {
-          fallback: (
-            typeof fallback === "function" ? createElement(fallback as FC) : (
-              typeof fallback === "object" && isValidElement(fallback) ? fallback : null
-            )
-          ),
-        },
+        { fallback },
         createElement(
           DataProvider,
           {
             dataCache,
-            dataUrl: dataUrl,
+            dataUrl,
             key: dataUrl,
           },
           el,
@@ -135,19 +132,4 @@ export const useRouter = (): {
 } => {
   const { url, params, e404 } = useContext(RouterContext);
   return { url, params, e404, redirect };
-};
-
-export const forwardProps = (children?: ReactNode, props: Record<string, unknown> = {}) => {
-  if (
-    children === null || children === undefined || typeof children === "string" || typeof children === "number" ||
-    typeof children === "boolean"
-  ) {
-    return children;
-  }
-  return createElement(ForwardPropsContext.Provider, { value: { props } }, children);
-};
-
-export const useForwardProps = <T = Record<string, unknown>>(): T => {
-  const { props } = useContext(ForwardPropsContext);
-  return props as T;
 };

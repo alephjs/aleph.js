@@ -146,8 +146,10 @@ export interface Context extends Record<string, unknown> {
   readonly htmlRewriter: HTMLRewriter;
   /** Returns the `Session` object. */
   getSession: <T extends Record<string, unknown> = Record<string, unknown>>() => Promise<Session<T>>;
-  /** Returns the next `Response` object. */
+  /** Calls next middleware/handler. */
   next: () => Promise<Response> | Response;
+  /** Renders the route page. */
+  render: () => Promise<Response>;
 }
 
 /** The Middleare for Aleph server. */
@@ -194,10 +196,10 @@ export interface ModuleLoader {
 
 /** The optimization options for the server. */
 export type BuildOptions = {
-  /** The output directory, default is "./out". */
-  outputDir?: string;
   /** The built target for esbuild, default is "es2018". */
   buildTarget?: "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021" | "es2022";
+  /** The output directory, default is "./out". */
+  outputDir?: string;
   /** The SSG options for the FS routing. */
   ssg?: boolean | SSGOptions;
   /** The source map options for esbuild. */
@@ -261,9 +263,9 @@ export type SSR =
 export type ErrorHandler = {
   (
     error: unknown,
-    cause: "route-data-fetch" | "ssr" | "transform" | "fs" | "middleware",
+    cause: "fetch-route" | "fetch-route-data" | "ssr" | "transform" | "fs" | "middleware",
     request: Request,
-    context: Context,
+    context?: Context,
   ): Response | void;
 };
 

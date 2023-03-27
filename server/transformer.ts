@@ -102,14 +102,6 @@ export default {
             const version = depGraph.get(depSpecifier)?.version ?? depGraph.globalVersion;
             const url = `"${importUrl}${sep}ssr&v=${version.toString(36)}"`;
             s.overwrite(loc.start - 1, loc.end - 1, url);
-          } else if (
-            depSpecifier.startsWith(alephPkgUri + "/") && (
-              depSpecifier.endsWith(".tsx") || alephPkgUri === "https://aleph"
-            )
-          ) {
-            const origin = Reflect.get(globalThis, "__ALEPH_SERVER_ORIGIN");
-            const url = `"${origin}${toLocalPath(depSpecifier)}?ssr&v=${depGraph.globalVersion.toString(36)}"`;
-            s.overwrite(loc.start - 1, loc.end - 1, url);
           }
         });
         return new Response(s.toBytes(), {
