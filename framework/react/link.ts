@@ -10,7 +10,7 @@ export type LinkProps = PropsWithChildren<
     replace?: boolean;
     prefetch?: boolean;
     innerRef?: MutableRefObject<HTMLAnchorElement | null>;
-  } & Omit<AnchorHTMLAttributes<Record<never, never>>, "herf" | "hrefLang">
+  } & Omit<AnchorHTMLAttributes<Record<never, never>>, "href" | "hrefLang">
 >;
 
 /**
