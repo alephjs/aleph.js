@@ -15,14 +15,8 @@ export { parse as parseCliArgs } from "https://deno.land/std@0.192.0/flags/mod.t
 export * as esbuild from "https://deno.land/x/esbuild@v0.17.12/mod.js";
 export * from "https://deno.land/x/aleph_compiler@0.9.3/mod.ts";
 export * from "https://deno.land/x/aleph_compiler@0.9.3/types.ts";
-export {
-	default as initLolHtml,
-	HTMLRewriter,
-} from "https://deno.land/x/lol_html@0.0.6/mod.ts";
+export { default as initLolHtml, HTMLRewriter } from "https://deno.land/x/lol_html@0.0.6/mod.ts";
 export { default as lolHtmlWasm } from "https://deno.land/x/lol_html@0.0.6/wasm.js";
 
 // npm
-export {
-	default as mitt,
-	type Emitter,
-} from "https://esm.sh/mitt@3.0.0?pin=v110";
+export { default as mitt, type Emitter } from "https://esm.sh/mitt@3.0.0?pin=v110";
