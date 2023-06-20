@@ -13,13 +13,13 @@ import rehypeHighlight from "https://esm.sh/v126/rehype-highlight@5.0.2";
 import rehypeSlug from "https://esm.sh/v126/rehype-slug@5.0.1";
 
 serve({
-	plugins: [
-		denoDeploy({ modules }),
-		mdx({
-			remarkPlugins: [remarkFrontmatter, remarkGFM],
-			rehypePlugins: [rehypeHighlight, rehypeSlug],
-			providerImportSource: "@mdx-js/react",
-		}),
-		react({ ssr: true }),
-	],
+  plugins: [
+    denoDeploy({ modules }),
+    mdx({
+      remarkPlugins: [remarkFrontmatter, remarkGFM],
+      rehypePlugins: [rehypeHighlight, rehypeSlug],
+      providerImportSource: "@mdx-js/react",
+    }),
+    react({ ssr: true }),
+  ],
 });

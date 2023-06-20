@@ -17,7 +17,7 @@ const store = {
 };
 
 export const data = () => {
-    return Response.json(store);
+  return Response.json(store);
 };
 
 export async function mutation(req: Request): Promise<Response> {
