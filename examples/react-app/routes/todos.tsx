@@ -1,3 +1,5 @@
+/** @format */
+
 import type { FormEvent } from "react";
 import { Head, useData } from "aleph/react";
 
@@ -14,9 +16,9 @@ const store = {
   },
 };
 
-export function data() {
+export const data = () => {
   return Response.json(store);
-}
+};
 
 export async function mutation(req: Request): Promise<Response> {
   const { id, message, completed } = await req.json();
@@ -43,7 +45,11 @@ export async function mutation(req: Request): Promise<Response> {
 }
 
 export default function Todos() {
-  const { data: { todos }, isMutating, mutation } = useData<{ todos: Todo[] }>();
+  const {
+    data: { todos },
+    isMutating,
+    mutation,
+  } = useData<{ todos: Todo[] }>();
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,16 +57,22 @@ export default function Todos() {
     const fd = new FormData(form);
     const message = fd.get("message")?.toString().trim();
     if (message) {
-      await mutation.put({ message }, {
-        // optimistic update data without waiting for the server response
-        optimisticUpdate: (data) => {
-          return {
-            todos: [...data.todos, { id: 0, message, completed: false }],
-          };
+      await mutation.put(
+        { message },
+        {
+          // optimistic update data without waiting for the server response
+          optimisticUpdate: (data) => {
+            return {
+              todos: [
+                ...data.todos,
+                { id: 0, message, completed: false },
+              ],
+            };
+          },
+          // replace the data with the new data that is from the server response
+          replace: true,
         },
-        // replace the data with the new data that is from the server response
-        replace: true,
-      });
+      );
       setTimeout(() => form.querySelector("input")?.focus(), 0);
       form.reset();
     }
@@ -70,11 +82,19 @@ export default function Todos() {
     <div className="todos-app">
       <Head>
         <title>Todos</title>
-        <meta name="description" content="A todos app powered by Aleph.js" />
+        <meta
+          name="description"
+          content="A todos app powered by Aleph.js"
+        />
       </Head>
       <h1>
         <span>Todos</span>
-        {todos.length > 0 && <em>{todos.filter((todo) => todo.completed).length}/{todos.length}</em>}
+        {todos.length > 0 && (
+          <em>
+            {todos.filter((todo) => todo.completed).length}/
+            {todos.length}
+          </em>
+        )}
       </h1>
       <ul>
         {todos.map((todo) => (
@@ -82,13 +102,19 @@ export default function Todos() {
             <input
               type="checkbox"
               checked={todo.completed}
-              onChange={() => mutation.patch({ id: todo.id, completed: !todo.completed }, "replace")}
+              onChange={() =>
+                mutation.patch(
+                  { id: todo.id, completed: !todo.completed },
+                  "replace",
+                )}
             />
             <label className={todo.completed ? "completed" : ""}>
               {todo.message}
             </label>
             {todo.id > 0 && (
-              <button onClick={() => mutation.delete({ id: todo.id }, "replace")}>
+              <button
+                onClick={() => mutation.delete({ id: todo.id }, "replace")}
+              >
                 <svg
                   viewBox="0 0 32 32"
                   fill="none"

@@ -1,3 +1,5 @@
+/** @format */
+
 import { serve } from "aleph/server";
 import react from "aleph/plugins/react";
 import denoDeploy from "aleph/plugins/deploy";

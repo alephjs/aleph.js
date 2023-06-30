@@ -9,11 +9,11 @@
     "aleph/plugins/mdx": "./plugins/mdx.ts",
     "aleph/react": "./framework/react/mod.ts",
     "aleph/plugins/react": "./framework/react/plugin.ts",
-    "@unocss/core": "https://esm.sh/v113/@unocss/core@0.50.6",
-    "@unocss/preset-uno": "https://esm.sh/v113/@unocss/preset-uno@0.50.6",
-    "react": "https://esm.sh/v113/react@18.2.0",
-    "react-dom": "https://esm.sh/v113/react-dom@18.2.0",
-    "react-dom/": "https://esm.sh/v113/react-dom@18.2.0/",
-    "@mdx-js/react": "https://esm.sh/v113/@mdx-js/react@2.3.0"
+    "@unocss/core": "https://esm.sh/v126/@unocss/core@0.50.6",
+    "@unocss/preset-uno": "https://esm.sh/v126/@unocss/preset-uno@0.50.6",
+    "react": "https://esm.sh/v126/react@18.2.0",
+    "react-dom": "https://esm.sh/v126/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/v126/react-dom@18.2.0/",
+    "@mdx-js/react": "https://esm.sh/v126/@mdx-js/react@2.3.0"
   }
 }

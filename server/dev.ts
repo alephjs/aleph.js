@@ -1,5 +1,7 @@
+/** @format */
+
 import { isFilledString } from "../shared/util.ts";
-import { colors, Emitter, ensureDir, mitt, parseDeps, path } from "./deps.ts";
+import { colors, Emitter, ensureDir, mitt, parseCliArgs, parseDeps, path } from "./deps.ts";
 import depGraph from "./graph.ts";
 import { builtinModuleExts, findFile, getAlephConfig, getImportMap, watchFs } from "./helpers.ts";
 import log from "./log.ts";
@@ -7,7 +9,14 @@ import { initRouter, toRouterRegExp } from "./router.ts";
 import type { AlephConfig } from "./types.ts";
 
 type WatchFsEvents = {
-  [key in "create" | "remove" | "modify" | `modify:${string}` | `hotUpdate:${string}`]: {
+  [
+    key in
+      | "create"
+      | "remove"
+      | "modify"
+      | `modify:${string}`
+      | `hotUpdate:${string}`
+  ]: {
     specifier: string;
   };
 };
@@ -51,45 +60,52 @@ export function watch(appDir: string, onRouterChange?: () => void) {
     });
   }
 
-  watchFs(appDir, (kind: "create" | "remove" | "modify", pathname: string) => {
-    const specifier = "./" + path.relative(appDir, pathname).replaceAll("\\", "/");
-    // delete global cached index html
-    if (specifier === "./index.html") {
-      Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
-    }
-    if (kind === "remove") {
-      depGraph.unmark(specifier);
-    } else {
-      depGraph.update(specifier);
-    }
-    if (kind === "modify") {
-      watchFsEmitters.forEach((e) => {
-        e.emit("modify", { specifier });
-        e.emit(`modify:${specifier}`, { specifier });
-        if (e.all.has(`hotUpdate:${specifier}`)) {
-          e.emit(`hotUpdate:${specifier}`, { specifier });
-        } else if (specifier !== "./routes/_export.ts") {
-          depGraph.lookup(specifier, (specifier) => {
-            if (e.all.has(`hotUpdate:${specifier}`)) {
-              e.emit(`hotUpdate:${specifier}`, { specifier });
-              return false;
-            }
-          });
-        }
-      });
-    } else {
-      watchFsEmitters.forEach((e) => e.emit(kind, { specifier }));
-    }
-  });
+  watchFs(
+    appDir,
+    (kind: "create" | "remove" | "modify", pathname: string) => {
+      const specifier = "./" + path.relative(appDir, pathname).replaceAll("\\", "/");
+      // delete global cached index html
+      if (specifier === "./index.html") {
+        Reflect.deleteProperty(globalThis, "__ALEPH_INDEX_HTML");
+      }
+      if (kind === "remove") {
+        depGraph.unmark(specifier);
+      } else {
+        depGraph.update(specifier);
+      }
+      if (kind === "modify") {
+        watchFsEmitters.forEach((e) => {
+          e.emit("modify", { specifier });
+          e.emit(`modify:${specifier}`, { specifier });
+          if (e.all.has(`hotUpdate:${specifier}`)) {
+            e.emit(`hotUpdate:${specifier}`, { specifier });
+          } else if (specifier !== "./routes/_export.ts") {
+            depGraph.lookup(specifier, (specifier) => {
+              if (e.all.has(`hotUpdate:${specifier}`)) {
+                e.emit(`hotUpdate:${specifier}`, { specifier });
+                return false;
+              }
+            });
+          }
+        });
+      } else {
+        watchFsEmitters.forEach((e) => e.emit(kind, { specifier }));
+      }
+    },
+  );
 }
 
 let devProcess: Deno.Process | null = null;
 let watched = false;
 
-export default async function dev(serverEntry?: string) {
-  serverEntry = serverEntry
-    ? serverEntry.startsWith("file://") ? path.fromFileUrl(serverEntry) : path.resolve(serverEntry)
+export default async function dev(args?: string[]) {
+  const flags = parseCliArgs(args || [], {
+    boolean: ["unstable", "A"],
+  });
+  const serverEntry = typeof flags._[0] === "string"
+    ? flags._[0].startsWith("file://") ? path.fromFileUrl(flags._[0]) : path.resolve(flags._[0])
     : await findFile(builtinModuleExts.map((ext) => `server.${ext}`));
+
   if (!serverEntry) {
     log.fatal("[dev] No server entry found.");
     return;
@@ -108,7 +124,11 @@ export default async function dev(serverEntry?: string) {
   const deps = await parseDeps(entry, code, {
     importMap: JSON.stringify(importMap),
   });
-  const exportTs = deps.find((dep) => dep.specifier.startsWith("./") && dep.specifier.endsWith("/_export.ts"));
+  const exportTs = deps.find(
+    (dep) =>
+      dep.specifier.startsWith("./") &&
+      dep.specifier.endsWith("/_export.ts"),
+  );
 
   // reset the `_export.ts` module
   if (exportTs) {
@@ -121,19 +141,23 @@ export default async function dev(serverEntry?: string) {
   const emitter = createWatchFsEmitter();
   emitter.on("*", (kind, { specifier }) => {
     if (
-      kind === "modify" && !specifier.endsWith("/_export.ts") && (
-        specifier === entry ||
-        deps.some((dep) => dep.specifier === specifier)
-      )
+      kind === "modify" &&
+      !specifier.endsWith("/_export.ts") &&
+      (specifier === entry ||
+        deps.some((dep) => dep.specifier === specifier))
     ) {
       console.clear();
       console.info(colors.dim("[dev] Restarting the server..."));
       devProcess?.kill("SIGTERM");
-      dev(serverEntry);
+      dev(args);
     }
   });
 
-  const cmd = [Deno.execPath(), "run", "-A", "--no-lock", serverEntry, "--dev"];
+  const cmd = [Deno.execPath(), "run", "-A", "--no-lock"];
+
+  flags.unstable && cmd.push("--unstable");
+  cmd.push(serverEntry), cmd.push("--dev");
+  console.log(cmd);
   devProcess = Deno.run({ cmd, stderr: "inherit", stdout: "inherit" });
   await devProcess.status();
   removeWatchFsEmitter(emitter);

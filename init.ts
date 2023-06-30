@@ -1,30 +1,19 @@
-import { Untar } from "https://deno.land/std@0.180.0/archive/untar.ts";
-import { parse } from "https://deno.land/std@0.180.0/flags/mod.ts";
-import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.180.0/fmt/colors.ts";
-import { copy as copyDir } from "https://deno.land/std@0.180.0/fs/copy.ts";
-import { copy } from "https://deno.land/std@0.180.0/streams/copy.ts";
-import { readerFromStreamReader } from "https://deno.land/std@0.180.0/streams/reader_from_stream_reader.ts";
-import { ensureDir } from "https://deno.land/std@0.180.0/fs/ensure_dir.ts";
-import { basename, join } from "https://deno.land/std@0.180.0/path/mod.ts";
+/** @format */
 
-const templates = [
-  "react",
-  "react-mdx",
-  "yew",
-  "leptos",
-  "api",
-];
+import { Untar } from "https://deno.land/std@0.192.0/archive/untar.ts";
+import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
+import { blue, bold, cyan, dim, green, red } from "https://deno.land/std@0.192.0/fmt/colors.ts";
+import { copy as copyDir } from "https://deno.land/std@0.192.0/fs/copy.ts";
+import { copy } from "https://deno.land/std@0.192.0/streams/copy.ts";
+import { readerFromStreamReader } from "https://deno.land/std@0.192.0/streams/reader_from_stream_reader.ts";
+import { ensureDir } from "https://deno.land/std@0.192.0/fs/ensure_dir.ts";
+import { basename, join } from "https://deno.land/std@0.192.0/path/mod.ts";
 
-const rsApps = [
-  "yew",
-  "leptos",
-];
+const templates = ["react", "react-mdx", "yew", "leptos", "api"];
 
-const unocssApps = [
-  "react",
-  "yew",
-  "leptos",
-];
+const rsApps = ["yew", "leptos"];
+
+const unocssApps = ["react", "yew", "leptos"];
 
 const versions = {
   react: "18.2.0",
@@ -38,15 +27,19 @@ export default async function init(nameArg?: string, options?: Options) {
   let { template } = options || {};
 
   // get and check the project name
-  const name = nameArg ?? await ask("Project Name:");
+  const name = nameArg ?? (await ask("Project Name:"));
   if (!name) {
     console.error(`${red("!")} Please entry project name.`);
     Deno.exit(1);
   }
 
-  if (template && !(templates.includes(template))) {
+  if (template && !templates.includes(template)) {
     console.error(
-      `${red("!")} Invalid template name ${red(template)}, must be one of [${blue(templates.join(","))}]`,
+      `${red("!")} Invalid template name ${
+        red(
+          template,
+        )
+      }, must be one of [${blue(templates.join(","))}]`,
     );
     Deno.exit(1);
   }
@@ -60,23 +53,37 @@ export default async function init(nameArg?: string, options?: Options) {
   }
 
   if (!template) {
-    const answer = await ask([
-      "Select a framework:",
-      ...templates.map((name, i) => `  ${bold((i + 1).toString())}. ${getTemplateDisplayName(name)}`),
-      dim(`[1-${templates.length}]`),
-    ].join("\n"));
+    const answer = await ask(
+      [
+        "Select a framework:",
+        ...templates.map(
+          (name, i) =>
+            `  ${
+              bold(
+                (i + 1).toString(),
+              )
+            }. ${getTemplateDisplayName(name)}`,
+        ),
+        dim(`[1-${templates.length}]`),
+      ].join("\n"),
+    );
     const n = parseInt(answer);
     if (!isNaN(n) && n > 0 && n <= templates.length) {
       template = templates[n - 1];
     } else {
-      console.error(`${red("!")} Please entry ${cyan(`[1-${templates.length}]`)}.`);
+      console.error(
+        `${red("!")} Please entry ${cyan(`[1-${templates.length}]`)}.`,
+      );
       Deno.exit(1);
     }
   }
 
   const appDir = join(Deno.cwd(), name);
-  const withUnocss = unocssApps.includes(template!) && await confirm("Use Atomic CSS (powered by Unocss)?");
-  const withVscode = await confirm("Initialize VS Code workspace configuration?");
+  const withUnocss = unocssApps.includes(template!) &&
+    (await confirm("Use Atomic CSS (powered by Unocss)?"));
+  const withVscode = await confirm(
+    "Initialize VS Code workspace configuration?",
+  );
   const deploy = !rsApps.includes(template) ? await confirm("Deploy to Deno Deploy?") : false;
   const isRsApp = rsApps.includes(template);
 
@@ -86,8 +93,16 @@ export default async function init(nameArg?: string, options?: Options) {
     await copyDir(src, name);
     alephPkgUri = "..";
   } else {
-    console.log(`${dim("↓")} Downloading template(${blue(template!)}), this might take a moment...`);
-    const res = await fetch("https://cdn.deno.land/aleph/meta/versions.json");
+    console.log(
+      `${dim("↓")} Downloading template(${
+        blue(
+          template!,
+        )
+      }), this might take a moment...`,
+    );
+    const res = await fetch(
+      "https://cdn.deno.land/aleph/meta/versions.json",
+    );
     if (res.status !== 200) {
       console.error(await res.text());
       Deno.exit(1);
@@ -105,11 +120,16 @@ export default async function init(nameArg?: string, options?: Options) {
     // @ts-ignore
     const gz = new DecompressionStream("gzip");
     const entryList = new Untar(
-      readerFromStreamReader(resp.body!.pipeThrough<Uint8Array>(gz).getReader()),
+      readerFromStreamReader(
+        resp.body!.pipeThrough<Uint8Array>(gz).getReader(),
+      ),
     );
     const prefix = `${basename(repo)}-${VERSION}/examples/${withUnocss ? "with-unocss/" : ""}${template}-app/`;
     for await (const entry of entryList) {
-      if (entry.fileName.startsWith(prefix) && !entry.fileName.endsWith("/README.md")) {
+      if (
+        entry.fileName.startsWith(prefix) &&
+        !entry.fileName.endsWith("/README.md")
+      ) {
         const fp = join(appDir, trimPrefix(entry.fileName, prefix));
         if (entry.type === "directory") {
           await ensureDir(fp);
@@ -129,7 +149,10 @@ export default async function init(nameArg?: string, options?: Options) {
       serverCode
         .replace('import modules from "./routes/_export.ts";\n', "")
         .replace('import denoDeploy from "aleph/plugins/deploy";\n', "")
-        .replace("    denoDeploy({ moduleMain: import.meta.url, modules }),\n", "")
+        .replace(
+          "    denoDeploy({ moduleMain: import.meta.url, modules }),\n",
+          "",
+        )
         .replace("    denoDeploy({ modules }),\n", ""),
     );
     await Deno.remove(join(appDir, "routes/_export.ts"));
@@ -150,22 +173,15 @@ export default async function init(nameArg?: string, options?: Options) {
   }
   const { version: ESM_VERSION } = await res.json();
   const denoConfig = {
-    "compilerOptions": {
-      "lib": [
-        "dom",
-        "dom.iterable",
-        "dom.extras",
-        "deno.ns",
-      ],
-      "types": [
-        `${alephPkgUri}/types.d.ts`,
-      ],
+    compilerOptions: {
+      lib: ["dom", "dom.iterable", "dom.extras", "deno.ns"],
+      types: [`${alephPkgUri}/types.d.ts`],
     },
-    "importMap": "import_map.json",
-    "tasks": {
-      "dev": await existsFile(join(appDir, "dev.ts")) ? "deno run -A dev.ts" : `deno run -A ${alephPkgUri}/dev.ts`,
-      "start": "deno run -A server.ts",
-      "build": "deno run -A server.ts --build",
+    importMap: "import_map.json",
+    tasks: {
+      dev: (await existsFile(join(appDir, "dev.ts"))) ? "deno run -A dev.ts" : `deno run -A ${alephPkgUri}/dev.ts`,
+      start: "deno run -A server.ts",
+      build: "deno run -A server.ts --build",
       "esm:add": `deno run -A https://esm.sh/v${ESM_VERSION} add`,
       "esm:update": `deno run -A https://esm.sh/v${ESM_VERSION} update`,
       "esm:remove": `deno run -A https://esm.sh/v${ESM_VERSION} remove`,
@@ -199,16 +215,16 @@ export default async function init(nameArg?: string, options?: Options) {
         "aleph/plugins/mdx": `${alephPkgUri}/plugins/mdx.ts`,
         "@mdx-js/react": `https://esm.sh/v${ESM_VERSION}/@mdx-js/react@2.3.0`,
       });
-      /* falls through */
+    /* falls through */
     case "react": {
       Object.assign(denoConfig.compilerOptions, {
-        "jsx": "react-jsx",
-        "jsxImportSource": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
+        jsx: "react-jsx",
+        jsxImportSource: `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
       });
       Object.assign(importMap.imports, {
         "aleph/react": `${alephPkgUri}/framework/react/mod.ts`,
         "aleph/plugins/react": `${alephPkgUri}/framework/react/plugin.ts`,
-        "react": `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
+        react: `https://esm.sh/v${ESM_VERSION}/react@${versions.react}`,
         "react-dom": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}`,
         "react-dom/": `https://esm.sh/v${ESM_VERSION}/react-dom@${versions.react}/`,
       });
@@ -248,19 +264,33 @@ export default async function init(nameArg?: string, options?: Options) {
     stdout: "inherit",
   }).status();
 
-  console.log([
-    "",
-    green("▲ Aleph.js is ready to go!"),
-    "",
-    `${dim("$")} cd ${name}`,
-    `${dim("$")} deno task dev    ${dim("# Start the server in `development` mode")}`,
-    `${dim("$")} deno task start  ${dim("# Start the server in `production` mode")}`,
-    `${dim("$")} deno task build  ${dim("# Build & Optimize the app (bundling, SSG, etc.)")}`,
-    "",
-    `Docs: ${cyan("https://alephjs.org/docs")}`,
-    `Bugs: ${cyan("https://github.com/alephjs/aleph.js/issues")}`,
-    "",
-  ].join("\n"));
+  console.log(
+    [
+      "",
+      green("▲ Aleph.js is ready to go!"),
+      "",
+      `${dim("$")} cd ${name}`,
+      `${dim("$")} deno task dev    ${
+        dim(
+          "# Start the server in `development` mode",
+        )
+      }`,
+      `${dim("$")} deno task start  ${
+        dim(
+          "# Start the server in `production` mode",
+        )
+      }`,
+      `${dim("$")} deno task build  ${
+        dim(
+          "# Build & Optimize the app (bundling, SSG, etc.)",
+        )
+      }`,
+      "",
+      `Docs: ${cyan("https://alephjs.org/docs")}`,
+      `Bugs: ${cyan("https://github.com/alephjs/aleph.js/issues")}`,
+      "",
+    ].join("\n"),
+  );
   Deno.exit(0);
 }
 
@@ -280,7 +310,9 @@ async function isFolderEmpty(root: string, name: string): Promise<boolean> {
 }
 
 async function ask(question = ":") {
-  await Deno.stdout.write(new TextEncoder().encode(cyan("? ") + question + " "));
+  await Deno.stdout.write(
+    new TextEncoder().encode(cyan("? ") + question + " "),
+  );
   const buf = new Uint8Array(1024);
   const n = <number> await Deno.stdin.read(buf);
   const answer = new TextDecoder().decode(buf.subarray(0, n));

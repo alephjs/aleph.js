@@ -1,11 +1,14 @@
+/** @format */
+
 // deno std
-export { concat as concatBytes } from "https://deno.land/std@0.180.0/bytes/mod.ts";
-export { encode as btoa } from "https://deno.land/std@0.180.0/encoding/base64.ts";
-export * as colors from "https://deno.land/std@0.180.0/fmt/colors.ts";
-export { ensureDir } from "https://deno.land/std@0.180.0/fs/ensure_dir.ts";
-export { serve, serveTls } from "https://deno.land/std@0.180.0/http/server.ts";
-export * as path from "https://deno.land/std@0.180.0/path/mod.ts";
-export * as jsonc from "https://deno.land/std@0.180.0/jsonc/mod.ts";
+export { concat as concatBytes } from "https://deno.land/std@0.192.0/bytes/mod.ts";
+export { encode as btoa } from "https://deno.land/std@0.192.0/encoding/base64.ts";
+export * as colors from "https://deno.land/std@0.192.0/fmt/colors.ts";
+export { ensureDir } from "https://deno.land/std@0.192.0/fs/ensure_dir.ts";
+export { serve, serveTls } from "https://deno.land/std@0.192.0/http/server.ts";
+export * as path from "https://deno.land/std@0.192.0/path/mod.ts";
+export * as jsonc from "https://deno.land/std@0.192.0/jsonc/mod.ts";
+export { parse as parseCliArgs } from "https://deno.land/std@0.192.0/flags/mod.ts";
 
 // third-party
 // @deno-types="https://deno.land/x/esbuild@v0.17.12/mod.d.ts"
