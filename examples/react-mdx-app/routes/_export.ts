@@ -1,7 +1,7 @@
 /** @format */
 
 // Exports router modules for serverless env that doesn't support the dynamic import.
-// This module will be updated automaticlly in develoment mode, do NOT edit it manually.
+// This module will be updated automatically in development mode, do NOT edit it manually.
 // deno-fmt-ignore-file
 // deno-lint-ignore-file
 // @ts-nocheck
