@@ -1,12 +1,11 @@
+> ⚠️ This project is no longer maintained, we recommend using [fresh](https://fresh.deno.dev) that is maintained by deno team.
+
 [![Aleph.js: The Full-stack Framework in Deno.](.github/poster.svg)](https://alephjs.org)
 
 <p>
   <a href="https://discord.gg/pWGdS7sAqD"><img src="https://img.shields.io/discord/775256646821085215?color=%23008181&label=Chat&labelColor=%23111&logo=discord&logoColor=%23aaaaaa" alt="Chat"></a>
   <a href="https://twitter.com/intent/follow?screen_name=alephjs"><img src="https://img.shields.io/twitter/follow/alephjs?style=social" alt="Twitter"></a>
 </p>
-
-> ⚠️ Not yet 1.0. Many things are subject to change. Documentation is lacking in many places. Try it out and give us
-> feedback!
 
 Some demo apps deployed to [Deno Deploy](https://deno.com/deploy) with the new architecture:
 
@@ -31,7 +30,7 @@ Initialize a new project, you can pick a start template with `--template` flag, 
 `[react, react-mdx, api, yew]`
 
 ```bash
-deno run -A -r https://alephjs.org/init.ts
+deno run -A -r https://alephjs.org/init.tsh
 ```
 
 after `init`, you can run the app with deno tasks:
